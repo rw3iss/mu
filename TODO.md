@@ -1,2 +1,10 @@
 - bug: onboarding: saving settings/media dir isn't working.
 - show scan progress/count in status updates, or Settings/Library page, or separate 'scan' module to view/see?
+- Settings:
+	- add sub-url routes for each settings sub-section  (ie. /settings/playback, etc).
+	- About section:
+		- show link to 'update log' or recent changes (create workflow)
+		- show author/developer (me), github for the repo, buy coffee link
+	- Library section:
+		- support multiple/array of directories
+		- show 'next scan in <x>' time?

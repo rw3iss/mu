@@ -338,3 +338,84 @@
   color: var(--color-text-muted);
   @include truncate(1);
 }
+
+// ============================================
+// Management Bar
+// ============================================
+
+.managementSection {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.managementBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.mgmtBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--color-bg-surface);
+    border-color: var(--color-accent);
+    color: var(--color-text-primary);
+  }
+}
+
+.mgmtBtnDanger {
+  &:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+}
+
+.confirmRemove {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.confirmYes,
+.confirmNo {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.confirmYes {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+
+  &:hover {
+    background: #dc2626;
+  }
+}
+
+.confirmNo {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+}

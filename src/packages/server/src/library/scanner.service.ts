@@ -272,10 +272,50 @@ export class ScannerService {
   }
 
   /**
+   * Re-probe all files for a given movie and update their codec/duration info.
+   */
+  async rescanMovie(movieId: string) {
+    const files = this.database.db
+      .select()
+      .from(movieFiles)
+      .where(eq(movieFiles.movieId, movieId))
+      .all();
+
+    if (files.length === 0) {
+      throw new Error(`No files found for movie ${movieId}`);
+    }
+
+    const results: { fileId: string; fileName: string | null; updated: boolean }[] = [];
+
+    for (const file of files) {
+      const probeInfo = await this.probeFile(file.filePath);
+      if (probeInfo.codecVideo || probeInfo.codecAudio || probeInfo.resolution) {
+        this.database.db
+          .update(movieFiles)
+          .set({
+            codecVideo: probeInfo.codecVideo ?? null,
+            codecAudio: probeInfo.codecAudio ?? null,
+            resolution: probeInfo.resolution ?? file.resolution,
+            durationSeconds: probeInfo.durationSeconds ?? null,
+            bitrate: probeInfo.bitrate ?? null,
+          })
+          .where(eq(movieFiles.id, file.id))
+          .run();
+        results.push({ fileId: file.id, fileName: file.fileName, updated: true });
+      } else {
+        results.push({ fileId: file.id, fileName: file.fileName, updated: false });
+      }
+    }
+
+    this.logger.log(`Rescanned ${results.length} file(s) for movie ${movieId}`);
+    return { files: results };
+  }
+
+  /**
    * Use FFprobe to extract codec, resolution, duration, and bitrate from a file.
    * Returns partial info on failure so scanning can continue.
    */
-  private async probeFile(filePath: string): Promise<{
+  async probeFile(filePath: string): Promise<{
     codecVideo?: string;
     codecAudio?: string;
     resolution?: string;

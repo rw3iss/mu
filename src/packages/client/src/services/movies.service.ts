@@ -119,4 +119,18 @@ export const moviesService = {
   toggleWatchlist(movieId: string): Promise<{ inWatchlist: boolean }> {
     return api.post<{ inWatchlist: boolean }>(`/watchlist/${movieId}/toggle`);
   },
+
+  /**
+   * Re-scan movie file(s) — re-probes codecs, resolution, duration
+   */
+  rescan(movieId: string): Promise<{ files: { fileId: string; fileName: string; updated: boolean }[] }> {
+    return api.post(`/movies/${movieId}/rescan`);
+  },
+
+  /**
+   * Remove a movie from the library
+   */
+  remove(movieId: string): Promise<{ success: boolean }> {
+    return api.delete<{ success: boolean }>(`/movies/${movieId}`);
+  },
 };

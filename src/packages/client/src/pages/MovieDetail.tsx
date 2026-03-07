@@ -82,9 +82,36 @@ export function MovieDetail({ id }: MovieDetailProps) {
     if (!movie) return;
     try {
       await moviesService.refreshMetadata(movie.id);
-      notifySuccess('Metadata refresh started');
+      // Reload movie data to show updated metadata
+      const updated = await moviesService.get(movie.id);
+      setMovie(updated);
+      notifySuccess('Metadata refreshed');
     } catch {
       notifyError('Failed to refresh metadata');
+    }
+  }, [movie]);
+
+  const handleRescan = useCallback(async () => {
+    if (!movie) return;
+    try {
+      const result = await moviesService.rescan(movie.id);
+      const updatedCount = result.files.filter((f) => f.updated).length;
+      notifySuccess(`Re-scanned ${result.files.length} file(s), ${updatedCount} updated`);
+    } catch {
+      notifyError('Failed to re-scan movie files');
+    }
+  }, [movie]);
+
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+
+  const handleRemove = useCallback(async () => {
+    if (!movie) return;
+    try {
+      await moviesService.remove(movie.id);
+      notifySuccess('Movie removed from library');
+      route('/library');
+    } catch {
+      notifyError('Failed to remove movie');
     }
   }, [movie]);
 
@@ -296,9 +323,6 @@ export function MovieDetail({ id }: MovieDetailProps) {
             >
               {inWatchlist ? '\u2713 In Watchlist' : '\u2606 Watchlist'}
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleRefreshMetadata}>
-              Refresh
-            </Button>
           </div>
 
           {/* Overview */}
@@ -332,6 +356,40 @@ export function MovieDetail({ id }: MovieDetailProps) {
               </div>
             </div>
           )}
+
+          {/* Management */}
+          <div class={styles.managementSection}>
+            <h2 class={styles.sectionTitle}>Manage</h2>
+            <div class={styles.managementBar}>
+              <button class={styles.mgmtBtn} onClick={handleRescan}>
+                {'\u{1F50D}'} Re-scan File
+              </button>
+              <button class={styles.mgmtBtn} onClick={handleRefreshMetadata}>
+                {'\u21BB'} Refresh Metadata
+              </button>
+              {confirmingRemove ? (
+                <span class={styles.confirmRemove}>
+                  <span>Remove from library?</span>
+                  <button class={styles.confirmYes} onClick={handleRemove}>
+                    Yes
+                  </button>
+                  <button
+                    class={styles.confirmNo}
+                    onClick={() => setConfirmingRemove(false)}
+                  >
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button
+                  class={`${styles.mgmtBtn} ${styles.mgmtBtnDanger}`}
+                  onClick={() => setConfirmingRemove(true)}
+                >
+                  {'\u2715'} Remove
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
