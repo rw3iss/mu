@@ -1,0 +1,31 @@
+services:
+  mu:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: mu
+    restart: unless-stopped
+    ports:
+      - "${MU_SERVER_PORT:-8080}:8080"
+    volumes:
+      - mu-data:/app/data
+      - ${MEDIA_DIR:-/media}:/media:ro
+    environment:
+      - NODE_ENV=production
+      - MU_SERVER_HOST=0.0.0.0
+      - MU_SERVER_PORT=8080
+      - MU_DATA_DIR=/app/data
+      - MU_DATABASE_SQLITE_PATH=/app/data/db/mu.db
+      - MU_MEDIA_DIRECTORIES=/media
+      - MU_TMDB_API_KEY=${MU_TMDB_API_KEY:-}
+      - MU_OMDB_API_KEY=${MU_OMDB_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mu-data:
+    driver: local

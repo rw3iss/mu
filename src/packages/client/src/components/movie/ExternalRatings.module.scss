@@ -1,0 +1,63 @@
+.ratings {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.source {
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.score {
+  font-weight: var(--font-weight-bold);
+}
+
+// IMDb
+.imdb {
+  background: #f5c518;
+  color: #000000;
+}
+
+// Rotten Tomatoes
+.rt {
+  &.fresh {
+    background: #fa320a;
+    color: #ffffff;
+  }
+
+  &.rotten {
+    background: #0ac855;
+    color: #ffffff;
+  }
+}
+
+// Metacritic
+.metacritic {
+  color: #ffffff;
+
+  &.favorable {
+    background: #6c3;
+  }
+
+  &.mixed {
+    background: #fc3;
+    color: #000000;
+  }
+
+  &.unfavorable {
+    background: #f00;
+  }
+}

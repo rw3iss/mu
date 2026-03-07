@@ -1,0 +1,18 @@
+{
+  "name": "omdb-ratings",
+  "displayName": "OMDB Ratings",
+  "version": "1.0.0",
+  "description": "Fetch movie ratings from OMDB (IMDb, Rotten Tomatoes, Metacritic)",
+  "author": "Mu",
+  "entryPoint": "index.ts",
+  "permissions": ["network", "cache"],
+  "settings": [
+    {
+      "key": "apiKey",
+      "type": "string",
+      "label": "OMDB API Key",
+      "description": "API key from omdbapi.com",
+      "required": true
+    }
+  ]
+}

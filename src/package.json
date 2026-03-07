@@ -1,0 +1,31 @@
+{
+  "name": "mu",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Self-hosted movie streaming and management platform",
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:server": "turbo run dev --filter=@mu/server",
+    "dev:client": "turbo run dev --filter=@mu/client",
+    "build": "turbo run build",
+    "start": "node packages/server/dist/main.js",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:generate": "cd packages/server && npx drizzle-kit generate",
+    "db:migrate": "cd packages/server && npx drizzle-kit push --force",
+    "db:push": "cd packages/server && npx drizzle-kit push",
+    "db:seed": "cd packages/server && npx tsx src/database/seed.ts",
+    "db:studio": "cd packages/server && npx drizzle-kit studio",
+    "db:reset": "cd packages/server && rm -f data/db/mu.db data/db/mu.db-shm data/db/mu.db-wal && echo 'Database cleared. Run pnpm db:migrate && pnpm db:seed to reinitialize.'",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

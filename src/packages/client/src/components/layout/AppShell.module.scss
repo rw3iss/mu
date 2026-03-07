@@ -1,0 +1,37 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  transition: margin-left var(--transition-normal);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  .collapsed & {
+    margin-left: var(--sidebar-collapsed-width);
+  }
+}
+
+.content {
+  flex: 1;
+  padding: var(--space-lg);
+  padding-top: calc(var(--topbar-height) + var(--space-lg));
+  max-width: 1600px;
+  width: 100%;
+
+  @include mobile {
+    padding: var(--space-md);
+    padding-top: calc(var(--topbar-height) + var(--space-md));
+    margin-left: 0;
+  }
+}
+
+@include mobile {
+  .main {
+    margin-left: 0;
+  }
+}

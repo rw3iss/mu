@@ -1,0 +1,30 @@
+{
+  "name": "tmdb-metadata",
+  "displayName": "TMDB Metadata",
+  "version": "1.0.0",
+  "description": "Fetch movie metadata from The Movie Database (TMDB)",
+  "author": "Mu",
+  "entryPoint": "index.ts",
+  "permissions": ["read:movies", "write:metadata", "network", "cache"],
+  "settings": [
+    {
+      "key": "apiKey",
+      "type": "string",
+      "label": "TMDB API Key",
+      "description": "API key from themoviedb.org",
+      "required": true
+    },
+    {
+      "key": "language",
+      "type": "string",
+      "label": "Language",
+      "default": "en-US"
+    },
+    {
+      "key": "includeAdult",
+      "type": "boolean",
+      "label": "Include Adult Content",
+      "default": false
+    }
+  ]
+}

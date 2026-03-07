@@ -1,0 +1,328 @@
+.controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-player-controls);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  pointer-events: none;
+
+  &.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.gradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  pointer-events: none;
+}
+
+// ============================================
+// Top bar (title)
+// ============================================
+
+.topBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: var(--space-lg) var(--space-xl);
+  z-index: 1;
+  background: linear-gradient(rgba(0, 0, 0, 0.7), transparent);
+}
+
+.nowPlaying {
+  color: #ffffff;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+// ============================================
+// Seek bar
+// ============================================
+
+.seekContainer {
+  position: relative;
+  padding: 0 var(--space-md);
+  z-index: 1;
+}
+
+.seekBar {
+  height: 20px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.seekTrack {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-full);
+  transition: height var(--transition-fast);
+
+  .seekBar:hover & {
+    height: 6px;
+  }
+}
+
+.seekProgress {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+  transition: width 100ms linear;
+}
+
+.seekThumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  width: 14px;
+  height: 14px;
+  background: var(--color-accent);
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+  transition: transform var(--transition-fast);
+
+  .seekBar:hover & {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.seekTooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #ffffff;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+// ============================================
+// Bottom bar
+// ============================================
+
+.bottomBar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  z-index: 1;
+}
+
+.leftControls,
+.rightControls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.controlButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 var(--space-xs);
+  color: #ffffff;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  &.active {
+    color: var(--color-accent);
+  }
+}
+
+// ============================================
+// Skip buttons
+// ============================================
+
+.skipIcon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.skipArrow {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.skipLabel {
+  position: absolute;
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin-top: 1px;
+}
+
+// ============================================
+// Volume
+// ============================================
+
+.volumeGroup {
+  display: flex;
+  align-items: center;
+  gap: 0;
+
+  &:hover .volumeSlider {
+    width: 80px;
+    opacity: 1;
+    margin-left: var(--space-xs);
+  }
+}
+
+.volumeSlider {
+  width: 0;
+  opacity: 0;
+  transition: width var(--transition-normal), opacity var(--transition-normal),
+    margin var(--transition-normal);
+  accent-color: var(--color-accent);
+  cursor: pointer;
+  appearance: none;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-full);
+  outline: none;
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #ffffff;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  &::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: #ffffff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+  }
+}
+
+.timeDisplay {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.9);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: var(--space-sm);
+
+  @include mobile {
+    font-size: var(--font-size-xs);
+  }
+}
+
+// ============================================
+// Settings menu
+// ============================================
+
+.menuContainer {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  bottom: calc(100% + var(--space-sm));
+  right: 0;
+  min-width: 180px;
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) 0;
+  box-shadow: var(--shadow-lg);
+  animation: fadeIn 150ms ease;
+  backdrop-filter: blur(12px);
+}
+
+.menuRow {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: var(--font-size-sm);
+  transition: background var(--transition-fast);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.menuRowLabel {
+  font-weight: var(--font-weight-medium);
+}
+
+.menuRowValue {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: var(--font-size-xs);
+}
+
+.menuBack {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: var(--space-xs);
+  transition: background var(--transition-fast);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--font-size-sm);
+  transition: background var(--transition-fast);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &.selected {
+    color: var(--color-accent);
+    font-weight: var(--font-weight-semibold);
+  }
+}

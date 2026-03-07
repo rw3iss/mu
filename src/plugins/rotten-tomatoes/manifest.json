@@ -1,0 +1,9 @@
+{
+  "name": "rotten-tomatoes",
+  "displayName": "Rotten Tomatoes Scores",
+  "version": "1.0.0",
+  "description": "Fetch Rotten Tomatoes scores via OMDB API",
+  "author": "Mu",
+  "entryPoint": "index.ts",
+  "permissions": ["network", "cache"]
+}

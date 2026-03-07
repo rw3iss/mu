@@ -1,0 +1,55 @@
+.player {
+  position: fixed;
+  inset: 0;
+  background: #000000;
+  z-index: var(--z-player-controls);
+}
+
+.loading,
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-lg);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--font-size-lg);
+}
+
+.backButton {
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-accent);
+  color: #ffffff;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  transition: background var(--transition-fast);
+
+  &:hover {
+    background: var(--color-accent-hover);
+  }
+}
+
+.closeButton {
+  position: absolute;
+  top: var(--space-md);
+  left: var(--space-md);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-lg);
+  z-index: calc(var(--z-player-controls) + 1);
+  transition: background var(--transition-fast);
+  opacity: 0.7;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.8);
+    opacity: 1;
+  }
+}

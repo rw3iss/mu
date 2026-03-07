@@ -1,0 +1,29 @@
+{
+  "name": "Mu",
+  "short_name": "Mu",
+  "description": "Self-hosted movie streaming platform",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#e94560",
+  "background_color": "#0f0f0f",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["entertainment"]
+}

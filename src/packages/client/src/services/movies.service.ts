@@ -1,0 +1,122 @@
+import { api } from './api';
+import type { Movie } from '@/state/library.state';
+
+// ============================================
+// Types
+// ============================================
+
+export interface MovieListResponse {
+  movies: Movie[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface MovieFile {
+  id: string;
+  filename: string;
+  path: string;
+  size: number;
+  format: string;
+  videoCodec: string;
+  audioCodec: string;
+  resolution: string;
+  bitrate: number;
+  duration: number;
+}
+
+// ============================================
+// Movies Service
+// ============================================
+
+export const moviesService = {
+  /**
+   * List movies with pagination and filtering
+   */
+  list(params?: Record<string, string>): Promise<MovieListResponse> {
+    return api.get<MovieListResponse>('/movies', params);
+  },
+
+  /**
+   * Get a single movie by ID
+   */
+  get(id: string): Promise<Movie> {
+    return api.get<Movie>(`/movies/${id}`);
+  },
+
+  /**
+   * Search movies by query string
+   */
+  search(query: string, params?: Record<string, string>): Promise<MovieListResponse> {
+    return api.get<MovieListResponse>('/movies/search', { q: query, ...params });
+  },
+
+  /**
+   * Get files associated with a movie
+   */
+  getFiles(movieId: string): Promise<MovieFile[]> {
+    return api.get<MovieFile[]>(`/movies/${movieId}/files`);
+  },
+
+  /**
+   * Trigger a metadata refresh for a movie
+   */
+  refreshMetadata(movieId: string): Promise<void> {
+    return api.post<void>(`/movies/${movieId}/refresh`);
+  },
+
+  /**
+   * Get recently added movies
+   */
+  getRecentlyAdded(limit = 20): Promise<MovieListResponse> {
+    return api.get<MovieListResponse>('/movies', {
+      sortBy: 'addedAt',
+      sortOrder: 'desc',
+      limit: String(limit),
+    });
+  },
+
+  /**
+   * Get movies the user is currently watching (have progress)
+   */
+  getContinueWatching(): Promise<MovieListResponse> {
+    return api.get<MovieListResponse>('/movies/continue-watching');
+  },
+
+  /**
+   * Get trending/popular movies
+   */
+  getTrending(limit = 20): Promise<MovieListResponse> {
+    return api.get<MovieListResponse>('/movies/trending', {
+      limit: String(limit),
+    });
+  },
+
+  /**
+   * Get available genres
+   */
+  getGenres(): Promise<string[]> {
+    return api.get<string[]>('/movies/genres');
+  },
+
+  /**
+   * Update movie details (title, year, overview, etc.)
+   */
+  update(movieId: string, data: Record<string, unknown>): Promise<Movie> {
+    return api.patch<Movie>(`/movies/${movieId}`, data);
+  },
+
+  /**
+   * Rate a movie
+   */
+  rate(movieId: string, rating: number): Promise<void> {
+    return api.post<void>(`/movies/${movieId}/rate`, { rating });
+  },
+
+  /**
+   * Add/remove movie from watchlist
+   */
+  toggleWatchlist(movieId: string): Promise<{ inWatchlist: boolean }> {
+    return api.post<{ inWatchlist: boolean }>(`/watchlist/${movieId}/toggle`);
+  },
+};

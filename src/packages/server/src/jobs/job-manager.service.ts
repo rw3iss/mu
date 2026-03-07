@@ -1,0 +1,286 @@
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { ToadScheduler, SimpleIntervalJob, AsyncTask } from 'toad-scheduler';
+import { nowISO, WsEvent } from '@mu/shared';
+import { EventsService } from '../events/events.service.js';
+import type {
+  JobDescriptor,
+  JobRecord,
+  JobHandler,
+  JobHelpers,
+  ScheduledJobOptions,
+} from './job.interface.js';
+
+@Injectable()
+export class JobManagerService implements OnModuleDestroy {
+  private readonly logger = new Logger('JobManager');
+
+  /** Handler registry: type → handler function */
+  private readonly handlers = new Map<string, JobHandler>();
+
+  /** All known jobs (in-memory) */
+  private readonly jobs = new Map<string, JobRecord>();
+
+  /** Pending queue sorted by priority */
+  private readonly queue: string[] = [];
+
+  /** Currently running job ids */
+  private readonly running = new Set<string>();
+
+  /** Max concurrent jobs */
+  private maxConcurrency = 4;
+
+  /** Scheduled recurring jobs */
+  private readonly scheduler = new ToadScheduler();
+  private readonly scheduledJobs = new Map<string, SimpleIntervalJob>();
+
+  constructor(private readonly events: EventsService) {}
+
+  // ===========================================================
+  // Handler Registration (used by other services)
+  // ===========================================================
+
+  /**
+   * Register a handler for a job type. Only one handler per type.
+   */
+  registerHandler(type: string, handler: JobHandler): void {
+    if (this.handlers.has(type)) {
+      this.logger.warn(`Overwriting handler for job type "${type}"`);
+    }
+    this.handlers.set(type, handler);
+    this.logger.log(`Handler registered for job type: ${type}`);
+  }
+
+  // ===========================================================
+  // One-off Jobs
+  // ===========================================================
+
+  /**
+   * Enqueue a one-off job. Returns the job id.
+   */
+  enqueue(descriptor: JobDescriptor): string {
+    const id = crypto.randomUUID();
+    const now = nowISO();
+
+    const job: JobRecord = {
+      id,
+      type: descriptor.type,
+      label: descriptor.label ?? descriptor.type,
+      status: 'pending',
+      payload: descriptor.payload ?? {},
+      priority: descriptor.priority ?? 10,
+      createdAt: now,
+    };
+
+    this.jobs.set(id, job);
+
+    // Insert into queue maintaining priority order (lower number = first)
+    const insertIdx = this.queue.findIndex((qId) => {
+      const qJob = this.jobs.get(qId);
+      return qJob && qJob.priority > job.priority;
+    });
+    if (insertIdx === -1) {
+      this.queue.push(id);
+    } else {
+      this.queue.splice(insertIdx, 0, id);
+    }
+
+    this.logger.debug(`Job enqueued: [${job.type}] ${job.label} (${id})`);
+    this.processQueue();
+    return id;
+  }
+
+  /**
+   * Get a job by id.
+   */
+  getJob(id: string): JobRecord | undefined {
+    return this.jobs.get(id);
+  }
+
+  /**
+   * List all jobs, optionally filtered by type and/or status.
+   */
+  listJobs(filter?: { type?: string; status?: string }): JobRecord[] {
+    let result = Array.from(this.jobs.values());
+    if (filter?.type) {
+      result = result.filter((j) => j.type === filter.type);
+    }
+    if (filter?.status) {
+      result = result.filter((j) => j.status === filter.status);
+    }
+    // Most recent first
+    return result.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }
+
+  /**
+   * Cancel a pending job. Running jobs cannot be cancelled.
+   */
+  cancel(id: string): boolean {
+    const job = this.jobs.get(id);
+    if (!job || job.status !== 'pending') return false;
+
+    const idx = this.queue.indexOf(id);
+    if (idx !== -1) this.queue.splice(idx, 1);
+
+    job.status = 'failed';
+    job.error = 'Cancelled';
+    job.completedAt = nowISO();
+    return true;
+  }
+
+  /**
+   * Remove completed/failed jobs older than the given age (ms).
+   * Called internally for housekeeping.
+   */
+  pruneOldJobs(maxAgeMs: number = 24 * 60 * 60 * 1000): number {
+    const cutoff = Date.now() - maxAgeMs;
+    let removed = 0;
+    for (const [id, job] of this.jobs) {
+      if (
+        (job.status === 'completed' || job.status === 'failed') &&
+        new Date(job.createdAt).getTime() < cutoff
+      ) {
+        this.jobs.delete(id);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
+  // ===========================================================
+  // Scheduled / Recurring Jobs
+  // ===========================================================
+
+  /**
+   * Register a recurring job that enqueues a descriptor at an interval.
+   */
+  schedule(options: ScheduledJobOptions): void {
+    if (this.scheduledJobs.has(options.name)) {
+      this.unschedule(options.name);
+    }
+
+    const task = new AsyncTask(
+      options.name,
+      async () => {
+        this.enqueue(options.job);
+      },
+      (err) => {
+        this.logger.error(`Scheduled job "${options.name}" error: ${err.message}`);
+      },
+    );
+
+    const job = new SimpleIntervalJob(
+      { milliseconds: options.intervalMs, runImmediately: options.runImmediately ?? false },
+      task,
+      { id: options.name },
+    );
+
+    this.scheduler.addSimpleIntervalJob(job);
+    this.scheduledJobs.set(options.name, job);
+    this.logger.log(
+      `Scheduled job "${options.name}" every ${options.intervalMs}ms`,
+    );
+  }
+
+  /**
+   * Remove a scheduled recurring job.
+   */
+  unschedule(name: string): void {
+    if (this.scheduledJobs.has(name)) {
+      this.scheduler.removeById(name);
+      this.scheduledJobs.delete(name);
+      this.logger.log(`Unscheduled job "${name}"`);
+    }
+  }
+
+  /**
+   * List names of all registered scheduled jobs.
+   */
+  listScheduledJobs(): string[] {
+    return Array.from(this.scheduledJobs.keys());
+  }
+
+  // ===========================================================
+  // Internal Queue Processing
+  // ===========================================================
+
+  private processQueue(): void {
+    while (this.running.size < this.maxConcurrency && this.queue.length > 0) {
+      const jobId = this.queue.shift();
+      if (!jobId) break;
+
+      const job = this.jobs.get(jobId);
+      if (!job || job.status !== 'pending') continue;
+
+      const handler = this.handlers.get(job.type);
+      if (!handler) {
+        this.logger.warn(`No handler for job type "${job.type}" — skipping ${jobId}`);
+        job.status = 'failed';
+        job.error = `No handler registered for type "${job.type}"`;
+        job.completedAt = nowISO();
+        this.emitJobEvent(WsEvent.JOB_FAILED, job);
+        continue;
+      }
+
+      this.runJob(job, handler);
+    }
+  }
+
+  private async runJob(job: JobRecord, handler: JobHandler): Promise<void> {
+    job.status = 'running';
+    job.startedAt = nowISO();
+    this.running.add(job.id);
+    this.emitJobEvent(WsEvent.JOB_STARTED, job);
+
+    const helpers: JobHelpers = {
+      reportProgress: (percent: number) => {
+        job.progress = Math.min(100, Math.max(0, percent));
+        this.emitJobEvent(WsEvent.JOB_PROGRESS, job);
+      },
+      log: (msg: string) => {
+        this.logger.debug(`[${job.type}:${job.id.slice(0, 8)}] ${msg}`);
+      },
+    };
+
+    try {
+      const result = await handler(job, helpers);
+      job.status = 'completed';
+      job.progress = 100;
+      job.result = result;
+      job.completedAt = nowISO();
+      this.emitJobEvent(WsEvent.JOB_COMPLETED, job);
+      this.logger.debug(`Job completed: [${job.type}] ${job.label} (${job.id})`);
+    } catch (err: any) {
+      job.status = 'failed';
+      job.error = err?.message ?? 'Unknown error';
+      job.completedAt = nowISO();
+      this.emitJobEvent(WsEvent.JOB_FAILED, job);
+      this.logger.error(`Job failed: [${job.type}] ${job.label} — ${job.error}`);
+    } finally {
+      this.running.delete(job.id);
+      this.processQueue();
+    }
+  }
+
+  private emitJobEvent(event: WsEvent, job: JobRecord): void {
+    this.events.emit(event, {
+      id: job.id,
+      type: job.type,
+      label: job.label,
+      status: job.status,
+      progress: job.progress,
+      error: job.error,
+    });
+  }
+
+  // ===========================================================
+  // Lifecycle
+  // ===========================================================
+
+  onModuleDestroy(): void {
+    this.scheduler.stop();
+    this.scheduledJobs.clear();
+    this.logger.log('Job manager stopped');
+  }
+}
