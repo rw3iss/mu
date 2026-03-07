@@ -47,11 +47,19 @@ export function VideoPlayer({
       // Direct play or native HLS (Safari)
       video.src = streamUrl;
     } else {
-      // HLS.js playback
+      // HLS.js playback — configured for transcoded streams that may
+      // take a moment to generate the first segments.
       const hls = new Hls({
         startPosition,
         enableWorker: true,
         lowLatencyMode: false,
+        // Retry manifest/fragment loads while transcoder is generating
+        manifestLoadingMaxRetry: 10,
+        manifestLoadingRetryDelay: 1000,
+        levelLoadingMaxRetry: 10,
+        levelLoadingRetryDelay: 1000,
+        fragLoadingMaxRetry: 6,
+        fragLoadingRetryDelay: 1000,
       });
 
       hls.loadSource(streamUrl);

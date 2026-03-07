@@ -1,1 +1,2 @@
-- job system to do background queuing for metadata, reviews, and thumbnails for videos.
+- bug: onboarding: saving settings/media dir isn't working.
+- show scan progress/count in status updates, or Settings/Library page, or separate 'scan' module to view/see?

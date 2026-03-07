@@ -266,28 +266,39 @@ export class StreamService {
 
   /**
    * Determine the optimal stream mode based on container format and video codec.
+   *
+   * Browser-native playback requires H.264/AAC in an MP4 or WebM container.
+   * Everything else must be transcoded to HLS.
    */
   private determineStreamMode(file: any): string {
     const filePath = (file.filePath || '').toLowerCase();
     const codec = (file.codecVideo || '').toLowerCase();
+    const ext = filePath.slice(filePath.lastIndexOf('.'));
 
     const isH264 = codec === 'h264' || codec === 'avc' || codec === 'h.264';
-    const isMp4 = filePath.endsWith('.mp4') || filePath.endsWith('.m4v');
-    const isMkv = filePath.endsWith('.mkv');
-    const isWebm = filePath.endsWith('.webm');
+    const isHevc = codec === 'hevc' || codec === 'h265' || codec === 'h.265';
+    const isMp4 = ext === '.mp4' || ext === '.m4v';
+    const isMkv = ext === '.mkv';
+    const isWebm = ext === '.webm';
+
+    // Browser-compatible containers
+    const isBrowserContainer = isMp4 || isWebm;
 
     // If we have codec info, use it for precise decisions
     if (codec) {
-      if (isH264 && isMp4) return StreamMode.DIRECT_PLAY;
+      if (isH264 && isBrowserContainer) return StreamMode.DIRECT_PLAY;
       if (isH264 && isMkv) return StreamMode.DIRECT_STREAM;
+      // HEVC, XviD, MPEG-4, VP8/9, etc. all need transcoding
       return StreamMode.TRANSCODE;
     }
 
-    // No codec info available (scanner didn't probe) — default to direct play
-    // for browser-friendly containers; browsers handle mp4/webm/mkv well
+    // No codec info — decide based on container only.
+    // Only MP4/WebM are safe to attempt direct play without knowing the codec.
+    // AVI, MOV, WMV, FLV, TS, etc. almost certainly need transcoding.
     if (isMp4 || isWebm) return StreamMode.DIRECT_PLAY;
     if (isMkv) return StreamMode.DIRECT_STREAM;
 
-    return StreamMode.DIRECT_PLAY;
+    // Default: transcode anything we're not sure about
+    return StreamMode.TRANSCODE;
   }
 }

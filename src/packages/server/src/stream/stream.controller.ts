@@ -60,7 +60,12 @@ export class StreamController {
     const manifest = await this.hlsGenerator.getManifest(sessionId);
 
     if (!manifest) {
-      throw new NotFoundException(`Manifest not found for session ${sessionId}`);
+      // Manifest not ready yet — transcoder is still generating.
+      // Return 503 with Retry-After so HLS.js will retry.
+      return reply
+        .status(503)
+        .header('Retry-After', '1')
+        .send({ message: 'Manifest not yet available, transcoding in progress' });
     }
 
     return reply
@@ -81,9 +86,11 @@ export class StreamController {
     const segment = await this.hlsGenerator.getSegment(sessionId, parseInt(segmentNumber, 10));
 
     if (!segment) {
-      throw new NotFoundException(
-        `Segment ${segmentNumber} not found for session ${sessionId}`,
-      );
+      // Segment not yet transcoded — tell the client to retry
+      return reply
+        .status(503)
+        .header('Retry-After', '1')
+        .send({ message: 'Segment not yet available' });
     }
 
     return reply

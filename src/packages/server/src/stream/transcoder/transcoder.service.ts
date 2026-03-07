@@ -19,7 +19,9 @@ export class TranscoderService implements OnModuleDestroy {
   private readonly cacheDir: string;
 
   constructor(private readonly config: ConfigService) {
-    this.cacheDir = path.resolve('data/cache/streams');
+    this.cacheDir = path.resolve(
+      this.config.get<string>('cache.streamDir') || './data/cache/streams',
+    );
   }
 
   async onModuleDestroy() {
@@ -129,7 +131,9 @@ export class TranscoderService implements OnModuleDestroy {
     if (proc) {
       this.logger.log(`Stopping transcode for session ${sessionId}`);
       try {
-        proc.kill('SIGKILL');
+        // On Windows, SIGKILL is not available; use SIGTERM which works cross-platform.
+        // fluent-ffmpeg processes respond to SIGTERM gracefully.
+        proc.kill();
       } catch (err) {
         this.logger.warn(`Failed to kill FFmpeg process for session ${sessionId}: ${err}`);
       }

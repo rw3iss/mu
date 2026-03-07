@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { eq, and } from 'drizzle-orm';
 import { stat, opendir } from 'fs/promises';
 import { basename, extname, join } from 'path';
+import ffmpeg from 'fluent-ffmpeg';
 import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
 import { DatabaseService } from '../database/database.service.js';
 import { ConfigService } from '../config/config.service.js';
@@ -108,6 +109,9 @@ export class ScannerService {
               updatedAt: movieNow,
             }).run();
 
+            // Probe the file for codec/duration info
+            const probeInfo = await this.probeFile(filePath);
+
             this.database.db.insert(movieFiles).values({
               id: crypto.randomUUID(),
               movieId,
@@ -115,7 +119,11 @@ export class ScannerService {
               filePath,
               fileName,
               fileSize,
-              resolution: parsed.quality ?? null,
+              resolution: parsed.quality ?? probeInfo.resolution ?? null,
+              codecVideo: probeInfo.codecVideo ?? null,
+              codecAudio: probeInfo.codecAudio ?? null,
+              durationSeconds: probeInfo.durationSeconds ?? null,
+              bitrate: probeInfo.bitrate ?? null,
               available: true,
               addedAt: movieNow,
               fileModifiedAt,
@@ -261,6 +269,54 @@ export class ScannerService {
   private extractQuality(name: string): string | undefined {
     const match = name.match(/\b(2160p|4k|1080p|720p|480p|360p)\b/i);
     return match?.[1]?.toLowerCase();
+  }
+
+  /**
+   * Use FFprobe to extract codec, resolution, duration, and bitrate from a file.
+   * Returns partial info on failure so scanning can continue.
+   */
+  private async probeFile(filePath: string): Promise<{
+    codecVideo?: string;
+    codecAudio?: string;
+    resolution?: string;
+    durationSeconds?: number;
+    bitrate?: number;
+  }> {
+    return new Promise((resolve) => {
+      ffmpeg.ffprobe(filePath, (err, metadata) => {
+        if (err) {
+          this.logger.warn(`FFprobe failed for ${basename(filePath)}: ${err.message}`);
+          resolve({});
+          return;
+        }
+
+        const videoStream = metadata.streams?.find((s) => s.codec_type === 'video');
+        const audioStream = metadata.streams?.find((s) => s.codec_type === 'audio');
+
+        const width = videoStream?.width;
+        const height = videoStream?.height;
+        let resolution: string | undefined;
+        if (height) {
+          if (height >= 2160) resolution = '2160p';
+          else if (height >= 1080) resolution = '1080p';
+          else if (height >= 720) resolution = '720p';
+          else if (height >= 480) resolution = '480p';
+          else resolution = `${height}p`;
+        }
+
+        resolve({
+          codecVideo: videoStream?.codec_name ?? undefined,
+          codecAudio: audioStream?.codec_name ?? undefined,
+          resolution,
+          durationSeconds: metadata.format?.duration
+            ? Math.round(metadata.format.duration)
+            : undefined,
+          bitrate: metadata.format?.bit_rate
+            ? Math.round(Number(metadata.format.bit_rate))
+            : undefined,
+        });
+      });
+    });
   }
 
   async *walkDir(dirPath: string, extensions: readonly string[]): AsyncGenerator<string> {
