@@ -95,7 +95,7 @@ Mu is an all-in-one solution for organizing your local movie collection, streami
 - **Node.js** 20 or later
 - **FFmpeg** 5 or later (for transcoding and media analysis)
 - **pnpm** 9 or later (for package management)
-- **OS**: Linux (recommended), macOS, or Windows (via WSL)
+- **OS**: Linux (recommended), macOS, or Windows (native or WSL)
 
 ### Hardware
 

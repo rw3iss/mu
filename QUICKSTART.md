@@ -49,6 +49,49 @@ sudo pacman -S nodejs npm ffmpeg git
 corepack enable pnpm
 ```
 
+**Windows (Native):**
+
+> Mu runs natively on Windows -- WSL is not required, but is also supported (see below).
+
+1. **Node.js 20+**: Download the installer from [nodejs.org](https://nodejs.org/) (LTS recommended). The installer adds `node` and `npm` to your PATH automatically.
+
+2. **pnpm**: Open PowerShell or Command Prompt and run:
+   ```powershell
+   corepack enable pnpm
+   ```
+
+3. **FFmpeg**: The easiest method is via [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/) (included in Windows 10 1709+ and Windows 11):
+   ```powershell
+   winget install Gyan.FFmpeg
+   ```
+   Alternatively, download a release build from [gyan.dev/ffmpeg](https://www.gyan.dev/ffmpeg/builds/) (get the `ffmpeg-release-essentials.zip`), extract it, and add the `bin/` folder to your system PATH.
+
+4. **Git**: Download from [git-scm.com](https://git-scm.com/download/win) or install via winget:
+   ```powershell
+   winget install Git.Git
+   ```
+
+After installing, verify in a **new** terminal:
+```powershell
+node --version     # Should show v20.x or later
+pnpm --version     # Should show 9.x or later
+ffmpeg -version    # Should show 5.x or later
+git --version
+```
+
+**Windows (WSL):**
+
+If you prefer a Linux-like environment on Windows, use [Windows Subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/install):
+
+```powershell
+# Install WSL with Ubuntu (run in PowerShell as Administrator)
+wsl --install
+```
+
+After WSL is set up and you're in the Ubuntu shell, follow the **Ubuntu / Debian** instructions above.
+
+> **Note for WSL users**: To access movie files stored on Windows drives, use the mount path (e.g., `/mnt/c/Users/You/Movies`). Performance is better when files are on the Linux filesystem (`~/Movies`) rather than mounted Windows drives.
+
 ---
 
 ## Option A: Quick Install Script
@@ -319,6 +362,35 @@ Create `~/Library/LaunchAgents/app.mu.plist`:
 launchctl load ~/Library/LaunchAgents/app.mu.plist
 ```
 
+### Windows (Task Scheduler)
+
+You can use Task Scheduler to start Mu on login:
+
+1. Open **Task Scheduler** (`taskschd.msc`)
+2. Click **Create Basic Task**
+3. Name it `Mu` and click Next
+4. Trigger: **When I log on**, click Next
+5. Action: **Start a program**
+   - Program/script: `C:\Program Files\nodejs\node.exe`
+   - Add arguments: `packages\server\dist\main.js`
+   - Start in: `C:\path\to\mu`
+6. Finish
+
+Alternatively, use [NSSM](https://nssm.cc/) to run Mu as a proper Windows service:
+
+```powershell
+# Install NSSM (via winget or download from nssm.cc)
+winget install NSSM.NSSM
+
+# Create the service
+nssm install Mu "C:\Program Files\nodejs\node.exe" "packages\server\dist\main.js"
+nssm set Mu AppDirectory "C:\path\to\mu"
+nssm set Mu AppEnvironmentExtra NODE_ENV=production
+
+# Start the service
+nssm start Mu
+```
+
 ---
 
 ## Remote Access
@@ -402,11 +474,32 @@ MU_SERVER_LOG_LEVEL=debug pnpm start
 - Check available disk space for transcoding temp files in `data/cache/streams/`
 - Check max concurrent streams setting vs current active streams
 
+### Windows-specific issues
+
+- **FFmpeg not found**: Make sure the FFmpeg `bin/` directory is in your system PATH. Open a new terminal after changing PATH.
+- **Permission errors on media files**: Run the terminal as Administrator, or ensure the Mu process user has read access to the media directories.
+- **Port conflicts**: Check what's using the port:
+  ```powershell
+  netstat -ano | findstr :8080
+  ```
+- **Long path errors**: Enable long paths in Windows if your media directory structure is deeply nested:
+  ```powershell
+  # Run in PowerShell as Administrator
+  New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+  ```
+
 ### Can't connect remotely
 
 - Verify server is binding to `0.0.0.0` (not `127.0.0.1`)
-- Check firewall: `sudo ufw status` (Ubuntu) or `sudo firewall-cmd --list-all` (Fedora)
-- Allow port: `sudo ufw allow 8080` or `sudo firewall-cmd --add-port=8080/tcp --permanent`
+- Check firewall:
+  - Linux: `sudo ufw status` (Ubuntu) or `sudo firewall-cmd --list-all` (Fedora)
+  - Windows: check Windows Defender Firewall -- allow Node.js through, or add an inbound rule for port 8080
+- Allow port:
+  - Linux: `sudo ufw allow 8080` or `sudo firewall-cmd --add-port=8080/tcp --permanent`
+  - Windows (PowerShell as Admin):
+    ```powershell
+    New-NetFirewallRule -DisplayName "Mu" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
+    ```
 - If using Docker, ensure port is mapped in docker-compose.yml
 
 ---
