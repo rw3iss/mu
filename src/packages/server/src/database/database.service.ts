@@ -20,7 +20,7 @@ export class DatabaseService implements OnModuleDestroy {
   }
 
   async initialize() {
-    const dbPath = resolve(this.config.get<string>('database.sqlitePath', './data/db/mu.db'));
+    const dbPath = resolve(this.config.get<string>('database.path', './data/db/mu.db'));
     const dbDir = dirname(dbPath);
 
     if (!existsSync(dbDir)) {
