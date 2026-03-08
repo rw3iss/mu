@@ -133,4 +133,11 @@ export const moviesService = {
   remove(movieId: string): Promise<{ success: boolean }> {
     return api.delete<{ success: boolean }>(`/movies/${movieId}`);
   },
+
+  /**
+   * Cancel all active processing jobs for a movie
+   */
+  cancelProcessing(movieId: string): Promise<{ cancelled: number }> {
+    return api.post<{ cancelled: number }>(`/jobs/cancel-by-movie/${movieId}`);
+  },
 };

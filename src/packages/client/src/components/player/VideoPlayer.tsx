@@ -1,11 +1,11 @@
 import { h } from 'preact';
-import { useEffect, useRef, useCallback, useState, useMemo } from 'preact/hooks';
-import Hls from 'hls.js';
+import { useEffect, useRef, useCallback, useState } from 'preact/hooks';
 import { PlayerControls } from './PlayerControls';
 import { InfoPanel } from './InfoPanel';
+import { useVideoEngine } from './useVideoEngine';
+import type { VideoEngine } from './useVideoEngine';
 import {
   currentSession,
-  isPlaying,
   currentTime,
   duration,
   volume,
@@ -13,29 +13,17 @@ import {
   isFullscreen,
   isBuffering,
   showControls,
-  updateProgress,
+  isPlaying,
 } from '@/state/player.state';
-import { getUiSetting } from '@/hooks/useUiSetting';
 import type { Movie } from '@/state/library.state';
 import styles from './VideoPlayer.module.scss';
-
-const BUFFER_CONFIGS: Record<string, { maxBufferLength: number; maxMaxBufferLength: number; maxBufferSize: number }> = {
-  small:  { maxBufferLength: 10,  maxMaxBufferLength: 20,  maxBufferSize: 15 * 1024 * 1024 },
-  normal: { maxBufferLength: 30,  maxMaxBufferLength: 60,  maxBufferSize: 60 * 1024 * 1024 },
-  large:  { maxBufferLength: 60,  maxMaxBufferLength: 120, maxBufferSize: 120 * 1024 * 1024 },
-  max:    { maxBufferLength: 120, maxMaxBufferLength: 240, maxBufferSize: 250 * 1024 * 1024 },
-};
-
-/** Max recovery attempts after HLS.js exhausts per-fragment retries */
-const MAX_RECOVERIES = 3;
-/** Base delay before each recovery attempt (multiplied by attempt number) */
-const RECOVERY_BASE_DELAY_MS = 2000;
 
 interface VideoPlayerProps {
   streamUrl: string;
   directPlay?: boolean;
   startPosition?: number;
   movie?: Movie | null;
+  externalEngine?: VideoEngine | null;
 }
 
 export function VideoPlayer({
@@ -43,246 +31,44 @@ export function VideoPlayer({
   directPlay = false,
   startPosition = 0,
   movie = null,
+  externalEngine,
 }: VideoPlayerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const hlsRef = useRef<Hls | null>(null);
-  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const lastDisplayTime = useRef<number>(0);
-  const seekLockRef = useRef(false);
-  const seekLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showInfo, setShowInfo] = useState(false);
-  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
-  const bufferConfig = useMemo(() => {
-    const stored = getUiSetting('buffer_size', 'normal');
-    return BUFFER_CONFIGS[stored] || BUFFER_CONFIGS.normal;
-  }, []);
+  // Use external engine or create internal one
+  const internalEngine = useVideoEngine();
+  const engine = externalEngine ?? internalEngine;
 
-  // Initialize HLS or native playback
+  // Move video element into our container
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (directPlay || !Hls.isSupported()) {
-      // Direct play or native HLS (Safari) — append token for authenticated access
-      const token = localStorage.getItem('mu_token');
-      const sep = streamUrl.includes('?') ? '&' : '?';
-      video.src = token ? `${streamUrl}${sep}token=${encodeURIComponent(token)}` : streamUrl;
-      if (startPosition > 0) {
-        video.currentTime = startPosition;
-      }
-      video.play().catch(() => {});
-    } else {
-      // HLS.js playback — configured for transcoded/remuxed streams
-      const token = localStorage.getItem('mu_token');
-      const hls = new Hls({
-        startPosition,
-        enableWorker: true,
-        lowLatencyMode: false,
-        startFragPrefetch: true,
-        maxBufferLength: bufferConfig.maxBufferLength,
-        maxMaxBufferLength: bufferConfig.maxMaxBufferLength,
-        maxBufferSize: bufferConfig.maxBufferSize,
-        // 5 fast retries per fragment/manifest before escalating to fatal
-        manifestLoadingMaxRetry: 5,
-        manifestLoadingRetryDelay: 1000,
-        levelLoadingMaxRetry: 5,
-        levelLoadingRetryDelay: 1000,
-        fragLoadingMaxRetry: 5,
-        fragLoadingRetryDelay: 1000,
-        // Inject auth token into all HLS.js XHR requests
-        xhrSetup(xhr) {
-          if (token) {
-            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-          }
-        },
-      });
-
-      hls.loadSource(streamUrl);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (startPosition > 0) {
-          video.currentTime = startPosition;
-        }
-        video.play().catch(() => {});
-      });
-
-      let networkRecoveries = 0;
-      let mediaRecoveries = 0;
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (!data.fatal) return;
-
-        const detail = data.details || 'unknown';
-        const response = (data as any).response;
-        const statusCode = response?.code ?? '';
-
-        switch (data.type) {
-          case Hls.ErrorTypes.NETWORK_ERROR:
-            if (networkRecoveries < MAX_RECOVERIES) {
-              networkRecoveries++;
-              const delay = RECOVERY_BASE_DELAY_MS * networkRecoveries;
-              console.warn(
-                `[HLS] Network error (${detail}${statusCode ? ` HTTP ${statusCode}` : ''}), ` +
-                `recovery ${networkRecoveries}/${MAX_RECOVERIES} in ${delay}ms`,
-              );
-              setTimeout(() => {
-                if (hlsRef.current) hls.startLoad();
-              }, delay);
-            } else {
-              const msg = `Network error: unable to load video segments after ${5 + MAX_RECOVERIES} attempts (${detail}${statusCode ? `, HTTP ${statusCode}` : ''})`;
-              console.error(`[HLS] ${msg}`);
-              setPlaybackError(msg);
-              hls.destroy();
-              hlsRef.current = null;
-            }
-            break;
-          case Hls.ErrorTypes.MEDIA_ERROR:
-            if (mediaRecoveries < MAX_RECOVERIES) {
-              mediaRecoveries++;
-              console.warn(
-                `[HLS] Media error (${detail}), recovery ${mediaRecoveries}/${MAX_RECOVERIES}`,
-              );
-              hls.recoverMediaError();
-            } else {
-              const msg = `Media error: video could not be decoded (${detail})`;
-              console.error(`[HLS] ${msg}`);
-              setPlaybackError(msg);
-              hls.destroy();
-              hlsRef.current = null;
-            }
-            break;
-          default: {
-            const msg = `Playback error: ${detail}`;
-            console.error(`[HLS] Fatal error: ${detail}`);
-            setPlaybackError(msg);
-            hls.destroy();
-            hlsRef.current = null;
-            break;
-          }
-        }
-      });
-
-      hlsRef.current = hls;
+    if (containerRef.current && engine.videoRef.current) {
+      containerRef.current.insertBefore(
+        engine.videoRef.current,
+        containerRef.current.firstChild,
+      );
+      // Add click/dblclick handlers to the video element
+      const video = engine.videoRef.current;
+      const handleClick = () => engine.togglePlay();
+      const handleDblClick = () => toggleFullscreen();
+      video.addEventListener('click', handleClick);
+      video.addEventListener('dblclick', handleDblClick);
+      return () => {
+        video.removeEventListener('click', handleClick);
+        video.removeEventListener('dblclick', handleDblClick);
+      };
     }
+  }, [engine.videoRef.current]);
 
-    return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-    };
-  }, [streamUrl, directPlay, startPosition]);
-
-  // Sync volume/mute state to video element
+  // Initialize playback (only if using internal engine)
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    video.volume = volume.value;
-    video.muted = isMuted.value;
-  }, [volume.value, isMuted.value]);
-
-  // Smooth 60fps time tracking via requestAnimationFrame
-  // Replaces onTimeUpdate (~4fps) for jank-free seek bar movement.
-  // Includes a guard against small backward jumps from HLS segment alignment.
-  useEffect(() => {
-    const tick = () => {
-      const video = videoRef.current;
-      if (video && !seekLockRef.current) {
-        const time = video.currentTime;
-        // Allow forward movement, or backward jumps > 1s (genuine seeks).
-        // Ignore tiny backward jitter (< 1s) from HLS segment boundaries.
-        if (time >= lastDisplayTime.current || time < lastDisplayTime.current - 1) {
-          currentTime.value = time;
-          lastDisplayTime.current = time;
-        }
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-      }
-      if (seekLockTimerRef.current) {
-        clearTimeout(seekLockTimerRef.current);
-      }
-    };
-  }, []);
-
-  // Progress reporting every 10s
-  useEffect(() => {
-    progressIntervalRef.current = setInterval(() => {
-      if (isPlaying.value && videoRef.current) {
-        updateProgress(videoRef.current.currentTime);
-      }
-    }, 10000);
-
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
-  }, []);
-
-  // Video event handlers
-  const handleDurationChange = useCallback(() => {
-    const video = videoRef.current;
-    if (video && video.duration && isFinite(video.duration)) {
-      duration.value = video.duration;
+    if (!externalEngine) {
+      engine.initPlayback(streamUrl, directPlay, startPosition);
     }
-  }, []);
+  }, [streamUrl, directPlay, startPosition, externalEngine]);
 
-  const handlePlay = useCallback(() => {
-    isPlaying.value = true;
-  }, []);
-
-  const handlePause = useCallback(() => {
-    isPlaying.value = false;
-  }, []);
-
-  const handleWaiting = useCallback(() => {
-    isBuffering.value = true;
-  }, []);
-
-  const handleCanPlay = useCallback(() => {
-    isBuffering.value = false;
-  }, []);
-
-  // Playback controls
-  const togglePlay = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (video.paused) {
-      video.play();
-    } else {
-      video.pause();
-    }
-  }, []);
-
-  const seek = useCallback((time: number) => {
-    const video = videoRef.current;
-    if (video) {
-      // Lock rAF updates so the bar doesn't fight with the user's position
-      // while the video element is still seeking to the new time.
-      seekLockRef.current = true;
-      video.currentTime = time;
-      currentTime.value = time;
-      lastDisplayTime.current = time;
-
-      if (seekLockTimerRef.current) clearTimeout(seekLockTimerRef.current);
-      seekLockTimerRef.current = setTimeout(() => {
-        seekLockRef.current = false;
-      }, 150);
-    }
-  }, []);
-
+  // Fullscreen
   const toggleFullscreen = useCallback(async () => {
     const container = containerRef.current;
     if (!container) return;
@@ -334,7 +120,6 @@ export function VideoPlayer({
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Don't handle if typing in an input
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
@@ -346,7 +131,7 @@ export function VideoPlayer({
         case ' ':
         case 'k':
           e.preventDefault();
-          togglePlay();
+          engine.togglePlay();
           break;
         case 'f':
           e.preventDefault();
@@ -362,11 +147,11 @@ export function VideoPlayer({
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          seek(Math.max(0, currentTime.value - 10));
+          engine.seek(Math.max(0, currentTime.value - 10));
           break;
         case 'ArrowRight':
           e.preventDefault();
-          seek(Math.min(duration.value, currentTime.value + 10));
+          engine.seek(Math.min(duration.value, currentTime.value + 10));
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -389,7 +174,7 @@ export function VideoPlayer({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [togglePlay, toggleFullscreen, toggleInfo, seek, resetControlsTimer, showInfo]);
+  }, [engine, toggleFullscreen, toggleInfo, resetControlsTimer, showInfo]);
 
   // Fullscreen change detection
   useEffect(() => {
@@ -409,37 +194,26 @@ export function VideoPlayer({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
-      <video
-        ref={videoRef}
-        class={styles.video}
-        onDurationChange={handleDurationChange}
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onWaiting={handleWaiting}
-        onCanPlay={handleCanPlay}
-        onClick={togglePlay}
-        autoPlay
-        playsInline
-      />
+      {/* Video element is inserted here via DOM manipulation */}
 
-      {isBuffering.value && !playbackError && (
+      {isBuffering.value && !engine.playbackError && (
         <div class={styles.bufferingOverlay}>
           <div class={styles.bufferingSpinner} />
         </div>
       )}
 
-      {playbackError && (
+      {engine.playbackError && (
         <div class={styles.errorOverlay}>
           <div class={styles.errorIcon}>!</div>
           <p class={styles.errorTitle}>Playback Failed</p>
-          <p class={styles.errorDetail}>{playbackError}</p>
+          <p class={styles.errorDetail}>{engine.playbackError}</p>
         </div>
       )}
 
       <PlayerControls
         visible={showControls.value}
-        onTogglePlay={togglePlay}
-        onSeek={seek}
+        onTogglePlay={engine.togglePlay}
+        onSeek={engine.seek}
         onToggleFullscreen={toggleFullscreen}
         onToggleInfo={toggleInfo}
         session={currentSession.value}

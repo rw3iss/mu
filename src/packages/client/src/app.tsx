@@ -24,6 +24,8 @@ import { isAuthenticated, isSetupComplete, isLoading, checkAuth } from '@/state/
 import { initTheme } from '@/state/theme.state';
 import { wsService } from '@/services/websocket.service';
 import { useScanEvents } from '@/hooks/useScanEvents';
+import { GlobalPlayer } from '@/components/player/GlobalPlayer';
+import { initGlobalPlayer } from '@/state/globalPlayer.state';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
 
@@ -54,6 +56,7 @@ export function App() {
     initTheme();
     checkAuth();
     wsService.connect();
+    initGlobalPlayer();
     return () => wsService.disconnect();
   }, []);
 
@@ -74,6 +77,7 @@ export function App() {
   return (
     <div>
       <Toast />
+      <GlobalPlayer />
       {isAuthRoute || isPlayerRoute ? (
         <Router onChange={handleRouteChange}>
           <Login path="/login" />

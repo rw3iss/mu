@@ -56,6 +56,8 @@ export class ScannerService {
     this.events.emit(WsEvent.SCAN_STARTED, { sourceId, logId });
     this.logger.log(`Scan started for source: ${source.path}`);
 
+    const scanStartTime = performance.now();
+
     let filesFound = 0;
     let filesAdded = 0;
     let filesUpdated = 0;
@@ -205,8 +207,9 @@ export class ScannerService {
         filesRemoved,
       });
 
+      const scanElapsed = ((performance.now() - scanStartTime) / 1000).toFixed(2);
       this.logger.log(
-        `Scan completed for ${source.path}: found=${filesFound} added=${filesAdded} updated=${filesUpdated} removed=${filesRemoved}`,
+        `Scan completed for ${source.path} in ${scanElapsed}s: found=${filesFound} added=${filesAdded} updated=${filesUpdated} removed=${filesRemoved}`,
       );
 
       // Metadata + thumbnail jobs are now enqueued automatically by
@@ -227,7 +230,8 @@ export class ScannerService {
         .run();
 
       this.events.emit(WsEvent.SCAN_ERROR, { sourceId, logId, error: err.message });
-      this.logger.error(`Scan failed for ${source.path}: ${err.message}`);
+      const scanElapsed = ((performance.now() - scanStartTime) / 1000).toFixed(2);
+      this.logger.error(`Scan failed for ${source.path} after ${scanElapsed}s: ${err.message}`);
       throw err;
     }
 

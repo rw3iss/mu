@@ -28,6 +28,16 @@ export class JobController {
     return { jobs: this.jobManager.listScheduledJobs() };
   }
 
+  @Post('cancel-by-movie/:movieId')
+  @Roles('admin')
+  cancelByMovie(
+    @Param('movieId') movieId: string,
+    @Query('type') type?: string,
+  ) {
+    const results = this.jobManager.cancelByPayload('movieId', movieId, type ?? 'pre-transcode');
+    return { cancelled: results.length };
+  }
+
   @Get(':id')
   @Roles('admin')
   getJob(@Param('id') id: string) {

@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useCallback, useEffect } from 'preact/hooks';
+import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { MediaPathList } from '@/components/library/MediaPathList';
@@ -14,6 +14,46 @@ import { Plugins } from './Plugins';
 import { AdminDashboard } from './AdminDashboard';
 import type { Theme } from '@/state/theme.state';
 import styles from './Settings.module.scss';
+
+interface ServerStats {
+  system: {
+    cpuCount: number;
+    loadAvg: number[];
+    memoryUsed: number;
+    memoryTotal: number;
+    memoryFree: number;
+    uptime: number;
+    platform: string;
+  };
+  services: {
+    activeStreams: number;
+    activeTranscodes: number;
+    runningJobs: number;
+    pendingJobs: number;
+  };
+}
+
+function formatBytes(bytes: number): string {
+  const gb = bytes / (1024 * 1024 * 1024);
+  return `${gb.toFixed(1)} GB`;
+}
+
+function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const parts: string[] = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  parts.push(`${m}m`);
+  return parts.join(' ');
+}
+
+function meterColor(ratio: number): string {
+  if (ratio < 0.6) return 'var(--color-accent, #4caf50)';
+  if (ratio < 0.85) return '#ff9800';
+  return '#f44336';
+}
 
 interface SettingsProps {
   path?: string;
@@ -63,6 +103,7 @@ export function Settings(props: SettingsProps) {
 
   // Notification settings
   const [notifyScanResults, setNotifyScanResults] = useState(true);
+  const [notifyPlaylist, setNotifyPlaylist] = useState(true);
 
   // Sync tab from URL prop
   useEffect(() => {
@@ -134,6 +175,8 @@ export function Settings(props: SettingsProps) {
 
     const stored = localStorage.getItem('mu_notify_scan');
     if (stored !== null) setNotifyScanResults(stored !== 'false');
+    const storedPlaylist = localStorage.getItem('mu_notify_playlist');
+    if (storedPlaylist !== null) setNotifyPlaylist(storedPlaylist !== 'false');
   }, []);
 
   const handleSavePlayback = useCallback(async () => {
@@ -237,6 +280,35 @@ export function Settings(props: SettingsProps) {
   }, []);
 
   const nextScanText = autoScanEnabled ? formatNextScan(nextScanAt) : null;
+
+  // Server stats polling
+  const [serverStats, setServerStats] = useState<ServerStats | null>(null);
+  const statsTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (activeTab !== 'about') {
+      // Clean up when leaving About tab
+      if (statsTimer.current) {
+        clearInterval(statsTimer.current);
+        statsTimer.current = null;
+      }
+      return;
+    }
+
+    const fetchStats = () => {
+      api.get<ServerStats>('/health/stats').then(setServerStats).catch(() => {});
+    };
+
+    fetchStats();
+    statsTimer.current = setInterval(fetchStats, 5000);
+
+    return () => {
+      if (statsTimer.current) {
+        clearInterval(statsTimer.current);
+        statsTimer.current = null;
+      }
+    };
+  }, [activeTab]);
 
   const user = currentUser.value;
   const isAdmin = user?.role === 'admin';
@@ -582,6 +654,27 @@ export function Settings(props: SettingsProps) {
                   <span class={styles.toggleTrack} />
                 </label>
               </div>
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Notify for playlist changes</span>
+                  <span class={styles.settingDescription}>
+                    Show toast notifications when movies are added to or removed from playlists
+                  </span>
+                </div>
+                <label class={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={notifyPlaylist}
+                    onChange={(e) => {
+                      const checked = (e.target as HTMLInputElement).checked;
+                      setNotifyPlaylist(checked);
+                      localStorage.setItem('mu_notify_playlist', String(checked));
+                    }}
+                  />
+                  <span class={styles.toggleTrack} />
+                </label>
+              </div>
             </div>
           )}
 
@@ -624,6 +717,63 @@ export function Settings(props: SettingsProps) {
                 organize, browse, and stream your personal movie collection
                 from anywhere.
               </p>
+
+              {serverStats && (
+                <>
+                  <h3 class={styles.aboutSectionTitle}>Server Stats</h3>
+                  <div class={styles.statsGrid}>
+                    {(() => {
+                      const cpuRatio = Math.min(serverStats.system.loadAvg[0] / serverStats.system.cpuCount, 1);
+                      return (
+                        <div class={styles.aboutItem}>
+                          <span class={styles.aboutLabel}>CPU Load</span>
+                          <span class={styles.aboutValue}>
+                            {serverStats.system.loadAvg[0].toFixed(2)} / {serverStats.system.cpuCount}
+                          </span>
+                          <div class={styles.meterTrack}>
+                            <div class={styles.meterFill} style={{ width: `${cpuRatio * 100}%`, backgroundColor: meterColor(cpuRatio) }} />
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {(() => {
+                      const memUsed = serverStats.system.memoryTotal - serverStats.system.memoryFree;
+                      const memRatio = memUsed / serverStats.system.memoryTotal;
+                      return (
+                        <div class={styles.aboutItem}>
+                          <span class={styles.aboutLabel}>Memory</span>
+                          <span class={styles.aboutValue}>
+                            {formatBytes(memUsed)} / {formatBytes(serverStats.system.memoryTotal)}
+                          </span>
+                          <div class={styles.meterTrack}>
+                            <div class={styles.meterFill} style={{ width: `${memRatio * 100}%`, backgroundColor: meterColor(memRatio) }} />
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    <div class={styles.aboutItem}>
+                      <span class={styles.aboutLabel}>Uptime</span>
+                      <span class={styles.aboutValue}>{formatUptime(serverStats.system.uptime)}</span>
+                    </div>
+                    <div class={styles.aboutItem}>
+                      <span class={styles.aboutLabel}>Active Streams</span>
+                      <span class={styles.aboutValue}>{serverStats.services.activeStreams}</span>
+                    </div>
+                    <div class={styles.aboutItem}>
+                      <span class={styles.aboutLabel}>Transcodes</span>
+                      <span class={styles.aboutValue}>{serverStats.services.activeTranscodes}</span>
+                    </div>
+                    <div class={styles.aboutItem}>
+                      <span class={styles.aboutLabel}>Running Jobs</span>
+                      <span class={styles.aboutValue}>{serverStats.services.runningJobs}</span>
+                    </div>
+                    <div class={styles.aboutItem}>
+                      <span class={styles.aboutLabel}>Pending Jobs</span>
+                      <span class={styles.aboutValue}>{serverStats.services.pendingJobs}</span>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <h3 class={styles.aboutSectionTitle}>Developer</h3>
               <div class={styles.developerLinks}>

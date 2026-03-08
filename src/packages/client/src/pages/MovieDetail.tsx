@@ -8,6 +8,7 @@ import { Spinner } from '@/components/common/Spinner';
 import { moviesService } from '@/services/movies.service';
 import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { notifySuccess, notifyError } from '@/state/notifications.state';
+import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import styles from './MovieDetail.module.scss';
 
@@ -49,8 +50,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
   const handlePlay = useCallback(() => {
     if (movie) {
-      // Replace so the player doesn't pollute the back-navigation stack
-      route(`/player/${movie.id}`, true);
+      playMovie(movie.id);
     }
   }, [movie]);
 
@@ -113,6 +113,18 @@ export function MovieDetail({ id }: MovieDetailProps) {
     } catch {
       setRescanState('idle');
       notifyError('Failed to re-scan movie files');
+    }
+  }, [movie]);
+
+  const handleCancelProcessing = useCallback(async () => {
+    if (!movie) return;
+    try {
+      await moviesService.cancelProcessing(movie.id);
+      const updated = await moviesService.get(movie.id);
+      setMovie(updated);
+      notifySuccess('Processing cancelled');
+    } catch {
+      notifyError('Failed to cancel processing');
     }
   }, [movie]);
 
@@ -331,9 +343,19 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
           {/* Actions */}
           <div class={styles.actions}>
-            <Button variant="primary" size="lg" onClick={handlePlay}>
-              {'\u25B6'} Play
-            </Button>
+            {movie.status === 'processing' ? (
+              <div class={styles.processingStatus}>
+                <Spinner size="sm" />
+                <span>Processing...</span>
+                <Button variant="ghost" size="lg" onClick={handleCancelProcessing}>
+                  {'\u2715'} Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button variant="primary" size="lg" onClick={handlePlay}>
+                {'\u25B6'} Play
+              </Button>
+            )}
             <Button
               variant={inWatchlist ? 'secondary' : 'ghost'}
               size="lg"

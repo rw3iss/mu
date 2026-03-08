@@ -3,6 +3,7 @@ import { eq, like, and, desc, asc, sql, count } from 'drizzle-orm';
 import { nowISO, paginationDefaults } from '@mu/shared';
 import type { MovieListQuery } from '@mu/shared';
 import { DatabaseService } from '../database/database.service.js';
+import { JobManagerService } from '../jobs/job-manager.service.js';
 import {
   movies,
   movieMetadata,
@@ -15,7 +16,10 @@ import {
 export class MoviesService {
   private readonly logger = new Logger('MoviesService');
 
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly jobManager: JobManagerService,
+  ) {}
 
   findAll(query: MovieListQuery, userId?: string) {
     const { page, pageSize, offset } = paginationDefaults(query);
@@ -179,7 +183,12 @@ export class MoviesService {
       userRating = ratingEntry?.rating ?? 0;
     }
 
-    return this.flattenMovie(movie, metadata, inWatchlist, userRating);
+    const activeJobs = this.jobManager.findJobsByPayload(
+      'movieId', id, 'pre-transcode', ['pending', 'running'],
+    );
+    const status = activeJobs.length > 0 ? 'processing' : 'idle';
+
+    return { ...this.flattenMovie(movie, metadata, inWatchlist, userRating), status };
   }
 
   /**

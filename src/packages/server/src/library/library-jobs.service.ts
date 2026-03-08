@@ -146,6 +146,13 @@ export class LibraryJobsService implements OnModuleInit {
           quality: string;
         };
         helpers.log(`Pre-transcoding file ${movieFileId} (${mode}, ${quality})`);
+
+        // Register cancel callback to kill the FFmpeg process
+        const processKey = `pre-${movieFileId}-${quality}`;
+        this.jobManager.setOnCancel(job.id, () => {
+          this.transcoderService.stopTranscode(processKey);
+        });
+
         await this.transcoderService.preTranscode(movieFileId, filePath, mode, quality);
         helpers.reportProgress(100);
         return { movieFileId, quality };
@@ -294,6 +301,7 @@ export class LibraryJobsService implements OnModuleInit {
           type: JOB_TYPE.PRE_TRANSCODE,
           label: `Pre-transcode: ${title}`,
           payload: {
+            movieId,
             movieFileId: file.id,
             filePath: file.filePath,
             mode,

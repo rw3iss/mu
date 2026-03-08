@@ -207,29 +207,49 @@ export function PlayerControls({
     setSettingsPanel('main');
   }, []);
 
-  // ── Volume SVG icons (white, clean) ──
+  // ── Volume SVG icons (4 tiers: muted, low, medium, high) ──
   const VolumeIcon = () => {
-    if (isMuted.value || volume.value === 0) {
+    const v = volume.value;
+    const muted = isMuted.value || v === 0;
+
+    const speakerBody = (
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="white" stroke="none" />
+    );
+
+    if (muted) {
       return (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="white" stroke="none" />
+          {speakerBody}
           <line x1="23" y1="9" x2="17" y2="15" />
           <line x1="17" y1="9" x2="23" y2="15" />
         </svg>
       );
     }
-    if (volume.value < 0.5) {
+
+    if (v <= 0.32) {
       return (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="white" stroke="none" />
+          {speakerBody}
           <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
         </svg>
       );
     }
+
+    if (v <= 0.66) {
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          {speakerBody}
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+        </svg>
+      );
+    }
+
     return (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="white" stroke="none" />
+        {speakerBody}
         <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+        <path d="M17.7 6.3a7.5 7.5 0 0 1 0 11.4" />
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
       </svg>
     );
@@ -327,8 +347,22 @@ export function PlayerControls({
           </button>
         </div>
 
-        {/* Right: volume, info, settings, fullscreen */}
+        {/* Right: info, volume, settings, fullscreen */}
         <div class={styles.rightControls}>
+          {/* Info */}
+          <button
+            class={styles.controlBtn}
+            onClick={onToggleInfo}
+            aria-label="Movie info"
+            title="Info"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+          </button>
+
           {/* Volume */}
           <div class={styles.volumeWrap} ref={volumeRef}>
             <button
@@ -362,20 +396,6 @@ export function PlayerControls({
               </div>
             )}
           </div>
-
-          {/* Info */}
-          <button
-            class={styles.controlBtn}
-            onClick={onToggleInfo}
-            aria-label="Movie info"
-            title="Info"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-          </button>
 
           {/* Settings */}
           <div class={styles.menuContainer} ref={settingsRef}>

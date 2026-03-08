@@ -352,6 +352,8 @@ export class TranscoderService implements OnModuleDestroy {
     });
   }
 
+  getActiveTranscodeCount(): number { return this.activeProcesses.size; }
+
   stopTranscode(sessionId: string): void {
     const proc = this.activeProcesses.get(sessionId);
     if (proc) {

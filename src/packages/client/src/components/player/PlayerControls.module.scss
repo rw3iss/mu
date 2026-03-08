@@ -247,7 +247,18 @@
   border-radius: 6px;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(12px);
-  animation: fadeIn 120ms ease;
+  animation: volumeFadeIn 120ms ease;
+}
+
+@keyframes volumeFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .volumeSlider {

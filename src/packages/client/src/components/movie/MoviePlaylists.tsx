@@ -6,6 +6,11 @@ import type { Playlist, MoviePlaylistInfo } from '@/services/playlists.service';
 import { notifySuccess, notifyError } from '@/state/notifications.state';
 import styles from './MoviePlaylists.module.scss';
 
+function shouldNotifyPlaylist(): boolean {
+  const stored = localStorage.getItem('mu_notify_playlist');
+  return stored !== 'false';
+}
+
 interface MoviePlaylistsProps {
   movieId: string;
 }
@@ -55,7 +60,7 @@ export function MoviePlaylists({ movieId }: MoviePlaylistsProps) {
       if (playlist) {
         setMemberPlaylists((prev) => [...prev, { id: playlist.id, name: playlist.name }]);
       }
-      notifySuccess(`Added to ${playlist?.name ?? 'playlist'}`);
+      if (shouldNotifyPlaylist()) notifySuccess(`Added to ${playlist?.name ?? 'playlist'}`);
     } catch {
       notifyError('Failed to add to playlist');
     }
@@ -65,7 +70,7 @@ export function MoviePlaylists({ movieId }: MoviePlaylistsProps) {
     try {
       await playlistsService.removeMovie(playlistId, movieId);
       setMemberPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
-      notifySuccess(`Removed from ${playlistName}`);
+      if (shouldNotifyPlaylist()) notifySuccess(`Removed from ${playlistName}`);
     } catch {
       notifyError('Failed to remove from playlist');
     }

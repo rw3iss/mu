@@ -26,6 +26,7 @@ export interface Movie {
   addedAt: string;
   watchProgress?: number;
   inWatchlist?: boolean;
+  status?: 'idle' | 'processing';
 }
 
 export interface LibraryFilters {

@@ -26,6 +26,9 @@ export class JobManagerService implements OnModuleDestroy {
   /** Currently running job ids */
   private readonly running = new Set<string>();
 
+  /** Cleanup callbacks for running jobs (e.g. kill FFmpeg) */
+  private readonly onCancelCallbacks = new Map<string, () => void>();
+
   /** Max concurrent jobs */
   private maxConcurrency = 4;
 
@@ -114,19 +117,75 @@ export class JobManagerService implements OnModuleDestroy {
   }
 
   /**
-   * Cancel a pending job. Running jobs cannot be cancelled.
+   * Register a cleanup callback for a running job (e.g. to kill an FFmpeg process).
+   */
+  setOnCancel(jobId: string, callback: () => void): void {
+    this.onCancelCallbacks.set(jobId, callback);
+  }
+
+  /**
+   * Cancel a pending or running job.
+   * For running jobs, calls the onCancel callback if registered.
    */
   cancel(id: string): boolean {
     const job = this.jobs.get(id);
-    if (!job || job.status !== 'pending') return false;
+    if (!job) return false;
 
-    const idx = this.queue.indexOf(id);
-    if (idx !== -1) this.queue.splice(idx, 1);
+    if (job.status === 'pending') {
+      const idx = this.queue.indexOf(id);
+      if (idx !== -1) this.queue.splice(idx, 1);
+    } else if (job.status === 'running') {
+      const callback = this.onCancelCallbacks.get(id);
+      if (callback) {
+        try { callback(); } catch (err: any) {
+          this.logger.warn(`onCancel callback error for job ${id}: ${err.message}`);
+        }
+        this.onCancelCallbacks.delete(id);
+      }
+      this.running.delete(id);
+    } else {
+      return false;
+    }
 
     job.status = 'failed';
     job.error = 'Cancelled';
     job.completedAt = nowISO();
+    this.emitJobEvent(WsEvent.JOB_FAILED, job);
+    this.processQueue();
     return true;
+  }
+
+  /**
+   * Find jobs whose payload matches a key/value pair.
+   */
+  findJobsByPayload(
+    key: string,
+    value: unknown,
+    type?: string,
+    statuses?: string[],
+  ): JobRecord[] {
+    const result: JobRecord[] = [];
+    for (const job of this.jobs.values()) {
+      if (job.payload?.[key] !== value) continue;
+      if (type && job.type !== type) continue;
+      if (statuses && !statuses.includes(job.status)) continue;
+      result.push(job);
+    }
+    return result;
+  }
+
+  /**
+   * Cancel all pending/running jobs matching a payload key/value.
+   */
+  cancelByPayload(key: string, value: unknown, type?: string): JobRecord[] {
+    const jobs = this.findJobsByPayload(key, value, type, ['pending', 'running']);
+    const cancelled: JobRecord[] = [];
+    for (const job of jobs) {
+      if (this.cancel(job.id)) {
+        cancelled.push(job);
+      }
+    }
+    return cancelled;
   }
 
   /**
@@ -243,6 +302,8 @@ export class JobManagerService implements OnModuleDestroy {
       },
     };
 
+    const startTime = performance.now();
+
     try {
       const result = await handler(job, helpers);
       job.status = 'completed';
@@ -250,15 +311,18 @@ export class JobManagerService implements OnModuleDestroy {
       job.result = result;
       job.completedAt = nowISO();
       this.emitJobEvent(WsEvent.JOB_COMPLETED, job);
-      this.logger.debug(`Job completed: [${job.type}] ${job.label} (${job.id})`);
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+      this.logger.log(`Job completed: [${job.type}] ${job.label} (${job.id}) in ${elapsed}s`);
     } catch (err: any) {
       job.status = 'failed';
       job.error = err?.message ?? 'Unknown error';
       job.completedAt = nowISO();
       this.emitJobEvent(WsEvent.JOB_FAILED, job);
-      this.logger.error(`Job failed: [${job.type}] ${job.label} — ${job.error}`);
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+      this.logger.error(`Job failed: [${job.type}] ${job.label} — ${job.error} (after ${elapsed}s)`);
     } finally {
       this.running.delete(job.id);
+      this.onCancelCallbacks.delete(job.id);
       this.processQueue();
     }
   }
