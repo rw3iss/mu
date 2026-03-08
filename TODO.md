@@ -20,6 +20,17 @@ Also do the same for the 'Admin' section: Show it as a new menu item in the Sett
 
 - Add commenting/Notes plugin (personal comments) to ie. add notes to personal video files.
 
+- Movie Page:
+	- add mini features to grab extended data for a movie, like:
+		- fetch cast: compiles top cast members from third parties, stores in our backend for that movie (we begin to keep people DB).
+		- fetch reviews: load reviews, similarly.
+
+
+- IMDB plugin:
+	- Settings: show imdb rating, show imdb reviews
+	- Movie page: Show IMDB rating, show imdb reviews
+	-
+
 - PLUGIN: Public comments for a movie:
 	- movie must have imdb/tmdb association
 	- need central movie db to store public comments
@@ -28,13 +39,8 @@ Also do the same for the 'Admin' section: Show it as a new menu item in the Sett
 
 - PLUGIN: Integrate web urls or other video websites, ie. Watch youtube, twitch from the app.
 
-On the Movies listing page, there is a toggle button to change the list view from 'card' or 'list', but it doesn't seem to work.
-It only shows the movies as cards.
-Can you try to get the list view working, so it will show the movies in a vertical list.
-Also can you add a sort direction toggle button after the sort by dropdown, to change the sort direction?
-Searching or changing the sort or filter options should trigger a new backend query with those new search parameters, so later pagination and everything can work properly.
+- add 'Pick a movie' for movie... open page user can page through movie options, set filters, "Movie Picker"
 
-Also, on the movies page, add some more details to the movie cards and list items, such as the movie year, from the metadata, if available, also show the date the movie was added to the library, and maybe the rating for it, if there is one the user has set for that movie.
 
 --------------------------------------------------------------------------------
 

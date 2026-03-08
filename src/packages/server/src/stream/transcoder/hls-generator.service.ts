@@ -22,7 +22,7 @@ export class HlsGeneratorService {
       return data;
     } catch (err: any) {
       if (err.code === 'ENOENT') {
-        this.logger.warn(`Manifest not yet available for session ${sessionId}`);
+        this.logger.warn(`Manifest not found for session ${sessionId} at ${manifestPath}`);
         return null;
       }
       this.logger.error(`Error reading manifest for session ${sessionId}: ${err.message}`);
@@ -45,7 +45,7 @@ export class HlsGeneratorService {
     } catch (err: any) {
       if (err.code === 'ENOENT') {
         this.logger.warn(
-          `Segment ${segmentNumber} not yet available for session ${sessionId}`,
+          `Segment ${segmentNumber} not found for session ${sessionId} at ${segmentPath}`,
         );
         return null;
       }

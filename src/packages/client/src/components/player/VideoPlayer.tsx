@@ -26,6 +26,11 @@ const BUFFER_CONFIGS: Record<string, { maxBufferLength: number; maxMaxBufferLeng
   max:    { maxBufferLength: 120, maxMaxBufferLength: 240, maxBufferSize: 250 * 1024 * 1024 },
 };
 
+/** Max recovery attempts after HLS.js exhausts per-fragment retries */
+const MAX_RECOVERIES = 3;
+/** Base delay before each recovery attempt (multiplied by attempt number) */
+const RECOVERY_BASE_DELAY_MS = 2000;
+
 interface VideoPlayerProps {
   streamUrl: string;
   directPlay?: boolean;
@@ -45,6 +50,7 @@ export function VideoPlayer({
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   const bufferConfig = useMemo(() => {
     const stored = getUiSetting('buffer_size', 'normal');
@@ -76,12 +82,12 @@ export function VideoPlayer({
         maxBufferLength: bufferConfig.maxBufferLength,
         maxMaxBufferLength: bufferConfig.maxMaxBufferLength,
         maxBufferSize: bufferConfig.maxBufferSize,
-        // Retry manifest/fragment loads while transcoder is generating
-        manifestLoadingMaxRetry: 30,
+        // 5 fast retries per fragment/manifest before escalating to fatal
+        manifestLoadingMaxRetry: 5,
         manifestLoadingRetryDelay: 1000,
-        levelLoadingMaxRetry: 10,
+        levelLoadingMaxRetry: 5,
         levelLoadingRetryDelay: 1000,
-        fragLoadingMaxRetry: 30,
+        fragLoadingMaxRetry: 5,
         fragLoadingRetryDelay: 1000,
         // Inject auth token into all HLS.js XHR requests
         xhrSetup(xhr) {
@@ -101,35 +107,57 @@ export function VideoPlayer({
         video.play().catch(() => {});
       });
 
-      let networkRetries = 0;
-      let mediaRetries = 0;
+      let networkRecoveries = 0;
+      let mediaRecoveries = 0;
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              if (networkRetries < 3) {
-                networkRetries++;
-                console.error(`[HLS] Network error, recovery attempt ${networkRetries}/3`);
-                hls.startLoad();
-              } else {
-                console.error('[HLS] Network error, max retries exceeded — destroying');
-                hls.destroy();
-              }
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              if (mediaRetries < 3) {
-                mediaRetries++;
-                console.error(`[HLS] Media error, recovery attempt ${mediaRetries}/3`);
-                hls.recoverMediaError();
-              } else {
-                console.error('[HLS] Media error, max retries exceeded — destroying');
-                hls.destroy();
-              }
-              break;
-            default:
-              console.error('[HLS] Fatal error, destroying');
+        if (!data.fatal) return;
+
+        const detail = data.details || 'unknown';
+        const response = (data as any).response;
+        const statusCode = response?.code ?? '';
+
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            if (networkRecoveries < MAX_RECOVERIES) {
+              networkRecoveries++;
+              const delay = RECOVERY_BASE_DELAY_MS * networkRecoveries;
+              console.warn(
+                `[HLS] Network error (${detail}${statusCode ? ` HTTP ${statusCode}` : ''}), ` +
+                `recovery ${networkRecoveries}/${MAX_RECOVERIES} in ${delay}ms`,
+              );
+              setTimeout(() => {
+                if (hlsRef.current) hls.startLoad();
+              }, delay);
+            } else {
+              const msg = `Network error: unable to load video segments after ${5 + MAX_RECOVERIES} attempts (${detail}${statusCode ? `, HTTP ${statusCode}` : ''})`;
+              console.error(`[HLS] ${msg}`);
+              setPlaybackError(msg);
               hls.destroy();
-              break;
+              hlsRef.current = null;
+            }
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            if (mediaRecoveries < MAX_RECOVERIES) {
+              mediaRecoveries++;
+              console.warn(
+                `[HLS] Media error (${detail}), recovery ${mediaRecoveries}/${MAX_RECOVERIES}`,
+              );
+              hls.recoverMediaError();
+            } else {
+              const msg = `Media error: video could not be decoded (${detail})`;
+              console.error(`[HLS] ${msg}`);
+              setPlaybackError(msg);
+              hls.destroy();
+              hlsRef.current = null;
+            }
+            break;
+          default: {
+            const msg = `Playback error: ${detail}`;
+            console.error(`[HLS] Fatal error: ${detail}`);
+            setPlaybackError(msg);
+            hls.destroy();
+            hlsRef.current = null;
+            break;
           }
         }
       });
@@ -360,9 +388,17 @@ export function VideoPlayer({
         playsInline
       />
 
-      {isBuffering.value && (
+      {isBuffering.value && !playbackError && (
         <div class={styles.bufferingOverlay}>
           <div class={styles.bufferingSpinner} />
+        </div>
+      )}
+
+      {playbackError && (
+        <div class={styles.errorOverlay}>
+          <div class={styles.errorIcon}>!</div>
+          <p class={styles.errorTitle}>Playback Failed</p>
+          <p class={styles.errorDetail}>{playbackError}</p>
         </div>
       )}
 
