@@ -27,6 +27,11 @@ Also do the same for the 'Admin' section: Show it as a new menu item in the Sett
 
 - add 'Pick a movie' for movie... open page user can page through movie options, set filters, "Movie Picker"
 
+- There is a slight playback bug where while the movie is playing, the seek bars button is sort of jumping from place to place, as it plays, every half second or so. Is there anyway you could get the knob button on the seek bar to move smoothly, or not jump at all? Just have it move in a straight line through the seek bar. Maybe we need to make the update interval faster, but others, if it's on an update interval, have it animate from the previous position to the next, according to the speed of the movie, ie. calculate the 'step animation speed' when the movie loads, to know how fast it should animate between each step. Unless you see an easier way to animate the button smoothly or naturally as the movie plays...
+If the user clicks in a new seek bar location, or drags the seek bar, it shouldn't animate, it should just jump there, then when it begins playing, the animation should take over again.
+If the user resizes the windows, or goes into fullscreen or out, the seek bar animation speed may need to be recalculated, depending on the seek bar length, if that's the solution we go with. Figure out a convenient or clever solution to have the seek bar play smoothly without jumping at all. Also ensure the seek bar positioning is accurate. Sometimes as it's playing, early on, it seems like the seek position jumps or skips back now and then.
+
+
 
 # PLUGINS:
 - EQ + Compressor
@@ -34,6 +39,7 @@ Also do the same for the 'Admin' section: Show it as a new menu item in the Sett
 - IMDB plugin:
 	- Settings: show imdb rating, show imdb reviews
 	- Movie page: Show IMDB rating, show imdb reviews
+	- Data import: import personal ratings and reviews (option to override local or skip), import playlists, watchlist, etc.
 
 - Public comments for a movie:
 	- movie must have imdb/tmdb association
@@ -44,6 +50,7 @@ Also do the same for the 'Admin' section: Show it as a new menu item in the Sett
 - Other video sources?
 	- Integrate web urls or other video websites, ie. Watch youtube, stream twitch from the app, etc. Even connect with other users for video meetings?
 
+- Buddy Watch: connect with another user and show webcam thumbnail and watch the same movie together.
 
 
 --------------------------------------------------------------------------------

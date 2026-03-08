@@ -79,26 +79,39 @@ export function MovieDetail({ id }: MovieDetailProps) {
     }
   }, [movie]);
 
+  const [rescanState, setRescanState] = useState<'idle' | 'loading' | 'complete'>('idle');
+  const [refreshState, setRefreshState] = useState<'idle' | 'loading' | 'complete'>('idle');
+
   const handleRefreshMetadata = useCallback(async () => {
     if (!movie) return;
+    setRefreshState('loading');
     try {
       await moviesService.refreshMetadata(movie.id);
-      // Reload movie data to show updated metadata
       const updated = await moviesService.get(movie.id);
       setMovie(updated);
+      setRefreshState('complete');
       notifySuccess('Metadata refreshed');
+      setTimeout(() => setRefreshState('idle'), 3000);
     } catch {
+      setRefreshState('idle');
       notifyError('Failed to refresh metadata');
     }
   }, [movie]);
 
   const handleRescan = useCallback(async () => {
     if (!movie) return;
+    setRescanState('loading');
     try {
       const result = await moviesService.rescan(movie.id);
       const updatedCount = result.files.filter((f) => f.updated).length;
+      // Reload movie data after rescan
+      const updated = await moviesService.get(movie.id);
+      setMovie(updated);
+      setRescanState('complete');
       notifySuccess(`Re-scanned ${result.files.length} file(s), ${updatedCount} updated`);
+      setTimeout(() => setRescanState('idle'), 3000);
     } catch {
+      setRescanState('idle');
       notifyError('Failed to re-scan movie files');
     }
   }, [movie]);
@@ -366,12 +379,22 @@ export function MovieDetail({ id }: MovieDetailProps) {
           <div class={styles.managementSection}>
             <h2 class={styles.sectionTitle}>Manage</h2>
             <div class={styles.managementBar}>
-              <button class={styles.mgmtBtn} onClick={handleRescan}>
-                {'\u{1F50D}'} Re-scan File
-              </button>
-              <button class={styles.mgmtBtn} onClick={handleRefreshMetadata}>
-                {'\u21BB'} Refresh Metadata
-              </button>
+              <Button
+                variant="secondary"
+                loading={rescanState === 'loading'}
+                disabled={rescanState !== 'idle'}
+                onClick={handleRescan}
+              >
+                {rescanState === 'complete' ? '\u2713 Scanned' : '\u{1F50D} Re-scan File'}
+              </Button>
+              <Button
+                variant="secondary"
+                loading={refreshState === 'loading'}
+                disabled={refreshState !== 'idle'}
+                onClick={handleRefreshMetadata}
+              >
+                {refreshState === 'complete' ? '\u2713 Complete' : '\u21BB Refresh Metadata'}
+              </Button>
               {confirmingRemove ? (
                 <span class={styles.confirmRemove}>
                   <span>Remove from library?</span>

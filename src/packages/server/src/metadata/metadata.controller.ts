@@ -2,10 +2,11 @@ import { Controller, Post, Param, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { basename } from 'path';
 import ffmpeg from 'fluent-ffmpeg';
-import { nowISO } from '@mu/shared';
+import { nowISO, WsEvent } from '@mu/shared';
 import { MetadataService } from './metadata.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
+import { EventsService } from '../events/events.service.js';
 import { movies, movieMetadata, movieFiles } from '../database/schema/index.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 
@@ -17,6 +18,7 @@ export class MetadataController {
     private readonly metadataService: MetadataService,
     private readonly database: DatabaseService,
     private readonly thumbnailService: ThumbnailService,
+    private readonly events: EventsService,
   ) {}
 
   @Post('movies/refresh-all')
@@ -160,6 +162,10 @@ export class MetadataController {
     }
 
     this.logger.log(`Rescanned ${results.length} file(s) for movie ${movieId}`);
+
+    // Emit WebSocket event
+    this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'rescan' });
+
     return { files: results, thumbnailUrl };
   }
 
