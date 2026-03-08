@@ -49,6 +49,10 @@ export function VideoPlayer({
   const hlsRef = useRef<Hls | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const lastDisplayTime = useRef<number>(0);
+  const seekLockRef = useRef(false);
+  const seekLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
 
@@ -182,6 +186,35 @@ export function VideoPlayer({
     video.muted = isMuted.value;
   }, [volume.value, isMuted.value]);
 
+  // Smooth 60fps time tracking via requestAnimationFrame
+  // Replaces onTimeUpdate (~4fps) for jank-free seek bar movement.
+  // Includes a guard against small backward jumps from HLS segment alignment.
+  useEffect(() => {
+    const tick = () => {
+      const video = videoRef.current;
+      if (video && !seekLockRef.current) {
+        const time = video.currentTime;
+        // Allow forward movement, or backward jumps > 1s (genuine seeks).
+        // Ignore tiny backward jitter (< 1s) from HLS segment boundaries.
+        if (time >= lastDisplayTime.current || time < lastDisplayTime.current - 1) {
+          currentTime.value = time;
+          lastDisplayTime.current = time;
+        }
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      if (seekLockTimerRef.current) {
+        clearTimeout(seekLockTimerRef.current);
+      }
+    };
+  }, []);
+
   // Progress reporting every 10s
   useEffect(() => {
     progressIntervalRef.current = setInterval(() => {
@@ -198,13 +231,6 @@ export function VideoPlayer({
   }, []);
 
   // Video event handlers
-  const handleTimeUpdate = useCallback(() => {
-    const video = videoRef.current;
-    if (video) {
-      currentTime.value = video.currentTime;
-    }
-  }, []);
-
   const handleDurationChange = useCallback(() => {
     const video = videoRef.current;
     if (video && video.duration && isFinite(video.duration)) {
@@ -243,8 +269,17 @@ export function VideoPlayer({
   const seek = useCallback((time: number) => {
     const video = videoRef.current;
     if (video) {
+      // Lock rAF updates so the bar doesn't fight with the user's position
+      // while the video element is still seeking to the new time.
+      seekLockRef.current = true;
       video.currentTime = time;
       currentTime.value = time;
+      lastDisplayTime.current = time;
+
+      if (seekLockTimerRef.current) clearTimeout(seekLockTimerRef.current);
+      seekLockTimerRef.current = setTimeout(() => {
+        seekLockRef.current = false;
+      }, 150);
     }
   }, []);
 
@@ -377,7 +412,6 @@ export function VideoPlayer({
       <video
         ref={videoRef}
         class={styles.video}
-        onTimeUpdate={handleTimeUpdate}
         onDurationChange={handleDurationChange}
         onPlay={handlePlay}
         onPause={handlePause}

@@ -39,7 +39,7 @@ function formatTime(seconds: number): string {
 }
 
 /** Throttle interval for seek-while-dragging (ms) */
-const DRAG_THROTTLE_MS = 50;
+const DRAG_THROTTLE_MS = 15;
 
 export function PlayerControls({
   visible,
