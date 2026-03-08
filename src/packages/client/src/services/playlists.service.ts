@@ -4,11 +4,20 @@ import { api } from './api';
 // Types
 // ============================================
 
+export interface PlaylistMovieSummary {
+  movieId: string;
+  title: string;
+  year: number | null;
+  posterUrl: string | null;
+  thumbnailUrl: string | null;
+}
+
 export interface Playlist {
   id: string;
   name: string;
   description: string;
   movieCount: number;
+  movies?: PlaylistMovieSummary[];
   createdAt: string;
   updatedAt: string;
 }
@@ -25,6 +34,11 @@ export interface PlaylistDetail extends Playlist {
   movies: PlaylistMovie[];
 }
 
+export interface MoviePlaylistInfo {
+  id: string;
+  name: string;
+}
+
 // ============================================
 // Playlists Service
 // ============================================
@@ -32,9 +46,11 @@ export interface PlaylistDetail extends Playlist {
 export const playlistsService = {
   /**
    * List all playlists for the current user.
+   * Pass includeMovies=true to get movie summaries (title, year, poster) with each playlist.
    */
-  list(): Promise<Playlist[]> {
-    return api.get<Playlist[]>('/playlists');
+  list(options?: { includeMovies?: boolean }): Promise<Playlist[]> {
+    const params = options?.includeMovies ? '?includeMovies=true' : '';
+    return api.get<Playlist[]>(`/playlists${params}`);
   },
 
   /**
@@ -68,6 +84,13 @@ export const playlistsService = {
    */
   remove(id: string): Promise<void> {
     return api.delete<void>(`/playlists/${id}`);
+  },
+
+  /**
+   * Get all playlists that contain a given movie.
+   */
+  getByMovie(movieId: string): Promise<MoviePlaylistInfo[]> {
+    return api.get<MoviePlaylistInfo[]>(`/playlists/by-movie/${movieId}`);
   },
 
   /**

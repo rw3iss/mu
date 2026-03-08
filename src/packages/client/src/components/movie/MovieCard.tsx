@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import type { Movie } from '@/state/library.state';
+import { getRatingColor } from '@/utils/rating-color';
 import styles from './MovieCard.module.scss';
 
 interface MovieCardProps {
@@ -22,12 +23,7 @@ export function MovieCard({ movie }: MovieCardProps) {
   );
 
   const rating = movie.rating ?? 0;
-  const ratingColor =
-    rating >= 7
-      ? 'var(--color-success)'
-      : rating >= 5
-        ? 'var(--color-warning)'
-        : 'var(--color-error)';
+  const ratingColor = getRatingColor(rating);
 
   return (
     <div class={styles.card} onClick={handleClick} role="button" tabIndex={0}>
@@ -73,7 +69,24 @@ export function MovieCard({ movie }: MovieCardProps) {
 
       <div class={styles.info}>
         <h3 class={styles.title}>{movie.title}</h3>
-        <span class={styles.year}>{movie.year}</span>
+        <div class={styles.details}>
+          <span class={styles.year}>{movie.year}</span>
+          {movie.runtime > 0 && (
+            <span class={styles.runtime}>
+              {Math.floor(movie.runtime / 60)}h {movie.runtime % 60}m
+            </span>
+          )}
+          {movie.addedAt && (
+            <span class={styles.addedAt}>
+              {new Date(movie.addedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+          )}
+          {rating > 0 && (
+            <span class={styles.userRating} style={{ color: ratingColor }}>
+              {'\u2605'} {rating.toFixed(1)}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

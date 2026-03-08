@@ -15,8 +15,7 @@ import { History } from '@/pages/History';
 import { Discover } from '@/pages/Discover';
 import { Search } from '@/pages/Search';
 import { Settings } from '@/pages/Settings';
-import { Plugins } from '@/pages/Plugins';
-import { AdminDashboard } from '@/pages/AdminDashboard';
+import { Changelog } from '@/pages/Changelog';
 import { PersonDetail } from '@/pages/PersonDetail';
 import { Login } from '@/pages/Login';
 import { Setup } from '@/pages/Setup';
@@ -27,6 +26,11 @@ import { wsService } from '@/services/websocket.service';
 import { useScanEvents } from '@/hooks/useScanEvents';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
+
+function Redirect({ to, path: _path }: { to: string; path: string }) {
+  useEffect(() => { route(to, true); }, []);
+  return null;
+}
 
 function handleRouteChange(e: { url: string }) {
   const url = e.url.split('?')[0] ?? e.url;
@@ -90,9 +94,10 @@ export function App() {
             <History path="/history" />
             <Discover path="/discover" />
             <Search path="/search" />
-            <Settings path="/settings" />
-            <Plugins path="/plugins" />
-            <AdminDashboard path="/admin" />
+            <Settings path="/settings/:tab?" />
+            <Changelog path="/changelog" />
+            <Redirect path="/plugins" to="/settings/plugins" />
+            <Redirect path="/admin" to="/settings/admin" />
             <PersonDetail path="/person/:id" />
             <Login path="/login" />
             <Setup path="/setup" />

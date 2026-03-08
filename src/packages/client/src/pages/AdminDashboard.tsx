@@ -24,6 +24,9 @@ export function AdminDashboard(_props: AdminDashboardProps) {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
+  const [endingAll, setEndingAll] = useState(false);
+  const [generatingThumbnails, setGeneratingThumbnails] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -61,6 +64,44 @@ export function AdminDashboard(_props: AdminDashboardProps) {
       notifySuccess('Metadata refresh started for all movies');
     } catch {
       notifyError('Failed to start metadata refresh');
+    }
+  }, []);
+
+  const handleGenerateThumbnails = useCallback(async () => {
+    setGeneratingThumbnails(true);
+    try {
+      const result = await streamService.generateMissingThumbnails();
+      notifySuccess(`Thumbnail generation started for ${result.movieCount} movies`);
+    } catch {
+      notifyError('Failed to start thumbnail generation');
+    } finally {
+      setGeneratingThumbnails(false);
+    }
+  }, []);
+
+  const handleEndSession = useCallback(async (sessionId: string) => {
+    setEndingSessionId(sessionId);
+    try {
+      await streamService.endSession(sessionId);
+      setActiveSessions((prev) => prev.filter((s) => s.sessionId !== sessionId));
+      notifySuccess('Session ended');
+    } catch {
+      notifyError('Failed to end session');
+    } finally {
+      setEndingSessionId(null);
+    }
+  }, []);
+
+  const handleEndAllSessions = useCallback(async () => {
+    setEndingAll(true);
+    try {
+      const result = await streamService.endAllSessions();
+      setActiveSessions([]);
+      notifySuccess(`Ended ${result.endedCount} session(s)`);
+    } catch {
+      notifyError('Failed to end sessions');
+    } finally {
+      setEndingAll(false);
     }
   }, []);
 
@@ -132,12 +173,36 @@ export function AdminDashboard(_props: AdminDashboardProps) {
           <Button variant="secondary" onClick={handleRefreshMetadata}>
             Refresh All Metadata
           </Button>
+          <Button
+            variant="secondary"
+            onClick={handleGenerateThumbnails}
+            loading={generatingThumbnails}
+          >
+            Fetch Missing Thumbnails
+          </Button>
         </div>
       </section>
 
       {/* Active Sessions */}
       <section class={styles.section}>
-        <h2 class={styles.sectionTitle}>Active Sessions</h2>
+        <div class={styles.sectionHeader}>
+          <h2 class={styles.sectionTitle}>Active Sessions</h2>
+          {activeSessions.length > 0 && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleEndAllSessions}
+              loading={endingAll}
+            >
+              End All Sessions
+            </Button>
+          )}
+        </div>
+        {activeSessions.length > 0 && (
+          <p class={styles.endAllNote}>
+            This will end all active sessions except your current one.
+          </p>
+        )}
         {activeSessions.length === 0 ? (
           <p class={styles.emptyText}>No active streams</p>
         ) : (
@@ -145,12 +210,20 @@ export function AdminDashboard(_props: AdminDashboardProps) {
             {activeSessions.map((session) => (
               <div key={session.sessionId} class={styles.sessionItem}>
                 <div class={styles.sessionInfo}>
-                  <span class={styles.sessionUser}>{session.username}</span>
-                  <span class={styles.sessionMovie}>{session.movieTitle}</span>
+                  <span class={styles.sessionUser}>{session.username || 'Unknown'}</span>
+                  <span class={styles.sessionMovie}>{session.movieTitle || 'Unknown'}</span>
                 </div>
                 <span class={styles.sessionTime}>
                   Started {new Date(session.startedAt).toLocaleTimeString()}
                 </span>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => handleEndSession(session.sessionId)}
+                  loading={endingSessionId === session.sessionId}
+                >
+                  End
+                </Button>
               </div>
             ))}
           </div>

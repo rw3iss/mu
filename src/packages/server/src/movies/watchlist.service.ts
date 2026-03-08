@@ -66,6 +66,7 @@ export class WatchlistService {
         movieTitle: movies.title,
         movieYear: movies.year,
         moviePosterUrl: movies.posterUrl,
+        movieThumbnailUrl: movies.thumbnailUrl,
         movieOverview: movies.overview,
         movieRuntimeMinutes: movies.runtimeMinutes,
       })

@@ -2,9 +2,10 @@ import { h } from 'preact';
 import { useState, useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { MediaPathList } from '@/components/library/MediaPathList';
+import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { setup } from '@/state/auth.state';
 import { notifySuccess, notifyError } from '@/state/notifications.state';
-import { api } from '@/services/api';
 import styles from './Setup.module.scss';
 
 interface SetupProps {
@@ -25,10 +26,10 @@ export function Setup(_props: SetupProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   // Media source fields
-  const [mediaPath, setMediaPath] = useState('');
+  const [mediaPaths, setMediaPaths] = useState<MediaPathEntryData[]>([{ path: '', source: null }]);
 
   const handleAccountSubmit = useCallback(
-    async (e: Event) => {
+    (e: Event) => {
       e.preventDefault();
       setError('');
 
@@ -47,49 +48,63 @@ export function Setup(_props: SetupProps) {
         return;
       }
 
+      setStep('media');
+    },
+    [username, password, confirmPassword]
+  );
+
+  const doSetup = useCallback(
+    async (withMediaPaths?: string[]) => {
       setIsLoading(true);
+      setError('');
 
       try {
-        await setup(username.trim(), email.trim() || undefined, password);
-        notifySuccess('Admin account created');
-        setStep('media');
+        await setup(
+          username.trim(),
+          email.trim() || undefined,
+          password,
+          withMediaPaths,
+        );
+        const count = withMediaPaths?.length ?? 0;
+        notifySuccess(
+          count > 0
+            ? `Account created and ${count} media ${count === 1 ? 'path' : 'paths'} configured`
+            : 'Admin account created',
+        );
+        setStep('complete');
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Setup failed';
         setError(message);
-        notifyError('Failed to create admin account');
+        notifyError('Setup failed');
       } finally {
         setIsLoading(false);
       }
     },
-    [username, email, password, confirmPassword]
+    [username, email, password]
   );
 
   const handleMediaSubmit = useCallback(
-    async (e: Event) => {
+    (e: Event) => {
       e.preventDefault();
       setError('');
 
-      if (!mediaPath.trim()) {
-        setError('Please provide a media library path');
+      const validPaths = mediaPaths
+        .map((entry) => entry.path.trim())
+        .filter(Boolean);
+
+      if (validPaths.length === 0) {
+        setError('Please provide at least one media library path');
         return;
       }
 
-      setIsLoading(true);
-
-      try {
-        await api.post('/sources', { path: mediaPath.trim() });
-        notifySuccess('Media source configured');
-        setStep('complete');
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to configure';
-        setError(message);
-        notifyError('Failed to configure media source');
-      } finally {
-        setIsLoading(false);
-      }
+      doSetup(validPaths);
     },
-    [mediaPath]
+    [mediaPaths, doSetup]
   );
+
+  const handleSkipMedia = useCallback(() => {
+    doSetup();
+  }, [doSetup]);
 
   const handleFinish = useCallback(() => {
     route('/');
@@ -182,8 +197,8 @@ export function Setup(_props: SetupProps) {
               />
             </div>
 
-            <Button type="submit" variant="primary" size="lg" fullWidth loading={isLoading}>
-              Create Account
+            <Button type="submit" variant="primary" size="lg" fullWidth>
+              Next
             </Button>
           </form>
         )}
@@ -192,24 +207,19 @@ export function Setup(_props: SetupProps) {
         {step === 'media' && (
           <form class={styles.form} onSubmit={handleMediaSubmit}>
             <div class={styles.field}>
-              <label class={styles.label} htmlFor="setup-media">Media Library Path</label>
-              <input
-                id="setup-media"
-                type="text"
-                class={styles.input}
-                value={mediaPath}
-                onInput={(e) => setMediaPath((e.target as HTMLInputElement).value)}
-                placeholder="/path/to/your/movies"
-                autoFocus
-                required
+              <label class={styles.label}>Media Library Paths</label>
+              <MediaPathList
+                entries={mediaPaths}
+                onChange={setMediaPaths}
+                showBrowse={false}
               />
               <span class={styles.hint}>
-                The directory where your movie files are stored
+                The directories where your movie files are stored
               </span>
             </div>
 
             <div class={styles.buttonRow}>
-              <Button type="button" variant="ghost" size="lg" onClick={() => handleFinish()}>
+              <Button type="button" variant="ghost" size="lg" onClick={handleSkipMedia} loading={isLoading}>
                 Skip for now
               </Button>
               <Button type="submit" variant="primary" size="lg" loading={isLoading}>
@@ -224,8 +234,10 @@ export function Setup(_props: SetupProps) {
           <div class={styles.complete}>
             <div class={styles.checkmark}>{'\u2713'}</div>
             <p class={styles.completeText}>
-              Everything is set up and ready to go. Mu will now scan your media library
-              for movies.
+              Everything is set up and ready to go.
+              {mediaPaths.some((e) => e.path.trim())
+                ? ' Mu will now scan your media library for movies.'
+                : ' You can add a media library later in Settings.'}
             </p>
             <Button variant="primary" size="lg" fullWidth onClick={handleFinish}>
               Start Using Mu

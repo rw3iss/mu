@@ -16,7 +16,9 @@ import {
   setFilters,
   setViewMode,
   initViewMode,
+  initSortPrefs,
 } from '@/state/library.state';
+import type { LibraryFilters } from '@/state/library.state';
 import { useDebounce } from '@/hooks/useDebounce';
 import { moviesService } from '@/services/movies.service';
 import styles from './Library.module.scss';
@@ -33,6 +35,7 @@ export function Library(_props: LibraryProps) {
 
   useEffect(() => {
     initViewMode();
+    initSortPrefs();
     fetchMovies(1);
     loadGenres();
   }, []);
@@ -71,9 +74,12 @@ export function Library(_props: LibraryProps) {
   );
 
   const handleSortChange = useCallback((e: Event) => {
-    const value = (e.target as HTMLSelectElement).value;
-    const [sortBy, sortOrder] = value.split(':') as [string, 'asc' | 'desc'];
-    setFilters({ sortBy: sortBy as any, sortOrder });
+    const value = (e.target as HTMLSelectElement).value as LibraryFilters['sortBy'];
+    setFilters({ sortBy: value });
+  }, []);
+
+  const handleToggleDirection = useCallback(() => {
+    setFilters({ sortOrder: filters.value.sortOrder === 'asc' ? 'desc' : 'asc' });
   }, []);
 
   return (
@@ -97,22 +103,37 @@ export function Library(_props: LibraryProps) {
         </div>
 
         <div class={styles.toolbarActions}>
-          <select class={styles.sortSelect} onChange={handleSortChange}>
-            <option value="addedAt:desc">Recently Added</option>
-            <option value="title:asc">Title A-Z</option>
-            <option value="title:desc">Title Z-A</option>
-            <option value="year:desc">Year (Newest)</option>
-            <option value="year:asc">Year (Oldest)</option>
-            <option value="rating:desc">Highest Rated</option>
-            <option value="runtime:asc">Shortest</option>
-            <option value="runtime:desc">Longest</option>
+          <select class={styles.sortSelect} value={filters.value.sortBy} onChange={handleSortChange}>
+            <option value="addedAt">Recently Added</option>
+            <option value="title">Title</option>
+            <option value="year">Year</option>
+            <option value="rating">Rating</option>
+            <option value="runtime">Runtime</option>
           </select>
 
+          <button
+            class={styles.sortDirection}
+            onClick={handleToggleDirection}
+            aria-label={`Sort ${filters.value.sortOrder === 'asc' ? 'ascending' : 'descending'}`}
+            title={filters.value.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+          >
+            {filters.value.sortOrder === 'asc' ? '\u2191' : '\u2193'}
+          </button>
+
           <div class={styles.viewToggle}>
+            <button
+              class={`${styles.viewButton} ${viewMode.value === 'large' ? styles.active : ''}`}
+              onClick={() => setViewMode('large')}
+              aria-label="Large card view"
+              title="Large cards"
+            >
+              {'\u2B1C'}
+            </button>
             <button
               class={`${styles.viewButton} ${viewMode.value === 'grid' ? styles.active : ''}`}
               onClick={() => setViewMode('grid')}
               aria-label="Grid view"
+              title="Grid"
             >
               {'\u25A6'}
             </button>
@@ -120,6 +141,7 @@ export function Library(_props: LibraryProps) {
               class={`${styles.viewButton} ${viewMode.value === 'list' ? styles.active : ''}`}
               onClick={() => setViewMode('list')}
               aria-label="List view"
+              title="List"
             >
               {'\u2630'}
             </button>
@@ -161,6 +183,7 @@ export function Library(_props: LibraryProps) {
       <MovieGrid
         movies={movies.value}
         isLoading={isLoading.value}
+        viewMode={viewMode.value}
         emptyMessage={
           searchQuery.value
             ? `No results for "${searchQuery.value}"`

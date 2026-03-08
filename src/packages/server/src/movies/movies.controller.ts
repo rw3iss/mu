@@ -3,7 +3,6 @@ import type { MovieListQuery } from '@mu/shared';
 import { MoviesService } from './movies.service.js';
 import { RatingsService } from './ratings.service.js';
 import { HistoryService } from './history.service.js';
-import { ScannerService } from '../library/scanner.service.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 
@@ -13,12 +12,11 @@ export class MoviesController {
     private readonly moviesService: MoviesService,
     private readonly ratingsService: RatingsService,
     private readonly historyService: HistoryService,
-    private readonly scannerService: ScannerService,
   ) {}
 
   @Get()
-  findAll(@Query() query: MovieListQuery) {
-    return this.moviesService.findAll(query);
+  findAll(@Query() query: MovieListQuery, @CurrentUser('id') userId: string) {
+    return this.moviesService.findAll(query, userId);
   }
 
   @Get('search')
@@ -102,13 +100,6 @@ export class MoviesController {
   ) {
     this.historyService.markUnwatched(userId, movieId);
     return { success: true };
-  }
-
-  @Post(':id/rescan')
-  @Roles('admin')
-  async rescan(@Param('id') id: string) {
-    const result = await this.scannerService.rescanMovie(id);
-    return result;
   }
 
   @Post('bulk')

@@ -17,7 +17,7 @@ export class MoviesService {
 
   constructor(private readonly database: DatabaseService) {}
 
-  findAll(query: MovieListQuery) {
+  findAll(query: MovieListQuery, userId?: string) {
     const { page, pageSize, offset } = paginationDefaults(query);
 
     const conditions = [];
@@ -54,33 +54,48 @@ export class MoviesService {
       case 'addedAt':
         orderBy = sortOrder(movies.addedAt);
         break;
+      case 'runtime':
+        orderBy = sortOrder(movies.runtimeMinutes);
+        break;
+      case 'rating':
+        orderBy = sortOrder(userRatings.rating);
+        break;
       default:
         orderBy = desc(movies.addedAt);
     }
 
-    // Build query with optional genre join
+    const selectFields = {
+      id: movies.id,
+      title: movies.title,
+      originalTitle: movies.originalTitle,
+      year: movies.year,
+      overview: movies.overview,
+      runtimeMinutes: movies.runtimeMinutes,
+      posterUrl: movies.posterUrl,
+      thumbnailUrl: movies.thumbnailUrl,
+      backdropUrl: movies.backdropUrl,
+      imdbId: movies.imdbId,
+      tmdbId: movies.tmdbId,
+      contentRating: movies.contentRating,
+      addedAt: movies.addedAt,
+      updatedAt: movies.updatedAt,
+      rating: userRatings.rating,
+    };
+
+    // Build query — always left-join userRatings for the current user
+    const ratingJoinCond = userId
+      ? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
+      : eq(movies.id, userRatings.movieId);
+
     let data;
     let total: number;
 
     if (query.genre) {
       data = this.database.db
-        .select({
-          id: movies.id,
-          title: movies.title,
-          originalTitle: movies.originalTitle,
-          year: movies.year,
-          overview: movies.overview,
-          runtimeMinutes: movies.runtimeMinutes,
-          posterUrl: movies.posterUrl,
-          backdropUrl: movies.backdropUrl,
-          imdbId: movies.imdbId,
-          tmdbId: movies.tmdbId,
-          contentRating: movies.contentRating,
-          addedAt: movies.addedAt,
-          updatedAt: movies.updatedAt,
-        })
+        .select(selectFields)
         .from(movies)
         .leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
+        .leftJoin(userRatings, ratingJoinCond)
         .where(where)
         .orderBy(orderBy)
         .limit(pageSize)
@@ -96,8 +111,9 @@ export class MoviesService {
       total = countResult?.count ?? 0;
     } else {
       data = this.database.db
-        .select()
+        .select(selectFields)
         .from(movies)
+        .leftJoin(userRatings, ratingJoinCond)
         .where(where)
         .orderBy(orderBy)
         .limit(pageSize)
@@ -113,7 +129,7 @@ export class MoviesService {
     }
 
     return {
-      movies: data,
+      movies: data.map((row) => this.applyPosterFallback({ ...row, rating: row.rating ?? 0 })),
       total,
       page,
       pageSize,
@@ -180,12 +196,17 @@ export class MoviesService {
       }
     };
 
+    // Use thumbnailUrl as poster fallback when no TMDB poster is set
+    const posterUrl = movie.posterUrl || movie.thumbnailUrl || '';
+    const thumbnailUrl = movie.thumbnailUrl || '';
+
     return {
       id: movie.id,
       title: movie.title,
       year: movie.year ?? 0,
       overview: movie.overview ?? '',
-      posterUrl: movie.posterUrl ?? '',
+      posterUrl,
+      thumbnailUrl,
       backdropUrl: movie.backdropUrl ?? '',
       runtime: movie.runtimeMinutes ?? 0,
       imdbId: movie.imdbId ?? undefined,
@@ -213,7 +234,8 @@ export class MoviesService {
       .from(movies)
       .orderBy(desc(movies.addedAt))
       .limit(limit)
-      .all();
+      .all()
+      .map(this.applyPosterFallback);
   }
 
   search(q: string) {
@@ -223,7 +245,20 @@ export class MoviesService {
       .where(like(movies.title, `%${q}%`))
       .orderBy(asc(movies.title))
       .limit(50)
-      .all();
+      .all()
+      .map(this.applyPosterFallback);
+  }
+
+  /**
+   * For list views, fall back to thumbnailUrl when posterUrl is empty.
+   */
+  private applyPosterFallback<T extends { posterUrl?: string | null; thumbnailUrl?: string | null }>(
+    movie: T,
+  ): T {
+    if (!movie.posterUrl && movie.thumbnailUrl) {
+      return { ...movie, posterUrl: movie.thumbnailUrl };
+    }
+    return movie;
   }
 
   update(id: string, data: Partial<{

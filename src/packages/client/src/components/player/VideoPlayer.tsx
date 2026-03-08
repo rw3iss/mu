@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useEffect, useRef, useCallback, useState } from 'preact/hooks';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'preact/hooks';
 import Hls from 'hls.js';
 import { PlayerControls } from './PlayerControls';
 import { InfoPanel } from './InfoPanel';
@@ -15,8 +15,16 @@ import {
   showControls,
   updateProgress,
 } from '@/state/player.state';
+import { getUiSetting } from '@/hooks/useUiSetting';
 import type { Movie } from '@/state/library.state';
 import styles from './VideoPlayer.module.scss';
+
+const BUFFER_CONFIGS: Record<string, { maxBufferLength: number; maxMaxBufferLength: number; maxBufferSize: number }> = {
+  small:  { maxBufferLength: 10,  maxMaxBufferLength: 20,  maxBufferSize: 15 * 1024 * 1024 },
+  normal: { maxBufferLength: 30,  maxMaxBufferLength: 60,  maxBufferSize: 60 * 1024 * 1024 },
+  large:  { maxBufferLength: 60,  maxMaxBufferLength: 120, maxBufferSize: 120 * 1024 * 1024 },
+  max:    { maxBufferLength: 120, maxMaxBufferLength: 240, maxBufferSize: 250 * 1024 * 1024 },
+};
 
 interface VideoPlayerProps {
   streamUrl: string;
@@ -38,6 +46,11 @@ export function VideoPlayer({
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showInfo, setShowInfo] = useState(false);
 
+  const bufferConfig = useMemo(() => {
+    const stored = getUiSetting('buffer_size', 'normal');
+    return BUFFER_CONFIGS[stored] || BUFFER_CONFIGS.normal;
+  }, []);
+
   // Initialize HLS or native playback
   useEffect(() => {
     const video = videoRef.current;
@@ -46,19 +59,26 @@ export function VideoPlayer({
     if (directPlay || !Hls.isSupported()) {
       // Direct play or native HLS (Safari)
       video.src = streamUrl;
+      if (startPosition > 0) {
+        video.currentTime = startPosition;
+      }
+      video.play().catch(() => {});
     } else {
-      // HLS.js playback — configured for transcoded streams that may
-      // take a moment to generate the first segments.
+      // HLS.js playback — configured for transcoded/remuxed streams
       const hls = new Hls({
         startPosition,
         enableWorker: true,
         lowLatencyMode: false,
+        startFragPrefetch: true,
+        maxBufferLength: bufferConfig.maxBufferLength,
+        maxMaxBufferLength: bufferConfig.maxMaxBufferLength,
+        maxBufferSize: bufferConfig.maxBufferSize,
         // Retry manifest/fragment loads while transcoder is generating
-        manifestLoadingMaxRetry: 10,
+        manifestLoadingMaxRetry: 30,
         manifestLoadingRetryDelay: 1000,
         levelLoadingMaxRetry: 10,
         levelLoadingRetryDelay: 1000,
-        fragLoadingMaxRetry: 6,
+        fragLoadingMaxRetry: 10,
         fragLoadingRetryDelay: 1000,
       });
 
@@ -69,6 +89,7 @@ export function VideoPlayer({
         if (startPosition > 0) {
           video.currentTime = startPosition;
         }
+        video.play().catch(() => {});
       });
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -312,6 +333,7 @@ export function VideoPlayer({
         onWaiting={handleWaiting}
         onCanPlay={handleCanPlay}
         onClick={togglePlay}
+        autoPlay
         playsInline
       />
 

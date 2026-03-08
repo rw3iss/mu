@@ -13,6 +13,7 @@ import {
   movieFiles,
   streamSessions,
   userWatchHistory,
+  users,
 } from '../database/schema/index.js';
 
 interface StartStreamOptions {
@@ -59,7 +60,7 @@ export class StreamService {
       userId,
       movieFileId: file.id,
       quality,
-      transcoding: mode === StreamMode.TRANSCODE,
+      transcoding: mode !== StreamMode.DIRECT_PLAY,
       startedAt: nowISO(),
       lastActiveAt: nowISO(),
       positionSeconds: 0,
@@ -81,13 +82,16 @@ export class StreamService {
       this.logger.warn(`Failed to find external subtitles: ${err}`);
     }
 
-    // If transcoding is needed, start the transcode pipeline
+    // Start transcode or remux pipeline as needed
     if (mode === StreamMode.TRANSCODE) {
       await this.transcoderService.startTranscode(sessionId, file.filePath, {
         quality,
         audioTrack: options.audioTrack,
         subtitleTrack: options.subtitleTrack,
       });
+    } else if (mode === StreamMode.DIRECT_STREAM) {
+      // H.264 in non-browser container (MKV/AVI/MOV) — remux to HLS without re-encoding
+      await this.transcoderService.startRemux(sessionId, file.filePath);
     }
 
     // Look up resume position from watch history
@@ -102,11 +106,12 @@ export class StreamService {
     }
 
     // Build stream URL based on mode
-    const directPlay = mode !== StreamMode.TRANSCODE;
+    const directPlay = mode === StreamMode.DIRECT_PLAY;
     let streamUrl: string;
     if (directPlay) {
       streamUrl = `/api/v1/stream/direct/${file.id}`;
     } else {
+      // Both TRANSCODE and DIRECT_STREAM use HLS manifest
       streamUrl = `/api/v1/stream/${sessionId}/manifest.m3u8`;
     }
 
@@ -213,7 +218,8 @@ export class StreamService {
       .delete(streamSessions)
       .where(eq(streamSessions.id, sessionId));
 
-    // Update watch history with final position
+    // Upsert watch history with final position (create if watched >= 10s)
+    const finalPosition = session.positionSeconds ?? 0;
     const existing = await this.database.db
       .select()
       .from(userWatchHistory)
@@ -228,10 +234,19 @@ export class StreamService {
       await this.database.db
         .update(userWatchHistory)
         .set({
-          positionSeconds: session.positionSeconds ?? 0,
+          positionSeconds: finalPosition,
           watchedAt: nowISO(),
         })
         .where(eq(userWatchHistory.id, existing[0]!.id));
+    } else if (finalPosition >= 10) {
+      await this.database.db.insert(userWatchHistory).values({
+        id: crypto.randomUUID(),
+        userId: session.userId,
+        movieId: session.movieId,
+        positionSeconds: finalPosition,
+        durationWatchedSeconds: 0,
+        watchedAt: nowISO(),
+      });
     }
 
     this.events.emit(WsEvent.STREAM_ENDED, {
@@ -245,8 +260,37 @@ export class StreamService {
 
   async getActiveSessions() {
     return this.database.db
+      .select({
+        sessionId: streamSessions.id,
+        userId: streamSessions.userId,
+        username: users.username,
+        movieId: streamSessions.movieId,
+        movieTitle: movies.title,
+        position: streamSessions.positionSeconds,
+        startedAt: streamSessions.startedAt,
+        lastActivity: streamSessions.lastActiveAt,
+      })
+      .from(streamSessions)
+      .leftJoin(users, eq(streamSessions.userId, users.id))
+      .leftJoin(movies, eq(streamSessions.movieId, movies.id))
+      .all();
+  }
+
+  async endAllSessions(): Promise<number> {
+    const sessions = this.database.db
       .select()
-      .from(streamSessions);
+      .from(streamSessions)
+      .all();
+
+    for (const session of sessions) {
+      try {
+        await this.endStream(session.id);
+      } catch (err: any) {
+        this.logger.warn(`Failed to end session ${session.id}: ${err.message}`);
+      }
+    }
+
+    return sessions.length;
   }
 
   /**
@@ -294,9 +338,8 @@ export class StreamService {
 
     // No codec info — decide based on container only.
     // Only MP4/WebM are safe to attempt direct play without knowing the codec.
-    // AVI, MOV, WMV, FLV, TS, etc. almost certainly need transcoding.
+    // MKV without codec info must transcode (can't assume H.264 for remux).
     if (isMp4 || isWebm) return StreamMode.DIRECT_PLAY;
-    if (isMkv) return StreamMode.DIRECT_STREAM;
 
     // Default: transcode anything we're not sure about
     return StreamMode.TRANSCODE;

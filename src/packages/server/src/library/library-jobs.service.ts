@@ -1,16 +1,18 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject, Logger, OnModuleInit, forwardRef } from '@nestjs/common';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { ScannerService } from './scanner.service.js';
+import { LibraryService } from './library.service.js';
 import { MetadataService } from '../metadata/metadata.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { EventsService } from '../events/events.service.js';
-import { WsEvent } from '@mu/shared';
+import { nowISO, WsEvent } from '@mu/shared';
 import type { JobRecord, JobHelpers } from '../jobs/job.interface.js';
 
 /** Well-known job types */
 export const JOB_TYPE = {
   SCAN: 'scan',
+  SCAN_ALL: 'scan-all',
   METADATA: 'metadata',
   THUMBNAIL: 'thumbnail',
   CLEANUP: 'cleanup',
@@ -20,9 +22,15 @@ export const JOB_TYPE = {
 export class LibraryJobsService implements OnModuleInit {
   private readonly logger = new Logger('LibraryJobs');
 
+  /** Track when the auto-scan was last scheduled so we can compute next run */
+  private autoScanScheduledAt: string | null = null;
+  private autoScanIntervalMs: number = 0;
+
   constructor(
     private readonly jobManager: JobManagerService,
     private readonly scanner: ScannerService,
+    @Inject(forwardRef(() => LibraryService))
+    private readonly libraryService: LibraryService,
     private readonly metadata: MetadataService,
     private readonly thumbnail: ThumbnailService,
     private readonly settings: SettingsService,
@@ -82,6 +90,31 @@ export class LibraryJobsService implements OnModuleInit {
       },
     );
 
+    // Scan-all handler — scans every enabled source
+    this.jobManager.registerHandler(
+      JOB_TYPE.SCAN_ALL,
+      async (_job: JobRecord, helpers: JobHelpers) => {
+        const sources = this.libraryService.getSources().filter((s) => s.enabled);
+        helpers.log(`Scanning ${sources.length} enabled sources`);
+
+        let totalFilesFound = 0;
+        let totalFilesAdded = 0;
+
+        for (const source of sources) {
+          try {
+            const result = await this.scanner.scanSource(source.id);
+            totalFilesFound += result.filesFound;
+            totalFilesAdded += result.filesAdded;
+          } catch (err: any) {
+            helpers.log(`Scan failed for source ${source.id}: ${err.message}`);
+          }
+        }
+
+        helpers.reportProgress(100);
+        return { sourceCount: sources.length, totalFilesFound, totalFilesAdded };
+      },
+    );
+
     // Cleanup handler — prune old completed/failed jobs
     this.jobManager.registerHandler(
       JOB_TYPE.CLEANUP,
@@ -106,6 +139,83 @@ export class LibraryJobsService implements OnModuleInit {
       intervalMs: 24 * 60 * 60 * 1000, // 24h
       job: { type: JOB_TYPE.CLEANUP, label: 'Daily job cleanup' },
     });
+
+    // Auto-scan based on library settings
+    this.refreshAutoScanSchedule();
+  }
+
+  /**
+   * Read the library settings and (re-)register the auto-scan scheduled job.
+   * Called on startup and whenever settings are saved.
+   */
+  refreshAutoScanSchedule(): void {
+    const lib = this.settings.get<Record<string, unknown>>('library', {});
+    const autoScanEnabled = (lib as any)?.autoScanEnabled !== false; // default true
+    const scanIntervalHours = Number((lib as any)?.scanIntervalHours) || 6;
+
+    // Always remove old schedule first
+    this.jobManager.unschedule('auto-library-scan');
+    this.autoScanScheduledAt = null;
+    this.autoScanIntervalMs = 0;
+
+    if (!autoScanEnabled) {
+      this.logger.log('Auto-scan disabled');
+      return;
+    }
+
+    const intervalMs = scanIntervalHours * 60 * 60 * 1000;
+    this.autoScanIntervalMs = intervalMs;
+    this.autoScanScheduledAt = nowISO();
+
+    this.jobManager.schedule({
+      name: 'auto-library-scan',
+      intervalMs,
+      runImmediately: false,
+      job: { type: JOB_TYPE.SCAN_ALL, label: 'Scheduled library scan' },
+    });
+
+    this.logger.log(`Auto-scan scheduled every ${scanIntervalHours}h`);
+  }
+
+  /**
+   * Get the current auto-scan status for the API.
+   */
+  getScanStatus(): {
+    autoScanEnabled: boolean;
+    scanIntervalHours: number;
+    nextScanAt: string | null;
+    lastScanAt: string | null;
+  } {
+    const lib = this.settings.get<Record<string, unknown>>('library', {});
+    const autoScanEnabled = (lib as any)?.autoScanEnabled !== false;
+    const scanIntervalHours = Number((lib as any)?.scanIntervalHours) || 6;
+
+    let nextScanAt: string | null = null;
+    if (autoScanEnabled && this.autoScanScheduledAt && this.autoScanIntervalMs > 0) {
+      // Compute next scan: find the next interval tick from when we scheduled
+      const scheduledTime = new Date(this.autoScanScheduledAt).getTime();
+      const now = Date.now();
+      const elapsed = now - scheduledTime;
+      const remaining = this.autoScanIntervalMs - (elapsed % this.autoScanIntervalMs);
+      nextScanAt = new Date(now + remaining).toISOString();
+    }
+
+    // Find the most recent scan completion
+    const scanJobs = this.jobManager.listJobs({ type: JOB_TYPE.SCAN });
+    const allScanJobs = [
+      ...scanJobs,
+      ...this.jobManager.listJobs({ type: JOB_TYPE.SCAN_ALL }),
+    ];
+    const lastCompleted = allScanJobs
+      .filter((j) => j.status === 'completed' && j.completedAt)
+      .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())[0];
+
+    return {
+      autoScanEnabled,
+      scanIntervalHours,
+      nextScanAt,
+      lastScanAt: lastCompleted?.completedAt ?? null,
+    };
   }
 
   // ===========================================================

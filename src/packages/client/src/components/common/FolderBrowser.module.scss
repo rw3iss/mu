@@ -1,0 +1,117 @@
+.browser {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  overflow-x: auto;
+}
+
+.breadcrumbSegment {
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg-tertiary);
+  }
+}
+
+.breadcrumbSeparator {
+  color: var(--color-text-muted);
+  margin: 0 1px;
+}
+
+.listing {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+}
+
+.error {
+  padding: var(--space-md);
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}
+
+.empty {
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.dirEntry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--color-border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: var(--color-bg-elevated);
+  }
+}
+
+.dirIcon {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.dirName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.currentPath {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}

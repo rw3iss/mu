@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
 
 export const movies = sqliteTable('movies', {
   id: text('id').primaryKey(),
@@ -15,6 +15,7 @@ export const movies = sqliteTable('movies', {
   backdropUrl: text('backdrop_url'),
   trailerUrl: text('trailer_url'),
   thumbnailUrl: text('thumbnail_url'),
+  thumbnailAspectRatio: real('thumbnail_aspect_ratio'),
   imdbId: text('imdb_id'),
   tmdbId: integer('tmdb_id'),
   contentRating: text('content_rating'),

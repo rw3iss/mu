@@ -129,6 +129,15 @@ export class ScannerService {
               fileModifiedAt,
             }).run();
 
+            // Populate runtimeMinutes from probe duration
+            if (probeInfo.durationSeconds && probeInfo.durationSeconds > 0) {
+              this.database.db
+                .update(movies)
+                .set({ runtimeMinutes: Math.round(probeInfo.durationSeconds / 60) })
+                .where(eq(movies.id, movieId))
+                .run();
+            }
+
             filesAdded++;
             newMovieIds.push(movieId);
             this.events.emit(WsEvent.LIBRARY_MOVIE_ADDED, { movieId, title: parsed.title });

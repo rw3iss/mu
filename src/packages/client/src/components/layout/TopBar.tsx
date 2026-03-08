@@ -1,39 +1,19 @@
 import { h } from 'preact';
-import { useState, useCallback, useRef, useEffect } from 'preact/hooks';
+import { useState, useCallback, useEffect } from 'preact/hooks';
 import { route } from 'preact-router';
-import { currentUser, logout } from '@/state/auth.state';
 import { theme, toggleTheme } from '@/state/theme.state';
 import { useDebounce } from '@/hooks/useDebounce';
 import styles from './TopBar.module.scss';
 
 export function TopBar() {
   const [searchValue, setSearchValue] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const debouncedSearch = useDebounce(searchValue, 300);
-  const user = currentUser.value;
 
   useEffect(() => {
     if (debouncedSearch) {
       route(`/search?q=${encodeURIComponent(debouncedSearch)}`);
     }
   }, [debouncedSearch]);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-
-    if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [menuOpen]);
 
   const handleSearch = useCallback((e: Event) => {
     const target = e.target as HTMLInputElement;
@@ -50,19 +30,18 @@ export function TopBar() {
     [searchValue]
   );
 
-  const handleLogout = useCallback(async () => {
-    setMenuOpen(false);
-    await logout();
-    route('/login');
-  }, []);
-
   const themeLabel =
     theme.value === 'dark' ? 'Dark' : theme.value === 'light' ? 'Light' : 'Auto';
 
   return (
     <header class={styles.topbar}>
       <form class={styles.searchForm} onSubmit={handleSearchSubmit}>
-        <span class={styles.searchIcon}>{'\u{1F50D}'}</span>
+        <span class={styles.searchIcon}>
+          <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={2} stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </span>
         <input
           type="search"
           class={styles.searchInput}
@@ -82,55 +61,6 @@ export function TopBar() {
         >
           {theme.value === 'dark' ? '\u{1F319}' : theme.value === 'light' ? '\u2600' : '\u{1F500}'}
         </button>
-
-        {user && (
-          <div class={styles.userMenu} ref={menuRef}>
-            <button
-              class={styles.userButton}
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-expanded={menuOpen}
-              aria-haspopup="true"
-            >
-              <div class={styles.avatar}>
-                {user.username.charAt(0).toUpperCase()}
-              </div>
-            </button>
-
-            {menuOpen && (
-              <div class={styles.dropdown}>
-                <div class={styles.dropdownHeader}>
-                  <span class={styles.dropdownName}>{user.username}</span>
-                  <span class={styles.dropdownEmail}>{user.email}</span>
-                </div>
-                <div class={styles.dropdownDivider} />
-                <button
-                  class={styles.dropdownItem}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    route('/settings');
-                  }}
-                >
-                  Settings
-                </button>
-                {user.role === 'admin' && (
-                  <button
-                    class={styles.dropdownItem}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      route('/admin');
-                    }}
-                  >
-                    Admin
-                  </button>
-                )}
-                <div class={styles.dropdownDivider} />
-                <button class={`${styles.dropdownItem} ${styles.danger}`} onClick={handleLogout}>
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </header>
   );

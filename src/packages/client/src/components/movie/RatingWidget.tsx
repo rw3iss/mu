@@ -1,5 +1,6 @@
 import { h } from 'preact';
 import { useState, useCallback } from 'preact/hooks';
+import { getRatingColor } from '@/utils/rating-color';
 import styles from './RatingWidget.module.scss';
 
 interface RatingWidgetProps {
@@ -22,12 +23,7 @@ export function RatingWidget({
 
   const percentage = (value / max) * 100;
 
-  const ratingColor =
-    value >= 7
-      ? 'var(--color-success)'
-      : value >= 5
-        ? 'var(--color-warning)'
-        : 'var(--color-error)';
+  const ratingColor = getRatingColor(value);
 
   const handleEdit = useCallback(() => {
     if (editable) {

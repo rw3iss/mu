@@ -1,3 +1,7 @@
+// ============================================
+// Player Controls — flush, edge-to-edge layout
+// ============================================
+
 .controls {
   position: absolute;
   bottom: 0;
@@ -7,6 +11,9 @@
   opacity: 0;
   transition: opacity var(--transition-normal);
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  background: rgba(18, 18, 18, 0.97);
 
   &.visible {
     opacity: 1;
@@ -16,70 +23,93 @@
 
 .gradient {
   position: absolute;
-  bottom: 0;
+  bottom: 100%;
   left: 0;
   right: 0;
-  height: 200px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  height: 120px;
+  background: linear-gradient(transparent, rgba(18, 18, 18, 0.97));
   pointer-events: none;
 }
 
 // ============================================
-// Top bar (title)
+// Row 1: Title
 // ============================================
 
-.topBar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  padding: var(--space-lg) var(--space-xl);
-  z-index: 1;
-  background: linear-gradient(rgba(0, 0, 0, 0.7), transparent);
-}
-
-.nowPlaying {
-  color: #ffffff;
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-}
-
-// ============================================
-// Seek bar
-// ============================================
-
-.seekContainer {
+.titleRow {
   position: relative;
-  padding: 0 var(--space-md);
   z-index: 1;
+  text-align: center;
+  padding: 6px 12px 2px;
+}
+
+.titleText {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+// ============================================
+// Row 2: Seek bar with time labels
+// ============================================
+
+.seekRow {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.timeLabel {
+  font-size: 11px;
+
+  &.timeCurrent {
+    font-size: 13px;
+  }
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 36px;
+  text-align: center;
+  user-select: none;
 }
 
 .seekBar {
-  height: 20px;
+  flex: 1;
+  height: 18px;
   display: flex;
   align-items: center;
   cursor: pointer;
-  padding: 6px 0;
+
+  &.dragging {
+    cursor: grabbing;
+  }
 }
 
 .seekTrack {
   position: relative;
   width: 100%;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: var(--radius-full);
-  transition: height var(--transition-fast);
+  height: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
+  transition: height 120ms ease;
 
-  .seekBar:hover & {
-    height: 6px;
+  .seekBar:hover &,
+  .seekBar.dragging & {
+    height: 5px;
   }
 }
 
 .seekProgress {
   height: 100%;
   background: var(--color-accent);
-  border-radius: var(--radius-full);
+  border-radius: 2px;
   transition: width 100ms linear;
 }
 
@@ -87,160 +117,190 @@
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%) scale(0);
-  width: 14px;
-  height: 14px;
-  background: var(--color-accent);
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
   border-radius: 50%;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
-  transition: transform var(--transition-fast);
+  transition: transform 120ms ease;
 
-  .seekBar:hover & {
+  .seekBar:hover &,
+  .seekBar.dragging & {
     transform: translate(-50%, -50%) scale(1);
   }
 }
 
 .seekTooltip {
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 6px);
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.9);
   color: #ffffff;
-  font-size: var(--font-size-xs);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   padding: 2px 6px;
-  border-radius: var(--radius-sm);
+  border-radius: 3px;
   white-space: nowrap;
   pointer-events: none;
 }
 
 // ============================================
-// Bottom bar
+// Row 3: Controls — flush, no padding
 // ============================================
 
-.bottomBar {
+.controlsRow {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-sm) var(--space-md) var(--space-md);
   z-index: 1;
-}
-
-.leftControls,
-.rightControls {
   display: flex;
-  align-items: center;
-  gap: var(--space-sm);
+  align-items: stretch;
+  justify-content: center;
 }
 
-.controlButton {
+.centerControls {
+  display: flex;
+  align-items: stretch;
+}
+
+.rightControls {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+// ============================================
+// Buttons — flat, no radius, edge-to-edge
+// ============================================
+
+.controlBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 36px;
-  height: 36px;
-  padding: 0 var(--space-xs);
+  width: 52px;
+  height: 48px;
   color: #ffffff;
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  border-radius: var(--radius-sm);
-  transition: background var(--transition-fast);
+  border-radius: 0;
+  transition: background 120ms ease;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
   }
 
   &.active {
     color: var(--color-accent);
   }
-}
 
-// ============================================
-// Skip buttons
-// ============================================
-
-.skipIcon {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-}
-
-.skipArrow {
-  font-size: 22px;
-  line-height: 1;
-}
-
-.skipLabel {
-  position: absolute;
-  font-size: 9px;
-  font-weight: var(--font-weight-bold);
-  line-height: 1;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  margin-top: 1px;
-}
-
-// ============================================
-// Volume
-// ============================================
-
-.volumeGroup {
-  display: flex;
-  align-items: center;
-  gap: 0;
-
-  &:hover .volumeSlider {
-    width: 80px;
-    opacity: 1;
-    margin-left: var(--space-xs);
+  svg {
+    display: block;
   }
 }
 
+.playBtn {
+  width: 60px;
+
+  svg {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+// ============================================
+// Skip buttons — text + icon in a row
+// ============================================
+
+.skipBtn {
+  width: auto;
+  gap: 0;
+  padding: 0 10px;
+}
+
+.skipText {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+// ============================================
+// Volume — vertical popup
+// ============================================
+
+.volumeWrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.volumePopup {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 10px;
+  background: rgba(18, 18, 18, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  animation: fadeIn 120ms ease;
+}
+
 .volumeSlider {
-  width: 0;
-  opacity: 0;
-  transition: width var(--transition-normal), opacity var(--transition-normal),
-    margin var(--transition-normal);
-  accent-color: var(--color-accent);
-  cursor: pointer;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 4px;
+  height: 100px;
   appearance: none;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
   outline: none;
+  cursor: pointer;
 
   &::-webkit-slider-thumb {
     appearance: none;
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     background: #ffffff;
     border-radius: 50%;
     cursor: pointer;
   }
 
   &::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     background: #ffffff;
     border-radius: 50%;
     cursor: pointer;
     border: none;
   }
+
+  &::-webkit-slider-runnable-track {
+    background: transparent;
+  }
+
+  &::-moz-range-track {
+    background: transparent;
+  }
 }
 
-.timeDisplay {
-  font-size: var(--font-size-sm);
-  color: rgba(255, 255, 255, 0.9);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  margin-left: var(--space-sm);
+.volumeMuteBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #ffffff;
+  border-radius: 0;
+  transition: background 120ms ease;
 
-  @include mobile {
-    font-size: var(--font-size-xs);
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -250,19 +310,21 @@
 
 .menuContainer {
   position: relative;
+  display: flex;
+  align-items: stretch;
 }
 
 .menu {
   position: absolute;
-  bottom: calc(100% + var(--space-sm));
+  bottom: 100%;
   right: 0;
   min-width: 180px;
-  background: rgba(20, 20, 20, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-md);
-  padding: var(--space-xs) 0;
-  box-shadow: var(--shadow-lg);
-  animation: fadeIn 150ms ease;
+  background: rgba(18, 18, 18, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 4px 0;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+  animation: fadeIn 120ms ease;
   backdrop-filter: blur(12px);
 }
 
@@ -271,37 +333,37 @@
   width: 100%;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-sm) var(--space-md);
+  padding: 8px 14px;
   color: rgba(255, 255, 255, 0.9);
-  font-size: var(--font-size-sm);
-  transition: background var(--transition-fast);
+  font-size: 13px;
+  transition: background 120ms ease;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
   }
 }
 
 .menuRowLabel {
-  font-weight: var(--font-weight-medium);
+  font-weight: 500;
 }
 
 .menuRowValue {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
 }
 
 .menuBack {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: var(--space-xs);
-  transition: background var(--transition-fast);
+  gap: 4px;
+  padding: 8px 14px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+  transition: background 120ms ease;
 
   &:hover {
     background: rgba(255, 255, 255, 0.05);
@@ -311,18 +373,29 @@
 .menuItem {
   display: block;
   width: 100%;
-  padding: var(--space-sm) var(--space-md);
+  padding: 8px 14px;
   text-align: left;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: var(--font-size-sm);
-  transition: background var(--transition-fast);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  transition: background 120ms ease;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   &.selected {
     color: var(--color-accent);
-    font-weight: var(--font-weight-semibold);
+    font-weight: 600;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

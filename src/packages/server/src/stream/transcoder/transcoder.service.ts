@@ -57,15 +57,21 @@ export class TranscoderService implements OnModuleDestroy {
       let command = ffmpeg(filePath)
         .outputOptions([
           '-f', 'hls',
-          '-hls_time', '6',
+          '-hls_time', '2',
           '-hls_list_size', '0',
           '-hls_segment_filename', segmentPattern,
           '-hls_playlist_type', 'event',
+          '-hls_flags', 'independent_segments',
         ])
         .videoCodec(videoCodec)
         .audioCodec('aac')
-        .audioBitrate(profile.audioBitrate)
-        .videoBitrate(profile.videoBitrate)
+        .outputOptions([
+          '-threads', '0',
+          '-g', '48',
+          '-sc_threshold', '0',
+          '-b:a', profile.audioBitrate,
+          '-b:v', profile.videoBitrate,
+        ])
         .size(`${profile.width}x${profile.height}`)
         .outputOptions(['-preset', profile.preset]);
 
@@ -82,15 +88,15 @@ export class TranscoderService implements OnModuleDestroy {
         command = command.inputOptions(['-hwaccel', 'qsv']);
       }
 
-      // Select specific audio track if provided
-      if (options.audioTrack !== undefined) {
-        command = command.outputOptions(['-map', `0:a:${options.audioTrack}`]);
-      } else {
-        command = command.outputOptions(['-map', '0:a:0']);
-      }
-
       // Map video stream
       command = command.outputOptions(['-map', '0:v:0']);
+
+      // Select specific audio track if provided (? suffix prevents crash on files with no audio)
+      if (options.audioTrack !== undefined) {
+        command = command.outputOptions(['-map', `0:a:${options.audioTrack}?`]);
+      } else {
+        command = command.outputOptions(['-map', '0:a:0?']);
+      }
 
       command
         .output(outputPath)
@@ -119,6 +125,58 @@ export class TranscoderService implements OnModuleDestroy {
       const proc = command.run();
 
       // fluent-ffmpeg stores the process on the command object
+      const ffmpegProcess = (command as any).ffmpegProc;
+      if (ffmpegProcess) {
+        this.activeProcesses.set(sessionId, ffmpegProcess);
+      }
+    });
+  }
+
+  async startRemux(sessionId: string, filePath: string): Promise<void> {
+    const sessionDir = this.getSessionDir(sessionId);
+    await mkdir(sessionDir, { recursive: true });
+
+    const outputPath = path.join(sessionDir, 'stream.m3u8');
+    const segmentPattern = path.join(sessionDir, 'segment_%04d.ts');
+
+    return new Promise<void>((resolve, reject) => {
+      const command = ffmpeg(filePath)
+        .outputOptions([
+          '-f', 'hls',
+          '-hls_time', '2',
+          '-hls_list_size', '0',
+          '-hls_segment_filename', segmentPattern,
+          '-hls_playlist_type', 'event',
+          '-hls_flags', 'independent_segments',
+        ])
+        .videoCodec('copy')
+        .audioCodec('copy')
+        .outputOptions([
+          '-map', '0:v:0',
+          '-map', '0:a:0?',
+        ])
+        .output(outputPath)
+        .on('start', (commandLine: string) => {
+          this.logger.log(`FFmpeg remux started for session ${sessionId}: ${commandLine}`);
+          resolve();
+        })
+        .on('progress', (progress: any) => {
+          this.logger.debug(
+            `Remux progress [${sessionId}]: ${progress.percent?.toFixed(1)}%`,
+          );
+        })
+        .on('error', (err: Error) => {
+          this.logger.error(`FFmpeg remux error for session ${sessionId}: ${err.message}`);
+          this.activeProcesses.delete(sessionId);
+          reject(err);
+        })
+        .on('end', () => {
+          this.logger.log(`Remux complete for session ${sessionId}`);
+          this.activeProcesses.delete(sessionId);
+        });
+
+      command.run();
+
       const ffmpegProcess = (command as any).ffmpegProc;
       if (ffmpegProcess) {
         this.activeProcesses.set(sessionId, ffmpegProcess);

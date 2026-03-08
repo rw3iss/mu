@@ -33,6 +33,7 @@ export function History(_props: HistoryProps) {
           movieTitle: string;
           movieYear: number;
           moviePosterUrl: string;
+          movieThumbnailUrl: string;
         }>;
       }>('/history');
       setMovies(data.data.map((entry) => ({
@@ -40,7 +41,7 @@ export function History(_props: HistoryProps) {
         title: entry.movieTitle ?? 'Untitled',
         year: entry.movieYear ?? 0,
         overview: '',
-        posterUrl: entry.moviePosterUrl ?? '',
+        posterUrl: entry.moviePosterUrl || entry.movieThumbnailUrl || '',
         backdropUrl: '',
         runtime: 0,
         genres: [],

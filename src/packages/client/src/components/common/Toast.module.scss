@@ -28,6 +28,12 @@
   animation: slideInRight 250ms ease;
   pointer-events: auto;
   @include glass;
+
+  :global([data-theme='light']) & {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
 }
 
 .icon {

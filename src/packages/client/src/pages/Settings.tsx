@@ -1,31 +1,60 @@
 import { h } from 'preact';
 import { useState, useCallback, useEffect } from 'preact/hooks';
+import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { MediaPathList } from '@/components/library/MediaPathList';
+import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { theme, setTheme } from '@/state/theme.state';
+import { currentUser } from '@/state/auth.state';
+import { useUiSetting } from '@/hooks/useUiSetting';
 import { notifySuccess, notifyError } from '@/state/notifications.state';
 import { api } from '@/services/api';
+import { sourcesService } from '@/services/sources.service';
+import { Plugins } from './Plugins';
+import { AdminDashboard } from './AdminDashboard';
 import type { Theme } from '@/state/theme.state';
 import styles from './Settings.module.scss';
 
 interface SettingsProps {
   path?: string;
+  tab?: string;
 }
 
-type SettingsTab = 'general' | 'playback' | 'library' | 'notifications' | 'rating' | 'about';
+type SettingsTab = 'general' | 'playback' | 'library' | 'notifications' | 'rating' | 'plugins' | 'admin' | 'about';
 
-export function Settings(_props: SettingsProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+const VALID_TABS: SettingsTab[] = ['general', 'playback', 'library', 'notifications', 'rating', 'plugins', 'admin', 'about'];
+
+function isValidTab(tab: string | undefined): tab is SettingsTab {
+  return VALID_TABS.includes(tab as SettingsTab);
+}
+
+function formatNextScan(nextScanAt: string | null): string | null {
+  if (!nextScanAt) return null;
+  const diff = new Date(nextScanAt).getTime() - Date.now();
+  if (diff <= 0) return 'any moment now';
+  const minutes = Math.round(diff / 60000);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const hours = Math.round(minutes / 60);
+  return `${hours} hour${hours === 1 ? '' : 's'}`;
+}
+
+export function Settings(props: SettingsProps) {
+  const initialTab = isValidTab(props.tab) ? props.tab : 'general';
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   // Playback settings
   const [defaultQuality, setDefaultQuality] = useState('auto');
   const [autoplay, setAutoplay] = useState(true);
+  const [bufferSize, setBufferSizeSetting] = useUiSetting('buffer_size', 'normal');
 
   // Library settings
   const [scanInterval, setScanInterval] = useState('6');
-  const [mediaPath, setMediaPath] = useState('');
+  const [mediaPathEntries, setMediaPathEntries] = useState<MediaPathEntryData[]>([]);
   const [fetchExtendedMetadata, setFetchExtendedMetadata] = useState(true);
+  const [autoScanEnabled, setAutoScanEnabled] = useState(true);
+  const [nextScanAt, setNextScanAt] = useState<string | null>(null);
 
   // Rating settings
   const [ratingScale, setRatingScale] = useState('10');
@@ -33,6 +62,19 @@ export function Settings(_props: SettingsProps) {
 
   // Notification settings
   const [notifyScanResults, setNotifyScanResults] = useState(true);
+
+  // Sync tab from URL prop
+  useEffect(() => {
+    if (isValidTab(props.tab) && props.tab !== activeTab) {
+      setActiveTab(props.tab);
+    }
+  }, [props.tab]);
+
+  const handleTabChange = useCallback((tab: SettingsTab) => {
+    setActiveTab(tab);
+    const url = tab === 'general' ? '/settings' : `/settings/${tab}`;
+    route(url, true);
+  }, []);
 
   useEffect(() => {
     async function loadSettings() {
@@ -43,13 +85,36 @@ export function Settings(_props: SettingsProps) {
         if (playback) {
           if (typeof playback.defaultQuality === 'string') setDefaultQuality(playback.defaultQuality);
           if (typeof playback.autoplay === 'boolean') setAutoplay(playback.autoplay);
+          if (typeof playback.bufferSize === 'string') {
+            setBufferSizeSetting(playback.bufferSize);
+          }
         }
 
         const library = data.library as Record<string, unknown> | undefined;
         if (library) {
-          if (typeof library.mediaPath === 'string') setMediaPath(library.mediaPath);
           if (library.scanIntervalHours != null) setScanInterval(String(library.scanIntervalHours));
           if (typeof library.fetchExtendedMetadata === 'boolean') setFetchExtendedMetadata(library.fetchExtendedMetadata);
+          if (typeof library.autoScanEnabled === 'boolean') setAutoScanEnabled(library.autoScanEnabled);
+        }
+
+        // Load sources from the API
+        try {
+          const sources = await sourcesService.getAll();
+          if (sources.length > 0) {
+            setMediaPathEntries(sources.map((s) => ({ path: s.path, source: s })));
+          } else {
+            setMediaPathEntries([{ path: '', source: null }]);
+          }
+        } catch {
+          setMediaPathEntries([{ path: '', source: null }]);
+        }
+
+        // Load scan status
+        try {
+          const scanStatus = await sourcesService.getScanStatus();
+          setNextScanAt(scanStatus.nextScanAt);
+        } catch {
+          // ignore
         }
 
         const rating = data.rating as Record<string, unknown> | undefined;
@@ -73,33 +138,54 @@ export function Settings(_props: SettingsProps) {
     setIsSaving(true);
     try {
       await api.put('/settings/playback', {
-        value: { defaultQuality, autoplay },
+        value: { defaultQuality, autoplay, bufferSize },
       });
+      setBufferSizeSetting(bufferSize);
       notifySuccess('Playback settings saved');
     } catch {
       notifyError('Failed to save settings');
     } finally {
       setIsSaving(false);
     }
-  }, [defaultQuality, autoplay]);
+  }, [defaultQuality, autoplay, bufferSize]);
 
   const handleSaveLibrary = useCallback(async () => {
     setIsSaving(true);
     try {
+      // Sync media sources
+      const validPaths = mediaPathEntries
+        .map((e) => e.path.trim())
+        .filter(Boolean);
+      await sourcesService.sync(validPaths);
+
+      // Reload sources to get full objects with scan status
+      const sources = await sourcesService.getAll();
+      if (sources.length > 0) {
+        setMediaPathEntries(sources.map((s) => ({ path: s.path, source: s })));
+      } else {
+        setMediaPathEntries([{ path: '', source: null }]);
+      }
+
+      // Save library settings
       await api.put('/settings/library', {
         value: {
           scanIntervalHours: parseInt(scanInterval, 10),
-          mediaPath: mediaPath || undefined,
           fetchExtendedMetadata,
+          autoScanEnabled,
         },
       });
+
+      // Refresh the auto-scan schedule on the server
+      const scanStatus = await sourcesService.refreshSchedule();
+      setNextScanAt(scanStatus.nextScanAt);
+
       notifySuccess('Library settings saved');
     } catch {
       notifyError('Failed to save settings');
     } finally {
       setIsSaving(false);
     }
-  }, [scanInterval, mediaPath, fetchExtendedMetadata]);
+  }, [scanInterval, mediaPathEntries, fetchExtendedMetadata, autoScanEnabled]);
 
   const handleSaveRating = useCallback(async () => {
     setIsSaving(true);
@@ -115,14 +201,42 @@ export function Settings(_props: SettingsProps) {
     }
   }, [ratingScale, showExternalRatings]);
 
+  // Scan state
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{
+    filesFound: number;
+    filesAdded: number;
+    filesUpdated: number;
+    filesRemoved: number;
+  } | null>(null);
+
   const handleScanNow = useCallback(async () => {
+    setIsScanning(true);
+    setScanResult(null);
     try {
-      await api.post('/sources/scan');
-      notifySuccess('Library scan started');
+      const result = await api.post<{
+        filesFound: number;
+        filesAdded: number;
+        filesUpdated: number;
+        filesRemoved: number;
+      }>('/sources/scan');
+      setScanResult(result);
+      if (result.filesAdded > 0) {
+        notifySuccess(`Scan complete: ${result.filesAdded} new movie${result.filesAdded === 1 ? '' : 's'} added`);
+      } else {
+        notifySuccess('Scan complete — no new movies found');
+      }
     } catch {
-      notifyError('Failed to start scan');
+      notifyError('Failed to scan library');
+    } finally {
+      setIsScanning(false);
     }
   }, []);
+
+  const nextScanText = autoScanEnabled ? formatNextScan(nextScanAt) : null;
+
+  const user = currentUser.value;
+  const isAdmin = user?.role === 'admin';
 
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'general', label: 'General' },
@@ -130,6 +244,10 @@ export function Settings(_props: SettingsProps) {
     { id: 'library', label: 'Library' },
     { id: 'notifications', label: 'Notifications' },
     { id: 'rating', label: 'Rating' },
+    ...(isAdmin ? [
+      { id: 'plugins' as SettingsTab, label: 'Plugins' },
+      { id: 'admin' as SettingsTab, label: 'Admin' },
+    ] : []),
     { id: 'about', label: 'About' },
   ];
 
@@ -144,7 +262,7 @@ export function Settings(_props: SettingsProps) {
             <button
               key={tab.id}
               class={`${styles.tab} ${activeTab === tab.id ? styles.active : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
             >
               {tab.label}
             </button>
@@ -234,6 +352,25 @@ export function Settings(_props: SettingsProps) {
                 </label>
               </div>
 
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Buffer Size</span>
+                  <span class={styles.settingDescription}>
+                    Amount of video to pre-load. Larger buffers improve stability on slow connections.
+                  </span>
+                </div>
+                <select
+                  class={styles.select}
+                  value={bufferSize}
+                  onChange={(e) => setBufferSizeSetting((e.target as HTMLSelectElement).value)}
+                >
+                  <option value="small">Small (10s)</option>
+                  <option value="normal">Normal (30s)</option>
+                  <option value="large">Large (60s)</option>
+                  <option value="max">Maximum (120s)</option>
+                </select>
+              </div>
+
               <div class={styles.actions}>
                 <Button variant="primary" loading={isSaving} onClick={handleSavePlayback}>
                   Save Changes
@@ -247,32 +384,51 @@ export function Settings(_props: SettingsProps) {
             <div class={styles.panel}>
               <h2 class={styles.panelTitle}>Library</h2>
 
-              <div class={styles.settingRow}>
+              <div class={styles.settingGroup}>
                 <div class={styles.settingInfo}>
-                  <span class={styles.settingLabel}>Media Path</span>
+                  <span class={styles.settingLabel}>Media Paths</span>
                   <span class={styles.settingDescription}>
-                    Path to your movie files
+                    Directories containing your movie files
                   </span>
                 </div>
-                <input
-                  type="text"
-                  class={styles.input}
-                  value={mediaPath}
-                  onInput={(e) => setMediaPath((e.target as HTMLInputElement).value)}
-                  placeholder="/path/to/movies"
+                <MediaPathList
+                  entries={mediaPathEntries}
+                  onChange={setMediaPathEntries}
+                  showBrowse={true}
                 />
+              </div>
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Automatic Scanning</span>
+                  <span class={styles.settingDescription}>
+                    Periodically scan media directories for new files
+                  </span>
+                </div>
+                <label class={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={autoScanEnabled}
+                    onChange={(e) => setAutoScanEnabled((e.target as HTMLInputElement).checked)}
+                  />
+                  <span class={styles.toggleTrack} />
+                </label>
               </div>
 
               <div class={styles.settingRow}>
                 <div class={styles.settingInfo}>
                   <span class={styles.settingLabel}>Scan Interval</span>
                   <span class={styles.settingDescription}>
-                    How often to check for new files (in hours)
+                    How often to check for new files
+                    {nextScanText && (
+                      <span class={styles.nextScan}> &middot; Next scan in {nextScanText}</span>
+                    )}
                   </span>
                 </div>
                 <select
                   class={styles.select}
                   value={scanInterval}
+                  disabled={!autoScanEnabled}
                   onChange={(e) => setScanInterval((e.target as HTMLSelectElement).value)}
                 >
                   <option value="1">Every hour</option>
@@ -300,10 +456,38 @@ export function Settings(_props: SettingsProps) {
                 </label>
               </div>
 
-              <div class={styles.actions}>
-                <Button variant="secondary" onClick={handleScanNow}>
-                  Scan Now
+              <div class={styles.scanSection}>
+                <Button variant="secondary" loading={isScanning} onClick={handleScanNow}>
+                  {isScanning ? 'Scanning...' : 'Scan Now'}
                 </Button>
+                {scanResult && (
+                  <div class={styles.scanResult}>
+                    <span class={styles.scanStat}>
+                      {scanResult.filesFound} file{scanResult.filesFound === 1 ? '' : 's'} found
+                    </span>
+                    {scanResult.filesAdded > 0 && (
+                      <span class={styles.scanStatHighlight}>
+                        {scanResult.filesAdded} new movie{scanResult.filesAdded === 1 ? '' : 's'} imported
+                      </span>
+                    )}
+                    {scanResult.filesUpdated > 0 && (
+                      <span class={styles.scanStat}>
+                        {scanResult.filesUpdated} updated
+                      </span>
+                    )}
+                    {scanResult.filesRemoved > 0 && (
+                      <span class={styles.scanStat}>
+                        {scanResult.filesRemoved} removed
+                      </span>
+                    )}
+                    {scanResult.filesAdded === 0 && scanResult.filesUpdated === 0 && scanResult.filesRemoved === 0 && (
+                      <span class={styles.scanStat}>Library is up to date</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div class={styles.actions}>
                 <Button variant="primary" loading={isSaving} onClick={handleSaveLibrary}>
                   Save Changes
                 </Button>
@@ -387,6 +571,20 @@ export function Settings(_props: SettingsProps) {
             </div>
           )}
 
+          {/* Plugins Tab */}
+          {activeTab === 'plugins' && isAdmin && (
+            <div class={styles.panel}>
+              <Plugins />
+            </div>
+          )}
+
+          {/* Admin Tab */}
+          {activeTab === 'admin' && isAdmin && (
+            <div class={styles.panel}>
+              <AdminDashboard />
+            </div>
+          )}
+
           {/* About Tab */}
           {activeTab === 'about' && (
             <div class={styles.panel}>
@@ -412,6 +610,19 @@ export function Settings(_props: SettingsProps) {
                 organize, browse, and stream your personal movie collection
                 from anywhere.
               </p>
+
+              <h3 class={styles.aboutSectionTitle}>Developer</h3>
+              <div class={styles.developerLinks}>
+                <a href="https://www.ryanweiss.net" target="_blank" rel="noopener noreferrer" class={styles.developerLink}>
+                  Ryan Weiss
+                </a>
+                <a href="https://github.com/rw3iss/mu" target="_blank" rel="noopener noreferrer" class={styles.developerLink}>
+                  Project Website
+                </a>
+                <a href="/changelog" class={styles.developerLink} onClick={(e) => { e.preventDefault(); route('/changelog'); }}>
+                  Recent Changes
+                </a>
+              </div>
             </div>
           )}
         </div>

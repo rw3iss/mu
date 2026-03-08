@@ -56,6 +56,44 @@ export class LibraryService {
     this.events.emit('library:source-removed', { id, path: source.path });
   }
 
+  findByPath(path: string) {
+    return this.database.db
+      .select()
+      .from(mediaSources)
+      .where(eq(mediaSources.path, path))
+      .get();
+  }
+
+  syncSources(paths: string[]) {
+    const existing = this.getSources();
+    const existingPaths = new Set(existing.map((s) => s.path));
+    const newPaths = new Set(paths);
+
+    const created: typeof existing = [];
+    const kept: typeof existing = [];
+    const removedPaths: string[] = [];
+
+    // Add new paths
+    for (const path of paths) {
+      if (!existingPaths.has(path)) {
+        created.push(this.addSource(path));
+      } else {
+        const source = existing.find((s) => s.path === path)!;
+        kept.push(source);
+      }
+    }
+
+    // Remove sources whose paths are no longer in the list
+    for (const source of existing) {
+      if (!newPaths.has(source.path)) {
+        this.removeSource(source.id);
+        removedPaths.push(source.path);
+      }
+    }
+
+    return { created, removed: removedPaths, kept };
+  }
+
   updateSource(id: string, data: Partial<{ label: string; enabled: boolean; scanIntervalHours: number }>) {
     const existing = this.getSource(id);
     if (!existing) {

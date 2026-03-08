@@ -112,6 +112,15 @@
   min-width: 0;
 }
 
+.playlistsColumn {
+  flex-shrink: 0;
+  width: 240px;
+
+  @include mobile {
+    width: 100%;
+  }
+}
+
 // ============================================
 // Editable Title
 // ============================================

@@ -17,6 +17,7 @@ export const movieFiles = sqliteTable('movie_files', {
   durationSeconds: integer('duration_seconds'),
   subtitleTracks: text('subtitle_tracks'),
   audioTracks: text('audio_tracks'),
+  fileMetadata: text('file_metadata'),
   available: integer('available', { mode: 'boolean' }).default(true),
   addedAt: text('added_at').notNull(),
   fileModifiedAt: text('file_modified_at'),

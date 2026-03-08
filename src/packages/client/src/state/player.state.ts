@@ -83,6 +83,10 @@ export async function endStream(): Promise<void> {
   if (!session) return;
 
   try {
+    // Send final position so history is recorded even for short views
+    if (currentTime.value > 0) {
+      await streamService.updateProgress(session.sessionId, currentTime.value).catch(() => {});
+    }
     await streamService.endStream(session.sessionId);
   } catch (error) {
     console.error('Failed to end stream:', error);

@@ -4,6 +4,14 @@ import { nowISO } from '@mu/shared';
 import { DatabaseService } from '../database/database.service.js';
 import { playlists, playlistMovies, movies } from '../database/schema/index.js';
 
+interface PlaylistMovieSummary {
+  movieId: string;
+  title: string;
+  year: number | null;
+  posterUrl: string | null;
+  thumbnailUrl: string | null;
+}
+
 @Injectable()
 export class PlaylistsService {
   constructor(private readonly database: DatabaseService) {}
@@ -24,7 +32,7 @@ export class PlaylistsService {
     return this.findById(id);
   }
 
-  findAll(userId: string) {
+  findAll(userId: string, options?: { includeMovies?: boolean }) {
     const result = this.database.db
       .select({
         id: playlists.id,
@@ -42,7 +50,28 @@ export class PlaylistsService {
       .groupBy(playlists.id)
       .all();
 
-    return result;
+    if (!options?.includeMovies) {
+      return result;
+    }
+
+    // Attach movie summaries for each playlist
+    return result.map((playlist) => {
+      const movieSummaries = this.database.db
+        .select({
+          movieId: playlistMovies.movieId,
+          title: movies.title,
+          year: movies.year,
+          posterUrl: movies.posterUrl,
+          thumbnailUrl: movies.thumbnailUrl,
+        })
+        .from(playlistMovies)
+        .innerJoin(movies, eq(playlistMovies.movieId, movies.id))
+        .where(eq(playlistMovies.playlistId, playlist.id))
+        .orderBy(asc(playlistMovies.position))
+        .all() as PlaylistMovieSummary[];
+
+      return { ...playlist, movies: movieSummaries };
+    });
   }
 
   findById(id: string) {
@@ -65,6 +94,7 @@ export class PlaylistsService {
         movieTitle: movies.title,
         movieYear: movies.year,
         moviePosterUrl: movies.posterUrl,
+        movieThumbnailUrl: movies.thumbnailUrl,
         movieRuntimeMinutes: movies.runtimeMinutes,
       })
       .from(playlistMovies)
@@ -157,6 +187,18 @@ export class PlaylistsService {
       .set({ updatedAt: nowISO() })
       .where(eq(playlists.id, playlistId))
       .run();
+  }
+
+  findByMovie(userId: string, movieId: string) {
+    return this.database.db
+      .select({
+        id: playlists.id,
+        name: playlists.name,
+      })
+      .from(playlistMovies)
+      .innerJoin(playlists, eq(playlistMovies.playlistId, playlists.id))
+      .where(and(eq(playlistMovies.movieId, movieId), eq(playlists.userId, userId)))
+      .all();
   }
 
   reorder(playlistId: string, movieIds: string[]) {

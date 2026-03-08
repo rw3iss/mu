@@ -4,6 +4,8 @@
 // Users can override via color pickers / custom theme JSON.
 // ============================================
 
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
 :root {
   // Core palette
   --color-bg-primary: #080c14;
@@ -46,8 +48,8 @@
   --space-xl: 32px;
   --space-2xl: 48px;
 
-  // Typography
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+  // Typography — Outfit: thin, cinematic
+  --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
   --font-family-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Consolas,
     monospace;
@@ -61,6 +63,7 @@
   --font-size-3xl: 2rem;
   --font-size-4xl: 2.5rem;
 
+  --font-weight-light: 300;
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;

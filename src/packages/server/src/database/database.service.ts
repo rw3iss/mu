@@ -246,6 +246,16 @@ export class DatabaseService implements OnModuleDestroy {
     } catch {
       // Column already exists
     }
+    try {
+      this.sqlite.exec(`ALTER TABLE movie_files ADD COLUMN file_metadata TEXT`);
+    } catch {
+      // Column already exists
+    }
+    try {
+      this.sqlite.exec(`ALTER TABLE movies ADD COLUMN thumbnail_aspect_ratio REAL`);
+    } catch {
+      // Column already exists
+    }
 
     this.logger.log('Tables created from inline SQL');
   }

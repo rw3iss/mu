@@ -125,7 +125,45 @@
   margin-bottom: 2px;
 }
 
+.details {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
 .year {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
+}
+
+.runtime {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+
+  &::before {
+    content: '\00b7';
+    margin-right: var(--space-xs);
+  }
+}
+
+.addedAt {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+
+  &::before {
+    content: '\00b7';
+    margin-right: var(--space-xs);
+  }
+}
+
+.userRating {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+
+  &::before {
+    content: '\00b7';
+    margin-right: var(--space-xs);
+    color: var(--color-text-muted);
+  }
 }

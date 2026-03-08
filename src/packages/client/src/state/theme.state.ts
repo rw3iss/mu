@@ -1,4 +1,5 @@
 import { signal, effect } from '@preact/signals';
+import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
 
 // ============================================
 // Types
@@ -10,7 +11,13 @@ export type Theme = 'dark' | 'light' | 'auto';
 // Signals
 // ============================================
 
-export const theme = signal<Theme>('dark');
+// Read saved theme from localStorage immediately (not in useEffect)
+// so the effect below doesn't overwrite a saved value with the default.
+const saved = getUiSetting<string>('theme', 'dark');
+const initial: Theme =
+  saved === 'dark' || saved === 'light' || saved === 'auto' ? saved : 'dark';
+
+export const theme = signal<Theme>(initial);
 
 // ============================================
 // Effects
@@ -30,7 +37,7 @@ function applyTheme(t: Theme): void {
 
 effect(() => {
   applyTheme(theme.value);
-  localStorage.setItem('mu_theme', theme.value);
+  setUiSetting('theme', theme.value);
 });
 
 // ============================================
@@ -52,12 +59,8 @@ export function toggleTheme(): void {
 }
 
 export function initTheme(): void {
-  const saved = localStorage.getItem('mu_theme') as Theme | null;
-  if (saved === 'dark' || saved === 'light' || saved === 'auto') {
-    theme.value = saved;
-  }
-
-  // Listen for system theme changes
+  // Theme is already loaded from localStorage at module level.
+  // Just set up the system-preference listener for 'auto' mode.
   if (typeof window !== 'undefined') {
     window
       .matchMedia('(prefers-color-scheme: dark)')

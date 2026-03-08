@@ -81,10 +81,12 @@ export async function checkAuth(): Promise<void> {
 export async function setup(
   username: string,
   email: string | undefined,
-  password: string
+  password: string,
+  mediaPaths?: string[],
 ): Promise<void> {
-  const body: Record<string, string> = { username, password };
+  const body: Record<string, unknown> = { username, password };
   if (email) body.email = email;
+  if (mediaPaths?.length) body.mediaPaths = mediaPaths;
 
   const response = await api.post<{ user: User; accessToken: string }>('/auth/setup', body);
 

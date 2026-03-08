@@ -6,6 +6,7 @@ import { RatingWidget } from '@/components/movie/RatingWidget';
 import { ExternalRatings } from '@/components/movie/ExternalRatings';
 import { Spinner } from '@/components/common/Spinner';
 import { moviesService } from '@/services/movies.service';
+import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { notifySuccess, notifyError } from '@/state/notifications.state';
 import type { Movie } from '@/state/library.state';
 import styles from './MovieDetail.module.scss';
@@ -185,9 +186,13 @@ export function MovieDetail({ id }: MovieDetailProps) {
   }
 
   const hours = Math.floor(movie.runtime / 60);
-  const minutes = movie.runtime % 60;
+  const mins = movie.runtime % 60;
   const runtimeText = movie.runtime
-    ? `${hours > 0 ? `${hours}h ` : ''}${minutes}m`
+    ? hours > 0
+      ? mins > 0
+        ? `${hours} hour${hours !== 1 ? 's' : ''}, ${mins} minute${mins !== 1 ? 's' : ''}`
+        : `${hours} hour${hours !== 1 ? 's' : ''}`
+      : `${mins} minute${mins !== 1 ? 's' : ''}`
     : '';
 
   return (
@@ -390,6 +395,11 @@ export function MovieDetail({ id }: MovieDetailProps) {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Playlists (right column) */}
+        <div class={styles.playlistsColumn}>
+          <MoviePlaylists movieId={movie.id} />
         </div>
       </div>
     </div>

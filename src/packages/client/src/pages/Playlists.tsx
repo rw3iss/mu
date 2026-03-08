@@ -6,19 +6,37 @@ import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import { notifySuccess, notifyError } from '@/state/notifications.state';
 import { route } from 'preact-router';
+import type { Playlist, PlaylistMovieSummary } from '@/services/playlists.service';
 import styles from './Playlists.module.scss';
 
 interface PlaylistsProps {
   path?: string;
 }
 
-interface Playlist {
-  id: string;
-  name: string;
-  description: string;
-  movieCount: number;
-  posterUrl?: string;
-  createdAt: string;
+/** Max movies to show in the 3x2 preview grid */
+const PREVIEW_COUNT = 6;
+
+function MovieTile({ movie }: { movie: PlaylistMovieSummary }) {
+  const poster = movie.posterUrl || movie.thumbnailUrl;
+
+  if (poster) {
+    return <img class={styles.tilePoster} src={poster} alt={movie.title} />;
+  }
+
+  // Fallback: abbreviation + year
+  const abbr = movie.title
+    .split(/\s+/)
+    .slice(0, 3)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+
+  return (
+    <div class={styles.tileFallback}>
+      <span class={styles.tileAbbr}>{abbr}</span>
+      {movie.year && <span class={styles.tileYear}>{movie.year}</span>}
+    </div>
+  );
 }
 
 export function Playlists(_props: PlaylistsProps) {
@@ -35,7 +53,7 @@ export function Playlists(_props: PlaylistsProps) {
   async function loadPlaylists() {
     setIsLoading(true);
     try {
-      const data = await api.get<Playlist[]>('/playlists');
+      const data = await api.get<Playlist[]>('/playlists?includeMovies=true');
       setPlaylists(data);
     } catch {
       console.error('Failed to load playlists');
@@ -89,29 +107,49 @@ export function Playlists(_props: PlaylistsProps) {
         </div>
       ) : (
         <div class={styles.grid}>
-          {playlists.map((playlist) => (
-            <div
-              key={playlist.id}
-              class={styles.card}
-              onClick={() => route(`/playlists/${playlist.id}`)}
-              role="button"
-              tabIndex={0}
-            >
-              <div class={styles.cardPoster}>
-                {playlist.posterUrl ? (
-                  <img src={playlist.posterUrl} alt="" />
-                ) : (
-                  <span class={styles.cardIcon}>{'\u{1F4CB}'}</span>
-                )}
+          {playlists.map((playlist) => {
+            const previewMovies = (playlist.movies ?? []).slice(0, PREVIEW_COUNT);
+            const hasMovies = previewMovies.length > 0;
+
+            return (
+              <div
+                key={playlist.id}
+                class={styles.card}
+                onClick={() => route(`/playlists/${playlist.id}`)}
+                role="button"
+                tabIndex={0}
+              >
+                <div class={styles.cardPoster}>
+                  {hasMovies ? (
+                    <div class={styles.movieGrid}>
+                      {previewMovies.map((m) => (
+                        <div key={m.movieId} class={styles.movieTile}>
+                          <MovieTile movie={m} />
+                        </div>
+                      ))}
+                      {/* Fill remaining cells if fewer than 6 */}
+                      {Array.from({ length: PREVIEW_COUNT - previewMovies.length }).map((_, i) => (
+                        <div key={`empty-${i}`} class={styles.movieTileEmpty} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div class={styles.emptyPoster}>
+                      <span class={styles.emptyIcon}>No movies yet</span>
+                    </div>
+                  )}
+                </div>
+                <div class={styles.cardInfo}>
+                  <h3 class={styles.cardName}>{playlist.name}</h3>
+                  {playlist.description && (
+                    <p class={styles.cardDescription}>{playlist.description}</p>
+                  )}
+                  <span class={styles.cardCount}>
+                    {playlist.movieCount} {playlist.movieCount === 1 ? 'movie' : 'movies'}
+                  </span>
+                </div>
               </div>
-              <div class={styles.cardInfo}>
-                <h3 class={styles.cardName}>{playlist.name}</h3>
-                <span class={styles.cardCount}>
-                  {playlist.movieCount} {playlist.movieCount === 1 ? 'movie' : 'movies'}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

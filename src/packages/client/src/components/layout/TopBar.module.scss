@@ -8,7 +8,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-lg);
-  background: var(--color-bg-secondary);
+  background:
+    linear-gradient(180deg, rgba(20, 28, 50, 0.5) 0%, rgba(13, 19, 33, 0.9) 100%),
+    var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
   z-index: var(--z-sticky);
   transition: left var(--transition-normal);
@@ -169,5 +171,13 @@
     &:hover {
       background: rgba(248, 113, 113, 0.08);
     }
+  }
+}
+
+// Light theme topbar gradient
+:global([data-theme='light']) {
+  .topbar {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 242, 250, 0.98) 100%);
   }
 }

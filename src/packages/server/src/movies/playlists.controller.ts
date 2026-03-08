@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { PlaylistsService } from './playlists.service.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 
@@ -7,8 +7,13 @@ export class PlaylistsController {
   constructor(private readonly playlistsService: PlaylistsService) {}
 
   @Get()
-  findAll(@CurrentUser('id') userId: string) {
-    return this.playlistsService.findAll(userId);
+  findAll(
+    @CurrentUser('id') userId: string,
+    @Query('includeMovies') includeMovies?: string,
+  ) {
+    return this.playlistsService.findAll(userId, {
+      includeMovies: includeMovies === 'true',
+    });
   }
 
   @Post()
@@ -17,6 +22,14 @@ export class PlaylistsController {
     @CurrentUser('id') userId: string,
   ) {
     return this.playlistsService.create(userId, body.name, body.description);
+  }
+
+  @Get('by-movie/:movieId')
+  findByMovie(
+    @Param('movieId') movieId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.playlistsService.findByMovie(userId, movieId);
   }
 
   @Get(':id')

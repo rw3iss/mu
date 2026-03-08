@@ -9,6 +9,8 @@ export const setupSchema = z.object({
   username: z.string(),
   email: z.string().email().optional(),
   password: z.string().min(8),
+  mediaPath: z.string().optional(),
+  mediaPaths: z.array(z.string()).optional(),
 });
 
 export const refreshSchema = z.object({

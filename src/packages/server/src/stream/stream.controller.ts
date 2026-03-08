@@ -77,13 +77,18 @@ export class StreamController {
   /**
    * Get a specific HLS segment for an active transcoding session.
    */
-  @Get(':sessionId/segment/:segmentNumber.ts')
+  @Get(':sessionId/:segmentFile')
   async getSegment(
     @Param('sessionId') sessionId: string,
-    @Param('segmentNumber') segmentNumber: string,
+    @Param('segmentFile') segmentFile: string,
     @Res() reply: FastifyReply,
   ) {
-    const segment = await this.hlsGenerator.getSegment(sessionId, parseInt(segmentNumber, 10));
+    // segmentFile is e.g. "segment_0000.ts"
+    const match = segmentFile.match(/^segment_(\d+)\.ts$/);
+    if (!match) {
+      return reply.status(404).send({ message: 'Invalid segment path' });
+    }
+    const segment = await this.hlsGenerator.getSegment(sessionId, parseInt(match[1]!, 10));
 
     if (!segment) {
       // Segment not yet transcoded — tell the client to retry

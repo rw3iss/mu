@@ -25,6 +25,7 @@ export function Watchlist(_props: WatchlistProps) {
           movieTitle: string;
           movieYear: number;
           moviePosterUrl: string;
+          movieThumbnailUrl: string;
           movieOverview: string;
           movieRuntimeMinutes: number;
         }>>('/watchlist');
@@ -34,7 +35,7 @@ export function Watchlist(_props: WatchlistProps) {
           title: entry.movieTitle ?? 'Untitled',
           year: entry.movieYear ?? 0,
           overview: entry.movieOverview ?? '',
-          posterUrl: entry.moviePosterUrl ?? '',
+          posterUrl: entry.moviePosterUrl || entry.movieThumbnailUrl || '',
           backdropUrl: '',
           runtime: entry.movieRuntimeMinutes ?? 0,
           genres: [],

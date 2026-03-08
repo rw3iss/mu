@@ -65,6 +65,7 @@ export class HistoryService {
         movieTitle: movies.title,
         movieYear: movies.year,
         moviePosterUrl: movies.posterUrl,
+        movieThumbnailUrl: movies.thumbnailUrl,
       })
       .from(userWatchHistory)
       .innerJoin(movies, eq(userWatchHistory.movieId, movies.id))
@@ -131,17 +132,16 @@ export class HistoryService {
   }
 
   getContinueWatching(userId: string) {
-    return this.database.db
+    const rows = this.database.db
       .select({
-        id: userWatchHistory.id,
-        movieId: userWatchHistory.movieId,
-        watchedAt: userWatchHistory.watchedAt,
+        id: movies.id,
+        title: movies.title,
+        year: movies.year,
+        posterUrl: movies.posterUrl,
+        thumbnailUrl: movies.thumbnailUrl,
+        runtimeMinutes: movies.runtimeMinutes,
+        addedAt: movies.addedAt,
         positionSeconds: userWatchHistory.positionSeconds,
-        durationWatchedSeconds: userWatchHistory.durationWatchedSeconds,
-        movieTitle: movies.title,
-        movieYear: movies.year,
-        moviePosterUrl: movies.posterUrl,
-        movieRuntimeMinutes: movies.runtimeMinutes,
       })
       .from(userWatchHistory)
       .innerJoin(movies, eq(userWatchHistory.movieId, movies.id))
@@ -149,5 +149,21 @@ export class HistoryService {
       .orderBy(desc(userWatchHistory.watchedAt))
       .limit(20)
       .all();
+
+    return rows.map((row) => {
+      const totalSeconds = (row.runtimeMinutes ?? 0) * 60;
+      const watchProgress = totalSeconds > 0 ? (row.positionSeconds ?? 0) / totalSeconds : 0;
+      const posterUrl = row.posterUrl || row.thumbnailUrl;
+      return {
+        id: row.id,
+        title: row.title,
+        year: row.year,
+        posterUrl,
+        thumbnailUrl: row.thumbnailUrl,
+        runtimeMinutes: row.runtimeMinutes,
+        addedAt: row.addedAt,
+        watchProgress,
+      };
+    });
   }
 }

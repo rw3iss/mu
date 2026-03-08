@@ -1,5 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { LibraryModule } from '../library/library.module.js';
+import { Module } from '@nestjs/common';
 import { MoviesService } from './movies.service.js';
 import { RatingsService } from './ratings.service.js';
 import { HistoryService } from './history.service.js';
@@ -12,7 +11,6 @@ import { WatchlistController } from './watchlist.controller.js';
 import { PlaylistsController } from './playlists.controller.js';
 
 @Module({
-  imports: [forwardRef(() => LibraryModule)],
   controllers: [
     MoviesController,
     RatingsController,

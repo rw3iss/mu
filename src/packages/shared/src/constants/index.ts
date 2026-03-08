@@ -12,7 +12,7 @@ export const SUPPORTED_VIDEO_EXTENSIONS = [
 
 export const SUPPORTED_SUBTITLE_EXTENSIONS = ['.srt', '.vtt', '.ass', '.ssa', '.sub'];
 
-export const HLS_SEGMENT_DURATION = 6;
+export const HLS_SEGMENT_DURATION = 2;
 export const PLAYBACK_SAVE_INTERVAL_MS = 10_000;
 
 export const CACHE_NAMESPACES = {

@@ -38,6 +38,9 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+/** Throttle interval for seek-while-dragging (ms) */
+const DRAG_THROTTLE_MS = 50;
+
 export function PlayerControls({
   visible,
   onTogglePlay,
@@ -50,8 +53,12 @@ export function PlayerControls({
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [settingsPanel, setSettingsPanel] = useState<'main' | 'quality' | 'subtitles'>('main');
   const [seekHover, setSeekHover] = useState<number | null>(null);
+  const [showVolume, setShowVolume] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const seekBarRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const volumeRef = useRef<HTMLDivElement>(null);
+  const dragLastSeek = useRef<number>(0);
 
   const progress = duration.value > 0 ? (currentTime.value / duration.value) * 100 : 0;
 
@@ -68,17 +75,40 @@ export function PlayerControls({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [showSettingsMenu]);
 
-  const handleSeekBarClick = useCallback(
+  // Close volume on outside click
+  useEffect(() => {
+    if (!showVolume) return;
+    function handleClick(e: MouseEvent) {
+      if (volumeRef.current && !volumeRef.current.contains(e.target as Node)) {
+        setShowVolume(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showVolume]);
+
+  // ── Seek bar: click ──
+  const seekFromEvent = useCallback(
     (e: MouseEvent) => {
       const bar = seekBarRef.current;
       if (!bar) return;
       const rect = bar.getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      onSeek(fraction * duration.value);
+      return fraction * duration.value;
     },
-    [onSeek]
+    [],
   );
 
+  const handleSeekBarClick = useCallback(
+    (e: MouseEvent) => {
+      if (isDragging) return;
+      const time = seekFromEvent(e);
+      if (time !== undefined) onSeek(time);
+    },
+    [onSeek, seekFromEvent, isDragging],
+  );
+
+  // ── Seek bar: hover tooltip ──
   const handleSeekHover = useCallback((e: MouseEvent) => {
     const bar = seekBarRef.current;
     if (!bar) return;
@@ -87,25 +117,79 @@ export function PlayerControls({
     setSeekHover(fraction * duration.value);
   }, []);
 
+  // ── Seek bar: drag ──
+  const handleSeekMouseDown = useCallback(
+    (e: MouseEvent) => {
+      e.preventDefault();
+      setIsDragging(true);
+      dragLastSeek.current = 0;
+
+      const onMove = (me: MouseEvent) => {
+        const now = performance.now();
+        if (now - dragLastSeek.current < DRAG_THROTTLE_MS) return;
+        dragLastSeek.current = now;
+
+        const bar = seekBarRef.current;
+        if (!bar) return;
+        const rect = bar.getBoundingClientRect();
+        const fraction = Math.max(0, Math.min(1, (me.clientX - rect.left) / rect.width));
+        onSeek(fraction * duration.value);
+      };
+
+      const onUp = (me: MouseEvent) => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        setIsDragging(false);
+
+        // Final seek to exact release position
+        const bar = seekBarRef.current;
+        if (bar) {
+          const rect = bar.getBoundingClientRect();
+          const fraction = Math.max(0, Math.min(1, (me.clientX - rect.left) / rect.width));
+          onSeek(fraction * duration.value);
+        }
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+
+      // Immediate seek on press
+      const bar = seekBarRef.current;
+      if (bar) {
+        const rect = bar.getBoundingClientRect();
+        const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        onSeek(fraction * duration.value);
+      }
+    },
+    [onSeek],
+  );
+
+  // ── Volume ──
   const handleVolumeChange = useCallback((e: Event) => {
     const target = e.target as HTMLInputElement;
     setVolume(parseFloat(target.value));
   }, []);
 
+  const toggleVolumePopup = useCallback(() => {
+    setShowVolume((v) => !v);
+  }, []);
+
+  // ── Skip ──
   const skipBack = useCallback(
     (seconds: number) => {
       onSeek(Math.max(0, currentTime.value - seconds));
     },
-    [onSeek]
+    [onSeek],
   );
 
   const skipForward = useCallback(
     (seconds: number) => {
       onSeek(Math.min(duration.value, currentTime.value + seconds));
     },
-    [onSeek]
+    [onSeek],
   );
 
+  // ── Settings ──
   const handleQualitySelect = useCallback((q: string) => {
     quality.value = q;
     setShowSettingsMenu(false);
@@ -123,31 +207,54 @@ export function PlayerControls({
     setSettingsPanel('main');
   }, []);
 
-  const volumeIcon =
-    isMuted.value || volume.value === 0
-      ? '\u{1F507}'
-      : volume.value < 0.5
-        ? '\u{1F509}'
-        : '\u{1F50A}';
+  // ── Volume SVG icons (white, clean) ──
+  const VolumeIcon = () => {
+    if (isMuted.value || volume.value === 0) {
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="white" stroke="none" />
+          <line x1="23" y1="9" x2="17" y2="15" />
+          <line x1="17" y1="9" x2="23" y2="15" />
+        </svg>
+      );
+    }
+    if (volume.value < 0.5) {
+      return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="white" stroke="none" />
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+        </svg>
+      );
+    }
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="white" stroke="none" />
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+      </svg>
+    );
+  };
 
   return (
     <div class={`${styles.controls} ${visible ? styles.visible : ''}`}>
       {/* Gradient overlay */}
       <div class={styles.gradient} />
 
-      {/* Top bar — title */}
+      {/* ── Row 1: Title ── */}
       {title && (
-        <div class={styles.topBar}>
-          <span class={styles.nowPlaying}>{title}</span>
+        <div class={styles.titleRow}>
+          <span class={styles.titleText}>{title}</span>
         </div>
       )}
 
-      {/* Seek bar */}
-      <div class={styles.seekContainer}>
+      {/* ── Row 2: Seek bar ── */}
+      <div class={styles.seekRow}>
+        <span class={`${styles.timeLabel} ${styles.timeCurrent}`}>{formatTime(currentTime.value)}</span>
         <div
           ref={seekBarRef}
-          class={styles.seekBar}
+          class={`${styles.seekBar} ${isDragging ? styles.dragging : ''}`}
           onClick={handleSeekBarClick}
+          onMouseDown={handleSeekMouseDown}
           onMouseMove={handleSeekHover}
           onMouseLeave={() => setSeekHover(null)}
           role="slider"
@@ -171,100 +278,123 @@ export function PlayerControls({
             </div>
           )}
         </div>
+        <span class={styles.timeLabel}>{formatTime(duration.value)}</span>
       </div>
 
-      {/* Bottom controls */}
-      <div class={styles.bottomBar}>
-        <div class={styles.leftControls}>
-          {/* Play/Pause */}
+      {/* ── Row 3: Controls ── */}
+      <div class={styles.controlsRow}>
+        {/* Center: skip-back, play, skip-forward */}
+        <div class={styles.centerControls}>
           <button
-            class={styles.controlButton}
+            class={`${styles.controlBtn} ${styles.skipBtn}`}
+            onClick={() => skipBack(10)}
+            aria-label="Skip back 10 seconds"
+          >
+            <span class={styles.skipText}>-10s</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style={{ transform: 'scaleX(-1)' }}>
+              <path d="M12.5 8c-3.6 0-6.5 2.9-6.5 6.5s2.9 6.5 6.5 6.5 6.5-2.9 6.5-6.5H17.5c0 2.8-2.2 5-5 5s-5-2.2-5-5 2.2-5 5-5V8z" />
+              <path d="M12.5 3L8.5 7l4 4V3z" />
+            </svg>
+          </button>
+
+          <button
+            class={`${styles.controlBtn} ${styles.playBtn}`}
             onClick={onTogglePlay}
             aria-label={isPlaying.value ? 'Pause' : 'Play'}
           >
-            {isPlaying.value ? '\u275A\u275A' : '\u25B6'}
+            {isPlaying.value ? (
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+            ) : (
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
           </button>
 
-          {/* Skip back 10s */}
           <button
-            class={styles.controlButton}
-            onClick={() => skipBack(10)}
-            aria-label="Skip back 10 seconds"
-            title="-10s"
+            class={`${styles.controlBtn} ${styles.skipBtn}`}
+            onClick={() => skipForward(10)}
+            aria-label="Skip forward 10 seconds"
           >
-            <span class={styles.skipIcon}>
-              <span class={styles.skipArrow}>{'\u21BA'}</span>
-              <span class={styles.skipLabel}>10</span>
-            </span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+              <path d="M12.5 8c-3.6 0-6.5 2.9-6.5 6.5s2.9 6.5 6.5 6.5 6.5-2.9 6.5-6.5H17.5c0 2.8-2.2 5-5 5s-5-2.2-5-5 2.2-5 5-5V8z" />
+              <path d="M12.5 3L8.5 7l4 4V3z" />
+            </svg>
+            <span class={styles.skipText}>+10s</span>
           </button>
-
-          {/* Skip forward 30s */}
-          <button
-            class={styles.controlButton}
-            onClick={() => skipForward(30)}
-            aria-label="Skip forward 30 seconds"
-            title="+30s"
-          >
-            <span class={styles.skipIcon}>
-              <span class={styles.skipArrow}>{'\u21BB'}</span>
-              <span class={styles.skipLabel}>30</span>
-            </span>
-          </button>
-
-          {/* Volume */}
-          <div class={styles.volumeGroup}>
-            <button
-              class={styles.controlButton}
-              onClick={toggleMute}
-              aria-label={isMuted.value ? 'Unmute' : 'Mute'}
-            >
-              {volumeIcon}
-            </button>
-            <input
-              type="range"
-              class={styles.volumeSlider}
-              min="0"
-              max="1"
-              step="0.05"
-              value={isMuted.value ? 0 : volume.value}
-              onInput={handleVolumeChange}
-              aria-label="Volume"
-            />
-          </div>
-
-          {/* Time display */}
-          <span class={styles.timeDisplay}>
-            {formatTime(currentTime.value)} / {formatTime(duration.value)}
-          </span>
         </div>
 
+        {/* Right: volume, info, settings, fullscreen */}
         <div class={styles.rightControls}>
-          {/* Info panel toggle */}
+          {/* Volume */}
+          <div class={styles.volumeWrap} ref={volumeRef}>
+            <button
+              class={styles.controlBtn}
+              onClick={toggleVolumePopup}
+              aria-label={isMuted.value ? 'Unmute' : 'Mute'}
+            >
+              <VolumeIcon />
+            </button>
+
+            {showVolume && (
+              <div class={styles.volumePopup}>
+                <input
+                  type="range"
+                  class={styles.volumeSlider}
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={isMuted.value ? 0 : volume.value}
+                  onInput={handleVolumeChange}
+                  aria-label="Volume"
+                  orient="vertical"
+                />
+                <button
+                  class={styles.volumeMuteBtn}
+                  onClick={toggleMute}
+                  aria-label={isMuted.value ? 'Unmute' : 'Mute'}
+                >
+                  <VolumeIcon />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Info */}
           <button
-            class={styles.controlButton}
+            class={styles.controlBtn}
             onClick={onToggleInfo}
             aria-label="Movie info"
             title="Info"
           >
-            {'\u24D8'}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
           </button>
 
-          {/* Settings (quality + subtitles) */}
+          {/* Settings */}
           <div class={styles.menuContainer} ref={settingsRef}>
             <button
-              class={`${styles.controlButton} ${showSettingsMenu ? styles.active : ''}`}
+              class={`${styles.controlBtn} ${showSettingsMenu ? styles.active : ''}`}
               onClick={toggleSettings}
               aria-label="Settings"
               title="Settings"
             >
-              {'\u2699'}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
             </button>
 
             {showSettingsMenu && (
               <div class={styles.menu}>
                 {settingsPanel === 'main' && (
                   <>
-                    {/* Quality row */}
                     <button
                       class={styles.menuRow}
                       onClick={() => setSettingsPanel('quality')}
@@ -276,7 +406,6 @@ export function PlayerControls({
                       </span>
                     </button>
 
-                    {/* Subtitles row */}
                     {session?.subtitles && session.subtitles.length > 0 && (
                       <button
                         class={styles.menuRow}
@@ -356,12 +485,20 @@ export function PlayerControls({
 
           {/* Fullscreen */}
           <button
-            class={styles.controlButton}
+            class={styles.controlBtn}
             onClick={onToggleFullscreen}
             aria-label={isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen'}
             title={isFullscreen.value ? 'Exit fullscreen' : 'Fullscreen'}
           >
-            {isFullscreen.value ? '\u2716' : '\u26F6'}
+            {isFullscreen.value ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+              </svg>
+            )}
           </button>
         </div>
       </div>

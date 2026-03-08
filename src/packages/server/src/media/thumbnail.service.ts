@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, statSync, unlinkSync } from 'fs';
 import { resolve, join } from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import { nowISO } from '@mu/shared';
@@ -8,12 +8,24 @@ import { DatabaseService } from '../database/database.service.js';
 import { ConfigService } from '../config/config.service.js';
 import { movies, movieFiles } from '../database/schema/index.js';
 
+/**
+ * Minimum JPEG file size (in bytes) for a frame to be considered "non-blank".
+ * A 320-wide all-black JPEG is typically 1-3 KB.  Anything below this threshold
+ * is almost certainly a black or nearly-blank frame.
+ */
+const MIN_FRAME_BYTES = 4096;
+
+interface ProbeInfo {
+  duration: number;
+  width: number;
+  height: number;
+}
+
 @Injectable()
 export class ThumbnailService {
   private readonly logger = new Logger('ThumbnailService');
   private readonly thumbnailDir: string;
-  private readonly width: number;
-  private readonly height: number;
+  private readonly maxWidth: number;
 
   constructor(
     private readonly database: DatabaseService,
@@ -22,8 +34,7 @@ export class ThumbnailService {
     this.thumbnailDir = resolve(
       this.config.get<string>('media.thumbnailDir', './data/thumbnails'),
     );
-    this.width = this.config.get<number>('media.thumbnailWidth', 320);
-    this.height = this.config.get<number>('media.thumbnailHeight', 180);
+    this.maxWidth = this.config.get<number>('media.thumbnailWidth', 480);
 
     if (!existsSync(this.thumbnailDir)) {
       mkdirSync(this.thumbnailDir, { recursive: true });
@@ -32,10 +43,9 @@ export class ThumbnailService {
 
   /**
    * Generate a thumbnail for a movie by extracting a frame from its video file.
-   * Captures a frame at ~10% into the video to avoid black intro frames.
+   * Uses a smart algorithm that tries multiple positions to avoid black/blank frames.
    */
   async generateForMovie(movieId: string): Promise<string | null> {
-    // Find the first available file for this movie
     const file = this.database.db
       .select()
       .from(movieFiles)
@@ -47,27 +57,43 @@ export class ThumbnailService {
       return null;
     }
 
+    return this.generateFromFile(movieId, file.filePath);
+  }
+
+  /**
+   * Generate a thumbnail for a movie from a specific file path.
+   * Preserves the video's native aspect ratio — scales to maxWidth and lets
+   * height follow naturally.  Stores the aspect ratio on the movie record so
+   * the frontend can lay out images correctly without loading them first.
+   */
+  async generateFromFile(movieId: string, filePath: string): Promise<string | null> {
     const outputFilename = `${movieId}.jpg`;
     const outputPath = join(this.thumbnailDir, outputFilename);
 
     try {
-      // Get duration to pick a good frame
-      const durationSeconds = await this.probeDuration(file.filePath);
-      // Capture at 10% or 5 seconds, whichever is greater (avoids black frames)
-      const seekTime = Math.max(5, Math.floor(durationSeconds * 0.1));
+      const probe = await this.probeVideo(filePath);
+      const seekTime = await this.findBestFrame(filePath, probe);
 
-      await this.extractFrame(file.filePath, outputPath, seekTime);
+      await this.extractFrame(filePath, outputPath, seekTime);
 
-      // Store a relative URL for the API to serve
       const thumbnailUrl = `/api/v1/media/thumbnails/${outputFilename}`;
+      const aspectRatio = probe.width && probe.height
+        ? Math.round((probe.width / probe.height) * 1000) / 1000
+        : null;
 
       this.database.db
         .update(movies)
-        .set({ thumbnailUrl, updatedAt: nowISO() })
+        .set({
+          thumbnailUrl,
+          thumbnailAspectRatio: aspectRatio,
+          updatedAt: nowISO(),
+        })
         .where(eq(movies.id, movieId))
         .run();
 
-      this.logger.debug(`Thumbnail generated for movie ${movieId}`);
+      this.logger.debug(
+        `Thumbnail generated for movie ${movieId} at ${seekTime}s (AR: ${aspectRatio})`,
+      );
       return thumbnailUrl;
     } catch (err: any) {
       this.logger.warn(
@@ -78,19 +104,114 @@ export class ThumbnailService {
   }
 
   /**
-   * Probe video duration in seconds.
+   * Smart frame selection algorithm.
+   *
+   * Tries candidate timestamps in order and picks the first frame that isn't
+   * mostly black.  "Blackness" is detected by checking the JPEG file size —
+   * a black frame compresses to a very small file (~1-3 KB),
+   * while a real frame is typically 10-50+ KB.
+   *
+   * Candidate order:
+   *   1.  ~2s  (very start, past any initial black)
+   *   2. ~30s  (past typical intros / studio logos)
+   *   3.  10%  of duration
+   *   4.  25%  of duration
+   *   5.  50%  of duration (midpoint fallback)
    */
-  private probeDuration(filePath: string): Promise<number> {
+  private async findBestFrame(filePath: string, probe: ProbeInfo): Promise<number> {
+    const candidates = this.getCandidateTimestamps(probe.duration);
+    const tempPath = join(this.thumbnailDir, `_probe_${Date.now()}.jpg`);
+
+    try {
+      for (const ts of candidates) {
+        try {
+          await this.extractFrame(filePath, tempPath, ts);
+
+          if (existsSync(tempPath)) {
+            const size = statSync(tempPath).size;
+            if (size >= MIN_FRAME_BYTES) {
+              this.logger.debug(
+                `Frame at ${ts}s passed brightness check (${size} bytes)`,
+              );
+              return ts;
+            }
+            this.logger.debug(
+              `Frame at ${ts}s is likely black (${size} bytes), trying next`,
+            );
+          }
+        } catch {
+          // Frame extraction failed at this timestamp — try next
+        }
+      }
+    } finally {
+      try {
+        if (existsSync(tempPath)) unlinkSync(tempPath);
+      } catch {
+        // ignore
+      }
+    }
+
+    // All candidates looked dark — fall back to midpoint
+    return Math.floor(probe.duration * 0.5);
+  }
+
+  /**
+   * Build an ordered list of candidate timestamps, clamped to the video duration.
+   */
+  private getCandidateTimestamps(durationSeconds: number): number[] {
+    const maxSeek = Math.max(0, durationSeconds - 1);
+    const raw = [
+      2,
+      30,
+      Math.floor(durationSeconds * 0.1),
+      Math.floor(durationSeconds * 0.25),
+      Math.floor(durationSeconds * 0.5),
+    ];
+
+    const seen = new Set<number>();
+    const result: number[] = [];
+    for (const ts of raw) {
+      const clamped = Math.min(ts, maxSeek);
+      if (!seen.has(clamped)) {
+        seen.add(clamped);
+        result.push(clamped);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Probe the video for duration and dimensions.
+   */
+  probeVideo(filePath: string): Promise<ProbeInfo> {
     return new Promise((resolve, reject) => {
       ffmpeg.ffprobe(filePath, (err, metadata) => {
         if (err) return reject(err);
-        resolve(metadata?.format?.duration ?? 60);
+
+        const videoStream = metadata.streams?.find((s) => s.codec_type === 'video');
+
+        resolve({
+          duration: metadata?.format?.duration ?? 60,
+          width: videoStream?.width ?? 0,
+          height: videoStream?.height ?? 0,
+        });
       });
     });
   }
 
   /**
+   * Kept for backward compatibility with callers that only need duration.
+   */
+  probeDuration(filePath: string): Promise<number> {
+    return this.probeVideo(filePath).then((p) => p.duration);
+  }
+
+  /**
    * Extract a single frame at the given seek time.
+   *
+   * Uses `-vf scale=WIDTH:-2` to scale to a max width while preserving the
+   * video's native aspect ratio.  The `-2` ensures the height is rounded to
+   * an even number (required by most codecs / JPEG encoders).
    */
   private extractFrame(
     inputPath: string,
@@ -101,7 +222,7 @@ export class ThumbnailService {
       ffmpeg(inputPath)
         .seekInput(seekSeconds)
         .frames(1)
-        .size(`${this.width}x${this.height}`)
+        .outputOptions(['-vf', `scale=${this.maxWidth}:-2`])
         .output(outputPath)
         .on('end', () => resolve())
         .on('error', (err) => reject(err))

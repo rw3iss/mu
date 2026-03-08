@@ -1,5 +1,7 @@
-import { Controller, Post, Get, Body, Req, Res, UsePipes } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, Res, UsePipes, Logger } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
+import { LibraryService } from '../library/library.service.js';
+import { LibraryJobsService } from '../library/library-jobs.service.js';
 import { loginSchema, setupSchema } from './dto/login.dto.js';
 import type { LoginDto, SetupDto } from './dto/login.dto.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
@@ -8,7 +10,13 @@ import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  private readonly logger = new Logger('AuthController');
+
+  constructor(
+    private readonly authService: AuthService,
+    private readonly libraryService: LibraryService,
+    private readonly libraryJobs: LibraryJobsService,
+  ) {}
 
   @Post('setup')
   @Public()
@@ -24,7 +32,24 @@ export class AuthController {
       maxAge: 15 * 60,
     });
 
-    return { user, accessToken };
+    // Compute effective paths: prefer mediaPaths array, fall back to single mediaPath
+    const effectivePaths = (
+      body.mediaPaths?.length ? body.mediaPaths : body.mediaPath ? [body.mediaPath] : []
+    ).filter((p) => p.trim());
+
+    const sources: any[] = [];
+    for (const mediaPath of effectivePaths) {
+      try {
+        const source = this.libraryService.addSource(mediaPath);
+        sources.push(source);
+        this.libraryJobs.enqueueScan(source.id, `Initial scan: ${mediaPath}`);
+        this.logger.log(`Media source created during setup: ${mediaPath}`);
+      } catch (err: any) {
+        this.logger.warn(`Failed to create media source during setup: ${err.message}`);
+      }
+    }
+
+    return { user, accessToken, sources };
   }
 
   @Post('login')

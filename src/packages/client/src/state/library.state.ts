@@ -11,6 +11,7 @@ export interface Movie {
   year: number;
   overview: string;
   posterUrl: string;
+  thumbnailUrl?: string;
   backdropUrl: string;
   runtime: number;
   genres: string[];
@@ -35,7 +36,7 @@ export interface LibraryFilters {
   sortOrder: 'asc' | 'desc';
 }
 
-export type ViewMode = 'grid' | 'list';
+export type ViewMode = 'large' | 'grid' | 'list';
 
 // ============================================
 // Signals
@@ -78,11 +79,11 @@ export async function fetchMovies(page = 1): Promise<void> {
     };
 
     if (searchQuery.value) {
-      params.q = searchQuery.value;
+      params.search = searchQuery.value;
     }
 
     if (filters.value.genres.length > 0) {
-      params.genres = filters.value.genres.join(',');
+      params.genre = filters.value.genres.join(',');
     }
 
     if (filters.value.yearRange) {
@@ -112,6 +113,10 @@ export async function searchMovies(query: string): Promise<void> {
 
 export function setFilters(newFilters: Partial<LibraryFilters>): void {
   filters.value = { ...filters.value, ...newFilters };
+  if (newFilters.sortBy !== undefined || newFilters.sortOrder !== undefined) {
+    localStorage.setItem('mu_sort_by', filters.value.sortBy);
+    localStorage.setItem('mu_sort_order', filters.value.sortOrder);
+  }
   fetchMovies(1);
 }
 
@@ -122,7 +127,18 @@ export function setViewMode(mode: ViewMode): void {
 
 export function initViewMode(): void {
   const saved = localStorage.getItem('mu_view_mode') as ViewMode | null;
-  if (saved === 'grid' || saved === 'list') {
+  if (saved === 'large' || saved === 'grid' || saved === 'list') {
     viewMode.value = saved;
+  }
+}
+
+export function initSortPrefs(): void {
+  const sortBy = localStorage.getItem('mu_sort_by') as LibraryFilters['sortBy'] | null;
+  const sortOrder = localStorage.getItem('mu_sort_order') as 'asc' | 'desc' | null;
+  if (sortBy && ['title', 'year', 'rating', 'addedAt', 'runtime'].includes(sortBy)) {
+    filters.value = { ...filters.value, sortBy };
+  }
+  if (sortOrder === 'asc' || sortOrder === 'desc') {
+    filters.value = { ...filters.value, sortOrder };
   }
 }

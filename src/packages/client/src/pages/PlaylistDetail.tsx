@@ -17,7 +17,8 @@ interface PlaylistMovie {
   position: number;
   movieTitle: string;
   movieYear: number;
-  moviePosterUrl: string;
+  moviePosterUrl: string | null;
+  movieThumbnailUrl: string | null;
   movieRuntimeMinutes: number;
 }
 
@@ -202,9 +203,9 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
                 role="button"
                 tabIndex={0}
               >
-                {movie.moviePosterUrl ? (
+                {(movie.moviePosterUrl || movie.movieThumbnailUrl) ? (
                   <img
-                    src={movie.moviePosterUrl}
+                    src={(movie.moviePosterUrl || movie.movieThumbnailUrl)!}
                     alt={`${movie.movieTitle} poster`}
                   />
                 ) : (

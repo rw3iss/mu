@@ -7,6 +7,7 @@ import {
   startStream,
   endStream,
   initPlayerSettings,
+  showControls,
 } from '@/state/player.state';
 import { moviesService } from '@/services/movies.service';
 import { notifyError } from '@/state/notifications.state';
@@ -84,7 +85,7 @@ export function Player({ id }: PlayerProps) {
   return (
     <div class={styles.player}>
       <button
-        class={styles.closeButton}
+        class={`${styles.closeButton} ${showControls.value ? styles.closeVisible : ''}`}
         onClick={() => route(`/movie/${id}`)}
         aria-label="Close player"
       >

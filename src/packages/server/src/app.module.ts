@@ -17,6 +17,8 @@ import { StreamModule } from './stream/stream.module.js';
 import { PluginModule } from './plugins/plugin.module.js';
 import { RecommendationsModule } from './recommendations/recommendations.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { FilesystemModule } from './filesystem/filesystem.module.js';
+import { AdminModule } from './admin/admin.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 
@@ -39,6 +41,8 @@ import { RolesGuard } from './common/guards/roles.guard.js';
     PluginModule,
     RecommendationsModule,
     SettingsModule,
+    FilesystemModule,
+    AdminModule,
   ],
   providers: [
     {

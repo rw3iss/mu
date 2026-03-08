@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Logger } from '@nestjs/common';
 import { LibraryService } from './library.service.js';
 import { LibraryJobsService } from './library-jobs.service.js';
+import { ScannerService } from './scanner.service.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 
@@ -11,6 +12,7 @@ export class LibraryController {
   constructor(
     private readonly libraryService: LibraryService,
     private readonly libraryJobs: LibraryJobsService,
+    private readonly scanner: ScannerService,
     private readonly jobManager: JobManagerService,
   ) {}
 
@@ -42,32 +44,67 @@ export class LibraryController {
     return { success: true };
   }
 
+  @Put('sync')
+  @Roles('admin')
+  sync(@Body() body: { paths: string[] }) {
+    return this.libraryService.syncSources(body.paths);
+  }
+
+  @Get('scan-status')
+  @Roles('admin')
+  scanStatus() {
+    return this.libraryJobs.getScanStatus();
+  }
+
+  @Post('refresh-schedule')
+  @Roles('admin')
+  refreshSchedule() {
+    this.libraryJobs.refreshAutoScanSchedule();
+    return this.libraryJobs.getScanStatus();
+  }
+
   @Post('scan')
   @Roles('admin')
-  scanAll() {
+  async scanAll() {
     const sources = this.libraryService.getSources().filter((s) => s.enabled);
-    const jobIds: string[] = [];
+
+    let totalFilesFound = 0;
+    let totalFilesAdded = 0;
+    let totalFilesUpdated = 0;
+    let totalFilesRemoved = 0;
 
     for (const source of sources) {
-      const jobId = this.libraryJobs.enqueueScan(
-        source.id,
-        `Scan: ${source.label || source.path}`,
-      );
-      jobIds.push(jobId);
+      try {
+        const result = await this.scanner.scanSource(source.id);
+        totalFilesFound += result.filesFound;
+        totalFilesAdded += result.filesAdded;
+        totalFilesUpdated += result.filesUpdated;
+        totalFilesRemoved += result.filesRemoved;
+      } catch (err: any) {
+        this.logger.error(`Scan failed for source ${source.id}: ${err.message}`);
+      }
     }
 
-    return { message: 'Scan jobs enqueued', jobIds, sourceCount: sources.length };
+    return {
+      message: 'Scan complete',
+      sourceCount: sources.length,
+      filesFound: totalFilesFound,
+      filesAdded: totalFilesAdded,
+      filesUpdated: totalFilesUpdated,
+      filesRemoved: totalFilesRemoved,
+    };
   }
 
   @Post(':id/scan')
   @Roles('admin')
-  scan(@Param('id') id: string) {
+  async scan(@Param('id') id: string) {
     const source = this.libraryService.getSource(id);
-    const jobId = this.libraryJobs.enqueueScan(
-      id,
-      `Scan: ${source.label || source.path}`,
-    );
+    const result = await this.scanner.scanSource(id);
 
-    return { message: 'Scan job enqueued', jobId };
+    return {
+      message: 'Scan complete',
+      sourceLabel: source.label || source.path,
+      ...result,
+    };
   }
 }

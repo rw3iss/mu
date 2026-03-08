@@ -50,6 +50,27 @@ export const streamService = {
   },
 
   /**
+   * End a specific session (admin)
+   */
+  endSession(sessionId: string): Promise<void> {
+    return api.delete<void>(`/admin/sessions/${sessionId}`);
+  },
+
+  /**
+   * End all sessions except the current user's (admin)
+   */
+  endAllSessions(): Promise<{ endedCount: number }> {
+    return api.delete<{ endedCount: number }>('/admin/sessions');
+  },
+
+  /**
+   * Generate thumbnails for all movies missing one (admin)
+   */
+  generateMissingThumbnails(): Promise<{ movieCount: number }> {
+    return api.post<{ movieCount: number }>('/admin/generate-missing-thumbnails');
+  },
+
+  /**
    * Get the stream URL for direct playback
    */
   getStreamUrl(sessionId: string): string {
