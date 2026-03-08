@@ -26,6 +26,7 @@ export const configSchema = z.object({
     ttlSeconds: z.coerce.number().int().positive().default(3600),
     imageDir: z.string().default('./data/cache/images'),
     streamDir: z.string().default('./data/cache/streams'),
+    persistTranscodes: z.boolean().default(true),
   }).default({}),
 
   auth: z.object({

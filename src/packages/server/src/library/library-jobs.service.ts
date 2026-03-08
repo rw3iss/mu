@@ -1,4 +1,6 @@
 import { Injectable, Inject, Logger, OnModuleInit, forwardRef } from '@nestjs/common';
+import { eq, and } from 'drizzle-orm';
+import { StreamMode } from '@mu/shared';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { ScannerService } from './scanner.service.js';
 import { LibraryService } from './library.service.js';
@@ -6,6 +8,10 @@ import { MetadataService } from '../metadata/metadata.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { EventsService } from '../events/events.service.js';
+import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
+import { StreamService } from '../stream/stream.service.js';
+import { DatabaseService } from '../database/database.service.js';
+import { movieFiles } from '../database/schema/index.js';
 import { nowISO, WsEvent } from '@mu/shared';
 import type { JobRecord, JobHelpers } from '../jobs/job.interface.js';
 
@@ -16,6 +22,7 @@ export const JOB_TYPE = {
   METADATA: 'metadata',
   THUMBNAIL: 'thumbnail',
   CLEANUP: 'cleanup',
+  PRE_TRANSCODE: 'pre-transcode',
 } as const;
 
 @Injectable()
@@ -35,6 +42,9 @@ export class LibraryJobsService implements OnModuleInit {
     private readonly thumbnail: ThumbnailService,
     private readonly settings: SettingsService,
     private readonly events: EventsService,
+    private readonly transcoderService: TranscoderService,
+    private readonly streamService: StreamService,
+    private readonly database: DatabaseService,
   ) {}
 
   onModuleInit() {
@@ -122,6 +132,23 @@ export class LibraryJobsService implements OnModuleInit {
         const removed = this.jobManager.pruneOldJobs(24 * 60 * 60 * 1000);
         helpers.log(`Pruned ${removed} old jobs`);
         return { removed };
+      },
+    );
+
+    // Pre-transcode handler — transcodes a file ahead of playback
+    this.jobManager.registerHandler(
+      JOB_TYPE.PRE_TRANSCODE,
+      async (job: JobRecord, helpers: JobHelpers) => {
+        const { movieFileId, filePath, mode, quality } = job.payload as {
+          movieFileId: string;
+          filePath: string;
+          mode: string;
+          quality: string;
+        };
+        helpers.log(`Pre-transcoding file ${movieFileId} (${mode}, ${quality})`);
+        await this.transcoderService.preTranscode(movieFileId, filePath, mode, quality);
+        helpers.reportProgress(100);
+        return { movieFileId, quality };
       },
     );
 
@@ -241,9 +268,41 @@ export class LibraryJobsService implements OnModuleInit {
         payload: { movieId },
         priority: 30,
       });
+
+      // Enqueue pre-transcode if the file needs transcoding and caching is enabled
+      this.enqueuePreTranscodeIfNeeded(movieId, title);
     });
 
-    this.logger.log('Listening for new movies to schedule metadata + thumbnail jobs');
+    this.logger.log('Listening for new movies to schedule metadata + thumbnail + pre-transcode jobs');
+  }
+
+  private enqueuePreTranscodeIfNeeded(movieId: string, title: string): void {
+    const lib = this.settings.get<Record<string, unknown>>('library', {});
+    const persistEnabled = (lib as any)?.persistTranscodes !== false; // default true
+    if (!persistEnabled) return;
+
+    const files = this.database.db
+      .select()
+      .from(movieFiles)
+      .where(and(eq(movieFiles.movieId, movieId), eq(movieFiles.available, true)))
+      .all();
+
+    for (const file of files) {
+      const mode = this.streamService.determineStreamMode(file);
+      if (mode === StreamMode.TRANSCODE || mode === StreamMode.DIRECT_STREAM) {
+        this.jobManager.enqueue({
+          type: JOB_TYPE.PRE_TRANSCODE,
+          label: `Pre-transcode: ${title}`,
+          payload: {
+            movieFileId: file.id,
+            filePath: file.filePath,
+            mode,
+            quality: '1080p',
+          },
+          priority: 40,
+        });
+      }
+    }
   }
 
   // ===========================================================

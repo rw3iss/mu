@@ -13,8 +13,8 @@ export class HlsGeneratorService {
    * Read and return the HLS master manifest (.m3u8) for a given session.
    * Returns null if the manifest file does not yet exist.
    */
-  async getManifest(sessionId: string): Promise<Buffer | null> {
-    const sessionDir = this.transcoderService.getSessionDir(sessionId);
+  async getManifest(sessionId: string, dir?: string): Promise<Buffer | null> {
+    const sessionDir = dir || this.transcoderService.getSessionDir(sessionId);
     const manifestPath = path.join(sessionDir, 'stream.m3u8');
 
     try {
@@ -34,8 +34,8 @@ export class HlsGeneratorService {
    * Read and return a specific HLS transport stream segment (.ts) for a given session.
    * Returns null if the segment file does not exist.
    */
-  async getSegment(sessionId: string, segmentNumber: number): Promise<Buffer | null> {
-    const sessionDir = this.transcoderService.getSessionDir(sessionId);
+  async getSegment(sessionId: string, segmentNumber: number, dir?: string): Promise<Buffer | null> {
+    const sessionDir = dir || this.transcoderService.getSessionDir(sessionId);
     const segmentFileName = `segment_${segmentNumber.toString().padStart(4, '0')}.ts`;
     const segmentPath = path.join(sessionDir, segmentFileName);
 

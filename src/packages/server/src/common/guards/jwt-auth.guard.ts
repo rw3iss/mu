@@ -28,7 +28,19 @@ export class JwtAuthGuard implements CanActivate {
       await request.jwtVerify();
       return true;
     } catch {
-      // JWT failed — fall through to local bypass
+      // JWT header failed — try query parameter token (for HLS.js / native video streams)
+    }
+
+    // Fallback: token in query string (used by HLS.js, Safari native HLS, subtitle tracks)
+    const queryToken = (request.query as Record<string, string>)?.token;
+    if (queryToken) {
+      try {
+        const decoded = request.server.jwt.verify(queryToken);
+        request.user = decoded;
+        return true;
+      } catch {
+        // Query token invalid — fall through to local bypass
+      }
     }
 
     // Local bypass: for localhost connections without a valid JWT,

@@ -76,6 +76,16 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+.sectionTitle {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-top: var(--space-xl);
+  margin-bottom: var(--space-md);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
 .settingRow {
   display: flex;
   align-items: center;

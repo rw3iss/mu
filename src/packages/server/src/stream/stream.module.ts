@@ -16,6 +16,6 @@ import { SubtitleController } from './subtitles/subtitle.controller.js';
     DirectPlayService,
     SubtitleService,
   ],
-  exports: [StreamService],
+  exports: [StreamService, TranscoderService],
 })
 export class StreamModule {}

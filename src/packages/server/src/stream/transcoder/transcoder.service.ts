@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ChildProcess } from 'child_process';
-import { mkdir, rm } from 'fs/promises';
+import { mkdir, rm, writeFile, access } from 'fs/promises';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import { ConfigService } from '../../config/config.service.js';
@@ -31,13 +31,49 @@ export class TranscoderService implements OnModuleDestroy {
     }
   }
 
+  /**
+   * Get the persistent cache directory for a given movie file + quality.
+   */
+  getPersistentDir(movieFileId: string, quality: string): string {
+    return path.join(this.cacheDir, 'persistent', movieFileId, quality);
+  }
+
+  /**
+   * Check whether a fully completed transcode cache exists.
+   */
+  async hasCachedTranscode(movieFileId: string, quality: string): Promise<boolean> {
+    const dir = this.getPersistentDir(movieFileId, quality);
+    try {
+      await access(path.join(dir, '.complete'));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Remove persistent cache for one file (all qualities) or all files.
+   */
+  async clearCache(movieFileId?: string): Promise<void> {
+    const target = movieFileId
+      ? path.join(this.cacheDir, 'persistent', movieFileId)
+      : path.join(this.cacheDir, 'persistent');
+    try {
+      await rm(target, { recursive: true, force: true });
+      this.logger.log(`Cleared persistent cache: ${target}`);
+    } catch (err) {
+      this.logger.warn(`Failed to clear cache ${target}: ${err}`);
+    }
+  }
+
   async startTranscode(
     sessionId: string,
     filePath: string,
     options: TranscodeOptions = {},
+    outputDir?: string,
   ): Promise<void> {
-    const sessionDir = this.getSessionDir(sessionId);
-    await mkdir(sessionDir, { recursive: true });
+    const targetDir = outputDir || this.getSessionDir(sessionId);
+    await mkdir(targetDir, { recursive: true });
 
     const quality = options.quality || '1080p';
     const profile = TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES]
@@ -47,8 +83,8 @@ export class TranscoderService implements OnModuleDestroy {
       throw new Error(`No transcoding profile found for quality "${quality}"`);
     }
 
-    const outputPath = path.join(sessionDir, 'stream.m3u8');
-    const segmentPattern = path.join(sessionDir, 'segment_%04d.ts');
+    const outputPath = path.join(targetDir, 'stream.m3u8');
+    const segmentPattern = path.join(targetDir, 'segment_%04d.ts');
 
     const hwAccel = this.config.get<string>('transcoding.hwAccel') || 'none';
     const videoCodec = this.getVideoCodec(hwAccel);
@@ -119,6 +155,10 @@ export class TranscoderService implements OnModuleDestroy {
         .on('end', () => {
           this.logger.log(`Transcode complete for session ${sessionId}`);
           this.activeProcesses.delete(sessionId);
+          // Write .complete marker for persistent cache
+          if (outputDir) {
+            writeFile(path.join(targetDir, '.complete'), '').catch(() => {});
+          }
         });
 
       // Run the command and capture the child process
@@ -132,12 +172,12 @@ export class TranscoderService implements OnModuleDestroy {
     });
   }
 
-  async startRemux(sessionId: string, filePath: string): Promise<void> {
-    const sessionDir = this.getSessionDir(sessionId);
-    await mkdir(sessionDir, { recursive: true });
+  async startRemux(sessionId: string, filePath: string, outputDir?: string): Promise<void> {
+    const targetDir = outputDir || this.getSessionDir(sessionId);
+    await mkdir(targetDir, { recursive: true });
 
-    const outputPath = path.join(sessionDir, 'stream.m3u8');
-    const segmentPattern = path.join(sessionDir, 'segment_%04d.ts');
+    const outputPath = path.join(targetDir, 'stream.m3u8');
+    const segmentPattern = path.join(targetDir, 'segment_%04d.ts');
 
     return new Promise<void>((resolve, reject) => {
       const command = ffmpeg(filePath)
@@ -173,6 +213,9 @@ export class TranscoderService implements OnModuleDestroy {
         .on('end', () => {
           this.logger.log(`Remux complete for session ${sessionId}`);
           this.activeProcesses.delete(sessionId);
+          if (outputDir) {
+            writeFile(path.join(targetDir, '.complete'), '').catch(() => {});
+          }
         });
 
       command.run();
@@ -180,6 +223,111 @@ export class TranscoderService implements OnModuleDestroy {
       const ffmpegProcess = (command as any).ffmpegProc;
       if (ffmpegProcess) {
         this.activeProcesses.set(sessionId, ffmpegProcess);
+      }
+    });
+  }
+
+  /**
+   * Run a full transcode or remux to the persistent cache directory.
+   * Resolves when FFmpeg finishes (not on start), so the cache is complete.
+   */
+  async preTranscode(
+    movieFileId: string,
+    filePath: string,
+    mode: string,
+    quality: string = '1080p',
+  ): Promise<void> {
+    const persistDir = this.getPersistentDir(movieFileId, quality);
+
+    // Already cached
+    if (await this.hasCachedTranscode(movieFileId, quality)) {
+      this.logger.log(`Pre-transcode skipped — cache exists for ${movieFileId}/${quality}`);
+      return;
+    }
+
+    await mkdir(persistDir, { recursive: true });
+
+    const outputPath = path.join(persistDir, 'stream.m3u8');
+    const segmentPattern = path.join(persistDir, 'segment_%04d.ts');
+    const processKey = `pre-${movieFileId}-${quality}`;
+
+    const isTranscode = mode === 'transcode';
+
+    const hwAccel = this.config.get<string>('transcoding.hwAccel') || 'none';
+
+    return new Promise<void>((resolve, reject) => {
+      let command = ffmpeg(filePath)
+        .outputOptions([
+          '-f', 'hls',
+          '-hls_time', '2',
+          '-hls_list_size', '0',
+          '-hls_segment_filename', segmentPattern,
+          '-hls_playlist_type', 'event',
+          '-hls_flags', 'independent_segments',
+        ]);
+
+      if (isTranscode) {
+        const profile = (TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES]
+          ?? TRANSCODING_PROFILES['1080p'])!;
+        const videoCodec = this.getVideoCodec(hwAccel);
+
+        command = command
+          .videoCodec(videoCodec)
+          .audioCodec('aac')
+          .outputOptions([
+            '-threads', '0',
+            '-g', '48',
+            '-sc_threshold', '0',
+            '-b:a', profile.audioBitrate,
+            '-b:v', profile.videoBitrate,
+          ])
+          .size(`${profile.width}x${profile.height}`)
+          .outputOptions(['-preset', profile.preset]);
+
+        if (hwAccel === 'nvenc') {
+          command = command.inputOptions(['-hwaccel', 'cuda']);
+        } else if (hwAccel === 'vaapi') {
+          command = command.inputOptions([
+            '-hwaccel', 'vaapi',
+            '-hwaccel_output_format', 'vaapi',
+            '-vaapi_device', '/dev/dri/renderD128',
+          ]);
+        } else if (hwAccel === 'qsv') {
+          command = command.inputOptions(['-hwaccel', 'qsv']);
+        }
+      } else {
+        // DIRECT_STREAM → remux (copy codecs)
+        command = command.videoCodec('copy').audioCodec('copy');
+      }
+
+      command = command.outputOptions(['-map', '0:v:0', '-map', '0:a:0?']);
+
+      command
+        .output(outputPath)
+        .on('start', (commandLine: string) => {
+          this.logger.log(`Pre-transcode started for ${movieFileId}: ${commandLine}`);
+        })
+        .on('progress', (progress: any) => {
+          this.logger.debug(
+            `Pre-transcode progress [${movieFileId}]: ${progress.percent?.toFixed(1)}%`,
+          );
+        })
+        .on('error', (err: Error) => {
+          this.logger.error(`Pre-transcode error for ${movieFileId}: ${err.message}`);
+          this.activeProcesses.delete(processKey);
+          reject(err);
+        })
+        .on('end', () => {
+          this.logger.log(`Pre-transcode complete for ${movieFileId}/${quality}`);
+          this.activeProcesses.delete(processKey);
+          writeFile(path.join(persistDir, '.complete'), '').then(() => resolve()).catch(() => resolve());
+        });
+
+      command.run();
+
+      const ffmpegProcess = (command as any).ffmpegProc;
+      if (ffmpegProcess) {
+        this.activeProcesses.set(processKey, ffmpegProcess);
       }
     });
   }

@@ -57,7 +57,8 @@ export class StreamController {
     @Param('sessionId') sessionId: string,
     @Res() reply: FastifyReply,
   ) {
-    const manifest = await this.hlsGenerator.getManifest(sessionId);
+    const dir = this.streamService.getSessionCacheDir(sessionId);
+    const manifest = await this.hlsGenerator.getManifest(sessionId, dir);
 
     if (!manifest) {
       // Manifest not ready yet — transcoder is still generating.
@@ -88,7 +89,8 @@ export class StreamController {
     if (!match) {
       return reply.status(404).send({ message: 'Invalid segment path' });
     }
-    const segment = await this.hlsGenerator.getSegment(sessionId, parseInt(match[1]!, 10));
+    const dir = this.streamService.getSessionCacheDir(sessionId);
+    const segment = await this.hlsGenerator.getSegment(sessionId, parseInt(match[1]!, 10), dir);
 
     if (!segment) {
       // Segment not yet transcoded — tell the client to retry

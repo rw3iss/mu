@@ -20,9 +20,9 @@ interface SettingsProps {
   tab?: string;
 }
 
-type SettingsTab = 'general' | 'playback' | 'library' | 'notifications' | 'rating' | 'plugins' | 'admin' | 'about';
+type SettingsTab = 'general' | 'playback' | 'library' | 'notifications' | 'plugins' | 'admin' | 'about';
 
-const VALID_TABS: SettingsTab[] = ['general', 'playback', 'library', 'notifications', 'rating', 'plugins', 'admin', 'about'];
+const VALID_TABS: SettingsTab[] = ['general', 'playback', 'library', 'notifications', 'plugins', 'admin', 'about'];
 
 function isValidTab(tab: string | undefined): tab is SettingsTab {
   return VALID_TABS.includes(tab as SettingsTab);
@@ -53,6 +53,7 @@ export function Settings(props: SettingsProps) {
   const [scanInterval, setScanInterval] = useState('6');
   const [mediaPathEntries, setMediaPathEntries] = useState<MediaPathEntryData[]>([]);
   const [fetchExtendedMetadata, setFetchExtendedMetadata] = useState(true);
+  const [persistTranscodes, setPersistTranscodes] = useState(true);
   const [autoScanEnabled, setAutoScanEnabled] = useState(true);
   const [nextScanAt, setNextScanAt] = useState<string | null>(null);
 
@@ -94,6 +95,7 @@ export function Settings(props: SettingsProps) {
         if (library) {
           if (library.scanIntervalHours != null) setScanInterval(String(library.scanIntervalHours));
           if (typeof library.fetchExtendedMetadata === 'boolean') setFetchExtendedMetadata(library.fetchExtendedMetadata);
+          if (typeof library.persistTranscodes === 'boolean') setPersistTranscodes(library.persistTranscodes);
           if (typeof library.autoScanEnabled === 'boolean') setAutoScanEnabled(library.autoScanEnabled);
         }
 
@@ -171,6 +173,7 @@ export function Settings(props: SettingsProps) {
         value: {
           scanIntervalHours: parseInt(scanInterval, 10),
           fetchExtendedMetadata,
+          persistTranscodes,
           autoScanEnabled,
         },
       });
@@ -185,7 +188,7 @@ export function Settings(props: SettingsProps) {
     } finally {
       setIsSaving(false);
     }
-  }, [scanInterval, mediaPathEntries, fetchExtendedMetadata, autoScanEnabled]);
+  }, [scanInterval, mediaPathEntries, fetchExtendedMetadata, persistTranscodes, autoScanEnabled]);
 
   const handleSaveRating = useCallback(async () => {
     setIsSaving(true);
@@ -243,7 +246,6 @@ export function Settings(props: SettingsProps) {
     { id: 'playback', label: 'Playback' },
     { id: 'library', label: 'Library' },
     { id: 'notifications', label: 'Notifications' },
-    { id: 'rating', label: 'Rating' },
     ...(isAdmin ? [
       { id: 'plugins' as SettingsTab, label: 'Plugins' },
       { id: 'admin' as SettingsTab, label: 'Admin' },
@@ -306,6 +308,49 @@ export function Settings(props: SettingsProps) {
                 <select class={styles.select}>
                   <option value="en">English</option>
                 </select>
+              </div>
+
+              <h3 class={styles.sectionTitle}>Rating</h3>
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Rating Scale</span>
+                  <span class={styles.settingDescription}>
+                    Scale used for your personal ratings
+                  </span>
+                </div>
+                <select
+                  class={styles.select}
+                  value={ratingScale}
+                  onChange={(e) => setRatingScale((e.target as HTMLSelectElement).value)}
+                >
+                  <option value="10">0 - 10</option>
+                  <option value="5">0 - 5</option>
+                  <option value="100">0 - 100</option>
+                </select>
+              </div>
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>External Sources</span>
+                  <span class={styles.settingDescription}>
+                    Show ratings from external services
+                  </span>
+                </div>
+                <label class={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={showExternalRatings}
+                    onChange={(e) => setShowExternalRatings((e.target as HTMLInputElement).checked)}
+                  />
+                  <span class={styles.toggleTrack} />
+                </label>
+              </div>
+
+              <div class={styles.actions}>
+                <Button variant="primary" loading={isSaving} onClick={handleSaveRating}>
+                  Save Changes
+                </Button>
               </div>
             </div>
           )}
@@ -456,6 +501,23 @@ export function Settings(props: SettingsProps) {
                 </label>
               </div>
 
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Cache Transcoded Files</span>
+                  <span class={styles.settingDescription}>
+                    Keep transcoded files on disk so they don't need to be re-transcoded on subsequent plays
+                  </span>
+                </div>
+                <label class={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={persistTranscodes}
+                    onChange={(e) => setPersistTranscodes((e.target as HTMLInputElement).checked)}
+                  />
+                  <span class={styles.toggleTrack} />
+                </label>
+              </div>
+
               <div class={styles.scanSection}>
                 <Button variant="secondary" loading={isScanning} onClick={handleScanNow}>
                   {isScanning ? 'Scanning...' : 'Scan Now'}
@@ -519,54 +581,6 @@ export function Settings(props: SettingsProps) {
                   />
                   <span class={styles.toggleTrack} />
                 </label>
-              </div>
-            </div>
-          )}
-
-          {/* Rating Tab */}
-          {activeTab === 'rating' && (
-            <div class={styles.panel}>
-              <h2 class={styles.panelTitle}>Rating</h2>
-
-              <div class={styles.settingRow}>
-                <div class={styles.settingInfo}>
-                  <span class={styles.settingLabel}>Rating Scale</span>
-                  <span class={styles.settingDescription}>
-                    Scale used for your personal ratings
-                  </span>
-                </div>
-                <select
-                  class={styles.select}
-                  value={ratingScale}
-                  onChange={(e) => setRatingScale((e.target as HTMLSelectElement).value)}
-                >
-                  <option value="10">0 - 10</option>
-                  <option value="5">0 - 5</option>
-                  <option value="100">0 - 100</option>
-                </select>
-              </div>
-
-              <div class={styles.settingRow}>
-                <div class={styles.settingInfo}>
-                  <span class={styles.settingLabel}>External Sources</span>
-                  <span class={styles.settingDescription}>
-                    Show ratings from external services
-                  </span>
-                </div>
-                <label class={styles.toggle}>
-                  <input
-                    type="checkbox"
-                    checked={showExternalRatings}
-                    onChange={(e) => setShowExternalRatings((e.target as HTMLInputElement).checked)}
-                  />
-                  <span class={styles.toggleTrack} />
-                </label>
-              </div>
-
-              <div class={styles.actions}>
-                <Button variant="primary" loading={isSaving} onClick={handleSaveRating}>
-                  Save Changes
-                </Button>
               </div>
             </div>
           )}

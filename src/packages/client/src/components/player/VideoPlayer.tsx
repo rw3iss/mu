@@ -57,14 +57,17 @@ export function VideoPlayer({
     if (!video) return;
 
     if (directPlay || !Hls.isSupported()) {
-      // Direct play or native HLS (Safari)
-      video.src = streamUrl;
+      // Direct play or native HLS (Safari) — append token for authenticated access
+      const token = localStorage.getItem('mu_token');
+      const sep = streamUrl.includes('?') ? '&' : '?';
+      video.src = token ? `${streamUrl}${sep}token=${encodeURIComponent(token)}` : streamUrl;
       if (startPosition > 0) {
         video.currentTime = startPosition;
       }
       video.play().catch(() => {});
     } else {
       // HLS.js playback — configured for transcoded/remuxed streams
+      const token = localStorage.getItem('mu_token');
       const hls = new Hls({
         startPosition,
         enableWorker: true,
@@ -78,8 +81,14 @@ export function VideoPlayer({
         manifestLoadingRetryDelay: 1000,
         levelLoadingMaxRetry: 10,
         levelLoadingRetryDelay: 1000,
-        fragLoadingMaxRetry: 10,
+        fragLoadingMaxRetry: 30,
         fragLoadingRetryDelay: 1000,
+        // Inject auth token into all HLS.js XHR requests
+        xhrSetup(xhr) {
+          if (token) {
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          }
+        },
       });
 
       hls.loadSource(streamUrl);
@@ -92,16 +101,30 @@ export function VideoPlayer({
         video.play().catch(() => {});
       });
 
+      let networkRetries = 0;
+      let mediaRetries = 0;
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              console.error('[HLS] Network error, attempting recovery');
-              hls.startLoad();
+              if (networkRetries < 3) {
+                networkRetries++;
+                console.error(`[HLS] Network error, recovery attempt ${networkRetries}/3`);
+                hls.startLoad();
+              } else {
+                console.error('[HLS] Network error, max retries exceeded — destroying');
+                hls.destroy();
+              }
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
-              console.error('[HLS] Media error, attempting recovery');
-              hls.recoverMediaError();
+              if (mediaRetries < 3) {
+                mediaRetries++;
+                console.error(`[HLS] Media error, recovery attempt ${mediaRetries}/3`);
+                hls.recoverMediaError();
+              } else {
+                console.error('[HLS] Media error, max retries exceeded — destroying');
+                hls.destroy();
+              }
               break;
             default:
               console.error('[HLS] Fatal error, destroying');

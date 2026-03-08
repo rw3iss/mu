@@ -8,6 +8,7 @@ import { EventsService } from '../events/events.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { SubtitleService } from './subtitles/subtitle.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import {
   movies,
   movieFiles,
@@ -26,6 +27,9 @@ interface StartStreamOptions {
 export class StreamService {
   private readonly logger = new Logger(StreamService.name);
 
+  /** Maps sessionId → the directory where HLS segments live (persistent or ephemeral) */
+  private readonly sessionDirs = new Map<string, string>();
+
   constructor(
     private readonly database: DatabaseService,
     private readonly config: ConfigService,
@@ -33,6 +37,7 @@ export class StreamService {
     private readonly transcoderService: TranscoderService,
     private readonly directPlayService: DirectPlayService,
     private readonly subtitleService: SubtitleService,
+    private readonly settings: SettingsService,
   ) {}
 
   async startStream(movieId: string, userId: string, options: StartStreamOptions = {}) {
@@ -83,15 +88,33 @@ export class StreamService {
     }
 
     // Start transcode or remux pipeline as needed
-    if (mode === StreamMode.TRANSCODE) {
-      await this.transcoderService.startTranscode(sessionId, file.filePath, {
-        quality,
-        audioTrack: options.audioTrack,
-        subtitleTrack: options.subtitleTrack,
-      });
-    } else if (mode === StreamMode.DIRECT_STREAM) {
-      // H.264 in non-browser container (MKV/AVI/MOV) — remux to HLS without re-encoding
-      await this.transcoderService.startRemux(sessionId, file.filePath);
+    const lib = this.settings.get<Record<string, unknown>>('library', {});
+    const persistEnabled = (lib as any)?.persistTranscodes !== false;
+
+    if (mode === StreamMode.TRANSCODE || mode === StreamMode.DIRECT_STREAM) {
+      const persistDir = this.transcoderService.getPersistentDir(file.id, quality);
+      const hasCached = persistEnabled && await this.transcoderService.hasCachedTranscode(file.id, quality);
+
+      if (hasCached) {
+        // Use the existing persistent cache — no FFmpeg needed
+        this.sessionDirs.set(sessionId, persistDir);
+        this.logger.log(`Using cached transcode for session=${sessionId}, file=${file.id}`);
+      } else {
+        const outputDir = persistEnabled ? persistDir : undefined;
+        if (outputDir) {
+          this.sessionDirs.set(sessionId, persistDir);
+        }
+
+        if (mode === StreamMode.TRANSCODE) {
+          await this.transcoderService.startTranscode(sessionId, file.filePath, {
+            quality,
+            audioTrack: options.audioTrack,
+            subtitleTrack: options.subtitleTrack,
+          }, outputDir);
+        } else {
+          await this.transcoderService.startRemux(sessionId, file.filePath, outputDir);
+        }
+      }
     }
 
     // Look up resume position from watch history
@@ -210,7 +233,12 @@ export class StreamService {
     // Stop any active transcode
     if (session.transcoding) {
       this.transcoderService.stopTranscode(sessionId);
-      await this.transcoderService.cleanup(sessionId);
+      // Only delete ephemeral session dirs — persistent cache dirs are kept
+      const isPersistent = this.sessionDirs.has(sessionId);
+      if (!isPersistent) {
+        await this.transcoderService.cleanup(sessionId);
+      }
+      this.sessionDirs.delete(sessionId);
     }
 
     // Mark session as ended by clearing lastActiveAt
@@ -294,6 +322,14 @@ export class StreamService {
   }
 
   /**
+   * Get the HLS directory for a session — persistent cache dir if available,
+   * otherwise the default ephemeral session dir.
+   */
+  getSessionCacheDir(sessionId: string): string | undefined {
+    return this.sessionDirs.get(sessionId);
+  }
+
+  /**
    * Select the best file from a list of available movie files.
    * Prefers the highest resolution file available.
    */
@@ -314,7 +350,7 @@ export class StreamService {
    * Browser-native playback requires H.264/AAC in an MP4 or WebM container.
    * Everything else must be transcoded to HLS.
    */
-  private determineStreamMode(file: any): string {
+  determineStreamMode(file: any): string {
     const filePath = (file.filePath || '').toLowerCase();
     const codec = (file.codecVideo || '').toLowerCase();
     const ext = filePath.slice(filePath.lastIndexOf('.'));
