@@ -25,21 +25,25 @@ Also do the same for the 'Admin' section: Show it as a new menu item in the Sett
 		- fetch cast: compiles top cast members from third parties, stores in our backend for that movie (we begin to keep people DB).
 		- fetch reviews: load reviews, similarly.
 
+- add 'Pick a movie' for movie... open page user can page through movie options, set filters, "Movie Picker"
+
+
+# PLUGINS:
+- EQ + Compressor
 
 - IMDB plugin:
 	- Settings: show imdb rating, show imdb reviews
 	- Movie page: Show IMDB rating, show imdb reviews
-	-
 
-- PLUGIN: Public comments for a movie:
+- Public comments for a movie:
 	- movie must have imdb/tmdb association
 	- need central movie db to store public comments
 	- show comments icon in player
 	- load comments, add, options to show them popup as "live comments" and options for "highest rated comments when conflicts"
 
-- PLUGIN: Integrate web urls or other video websites, ie. Watch youtube, twitch from the app.
+- Other video sources?
+	- Integrate web urls or other video websites, ie. Watch youtube, stream twitch from the app, etc. Even connect with other users for video meetings?
 
-- add 'Pick a movie' for movie... open page user can page through movie options, set filters, "Movie Picker"
 
 
 --------------------------------------------------------------------------------

@@ -14,6 +14,7 @@ import {
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { StreamService } from './stream.service.js';
 import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
+import { TranscoderService } from './transcoder/transcoder.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -27,6 +28,7 @@ export class StreamController {
   constructor(
     private readonly streamService: StreamService,
     private readonly hlsGenerator: HlsGeneratorService,
+    private readonly transcoderService: TranscoderService,
     private readonly directPlayService: DirectPlayService,
     private readonly db: DatabaseService,
   ) {}
@@ -57,6 +59,15 @@ export class StreamController {
     @Param('sessionId') sessionId: string,
     @Res() reply: FastifyReply,
   ) {
+    // Check if FFmpeg has crashed for this session
+    const state = this.transcoderService.getTranscodeState(sessionId);
+    if (state?.state === 'failed') {
+      this.logger.error(`Manifest requested for failed session ${sessionId}: ${state.error}`);
+      return reply
+        .status(500)
+        .send({ message: `Transcoding failed: ${state.error}` });
+    }
+
     const dir = this.streamService.getSessionCacheDir(sessionId);
     const manifest = await this.hlsGenerator.getManifest(sessionId, dir);
 
@@ -89,6 +100,15 @@ export class StreamController {
     if (!match) {
       return reply.status(404).send({ message: 'Invalid segment path' });
     }
+
+    // Check if FFmpeg has crashed for this session
+    const state = this.transcoderService.getTranscodeState(sessionId);
+    if (state?.state === 'failed') {
+      return reply
+        .status(500)
+        .send({ message: `Transcoding failed: ${state.error}` });
+    }
+
     const dir = this.streamService.getSessionCacheDir(sessionId);
     const segment = await this.hlsGenerator.getSegment(sessionId, parseInt(match[1]!, 10), dir);
 

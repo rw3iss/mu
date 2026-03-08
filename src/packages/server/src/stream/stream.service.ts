@@ -145,8 +145,9 @@ export class StreamService {
       mode,
     });
 
+    const resolvedDir = this.sessionDirs.get(sessionId) || this.transcoderService.getSessionDir(sessionId);
     this.logger.log(
-      `Stream started: session=${sessionId}, movie=${movieId}, mode=${mode}, quality=${quality}`,
+      `Stream started: session=${sessionId}, movie=${movieId}, file=${file.id}, mode=${mode}, quality=${quality}, segmentDir=${resolvedDir}`,
     );
 
     return {

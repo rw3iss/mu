@@ -12,10 +12,14 @@ interface TranscodeOptions {
   subtitleTrack?: number;
 }
 
+type TranscodeState = 'running' | 'completed' | 'failed';
+
 @Injectable()
 export class TranscoderService implements OnModuleDestroy {
   private readonly logger = new Logger(TranscoderService.name);
   private readonly activeProcesses = new Map<string, ChildProcess>();
+  /** Tracks the state of each transcode session (running / completed / failed) */
+  private readonly sessionStates = new Map<string, { state: TranscodeState; error?: string }>();
   private readonly cacheDir: string;
 
   constructor(private readonly config: ConfigService) {
@@ -64,6 +68,14 @@ export class TranscoderService implements OnModuleDestroy {
     } catch (err) {
       this.logger.warn(`Failed to clear cache ${target}: ${err}`);
     }
+  }
+
+  /**
+   * Get the transcode state for a session. Returns undefined if the session
+   * was never tracked (e.g. direct play or unknown session).
+   */
+  getTranscodeState(sessionId: string): { state: TranscodeState; error?: string } | undefined {
+    return this.sessionStates.get(sessionId);
   }
 
   async startTranscode(
@@ -137,7 +149,9 @@ export class TranscoderService implements OnModuleDestroy {
       command
         .output(outputPath)
         .on('start', (commandLine: string) => {
-          this.logger.log(`FFmpeg started for session ${sessionId}: ${commandLine}`);
+          this.logger.log(`FFmpeg started for session ${sessionId}, outputDir=${targetDir}`);
+          this.logger.debug(`FFmpeg command: ${commandLine}`);
+          this.sessionStates.set(sessionId, { state: 'running' });
           // Resolve immediately once FFmpeg starts; segments will be generated progressively
           resolve();
         })
@@ -149,12 +163,14 @@ export class TranscoderService implements OnModuleDestroy {
         .on('error', (err: Error) => {
           this.logger.error(`FFmpeg error for session ${sessionId}: ${err.message}`);
           this.activeProcesses.delete(sessionId);
+          this.sessionStates.set(sessionId, { state: 'failed', error: err.message });
           // Only reject if we haven't resolved yet
           reject(err);
         })
         .on('end', () => {
           this.logger.log(`Transcode complete for session ${sessionId}`);
           this.activeProcesses.delete(sessionId);
+          this.sessionStates.set(sessionId, { state: 'completed' });
           // Write .complete marker for persistent cache
           if (outputDir) {
             writeFile(path.join(targetDir, '.complete'), '').catch(() => {});
@@ -197,7 +213,9 @@ export class TranscoderService implements OnModuleDestroy {
         ])
         .output(outputPath)
         .on('start', (commandLine: string) => {
-          this.logger.log(`FFmpeg remux started for session ${sessionId}: ${commandLine}`);
+          this.logger.log(`FFmpeg remux started for session ${sessionId}, outputDir=${targetDir}`);
+          this.logger.debug(`FFmpeg command: ${commandLine}`);
+          this.sessionStates.set(sessionId, { state: 'running' });
           resolve();
         })
         .on('progress', (progress: any) => {
@@ -208,11 +226,13 @@ export class TranscoderService implements OnModuleDestroy {
         .on('error', (err: Error) => {
           this.logger.error(`FFmpeg remux error for session ${sessionId}: ${err.message}`);
           this.activeProcesses.delete(sessionId);
+          this.sessionStates.set(sessionId, { state: 'failed', error: err.message });
           reject(err);
         })
         .on('end', () => {
           this.logger.log(`Remux complete for session ${sessionId}`);
           this.activeProcesses.delete(sessionId);
+          this.sessionStates.set(sessionId, { state: 'completed' });
           if (outputDir) {
             writeFile(path.join(targetDir, '.complete'), '').catch(() => {});
           }
