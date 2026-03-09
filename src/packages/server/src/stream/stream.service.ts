@@ -374,29 +374,33 @@ export class StreamService {
 
     if (!encodeHighest) return defaultQuality;
 
-    // Look up all cached qualities for this file
-    const cached = this.database.db
-      .select({ quality: transcodeCache.quality })
-      .from(transcodeCache)
-      .where(eq(transcodeCache.movieFileId, movieFileId))
-      .all();
+    try {
+      // Look up all cached qualities for this file
+      const cached = this.database.db
+        .select({ quality: transcodeCache.quality })
+        .from(transcodeCache)
+        .where(eq(transcodeCache.movieFileId, movieFileId))
+        .all();
 
-    if (cached.length === 0) return defaultQuality;
+      if (cached.length === 0) return defaultQuality;
 
-    // Pick the highest cached quality
-    const ranks: Record<string, number> = { '480p': 1, '720p': 2, '1080p': 3, '4k': 4 };
-    let best = defaultQuality;
-    let bestRank = ranks[defaultQuality] ?? 0;
+      // Pick the highest cached quality
+      const ranks: Record<string, number> = { '480p': 1, '720p': 2, '1080p': 3, '4k': 4 };
+      let best = defaultQuality;
+      let bestRank = ranks[defaultQuality] ?? 0;
 
-    for (const { quality } of cached) {
-      const rank = ranks[quality] ?? 0;
-      if (rank > bestRank) {
-        best = quality;
-        bestRank = rank;
+      for (const { quality } of cached) {
+        const rank = ranks[quality] ?? 0;
+        if (rank > bestRank) {
+          best = quality;
+          bestRank = rank;
+        }
       }
-    }
 
-    return best;
+      return best;
+    } catch {
+      return defaultQuality;
+    }
   }
 
   /**

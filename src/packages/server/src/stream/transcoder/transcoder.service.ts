@@ -104,6 +104,19 @@ export class TranscoderService implements OnModuleDestroy {
     outputDir?: string,
   ): Promise<void> {
     const targetDir = outputDir || this.getSessionDir(sessionId);
+
+    // Clean out stale partial files from a previously failed transcode
+    if (outputDir) {
+      try {
+        await access(path.join(targetDir, 'stream.m3u8'));
+        // File exists but no .complete marker (checked by caller) — wipe and recreate
+        this.logger.warn(`Removing stale partial transcode in ${targetDir}`);
+        await rm(targetDir, { recursive: true, force: true });
+      } catch {
+        // No existing file — nothing to clean
+      }
+    }
+
     await mkdir(targetDir, { recursive: true });
 
     const quality = options.quality || '1080p';
@@ -214,6 +227,18 @@ export class TranscoderService implements OnModuleDestroy {
 
   async startRemux(sessionId: string, filePath: string, outputDir?: string): Promise<void> {
     const targetDir = outputDir || this.getSessionDir(sessionId);
+
+    // Clean out stale partial files from a previously failed remux
+    if (outputDir) {
+      try {
+        await access(path.join(targetDir, 'stream.m3u8'));
+        this.logger.warn(`Removing stale partial remux in ${targetDir}`);
+        await rm(targetDir, { recursive: true, force: true });
+      } catch {
+        // No existing file — nothing to clean
+      }
+    }
+
     await mkdir(targetDir, { recursive: true });
 
     const outputPath = path.join(targetDir, 'stream.m3u8');
@@ -287,6 +312,15 @@ export class TranscoderService implements OnModuleDestroy {
     if (await this.hasCachedTranscode(movieFileId, quality)) {
       this.logger.log(`Pre-transcode skipped — cache exists for ${movieFileId}/${quality}`);
       return;
+    }
+
+    // Clean out stale partial files from a previously failed pre-transcode
+    try {
+      await access(path.join(persistDir, 'stream.m3u8'));
+      this.logger.warn(`Removing stale partial pre-transcode in ${persistDir}`);
+      await rm(persistDir, { recursive: true, force: true });
+    } catch {
+      // No existing file — nothing to clean
     }
 
     await mkdir(persistDir, { recursive: true });

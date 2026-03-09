@@ -17,6 +17,7 @@
     "db:seed": "cd packages/server && npx tsx src/database/seed.ts",
     "db:studio": "cd packages/server && npx drizzle-kit studio",
     "db:reset": "cd packages/server && node -e \"const fs=require('fs');['data/db/mu.db','data/db/mu.db-shm','data/db/mu.db-wal'].forEach(p=>{try{fs.unlinkSync(p)}catch{}});console.log('Database cleared. Run pnpm db:migrate && pnpm db:seed to reinitialize.')\"",
+    "cache:clean": "node scripts/cache-clean.js",
     "clean": "turbo run clean && node -e \"const fs=require('fs');try{fs.rmSync('node_modules',{recursive:true,force:true})}catch{}\""
   },
   "devDependencies": {

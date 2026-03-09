@@ -7,6 +7,7 @@ import type { LoginDto, SetupDto } from './dto/login.dto.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { Public } from '../common/decorators/public.decorator.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { ConfigService } from '../config/config.service.js';
 
 @Controller('auth')
 export class AuthController {
@@ -16,6 +17,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly libraryService: LibraryService,
     private readonly libraryJobs: LibraryJobsService,
+    private readonly config: ConfigService,
   ) {}
 
   @Post('setup')
@@ -94,6 +96,7 @@ export class AuthController {
   @Public()
   async status() {
     const setupComplete = await this.authService.isSetupComplete();
-    return { setupComplete };
+    const localBypass = this.config.get<boolean>('auth.localBypass', true);
+    return { setupComplete, localBypass };
   }
 }

@@ -126,7 +126,7 @@
   transition: transform 200ms ease;
 
   &:hover {
-    z-index: 10;
+    z-index: 250; // above sidebar (--z-sticky: 200) so tooltip isn't clipped
   }
 }
 
@@ -185,29 +185,28 @@
 
     .posterInfo {
       opacity: 1;
-      transform: translateX(-50%) translateY(0);
+      transform: translateY(0);
     }
   }
 
   .posterInfo {
     position: absolute;
     bottom: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%) translateY(4px);
+    left: 0;
+    transform: translateY(4px);
     background: var(--color-bg-elevated);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     padding: var(--space-xs) var(--space-sm);
     white-space: nowrap;
-    z-index: 20;
+    z-index: 250;
     box-shadow: var(--shadow-lg);
 
     &::after {
       content: '';
       position: absolute;
       top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
+      left: 20px;
       border: 5px solid transparent;
       border-top-color: var(--color-bg-elevated);
     }

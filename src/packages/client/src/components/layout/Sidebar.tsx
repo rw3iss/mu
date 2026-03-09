@@ -1,5 +1,5 @@
 import { currentPath } from '@/app';
-import { currentUser } from '@/state/auth.state';
+import { currentUser, logout } from '@/state/auth.state';
 import { JSX } from 'preact';
 import { route } from 'preact-router';
 import { useCallback } from 'preact/hooks';
@@ -100,7 +100,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     <nav class={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
       <div class={styles.header}>
         <button class={styles.logo} onClick={() => handleNav('/')}>
-          <img src="/mu_2_small.png" alt="Mu" class={styles.logoImage} />
+          <img src="/mu_logo_128w.png" alt="Mu" class={styles.logoImage} />
         </button>
         <button
           class={styles.toggle}
@@ -135,6 +135,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <span class={styles.userName}>{user.username}</span>
             <span class={styles.userRole}>{user.role}</span>
           </div>
+          <button
+            class={styles.logoutButton}
+            onClick={logout}
+            title="Logout"
+            aria-label="Logout"
+          >
+            <Icon2
+              d1="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
+              d2="M16 17l5-5-5-5M21 12H9"
+              size={18}
+            />
+          </button>
         </div>
       )}
     </nav>

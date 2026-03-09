@@ -1,4 +1,5 @@
 import { signal, computed } from '@preact/signals';
+import { route } from 'preact-router';
 import { api } from '@/services/api';
 
 // ============================================
@@ -21,6 +22,7 @@ export interface User {
 export const currentUser = signal<User | null>(null);
 export const isLoading = signal(true);
 export const isSetupComplete = signal(true);
+export const localBypass = signal(false);
 export const isAuthenticated = computed(() => currentUser.value !== null);
 
 // ============================================
@@ -45,6 +47,7 @@ export async function logout(): Promise<void> {
   } finally {
     localStorage.removeItem('mu_token');
     currentUser.value = null;
+    route('/login');
   }
 }
 
@@ -52,16 +55,31 @@ export async function checkAuth(): Promise<void> {
   isLoading.value = true;
 
   try {
-    // Check if setup is complete
-    const setupStatus = await api.get<{ setupComplete: boolean }>('/auth/status');
-    isSetupComplete.value = setupStatus.setupComplete;
+    // Check if setup is complete and whether local bypass is enabled
+    const status = await api.get<{ setupComplete: boolean; localBypass?: boolean }>('/auth/status');
+    isSetupComplete.value = status.setupComplete;
+    localBypass.value = status.localBypass === true;
 
     if (!isSetupComplete.value) {
       isLoading.value = false;
       return;
     }
 
-    // Check if user is authenticated
+    // When local bypass is enabled, the server auto-authenticates localhost
+    // requests — call /auth/me directly even without a token
+    if (localBypass.value) {
+      try {
+        const user = await api.get<User>('/auth/me');
+        currentUser.value = user;
+      } catch {
+        // Local bypass failed (e.g. no admin user yet) — treat as unauthenticated
+        currentUser.value = null;
+      }
+      isLoading.value = false;
+      return;
+    }
+
+    // Check if user has a stored token
     const token = localStorage.getItem('mu_token');
     if (!token) {
       isLoading.value = false;

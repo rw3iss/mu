@@ -20,7 +20,7 @@ import { PersonDetail } from '@/pages/PersonDetail';
 import { Login } from '@/pages/Login';
 import { Setup } from '@/pages/Setup';
 import { NotFound } from '@/pages/NotFound';
-import { isAuthenticated, isSetupComplete, isLoading, checkAuth } from '@/state/auth.state';
+import { isAuthenticated, isSetupComplete, isLoading, localBypass, checkAuth } from '@/state/auth.state';
 import { initTheme } from '@/state/theme.state';
 import '@/state/accentColor.state';
 import { wsService } from '@/services/websocket.service';
@@ -35,21 +35,30 @@ function Redirect({ to, path: _path }: { to: string; path: string }) {
   return null;
 }
 
+function enforceAuth(url: string): boolean {
+  if (isLoading.value) return false;
+
+  if (!isSetupComplete.value && url !== '/setup') {
+    route('/setup', true);
+    return true;
+  }
+
+  // Skip auth checks when local bypass is active
+  if (localBypass.value) return false;
+
+  if (!isAuthenticated.value && !['/login', '/setup'].includes(url)) {
+    route('/login', true);
+    return true;
+  }
+
+  return false;
+}
+
 function handleRouteChange(e: { url: string }) {
   const url = e.url.split('?')[0] ?? e.url;
   currentPath.value = url;
 
-  if (isLoading.value) return;
-
-  if (!isSetupComplete.value && url !== '/setup') {
-    route('/setup', true);
-    return;
-  }
-
-  if (!isAuthenticated.value && !['/login', '/setup'].includes(url)) {
-    route('/login', true);
-    return;
-  }
+  if (enforceAuth(url)) return;
 
   // Auto-minimize player when navigating away from the player page
   // (e.g. browser back button). closePlayer/minimizePlayer set the mode
@@ -67,6 +76,13 @@ export function App() {
     initGlobalPlayer();
     return () => wsService.disconnect();
   }, []);
+
+  // Enforce auth redirect on initial load once checkAuth() completes
+  useEffect(() => {
+    if (!isLoading.value) {
+      enforceAuth(currentPath.value);
+    }
+  }, [isLoading.value]);
 
   useScanEvents();
 

@@ -239,6 +239,13 @@ export class DatabaseService implements OnModuleDestroy {
         files_removed INTEGER DEFAULT 0,
         errors TEXT DEFAULT '[]'
       );
+      CREATE TABLE IF NOT EXISTS transcode_cache (
+        id TEXT PRIMARY KEY,
+        movie_file_id TEXT NOT NULL REFERENCES movie_files(id) ON DELETE CASCADE,
+        quality TEXT NOT NULL,
+        encoding_settings TEXT NOT NULL,
+        completed_at TEXT NOT NULL
+      );
     `);
     // Add columns that may not exist in older databases
     try {
