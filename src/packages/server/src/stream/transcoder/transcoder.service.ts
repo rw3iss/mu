@@ -24,6 +24,8 @@ export class TranscoderService implements OnModuleDestroy {
   private readonly activeProcesses = new Map<string, ChildProcess>();
   /** Tracks the state of each transcode session (running / completed / failed) */
   private readonly sessionStates = new Map<string, { state: TranscodeState; error?: string }>();
+  /** Sessions that have already retried with software encoding (prevents infinite loops) */
+  private readonly swFallbackAttempted = new Set<string>();
   private readonly cacheDir: string;
 
   constructor(
@@ -200,6 +202,19 @@ export class TranscoderService implements OnModuleDestroy {
         .on('error', (err: Error) => {
           this.logger.error(`FFmpeg error for session ${sessionId}: ${err.message}`);
           this.activeProcesses.delete(sessionId);
+
+          // If hardware acceleration was used, retry with software encoding
+          if (hwAccel !== 'none' && !this.swFallbackAttempted.has(sessionId)) {
+            this.swFallbackAttempted.add(sessionId);
+            this.logger.warn(
+              `Hardware acceleration (${hwAccel}) failed for session ${sessionId}, retrying with software encoding...`,
+            );
+            this.retryWithSoftware(sessionId, filePath, options, outputDir).catch((retryErr) => {
+              this.logger.error(`Software fallback also failed for session ${sessionId}: ${retryErr.message}`);
+            });
+            return;
+          }
+
           this.sessionStates.set(sessionId, { state: 'failed', error: err.message });
           // Only reject if we haven't resolved yet
           reject(err);
@@ -397,6 +412,19 @@ export class TranscoderService implements OnModuleDestroy {
         .on('error', (err: Error) => {
           this.logger.error(`Pre-transcode error for ${movieFileId}: ${err.message}`);
           this.activeProcesses.delete(processKey);
+
+          // If hardware acceleration was used, retry with software encoding
+          if (isTranscode && hwAccel !== 'none' && !this.swFallbackAttempted.has(processKey)) {
+            this.swFallbackAttempted.add(processKey);
+            this.logger.warn(
+              `Hardware acceleration (${hwAccel}) failed for pre-transcode ${movieFileId}, retrying with software encoding...`,
+            );
+            this.preTranscodeWithSoftware(movieFileId, filePath, quality, persistDir)
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+
           reject(err);
         })
         .on('end', () => {
@@ -452,6 +480,175 @@ export class TranscoderService implements OnModuleDestroy {
       if (proc.pid != null && !proc.killed) pids.push(proc.pid);
     }
     return pids;
+  }
+
+  /**
+   * Retry a failed transcode using software encoding (libx264).
+   * Called automatically when hardware acceleration fails.
+   */
+  private async retryWithSoftware(
+    sessionId: string,
+    filePath: string,
+    options: TranscodeOptions,
+    outputDir?: string,
+  ): Promise<void> {
+    const targetDir = outputDir || this.getSessionDir(sessionId);
+
+    // Clean up the failed attempt
+    try {
+      await rm(targetDir, { recursive: true, force: true });
+    } catch { /* ignore */ }
+    await mkdir(targetDir, { recursive: true });
+
+    const quality = options.quality || '1080p';
+    const profile = TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES]
+      ?? TRANSCODING_PROFILES['1080p'];
+
+    if (!profile) throw new Error(`No transcoding profile found for quality "${quality}"`);
+
+    const outputPath = path.join(targetDir, 'stream.m3u8');
+    const segmentPattern = path.join(targetDir, 'segment_%04d.ts');
+    const enc = this.getEncodingSettings();
+
+    return new Promise<void>((resolve, reject) => {
+      const videoRateOpts = enc.rateControl === 'crf'
+        ? ['-crf', String(enc.crf)]
+        : ['-b:v', profile.videoBitrate];
+
+      let command = ffmpeg(filePath)
+        .outputOptions([
+          '-f', 'hls',
+          '-hls_time', '2',
+          '-hls_list_size', '0',
+          '-hls_segment_filename', segmentPattern,
+          '-hls_playlist_type', 'event',
+          '-hls_flags', 'independent_segments',
+        ])
+        .videoCodec('libx264')
+        .audioCodec('aac')
+        .outputOptions([
+          '-threads', '0',
+          '-g', '48',
+          '-sc_threshold', '0',
+          '-b:a', profile.audioBitrate,
+          ...videoRateOpts,
+        ])
+        .size(`${profile.width}x${profile.height}`)
+        .outputOptions(['-preset', enc.preset])
+        .outputOptions(['-map', '0:v:0']);
+
+      if (options.audioTrack !== undefined) {
+        command = command.outputOptions(['-map', `0:a:${options.audioTrack}?`]);
+      } else {
+        command = command.outputOptions(['-map', '0:a:0?']);
+      }
+
+      command
+        .output(outputPath)
+        .on('start', (commandLine: string) => {
+          this.logger.log(`FFmpeg SW fallback started for session ${sessionId}`);
+          this.logger.debug(`FFmpeg command: ${commandLine}`);
+          this.sessionStates.set(sessionId, { state: 'running' });
+          resolve();
+        })
+        .on('progress', (progress: any) => {
+          this.logger.debug(`SW fallback progress [${sessionId}]: ${progress.percent?.toFixed(1)}%`);
+        })
+        .on('error', (err: Error) => {
+          this.logger.error(`FFmpeg SW fallback error for session ${sessionId}: ${err.message}`);
+          this.activeProcesses.delete(sessionId);
+          this.sessionStates.set(sessionId, { state: 'failed', error: err.message });
+          reject(err);
+        })
+        .on('end', () => {
+          this.logger.log(`SW fallback transcode complete for session ${sessionId}`);
+          this.activeProcesses.delete(sessionId);
+          this.sessionStates.set(sessionId, { state: 'completed' });
+          if (outputDir) {
+            writeFile(path.join(targetDir, '.complete'), '').catch(() => {});
+          }
+        });
+
+      command.run();
+      const ffmpegProcess = (command as any).ffmpegProc;
+      if (ffmpegProcess) {
+        this.activeProcesses.set(sessionId, ffmpegProcess);
+      }
+    });
+  }
+
+  /**
+   * Retry a failed pre-transcode using software encoding (libx264).
+   */
+  private async preTranscodeWithSoftware(
+    movieFileId: string,
+    filePath: string,
+    quality: string,
+    persistDir: string,
+  ): Promise<void> {
+    // Clean up the failed attempt
+    try {
+      await rm(persistDir, { recursive: true, force: true });
+    } catch { /* ignore */ }
+    await mkdir(persistDir, { recursive: true });
+
+    const profile = (TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES]
+      ?? TRANSCODING_PROFILES['1080p'])!;
+    const enc = this.getEncodingSettings();
+    const videoRateOpts = enc.rateControl === 'crf'
+      ? ['-crf', String(enc.crf)]
+      : ['-b:v', profile.videoBitrate];
+
+    const outputPath = path.join(persistDir, 'stream.m3u8');
+    const segmentPattern = path.join(persistDir, 'segment_%04d.ts');
+    const processKey = `pre-${movieFileId}-${quality}`;
+
+    return new Promise<void>((resolve, reject) => {
+      const command = ffmpeg(filePath)
+        .outputOptions([
+          '-f', 'hls',
+          '-hls_time', '2',
+          '-hls_list_size', '0',
+          '-hls_segment_filename', segmentPattern,
+          '-hls_playlist_type', 'event',
+          '-hls_flags', 'independent_segments',
+        ])
+        .videoCodec('libx264')
+        .audioCodec('aac')
+        .outputOptions([
+          '-threads', '0',
+          '-g', '48',
+          '-sc_threshold', '0',
+          '-b:a', profile.audioBitrate,
+          ...videoRateOpts,
+        ])
+        .size(`${profile.width}x${profile.height}`)
+        .outputOptions(['-preset', enc.preset])
+        .outputOptions(['-map', '0:v:0', '-map', '0:a:0?'])
+        .output(outputPath)
+        .on('start', (commandLine: string) => {
+          this.logger.log(`Pre-transcode SW fallback started for ${movieFileId}: ${commandLine}`);
+        })
+        .on('progress', (progress: any) => {
+          this.logger.debug(`Pre-transcode SW fallback [${movieFileId}]: ${progress.percent?.toFixed(1)}%`);
+        })
+        .on('error', (err: Error) => {
+          this.logger.error(`Pre-transcode SW fallback error for ${movieFileId}: ${err.message}`);
+          this.activeProcesses.delete(processKey);
+          reject(err);
+        })
+        .on('end', () => {
+          this.logger.log(`Pre-transcode SW fallback complete for ${movieFileId}/${quality}`);
+          this.activeProcesses.delete(processKey);
+          writeFile(path.join(persistDir, '.complete'), '').then(() => resolve()).catch(() => resolve());
+        });
+
+      command.run();
+      const ffmpegProcess = (command as any).ffmpegProc;
+      if (ffmpegProcess) {
+        this.activeProcesses.set(processKey, ffmpegProcess);
+      }
+    });
   }
 
   private getEncodingSettings() {

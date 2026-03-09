@@ -18,7 +18,7 @@ const BUFFER_CONFIGS: Record<string, { maxBufferLength: number; maxMaxBufferLeng
   max:    { maxBufferLength: 120, maxMaxBufferLength: 240, maxBufferSize: 250 * 1024 * 1024 },
 };
 
-const MAX_RECOVERIES = 3;
+const MAX_RECOVERIES = 6;
 const RECOVERY_BASE_DELAY_MS = 2000;
 
 export interface VideoEngine {
@@ -53,6 +53,9 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
   const seekLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Guards against DOM-move-induced pause events flipping isPlaying. */
   const movingRef = useRef(false);
+  /** Suppresses async pause events during destroy/initPlayback so they
+   *  don't reset intendedPlayingRef after we've already set it for the new stream. */
+  const suppressPauseRef = useRef(false);
   /**
    * Tracks the user's *intended* play state, independent of browser-fired
    * pause events caused by DOM re-parenting.  When the mini-bar unmounts
@@ -73,7 +76,6 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 
     if (!videoRef.current) {
       const video = document.createElement('video');
-      video.autoplay = true;
       video.playsInline = true;
       video.style.width = '100%';
       video.style.height = '100%';
@@ -90,10 +92,12 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
         intendedPlayingRef.current = true;
       });
       video.addEventListener('pause', () => {
-        // Ignore pause events caused by DOM re-parenting:
+        // Ignore pause events caused by:
         // 1. Explicit moves via moveVideoTo() set movingRef
         // 2. Implicit detachment (e.g. mini bar unmount) detected via document.contains
-        if (movingRef.current || !document.contains(video)) return;
+        // 3. Programmatic destroy/reinit (suppressPauseRef) — async pause events
+        //    from old HLS destroy must not reset intendedPlayingRef for the new stream
+        if (movingRef.current || suppressPauseRef.current || !document.contains(video)) return;
         isPlaying.value = false;
         intendedPlayingRef.current = false;
       });
@@ -147,6 +151,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
     const video = videoRef.current;
     if (!video) return;
 
+    // Suppress async pause events from the old HLS destroy so they don't
+    // reset intendedPlayingRef after we set it for the new stream.
+    suppressPauseRef.current = true;
+
     // Clean up previous HLS instance
     if (hlsRef.current) {
       hlsRef.current.destroy();
@@ -155,6 +163,9 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
     setPlaybackError(null);
 
     intendedPlayingRef.current = autoplay;
+
+    // Re-enable pause tracking after async events settle
+    requestAnimationFrame(() => { suppressPauseRef.current = false; });
 
     if (directPlay || !Hls.isSupported()) {
       const token = localStorage.getItem('mu_token');
@@ -172,12 +183,12 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
         maxBufferLength: bufferConfig.maxBufferLength,
         maxMaxBufferLength: bufferConfig.maxMaxBufferLength,
         maxBufferSize: bufferConfig.maxBufferSize,
-        manifestLoadingMaxRetry: 5,
-        manifestLoadingRetryDelay: 1000,
-        levelLoadingMaxRetry: 5,
-        levelLoadingRetryDelay: 1000,
-        fragLoadingMaxRetry: 5,
-        fragLoadingRetryDelay: 1000,
+        manifestLoadingMaxRetry: 15,
+        manifestLoadingRetryDelay: 2000,
+        levelLoadingMaxRetry: 15,
+        levelLoadingRetryDelay: 2000,
+        fragLoadingMaxRetry: 15,
+        fragLoadingRetryDelay: 2000,
         xhrSetup(xhr) {
           if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         },
@@ -187,6 +198,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        // Don't disrupt if user already started playing manually
+        if (!video.paused) return;
         if (startPosition > 0) video.currentTime = startPosition;
         if (autoplay) video.play().catch(() => {});
       });
@@ -262,6 +275,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
   }, []);
 
   const destroy = useCallback(() => {
+    suppressPauseRef.current = true;
     intendedPlayingRef.current = false;
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
     const video = videoRef.current;
@@ -270,6 +284,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
       video.removeAttribute('src');
       video.load();
     }
+    // Re-enable after async pause events settle
+    requestAnimationFrame(() => { suppressPauseRef.current = false; });
   }, []);
 
   const moveVideoTo = useCallback((container: HTMLElement) => {

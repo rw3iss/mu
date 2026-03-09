@@ -1,12 +1,14 @@
 import { Controller, Post, Param, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { basename } from 'path';
+import { existsSync, statSync } from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
 import { nowISO, WsEvent } from '@mu/shared';
 import { MetadataService } from './metadata.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { EventsService } from '../events/events.service.js';
+import { LibraryJobsService } from '../library/library-jobs.service.js';
 import { movies, movieMetadata, movieFiles } from '../database/schema/index.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 
@@ -19,6 +21,7 @@ export class MetadataController {
     private readonly database: DatabaseService,
     private readonly thumbnailService: ThumbnailService,
     private readonly events: EventsService,
+    private readonly libraryJobs: LibraryJobsService,
   ) {}
 
   @Post('movies/refresh-all')
@@ -74,13 +77,55 @@ export class MetadataController {
       .where(eq(movies.id, movieId))
       .get();
 
-    const results: { fileId: string; fileName: string | null; updated: boolean }[] = [];
+    const results: { fileId: string; fileName: string | null; updated: boolean; missing: boolean; corrupt?: boolean }[] = [];
 
     for (const file of files) {
+      // Check if the file exists on disk and re-mark as available if it does
+      const fileExists = existsSync(file.filePath);
+      if (fileExists && !file.available) {
+        this.database.db
+          .update(movieFiles)
+          .set({ available: true })
+          .where(eq(movieFiles.id, file.id))
+          .run();
+        this.logger.log(`Re-marked file as available: ${file.filePath}`);
+      } else if (!fileExists && file.available) {
+        this.database.db
+          .update(movieFiles)
+          .set({ available: false })
+          .where(eq(movieFiles.id, file.id))
+          .run();
+        this.logger.warn(`File no longer accessible, marked unavailable: ${file.filePath}`);
+      }
+
+      if (!fileExists) {
+        results.push({ fileId: file.id, fileName: file.fileName, updated: false, missing: true });
+        continue;
+      }
+
+      // Check for empty/corrupt files (< 1KB)
+      try {
+        const stat = statSync(file.filePath);
+        if (stat.size < 1024) {
+          this.logger.warn(`File is empty or corrupt (${stat.size} bytes): ${file.filePath}`);
+          this.database.db
+            .update(movieFiles)
+            .set({ available: false })
+            .where(eq(movieFiles.id, file.id))
+            .run();
+          results.push({ fileId: file.id, fileName: file.fileName, updated: false, missing: false, corrupt: true });
+          continue;
+        }
+      } catch {
+        // stat failed — treat as missing
+        results.push({ fileId: file.id, fileName: file.fileName, updated: false, missing: true });
+        continue;
+      }
+
       const probeResult = await this.probeFileFull(file.filePath);
 
       if (!probeResult) {
-        results.push({ fileId: file.id, fileName: file.fileName, updated: false });
+        results.push({ fileId: file.id, fileName: file.fileName, updated: false, missing: false });
         continue;
       }
 
@@ -147,7 +192,7 @@ export class MetadataController {
           .run();
       }
 
-      results.push({ fileId: file.id, fileName: file.fileName, updated: true });
+      results.push({ fileId: file.id, fileName: file.fileName, updated: true, missing: false });
     }
 
     // Generate a smart thumbnail (tries multiple positions, avoids black frames)
@@ -161,12 +206,22 @@ export class MetadataController {
       }
     }
 
+    // Enqueue pre-transcode jobs if needed (file available but no cached transcode)
+    let transcoding = false;
+    const movieTitle = movie?.title || 'Unknown';
+    try {
+      this.libraryJobs.enqueuePreTranscodeIfNeeded(movieId, movieTitle);
+      transcoding = true;
+    } catch (err: any) {
+      this.logger.warn(`Failed to enqueue pre-transcode during rescan: ${err.message}`);
+    }
+
     this.logger.log(`Rescanned ${results.length} file(s) for movie ${movieId}`);
 
     // Emit WebSocket event
     this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'rescan' });
 
-    return { files: results, thumbnailUrl };
+    return { files: results, thumbnailUrl, transcoding };
   }
 
   /**

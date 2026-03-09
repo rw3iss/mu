@@ -1,7 +1,55 @@
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+
+export interface PluginEndpointConfig {
+  /** Client-friendly method name (used in generated API client) */
+  methodName: string;
+  /** HTTP method */
+  method: HttpMethod;
+  /** Path after /plugins/:pluginId/api/ */
+  path: string;
+  /** Handler function */
+  handler: (params: {
+    query: Record<string, string>;
+    body: unknown;
+    params: Record<string, string>;
+  }) => Promise<unknown>;
+  /** Optional param schema for codegen */
+  schema?: {
+    params?: Record<string, 'string' | 'number'>;
+    query?: Record<string, 'string' | 'number'>;
+    body?: Record<string, unknown>;
+    response?: Record<string, unknown>;
+  };
+}
+
+export interface PluginUiSlotItem {
+  /** Unique ID for this item within the slot */
+  id: string;
+  /** Priority for ordering (lower = first) */
+  priority?: number;
+  /** Structured content — array of content blocks */
+  content: PluginUiContent[];
+}
+
+export type PluginUiContent =
+  | { type: 'heading'; text: string }
+  | { type: 'text'; text: string }
+  | { type: 'badge'; label: string; color?: string }
+  | { type: 'link'; text: string; url: string }
+  | { type: 'rating'; source: string; value: number; max?: number }
+  | { type: 'key-value'; label: string; value: string }
+  | { type: 'list'; items: string[] }
+  | { type: 'divider' };
+
 export interface IPlugin {
   onLoad(context: PluginContext): Promise<void>;
   onUnload(): Promise<void>;
   getInfo(): PluginInfo;
+  // Optional lifecycle hooks
+  onInstall?(context: PluginContext): Promise<void>;
+  onUninstall?(context: PluginContext): Promise<void>;
+  onEnable?(context: PluginContext): Promise<void>;
+  onDisable?(context: PluginContext): Promise<void>;
 }
 
 export interface PluginManifest {
@@ -52,6 +100,12 @@ export interface PluginContext {
   http: {
     fetch(url: string, options?: RequestInit): Promise<Response>;
   };
+  api: {
+    registerEndpoint(config: PluginEndpointConfig): void;
+  };
+  ui: {
+    registerSlotItem(slot: string, item: PluginUiSlotItem): void;
+  };
   getMovies(query?: { limit?: number; offset?: number }): Promise<unknown[]>;
   getMovieById(id: string): Promise<unknown | null>;
   updateMovieMetadata(
@@ -59,6 +113,8 @@ export interface PluginContext {
     data: Record<string, unknown>,
   ): Promise<void>;
 }
+
+export type PluginStatus = 'not_installed' | 'installed' | 'enabled' | 'disabled' | 'error';
 
 export interface PluginInfo {
   name: string;
@@ -68,6 +124,7 @@ export interface PluginInfo {
   author?: string;
   enabled: boolean;
   loaded: boolean;
+  status: PluginStatus;
   permissions: PluginPermission[];
   settings?: PluginSettingDefinition[];
 }

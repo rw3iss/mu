@@ -1,0 +1,7 @@
+{
+  "name": "@mu/plugin-example-info",
+  "version": "1.0.0",
+  "description": "Example plugin demonstrating API endpoint and UI slot registration",
+  "type": "module",
+  "main": "index.ts"
+}

@@ -288,7 +288,7 @@ export class LibraryJobsService implements OnModuleInit {
     this.logger.log('Listening for new movies to schedule metadata + thumbnail + pre-transcode jobs');
   }
 
-  private enqueuePreTranscodeIfNeeded(movieId: string, title: string): void {
+  enqueuePreTranscodeIfNeeded(movieId: string, title: string): void {
     const lib = this.settings.get<Record<string, unknown>>('library', {});
     const persistEnabled = (lib as any)?.persistTranscodes !== false; // default true
     if (!persistEnabled) return;

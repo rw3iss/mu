@@ -10,18 +10,23 @@ import { EventsService } from '../events/events.service.js';
 import { CacheService } from '../cache/cache.service.js';
 import { plugins } from '../database/schema/index.js';
 import { PluginContextFactory } from './plugin-context.factory.js';
+import { PluginApiRegistryService } from './plugin-api-registry.service.js';
+import { PluginUiRegistryService } from './plugin-ui-registry.service.js';
 import type {
   IPlugin,
   PluginManifest,
   PluginInfo,
   PluginPermission,
   PluginSettingDefinition,
+  PluginStatus,
+  PluginContext,
 } from './plugin.interface.js';
 
 interface LoadedPlugin {
   instance: IPlugin;
   manifest: PluginManifest;
   directory: string;
+  context: PluginContext;
 }
 
 @Injectable()
@@ -36,6 +41,8 @@ export class PluginManagerService {
     private readonly events: EventsService,
     private readonly cache: CacheService,
     private readonly contextFactory: PluginContextFactory,
+    private readonly apiRegistry: PluginApiRegistryService,
+    private readonly uiRegistry: PluginUiRegistryService,
   ) {
     const configDir = this.config.get<string>('plugins.directory', './plugins');
     const resolved = resolve(configDir);
@@ -95,6 +102,7 @@ export class PluginManagerService {
       instance: pluginInstance,
       manifest,
       directory: pluginDir,
+      context,
     });
 
     await this.upsertPluginRecord(manifest, true);
@@ -110,6 +118,10 @@ export class PluginManagerService {
     if (!loaded) {
       throw new Error(`Plugin "${name}" is not loaded`);
     }
+
+    // Clean up registries before unloading
+    this.apiRegistry.unregisterAll(name);
+    this.uiRegistry.unregisterAll(name);
 
     await loaded.instance.onUnload();
     this.activePlugins.delete(name);
@@ -131,6 +143,7 @@ export class PluginManagerService {
         author: loaded.manifest.author,
         enabled: true,
         loaded: true,
+        status: 'enabled',
         permissions: loaded.manifest.permissions,
         settings: loaded.manifest.settings,
       });
@@ -153,9 +166,21 @@ export class PluginManagerService {
 
     const pluginDir = join(this.pluginsDir, name);
     await this.loadPlugin(pluginDir);
+
+    // Call onEnable lifecycle hook if defined
+    const loaded = this.activePlugins.get(name);
+    if (loaded?.instance.onEnable) {
+      await loaded.instance.onEnable(loaded.context);
+    }
   }
 
   async disablePlugin(name: string): Promise<void> {
+    // Call onDisable lifecycle hook before unloading
+    const loaded = this.activePlugins.get(name);
+    if (loaded?.instance.onDisable) {
+      await loaded.instance.onDisable(loaded.context);
+    }
+
     if (this.activePlugins.has(name)) {
       await this.unloadPlugin(name);
     }
@@ -163,6 +188,103 @@ export class PluginManagerService {
     await this.updatePluginStatus(name, false);
 
     this.logger.log(`Plugin "${name}" disabled`);
+  }
+
+  async installPlugin(name: string): Promise<void> {
+    const discovered = await this.discoverPlugins();
+    const manifest = discovered.find((m) => m.name === name);
+
+    if (!manifest) {
+      throw new Error(`Plugin "${name}" not found in plugins directory`);
+    }
+
+    // Create DB record with status = 'installed'
+    const now = nowISO();
+    const existing = this.database.db
+      .select()
+      .from(plugins)
+      .where(eq(plugins.name, name))
+      .get();
+
+    if (existing) {
+      this.database.db
+        .update(plugins)
+        .set({
+          version: manifest.version,
+          status: 'installed',
+          updatedAt: now,
+        })
+        .where(eq(plugins.name, name))
+        .run();
+    } else {
+      this.database.db
+        .insert(plugins)
+        .values({
+          id: crypto.randomUUID(),
+          name,
+          version: manifest.version,
+          enabled: false,
+          status: 'installed',
+          settings: '{}',
+          installedAt: now,
+          updatedAt: now,
+        })
+        .run();
+    }
+
+    // Instantiate plugin temporarily to call onInstall
+    const pluginDir = join(this.pluginsDir, name);
+    const entryPointPath = join(pluginDir, manifest.entryPoint);
+
+    if (existsSync(entryPointPath)) {
+      try {
+        const pluginModule = await import(entryPointPath);
+        const PluginClass = pluginModule.default ?? pluginModule;
+        let pluginInstance: IPlugin;
+        if (typeof PluginClass === 'function') {
+          pluginInstance = new PluginClass();
+        } else {
+          pluginInstance = PluginClass as IPlugin;
+        }
+
+        if (pluginInstance.onInstall) {
+          const context = await this.contextFactory.createContext(name);
+          await pluginInstance.onInstall(context);
+        }
+      } catch (err) {
+        this.logger.warn(
+          `onInstall hook failed for "${name}": ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+
+    this.logger.log(`Plugin "${name}" installed`);
+  }
+
+  async uninstallPlugin(name: string): Promise<void> {
+    const loaded = this.activePlugins.get(name);
+
+    // Call onUninstall lifecycle hook
+    if (loaded?.instance.onUninstall) {
+      await loaded.instance.onUninstall(loaded.context);
+    }
+
+    // Unload if loaded
+    if (this.activePlugins.has(name)) {
+      await this.unloadPlugin(name);
+    }
+
+    // Clean up registries
+    this.apiRegistry.unregisterAll(name);
+    this.uiRegistry.unregisterAll(name);
+
+    // Remove DB record
+    this.database.db
+      .delete(plugins)
+      .where(eq(plugins.name, name))
+      .run();
+
+    this.logger.log(`Plugin "${name}" uninstalled`);
   }
 
   async discoverPlugins(): Promise<PluginManifest[]> {
@@ -211,6 +333,17 @@ export class PluginManagerService {
       const isLoaded = this.activePlugins.has(manifest.name);
       const isEnabled = dbRecord?.enabled ?? false;
 
+      let status: PluginStatus = 'not_installed';
+      if (dbRecord?.status) {
+        status = dbRecord.status as PluginStatus;
+      } else if (isEnabled && isLoaded) {
+        status = 'enabled';
+      } else if (isEnabled) {
+        status = 'installed';
+      } else if (dbRecord) {
+        status = 'disabled';
+      }
+
       result.push({
         name: manifest.name,
         displayName: manifest.displayName,
@@ -219,6 +352,7 @@ export class PluginManagerService {
         author: manifest.author,
         enabled: isEnabled,
         loaded: isLoaded,
+        status,
         permissions: manifest.permissions,
         settings: manifest.settings,
       });
@@ -385,6 +519,7 @@ export class PluginManagerService {
         .set({
           version: manifest.version,
           enabled,
+          status: enabled ? 'enabled' : 'disabled',
           updatedAt: now,
         })
         .where(eq(plugins.name, manifest.name))
@@ -397,6 +532,7 @@ export class PluginManagerService {
           name: manifest.name,
           version: manifest.version,
           enabled,
+          status: enabled ? 'enabled' : 'disabled',
           settings: '{}',
           installedAt: now,
           updatedAt: now,
@@ -412,7 +548,11 @@ export class PluginManagerService {
     const now = nowISO();
     this.database.db
       .update(plugins)
-      .set({ enabled, updatedAt: now })
+      .set({
+        enabled,
+        status: enabled ? 'enabled' : 'disabled',
+        updatedAt: now,
+      })
       .where(eq(plugins.name, name))
       .run();
   }

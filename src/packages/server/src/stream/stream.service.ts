@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { eq, and } from 'drizzle-orm';
+import { statSync } from 'fs';
 import crypto from 'crypto';
 import { nowISO, WsEvent, StreamMode } from '@mu/shared';
 import { DatabaseService } from '../database/database.service.js';
@@ -48,11 +49,47 @@ export class StreamService {
       .where(and(eq(movieFiles.movieId, movieId), eq(movieFiles.available, true)));
 
     if (movieFileList.length === 0) {
-      throw new NotFoundException(`No available file found for movie ${movieId}`);
+      // Check if there are unavailable files (file removed from disk / mount missing)
+      const allFiles = await this.database.db
+        .select({ id: movieFiles.id, filePath: movieFiles.filePath })
+        .from(movieFiles)
+        .where(eq(movieFiles.movieId, movieId));
+
+      if (allFiles.length > 0) {
+        this.logger.warn(
+          `Movie ${movieId} has ${allFiles.length} file(s) but none are available. ` +
+          `Paths: ${allFiles.map((f) => f.filePath).join(', ')}`,
+        );
+        throw new NotFoundException(
+          'The source file for this movie is not currently accessible. ' +
+          'It may have been moved or the storage is disconnected. Try running a library scan.',
+        );
+      }
+
+      throw new NotFoundException(`No file found for movie ${movieId}`);
     }
 
     // Pick the best available file (prefer highest resolution)
     const file = this.selectBestFile(movieFileList);
+
+    // Verify the file has actual content (not empty/corrupt)
+    try {
+      const stat = statSync(file.filePath);
+      if (stat.size < 1024) {
+        this.logger.warn(`File is empty or corrupt (${stat.size} bytes): ${file.filePath}`);
+        throw new BadRequestException(
+          'The video file appears to be empty or corrupt (0 bytes). ' +
+          'It may not have finished downloading or was saved incorrectly.',
+        );
+      }
+    } catch (err: any) {
+      if (err instanceof BadRequestException) throw err;
+      this.logger.warn(`Cannot stat file ${file.filePath}: ${err.message}`);
+      throw new NotFoundException(
+        'The source file for this movie is not currently accessible. ' +
+        'It may have been moved or the storage is disconnected.',
+      );
+    }
 
     // Determine stream mode based on container and codec
     const mode = this.determineStreamMode(file);
@@ -91,10 +128,11 @@ export class StreamService {
     // Start transcode or remux pipeline as needed
     const lib = this.settings.get<Record<string, unknown>>('library', {});
     const persistEnabled = (lib as any)?.persistTranscodes !== false;
+    let hasCached = false;
 
     if (mode === StreamMode.TRANSCODE || mode === StreamMode.DIRECT_STREAM) {
       const persistDir = this.transcoderService.getPersistentDir(file.id, quality);
-      const hasCached = persistEnabled && await this.transcoderService.hasCachedTranscode(file.id, quality);
+      hasCached = persistEnabled && await this.transcoderService.hasCachedTranscode(file.id, quality);
 
       if (hasCached) {
         // Use the existing persistent cache — no FFmpeg needed
@@ -167,11 +205,16 @@ export class StreamService {
       `Stream started: session=${sessionId}, movie=${movieId}, file=${file.id}, mode=${mode}, quality=${quality}, segmentDir=${resolvedDir}`,
     );
 
+    // Direct play and cached transcodes are ready immediately;
+    // live transcodes need time for ffmpeg to produce the first segment.
+    const ready = directPlay || (mode !== StreamMode.DIRECT_PLAY && hasCached);
+
     return {
       sessionId,
       movieId,
       streamUrl,
       directPlay,
+      ready,
       format: directPlay ? 'native' : 'hls',
       subtitles: subtitleTracks.map((t) => ({
         id: String(t.index),

@@ -10,6 +10,7 @@ export interface StreamSession {
   movieId: string;
   streamUrl: string;
   directPlay: boolean;
+  ready: boolean;
   format: string;
   subtitles: SubtitleTrack[];
   audioTracks: AudioTrack[];
@@ -54,6 +55,7 @@ export const audioTrack = signal<string | null>(null);
 export const isBuffering = signal(false);
 export const showControls = signal(true);
 export const showInfoPanel = signal(false);
+export const streamError = signal<string | null>(null);
 
 // ============================================
 // Actions

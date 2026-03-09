@@ -9,6 +9,7 @@ import {
   pluginsService,
   type PluginInfo,
   type PluginSettingDefinition,
+  type PluginStatus,
 } from '@/services/plugins.service';
 import { notifySuccess, notifyError } from '@/state/notifications.state';
 import styles from './Plugins.module.scss';
@@ -78,6 +79,7 @@ export function Plugins(_props: PluginsProps) {
                 ...p,
                 enabled: !p.enabled,
                 loaded: !p.enabled,
+                status: (!p.enabled ? 'enabled' : 'disabled') as PluginStatus,
               }
             : p
         )
@@ -87,6 +89,44 @@ export function Plugins(_props: PluginsProps) {
       );
     } catch {
       notifyError(`Failed to ${action} ${plugin.displayName || plugin.name}`);
+    } finally {
+      setTogglingName(null);
+    }
+  }, []);
+
+  const handleInstall = useCallback(async (plugin: PluginInfo) => {
+    setTogglingName(plugin.name);
+    try {
+      await pluginsService.install(plugin.name);
+      setPlugins((prev) =>
+        prev.map((p) =>
+          p.name === plugin.name
+            ? { ...p, status: 'installed' as PluginStatus }
+            : p
+        )
+      );
+      notifySuccess(`${plugin.displayName || plugin.name} installed`);
+    } catch {
+      notifyError(`Failed to install ${plugin.displayName || plugin.name}`);
+    } finally {
+      setTogglingName(null);
+    }
+  }, []);
+
+  const handleUninstall = useCallback(async (plugin: PluginInfo) => {
+    setTogglingName(plugin.name);
+    try {
+      await pluginsService.uninstall(plugin.name);
+      setPlugins((prev) =>
+        prev.map((p) =>
+          p.name === plugin.name
+            ? { ...p, enabled: false, loaded: false, status: 'not_installed' as PluginStatus }
+            : p
+        )
+      );
+      notifySuccess(`${plugin.displayName || plugin.name} uninstalled`);
+    } catch {
+      notifyError(`Failed to uninstall ${plugin.displayName || plugin.name}`);
     } finally {
       setTogglingName(null);
     }
@@ -144,15 +184,23 @@ export function Plugins(_props: PluginsProps) {
   }, [settingsPlugin, settingValues, handleCloseSettings]);
 
   function getStatusLabel(plugin: PluginInfo): string {
-    if (plugin.enabled && plugin.loaded) return 'active';
-    if (plugin.enabled) return 'enabled';
-    return 'disabled';
+    return plugin.status || (plugin.enabled && plugin.loaded ? 'enabled' : 'disabled');
   }
 
   function getStatusClass(plugin: PluginInfo): string {
-    if (plugin.enabled && plugin.loaded) return styles.statusActive;
-    if (plugin.enabled) return styles.statusEnabled;
-    return styles.statusDisabled;
+    switch (plugin.status) {
+      case 'enabled':
+        return styles.statusActive;
+      case 'installed':
+      case 'disabled':
+        return styles.statusEnabled;
+      case 'error':
+        return styles.statusDisabled;
+      default:
+        if (plugin.enabled && plugin.loaded) return styles.statusActive;
+        if (plugin.enabled) return styles.statusEnabled;
+        return styles.statusDisabled;
+    }
   }
 
   function hasConfigurableSettings(plugin: PluginInfo): boolean {
@@ -218,23 +266,46 @@ export function Plugins(_props: PluginsProps) {
                 )}
 
                 <div class={styles.cardActions}>
-                  <label class={styles.toggle}>
-                    <input
-                      type="checkbox"
-                      checked={plugin.enabled}
-                      disabled={togglingName === plugin.name}
-                      onChange={() => handleToggle(plugin)}
-                    />
-                    <span class={styles.toggleTrack} />
-                  </label>
-                  {hasConfigurableSettings(plugin) && (
+                  {plugin.status === 'not_installed' ? (
                     <Button
-                      variant="ghost"
+                      variant="primary"
                       size="sm"
-                      onClick={() => handleOpenSettings(plugin)}
+                      loading={togglingName === plugin.name}
+                      onClick={() => handleInstall(plugin)}
                     >
-                      Settings
+                      Install
                     </Button>
+                  ) : (
+                    <>
+                      <label class={styles.toggle}>
+                        <input
+                          type="checkbox"
+                          checked={plugin.enabled}
+                          disabled={togglingName === plugin.name}
+                          onChange={() => handleToggle(plugin)}
+                        />
+                        <span class={styles.toggleTrack} />
+                      </label>
+                      {hasConfigurableSettings(plugin) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenSettings(plugin)}
+                        >
+                          Settings
+                        </Button>
+                      )}
+                      {!plugin.enabled && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          loading={togglingName === plugin.name}
+                          onClick={() => handleUninstall(plugin)}
+                        >
+                          Uninstall
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

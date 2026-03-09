@@ -52,6 +52,32 @@ export class StreamController {
   }
 
   /**
+   * Check readiness of a streaming session (is transcoding done / first segment available?).
+   */
+  @Get(':sessionId/status')
+  async getStatus(
+    @Param('sessionId') sessionId: string,
+    @Res() reply: FastifyReply,
+  ) {
+    const state = this.transcoderService.getTranscodeState(sessionId);
+
+    if (state?.state === 'failed') {
+      return reply.send({ state: 'failed', ready: false, error: state.error });
+    }
+
+    // Check if the manifest and first segment exist
+    const dir = this.streamService.getSessionCacheDir(sessionId);
+    const manifest = await this.hlsGenerator.getManifest(sessionId, dir);
+    const firstSeg = await this.hlsGenerator.getSegment(sessionId, 0, dir);
+    const ready = manifest !== null && firstSeg !== null;
+
+    return reply.send({
+      state: state?.state || (ready ? 'completed' : 'preparing'),
+      ready,
+    });
+  }
+
+  /**
    * Get the HLS manifest for an active transcoding session.
    */
   @Get(':sessionId/manifest.m3u8')

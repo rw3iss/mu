@@ -263,6 +263,11 @@ export class DatabaseService implements OnModuleDestroy {
     } catch {
       // Column already exists
     }
+    try {
+      this.sqlite.exec(`ALTER TABLE plugins ADD COLUMN status TEXT DEFAULT 'not_installed'`);
+    } catch {
+      // Column already exists
+    }
 
     this.logger.log('Tables created from inline SQL');
   }

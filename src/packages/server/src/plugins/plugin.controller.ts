@@ -34,6 +34,32 @@ export class PluginController {
     return plugin;
   }
 
+  @Post(':name/install')
+  @Roles('admin')
+  async installPlugin(@Param('name') name: string) {
+    try {
+      await this.pluginManager.installPlugin(name);
+      return { success: true, message: `Plugin "${name}" installed` };
+    } catch (err) {
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Failed to install plugin',
+      );
+    }
+  }
+
+  @Post(':name/uninstall')
+  @Roles('admin')
+  async uninstallPlugin(@Param('name') name: string) {
+    try {
+      await this.pluginManager.uninstallPlugin(name);
+      return { success: true, message: `Plugin "${name}" uninstalled` };
+    } catch (err) {
+      throw new BadRequestException(
+        err instanceof Error ? err.message : 'Failed to uninstall plugin',
+      );
+    }
+  }
+
   @Post(':name/enable')
   @Roles('admin')
   async enablePlugin(@Param('name') name: string) {

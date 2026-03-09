@@ -21,7 +21,9 @@ import {
   showControls,
   showInfoPanel,
   initPlayerSettings,
+  streamError,
 } from '@/state/player.state';
+import { streamService } from '@/services/stream.service';
 import { useVideoEngine } from './useVideoEngine';
 import { setSharedVideoEngine } from '@/state/videoEngineRef';
 import { PlayerControls } from './PlayerControls';
@@ -31,6 +33,7 @@ export function GlobalPlayer() {
   const engine = useVideoEngine();
   const miniVideoContainerRef = useRef<HTMLDivElement>(null);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [preparingMessage, setPreparingMessage] = useState<string | null>(null);
   const playbackInitRef = useRef(false);
 
   // Expose the video engine via module-level ref so Player page can access it
@@ -44,16 +47,39 @@ export function GlobalPlayer() {
     if (!isPlayerActive.value || !globalMovieId.value) return;
 
     if (!currentSession.value) {
+      // Stop any old video before starting a new stream
+      engine.destroy();
       setIsInitializing(true);
+      setPreparingMessage(null);
       initPlayerSettings();
       playbackInitRef.current = false;
       engine.setIntendedPlaying(true);
-      startGlobalStream().then((session) => {
+      startGlobalStream().then(async (session) => {
         if (session) {
+          // If stream isn't ready yet (live transcode), poll until first segment is available
+          if (!session.ready && !session.directPlay) {
+            setPreparingMessage('Preparing video...');
+            const ready = await streamService.waitForReady(session.sessionId, (status) => {
+              if (status.state === 'failed') {
+                setPreparingMessage(`Transcoding failed: ${status.error || 'unknown error'}`);
+              }
+            });
+
+            if (!ready) {
+              setPreparingMessage('Failed to prepare video for playback.');
+              setIsInitializing(false);
+              return;
+            }
+          }
+
+          setPreparingMessage(null);
           const pos = forceStartPosition.value ?? session.startPosition;
           forceStartPosition.value = null;
           engine.initPlayback(session.streamUrl, session.directPlay, pos);
           playbackInitRef.current = true;
+        } else if (streamError.value) {
+          // Stream failed to start — show the error
+          setPreparingMessage(streamError.value);
         }
         setIsInitializing(false);
       });
@@ -117,6 +143,24 @@ export function GlobalPlayer() {
 
   return (
     <>
+      {/* Preparing / error overlay */}
+      {preparingMessage && !isMini && (
+        <div class={styles.preparingOverlay}>
+          <div class={styles.preparingContent}>
+            {!streamError.value && <div class={styles.preparingSpinner} />}
+            <span>{preparingMessage}</span>
+            {streamError.value && (
+              <button
+                class={styles.preparingClose}
+                onClick={() => { setPreparingMessage(null); closePlayer(); }}
+              >
+                Close
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Top header — full mode only, fades with controls */}
       {!isMini && (
         <div class={`${styles.topHeader} ${showControls.value ? styles.topHeaderVisible : ''}`}>

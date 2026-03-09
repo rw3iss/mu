@@ -10,6 +10,7 @@ import {
   isMuted,
   isPlaying,
   duration,
+  streamError,
 } from '@/state/player.state';
 import { moviesService } from '@/services/movies.service';
 import { streamService } from '@/services/stream.service';
@@ -210,13 +211,15 @@ export async function startGlobalStream(): Promise<StreamSession | null> {
   const movieId = globalMovieId.value;
   if (!movieId) return null;
 
+  streamError.value = null;
+
   try {
     const session = await startStream(movieId);
     return session;
-  } catch (err) {
+  } catch (err: any) {
     console.error('Failed to start global stream:', err);
-    playerMode.value = 'hidden';
-    globalMovieId.value = null;
+    const message = err?.body?.message || err?.message || 'Failed to start playback';
+    streamError.value = message;
     return null;
   }
 }

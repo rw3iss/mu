@@ -5,6 +5,8 @@ import { DatabaseService } from '../database/database.service.js';
 import { CacheService } from '../cache/cache.service.js';
 import { EventsService } from '../events/events.service.js';
 import { ConfigService } from '../config/config.service.js';
+import { PluginApiRegistryService } from './plugin-api-registry.service.js';
+import { PluginUiRegistryService } from './plugin-ui-registry.service.js';
 import { plugins, movies, movieMetadata } from '../database/schema/index.js';
 import type { PluginContext } from './plugin.interface.js';
 import crypto from 'crypto';
@@ -16,6 +18,8 @@ export class PluginContextFactory {
     private readonly cache: CacheService,
     private readonly events: EventsService,
     private readonly config: ConfigService,
+    private readonly apiRegistry: PluginApiRegistryService,
+    private readonly uiRegistry: PluginUiRegistryService,
   ) {}
 
   async createContext(pluginName: string): Promise<PluginContext> {
@@ -56,6 +60,18 @@ export class PluginContextFactory {
       http: {
         fetch: async (url: string, options?: RequestInit): Promise<Response> => {
           return fetch(url, options);
+        },
+      },
+
+      api: {
+        registerEndpoint: (config) => {
+          this.apiRegistry.register(pluginName, config);
+        },
+      },
+
+      ui: {
+        registerSlotItem: (slot, item) => {
+          this.uiRegistry.register(pluginName, slot, item);
         },
       },
 

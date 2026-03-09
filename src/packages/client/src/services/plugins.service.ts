@@ -11,6 +11,8 @@ export type PluginPermission =
   | 'cache'
   | 'events';
 
+export type PluginStatus = 'not_installed' | 'installed' | 'enabled' | 'disabled' | 'error';
+
 export interface PluginSettingDefinition {
   key: string;
   type: 'string' | 'number' | 'boolean' | 'select';
@@ -29,6 +31,7 @@ export interface PluginInfo {
   author?: string;
   enabled: boolean;
   loaded: boolean;
+  status: PluginStatus;
   permissions: PluginPermission[];
   settings?: PluginSettingDefinition[];
 }
@@ -37,6 +40,33 @@ export interface PluginSettingsResponse {
   name: string;
   definitions: PluginSettingDefinition[];
   values: Record<string, unknown>;
+}
+
+export type PluginUiContent =
+  | { type: 'heading'; text: string }
+  | { type: 'text'; text: string }
+  | { type: 'badge'; label: string; color?: string }
+  | { type: 'link'; text: string; url: string }
+  | { type: 'rating'; source: string; value: number; max?: number }
+  | { type: 'key-value'; label: string; value: string }
+  | { type: 'list'; items: string[] }
+  | { type: 'divider' };
+
+export interface PluginUiSlotItem {
+  id: string;
+  priority?: number;
+  content: PluginUiContent[];
+}
+
+export interface PluginEndpointSchema {
+  pluginName: string;
+  basePath: string;
+  endpoints: {
+    methodName: string;
+    method: string;
+    path: string;
+    schema?: Record<string, unknown>;
+  }[];
 }
 
 // ============================================
@@ -56,6 +86,20 @@ export const pluginsService = {
    */
   get(name: string): Promise<PluginInfo> {
     return api.get<PluginInfo>(`/plugins/${name}`);
+  },
+
+  /**
+   * Install a plugin.
+   */
+  install(name: string): Promise<void> {
+    return api.post<void>(`/plugins/${name}/install`);
+  },
+
+  /**
+   * Uninstall a plugin.
+   */
+  uninstall(name: string): Promise<void> {
+    return api.post<void>(`/plugins/${name}/uninstall`);
   },
 
   /**
@@ -84,5 +128,19 @@ export const pluginsService = {
    */
   updateSettings(name: string, settings: Record<string, unknown>): Promise<void> {
     return api.put<void>(`/plugins/${name}/settings`, settings);
+  },
+
+  /**
+   * Get the API schema for a plugin (for client codegen).
+   */
+  getSchema(name: string): Promise<PluginEndpointSchema> {
+    return api.get<PluginEndpointSchema>(`/plugins/${name}/schema`);
+  },
+
+  /**
+   * Get UI slot items from a plugin for a given slot.
+   */
+  getSlotItems(pluginName: string, slot: string): Promise<PluginUiSlotItem[]> {
+    return api.get<PluginUiSlotItem[]>(`/plugins/${pluginName}/ui/${slot}`);
   },
 };

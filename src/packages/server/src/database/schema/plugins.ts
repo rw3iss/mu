@@ -5,6 +5,7 @@ export const plugins = sqliteTable('plugins', {
   name: text('name'),
   version: text('version'),
   enabled: integer('enabled', { mode: 'boolean' }).default(false),
+  status: text('status').default('not_installed'),
   settings: text('settings'),
   installedAt: text('installed_at').notNull(),
   updatedAt: text('updated_at').notNull(),

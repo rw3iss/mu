@@ -1,0 +1,9 @@
+{
+  "name": "example-info",
+  "displayName": "Example Info",
+  "version": "1.0.0",
+  "description": "Example plugin demonstrating API endpoint and UI slot registration",
+  "author": "Mu",
+  "entryPoint": "index.ts",
+  "permissions": ["read:movies", "cache"]
+}

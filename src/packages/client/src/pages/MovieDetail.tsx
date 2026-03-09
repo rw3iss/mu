@@ -111,12 +111,32 @@ export function MovieDetail({ id }: MovieDetailProps) {
     setRescanState('loading');
     try {
       const result = await moviesService.rescan(movie.id);
-      const updatedCount = result.files.filter((f) => f.updated).length;
+      const missingFiles = result.files.filter((f: any) => f.missing);
+      const corruptFiles = result.files.filter((f: any) => f.corrupt);
+      const updatedCount = result.files.filter((f: any) => f.updated).length;
       // Reload movie data after rescan
       const updated = await moviesService.get(movie.id);
       setMovie(updated);
+
+      if (corruptFiles.length > 0) {
+        notifyError(`${corruptFiles.length} file(s) appear empty or corrupt (0 bytes). Re-download or replace the source file.`);
+      }
+      if (missingFiles.length === result.files.length && corruptFiles.length === 0) {
+        setRescanState('idle');
+        notifyError('Source file no longer exists on disk. It may have been moved or deleted.');
+        return;
+      }
+      if (missingFiles.length > 0 && corruptFiles.length === 0) {
+        notifyError(`${missingFiles.length} file(s) no longer found on disk.`);
+      }
+      if (corruptFiles.length === result.files.length) {
+        setRescanState('idle');
+        return;
+      }
+
       setRescanState('complete');
-      notifySuccess(`Re-scanned ${result.files.length} file(s), ${updatedCount} updated`);
+      const msg = `Re-scanned ${result.files.length} file(s), ${updatedCount} updated`;
+      notifySuccess(result.transcoding ? `${msg}. Transcoding started.` : msg);
       setTimeout(() => setRescanState('idle'), 3000);
     } catch {
       setRescanState('idle');

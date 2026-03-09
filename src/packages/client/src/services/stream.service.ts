@@ -20,12 +20,54 @@ export interface ActiveSession {
 // Stream Service
 // ============================================
 
+export interface StreamStatus {
+  state: 'preparing' | 'running' | 'completed' | 'failed';
+  ready: boolean;
+  error?: string;
+}
+
 export const streamService = {
   /**
    * Start a new stream session for a movie
    */
   startStream(movieId: string): Promise<StreamSession> {
     return api.get<StreamSession>(`/stream/${movieId}/start`);
+  },
+
+  /**
+   * Check readiness of a streaming session
+   */
+  getStreamStatus(sessionId: string): Promise<StreamStatus> {
+    return api.get<StreamStatus>(`/stream/${sessionId}/status`);
+  },
+
+  /**
+   * Poll until the stream is ready (first segment available) or failed.
+   * Calls onStatus on each poll so the UI can show progress.
+   * Returns true if ready, false if failed.
+   */
+  async waitForReady(
+    sessionId: string,
+    onStatus?: (status: StreamStatus) => void,
+    maxWaitMs: number = 120_000,
+  ): Promise<boolean> {
+    const start = Date.now();
+    const interval = 2000;
+
+    while (Date.now() - start < maxWaitMs) {
+      try {
+        const status = await this.getStreamStatus(sessionId);
+        if (onStatus) onStatus(status);
+
+        if (status.ready) return true;
+        if (status.state === 'failed') return false;
+      } catch {
+        // Network hiccup — keep trying
+      }
+      await new Promise((r) => setTimeout(r, interval));
+    }
+
+    return false;
   },
 
   /**
