@@ -1,6 +1,17 @@
 
 - Show "Info" panel in movie details page: file info, exif
 
+- Need to show option to "group" movies, or create sets to show as one (ie. tv series, etc):
+	- add group_id to movie collection items
+	- user can manually manage groups (later)
+	- when scanning movies, after metadata is pulled, check if other items exist in the same kind of set or series (run algorithm to check "if series" somehow, analyzing metadata, filenames, etc).
+		- if it detects similar/series items, put item's "group_id" into 'possible' state.
+		- then in the frontend, for those items, if it sees 'possible', show a 'Group' option button on the Movie Details page.
+		- when the Group button is clicked, explain their are multiple items matching, and ask if the user wants to combine them into one item, and show in a list on one page.
+		- smart options to break apart seasons.
+		- after items are "grouped", it can set the group_id to the parent item or same group guid that was created for it (ie. the reference to the imdb or something).
+		- later, if new items are scanned that match the group, it can set them to 'possible', and when the user clicks 'group' on them, it can run the scan process again, and find all the new similar items, and then ask the user if it wants to add them all in a checklist.
+
 - Ratings: when clicked, show breakout of 1-10 stars, with number entry on left and decimal up/down buttons. Allow half-stars in overlay. Close/cancel button on end.
 	- user clicks a main number, zooms in between that and next number, with mini decimal scale? Right click or click outside to stay at X.0.
 
@@ -32,6 +43,11 @@
 - Discover > Trending: other movies cross joined with mine? filter by personalized vs not.
 
 # PLUGINS:
+
+- Movie Bookmarks:
+	- add location + name/comment, see new button in player bar
+	- need ui hook to draw an element on seek bar...
+	- is this the same as comments?
 
 - "EQ + Compressor":
 	- show cpu usage?
