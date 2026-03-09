@@ -8,14 +8,14 @@ import { SubtitleService } from './subtitles/subtitle.service.js';
 import { SubtitleController } from './subtitles/subtitle.controller.js';
 
 @Module({
-  controllers: [StreamController, SubtitleController],
-  providers: [
-    StreamService,
-    TranscoderService,
-    HlsGeneratorService,
-    DirectPlayService,
-    SubtitleService,
-  ],
-  exports: [StreamService, TranscoderService, SubtitleService],
+	controllers: [StreamController, SubtitleController],
+	providers: [
+		StreamService,
+		TranscoderService,
+		HlsGeneratorService,
+		DirectPlayService,
+		SubtitleService,
+	],
+	exports: [StreamService, TranscoderService, SubtitleService],
 })
 export class StreamModule {}

@@ -229,6 +229,7 @@
 
 .posterItemGrid {
   overflow: hidden;
+  border-radius: 3px;
 
   &:hover {
     transform: scale(1.05);
@@ -250,7 +251,7 @@
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    padding: 4px 6px;
+    padding: 4px 6px 4px 10px;
   }
 
   .posterInfoTitle {
@@ -347,7 +348,7 @@
 .card {
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: 3px;
   cursor: pointer;
   transition: transform var(--transition-normal),
     box-shadow var(--transition-normal),
@@ -364,7 +365,7 @@
   position: relative;
   aspect-ratio: 3 / 2;
   background: var(--color-bg-elevated);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: 3px 3px 0 0;
   overflow: hidden;
 }
 
@@ -386,7 +387,7 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: 3px 3px 0 0;
 }
 
 .emptyIcon {

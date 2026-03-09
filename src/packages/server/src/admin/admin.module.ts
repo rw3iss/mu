@@ -4,7 +4,7 @@ import { StreamModule } from '../stream/stream.module.js';
 import { MediaModule } from '../media/media.module.js';
 
 @Module({
-  imports: [StreamModule, MediaModule],
-  controllers: [AdminController],
+	imports: [StreamModule, MediaModule],
+	controllers: [AdminController],
 })
 export class AdminModule {}

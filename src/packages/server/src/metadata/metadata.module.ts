@@ -9,9 +9,9 @@ import { MediaModule } from '../media/media.module.js';
 import { LibraryModule } from '../library/library.module.js';
 
 @Module({
-  imports: [MediaModule, forwardRef(() => LibraryModule)],
-  controllers: [MetadataController, ImageController],
-  providers: [TmdbProvider, OmdbProvider, MetadataService, ImageService],
-  exports: [MetadataService, ImageService, TmdbProvider, OmdbProvider],
+	imports: [MediaModule, forwardRef(() => LibraryModule)],
+	controllers: [MetadataController, ImageController],
+	providers: [TmdbProvider, OmdbProvider, MetadataService, ImageService],
+	exports: [MetadataService, ImageService, TmdbProvider, OmdbProvider],
 })
 export class MetadataModule {}

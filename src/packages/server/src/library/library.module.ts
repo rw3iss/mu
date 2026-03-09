@@ -9,9 +9,9 @@ import { LibraryJobsService } from './library-jobs.service.js';
 import { LibraryController } from './library.controller.js';
 
 @Module({
-  imports: [MetadataModule, MediaModule, StreamModule],
-  controllers: [LibraryController],
-  providers: [LibraryService, ScannerService, WatcherService, LibraryJobsService],
-  exports: [LibraryService, ScannerService, WatcherService, LibraryJobsService],
+	imports: [MetadataModule, MediaModule, StreamModule],
+	controllers: [LibraryController],
+	providers: [LibraryService, ScannerService, WatcherService, LibraryJobsService],
+	exports: [LibraryService, ScannerService, WatcherService, LibraryJobsService],
 })
 export class LibraryModule {}

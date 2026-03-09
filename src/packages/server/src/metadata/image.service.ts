@@ -1,80 +1,80 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { existsSync, mkdirSync } from 'fs';
-import { rm, writeFile } from 'fs/promises';
-import { join, resolve } from 'path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { rm, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { ConfigService } from '../config/config.service.js';
 
 @Injectable()
 export class ImageService {
-  private readonly logger = new Logger('ImageService');
-  private readonly cacheDir: string;
+	private readonly logger = new Logger('ImageService');
+	private readonly cacheDir: string;
 
-  constructor(private readonly config: ConfigService) {
-    this.cacheDir = resolve(this.config.get<string>('paths.imageCache', './data/cache/images'));
-    if (!existsSync(this.cacheDir)) {
-      mkdirSync(this.cacheDir, { recursive: true });
-    }
-  }
+	constructor(private readonly config: ConfigService) {
+		this.cacheDir = resolve(this.config.get<string>('paths.imageCache', './data/cache/images'));
+		if (!existsSync(this.cacheDir)) {
+			mkdirSync(this.cacheDir, { recursive: true });
+		}
+	}
 
-  async downloadAndCache(url: string, movieId: string, type: string): Promise<string | null> {
-    const movieDir = join(this.cacheDir, movieId);
-    if (!existsSync(movieDir)) {
-      mkdirSync(movieDir, { recursive: true });
-    }
+	async downloadAndCache(url: string, movieId: string, type: string): Promise<string | null> {
+		const movieDir = join(this.cacheDir, movieId);
+		if (!existsSync(movieDir)) {
+			mkdirSync(movieDir, { recursive: true });
+		}
 
-    const ext = this.getExtension(url);
-    const filePath = join(movieDir, `${type}${ext}`);
+		const ext = this.getExtension(url);
+		const filePath = join(movieDir, `${type}${ext}`);
 
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        this.logger.warn(`Failed to download image from ${url}: ${response.status}`);
-        return null;
-      }
+		try {
+			const response = await fetch(url);
+			if (!response.ok) {
+				this.logger.warn(`Failed to download image from ${url}: ${response.status}`);
+				return null;
+			}
 
-      const buffer = Buffer.from(await response.arrayBuffer());
-      await writeFile(filePath, buffer);
+			const buffer = Buffer.from(await response.arrayBuffer());
+			await writeFile(filePath, buffer);
 
-      this.logger.debug(`Cached image: ${filePath}`);
-      return filePath;
-    } catch (err: any) {
-      this.logger.error(`Error downloading image from ${url}: ${err.message}`);
-      return null;
-    }
-  }
+			this.logger.debug(`Cached image: ${filePath}`);
+			return filePath;
+		} catch (err: any) {
+			this.logger.error(`Error downloading image from ${url}: ${err.message}`);
+			return null;
+		}
+	}
 
-  getImagePath(movieId: string, type: string): string | null {
-    const movieDir = join(this.cacheDir, movieId);
-    const extensions = ['.jpg', '.jpeg', '.png', '.webp'];
+	getImagePath(movieId: string, type: string): string | null {
+		const movieDir = join(this.cacheDir, movieId);
+		const extensions = ['.jpg', '.jpeg', '.png', '.webp'];
 
-    for (const ext of extensions) {
-      const filePath = join(movieDir, `${type}${ext}`);
-      if (existsSync(filePath)) {
-        return filePath;
-      }
-    }
+		for (const ext of extensions) {
+			const filePath = join(movieDir, `${type}${ext}`);
+			if (existsSync(filePath)) {
+				return filePath;
+			}
+		}
 
-    return null;
-  }
+		return null;
+	}
 
-  /**
-   * Delete all cached images for a movie.
-   */
-  async clearForMovie(movieId: string): Promise<void> {
-    const movieDir = join(this.cacheDir, movieId);
-    if (existsSync(movieDir)) {
-      await rm(movieDir, { recursive: true, force: true });
-      this.logger.debug(`Cleared image cache for movie ${movieId}`);
-    }
-  }
+	/**
+	 * Delete all cached images for a movie.
+	 */
+	async clearForMovie(movieId: string): Promise<void> {
+		const movieDir = join(this.cacheDir, movieId);
+		if (existsSync(movieDir)) {
+			await rm(movieDir, { recursive: true, force: true });
+			this.logger.debug(`Cleared image cache for movie ${movieId}`);
+		}
+	}
 
-  private getExtension(url: string): string {
-    try {
-      const pathname = new URL(url).pathname;
-      const match = pathname.match(/\.(jpg|jpeg|png|webp)$/i);
-      return match?.[1] ? `.${match[1].toLowerCase()}` : '.jpg';
-    } catch {
-      return '.jpg';
-    }
-  }
+	private getExtension(url: string): string {
+		try {
+			const pathname = new URL(url).pathname;
+			const match = pathname.match(/\.(jpg|jpeg|png|webp)$/i);
+			return match?.[1] ? `.${match[1].toLowerCase()}` : '.jpg';
+		} catch {
+			return '.jpg';
+		}
+	}
 }

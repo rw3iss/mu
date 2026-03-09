@@ -44,23 +44,23 @@
   justify-content: space-between;
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-md);
+  text-decoration: none;
+  cursor: pointer;
   transition: background var(--transition-fast);
 
   &:hover {
     background: var(--color-bg-elevated);
+
+    .playlistName {
+      color: var(--color-accent);
+    }
   }
 }
 
 .playlistName {
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
-  text-decoration: none;
-  cursor: pointer;
   transition: color var(--transition-fast);
-
-  &:hover {
-    color: var(--color-accent);
-  }
 }
 
 .removeBtn {

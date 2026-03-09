@@ -2,8 +2,9 @@
   "name": "example-info",
   "displayName": "Example Info",
   "version": "1.0.0",
-  "description": "Example plugin demonstrating API endpoint and UI slot registration",
+  "description": "Example plugin demonstrating API endpoint and client-side UI slot registration",
   "author": "Mu",
   "entryPoint": "index.ts",
+  "clientEntry": "client/index.tsx",
   "permissions": ["read:movies", "cache"]
 }

@@ -1,13 +1,13 @@
 import Database from 'better-sqlite3';
 import bcrypt from 'bcrypt';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { mkdirSync } from 'fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { mkdirSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const dbPath = process.env.MU_DATABASE_SQLITE_PATH
-  || resolve(__dirname, '../../../../data/db/mu.db');
+const dbPath =
+	process.env.MU_DATABASE_SQLITE_PATH || resolve(__dirname, '../../../../data/db/mu.db');
 
 // Ensure directory exists
 mkdirSync(dirname(dbPath), { recursive: true });
@@ -26,17 +26,17 @@ const email = process.argv[4] || null;
 const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
 
 if (existing) {
-  console.log(`User "${username}" already exists — skipping.`);
+	console.log(`User "${username}" already exists — skipping.`);
 } else {
-  const id = crypto.randomUUID();
-  const passwordHash = await bcrypt.hash(password, 12);
+	const id = crypto.randomUUID();
+	const passwordHash = await bcrypt.hash(password, 12);
 
-  db.prepare(`
+	db.prepare(`
     INSERT INTO users (id, username, email, password_hash, role, created_at, updated_at)
     VALUES (?, ?, ?, ?, 'admin', ?, ?)
   `).run(id, username, email, passwordHash, now, now);
 
-  console.log(`Created admin user "${username}" with password "${password}".`);
+	console.log(`Created admin user "${username}" with password "${password}".`);
 }
 
 db.close();

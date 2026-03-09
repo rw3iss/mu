@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { eq, like, and, desc, asc, sql, count } from 'drizzle-orm';
-import { rm } from 'fs/promises';
-import path from 'path';
+import { rm } from 'node:fs/promises';
+import path from 'node:path';
 import { nowISO, paginationDefaults } from '@mu/shared';
 import type { MovieListQuery } from '@mu/shared';
 import { DatabaseService } from '../database/database.service.js';
@@ -12,458 +12,458 @@ import { ImageService } from '../metadata/image.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import {
-  movies,
-  movieMetadata,
-  movieFiles,
-  userWatchlist,
-  userRatings,
-  userWatchHistory,
+	movies,
+	movieMetadata,
+	movieFiles,
+	userWatchlist,
+	userRatings,
+	userWatchHistory,
 } from '../database/schema/index.js';
 
 @Injectable()
 export class MoviesService {
-  private readonly logger = new Logger('MoviesService');
+	private readonly logger = new Logger('MoviesService');
 
-  constructor(
-    private readonly database: DatabaseService,
-    private readonly jobManager: JobManagerService,
-    private readonly libraryService: LibraryService,
-    private readonly thumbnailService: ThumbnailService,
-    private readonly imageService: ImageService,
-    private readonly transcoderService: TranscoderService,
-    private readonly subtitleService: SubtitleService,
-  ) {}
+	constructor(
+		private readonly database: DatabaseService,
+		private readonly jobManager: JobManagerService,
+		private readonly libraryService: LibraryService,
+		private readonly thumbnailService: ThumbnailService,
+		private readonly imageService: ImageService,
+		private readonly transcoderService: TranscoderService,
+		private readonly subtitleService: SubtitleService,
+	) {}
 
-  findAll(query: MovieListQuery, userId?: string) {
-    const { page, pageSize, offset } = paginationDefaults(query);
+	findAll(query: MovieListQuery, userId?: string) {
+		const { page, pageSize, offset } = paginationDefaults(query);
 
-    const conditions = [];
+		const conditions = [];
 
-    if (query.search) {
-      conditions.push(like(movies.title, `%${query.search}%`));
-    }
+		if (query.search) {
+			conditions.push(like(movies.title, `%${query.search}%`));
+		}
 
-    if (query.genre) {
-      // Genres stored as JSON array in movie_metadata, use LIKE for containment
-      conditions.push(like(movieMetadata.genres, `%"${query.genre}"%`));
-    }
+		if (query.genre) {
+			// Genres stored as JSON array in movie_metadata, use LIKE for containment
+			conditions.push(like(movieMetadata.genres, `%"${query.genre}"%`));
+		}
 
-    if (query.yearFrom) {
-      conditions.push(sql`${movies.year} >= ${query.yearFrom}`);
-    }
+		if (query.yearFrom) {
+			conditions.push(sql`${movies.year} >= ${query.yearFrom}`);
+		}
 
-    if (query.yearTo) {
-      conditions.push(sql`${movies.year} <= ${query.yearTo}`);
-    }
+		if (query.yearTo) {
+			conditions.push(sql`${movies.year} <= ${query.yearTo}`);
+		}
 
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
+		const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // Determine sort
-    const sortOrder = query.sortOrder === 'asc' ? asc : desc;
-    let orderBy;
-    switch (query.sortBy) {
-      case 'title':
-        orderBy = sortOrder(movies.title);
-        break;
-      case 'year':
-        orderBy = sortOrder(movies.year);
-        break;
-      case 'addedAt':
-        orderBy = sortOrder(movies.addedAt);
-        break;
-      case 'runtime':
-        orderBy = sortOrder(movies.runtimeMinutes);
-        break;
-      case 'rating':
-        orderBy = sortOrder(userRatings.rating);
-        break;
-      default:
-        orderBy = desc(movies.addedAt);
-    }
+		// Determine sort
+		const sortOrder = query.sortOrder === 'asc' ? asc : desc;
+		let orderBy;
+		switch (query.sortBy) {
+			case 'title':
+				orderBy = sortOrder(movies.title);
+				break;
+			case 'year':
+				orderBy = sortOrder(movies.year);
+				break;
+			case 'addedAt':
+				orderBy = sortOrder(movies.addedAt);
+				break;
+			case 'runtime':
+				orderBy = sortOrder(movies.runtimeMinutes);
+				break;
+			case 'rating':
+				orderBy = sortOrder(userRatings.rating);
+				break;
+			default:
+				orderBy = desc(movies.addedAt);
+		}
 
-    const selectFields = {
-      id: movies.id,
-      title: movies.title,
-      originalTitle: movies.originalTitle,
-      year: movies.year,
-      overview: movies.overview,
-      runtimeMinutes: movies.runtimeMinutes,
-      posterUrl: movies.posterUrl,
-      thumbnailUrl: movies.thumbnailUrl,
-      backdropUrl: movies.backdropUrl,
-      imdbId: movies.imdbId,
-      tmdbId: movies.tmdbId,
-      contentRating: movies.contentRating,
-      addedAt: movies.addedAt,
-      updatedAt: movies.updatedAt,
-      rating: userRatings.rating,
-      watchPosition: userWatchHistory.positionSeconds,
-      watchCompleted: userWatchHistory.completed,
-      durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
-    };
+		const selectFields = {
+			id: movies.id,
+			title: movies.title,
+			originalTitle: movies.originalTitle,
+			year: movies.year,
+			overview: movies.overview,
+			runtimeMinutes: movies.runtimeMinutes,
+			posterUrl: movies.posterUrl,
+			thumbnailUrl: movies.thumbnailUrl,
+			backdropUrl: movies.backdropUrl,
+			imdbId: movies.imdbId,
+			tmdbId: movies.tmdbId,
+			contentRating: movies.contentRating,
+			addedAt: movies.addedAt,
+			updatedAt: movies.updatedAt,
+			rating: userRatings.rating,
+			watchPosition: userWatchHistory.positionSeconds,
+			watchCompleted: userWatchHistory.completed,
+			durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
+		};
 
-    // Build query — always left-join userRatings for the current user
-    const ratingJoinCond = userId
-      ? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
-      : eq(movies.id, userRatings.movieId);
+		// Build query — always left-join userRatings for the current user
+		const ratingJoinCond = userId
+			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
+			: eq(movies.id, userRatings.movieId);
 
-    const historyJoinCond = userId
-      ? and(eq(movies.id, userWatchHistory.movieId), eq(userWatchHistory.userId, userId))
-      : eq(movies.id, userWatchHistory.movieId);
+		const historyJoinCond = userId
+			? and(eq(movies.id, userWatchHistory.movieId), eq(userWatchHistory.userId, userId))
+			: eq(movies.id, userWatchHistory.movieId);
 
-    let data;
-    let total: number;
+		let data;
+		let total: number;
 
-    if (query.genre) {
-      data = this.database.db
-        .select(selectFields)
-        .from(movies)
-        .leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
-        .leftJoin(userRatings, ratingJoinCond)
-        .leftJoin(userWatchHistory, historyJoinCond)
-        .where(where)
-        .orderBy(orderBy)
-        .limit(pageSize)
-        .offset(offset)
-        .all();
+		if (query.genre) {
+			data = this.database.db
+				.select(selectFields)
+				.from(movies)
+				.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
+				.leftJoin(userRatings, ratingJoinCond)
+				.leftJoin(userWatchHistory, historyJoinCond)
+				.where(where)
+				.orderBy(orderBy)
+				.limit(pageSize)
+				.offset(offset)
+				.all();
 
-      const countResult = this.database.db
-        .select({ count: count() })
-        .from(movies)
-        .leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
-        .where(where)
-        .get();
-      total = countResult?.count ?? 0;
-    } else {
-      data = this.database.db
-        .select(selectFields)
-        .from(movies)
-        .leftJoin(userRatings, ratingJoinCond)
-        .leftJoin(userWatchHistory, historyJoinCond)
-        .where(where)
-        .orderBy(orderBy)
-        .limit(pageSize)
-        .offset(offset)
-        .all();
+			const countResult = this.database.db
+				.select({ count: count() })
+				.from(movies)
+				.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
+				.where(where)
+				.get();
+			total = countResult?.count ?? 0;
+		} else {
+			data = this.database.db
+				.select(selectFields)
+				.from(movies)
+				.leftJoin(userRatings, ratingJoinCond)
+				.leftJoin(userWatchHistory, historyJoinCond)
+				.where(where)
+				.orderBy(orderBy)
+				.limit(pageSize)
+				.offset(offset)
+				.all();
 
-      const countResult = this.database.db
-        .select({ count: count() })
-        .from(movies)
-        .where(where)
-        .get();
-      total = countResult?.count ?? 0;
-    }
+			const countResult = this.database.db
+				.select({ count: count() })
+				.from(movies)
+				.where(where)
+				.get();
+			total = countResult?.count ?? 0;
+		}
 
-    return {
-      movies: data.map((row) => {
-        const position = row.watchCompleted ? 0 : (row.watchPosition ?? 0);
-        return this.applyPosterFallback({
-          ...row,
-          rating: row.rating ?? 0,
-          watchPosition: position,
-          durationSeconds: row.durationSeconds ?? 0,
-          watchCompleted: undefined,
-        });
-      }),
-      total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
-    };
-  }
+		return {
+			movies: data.map((row) => {
+				const position = row.watchCompleted ? 0 : (row.watchPosition ?? 0);
+				return this.applyPosterFallback({
+					...row,
+					rating: row.rating ?? 0,
+					watchPosition: position,
+					durationSeconds: row.durationSeconds ?? 0,
+					watchCompleted: undefined,
+				});
+			}),
+			total,
+			page,
+			pageSize,
+			totalPages: Math.ceil(total / pageSize),
+		};
+	}
 
-  findById(id: string, userId?: string) {
-    const movie = this.database.db
-      .select()
-      .from(movies)
-      .where(eq(movies.id, id))
-      .get();
+	findById(id: string, userId?: string) {
+		const movie = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 
-    if (!movie) {
-      throw new NotFoundException(`Movie ${id} not found`);
-    }
+		if (!movie) {
+			throw new NotFoundException(`Movie ${id} not found`);
+		}
 
-    const metadata = this.database.db
-      .select()
-      .from(movieMetadata)
-      .where(eq(movieMetadata.movieId, id))
-      .get();
+		const metadata = this.database.db
+			.select()
+			.from(movieMetadata)
+			.where(eq(movieMetadata.movieId, id))
+			.get();
 
-    const files = this.database.db
-      .select()
-      .from(movieFiles)
-      .where(eq(movieFiles.movieId, id))
-      .all();
+		const files = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, id))
+			.all();
 
-    // Check watchlist status, user rating, and watch position if userId provided
-    let inWatchlist = false;
-    let userRating = 0;
-    let watchPosition = 0;
-    let durationSeconds = 0;
-    if (userId) {
-      const watchlistEntry = this.database.db
-        .select()
-        .from(userWatchlist)
-        .where(and(eq(userWatchlist.userId, userId), eq(userWatchlist.movieId, id)))
-        .get();
-      inWatchlist = !!watchlistEntry;
+		// Check watchlist status, user rating, and watch position if userId provided
+		let inWatchlist = false;
+		let userRating = 0;
+		let watchPosition = 0;
+		let durationSeconds = 0;
+		if (userId) {
+			const watchlistEntry = this.database.db
+				.select()
+				.from(userWatchlist)
+				.where(and(eq(userWatchlist.userId, userId), eq(userWatchlist.movieId, id)))
+				.get();
+			inWatchlist = !!watchlistEntry;
 
-      const ratingEntry = this.database.db
-        .select()
-        .from(userRatings)
-        .where(and(eq(userRatings.userId, userId), eq(userRatings.movieId, id)))
-        .get();
-      userRating = ratingEntry?.rating ?? 0;
+			const ratingEntry = this.database.db
+				.select()
+				.from(userRatings)
+				.where(and(eq(userRatings.userId, userId), eq(userRatings.movieId, id)))
+				.get();
+			userRating = ratingEntry?.rating ?? 0;
 
-      const historyEntry = this.database.db
-        .select()
-        .from(userWatchHistory)
-        .where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, id)))
-        .get();
-      if (historyEntry) {
-        watchPosition = historyEntry.completed ? 0 : (historyEntry.positionSeconds ?? 0);
-      }
-    }
+			const historyEntry = this.database.db
+				.select()
+				.from(userWatchHistory)
+				.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, id)))
+				.get();
+			if (historyEntry) {
+				watchPosition = historyEntry.completed ? 0 : (historyEntry.positionSeconds ?? 0);
+			}
+		}
 
-    // Get duration from movie file
-    const firstFile = files[0];
-    if (firstFile) {
-      durationSeconds = firstFile.durationSeconds ?? 0;
-    }
+		// Get duration from movie file
+		const firstFile = files[0];
+		if (firstFile) {
+			durationSeconds = firstFile.durationSeconds ?? 0;
+		}
 
-    const activeJobs = this.jobManager.findJobsByPayload(
-      'movieId', id, 'pre-transcode', ['pending', 'running'],
-    );
-    const status = activeJobs.length > 0 ? 'processing' : 'idle';
+		const activeJobs = this.jobManager.findJobsByPayload('movieId', id, 'pre-transcode', [
+			'pending',
+			'running',
+		]);
+		const status = activeJobs.length > 0 ? 'processing' : 'idle';
 
-    return { ...this.flattenMovie(movie, metadata, inWatchlist, userRating), status, watchPosition, durationSeconds };
-  }
+		return {
+			...this.flattenMovie(movie, metadata, inWatchlist, userRating),
+			status,
+			watchPosition,
+			durationSeconds,
+		};
+	}
 
-  /**
-   * Flatten a movie row + metadata into the shape the client expects.
-   */
-  private flattenMovie(movie: any, metadata: any, inWatchlist = false, userRating = 0) {
-    const parseJson = (val: string | null | undefined): any[] => {
-      if (!val) return [];
-      try {
-        const parsed = JSON.parse(val);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    };
+	/**
+	 * Flatten a movie row + metadata into the shape the client expects.
+	 */
+	private flattenMovie(movie: any, metadata: any, inWatchlist = false, userRating = 0) {
+		const parseJson = (val: string | null | undefined): any[] => {
+			if (!val) return [];
+			try {
+				const parsed = JSON.parse(val);
+				return Array.isArray(parsed) ? parsed : [];
+			} catch {
+				return [];
+			}
+		};
 
-    // Use thumbnailUrl as poster fallback when no TMDB poster is set
-    const posterUrl = movie.posterUrl || movie.thumbnailUrl || '';
-    const thumbnailUrl = movie.thumbnailUrl || '';
+		// Use thumbnailUrl as poster fallback when no TMDB poster is set
+		const posterUrl = movie.posterUrl || movie.thumbnailUrl || '';
+		const thumbnailUrl = movie.thumbnailUrl || '';
 
-    return {
-      id: movie.id,
-      title: movie.title,
-      year: movie.year ?? 0,
-      overview: movie.overview ?? '',
-      posterUrl,
-      thumbnailUrl,
-      backdropUrl: movie.backdropUrl ?? '',
-      runtime: movie.runtimeMinutes ?? 0,
-      imdbId: movie.imdbId ?? undefined,
-      tmdbId: movie.tmdbId ?? undefined,
-      addedAt: movie.addedAt ?? '',
-      genres: parseJson(metadata?.genres),
-      cast: parseJson(metadata?.cast),
-      director: (() => {
-        const directors = parseJson(metadata?.directors);
-        return directors.length > 0
-          ? (typeof directors[0] === 'string' ? directors[0] : directors[0]?.name ?? '')
-          : undefined;
-      })(),
-      imdbRating: metadata?.imdbRating ?? undefined,
-      rtRating: metadata?.rottenTomatoesScore ?? undefined,
-      metacriticRating: metadata?.metacriticScore ?? undefined,
-      rating: userRating,
-      inWatchlist,
-    };
-  }
+		return {
+			id: movie.id,
+			title: movie.title,
+			year: movie.year ?? 0,
+			overview: movie.overview ?? '',
+			posterUrl,
+			thumbnailUrl,
+			backdropUrl: movie.backdropUrl ?? '',
+			runtime: movie.runtimeMinutes ?? 0,
+			imdbId: movie.imdbId ?? undefined,
+			tmdbId: movie.tmdbId ?? undefined,
+			addedAt: movie.addedAt ?? '',
+			genres: parseJson(metadata?.genres),
+			cast: parseJson(metadata?.cast),
+			director: (() => {
+				const directors = parseJson(metadata?.directors);
+				return directors.length > 0
+					? typeof directors[0] === 'string'
+						? directors[0]
+						: (directors[0]?.name ?? '')
+					: undefined;
+			})(),
+			imdbRating: metadata?.imdbRating ?? undefined,
+			rtRating: metadata?.rottenTomatoesScore ?? undefined,
+			metacriticRating: metadata?.metacriticScore ?? undefined,
+			rating: userRating,
+			inWatchlist,
+		};
+	}
 
-  findRecent(limit: number = 20) {
-    return this.database.db
-      .select()
-      .from(movies)
-      .orderBy(desc(movies.addedAt))
-      .limit(limit)
-      .all()
-      .map(this.applyPosterFallback);
-  }
+	findRecent(limit: number = 20) {
+		return this.database.db
+			.select()
+			.from(movies)
+			.orderBy(desc(movies.addedAt))
+			.limit(limit)
+			.all()
+			.map(this.applyPosterFallback);
+	}
 
-  search(q: string) {
-    return this.database.db
-      .select()
-      .from(movies)
-      .where(like(movies.title, `%${q}%`))
-      .orderBy(asc(movies.title))
-      .limit(50)
-      .all()
-      .map(this.applyPosterFallback);
-  }
+	search(q: string) {
+		return this.database.db
+			.select()
+			.from(movies)
+			.where(like(movies.title, `%${q}%`))
+			.orderBy(asc(movies.title))
+			.limit(50)
+			.all()
+			.map(this.applyPosterFallback);
+	}
 
-  /**
-   * For list views, fall back to thumbnailUrl when posterUrl is empty.
-   */
-  private applyPosterFallback<T extends { posterUrl?: string | null; thumbnailUrl?: string | null }>(
-    movie: T,
-  ): T {
-    if (!movie.posterUrl && movie.thumbnailUrl) {
-      return { ...movie, posterUrl: movie.thumbnailUrl };
-    }
-    return movie;
-  }
+	/**
+	 * For list views, fall back to thumbnailUrl when posterUrl is empty.
+	 */
+	private applyPosterFallback<
+		T extends { posterUrl?: string | null; thumbnailUrl?: string | null },
+	>(movie: T): T {
+		if (!movie.posterUrl && movie.thumbnailUrl) {
+			return { ...movie, posterUrl: movie.thumbnailUrl };
+		}
+		return movie;
+	}
 
-  update(id: string, data: Partial<{
-    title: string;
-    year: number;
-    overview: string;
-    posterUrl: string;
-    backdropUrl: string;
-    imdbId: string;
-    tmdbId: number;
-    runtimeMinutes: number;
-    contentRating: string;
-    tagline: string;
-    releaseDate: string;
-    language: string;
-    country: string;
-    trailerUrl: string;
-  }>) {
-    const existing = this.database.db
-      .select()
-      .from(movies)
-      .where(eq(movies.id, id))
-      .get();
+	update(
+		id: string,
+		data: Partial<{
+			title: string;
+			year: number;
+			overview: string;
+			posterUrl: string;
+			backdropUrl: string;
+			imdbId: string;
+			tmdbId: number;
+			runtimeMinutes: number;
+			contentRating: string;
+			tagline: string;
+			releaseDate: string;
+			language: string;
+			country: string;
+			trailerUrl: string;
+		}>,
+	) {
+		const existing = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 
-    if (!existing) {
-      throw new NotFoundException(`Movie ${id} not found`);
-    }
+		if (!existing) {
+			throw new NotFoundException(`Movie ${id} not found`);
+		}
 
-    this.database.db
-      .update(movies)
-      .set({ ...data, updatedAt: nowISO() })
-      .where(eq(movies.id, id))
-      .run();
+		this.database.db
+			.update(movies)
+			.set({ ...data, updatedAt: nowISO() })
+			.where(eq(movies.id, id))
+			.run();
 
-    return this.findById(id);
-  }
+		return this.findById(id);
+	}
 
-  remove(id: string) {
-    const existing = this.database.db
-      .select()
-      .from(movies)
-      .where(eq(movies.id, id))
-      .get();
+	remove(id: string) {
+		const existing = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 
-    if (!existing) {
-      throw new NotFoundException(`Movie ${id} not found`);
-    }
+		if (!existing) {
+			throw new NotFoundException(`Movie ${id} not found`);
+		}
 
-    this.database.db.delete(movies).where(eq(movies.id, id)).run();
-    this.logger.log(`Deleted movie: ${existing.title}`);
-  }
+		this.database.db.delete(movies).where(eq(movies.id, id)).run();
+		this.logger.log(`Deleted movie: ${existing.title}`);
+	}
 
-  async deleteFromDisk(id: string, deleteEnclosingFolder: boolean): Promise<void> {
-    const movie = this.database.db
-      .select()
-      .from(movies)
-      .where(eq(movies.id, id))
-      .get();
+	async deleteFromDisk(id: string, deleteEnclosingFolder: boolean): Promise<void> {
+		const movie = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 
-    if (!movie) {
-      throw new NotFoundException(`Movie ${id} not found`);
-    }
+		if (!movie) {
+			throw new NotFoundException(`Movie ${id} not found`);
+		}
 
-    const files = this.database.db
-      .select()
-      .from(movieFiles)
-      .where(eq(movieFiles.movieId, id))
-      .all();
+		const files = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, id))
+			.all();
 
-    // Safety: prevent deleting a library source root
-    if (deleteEnclosingFolder) {
-      const sources = this.libraryService.getSources();
-      const sourcePaths = sources.map((s) => path.resolve(s.path));
+		// Safety: prevent deleting a library source root
+		if (deleteEnclosingFolder) {
+			const sources = this.libraryService.getSources();
+			const sourcePaths = sources.map((s) => path.resolve(s.path));
 
-      for (const file of files) {
-        const dir = path.resolve(path.dirname(file.filePath));
-        if (sourcePaths.includes(dir)) {
-          throw new BadRequestException(
-            `Cannot delete enclosing folder "${dir}" because it is a library source path`,
-          );
-        }
-      }
-    }
+			for (const file of files) {
+				const dir = path.resolve(path.dirname(file.filePath));
+				if (sourcePaths.includes(dir)) {
+					throw new BadRequestException(
+						`Cannot delete enclosing folder "${dir}" because it is a library source path`,
+					);
+				}
+			}
+		}
 
-    // Delete files and caches
-    for (const file of files) {
-      await rm(file.filePath, { force: true });
-      if (deleteEnclosingFolder) {
-        await rm(path.dirname(file.filePath), { recursive: true, force: true });
-      }
-      await this.transcoderService.clearCache(file.id);
-      await this.subtitleService.clearCache(file.id);
-    }
+		// Delete files and caches
+		for (const file of files) {
+			await rm(file.filePath, { force: true });
+			if (deleteEnclosingFolder) {
+				await rm(path.dirname(file.filePath), { recursive: true, force: true });
+			}
+			await this.transcoderService.clearCache(file.id);
+			await this.subtitleService.clearCache(file.id);
+		}
 
-    this.thumbnailService.clearForMovie(id);
-    await this.imageService.clearForMovie(id);
+		this.thumbnailService.clearForMovie(id);
+		await this.imageService.clearForMovie(id);
 
-    // Remove DB row (cascades handle FK tables)
-    this.remove(id);
+		// Remove DB row (cascades handle FK tables)
+		this.remove(id);
 
-    this.logger.log(`Deleted movie from disk: ${movie.title}`);
-  }
+		this.logger.log(`Deleted movie from disk: ${movie.title}`);
+	}
 
-  getGenres(): string[] {
-    const rows = this.database.db
-      .select({ genres: movieMetadata.genres })
-      .from(movieMetadata)
-      .all();
+	getGenres(): string[] {
+		const rows = this.database.db
+			.select({ genres: movieMetadata.genres })
+			.from(movieMetadata)
+			.all();
 
-    const genreSet = new Set<string>();
-    for (const row of rows) {
-      if (row.genres) {
-        try {
-          const parsed = JSON.parse(row.genres);
-          if (Array.isArray(parsed)) {
-            for (const g of parsed) {
-              if (typeof g === 'string' && g.trim()) genreSet.add(g.trim());
-            }
-          }
-        } catch {
-          // skip malformed
-        }
-      }
-    }
+		const genreSet = new Set<string>();
+		for (const row of rows) {
+			if (row.genres) {
+				try {
+					const parsed = JSON.parse(row.genres);
+					if (Array.isArray(parsed)) {
+						for (const g of parsed) {
+							if (typeof g === 'string' && g.trim()) genreSet.add(g.trim());
+						}
+					}
+				} catch {
+					// skip malformed
+				}
+			}
+		}
 
-    return Array.from(genreSet).sort();
-  }
+		return Array.from(genreSet).sort();
+	}
 
-  bulkAction(action: string, movieIds: string[], userId: string, extra?: { playlistId?: string }) {
-    const results = { processed: 0, errors: [] as string[] };
+	bulkAction(
+		action: string,
+		movieIds: string[],
+		_userId: string,
+		_extra?: { playlistId?: string },
+	) {
+		const results = { processed: 0, errors: [] as string[] };
 
-    for (const movieId of movieIds) {
-      try {
-        switch (action) {
-          case 'delete':
-            this.remove(movieId);
-            break;
-          default:
-            // Other bulk actions (mark_watched, add_to_playlist, refresh_metadata)
-            // are delegated from the controller to the appropriate service
-            break;
-        }
-        results.processed++;
-      } catch (err: any) {
-        results.errors.push(`${movieId}: ${err.message}`);
-      }
-    }
+		for (const movieId of movieIds) {
+			try {
+				switch (action) {
+					case 'delete':
+						this.remove(movieId);
+						break;
+					default:
+						// Other bulk actions (mark_watched, add_to_playlist, refresh_metadata)
+						// are delegated from the controller to the appropriate service
+						break;
+				}
+				results.processed++;
+			} catch (err: any) {
+				results.errors.push(`${movieId}: ${err.message}`);
+			}
+		}
 
-    return results;
-  }
+		return results;
+	}
 }

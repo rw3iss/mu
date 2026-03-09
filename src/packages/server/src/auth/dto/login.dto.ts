@@ -1,20 +1,20 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  username: z.string(),
-  password: z.string().min(6),
+	username: z.string(),
+	password: z.string().min(6),
 });
 
 export const setupSchema = z.object({
-  username: z.string(),
-  email: z.string().email().optional(),
-  password: z.string().min(8),
-  mediaPath: z.string().optional(),
-  mediaPaths: z.array(z.string()).optional(),
+	username: z.string(),
+	email: z.string().email().optional(),
+	password: z.string().min(8),
+	mediaPath: z.string().optional(),
+	mediaPaths: z.array(z.string()).optional(),
 });
 
 export const refreshSchema = z.object({
-  refreshToken: z.string(),
+	refreshToken: z.string(),
 });
 
 export type LoginDto = z.infer<typeof loginSchema>;

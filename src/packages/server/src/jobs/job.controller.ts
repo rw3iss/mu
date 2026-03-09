@@ -1,63 +1,54 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Query,
-  NotFoundException,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, NotFoundException } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { JobManagerService } from './job-manager.service.js';
 
 @Controller('jobs')
 export class JobController {
-  constructor(private readonly jobManager: JobManagerService) {}
+	constructor(private readonly jobManager: JobManagerService) {}
 
-  @Get()
-  @Roles('admin')
-  listJobs(
-    @Query('type') type?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.jobManager.listJobs({ type, status });
-  }
+	@Get()
+	@Roles('admin')
+	listJobs(@Query('type') type?: string, @Query('status') status?: string) {
+		return this.jobManager.listJobs({ type, status });
+	}
 
-  @Get('scheduled')
-  @Roles('admin')
-  listScheduled() {
-    return { jobs: this.jobManager.listScheduledJobs() };
-  }
+	@Get('scheduled')
+	@Roles('admin')
+	listScheduled() {
+		return { jobs: this.jobManager.listScheduledJobs() };
+	}
 
-  @Post('cancel-by-movie/:movieId')
-  @Roles('admin')
-  cancelByMovie(
-    @Param('movieId') movieId: string,
-    @Query('type') type?: string,
-  ) {
-    const results = this.jobManager.cancelByPayload('movieId', movieId, type ?? 'pre-transcode');
-    return { cancelled: results.length };
-  }
+	@Post('cancel-by-movie/:movieId')
+	@Roles('admin')
+	cancelByMovie(@Param('movieId') movieId: string, @Query('type') type?: string) {
+		const results = this.jobManager.cancelByPayload(
+			'movieId',
+			movieId,
+			type ?? 'pre-transcode',
+		);
+		return { cancelled: results.length };
+	}
 
-  @Get(':id')
-  @Roles('admin')
-  getJob(@Param('id') id: string) {
-    const job = this.jobManager.getJob(id);
-    if (!job) throw new NotFoundException(`Job ${id} not found`);
-    return job;
-  }
+	@Get(':id')
+	@Roles('admin')
+	getJob(@Param('id') id: string) {
+		const job = this.jobManager.getJob(id);
+		if (!job) throw new NotFoundException(`Job ${id} not found`);
+		return job;
+	}
 
-  @Post(':id/cancel')
-  @Roles('admin')
-  cancelJob(@Param('id') id: string) {
-    const cancelled = this.jobManager.cancel(id);
-    return { success: cancelled };
-  }
+	@Post(':id/cancel')
+	@Roles('admin')
+	cancelJob(@Param('id') id: string) {
+		const cancelled = this.jobManager.cancel(id);
+		return { success: cancelled };
+	}
 
-  @Post('prune')
-  @Roles('admin')
-  pruneJobs(@Query('maxAgeHours') maxAgeHours?: string) {
-    const ageMs = maxAgeHours ? parseInt(maxAgeHours, 10) * 3600000 : undefined;
-    const removed = this.jobManager.pruneOldJobs(ageMs);
-    return { removed };
-  }
+	@Post('prune')
+	@Roles('admin')
+	pruneJobs(@Query('maxAgeHours') maxAgeHours?: string) {
+		const ageMs = maxAgeHours ? parseInt(maxAgeHours, 10) * 3600000 : undefined;
+		const removed = this.jobManager.pruneOldJobs(ageMs);
+		return { removed };
+	}
 }

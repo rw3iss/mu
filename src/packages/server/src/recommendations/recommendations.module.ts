@@ -4,8 +4,8 @@ import { RecommendationsService } from './recommendations.service.js';
 import { TasteProfileService } from './taste-profile.service.js';
 
 @Module({
-  controllers: [RecommendationsController],
-  providers: [RecommendationsService, TasteProfileService],
-  exports: [RecommendationsService],
+	controllers: [RecommendationsController],
+	providers: [RecommendationsService, TasteProfileService],
+	exports: [RecommendationsService],
 })
 export class RecommendationsModule {}

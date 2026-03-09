@@ -4,8 +4,8 @@ import { JobController } from './job.controller.js';
 
 @Global()
 @Module({
-  controllers: [JobController],
-  providers: [JobManagerService],
-  exports: [JobManagerService],
+	controllers: [JobController],
+	providers: [JobManagerService],
+	exports: [JobManagerService],
 })
 export class JobModule {}

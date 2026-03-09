@@ -15,27 +15,15 @@ import { MetadataModule } from '../metadata/metadata.module.js';
 import { StreamModule } from '../stream/stream.module.js';
 
 @Module({
-  imports: [LibraryModule, MediaModule, MetadataModule, StreamModule],
-  controllers: [
-    MoviesController,
-    RatingsController,
-    HistoryController,
-    WatchlistController,
-    PlaylistsController,
-  ],
-  providers: [
-    MoviesService,
-    RatingsService,
-    HistoryService,
-    WatchlistService,
-    PlaylistsService,
-  ],
-  exports: [
-    MoviesService,
-    RatingsService,
-    HistoryService,
-    WatchlistService,
-    PlaylistsService,
-  ],
+	imports: [LibraryModule, MediaModule, MetadataModule, StreamModule],
+	controllers: [
+		MoviesController,
+		RatingsController,
+		HistoryController,
+		WatchlistController,
+		PlaylistsController,
+	],
+	providers: [MoviesService, RatingsService, HistoryService, WatchlistService, PlaylistsService],
+	exports: [MoviesService, RatingsService, HistoryService, WatchlistService, PlaylistsService],
 })
 export class MoviesModule {}

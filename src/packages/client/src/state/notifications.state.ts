@@ -7,10 +7,10 @@ import { signal } from '@preact/signals';
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
 export interface Notification {
-  id: string;
-  type: NotificationType;
-  message: string;
-  duration: number;
+	id: string;
+	type: NotificationType;
+	message: string;
+	duration: number;
 }
 
 // ============================================
@@ -25,47 +25,43 @@ export const notifications = signal<Notification[]>([]);
 
 let idCounter = 0;
 
-export function addNotification(
-  type: NotificationType,
-  message: string,
-  duration = 5000
-): string {
-  const id = `notification-${++idCounter}-${Date.now()}`;
+export function addNotification(type: NotificationType, message: string, duration = 5000): string {
+	const id = `notification-${++idCounter}-${Date.now()}`;
 
-  const notification: Notification = { id, type, message, duration };
+	const notification: Notification = { id, type, message, duration };
 
-  notifications.value = [...notifications.value, notification];
+	notifications.value = [...notifications.value, notification];
 
-  if (duration > 0) {
-    setTimeout(() => {
-      removeNotification(id);
-    }, duration);
-  }
+	if (duration > 0) {
+		setTimeout(() => {
+			removeNotification(id);
+		}, duration);
+	}
 
-  return id;
+	return id;
 }
 
 export function removeNotification(id: string): void {
-  notifications.value = notifications.value.filter((n) => n.id !== id);
+	notifications.value = notifications.value.filter((n) => n.id !== id);
 }
 
 export function clearNotifications(): void {
-  notifications.value = [];
+	notifications.value = [];
 }
 
 // Convenience helpers
 export function notifySuccess(message: string, duration?: number): string {
-  return addNotification('success', message, duration);
+	return addNotification('success', message, duration);
 }
 
 export function notifyError(message: string, duration?: number): string {
-  return addNotification('error', message, duration ?? 8000);
+	return addNotification('error', message, duration ?? 8000);
 }
 
 export function notifyWarning(message: string, duration?: number): string {
-  return addNotification('warning', message, duration);
+	return addNotification('warning', message, duration);
 }
 
 export function notifyInfo(message: string, duration?: number): string {
-  return addNotification('info', message, duration);
+	return addNotification('info', message, duration);
 }

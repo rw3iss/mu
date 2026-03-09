@@ -6,36 +6,36 @@ import { streamService } from '@/services/stream.service';
 // ============================================
 
 export interface StreamSession {
-  sessionId: string;
-  movieId: string;
-  streamUrl: string;
-  directPlay: boolean;
-  ready: boolean;
-  format: string;
-  subtitles: SubtitleTrack[];
-  audioTracks: AudioTrack[];
-  qualities: QualityOption[];
-  startPosition: number;
+	sessionId: string;
+	movieId: string;
+	streamUrl: string;
+	directPlay: boolean;
+	ready: boolean;
+	format: string;
+	subtitles: SubtitleTrack[];
+	audioTracks: AudioTrack[];
+	qualities: QualityOption[];
+	startPosition: number;
 }
 
 export interface SubtitleTrack {
-  id: string;
-  label: string;
-  language: string;
-  url: string;
+	id: string;
+	label: string;
+	language: string;
+	url: string;
 }
 
 export interface AudioTrack {
-  id: string;
-  label: string;
-  language: string;
-  channels: number;
+	id: string;
+	label: string;
+	language: string;
+	channels: number;
 }
 
 export interface QualityOption {
-  label: string;
-  height: number;
-  bitrate: number;
+	label: string;
+	height: number;
+	bitrate: number;
 }
 
 // ============================================
@@ -62,60 +62,62 @@ export const streamError = signal<string | null>(null);
 // ============================================
 
 export async function startStream(movieId: string): Promise<StreamSession> {
-  const session = await streamService.startStream(movieId);
-  currentSession.value = session;
-  currentTime.value = session.startPosition || 0;
-  return session;
+	const session = await streamService.startStream(movieId);
+	currentSession.value = session;
+	currentTime.value = session.startPosition || 0;
+	return session;
 }
 
 export async function updateProgress(position: number): Promise<void> {
-  const session = currentSession.value;
-  if (!session) return;
+	const session = currentSession.value;
+	if (!session) return;
 
-  currentTime.value = position;
+	currentTime.value = position;
 
-  try {
-    await streamService.updateProgress(session.sessionId, position);
-  } catch (error) {
-    console.error('Failed to update progress:', error);
-  }
+	try {
+		await streamService.updateProgress(session.sessionId, position);
+	} catch (error) {
+		console.error('Failed to update progress:', error);
+	}
 }
 
 export async function endStream(): Promise<void> {
-  const session = currentSession.value;
-  if (!session) return;
+	const session = currentSession.value;
+	if (!session) return;
 
-  try {
-    // Send final position so history is recorded even for short views
-    if (currentTime.value > 0) {
-      await streamService.updateProgress(session.sessionId, currentTime.value).catch(() => {});
-    }
-    await streamService.endStream(session.sessionId);
-  } catch (error) {
-    console.error('Failed to end stream:', error);
-  } finally {
-    currentSession.value = null;
-    isPlaying.value = false;
-    currentTime.value = 0;
-    duration.value = 0;
-  }
+	try {
+		// Send final position so history is recorded even for short views
+		if (currentTime.value > 0) {
+			await streamService
+				.updateProgress(session.sessionId, currentTime.value)
+				.catch(() => {});
+		}
+		await streamService.endStream(session.sessionId);
+	} catch (error) {
+		console.error('Failed to end stream:', error);
+	} finally {
+		currentSession.value = null;
+		isPlaying.value = false;
+		currentTime.value = 0;
+		duration.value = 0;
+	}
 }
 
 export function setVolume(v: number): void {
-  volume.value = Math.max(0, Math.min(1, v));
-  if (v > 0) {
-    isMuted.value = false;
-  }
-  localStorage.setItem('mu_volume', String(volume.value));
+	volume.value = Math.max(0, Math.min(1, v));
+	if (v > 0) {
+		isMuted.value = false;
+	}
+	localStorage.setItem('mu_volume', String(volume.value));
 }
 
 export function toggleMute(): void {
-  isMuted.value = !isMuted.value;
+	isMuted.value = !isMuted.value;
 }
 
 export function initPlayerSettings(): void {
-  const savedVolume = localStorage.getItem('mu_volume');
-  if (savedVolume !== null) {
-    volume.value = parseFloat(savedVolume);
-  }
+	const savedVolume = localStorage.getItem('mu_volume');
+	if (savedVolume !== null) {
+		volume.value = parseFloat(savedVolume);
+	}
 }

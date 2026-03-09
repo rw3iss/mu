@@ -5,19 +5,19 @@ import type { UserRole } from '@mu/shared';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+	constructor(private reflector: Reflector) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (!requiredRoles || requiredRoles.length === 0) return true;
+	canActivate(context: ExecutionContext): boolean {
+		const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
+			context.getHandler(),
+			context.getClass(),
+		]);
+		if (!requiredRoles || requiredRoles.length === 0) return true;
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user;
-    if (!user) return false;
+		const request = context.switchToHttp().getRequest();
+		const user = request.user;
+		if (!user) return false;
 
-    return requiredRoles.includes(user.role);
-  }
+		return requiredRoles.includes(user.role);
+	}
 }

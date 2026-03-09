@@ -2,54 +2,54 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Database from 'better-sqlite3';
 import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { existsSync, mkdirSync } from 'fs';
-import { dirname, resolve } from 'path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { ConfigService } from '../config/config.service.js';
 import * as schema from './schema/index.js';
 
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
-  private readonly logger = new Logger('Database');
-  private sqlite!: Database.Database;
-  private _db!: BetterSQLite3Database<typeof schema>;
+	private readonly logger = new Logger('Database');
+	private sqlite!: Database.Database;
+	private _db!: BetterSQLite3Database<typeof schema>;
 
-  constructor(private config: ConfigService) {}
+	constructor(private config: ConfigService) {}
 
-  get db() {
-    return this._db;
-  }
+	get db() {
+		return this._db;
+	}
 
-  async initialize() {
-    const dbPath = resolve(this.config.get<string>('database.path', './data/db/mu.db'));
-    const dbDir = dirname(dbPath);
+	async initialize() {
+		const dbPath = resolve(this.config.get<string>('database.path', './data/db/mu.db'));
+		const dbDir = dirname(dbPath);
 
-    if (!existsSync(dbDir)) {
-      mkdirSync(dbDir, { recursive: true });
-    }
+		if (!existsSync(dbDir)) {
+			mkdirSync(dbDir, { recursive: true });
+		}
 
-    this.sqlite = new Database(dbPath);
-    this.sqlite.pragma('journal_mode = WAL');
-    this.sqlite.pragma('foreign_keys = ON');
-    this.sqlite.pragma('busy_timeout = 5000');
+		this.sqlite = new Database(dbPath);
+		this.sqlite.pragma('journal_mode = WAL');
+		this.sqlite.pragma('foreign_keys = ON');
+		this.sqlite.pragma('busy_timeout = 5000');
 
-    this._db = drizzle(this.sqlite, { schema });
-    this.logger.log(`SQLite database opened: ${dbPath}`);
-  }
+		this._db = drizzle(this.sqlite, { schema });
+		this.logger.log(`SQLite database opened: ${dbPath}`);
+	}
 
-  async runMigrations() {
-    const migrationsPath = resolve(import.meta.dirname, 'migrations');
-    if (existsSync(migrationsPath)) {
-      migrate(this._db, { migrationsFolder: migrationsPath });
-      this.logger.log('Database migrations applied');
-    } else {
-      this.logger.warn('No migrations directory found - creating tables directly');
-      this.createTablesIfNotExist();
-    }
-  }
+	async runMigrations() {
+		const migrationsPath = resolve(import.meta.dirname, 'migrations');
+		if (existsSync(migrationsPath)) {
+			migrate(this._db, { migrationsFolder: migrationsPath });
+			this.logger.log('Database migrations applied');
+		} else {
+			this.logger.warn('No migrations directory found - creating tables directly');
+			this.createTablesIfNotExist();
+		}
+	}
 
-  private createTablesIfNotExist() {
-    // Create tables directly from SQL when no migrations exist yet
-    this.sqlite.exec(`
+	private createTablesIfNotExist() {
+		// Create tables directly from SQL when no migrations exist yet
+		this.sqlite.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
@@ -247,33 +247,33 @@ export class DatabaseService implements OnModuleDestroy {
         completed_at TEXT NOT NULL
       );
     `);
-    // Add columns that may not exist in older databases
-    try {
-      this.sqlite.exec(`ALTER TABLE movies ADD COLUMN thumbnail_url TEXT`);
-    } catch {
-      // Column already exists
-    }
-    try {
-      this.sqlite.exec(`ALTER TABLE movie_files ADD COLUMN file_metadata TEXT`);
-    } catch {
-      // Column already exists
-    }
-    try {
-      this.sqlite.exec(`ALTER TABLE movies ADD COLUMN thumbnail_aspect_ratio REAL`);
-    } catch {
-      // Column already exists
-    }
-    try {
-      this.sqlite.exec(`ALTER TABLE plugins ADD COLUMN status TEXT DEFAULT 'not_installed'`);
-    } catch {
-      // Column already exists
-    }
+		// Add columns that may not exist in older databases
+		try {
+			this.sqlite.exec(`ALTER TABLE movies ADD COLUMN thumbnail_url TEXT`);
+		} catch {
+			// Column already exists
+		}
+		try {
+			this.sqlite.exec(`ALTER TABLE movie_files ADD COLUMN file_metadata TEXT`);
+		} catch {
+			// Column already exists
+		}
+		try {
+			this.sqlite.exec(`ALTER TABLE movies ADD COLUMN thumbnail_aspect_ratio REAL`);
+		} catch {
+			// Column already exists
+		}
+		try {
+			this.sqlite.exec(`ALTER TABLE plugins ADD COLUMN status TEXT DEFAULT 'not_installed'`);
+		} catch {
+			// Column already exists
+		}
 
-    this.logger.log('Tables created from inline SQL');
-  }
+		this.logger.log('Tables created from inline SQL');
+	}
 
-  onModuleDestroy() {
-    this.sqlite?.close();
-    this.logger.log('Database connection closed');
-  }
+	onModuleDestroy() {
+		this.sqlite?.close();
+		this.logger.log('Database connection closed');
+	}
 }

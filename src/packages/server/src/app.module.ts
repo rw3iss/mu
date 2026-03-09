@@ -23,36 +23,36 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 
 @Module({
-  imports: [
-    ConfigModule,
-    DatabaseModule,
-    CacheModule,
-    AuthModule,
-    UsersModule,
-    EventsModule,
-    SchedulerModule,
-    JobModule,
-    HealthModule,
-    LibraryModule,
-    MoviesModule,
-    MetadataModule,
-    MediaModule,
-    StreamModule,
-    PluginModule,
-    RecommendationsModule,
-    SettingsModule,
-    FilesystemModule,
-    AdminModule,
-  ],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
-  ],
+	imports: [
+		ConfigModule,
+		DatabaseModule,
+		CacheModule,
+		AuthModule,
+		UsersModule,
+		EventsModule,
+		SchedulerModule,
+		JobModule,
+		HealthModule,
+		LibraryModule,
+		MoviesModule,
+		MetadataModule,
+		MediaModule,
+		StreamModule,
+		PluginModule,
+		RecommendationsModule,
+		SettingsModule,
+		FilesystemModule,
+		AdminModule,
+	],
+	providers: [
+		{
+			provide: APP_GUARD,
+			useClass: JwtAuthGuard,
+		},
+		{
+			provide: APP_GUARD,
+			useClass: RolesGuard,
+		},
+	],
 })
 export class AppModule {}

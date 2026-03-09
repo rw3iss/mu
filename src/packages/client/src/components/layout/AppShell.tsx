@@ -1,4 +1,4 @@
-import { h, ComponentChildren } from 'preact';
+import { ComponentChildren } from 'preact';
 import { signal } from '@preact/signals';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
@@ -9,23 +9,23 @@ import styles from './AppShell.module.scss';
 export const sidebarCollapsed = signal(false);
 
 interface AppShellProps {
-  children: ComponentChildren;
+	children: ComponentChildren;
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const collapsed = sidebarCollapsed.value;
-  const showMiniPlayer = isPlayerActive.value && playerMode.value === 'mini';
+	const collapsed = sidebarCollapsed.value;
+	const showMiniPlayer = isPlayerActive.value && playerMode.value === 'mini';
 
-  return (
-    <div class={`${styles.shell} ${collapsed ? styles.collapsed : ''} ${showMiniPlayer ? styles.withMiniPlayer : ''}`}>
-      <Sidebar collapsed={collapsed} onToggle={() => (sidebarCollapsed.value = !collapsed)} />
-      <div class={styles.main}>
-        <TopBar />
-        <main class={styles.content}>
-          {children}
-        </main>
-      </div>
-      <MobileNav />
-    </div>
-  );
+	return (
+		<div
+			class={`${styles.shell} ${collapsed ? styles.collapsed : ''} ${showMiniPlayer ? styles.withMiniPlayer : ''}`}
+		>
+			<Sidebar collapsed={collapsed} onToggle={() => (sidebarCollapsed.value = !collapsed)} />
+			<div class={styles.main}>
+				<TopBar />
+				<main class={styles.content}>{children}</main>
+			</div>
+			<MobileNav />
+		</div>
+	);
 }

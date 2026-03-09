@@ -13,43 +13,43 @@ import { useState, useEffect } from 'preact/hooks';
  * const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
  */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia(query).matches;
-  });
+	const [matches, setMatches] = useState<boolean>(() => {
+		if (typeof window === 'undefined') return false;
+		return window.matchMedia(query).matches;
+	});
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
 
-    const mediaQuery = window.matchMedia(query);
+		const mediaQuery = window.matchMedia(query);
 
-    // Set initial value
-    setMatches(mediaQuery.matches);
+		// Set initial value
+		setMatches(mediaQuery.matches);
 
-    // Listen for changes
-    function handleChange(event: MediaQueryListEvent) {
-      setMatches(event.matches);
-    }
+		// Listen for changes
+		function handleChange(event: MediaQueryListEvent) {
+			setMatches(event.matches);
+		}
 
-    mediaQuery.addEventListener('change', handleChange);
+		mediaQuery.addEventListener('change', handleChange);
 
-    return () => {
-      mediaQuery.removeEventListener('change', handleChange);
-    };
-  }, [query]);
+		return () => {
+			mediaQuery.removeEventListener('change', handleChange);
+		};
+	}, [query]);
 
-  return matches;
+	return matches;
 }
 
 // Convenience hooks using the breakpoints from _variables.scss
 export function useIsMobile(): boolean {
-  return useMediaQuery('(max-width: 767px)');
+	return useMediaQuery('(max-width: 767px)');
 }
 
 export function useIsTablet(): boolean {
-  return useMediaQuery('(min-width: 768px) and (max-width: 1023px)');
+	return useMediaQuery('(min-width: 768px) and (max-width: 1023px)');
 }
 
 export function useIsDesktop(): boolean {
-  return useMediaQuery('(min-width: 1280px)');
+	return useMediaQuery('(min-width: 1280px)');
 }

@@ -9,7 +9,11 @@
     "dev:client": "turbo run dev --filter=@mu/client",
     "build": "turbo run build",
     "start": "node packages/server/dist/main.js",
-    "lint": "turbo run lint",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check --write .",
     "test": "turbo run test",
     "db:generate": "cd packages/server && npx drizzle-kit generate",
     "db:migrate": "cd packages/server && npx drizzle-kit push --force",
@@ -23,6 +27,7 @@
     "plugin:generate-client-api": "npx tsx scripts/plugin-generate-client-api.ts"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.6",
     "tsx": "^4.21.0",
     "turbo": "^2.3.0",
     "typescript": "^5.7.0"

@@ -1,34 +1,38 @@
 #!/usr/bin/env tsx
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 const pluginId = process.argv[2];
 
 if (!pluginId) {
-  console.error('Usage: pnpm plugin:generate <plugin-id>');
-  console.error('Example: pnpm plugin:generate my-awesome-plugin');
-  process.exit(1);
+	console.error('Usage: pnpm plugin:generate <plugin-id>');
+	console.error('Example: pnpm plugin:generate my-awesome-plugin');
+	process.exit(1);
 }
 
 // Validate plugin ID
 if (!/^[a-z][a-z0-9-]*$/.test(pluginId)) {
-  console.error('Error: Plugin ID must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens.');
-  process.exit(1);
+	console.error(
+		'Error: Plugin ID must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens.',
+	);
+	process.exit(1);
 }
 
 const pluginsDir = resolve(import.meta.dirname, '..', 'plugins');
 const pluginDir = join(pluginsDir, pluginId);
 
 if (existsSync(pluginDir)) {
-  console.error(`Error: Plugin directory already exists: ${pluginDir}`);
-  process.exit(1);
+	console.error(`Error: Plugin directory already exists: ${pluginDir}`);
+	process.exit(1);
 }
 
 // Convert plugin-id to PascalCase
 const pascalCase = pluginId
-  .split('-')
-  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-  .join('');
+	.split('-')
+	.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+	.join('');
+
+const displayName = pascalCase.replace(/([A-Z])/g, ' $1').trim();
 
 // Create directories
 mkdirSync(pluginDir, { recursive: true });
@@ -36,131 +40,152 @@ mkdirSync(join(pluginDir, 'client'), { recursive: true });
 
 // manifest.json
 writeFileSync(
-  join(pluginDir, 'manifest.json'),
-  JSON.stringify(
-    {
-      name: pluginId,
-      displayName: pascalCase.replace(/([A-Z])/g, ' $1').trim(),
-      version: '0.1.0',
-      description: `${pascalCase} plugin`,
-      author: 'Mu',
-      entryPoint: 'index.ts',
-      permissions: ['read:movies'],
-    },
-    null,
-    2,
-  ) + '\n',
+	join(pluginDir, 'manifest.json'),
+	`${JSON.stringify(
+		{
+			name: pluginId,
+			displayName,
+			version: '0.1.0',
+			description: `${displayName} plugin`,
+			author: 'Mu',
+			entryPoint: 'index.ts',
+			clientEntry: 'client/index.tsx',
+			permissions: ['read:movies'],
+		},
+		null,
+		2,
+	)}\n`,
 );
 
 // package.json
 writeFileSync(
-  join(pluginDir, 'package.json'),
-  JSON.stringify(
-    {
-      name: `@mu/plugin-${pluginId}`,
-      version: '0.1.0',
-      description: `${pascalCase} plugin`,
-      type: 'module',
-      main: 'index.ts',
-    },
-    null,
-    2,
-  ) + '\n',
+	join(pluginDir, 'package.json'),
+	`${JSON.stringify(
+		{
+			name: `@mu/plugin-${pluginId}`,
+			version: '0.1.0',
+			description: `${displayName} plugin`,
+			type: 'module',
+			main: 'index.ts',
+		},
+		null,
+		2,
+	)}\n`,
 );
 
-// index.ts
+// index.ts — server-side plugin
 writeFileSync(
-  join(pluginDir, 'index.ts'),
-  `import type { PluginContext, PluginInfo } from '../../packages/server/src/plugins/plugin.interface.js';
+	join(pluginDir, 'index.ts'),
+	`import type { PluginContext, PluginInfo } from '../../packages/server/src/plugins/plugin.interface.js';
 
 export default class ${pascalCase}Plugin {
-  private context!: PluginContext;
+\tprivate context!: PluginContext;
 
-  async onLoad(context: PluginContext): Promise<void> {
-    this.context = context;
+\tasync onLoad(context: PluginContext): Promise<void> {
+\t\tthis.context = context;
 
-    // Register API endpoints
-    context.api.registerEndpoint({
-      methodName: 'getExample',
-      method: 'GET',
-      path: '/example',
-      handler: async ({ query }) => {
-        return { message: 'Hello from ${pascalCase}!', query };
-      },
-      schema: {
-        response: { message: {} },
-      },
-    });
+\t\t// Register API endpoints (server-side)
+\t\tcontext.api.registerEndpoint({
+\t\t\tmethodName: 'getExample',
+\t\t\tmethod: 'GET',
+\t\t\tpath: '/example',
+\t\t\thandler: async ({ query }) => {
+\t\t\t\treturn { message: 'Hello from ${pascalCase}!', query };
+\t\t\t},
+\t\t\tschema: {
+\t\t\t\tresponse: { message: {} },
+\t\t\t},
+\t\t});
 
-    // Register UI slot items
-    context.ui.registerSlotItem('INFO_PANEL', {
-      id: '${pluginId}-info',
-      priority: 100,
-      content: [
-        { type: 'heading', text: '${pascalCase.replace(/([A-Z])/g, ' $1').trim()}' },
-        { type: 'text', text: 'Content from the ${pluginId} plugin.' },
-      ],
-    });
+\t\tcontext.logger.log('${pascalCase} plugin loaded (server)');
+\t}
 
-    context.logger.log('${pascalCase} plugin loaded');
-  }
+\tasync onUnload(): Promise<void> {
+\t\tthis.context.logger.log('${pascalCase} plugin unloaded');
+\t}
 
-  async onUnload(): Promise<void> {
-    this.context.logger.log('${pascalCase} plugin unloaded');
-  }
+\tgetInfo(): PluginInfo {
+\t\treturn {
+\t\t\tname: '${pluginId}',
+\t\t\tdisplayName: '${displayName}',
+\t\t\tversion: '0.1.0',
+\t\t\tdescription: '${displayName} plugin',
+\t\t\tauthor: 'Mu',
+\t\t\tenabled: true,
+\t\t\tloaded: true,
+\t\t\tstatus: 'enabled',
+\t\t\tpermissions: ['read:movies'],
+\t\t};
+\t}
 
-  getInfo(): PluginInfo {
-    return {
-      name: '${pluginId}',
-      displayName: '${pascalCase.replace(/([A-Z])/g, ' $1').trim()}',
-      version: '0.1.0',
-      description: '${pascalCase} plugin',
-      author: 'Mu',
-      enabled: true,
-      loaded: true,
-      status: 'enabled',
-      permissions: ['read:movies'],
-    };
-  }
+\tasync onInstall(context: PluginContext): Promise<void> {
+\t\tcontext.logger.log('${pascalCase} plugin installed');
+\t}
 
-  async onInstall(context: PluginContext): Promise<void> {
-    context.logger.log('${pascalCase} plugin installed');
-  }
+\tasync onUninstall(context: PluginContext): Promise<void> {
+\t\tcontext.logger.log('${pascalCase} plugin uninstalled');
+\t}
 
-  async onUninstall(context: PluginContext): Promise<void> {
-    context.logger.log('${pascalCase} plugin uninstalled');
-  }
+\tasync onEnable(context: PluginContext): Promise<void> {
+\t\tcontext.logger.log('${pascalCase} plugin enabled');
+\t}
 
-  async onEnable(context: PluginContext): Promise<void> {
-    context.logger.log('${pascalCase} plugin enabled');
-  }
-
-  async onDisable(context: PluginContext): Promise<void> {
-    context.logger.log('${pascalCase} plugin disabled');
-  }
+\tasync onDisable(context: PluginContext): Promise<void> {
+\t\tcontext.logger.log('${pascalCase} plugin disabled');
+\t}
 }
 `,
 );
 
-// client stub files
+// client/index.tsx — client-side plugin
 writeFileSync(
-  join(pluginDir, 'client', `${pluginId}-api.ts`),
-  `// Auto-generated client API for ${pluginId}
+	join(pluginDir, 'client', 'index.tsx'),
+	`import { h } from 'preact';
+import { UI } from '@/plugins/ui-slots';
+import type {
+\tIPluginClient,
+\tPluginClientContext,
+} from '@/plugins/plugin-client.interface';
+
+export default class ${pascalCase}Client implements IPluginClient {
+\tonLoad(context: PluginClientContext): void {
+\t\t// Register UI slot renderers (see UI enum for all available slots)
+\t\tcontext.slots.register(UI.INFO_PANEL, ({ movie }) => {
+\t\t\tif (!movie) return null;
+
+\t\t\treturn (
+\t\t\t\t<div style={{ padding: '12px 0' }}>
+\t\t\t\t\t<h3 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 600 }}>
+\t\t\t\t\t\t${displayName}
+\t\t\t\t\t</h3>
+\t\t\t\t\t<p style={{ margin: 0, fontSize: '13px', opacity: 0.8 }}>
+\t\t\t\t\t\tContent from the ${pluginId} plugin for {movie.title}.
+\t\t\t\t\t</p>
+\t\t\t\t</div>
+\t\t\t);
+\t\t});
+
+\t\tconsole.log('[${pluginId}] Client plugin loaded');
+\t}
+
+\tonUnload(): void {
+\t\tconsole.log('[${pluginId}] Client plugin unloaded');
+\t}
+}
+`,
+);
+
+// client/<plugin-id>-api.ts — API stub (regenerated by plugin:generate-client-api)
+writeFileSync(
+	join(pluginDir, 'client', `${pluginId}-api.ts`),
+	`// Auto-generated client API for ${pluginId}
 // Run \`pnpm plugin:generate-client-api ${pluginId}\` to regenerate from schema
 
+import { api } from '@/services/api';
+
 export class ${pascalCase}Api {
-  // TODO: Generated methods will go here
-}
-`,
-);
-
-writeFileSync(
-  join(pluginDir, 'client', `${pluginId}-client.ts`),
-  `// Client integration for ${pluginId}
-import { ${pascalCase}Api } from './${pluginId}-api.js';
-
-export class ${pascalCase}Client {
-  private api = new ${pascalCase}Api();
+\t// TODO: Generated methods will appear here after running:
+\t// pnpm plugin:generate-client-api ${pluginId}
 }
 `,
 );
@@ -170,11 +195,14 @@ console.log('');
 console.log('Files created:');
 console.log(`  ${pluginDir}/manifest.json`);
 console.log(`  ${pluginDir}/package.json`);
-console.log(`  ${pluginDir}/index.ts`);
-console.log(`  ${pluginDir}/client/${pluginId}-api.ts`);
-console.log(`  ${pluginDir}/client/${pluginId}-client.ts`);
+console.log(`  ${pluginDir}/index.ts          (server-side plugin)`);
+console.log(`  ${pluginDir}/client/index.tsx   (client-side plugin)`);
+console.log(`  ${pluginDir}/client/${pluginId}-api.ts  (API client stub)`);
 console.log('');
 console.log('Next steps:');
-console.log('  1. Edit index.ts to add your plugin logic');
-console.log('  2. Enable the plugin via the admin UI or API');
-console.log(`  3. Run \`pnpm plugin:generate-client-api ${pluginId}\` to generate the client API`);
+console.log('  1. Edit index.ts to add your server-side plugin logic and API endpoints');
+console.log('  2. Edit client/index.tsx to register UI slot renderers');
+console.log('  3. Install and enable the plugin via the admin UI');
+console.log(
+	`  4. Run \`pnpm plugin:generate-client-api ${pluginId}\` to generate the typed API client`,
+);
