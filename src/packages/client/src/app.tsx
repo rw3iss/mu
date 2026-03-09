@@ -22,10 +22,11 @@ import { Setup } from '@/pages/Setup';
 import { NotFound } from '@/pages/NotFound';
 import { isAuthenticated, isSetupComplete, isLoading, checkAuth } from '@/state/auth.state';
 import { initTheme } from '@/state/theme.state';
+import '@/state/accentColor.state';
 import { wsService } from '@/services/websocket.service';
 import { useScanEvents } from '@/hooks/useScanEvents';
 import { GlobalPlayer } from '@/components/player/GlobalPlayer';
-import { initGlobalPlayer } from '@/state/globalPlayer.state';
+import { initGlobalPlayer, playerMode, isPlayerActive } from '@/state/globalPlayer.state';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
 
@@ -48,6 +49,13 @@ function handleRouteChange(e: { url: string }) {
   if (!isAuthenticated.value && !['/login', '/setup'].includes(url)) {
     route('/login', true);
     return;
+  }
+
+  // Auto-minimize player when navigating away from the player page
+  // (e.g. browser back button). closePlayer/minimizePlayer set the mode
+  // before routing, so this only catches external navigation (popstate).
+  if (!url.startsWith('/player/') && playerMode.value === 'full' && isPlayerActive.value) {
+    playerMode.value = 'mini';
   }
 }
 

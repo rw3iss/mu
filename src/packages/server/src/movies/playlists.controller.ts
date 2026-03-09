@@ -10,9 +10,13 @@ export class PlaylistsController {
   findAll(
     @CurrentUser('id') userId: string,
     @Query('includeMovies') includeMovies?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
   ) {
     return this.playlistsService.findAll(userId, {
       includeMovies: includeMovies === 'true',
+      sortBy: sortBy as any,
+      sortOrder: sortOrder === 'asc' ? 'asc' : 'desc',
     });
   }
 

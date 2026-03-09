@@ -8,9 +8,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-lg);
-  background:
-    linear-gradient(180deg, rgba(20, 28, 50, 0.5) 0%, rgba(13, 19, 33, 0.9) 100%),
-    var(--color-bg-secondary);
+  background: #090b12;
   border-bottom: 1px solid var(--color-border);
   z-index: var(--z-sticky);
   transition: left var(--transition-normal);

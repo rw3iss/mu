@@ -12,6 +12,9 @@ import {
   duration,
 } from '@/state/player.state';
 import { moviesService } from '@/services/movies.service';
+import { streamService } from '@/services/stream.service';
+import { sharedVideoEngine } from '@/state/videoEngineRef';
+import { pushToHistory } from '@/state/history.state';
 import type { Movie } from '@/state/library.state';
 import type { StreamSession } from '@/state/player.state';
 
@@ -27,6 +30,9 @@ interface PersistedPlayerState {
   volume: number;
   isMuted: boolean;
   playerMode: PlayerMode;
+  isPlaying: boolean;
+  /** Persisted session data so we can resume without creating a new server session. */
+  session?: StreamSession | null;
 }
 
 const STORAGE_KEY = 'mu_player_state';
@@ -38,6 +44,19 @@ const STORAGE_KEY = 'mu_player_state';
 export const globalMovieId = signal<string | null>(null);
 export const globalMovie = signal<Movie | null>(null);
 export const playerMode = signal<PlayerMode>('hidden');
+
+/**
+ * Set during initGlobalPlayer when restoring from localStorage.
+ * Tells GlobalPlayer whether to auto-play after loading the restored session.
+ * null means "no restore in progress — use default behavior (auto-play)".
+ */
+export const restoredAutoplay = signal<boolean | null>(null);
+
+/**
+ * When set to a number, overrides the server-provided startPosition on the next stream init.
+ * Consumed (reset to null) by GlobalPlayer after applying.
+ */
+export const forceStartPosition = signal<number | null>(null);
 
 // Computed
 export const isPlayerActive = computed(() => playerMode.value !== 'hidden');
@@ -61,6 +80,8 @@ function saveState(): void {
       volume: volume.value,
       isMuted: isMuted.value,
       playerMode: playerMode.value,
+      isPlaying: isPlaying.value,
+      session: currentSession.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -94,13 +115,31 @@ function setupPersistenceEffects(): void {
  * If already playing this movie, just switches to full mode.
  * If playing a different movie, stops old stream first.
  */
-export async function playMovie(movieId: string): Promise<void> {
+export async function playMovie(movieId: string, opts?: { fromBeginning?: boolean }): Promise<void> {
   initPlayerSettings();
 
-  // Already playing this movie - just maximize
+  if (opts?.fromBeginning) {
+    forceStartPosition.value = 0;
+  }
+
+  // Already loaded this movie - maximize and ensure it's playing
   if (globalMovieId.value === movieId && currentSession.value) {
     playerMode.value = 'full';
-    route(`/player/${movieId}`, true);
+    const engine = sharedVideoEngine.value;
+    if (engine) {
+      engine.setIntendedPlaying(true);
+      const video = engine.videoRef.current;
+      if (opts?.fromBeginning && video) {
+        video.currentTime = 0;
+      }
+      if (video?.paused) video.play().catch(() => {});
+    }
+    // Update history cache for the re-played movie
+    const movie = globalMovie.value;
+    if (movie) {
+      pushToHistory(movie);
+    }
+    route(`/player/${movieId}`);
     return;
   }
 
@@ -115,11 +154,15 @@ export async function playMovie(movieId: string): Promise<void> {
 
   // Fetch movie data (non-blocking for UI)
   moviesService.get(movieId)
-    .then((m) => { globalMovie.value = m; })
+    .then((m) => {
+      globalMovie.value = m;
+      // Push to history cache as soon as we have the movie metadata
+      pushToHistory(m);
+    })
     .catch(() => { globalMovie.value = null; });
 
-  // Route to player page
-  route(`/player/${movieId}`, true);
+  // Route to player page (push, not replace — so back button stays in the SPA)
+  route(`/player/${movieId}`);
 }
 
 /**
@@ -209,6 +252,26 @@ export function initGlobalPlayer(): void {
         globalMovieId.value = null;
         localStorage.removeItem(STORAGE_KEY);
       });
+
+    // Tell GlobalPlayer whether to auto-play after restoring
+    restoredAutoplay.value = saved.isPlaying ?? false;
+
+    // Restore session — verify it's still valid on the server
+    if (saved.session?.sessionId) {
+      const session = { ...saved.session, startPosition: saved.currentTime };
+      // Optimistically restore so GlobalPlayer doesn't create a new session
+      currentSession.value = session;
+
+      // Verify the session is still alive by pinging updateProgress.
+      // If the server returns 404, the session was ended — create a new one.
+      streamService.updateProgress(session.sessionId, saved.currentTime)
+        .catch(() => {
+          // Session no longer exists on server — clear it so GlobalPlayer
+          // creates a fresh one on its next effect cycle.
+          console.warn('[GlobalPlayer] Persisted session expired, will create new one');
+          currentSession.value = null;
+        });
+    }
   } catch {
     localStorage.removeItem(STORAGE_KEY);
   }

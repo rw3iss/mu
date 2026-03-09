@@ -66,6 +66,7 @@ export class HistoryService {
         movieYear: movies.year,
         moviePosterUrl: movies.posterUrl,
         movieThumbnailUrl: movies.thumbnailUrl,
+        movieDurationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
       })
       .from(userWatchHistory)
       .innerJoin(movies, eq(userWatchHistory.movieId, movies.id))

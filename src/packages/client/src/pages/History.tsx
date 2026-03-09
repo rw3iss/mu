@@ -1,10 +1,10 @@
 import { h } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect } from 'preact/hooks';
 import { MovieGrid } from '@/components/movie/MovieGrid';
 import { Button } from '@/components/common/Button';
 import { api } from '@/services/api';
 import { notifySuccess, notifyError } from '@/state/notifications.state';
-import type { Movie } from '@/state/library.state';
+import { historyEntries, historyLoading, fetchHistory, clearHistoryCache } from '@/state/history.state';
 import styles from './History.module.scss';
 
 interface HistoryProps {
@@ -12,55 +12,20 @@ interface HistoryProps {
 }
 
 export function History(_props: HistoryProps) {
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
+  // Always fetch fresh data from the server when the page mounts.
+  // This replaces the cache with the authoritative server state,
+  // while in-session updates via pushToHistory keep it current between visits.
   useEffect(() => {
-    loadHistory();
+    fetchHistory();
   }, []);
 
-  async function loadHistory() {
-    setIsLoading(true);
-    try {
-      const data = await api.get<{
-        data: Array<{
-          id: string;
-          movieId: string;
-          watchedAt: string;
-          positionSeconds: number;
-          durationWatchedSeconds: number;
-          completed: boolean;
-          movieTitle: string;
-          movieYear: number;
-          moviePosterUrl: string;
-          movieThumbnailUrl: string;
-        }>;
-      }>('/history');
-      setMovies(data.data.map((entry) => ({
-        id: entry.movieId,
-        title: entry.movieTitle ?? 'Untitled',
-        year: entry.movieYear ?? 0,
-        overview: '',
-        posterUrl: entry.moviePosterUrl || entry.movieThumbnailUrl || '',
-        backdropUrl: '',
-        runtime: 0,
-        genres: [],
-        cast: [],
-        rating: 0,
-        addedAt: entry.watchedAt ?? '',
-        watchProgress: entry.positionSeconds ?? 0,
-      })));
-    } catch (error) {
-      console.error('Failed to load history:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const movies = historyEntries.value ?? [];
+  const isLoading = historyLoading.value && movies.length === 0;
 
   async function handleClearHistory() {
     try {
       await api.delete('/history');
-      setMovies([]);
+      clearHistoryCache();
       notifySuccess('Watch history cleared');
     } catch {
       notifyError('Failed to clear history');

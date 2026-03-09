@@ -2,13 +2,15 @@ import { h } from 'preact';
 import { useEffect, useState, useCallback, useRef } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { Modal } from '@/components/common/Modal';
 import { RatingWidget } from '@/components/movie/RatingWidget';
 import { ExternalRatings } from '@/components/movie/ExternalRatings';
 import { Spinner } from '@/components/common/Spinner';
 import { moviesService } from '@/services/movies.service';
 import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { notifySuccess, notifyError } from '@/state/notifications.state';
-import { playMovie } from '@/state/globalPlayer.state';
+import { playMovie, globalMovieId, closePlayer } from '@/state/globalPlayer.state';
+import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import type { Movie } from '@/state/library.state';
 import styles from './MovieDetail.module.scss';
 
@@ -49,6 +51,12 @@ export function MovieDetail({ id }: MovieDetailProps) {
   }, [id]);
 
   const handlePlay = useCallback(() => {
+    if (movie) {
+      playMovie(movie.id, { fromBeginning: true });
+    }
+  }, [movie]);
+
+  const handleResume = useCallback(() => {
     if (movie) {
       playMovie(movie.id);
     }
@@ -129,6 +137,26 @@ export function MovieDetail({ id }: MovieDetailProps) {
   }, [movie]);
 
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteFolder, setDeleteFolder] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteFromDisk = useCallback(async () => {
+    if (!movie) return;
+    setIsDeleting(true);
+    try {
+      if (globalMovieId.value === movie.id) {
+        await closePlayer();
+      }
+      await moviesService.deleteFromDisk(movie.id, deleteFolder);
+      notifySuccess('Movie deleted from disk');
+      route('/library');
+    } catch (err: any) {
+      notifyError(err?.message || 'Failed to delete movie from disk');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [movie, deleteFolder]);
 
   const handleRemove = useCallback(async () => {
     if (!movie) return;
@@ -351,6 +379,23 @@ export function MovieDetail({ id }: MovieDetailProps) {
                   {'\u2715'} Cancel
                 </Button>
               </div>
+            ) : hasWatchProgress(movie) ? (
+              <div class={styles.playGroup}>
+                <div class={styles.hybridBtn}>
+                  <button class={styles.hybridPlay} onClick={handlePlay} aria-label="Play from beginning">
+                    {'\u25B6'}
+                  </button>
+                  <button class={styles.hybridResume} onClick={handleResume}>
+                    Resume
+                  </button>
+                </div>
+                <div class={styles.playProgressBar}>
+                  <div
+                    class={styles.playProgressFill}
+                    style={{ width: `${getWatchPercent(movie)}%` }}
+                  />
+                </div>
+              </div>
             ) : (
               <Button variant="primary" size="lg" onClick={handlePlay}>
                 {'\u25B6'} Play
@@ -438,8 +483,47 @@ export function MovieDetail({ id }: MovieDetailProps) {
                   {'\u2715'} Remove
                 </button>
               )}
+              <button
+                class={`${styles.mgmtBtn} ${styles.mgmtBtnDanger}`}
+                onClick={() => { setDeleteFolder(false); setShowDeleteModal(true); }}
+              >
+                {'\u{1F5D1}'} Delete from Disk
+              </button>
             </div>
           </div>
+
+          {/* Delete from Disk Modal */}
+          <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete from Disk">
+            <div class={styles.deleteModalBody}>
+              <p>This will permanently delete the movie file(s) from disk and remove all cached data. This action cannot be undone.</p>
+              <label class={styles.deleteOption}>
+                <input
+                  type="radio"
+                  name="deleteMode"
+                  checked={!deleteFolder}
+                  onChange={() => setDeleteFolder(false)}
+                />
+                Delete movie file only
+              </label>
+              <label class={styles.deleteOption}>
+                <input
+                  type="radio"
+                  name="deleteMode"
+                  checked={deleteFolder}
+                  onChange={() => setDeleteFolder(true)}
+                />
+                Delete file and enclosing folder
+              </label>
+              <div class={styles.deleteActions}>
+                <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>
+                  Cancel
+                </Button>
+                <Button variant="danger" onClick={handleDeleteFromDisk} loading={isDeleting}>
+                  Delete Permanently
+                </Button>
+              </div>
+            </div>
+          </Modal>
         </div>
 
         {/* Playlists (right column) */}

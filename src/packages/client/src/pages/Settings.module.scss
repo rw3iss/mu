@@ -187,6 +187,65 @@
   }
 }
 
+// ── Accent color picker ──
+
+.accentColorPicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.colorSwatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-elevated);
+  flex-shrink: 0;
+
+  &:hover {
+    transform: scale(1.15);
+  }
+
+  &.activeSwatch {
+    border-color: var(--color-text-primary);
+    box-shadow: 0 0 0 2px var(--color-bg-surface);
+  }
+}
+
+.colorInput {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+  overflow: hidden;
+  flex-shrink: 0;
+
+  &::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+
+  &::-webkit-color-swatch {
+    border: none;
+    border-radius: 50%;
+  }
+
+  &::-moz-color-swatch {
+    border: none;
+    border-radius: 50%;
+  }
+}
+
 .toggle {
   position: relative;
   display: inline-block;
@@ -346,24 +405,254 @@
   font-weight: var(--font-weight-medium);
 }
 
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: var(--space-md);
-  margin-bottom: var(--space-xl);
+// ============================================
+// Server Statistics — structured layout
+// ============================================
+
+// Shared tooltip (hidden by default, shown on hover)
+.statTooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  background: var(--color-bg-primary, #1a1a1a);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  white-space: normal;
+  width: max-content;
+  max-width: 280px;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
+// ── Uptime banner ──
+.statBanner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+
+  &:hover .statTooltip {
+    display: block;
+  }
+}
+
+.statBannerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(var(--color-accent-rgb, 76, 175, 80), 0.12);
+  border-radius: var(--radius-md);
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.statBannerContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statBannerLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statBannerValue {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+// ── Section labels ──
+.statSectionLabel {
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: var(--space-sm);
+}
+
+// ── Two-column resource layout ──
+.statColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
+}
+
+.statColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+// ── Resource stat cards ──
+.statCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-text-muted);
+
+    .statTooltip {
+      display: block;
+    }
+  }
+}
+
+.statCardHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.statCardLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: var(--font-weight-medium);
+}
+
+.statCardValue {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+// ── Segmented stat values (app / sys / total) ──
+.statSegments {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.statSegment {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statSegmentLabel {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statSegmentValue {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.statSegmentDivider {
+  width: 1px;
+  height: 28px;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+
+// ── Meter bars ──
 .meterTrack {
+  position: relative;
   width: 100%;
   height: 6px;
   background: var(--color-bg-tertiary, rgba(255, 255, 255, 0.08));
   border-radius: 3px;
-  margin-top: var(--space-sm);
   overflow: hidden;
 }
 
 .meterFill {
+  position: absolute;
+  top: 0;
+  left: 0;
   height: 100%;
   border-radius: 3px;
   transition: width 0.6s ease, background-color 0.6s ease;
+}
+
+.meterFillFront {
+  z-index: 1;
+  background-color: var(--color-accent);
+}
+
+// ── Activity grid (4 columns) ──
+.statActivityGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xl);
+
+  @include mobile {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.statActivityCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-md) var(--space-sm);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  transition: border-color var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-text-muted);
+
+    .statTooltip {
+      display: block;
+    }
+  }
+}
+
+.statActivityValue {
+  font-size: var(--font-size-xl, 22px);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.statActivityLabel {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
 }

@@ -1,15 +1,23 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { eq, like, and, desc, asc, sql, count } from 'drizzle-orm';
+import { rm } from 'fs/promises';
+import path from 'path';
 import { nowISO, paginationDefaults } from '@mu/shared';
 import type { MovieListQuery } from '@mu/shared';
 import { DatabaseService } from '../database/database.service.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
+import { LibraryService } from '../library/library.service.js';
+import { ThumbnailService } from '../media/thumbnail.service.js';
+import { ImageService } from '../metadata/image.service.js';
+import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
+import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import {
   movies,
   movieMetadata,
   movieFiles,
   userWatchlist,
   userRatings,
+  userWatchHistory,
 } from '../database/schema/index.js';
 
 @Injectable()
@@ -19,6 +27,11 @@ export class MoviesService {
   constructor(
     private readonly database: DatabaseService,
     private readonly jobManager: JobManagerService,
+    private readonly libraryService: LibraryService,
+    private readonly thumbnailService: ThumbnailService,
+    private readonly imageService: ImageService,
+    private readonly transcoderService: TranscoderService,
+    private readonly subtitleService: SubtitleService,
   ) {}
 
   findAll(query: MovieListQuery, userId?: string) {
@@ -84,12 +97,19 @@ export class MoviesService {
       addedAt: movies.addedAt,
       updatedAt: movies.updatedAt,
       rating: userRatings.rating,
+      watchPosition: userWatchHistory.positionSeconds,
+      watchCompleted: userWatchHistory.completed,
+      durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
     };
 
     // Build query — always left-join userRatings for the current user
     const ratingJoinCond = userId
       ? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
       : eq(movies.id, userRatings.movieId);
+
+    const historyJoinCond = userId
+      ? and(eq(movies.id, userWatchHistory.movieId), eq(userWatchHistory.userId, userId))
+      : eq(movies.id, userWatchHistory.movieId);
 
     let data;
     let total: number;
@@ -100,6 +120,7 @@ export class MoviesService {
         .from(movies)
         .leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
         .leftJoin(userRatings, ratingJoinCond)
+        .leftJoin(userWatchHistory, historyJoinCond)
         .where(where)
         .orderBy(orderBy)
         .limit(pageSize)
@@ -118,6 +139,7 @@ export class MoviesService {
         .select(selectFields)
         .from(movies)
         .leftJoin(userRatings, ratingJoinCond)
+        .leftJoin(userWatchHistory, historyJoinCond)
         .where(where)
         .orderBy(orderBy)
         .limit(pageSize)
@@ -133,7 +155,16 @@ export class MoviesService {
     }
 
     return {
-      movies: data.map((row) => this.applyPosterFallback({ ...row, rating: row.rating ?? 0 })),
+      movies: data.map((row) => {
+        const position = row.watchCompleted ? 0 : (row.watchPosition ?? 0);
+        return this.applyPosterFallback({
+          ...row,
+          rating: row.rating ?? 0,
+          watchPosition: position,
+          durationSeconds: row.durationSeconds ?? 0,
+          watchCompleted: undefined,
+        });
+      }),
       total,
       page,
       pageSize,
@@ -164,9 +195,11 @@ export class MoviesService {
       .where(eq(movieFiles.movieId, id))
       .all();
 
-    // Check watchlist status and user rating if userId provided
+    // Check watchlist status, user rating, and watch position if userId provided
     let inWatchlist = false;
     let userRating = 0;
+    let watchPosition = 0;
+    let durationSeconds = 0;
     if (userId) {
       const watchlistEntry = this.database.db
         .select()
@@ -181,6 +214,21 @@ export class MoviesService {
         .where(and(eq(userRatings.userId, userId), eq(userRatings.movieId, id)))
         .get();
       userRating = ratingEntry?.rating ?? 0;
+
+      const historyEntry = this.database.db
+        .select()
+        .from(userWatchHistory)
+        .where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, id)))
+        .get();
+      if (historyEntry) {
+        watchPosition = historyEntry.completed ? 0 : (historyEntry.positionSeconds ?? 0);
+      }
+    }
+
+    // Get duration from movie file
+    const firstFile = files[0];
+    if (firstFile) {
+      durationSeconds = firstFile.durationSeconds ?? 0;
     }
 
     const activeJobs = this.jobManager.findJobsByPayload(
@@ -188,7 +236,7 @@ export class MoviesService {
     );
     const status = activeJobs.length > 0 ? 'processing' : 'idle';
 
-    return { ...this.flattenMovie(movie, metadata, inWatchlist, userRating), status };
+    return { ...this.flattenMovie(movie, metadata, inWatchlist, userRating), status, watchPosition, durationSeconds };
   }
 
   /**
@@ -318,6 +366,57 @@ export class MoviesService {
 
     this.database.db.delete(movies).where(eq(movies.id, id)).run();
     this.logger.log(`Deleted movie: ${existing.title}`);
+  }
+
+  async deleteFromDisk(id: string, deleteEnclosingFolder: boolean): Promise<void> {
+    const movie = this.database.db
+      .select()
+      .from(movies)
+      .where(eq(movies.id, id))
+      .get();
+
+    if (!movie) {
+      throw new NotFoundException(`Movie ${id} not found`);
+    }
+
+    const files = this.database.db
+      .select()
+      .from(movieFiles)
+      .where(eq(movieFiles.movieId, id))
+      .all();
+
+    // Safety: prevent deleting a library source root
+    if (deleteEnclosingFolder) {
+      const sources = this.libraryService.getSources();
+      const sourcePaths = sources.map((s) => path.resolve(s.path));
+
+      for (const file of files) {
+        const dir = path.resolve(path.dirname(file.filePath));
+        if (sourcePaths.includes(dir)) {
+          throw new BadRequestException(
+            `Cannot delete enclosing folder "${dir}" because it is a library source path`,
+          );
+        }
+      }
+    }
+
+    // Delete files and caches
+    for (const file of files) {
+      await rm(file.filePath, { force: true });
+      if (deleteEnclosingFolder) {
+        await rm(path.dirname(file.filePath), { recursive: true, force: true });
+      }
+      await this.transcoderService.clearCache(file.id);
+      await this.subtitleService.clearCache(file.id);
+    }
+
+    this.thumbnailService.clearForMovie(id);
+    await this.imageService.clearForMovie(id);
+
+    // Remove DB row (cascades handle FK tables)
+    this.remove(id);
+
+    this.logger.log(`Deleted movie from disk: ${movie.title}`);
   }
 
   getGenres(): string[] {

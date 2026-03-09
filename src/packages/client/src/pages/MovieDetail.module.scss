@@ -267,10 +267,72 @@
 
 .actions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-md);
   margin-bottom: var(--space-2xl);
   flex-wrap: wrap;
+}
+
+.playGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hybridBtn {
+  display: flex;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.hybridPlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: var(--font-size-md);
+  border: none;
+  cursor: pointer;
+  padding: var(--space-md) var(--space-sm);
+  transition: background var(--transition-fast);
+
+  &:hover {
+    background: var(--color-accent-hover);
+  }
+}
+
+.hybridResume {
+  display: flex;
+  align-items: center;
+  padding: var(--space-md) var(--space-xl);
+  background: var(--color-accent-active);
+  color: #fff;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+
+  &:hover {
+    background: var(--color-accent);
+  }
+}
+
+.playProgressBar {
+  width: 100%;
+  height: 3px;
+  background: var(--color-bg-elevated);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.playProgressFill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 2px;
+  transition: width var(--transition-fast);
 }
 
 .processingStatus {
@@ -435,4 +497,40 @@
   &:hover {
     border-color: var(--color-accent);
   }
+}
+
+// ============================================
+// Delete from Disk Modal
+// ============================================
+
+.deleteModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+
+  p {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-relaxed);
+  }
+}
+
+.deleteOption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+
+  input[type='radio'] {
+    accent-color: var(--color-accent);
+  }
+}
+
+.deleteActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
 }

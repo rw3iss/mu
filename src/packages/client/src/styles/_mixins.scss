@@ -71,7 +71,7 @@ $breakpoint-desktop: 1280px !default;
 }
 
 @mixin glass {
-  background: rgba(14, 22, 42, 0.6);
+  background: rgba(6, 9, 16, 0.7);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--color-border);

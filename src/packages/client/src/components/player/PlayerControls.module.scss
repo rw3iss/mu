@@ -1,19 +1,16 @@
 // ============================================
-// Player Controls — flush, edge-to-edge layout
+// Player Controls — unified layout, no mode variants
 // ============================================
 
 .controls {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: var(--z-player-controls);
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   opacity: 0;
   transition: opacity var(--transition-normal);
   pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  background: rgba(18, 18, 18, 0.97);
 
   &.visible {
     opacity: 1;
@@ -21,40 +18,8 @@
   }
 }
 
-.gradient {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  right: 0;
-  height: 120px;
-  background: linear-gradient(transparent, rgba(18, 18, 18, 0.97));
-  pointer-events: none;
-}
-
 // ============================================
-// Row 1: Title
-// ============================================
-
-.titleRow {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-  padding: 6px 12px 2px;
-}
-
-.titleText {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
-}
-
-// ============================================
-// Row 2: Seek bar with time labels
+// Row 1: Seek bar — flush to top, full width
 // ============================================
 
 .seekRow {
@@ -62,29 +27,18 @@
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-}
-
-.timeLabel {
-  font-size: 11px;
-
-  &.timeCurrent {
-    font-size: 13px;
-  }
-  color: rgba(255, 255, 255, 0.6);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  min-width: 36px;
-  text-align: center;
-  user-select: none;
+  padding: 0;
+  // Pull up so the 11px hit area above the track extends above the bar,
+  // and the 3px track sits flush at the bar's top edge.
+  margin-top: -11px;
 }
 
 .seekBar {
+  position: relative;
   flex: 1;
-  height: 18px;
+  height: 14px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   cursor: pointer;
 
   &.dragging {
@@ -97,7 +51,7 @@
   width: 100%;
   height: 3px;
   background: rgba(255, 255, 255, 0.18);
-  border-radius: 2px;
+  border-radius: 0;
   transition: height 120ms ease;
 
   .seekBar:hover &,
@@ -109,21 +63,23 @@
 .seekProgress {
   height: 100%;
   background: var(--color-accent);
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 .seekThumb {
   position: absolute;
-  top: 50%;
+  top: 1.5px;
   transform: translate(-50%, -50%) scale(0);
-  width: 12px;
-  height: 12px;
+  width: 18px;
+  height: 18px;
   background: #ffffff;
   border-radius: 50%;
-  transition: transform 120ms ease;
+  transition: transform 120ms ease, top 120ms ease;
+  pointer-events: none;
 
   .seekBar:hover &,
   .seekBar.dragging & {
+    top: 2.5px;
     transform: translate(-50%, -50%) scale(1);
   }
 }
@@ -143,41 +99,90 @@
 }
 
 // ============================================
-// Row 3: Controls — flush, no padding
+// Row 2: Content row — left slot + controls
 // ============================================
 
-.controlsRow {
+.contentRow {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.mainRow {
   position: relative;
   z-index: 1;
   display: flex;
   align-items: stretch;
-  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
 }
 
-.centerControls {
+// ── Left: title + timing ──
+.leftSection {
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 8px;
+  gap: 1px;
 }
 
-.rightControls {
+.titleText {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.timingLabel {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+// ── Center: playback controls ──
+.centerControls {
   position: absolute;
-  right: 0;
+  left: 50%;
   top: 0;
   bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+
+  // In mini mode, offset left by half the video thumbnail width
+  // so center stays at the page center, not the mainRow center.
+  .controls.miniMode & {
+    transform: translateX(calc(-50% - 100px));
+  }
+}
+
+// ── Right: info, volume, settings, fullscreen, minimize, close ──
+.rightControls {
+  margin-left: auto;
   display: flex;
   align-items: stretch;
 }
 
 // ============================================
-// Buttons — flat, no radius, edge-to-edge
+// Buttons
 // ============================================
 
 .controlBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 48px;
+  height: 100%;
+  aspect-ratio: 1;
   color: #ffffff;
   border-radius: 0;
   transition: background 120ms ease;
@@ -192,32 +197,30 @@
 
   svg {
     display: block;
+    width: 24px;
+    height: 24px;
   }
 }
 
 .playBtn {
-  width: 60px;
-
   svg {
-    width: 28px;
-    height: 28px;
+    width: 27px;
+    height: 27px;
   }
 }
 
 // ============================================
-// Skip buttons — text + icon in a row
+// Skip buttons
 // ============================================
 
 .skipBtn {
-  width: auto;
-  gap: 0;
-  padding: 0 10px;
+  // Square like all other buttons (aspect-ratio from controlBtn)
 }
 
 .skipText {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.75);
   line-height: 1;
   letter-spacing: 0.01em;
 }

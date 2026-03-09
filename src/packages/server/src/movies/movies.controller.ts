@@ -59,6 +59,16 @@ export class MoviesController {
     return this.moviesService.update(id, body as any);
   }
 
+  @Post(':id/delete-files')
+  @Roles('admin')
+  async deleteFromDisk(
+    @Param('id') id: string,
+    @Body() body: { deleteEnclosingFolder?: boolean },
+  ) {
+    await this.moviesService.deleteFromDisk(id, body.deleteEnclosingFolder ?? false);
+    return { success: true };
+  }
+
   @Delete(':id')
   @Roles('admin')
   remove(@Param('id') id: string) {

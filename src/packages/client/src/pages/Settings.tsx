@@ -5,6 +5,7 @@ import { Button } from '@/components/common/Button';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { theme, setTheme } from '@/state/theme.state';
+import { accentColor, setAccentColor, resetAccentColor } from '@/state/accentColor.state';
 import { currentUser } from '@/state/auth.state';
 import { useUiSetting } from '@/hooks/useUiSetting';
 import { notifySuccess, notifyError } from '@/state/notifications.state';
@@ -22,6 +23,10 @@ interface ServerStats {
     memoryUsed: number;
     memoryTotal: number;
     memoryFree: number;
+    appMemory: { main: number; children: number; total: number };
+    diskTotal: number;
+    diskFree: number;
+    dataDirSize: number;
     uptime: number;
     platform: string;
   };
@@ -35,6 +40,9 @@ interface ServerStats {
 
 function formatBytes(bytes: number): string {
   const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1000) {
+    return `${(gb / 1024).toFixed(1)} TB`;
+  }
   return `${gb.toFixed(1)} GB`;
 }
 
@@ -367,6 +375,54 @@ export function Settings(props: SettingsProps) {
                       {t.charAt(0).toUpperCase() + t.slice(1)}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Accent Color</span>
+                  <span class={styles.settingDescription}>
+                    Customize the primary accent color across the app
+                  </span>
+                </div>
+                <div class={styles.accentColorPicker}>
+                  {[
+                    { label: 'Default', value: '' },
+                    { label: 'Cyan', value: '#06b6d4' },
+                    { label: 'Blue', value: '#3b82f6' },
+                    { label: 'Purple', value: '#8b5cf6' },
+                    { label: 'Pink', value: '#ec4899' },
+                    { label: 'Amber', value: '#f59e0b' },
+                    { label: 'Green', value: '#22c55e' },
+                    { label: 'Red', value: '#ef4444' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      class={`${styles.colorSwatch} ${
+                        preset.value === ''
+                          ? !accentColor.value ? styles.activeSwatch : ''
+                          : accentColor.value === preset.value ? styles.activeSwatch : ''
+                      }`}
+                      style={preset.value ? { backgroundColor: preset.value } : undefined}
+                      title={preset.label}
+                      onClick={() => preset.value ? setAccentColor(preset.value) : resetAccentColor()}
+                    >
+                      {preset.value === '' && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
+                          <path d="M12 7v10" />
+                          <path d="M7 12h10" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                  <input
+                    type="color"
+                    class={styles.colorInput}
+                    value={accentColor.value || '#06b6d4'}
+                    onInput={(e) => setAccentColor((e.target as HTMLInputElement).value)}
+                    title="Custom color"
+                  />
                 </div>
               </div>
 
@@ -720,56 +776,144 @@ export function Settings(props: SettingsProps) {
 
               {serverStats && (
                 <>
-                  <h3 class={styles.aboutSectionTitle}>Server Stats</h3>
-                  <div class={styles.statsGrid}>
-                    {(() => {
-                      const cpuRatio = Math.min(serverStats.system.loadAvg[0] / serverStats.system.cpuCount, 1);
-                      return (
-                        <div class={styles.aboutItem}>
-                          <span class={styles.aboutLabel}>CPU Load</span>
-                          <span class={styles.aboutValue}>
-                            {serverStats.system.loadAvg[0].toFixed(2)} / {serverStats.system.cpuCount}
-                          </span>
-                          <div class={styles.meterTrack}>
-                            <div class={styles.meterFill} style={{ width: `${cpuRatio * 100}%`, backgroundColor: meterColor(cpuRatio) }} />
+                  <h3 class={styles.aboutSectionTitle}>Server Statistics</h3>
+
+                  {/* ── Uptime banner ── */}
+                  <div class={styles.statBanner}>
+                    <div class={styles.statBannerIcon}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                    </div>
+                    <div class={styles.statBannerContent}>
+                      <span class={styles.statBannerLabel}>Server Uptime</span>
+                      <span class={styles.statBannerValue}>{formatUptime(serverStats.system.uptime)}</span>
+                    </div>
+                    <span class={styles.statTooltip}>How long the server process has been running since last restart</span>
+                  </div>
+
+                  {/* ── Resources section: CPU, Memory | App Data, Disk ── */}
+                  <div class={styles.statSectionLabel}>Resources</div>
+                  <div class={styles.statColumns}>
+                    {/* Left column: CPU + Memory */}
+                    <div class={styles.statColumn}>
+                      {(() => {
+                        const cpuRatio = Math.min(serverStats.system.loadAvg[0] / serverStats.system.cpuCount, 1);
+                        return (
+                          <div class={styles.statCard}>
+                            <div class={styles.statCardHeader}>
+                              <span class={styles.statCardLabel}>CPU Load</span>
+                              <span class={styles.statCardValue}>
+                                {serverStats.system.loadAvg[0].toFixed(2)} / {serverStats.system.cpuCount}
+                              </span>
+                            </div>
+                            <div class={styles.meterTrack}>
+                              <div class={styles.meterFill} style={{ width: `${cpuRatio * 100}%`, backgroundColor: meterColor(cpuRatio) }} />
+                            </div>
+                            <span class={styles.statTooltip}>Overall system CPU load average across all processes, relative to {serverStats.system.cpuCount} available cores</span>
                           </div>
-                        </div>
-                      );
-                    })()}
-                    {(() => {
-                      const memUsed = serverStats.system.memoryTotal - serverStats.system.memoryFree;
-                      const memRatio = memUsed / serverStats.system.memoryTotal;
-                      return (
-                        <div class={styles.aboutItem}>
-                          <span class={styles.aboutLabel}>Memory</span>
-                          <span class={styles.aboutValue}>
-                            {formatBytes(memUsed)} / {formatBytes(serverStats.system.memoryTotal)}
-                          </span>
-                          <div class={styles.meterTrack}>
-                            <div class={styles.meterFill} style={{ width: `${memRatio * 100}%`, backgroundColor: meterColor(memRatio) }} />
+                        );
+                      })()}
+                      {(() => {
+                        const memTotal = serverStats.system.memoryTotal || 1;
+                        const memUsed = serverStats.system.memoryTotal - serverStats.system.memoryFree;
+                        const memRatio = memUsed / memTotal;
+                        const appMem = serverStats.system.appMemory?.total ?? 0;
+                        const appRatio = appMem / memTotal;
+                        return (
+                          <div class={styles.statCard}>
+                            <div class={styles.statCardHeader}>
+                              <span class={styles.statCardLabel}>Memory</span>
+                            </div>
+                            <div class={styles.statSegments}>
+                              <div class={styles.statSegment}>
+                                <span class={styles.statSegmentLabel}>App</span>
+                                <span class={styles.statSegmentValue}>{formatBytes(appMem)}</span>
+                              </div>
+                              <div class={styles.statSegmentDivider} />
+                              <div class={styles.statSegment}>
+                                <span class={styles.statSegmentLabel}>System</span>
+                                <span class={styles.statSegmentValue}>{formatBytes(memUsed)}</span>
+                              </div>
+                              <div class={styles.statSegmentDivider} />
+                              <div class={styles.statSegment}>
+                                <span class={styles.statSegmentLabel}>Total</span>
+                                <span class={styles.statSegmentValue}>{formatBytes(memTotal)}</span>
+                              </div>
+                            </div>
+                            <div class={styles.meterTrack}>
+                              <div class={styles.meterFill} style={{ width: `${memRatio * 100}%`, backgroundColor: meterColor(memRatio) }} />
+                              <div class={`${styles.meterFill} ${styles.meterFillFront}`} style={{ width: `${Math.max(appRatio * 100, 0.5)}%` }} />
+                            </div>
+                            <span class={styles.statTooltip}>App memory (Mu process + children) vs total system RAM usage</span>
                           </div>
-                        </div>
-                      );
-                    })()}
-                    <div class={styles.aboutItem}>
-                      <span class={styles.aboutLabel}>Uptime</span>
-                      <span class={styles.aboutValue}>{formatUptime(serverStats.system.uptime)}</span>
+                        );
+                      })()}
                     </div>
-                    <div class={styles.aboutItem}>
-                      <span class={styles.aboutLabel}>Active Streams</span>
-                      <span class={styles.aboutValue}>{serverStats.services.activeStreams}</span>
+
+                    {/* Right column: Disk */}
+                    <div class={styles.statColumn}>
+                      {serverStats.system.diskTotal > 0 && (() => {
+                        const diskTotal = serverStats.system.diskTotal || 1;
+                        const diskUsed = diskTotal - serverStats.system.diskFree;
+                        const diskRatio = diskUsed / diskTotal;
+                        const appSize = serverStats.system.dataDirSize || 0;
+                        const appRatio = appSize / diskTotal;
+                        return (
+                          <div class={styles.statCard}>
+                            <div class={styles.statCardHeader}>
+                              <span class={styles.statCardLabel}>Disk</span>
+                            </div>
+                            <div class={styles.statSegments}>
+                              <div class={styles.statSegment}>
+                                <span class={styles.statSegmentLabel}>App</span>
+                                <span class={styles.statSegmentValue}>{formatBytes(appSize)}</span>
+                              </div>
+                              <div class={styles.statSegmentDivider} />
+                              <div class={styles.statSegment}>
+                                <span class={styles.statSegmentLabel}>Used</span>
+                                <span class={styles.statSegmentValue}>{formatBytes(diskUsed)}</span>
+                              </div>
+                              <div class={styles.statSegmentDivider} />
+                              <div class={styles.statSegment}>
+                                <span class={styles.statSegmentLabel}>Total</span>
+                                <span class={styles.statSegmentValue}>{formatBytes(diskTotal)}</span>
+                              </div>
+                            </div>
+                            <div class={styles.meterTrack}>
+                              <div class={styles.meterFill} style={{ width: `${diskRatio * 100}%`, backgroundColor: meterColor(diskRatio) }} />
+                              <div class={`${styles.meterFill} ${styles.meterFillFront}`} style={{ width: `${Math.max(appRatio * 100, 0.5)}%` }} />
+                            </div>
+                            <span class={styles.statTooltip}>App data (database, thumbnails, cache, transcodes) vs total disk usage</span>
+                          </div>
+                        );
+                      })()}
                     </div>
-                    <div class={styles.aboutItem}>
-                      <span class={styles.aboutLabel}>Transcodes</span>
-                      <span class={styles.aboutValue}>{serverStats.services.activeTranscodes}</span>
+                  </div>
+
+                  {/* ── Activity section ── */}
+                  <div class={styles.statSectionLabel}>Activity</div>
+                  <div class={styles.statActivityGrid}>
+                    <div class={styles.statActivityCard}>
+                      <span class={styles.statActivityValue}>{serverStats.services.activeStreams}</span>
+                      <span class={styles.statActivityLabel}>Active Streams</span>
+                      <span class={styles.statTooltip}>Number of users currently watching a video stream from this server</span>
                     </div>
-                    <div class={styles.aboutItem}>
-                      <span class={styles.aboutLabel}>Running Jobs</span>
-                      <span class={styles.aboutValue}>{serverStats.services.runningJobs}</span>
+                    <div class={styles.statActivityCard}>
+                      <span class={styles.statActivityValue}>{serverStats.services.activeTranscodes}</span>
+                      <span class={styles.statActivityLabel}>Transcodes</span>
+                      <span class={styles.statTooltip}>Active video transcoding processes converting media to a compatible format in real time</span>
                     </div>
-                    <div class={styles.aboutItem}>
-                      <span class={styles.aboutLabel}>Pending Jobs</span>
-                      <span class={styles.aboutValue}>{serverStats.services.pendingJobs}</span>
+                    <div class={styles.statActivityCard}>
+                      <span class={styles.statActivityValue}>{serverStats.services.runningJobs}</span>
+                      <span class={styles.statActivityLabel}>Running Jobs</span>
+                      <span class={styles.statTooltip}>Background tasks currently executing, such as thumbnail generation or metadata fetching</span>
+                    </div>
+                    <div class={styles.statActivityCard}>
+                      <span class={styles.statActivityValue}>{serverStats.services.pendingJobs}</span>
+                      <span class={styles.statActivityLabel}>Pending Jobs</span>
+                      <span class={styles.statTooltip}>Queued background tasks waiting to be processed</span>
                     </div>
                   </div>
                 </>

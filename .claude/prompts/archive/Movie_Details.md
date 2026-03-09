@@ -1,0 +1,12 @@
+I'd like to add an option on the movie details page, to delete the movie file from disk (and the library).
+Put a new button under the 'Manage' section, on the movie details page, to the right of the 'Remove' button, which says 'Delete'.
+Have this delete button show a confirmation modal, which is custom for deleting movies. The custom modal will mention that deleting the file will delete the entire enclosing folder for the file, if it is included in one. Offer the user an option to not do that: Offer two radio options that by default will delete any enclosing folder, or otherwise let them select to only delete the file.
+Also explain in this modal that it will delete all associated data for the movie (ratings, reviews, metadata, etc).
+The confirmation should send the 'delete movie' request to a new backend endpoint, with the query or post flag to 'delete enclosing folder' (by default true), as well, or not.
+In the backend, during the delete, if the 'delete enclosing folder' option was set to true, then the backend file manager service should check run a validation utility, to ensure the file's parent folder is not one of the currently set Media Library Paths (set in the app's Library settings), ie. a root folder. As long as the parent folder is some other folder, then the entire folder can be deleted, if the option was set.
+If the option wasn't set, then just that file should be deleted, and not touch any other files or folders.
+Once a movie has been "deleted", it should be removed from the library, and all associated metadata and other db data related to that movie (including on-disk cached data for it, thumbnails, etc). Ensure their is a "delete" or "cleanup movie" script that can run in one of the services (ie. the File service, or Movie service, or somewhere appropriate), and ensure it cleans up all of the related movie data when a movie is deleted.
+Once a movie has been deleted, show a 'Movie deleted' notification on the frontend showing the success (or error).
+If the user deleted the movie they were currently viewing in the client, the app should forward the user back to the Library after the delete is finished.
+If they were playing that movie, the post-delete operation should check and tell the movie player to stop playing and hide itself (ie. remove the currently loaded movie).
+Ensure those steps happen in the delete operations.

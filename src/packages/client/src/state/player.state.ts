@@ -53,6 +53,7 @@ export const subtitleTrack = signal<string | null>(null);
 export const audioTrack = signal<string | null>(null);
 export const isBuffering = signal(false);
 export const showControls = signal(true);
+export const showInfoPanel = signal(false);
 
 // ============================================
 // Actions

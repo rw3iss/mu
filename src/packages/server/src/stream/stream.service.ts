@@ -117,7 +117,8 @@ export class StreamService {
       }
     }
 
-    // Look up resume position from watch history
+    // Look up resume position from watch history, and ensure a history
+    // entry exists (so the movie appears in history immediately on play).
     let resumePosition = 0;
     const historyRows = await this.database.db
       .select()
@@ -126,6 +127,21 @@ export class StreamService {
 
     if (historyRows.length > 0) {
       resumePosition = historyRows[0]!.positionSeconds ?? 0;
+      // Touch watchedAt so it sorts to the top of history
+      await this.database.db
+        .update(userWatchHistory)
+        .set({ watchedAt: nowISO() })
+        .where(eq(userWatchHistory.id, historyRows[0]!.id));
+    } else {
+      // Create history entry immediately on play
+      await this.database.db.insert(userWatchHistory).values({
+        id: crypto.randomUUID(),
+        userId,
+        movieId,
+        positionSeconds: 0,
+        durationWatchedSeconds: 0,
+        watchedAt: nowISO(),
+      });
     }
 
     // Build stream URL based on mode
@@ -247,7 +263,7 @@ export class StreamService {
       .delete(streamSessions)
       .where(eq(streamSessions.id, sessionId));
 
-    // Upsert watch history with final position (create if watched >= 10s)
+    // Update watch history with final position
     const finalPosition = session.positionSeconds ?? 0;
     const existing = await this.database.db
       .select()
@@ -267,7 +283,7 @@ export class StreamService {
           watchedAt: nowISO(),
         })
         .where(eq(userWatchHistory.id, existing[0]!.id));
-    } else if (finalPosition >= 10) {
+    } else {
       await this.database.db.insert(userWatchHistory).values({
         id: crypto.randomUUID(),
         userId: session.userId,

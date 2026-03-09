@@ -26,16 +26,24 @@ export interface VideoEngine {
   playbackError: string | null;
   togglePlay: () => void;
   seek: (time: number) => void;
-  initPlayback: (streamUrl: string, directPlay: boolean, startPosition: number) => void;
+  initPlayback: (streamUrl: string, directPlay: boolean, startPosition: number, autoplay?: boolean) => void;
   destroy: () => void;
+  /** Move the video element into a container, preserving play state across the DOM move. */
+  moveVideoTo: (container: HTMLElement) => void;
+  /** Explicitly set the intended play state (e.g. before starting a new movie). */
+  setIntendedPlaying: (value: boolean) => void;
 }
 
 /**
  * Creates a persistent video element and manages HLS playback.
- * The video element lives for the lifetime of the component that
- * calls this hook (GlobalPlayer) and can be moved between containers.
+ *
+ * @param enabled  When false the hook is inert — no video element is
+ *                 created and no RAF / interval loops run.  This lets
+ *                 VideoPlayer call the hook unconditionally (rules of
+ *                 hooks) while avoiding a second engine that would
+ *                 fight with the external one over shared signals.
  */
-export function useVideoEngine(): VideoEngine {
+export function useVideoEngine(enabled: boolean = true): VideoEngine {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -43,6 +51,15 @@ export function useVideoEngine(): VideoEngine {
   const lastDisplayTime = useRef<number>(0);
   const seekLockRef = useRef(false);
   const seekLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Guards against DOM-move-induced pause events flipping isPlaying. */
+  const movingRef = useRef(false);
+  /**
+   * Tracks the user's *intended* play state, independent of browser-fired
+   * pause events caused by DOM re-parenting.  When the mini-bar unmounts
+   * (GlobalPlayer returns null), the browser pauses the detached video.
+   * This ref lets moveVideoTo know whether to resume after the move.
+   */
+  const intendedPlayingRef = useRef(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   const bufferConfig = useMemo(() => {
@@ -50,8 +67,10 @@ export function useVideoEngine(): VideoEngine {
     return BUFFER_CONFIGS[stored] || BUFFER_CONFIGS.normal;
   }, []);
 
-  // Create the video element once on mount
+  // Create the video element once on mount (only when enabled)
   useEffect(() => {
+    if (!enabled) return;
+
     if (!videoRef.current) {
       const video = document.createElement('video');
       video.autoplay = true;
@@ -66,8 +85,18 @@ export function useVideoEngine(): VideoEngine {
           duration.value = video.duration;
         }
       });
-      video.addEventListener('play', () => { isPlaying.value = true; });
-      video.addEventListener('pause', () => { isPlaying.value = false; });
+      video.addEventListener('play', () => {
+        isPlaying.value = true;
+        intendedPlayingRef.current = true;
+      });
+      video.addEventListener('pause', () => {
+        // Ignore pause events caused by DOM re-parenting:
+        // 1. Explicit moves via moveVideoTo() set movingRef
+        // 2. Implicit detachment (e.g. mini bar unmount) detected via document.contains
+        if (movingRef.current || !document.contains(video)) return;
+        isPlaying.value = false;
+        intendedPlayingRef.current = false;
+      });
       video.addEventListener('waiting', () => { isBuffering.value = true; });
       video.addEventListener('canplay', () => { isBuffering.value = false; });
     }
@@ -103,17 +132,18 @@ export function useVideoEngine(): VideoEngine {
       }
       videoRef.current = null;
     };
-  }, []);
+  }, [enabled]);
 
   // Sync volume/mute state
   useEffect(() => {
+    if (!enabled) return;
     const video = videoRef.current;
     if (!video) return;
     video.volume = volume.value;
     video.muted = isMuted.value;
-  }, [volume.value, isMuted.value]);
+  }, [enabled, volume.value, isMuted.value]);
 
-  const initPlayback = useCallback((streamUrl: string, directPlay: boolean, startPosition: number) => {
+  const initPlayback = useCallback((streamUrl: string, directPlay: boolean, startPosition: number, autoplay: boolean = true) => {
     const video = videoRef.current;
     if (!video) return;
 
@@ -124,12 +154,14 @@ export function useVideoEngine(): VideoEngine {
     }
     setPlaybackError(null);
 
+    intendedPlayingRef.current = autoplay;
+
     if (directPlay || !Hls.isSupported()) {
       const token = localStorage.getItem('mu_token');
       const sep = streamUrl.includes('?') ? '&' : '?';
       video.src = token ? `${streamUrl}${sep}token=${encodeURIComponent(token)}` : streamUrl;
       if (startPosition > 0) video.currentTime = startPosition;
-      video.play().catch(() => {});
+      if (autoplay) video.play().catch(() => {});
     } else {
       const token = localStorage.getItem('mu_token');
       const hls = new Hls({
@@ -156,7 +188,7 @@ export function useVideoEngine(): VideoEngine {
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (startPosition > 0) video.currentTime = startPosition;
-        video.play().catch(() => {});
+        if (autoplay) video.play().catch(() => {});
       });
 
       let networkRecoveries = 0;
@@ -209,7 +241,13 @@ export function useVideoEngine(): VideoEngine {
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) video.play(); else video.pause();
+    if (video.paused) {
+      intendedPlayingRef.current = true;
+      video.play();
+    } else {
+      intendedPlayingRef.current = false;
+      video.pause();
+    }
   }, []);
 
   const seek = useCallback((time: number) => {
@@ -224,6 +262,7 @@ export function useVideoEngine(): VideoEngine {
   }, []);
 
   const destroy = useCallback(() => {
+    intendedPlayingRef.current = false;
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
     const video = videoRef.current;
     if (video) {
@@ -233,5 +272,30 @@ export function useVideoEngine(): VideoEngine {
     }
   }, []);
 
-  return { videoRef, playbackError, togglePlay, seek, initPlayback, destroy };
+  const moveVideoTo = useCallback((container: HTMLElement) => {
+    const video = videoRef.current;
+    if (!video || !container) return;
+
+    // Use intendedPlayingRef — the video may already be paused due to
+    // DOM detachment (mini bar unmount), but the user intended it to play.
+    const shouldPlay = intendedPlayingRef.current;
+
+    // Flag prevents the 'pause' event listener from flipping isPlaying
+    movingRef.current = true;
+    container.insertBefore(video, container.firstChild);
+
+    // Let the DOM settle, then clear the flag and resume if needed
+    requestAnimationFrame(() => {
+      movingRef.current = false;
+      if (shouldPlay && video.paused) {
+        video.play().catch(() => {});
+      }
+    });
+  }, []);
+
+  const setIntendedPlaying = useCallback((value: boolean) => {
+    intendedPlayingRef.current = value;
+  }, []);
+
+  return { videoRef, playbackError, togglePlay, seek, initPlayback, destroy, moveVideoTo, setIntendedPlaying };
 }

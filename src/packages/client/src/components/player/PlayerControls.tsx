@@ -1,4 +1,4 @@
-import { h } from 'preact';
+import { h, VNode } from 'preact';
 import { useState, useCallback, useRef, useEffect } from 'preact/hooks';
 import {
   isPlaying,
@@ -23,6 +23,10 @@ interface PlayerControlsProps {
   onToggleInfo: () => void;
   session: StreamSession | null;
   title?: string;
+  /** When true, fullscreen button shows maximize icon instead */
+  hasMiniThumbnail?: boolean;
+  /** Element rendered to the left of the controls row, below the seek bar */
+  leftSlot?: VNode | null;
 }
 
 function formatTime(seconds: number): string {
@@ -38,7 +42,6 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-/** Throttle interval for seek-while-dragging (ms) */
 const DRAG_THROTTLE_MS = 15;
 
 export function PlayerControls({
@@ -49,6 +52,8 @@ export function PlayerControls({
   onToggleInfo,
   session,
   title,
+  hasMiniThumbnail,
+  leftSlot,
 }: PlayerControlsProps) {
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [settingsPanel, setSettingsPanel] = useState<'main' | 'quality' | 'subtitles'>('main');
@@ -141,7 +146,6 @@ export function PlayerControls({
         document.removeEventListener('mouseup', onUp);
         setIsDragging(false);
 
-        // Final seek to exact release position
         const bar = seekBarRef.current;
         if (bar) {
           const rect = bar.getBoundingClientRect();
@@ -153,7 +157,6 @@ export function PlayerControls({
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
 
-      // Immediate seek on press
       const bar = seekBarRef.current;
       if (bar) {
         const rect = bar.getBoundingClientRect();
@@ -207,7 +210,7 @@ export function PlayerControls({
     setSettingsPanel('main');
   }, []);
 
-  // ── Volume SVG icons (4 tiers: muted, low, medium, high) ──
+  // ── Volume SVG icons ──
   const VolumeIcon = () => {
     const v = volume.value;
     const muted = isMuted.value || v === 0;
@@ -256,20 +259,9 @@ export function PlayerControls({
   };
 
   return (
-    <div class={`${styles.controls} ${visible ? styles.visible : ''}`}>
-      {/* Gradient overlay */}
-      <div class={styles.gradient} />
-
-      {/* ── Row 1: Title ── */}
-      {title && (
-        <div class={styles.titleRow}>
-          <span class={styles.titleText}>{title}</span>
-        </div>
-      )}
-
-      {/* ── Row 2: Seek bar ── */}
+    <div class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''}`}>
+      {/* ── Row 1: Seek bar — flush to top, full width ── */}
       <div class={styles.seekRow}>
-        <span class={`${styles.timeLabel} ${styles.timeCurrent}`}>{formatTime(currentTime.value)}</span>
         <div
           ref={seekBarRef}
           class={`${styles.seekBar} ${isDragging ? styles.dragging : ''}`}
@@ -298,11 +290,20 @@ export function PlayerControls({
             </div>
           )}
         </div>
-        <span class={styles.timeLabel}>{formatTime(duration.value)}</span>
       </div>
 
-      {/* ── Row 3: Controls ── */}
-      <div class={styles.controlsRow}>
+      {/* ── Row 2: Content row — optional left slot + controls ── */}
+      <div class={styles.contentRow}>
+        {leftSlot}
+        <div class={styles.mainRow}>
+          {/* Left: title + timing */}
+          <div class={styles.leftSection}>
+          {title && <span class={styles.titleText}>{title}</span>}
+          <span class={styles.timingLabel}>
+            {formatTime(currentTime.value)} / {formatTime(duration.value)}
+          </span>
+        </div>
+
         {/* Center: skip-back, play, skip-forward */}
         <div class={styles.centerControls}>
           <button
@@ -311,10 +312,6 @@ export function PlayerControls({
             aria-label="Skip back 10 seconds"
           >
             <span class={styles.skipText}>-10s</span>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style={{ transform: 'scaleX(-1)' }}>
-              <path d="M12.5 8c-3.6 0-6.5 2.9-6.5 6.5s2.9 6.5 6.5 6.5 6.5-2.9 6.5-6.5H17.5c0 2.8-2.2 5-5 5s-5-2.2-5-5 2.2-5 5-5V8z" />
-              <path d="M12.5 3L8.5 7l4 4V3z" />
-            </svg>
           </button>
 
           <button
@@ -323,12 +320,12 @@ export function PlayerControls({
             aria-label={isPlaying.value ? 'Pause' : 'Play'}
           >
             {isPlaying.value ? (
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
                 <rect x="6" y="4" width="4" height="16" rx="1" />
                 <rect x="14" y="4" width="4" height="16" rx="1" />
               </svg>
             ) : (
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
                 <path d="M8 5v14l11-7z" />
               </svg>
             )}
@@ -339,15 +336,11 @@ export function PlayerControls({
             onClick={() => skipForward(10)}
             aria-label="Skip forward 10 seconds"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-              <path d="M12.5 8c-3.6 0-6.5 2.9-6.5 6.5s2.9 6.5 6.5 6.5 6.5-2.9 6.5-6.5H17.5c0 2.8-2.2 5-5 5s-5-2.2-5-5 2.2-5 5-5V8z" />
-              <path d="M12.5 3L8.5 7l4 4V3z" />
-            </svg>
             <span class={styles.skipText}>+10s</span>
           </button>
         </div>
 
-        {/* Right: info, volume, settings, fullscreen */}
+        {/* Right: info, volume, settings, fullscreen, minimize, close */}
         <div class={styles.rightControls}>
           {/* Info */}
           <button
@@ -507,10 +500,14 @@ export function PlayerControls({
           <button
             class={styles.controlBtn}
             onClick={onToggleFullscreen}
-            aria-label={isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen'}
-            title={isFullscreen.value ? 'Exit fullscreen' : 'Fullscreen'}
+            aria-label={hasMiniThumbnail ? 'Maximize player' : (isFullscreen.value ? 'Exit fullscreen' : 'Enter fullscreen')}
+            title={hasMiniThumbnail ? 'Maximize' : (isFullscreen.value ? 'Exit fullscreen' : 'Fullscreen')}
           >
-            {isFullscreen.value ? (
+            {hasMiniThumbnail ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            ) : isFullscreen.value ? (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
               </svg>
@@ -520,6 +517,7 @@ export function PlayerControls({
               </svg>
             )}
           </button>
+        </div>
         </div>
       </div>
     </div>

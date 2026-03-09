@@ -383,6 +383,15 @@ export class TranscoderService implements OnModuleDestroy {
     }
   }
 
+  /** Return PIDs of all active child processes (for memory tracking). */
+  getChildPids(): number[] {
+    const pids: number[] = [];
+    for (const proc of this.activeProcesses.values()) {
+      if (proc.pid != null && !proc.killed) pids.push(proc.pid);
+    }
+    return pids;
+  }
+
   private getVideoCodec(hwAccel: string): string {
     switch (hwAccel) {
       case 'nvenc':

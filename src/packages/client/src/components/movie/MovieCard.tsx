@@ -3,6 +3,7 @@ import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import type { Movie } from '@/state/library.state';
 import { getRatingColor } from '@/utils/rating-color';
+import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieCard.module.scss';
 
 interface MovieCardProps {
@@ -47,11 +48,11 @@ export function MovieCard({ movie }: MovieCardProps) {
           </div>
         )}
 
-        {movie.watchProgress !== undefined && movie.watchProgress > 0 && (
+        {hasWatchProgress(movie) && (
           <div class={styles.progressBar}>
             <div
               class={styles.progressFill}
-              style={{ width: `${Math.min(movie.watchProgress * 100, 100)}%` }}
+              style={{ width: `${getWatchPercent(movie)}%` }}
             />
           </div>
         )}

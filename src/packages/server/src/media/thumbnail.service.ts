@@ -10,10 +10,10 @@ import { movies, movieFiles } from '../database/schema/index.js';
 
 /**
  * Minimum JPEG file size (in bytes) for a frame to be considered "non-blank".
- * A 320-wide all-black JPEG is typically 1-3 KB.  Anything below this threshold
- * is almost certainly a black or nearly-blank frame.
+ * At 960px wide with quality 2, a black frame is typically 3-8 KB.
+ * Anything below this threshold is almost certainly a black or nearly-blank frame.
  */
-const MIN_FRAME_BYTES = 4096;
+const MIN_FRAME_BYTES = 10240;
 
 interface ProbeInfo {
   duration: number;
@@ -26,6 +26,7 @@ export class ThumbnailService {
   private readonly logger = new Logger('ThumbnailService');
   private readonly thumbnailDir: string;
   private readonly maxWidth: number;
+  private readonly maxHeight: number;
 
   constructor(
     private readonly database: DatabaseService,
@@ -34,7 +35,8 @@ export class ThumbnailService {
     this.thumbnailDir = resolve(
       this.config.get<string>('media.thumbnailDir', './data/thumbnails'),
     );
-    this.maxWidth = this.config.get<number>('media.thumbnailWidth', 480);
+    this.maxWidth = this.config.get<number>('media.thumbnailWidth', 640);
+    this.maxHeight = this.config.get<number>('media.thumbnailHeight', 360);
 
     if (!existsSync(this.thumbnailDir)) {
       mkdirSync(this.thumbnailDir, { recursive: true });
@@ -76,7 +78,8 @@ export class ThumbnailService {
 
       await this.extractFrame(filePath, outputPath, seekTime);
 
-      const thumbnailUrl = `/api/v1/media/thumbnails/${outputFilename}`;
+      // Cache-bust: append version param so browsers fetch the fresh image
+      const thumbnailUrl = `/api/v1/media/thumbnails/${outputFilename}?v=${Date.now()}`;
       const aspectRatio = probe.width && probe.height
         ? Math.round((probe.width / probe.height) * 1000) / 1000
         : null;
@@ -222,12 +225,23 @@ export class ThumbnailService {
       ffmpeg(inputPath)
         .seekInput(seekSeconds)
         .frames(1)
-        .outputOptions(['-vf', `scale=${this.maxWidth}:-2`])
+        .outputOptions(['-vf', `scale=${this.maxWidth}:-2`, '-q:v', '2'])
         .output(outputPath)
         .on('end', () => resolve())
         .on('error', (err) => reject(err))
         .run();
     });
+  }
+
+  /**
+   * Delete the cached thumbnail for a movie.
+   */
+  clearForMovie(movieId: string): void {
+    const thumbPath = join(this.thumbnailDir, movieId + '.jpg');
+    if (existsSync(thumbPath)) {
+      unlinkSync(thumbPath);
+      this.logger.debug(`Cleared thumbnail for movie ${movieId}`);
+    }
   }
 
   /**

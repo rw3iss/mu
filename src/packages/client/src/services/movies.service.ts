@@ -135,6 +135,13 @@ export const moviesService = {
   },
 
   /**
+   * Delete a movie's file(s) from disk, clean up caches, and remove the DB record
+   */
+  deleteFromDisk(movieId: string, deleteEnclosingFolder: boolean): Promise<{ success: boolean }> {
+    return api.post<{ success: boolean }>(`/movies/${movieId}/delete-files`, { deleteEnclosingFolder });
+  },
+
+  /**
    * Cancel all active processing jobs for a movie
    */
   cancelProcessing(movieId: string): Promise<{ cancelled: number }> {

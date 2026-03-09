@@ -10,6 +10,9 @@ export interface PlaylistMovieSummary {
   year: number | null;
   posterUrl: string | null;
   thumbnailUrl: string | null;
+  runtimeMinutes: number | null;
+  durationSeconds: number | null;
+  addedAt: string | null;
 }
 
 export interface Playlist {

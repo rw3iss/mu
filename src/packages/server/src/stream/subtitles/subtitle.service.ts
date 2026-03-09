@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { mkdir, readdir, readFile, stat } from 'fs/promises';
+import { mkdir, readdir, readFile, rm, stat } from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 
@@ -95,6 +96,17 @@ export class SubtitleService {
     }
 
     return subtitleFiles;
+  }
+
+  /**
+   * Delete cached subtitles for a movie file.
+   */
+  async clearCache(movieFileId: string): Promise<void> {
+    const dir = this.getSubtitleDir(movieFileId);
+    if (existsSync(dir)) {
+      await rm(dir, { recursive: true, force: true });
+      this.logger.debug(`Cleared subtitle cache for file ${movieFileId}`);
+    }
   }
 
   /**

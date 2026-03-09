@@ -25,6 +25,8 @@ export interface Movie {
   director?: string;
   addedAt: string;
   watchProgress?: number;
+  watchPosition?: number;
+  durationSeconds?: number;
   inWatchlist?: boolean;
   status?: 'idle' | 'processing';
 }

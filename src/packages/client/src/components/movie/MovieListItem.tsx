@@ -3,6 +3,7 @@ import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import type { Movie } from '@/state/library.state';
 import { getRatingColor } from '@/utils/rating-color';
+import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieListItem.module.scss';
 
 interface MovieListItemProps {
@@ -50,6 +51,14 @@ export function MovieListItem({ movie }: MovieListItemProps) {
         ) : (
           <div class={styles.posterPlaceholder}>
             <span>{(movie.title ?? '?').charAt(0)}</span>
+          </div>
+        )}
+        {hasWatchProgress(movie) && (
+          <div class={styles.progressBar}>
+            <div
+              class={styles.progressFill}
+              style={{ width: `${getWatchPercent(movie)}%` }}
+            />
           </div>
         )}
       </div>

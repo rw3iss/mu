@@ -1,7 +1,21 @@
+
+
+
+
+
+- Show "Info" panel in movie details page: file info, exif
+
 - speed up transcoding?
+Can you do some research on the background transcoding, when new movies are scanned?
+Currently it takes a pretty long time, for each movie. I'm wondering if there is some way we could speed it up, or otherwise give the user the options on what of transcoding quality they want in the Settings.
+Are their any transcoding options available that would be useful to expose to the users to configure? List those out, and how they can affecft the transcoding process (ie. how they affect the quality, and speed of transcoding).
+
+
+On the playlists page, can you add
 
 - Ratings: when clicked, show breakout of 1-10 stars, with number entry on left and decimal up/down buttons. Allow half-stars in overlay. Close/cancel button on end.
 	- user clicks a main number, zooms in between that and next number, with mini decimal scale? Right click or click outside to stay at X.0.
+
 
 - Movie Info Flyout Panel:
 	- Add Move title, description, metadata, and Playlists.
@@ -10,13 +24,7 @@
 		- plugin hook: pluginInit: addInfoPanel(movie) => { registers function to render a component with data }
 	- when flyout renders, calls 'addInfoPanel' for any plugin, passes current movie, component renders custom
 
-Move the 'Plugins' sidebar page item to instead become a section in the 'Settings' page itself. Move all of the internal components and functionality of the plugins page, to the new Plugins section in the settings. You can keep the entire component, just rename as needed (ie. it's not a page anymore). The Settings page will not be where users control the plugins.
-Also do the same for the 'Admin' section: Show it as a new menu item in the Settings page, and remove the sidebar Admin item.
-
-
-- Subtitle integration
-
-- Add commenting/Notes plugin (personal comments) to ie. add notes to personal video files.
+- Subtitle integration... is?
 
 - Movie Page:
 	- add mini features to grab extended data for a movie, like:
@@ -25,8 +33,16 @@ Also do the same for the 'Admin' section: Show it as a new menu item in the Sett
 
 - add 'Pick a movie' for movie... open page user can page through movie options, set filters, "Movie Picker"
 
-- Store 'recent played position' to resume on playback. show modal to restart or not
+- Show modal to 'Resume or Restart' if a movie is played with a previous history position?
 
+- Need easier "install script" or setup method.
+	- can code be bundled? it's open source?
+	- for now: checkout code, run server?
+	- do background research, how does plex/jellyfin do this?
+
+- need a 'play queue': add item to queue, remove, move to front of queue, play playlist, clear queue, see queue
+
+- Discover > Trending: other movies cross joined with mine? filter by personalized vs not.
 
 # PLUGINS:
 
@@ -36,6 +52,10 @@ Also do the same for the 'Admin' section: Show it as a new menu item in the Sett
 	- find third party server-based eq+compression?
 		- add eq+compression profiles to be assigned custom to each movie, ie. "Use sound profile: X"
 
+- "Video Effects":
+	- simply contrast/brightness, etc.
+	- save profiles, assign to each movie
+
 - IMDB plugin:
 	- Settings: show imdb rating, show imdb reviews
 	- Movie page: Show IMDB rating, show imdb reviews
@@ -44,7 +64,7 @@ Also do the same for the 'Admin' section: Show it as a new menu item in the Sett
 - "Notes":
 	- add simple personal notes to movies/files.
 
-- "Popup Comments" for a movie:
+- "Public Comments" for a movie:
 	- movie must have imdb/tmdb association
 	- need central movie db to store public comments
 	- show comments icon in player

@@ -1,9 +1,8 @@
 import { h } from 'preact';
-import { useEffect, useRef, useCallback, useState } from 'preact/hooks';
-import { PlayerControls } from './PlayerControls';
+import { useEffect, useRef, useCallback } from 'preact/hooks';
 import { InfoPanel } from './InfoPanel';
-import { useVideoEngine } from './useVideoEngine';
 import type { VideoEngine } from './useVideoEngine';
+import { useVideoEngine } from './useVideoEngine';
 import {
   currentSession,
   currentTime,
@@ -14,6 +13,7 @@ import {
   isBuffering,
   showControls,
   isPlaying,
+  showInfoPanel,
 } from '@/state/player.state';
 import type { Movie } from '@/state/library.state';
 import styles from './VideoPlayer.module.scss';
@@ -35,19 +35,16 @@ export function VideoPlayer({
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showInfo, setShowInfo] = useState(false);
 
-  // Use external engine or create internal one
-  const internalEngine = useVideoEngine();
+  // Use external engine or create internal one.
+  const internalEngine = useVideoEngine(!externalEngine);
   const engine = externalEngine ?? internalEngine;
 
-  // Move video element into our container
+  // Move video element into our container (preserving play state)
   useEffect(() => {
     if (containerRef.current && engine.videoRef.current) {
-      containerRef.current.insertBefore(
-        engine.videoRef.current,
-        containerRef.current.firstChild,
-      );
+      engine.moveVideoTo(containerRef.current);
+
       // Add click/dblclick handlers to the video element
       const video = engine.videoRef.current;
       const handleClick = () => engine.togglePlay();
@@ -68,26 +65,19 @@ export function VideoPlayer({
     }
   }, [streamUrl, directPlay, startPosition, externalEngine]);
 
-  // Fullscreen
+  // Fullscreen — use document.documentElement so both video area and player bar are visible
   const toggleFullscreen = useCallback(async () => {
-    const container = containerRef.current;
-    if (!container) return;
-
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
         isFullscreen.value = false;
       } else {
-        await container.requestFullscreen();
+        await document.documentElement.requestFullscreen();
         isFullscreen.value = true;
       }
     } catch (error) {
       console.error('Fullscreen error:', error);
     }
-  }, []);
-
-  const toggleInfo = useCallback(() => {
-    setShowInfo((v) => !v);
   }, []);
 
   // Controls visibility
@@ -139,7 +129,7 @@ export function VideoPlayer({
           break;
         case 'i':
           e.preventDefault();
-          toggleInfo();
+          showInfoPanel.value = !showInfoPanel.value;
           break;
         case 'm':
           e.preventDefault();
@@ -162,9 +152,9 @@ export function VideoPlayer({
           volume.value = Math.max(0, volume.value - 0.1);
           break;
         case 'Escape':
-          if (showInfo) {
+          if (showInfoPanel.value) {
             e.preventDefault();
-            setShowInfo(false);
+            showInfoPanel.value = false;
           }
           break;
       }
@@ -174,7 +164,7 @@ export function VideoPlayer({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [engine, toggleFullscreen, toggleInfo, resetControlsTimer, showInfo]);
+  }, [engine, toggleFullscreen, resetControlsTimer]);
 
   // Fullscreen change detection
   useEffect(() => {
@@ -210,17 +200,7 @@ export function VideoPlayer({
         </div>
       )}
 
-      <PlayerControls
-        visible={showControls.value}
-        onTogglePlay={engine.togglePlay}
-        onSeek={engine.seek}
-        onToggleFullscreen={toggleFullscreen}
-        onToggleInfo={toggleInfo}
-        session={currentSession.value}
-        title={movie?.title}
-      />
-
-      <InfoPanel movie={movie} visible={showInfo} onClose={() => setShowInfo(false)} />
+      <InfoPanel movie={movie} visible={showInfoPanel.value} onClose={() => { showInfoPanel.value = false; }} />
     </div>
   );
 }

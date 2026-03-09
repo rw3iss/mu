@@ -42,8 +42,8 @@ export const configSchema = z.object({
     libraryPaths: z.array(z.string()).default([]),
     scanIntervalMinutes: z.coerce.number().int().positive().default(60),
     thumbnailDir: z.string().default('./data/thumbnails'),
-    thumbnailWidth: z.coerce.number().int().positive().default(320),
-    thumbnailHeight: z.coerce.number().int().positive().default(180),
+    thumbnailWidth: z.coerce.number().int().positive().default(640),
+    thumbnailHeight: z.coerce.number().int().positive().default(360),
     supportedExtensions: z.array(z.string()).default([
       '.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.ts',
     ]),

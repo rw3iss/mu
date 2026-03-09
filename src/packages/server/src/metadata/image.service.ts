@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { existsSync, mkdirSync } from 'fs';
-import { writeFile } from 'fs/promises';
+import { rm, writeFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { ConfigService } from '../config/config.service.js';
 
@@ -55,6 +55,17 @@ export class ImageService {
     }
 
     return null;
+  }
+
+  /**
+   * Delete all cached images for a movie.
+   */
+  async clearForMovie(movieId: string): Promise<void> {
+    const movieDir = join(this.cacheDir, movieId);
+    if (existsSync(movieDir)) {
+      await rm(movieDir, { recursive: true, force: true });
+      this.logger.debug(`Cleared image cache for movie ${movieId}`);
+    }
   }
 
   private getExtension(url: string): string {
