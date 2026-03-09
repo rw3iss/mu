@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { resolve, join } from 'path';
+import { pathToFileURL } from 'url';
 import crypto from 'crypto';
 import { nowISO } from '@mu/shared';
 import { DatabaseService } from '../database/database.service.js';
@@ -81,7 +82,7 @@ export class PluginManagerService {
       );
     }
 
-    const pluginModule = await import(entryPointPath);
+    const pluginModule = await import(pathToFileURL(entryPointPath).href);
     const PluginClass = pluginModule.default ?? pluginModule;
 
     let pluginInstance: IPlugin;
@@ -167,10 +168,23 @@ export class PluginManagerService {
     const pluginDir = join(this.pluginsDir, name);
     await this.loadPlugin(pluginDir);
 
-    // Call onEnable lifecycle hook if defined
     const loaded = this.activePlugins.get(name);
-    if (loaded?.instance.onEnable) {
-      await loaded.instance.onEnable(loaded.context);
+    if (loaded) {
+      // Call onInstall on first enable (deferred from installPlugin)
+      if (loaded.instance.onInstall) {
+        const dbRecord = this.database.db
+          .select()
+          .from(plugins)
+          .where(eq(plugins.name, name))
+          .get();
+        if (dbRecord?.status === 'installed') {
+          await loaded.instance.onInstall(loaded.context);
+        }
+      }
+      // Call onEnable lifecycle hook
+      if (loaded.instance.onEnable) {
+        await loaded.instance.onEnable(loaded.context);
+      }
     }
   }
 
@@ -232,33 +246,7 @@ export class PluginManagerService {
         .run();
     }
 
-    // Instantiate plugin temporarily to call onInstall
-    const pluginDir = join(this.pluginsDir, name);
-    const entryPointPath = join(pluginDir, manifest.entryPoint);
-
-    if (existsSync(entryPointPath)) {
-      try {
-        const pluginModule = await import(entryPointPath);
-        const PluginClass = pluginModule.default ?? pluginModule;
-        let pluginInstance: IPlugin;
-        if (typeof PluginClass === 'function') {
-          pluginInstance = new PluginClass();
-        } else {
-          pluginInstance = PluginClass as IPlugin;
-        }
-
-        if (pluginInstance.onInstall) {
-          const context = await this.contextFactory.createContext(name);
-          await pluginInstance.onInstall(context);
-        }
-      } catch (err) {
-        this.logger.warn(
-          `onInstall hook failed for "${name}": ${err instanceof Error ? err.message : err}`,
-        );
-      }
-    }
-
-    this.logger.log(`Plugin "${name}" installed`);
+    this.logger.log(`Plugin "${name}" installed (onInstall will run on first enable)`);
   }
 
   async uninstallPlugin(name: string): Promise<void> {
