@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ToadScheduler, SimpleIntervalJob, AsyncTask } from 'toad-scheduler';
 import { nowISO, WsEvent } from '@mu/shared';
 import { EventsService } from '../events/events.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import type {
   JobDescriptor,
   JobRecord,
@@ -36,7 +37,10 @@ export class JobManagerService implements OnModuleDestroy {
   private readonly scheduler = new ToadScheduler();
   private readonly scheduledJobs = new Map<string, SimpleIntervalJob>();
 
-  constructor(private readonly events: EventsService) {}
+  constructor(
+    private readonly events: EventsService,
+    private readonly settings: SettingsService,
+  ) {}
 
   // ===========================================================
   // Handler Registration (used by other services)
@@ -265,7 +269,9 @@ export class JobManagerService implements OnModuleDestroy {
   // ===========================================================
 
   private processQueue(): void {
-    while (this.running.size < this.maxConcurrency && this.queue.length > 0) {
+    const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+    const maxConcurrency = enc?.maxConcurrentJobs ?? this.maxConcurrency;
+    while (this.running.size < maxConcurrency && this.queue.length > 0) {
       const jobId = this.queue.shift();
       if (!jobId) break;
 

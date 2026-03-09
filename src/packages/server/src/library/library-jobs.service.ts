@@ -11,8 +11,9 @@ import { EventsService } from '../events/events.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { StreamService } from '../stream/stream.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { movieFiles } from '../database/schema/index.js';
+import { movieFiles, transcodeCache, movies } from '../database/schema/index.js';
 import { nowISO, WsEvent } from '@mu/shared';
+import crypto from 'crypto';
 import type { JobRecord, JobHelpers } from '../jobs/job.interface.js';
 
 /** Well-known job types */
@@ -154,6 +155,10 @@ export class LibraryJobsService implements OnModuleInit {
         });
 
         await this.transcoderService.preTranscode(movieFileId, filePath, mode, quality);
+
+        // Record the cached transcode with encoding settings used
+        this.recordTranscodeCache(movieFileId, quality);
+
         helpers.reportProgress(100);
         return { movieFileId, quality };
       },
@@ -288,6 +293,10 @@ export class LibraryJobsService implements OnModuleInit {
     const persistEnabled = (lib as any)?.persistTranscodes !== false; // default true
     if (!persistEnabled) return;
 
+    const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+    const defaultQuality = enc?.quality || '1080p';
+    const encodeHighest = enc?.encodeHighestAvailable === true;
+
     const files = this.database.db
       .select()
       .from(movieFiles)
@@ -296,16 +305,28 @@ export class LibraryJobsService implements OnModuleInit {
 
     for (const file of files) {
       const mode = this.streamService.determineStreamMode(file);
-      if (mode === StreamMode.TRANSCODE || mode === StreamMode.DIRECT_STREAM) {
+      if (mode !== StreamMode.TRANSCODE && mode !== StreamMode.DIRECT_STREAM) continue;
+
+      // Determine which qualities to encode
+      const qualities = new Set<string>([defaultQuality]);
+
+      if (encodeHighest && file.resolution) {
+        const nativeQuality = this.resolutionToQuality(file.resolution);
+        if (nativeQuality && this.qualityRank(nativeQuality) > this.qualityRank(defaultQuality)) {
+          qualities.add(nativeQuality);
+        }
+      }
+
+      for (const quality of qualities) {
         this.jobManager.enqueue({
           type: JOB_TYPE.PRE_TRANSCODE,
-          label: `Pre-transcode: ${title}`,
+          label: `Pre-transcode: ${title} (${quality})`,
           payload: {
             movieId,
             movieFileId: file.id,
             filePath: file.filePath,
             mode,
-            quality: '1080p',
+            quality,
           },
           priority: 40,
         });
@@ -351,6 +372,159 @@ export class LibraryJobsService implements OnModuleInit {
       payload: { movieId },
       priority: 30,
     });
+  }
+
+  /**
+   * Enqueue re-transcode jobs for all existing files whose cached transcode
+   * doesn't match the current encoding settings. Returns the number of jobs queued.
+   */
+  enqueueReTranscodeJobs(): number {
+    const lib = this.settings.get<Record<string, unknown>>('library', {});
+    const persistEnabled = (lib as any)?.persistTranscodes !== false;
+    if (!persistEnabled) return 0;
+
+    const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+    const defaultQuality = enc?.quality || '1080p';
+    const encodeHighest = enc?.encodeHighestAvailable === true;
+    const currentSettings = this.buildEncodingSettingsJson();
+
+    // Get all available movie files
+    const allFiles = this.database.db
+      .select({
+        file: movieFiles,
+        movieTitle: movies.title,
+      })
+      .from(movieFiles)
+      .leftJoin(movies, eq(movieFiles.movieId, movies.id))
+      .where(eq(movieFiles.available, true))
+      .all();
+
+    // Skip files that already have a pending/running pre-transcode job
+    const pendingTranscodeFileIds = new Set<string>();
+    const pendingJobs = this.jobManager.listJobs({ type: JOB_TYPE.PRE_TRANSCODE });
+    for (const job of pendingJobs) {
+      if (job.status === 'pending' || job.status === 'running') {
+        pendingTranscodeFileIds.add(job.payload?.movieFileId as string);
+      }
+    }
+
+    let queued = 0;
+
+    for (const { file, movieTitle } of allFiles) {
+      const mode = this.streamService.determineStreamMode(file);
+      if (mode !== StreamMode.TRANSCODE && mode !== StreamMode.DIRECT_STREAM) continue;
+
+      // Determine which qualities this file should have
+      const desiredQualities = new Set<string>([defaultQuality]);
+      if (encodeHighest && file.resolution) {
+        const nativeQuality = this.resolutionToQuality(file.resolution);
+        if (nativeQuality && this.qualityRank(nativeQuality) > this.qualityRank(defaultQuality)) {
+          desiredQualities.add(nativeQuality);
+        }
+      }
+
+      for (const quality of desiredQualities) {
+        // Check if we already have a matching cached transcode
+        const cached = this.database.db
+          .select()
+          .from(transcodeCache)
+          .where(and(
+            eq(transcodeCache.movieFileId, file.id),
+            eq(transcodeCache.quality, quality),
+          ))
+          .all();
+
+        const hasMatch = cached.some((c) => c.encodingSettings === currentSettings);
+        if (hasMatch) continue;
+
+        // Skip if a job is already pending for this file
+        if (pendingTranscodeFileIds.has(file.id)) continue;
+
+        // Clear old cache for this file+quality before re-encoding
+        this.transcoderService.clearCache(file.id).catch(() => {});
+
+        // Remove stale transcode_cache entries for this file+quality
+        this.database.db
+          .delete(transcodeCache)
+          .where(and(
+            eq(transcodeCache.movieFileId, file.id),
+            eq(transcodeCache.quality, quality),
+          ))
+          .run();
+
+        const title = movieTitle || file.id.slice(0, 8);
+        this.jobManager.enqueue({
+          type: JOB_TYPE.PRE_TRANSCODE,
+          label: `Re-transcode: ${title} (${quality})`,
+          payload: {
+            movieId: file.movieId,
+            movieFileId: file.id,
+            filePath: file.filePath,
+            mode,
+            quality,
+          },
+          priority: 50,
+        });
+        queued++;
+      }
+    }
+
+    this.logger.log(`Re-transcode: ${queued} jobs enqueued`);
+    return queued;
+  }
+
+  // ===========================================================
+  // Helpers
+  // ===========================================================
+
+  /** Record a completed transcode in the cache table. */
+  private recordTranscodeCache(movieFileId: string, quality: string): void {
+    const settingsJson = this.buildEncodingSettingsJson();
+
+    // Remove any existing entry for this file+quality, then insert fresh
+    this.database.db
+      .delete(transcodeCache)
+      .where(and(
+        eq(transcodeCache.movieFileId, movieFileId),
+        eq(transcodeCache.quality, quality),
+      ))
+      .run();
+
+    this.database.db.insert(transcodeCache).values({
+      id: crypto.randomUUID(),
+      movieFileId,
+      quality,
+      encodingSettings: settingsJson,
+      completedAt: nowISO(),
+    }).run();
+  }
+
+  /** Build a stable JSON string of current encoding settings for comparison. */
+  private buildEncodingSettingsJson(): string {
+    const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+    return JSON.stringify({
+      hwAccel: enc?.hwAccel || 'none',
+      preset: enc?.preset || 'veryfast',
+      rateControl: enc?.rateControl || 'cbr',
+      crf: enc?.crf ?? 23,
+    });
+  }
+
+  /** Map a resolution string (e.g. '1080p', '2160p') to a quality profile key. */
+  private resolutionToQuality(resolution: string): string | null {
+    const height = parseInt(resolution, 10);
+    if (isNaN(height)) return null;
+    if (height >= 2160) return '4k';
+    if (height >= 1080) return '1080p';
+    if (height >= 720) return '720p';
+    if (height >= 480) return '480p';
+    return null;
+  }
+
+  /** Numeric rank for quality comparison (higher = better). */
+  private qualityRank(quality: string): number {
+    const ranks: Record<string, number> = { '480p': 1, '720p': 2, '1080p': 3, '4k': 4 };
+    return ranks[quality] ?? 0;
   }
 
   private shouldFetchExtendedMetadata(): boolean {

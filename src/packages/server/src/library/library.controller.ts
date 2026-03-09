@@ -65,7 +65,7 @@ export class LibraryController {
 
   @Post('scan')
   @Roles('admin')
-  async scanAll() {
+  async scanAll(@Body() body?: { reEncode?: boolean }) {
     const sources = this.libraryService.getSources().filter((s) => s.enabled);
 
     let totalFilesFound = 0;
@@ -85,6 +85,12 @@ export class LibraryController {
       }
     }
 
+    // If re-encode requested, enqueue re-transcode jobs for mismatched files
+    let reEncodeJobsQueued = 0;
+    if (body?.reEncode) {
+      reEncodeJobsQueued = this.libraryJobs.enqueueReTranscodeJobs();
+    }
+
     return {
       message: 'Scan complete',
       sourceCount: sources.length,
@@ -92,6 +98,7 @@ export class LibraryController {
       filesAdded: totalFilesAdded,
       filesUpdated: totalFilesUpdated,
       filesRemoved: totalFilesRemoved,
+      reEncodeJobsQueued,
     };
   }
 

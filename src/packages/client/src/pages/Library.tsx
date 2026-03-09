@@ -21,6 +21,8 @@ import {
 import type { LibraryFilters } from '@/state/library.state';
 import { useDebounce } from '@/hooks/useDebounce';
 import { moviesService } from '@/services/movies.service';
+import { sourcesService } from '@/services/sources.service';
+import { libraryEvents } from '@/services/library-events.service';
 import styles from './Library.module.scss';
 
 interface LibraryProps {
@@ -31,6 +33,7 @@ export function Library(_props: LibraryProps) {
   const [localSearch, setLocalSearch] = useState(searchQuery.value);
   const [genres, setGenres] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const debouncedSearch = useDebounce(localSearch, 300);
 
   useEffect(() => {
@@ -38,6 +41,10 @@ export function Library(_props: LibraryProps) {
     initSortPrefs();
     fetchMovies(1);
     loadGenres();
+
+    // Subscribe to live library events so new movies appear automatically
+    libraryEvents.start();
+    return () => libraryEvents.stop();
   }, []);
 
   useEffect(() => {
@@ -52,6 +59,18 @@ export function Library(_props: LibraryProps) {
       // Genres optional
     }
   }
+
+  const handleUpdate = useCallback(async () => {
+    setIsUpdating(true);
+    try {
+      // Refresh the current list immediately
+      await fetchMovies(currentPage.value);
+      // Kick off a background scan — new movies will arrive via WebSocket
+      sourcesService.scanAll().catch(() => {});
+    } finally {
+      setIsUpdating(false);
+    }
+  }, []);
 
   const handleSearchInput = useCallback((e: Event) => {
     setLocalSearch((e.target as HTMLInputElement).value);
@@ -86,8 +105,18 @@ export function Library(_props: LibraryProps) {
     <div class={styles.library}>
       {/* Header */}
       <div class={styles.header}>
-        <h1 class={styles.title}>Library</h1>
-        <span class={styles.count}>{totalMovies.value} movies</span>
+        <div class={styles.headerLeft}>
+          <h1 class={styles.title}>Library</h1>
+          <span class={styles.count}>{totalMovies.value} movies</span>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          loading={isUpdating}
+          onClick={handleUpdate}
+        >
+          {isUpdating ? 'Updating...' : 'Update'}
+        </Button>
       </div>
 
       {/* Toolbar */}

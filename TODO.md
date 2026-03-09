@@ -1,21 +1,8 @@
 
-
-
-
-
 - Show "Info" panel in movie details page: file info, exif
-
-- speed up transcoding?
-Can you do some research on the background transcoding, when new movies are scanned?
-Currently it takes a pretty long time, for each movie. I'm wondering if there is some way we could speed it up, or otherwise give the user the options on what of transcoding quality they want in the Settings.
-Are their any transcoding options available that would be useful to expose to the users to configure? List those out, and how they can affecft the transcoding process (ie. how they affect the quality, and speed of transcoding).
-
-
-On the playlists page, can you add
 
 - Ratings: when clicked, show breakout of 1-10 stars, with number entry on left and decimal up/down buttons. Allow half-stars in overlay. Close/cancel button on end.
 	- user clicks a main number, zooms in between that and next number, with mini decimal scale? Right click or click outside to stay at X.0.
-
 
 - Movie Info Flyout Panel:
 	- Add Move title, description, metadata, and Playlists.

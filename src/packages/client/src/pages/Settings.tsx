@@ -105,6 +105,16 @@ export function Settings(props: SettingsProps) {
   const [autoScanEnabled, setAutoScanEnabled] = useState(true);
   const [nextScanAt, setNextScanAt] = useState<string | null>(null);
 
+  // Encoding settings
+  const [hwAccel, setHwAccel] = useState('none');
+  const [encodingPreset, setEncodingPreset] = useState('veryfast');
+  const [encodeQuality, setEncodeQuality] = useState('1080p');
+  const [encodeHighestAvailable, setEncodeHighestAvailable] = useState(false);
+  const [rateControl, setRateControl] = useState('cbr');
+  const [crfValue, setCrfValue] = useState('23');
+  const [maxConcurrentJobs, setMaxConcurrentJobs] = useState('2');
+  const [reEncodeOnScan, setReEncodeOnScan] = useState(false);
+
   // Rating settings
   const [ratingScale, setRatingScale] = useState('10');
   const [showExternalRatings, setShowExternalRatings] = useState(true);
@@ -146,6 +156,17 @@ export function Settings(props: SettingsProps) {
           if (typeof library.fetchExtendedMetadata === 'boolean') setFetchExtendedMetadata(library.fetchExtendedMetadata);
           if (typeof library.persistTranscodes === 'boolean') setPersistTranscodes(library.persistTranscodes);
           if (typeof library.autoScanEnabled === 'boolean') setAutoScanEnabled(library.autoScanEnabled);
+        }
+
+        const encoding = data.encoding as Record<string, unknown> | undefined;
+        if (encoding) {
+          if (typeof encoding.hwAccel === 'string') setHwAccel(encoding.hwAccel);
+          if (typeof encoding.preset === 'string') setEncodingPreset(encoding.preset);
+          if (typeof encoding.quality === 'string') setEncodeQuality(encoding.quality);
+          if (typeof encoding.encodeHighestAvailable === 'boolean') setEncodeHighestAvailable(encoding.encodeHighestAvailable);
+          if (typeof encoding.rateControl === 'string') setRateControl(encoding.rateControl);
+          if (encoding.crf != null) setCrfValue(String(encoding.crf));
+          if (encoding.maxConcurrentJobs != null) setMaxConcurrentJobs(String(encoding.maxConcurrentJobs));
         }
 
         // Load sources from the API
@@ -229,6 +250,19 @@ export function Settings(props: SettingsProps) {
         },
       });
 
+      // Save encoding settings
+      await api.put('/settings/encoding', {
+        value: {
+          hwAccel,
+          preset: encodingPreset,
+          quality: encodeQuality,
+          encodeHighestAvailable,
+          rateControl,
+          crf: parseInt(crfValue, 10),
+          maxConcurrentJobs: parseInt(maxConcurrentJobs, 10),
+        },
+      });
+
       // Refresh the auto-scan schedule on the server
       const scanStatus = await sourcesService.refreshSchedule();
       setNextScanAt(scanStatus.nextScanAt);
@@ -239,7 +273,7 @@ export function Settings(props: SettingsProps) {
     } finally {
       setIsSaving(false);
     }
-  }, [scanInterval, mediaPathEntries, fetchExtendedMetadata, persistTranscodes, autoScanEnabled]);
+  }, [scanInterval, mediaPathEntries, fetchExtendedMetadata, persistTranscodes, autoScanEnabled, hwAccel, encodingPreset, encodeQuality, encodeHighestAvailable, rateControl, crfValue, maxConcurrentJobs]);
 
   const handleSaveRating = useCallback(async () => {
     setIsSaving(true);
@@ -273,7 +307,7 @@ export function Settings(props: SettingsProps) {
         filesAdded: number;
         filesUpdated: number;
         filesRemoved: number;
-      }>('/sources/scan');
+      }>('/sources/scan', reEncodeOnScan ? { reEncode: true } : undefined);
       setScanResult(result);
       if (result.filesAdded > 0) {
         notifySuccess(`Scan complete: ${result.filesAdded} new movie${result.filesAdded === 1 ? '' : 's'} added`);
@@ -646,10 +680,163 @@ export function Settings(props: SettingsProps) {
                 </label>
               </div>
 
+              <h3 class={styles.encodingSectionTitle}>Encoding</h3>
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Hardware Acceleration</span>
+                  <span class={styles.settingDescription}>
+                    Use GPU hardware for faster encoding when available
+                  </span>
+                </div>
+                <select
+                  class={styles.select}
+                  value={hwAccel}
+                  onChange={(e) => setHwAccel((e.target as HTMLSelectElement).value)}
+                >
+                  <option value="none">Software</option>
+                  <option value="nvenc">NVIDIA GPU (NVENC)</option>
+                  <option value="vaapi">Intel/AMD Linux (VAAPI)</option>
+                  <option value="qsv">Intel Quick Sync (QSV)</option>
+                  <option value="videotoolbox">macOS (VideoToolbox)</option>
+                </select>
+              </div>
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Encoding Preset</span>
+                  <span class={styles.settingDescription}>
+                    Slower presets produce better quality but take longer to encode
+                  </span>
+                </div>
+                <select
+                  class={styles.select}
+                  value={encodingPreset}
+                  onChange={(e) => setEncodingPreset((e.target as HTMLSelectElement).value)}
+                >
+                  <option value="ultrafast">Ultra Fast</option>
+                  <option value="superfast">Super Fast</option>
+                  <option value="veryfast">Very Fast</option>
+                  <option value="faster">Faster</option>
+                  <option value="fast">Fast</option>
+                  <option value="medium">Medium</option>
+                  <option value="slow">Slow</option>
+                </select>
+              </div>
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Default Transcode Quality</span>
+                  <span class={styles.settingDescription}>
+                    Resolution used for background transcoding of movies
+                  </span>
+                </div>
+                <select
+                  class={styles.select}
+                  value={encodeQuality}
+                  onChange={(e) => setEncodeQuality((e.target as HTMLSelectElement).value)}
+                >
+                  <option value="480p">480p</option>
+                  <option value="720p">720p</option>
+                  <option value="1080p">1080p</option>
+                  <option value="4k">4K</option>
+                </select>
+              </div>
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Encode at Highest Quality</span>
+                  <span class={styles.settingDescription}>
+                    When enabled, movies whose source file exceeds the default quality will also be
+                    transcoded at the source's native resolution. Playback defaults to the highest
+                    available cached quality.
+                  </span>
+                </div>
+                <label class={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={encodeHighestAvailable}
+                    onChange={(e) => setEncodeHighestAvailable((e.target as HTMLInputElement).checked)}
+                  />
+                  <span class={styles.toggleTrack} />
+                </label>
+              </div>
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Rate Control</span>
+                  <span class={styles.settingDescription}>
+                    CRF adapts bitrate to scene complexity for better quality at smaller file sizes
+                  </span>
+                </div>
+                <select
+                  class={styles.select}
+                  value={rateControl}
+                  onChange={(e) => setRateControl((e.target as HTMLSelectElement).value)}
+                >
+                  <option value="cbr">Constant Bitrate (CBR)</option>
+                  <option value="crf">Constant Quality (CRF)</option>
+                </select>
+              </div>
+
+              {rateControl === 'crf' && (
+                <div class={styles.settingRow}>
+                  <div class={styles.settingInfo}>
+                    <span class={styles.settingLabel}>CRF Value</span>
+                    <span class={styles.settingDescription}>
+                      Lower values produce higher quality but larger files
+                    </span>
+                  </div>
+                  <select
+                    class={styles.select}
+                    value={crfValue}
+                    onChange={(e) => setCrfValue((e.target as HTMLSelectElement).value)}
+                  >
+                    <option value="18">18 — Near Lossless</option>
+                    <option value="20">20 — High Quality</option>
+                    <option value="23">23 — Balanced</option>
+                    <option value="26">26 — Smaller Files</option>
+                    <option value="28">28 — Low Quality</option>
+                  </select>
+                </div>
+              )}
+
+              <div class={styles.settingRow}>
+                <div class={styles.settingInfo}>
+                  <span class={styles.settingLabel}>Max Concurrent Jobs</span>
+                  <span class={styles.settingDescription}>
+                    Number of background encoding jobs that can run simultaneously
+                  </span>
+                </div>
+                <select
+                  class={styles.select}
+                  value={maxConcurrentJobs}
+                  onChange={(e) => setMaxConcurrentJobs((e.target as HTMLSelectElement).value)}
+                >
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="6">6</option>
+                  <option value="8">8</option>
+                </select>
+              </div>
+
               <div class={styles.scanSection}>
                 <Button variant="secondary" loading={isScanning} onClick={handleScanNow}>
                   {isScanning ? 'Scanning...' : 'Scan Now'}
                 </Button>
+                <label class={styles.toggle} title="Re-encode existing movies whose cached transcode doesn't match the encoding settings above">
+                  <input
+                    type="checkbox"
+                    checked={reEncodeOnScan}
+                    onChange={(e) => setReEncodeOnScan((e.target as HTMLInputElement).checked)}
+                  />
+                  <span class={styles.toggleTrack} />
+                </label>
+                <span class={styles.settingDescription}>
+                  Re-encode movies that don't match current encoding settings
+                </span>
                 {scanResult && (
                   <div class={styles.scanResult}>
                     <span class={styles.scanStat}>

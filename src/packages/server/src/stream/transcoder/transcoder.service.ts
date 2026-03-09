@@ -3,7 +3,11 @@ import { ChildProcess } from 'child_process';
 import { mkdir, rm, writeFile, access } from 'fs/promises';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
+import { eq } from 'drizzle-orm';
 import { ConfigService } from '../../config/config.service.js';
+import { SettingsService } from '../../settings/settings.service.js';
+import { DatabaseService } from '../../database/database.service.js';
+import { transcodeCache } from '../../database/schema/index.js';
 import { TRANSCODING_PROFILES } from './transcoder.profiles.js';
 
 interface TranscodeOptions {
@@ -22,7 +26,11 @@ export class TranscoderService implements OnModuleDestroy {
   private readonly sessionStates = new Map<string, { state: TranscodeState; error?: string }>();
   private readonly cacheDir: string;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly settings: SettingsService,
+    private readonly database: DatabaseService,
+  ) {
     this.cacheDir = path.resolve(
       this.config.get<string>('cache.streamDir') || './data/cache/streams',
     );
@@ -68,6 +76,17 @@ export class TranscoderService implements OnModuleDestroy {
     } catch (err) {
       this.logger.warn(`Failed to clear cache ${target}: ${err}`);
     }
+
+    // Also purge transcode_cache DB entries
+    try {
+      if (movieFileId) {
+        this.database.db.delete(transcodeCache).where(eq(transcodeCache.movieFileId, movieFileId)).run();
+      } else {
+        this.database.db.delete(transcodeCache).run();
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to clear transcode_cache entries: ${err}`);
+    }
   }
 
   /**
@@ -98,10 +117,15 @@ export class TranscoderService implements OnModuleDestroy {
     const outputPath = path.join(targetDir, 'stream.m3u8');
     const segmentPattern = path.join(targetDir, 'segment_%04d.ts');
 
-    const hwAccel = this.config.get<string>('transcoding.hwAccel') || 'none';
+    const enc = this.getEncodingSettings();
+    const hwAccel = enc.hwAccel;
     const videoCodec = this.getVideoCodec(hwAccel);
 
     return new Promise<void>((resolve, reject) => {
+      const videoRateOpts = enc.rateControl === 'crf'
+        ? ['-crf', String(enc.crf)]
+        : ['-b:v', profile.videoBitrate];
+
       let command = ffmpeg(filePath)
         .outputOptions([
           '-f', 'hls',
@@ -118,10 +142,10 @@ export class TranscoderService implements OnModuleDestroy {
           '-g', '48',
           '-sc_threshold', '0',
           '-b:a', profile.audioBitrate,
-          '-b:v', profile.videoBitrate,
+          ...videoRateOpts,
         ])
         .size(`${profile.width}x${profile.height}`)
-        .outputOptions(['-preset', profile.preset]);
+        .outputOptions(['-preset', enc.preset]);
 
       // Apply hardware acceleration input options
       if (hwAccel === 'nvenc') {
@@ -273,7 +297,8 @@ export class TranscoderService implements OnModuleDestroy {
 
     const isTranscode = mode === 'transcode';
 
-    const hwAccel = this.config.get<string>('transcoding.hwAccel') || 'none';
+    const enc = this.getEncodingSettings();
+    const hwAccel = enc.hwAccel;
 
     return new Promise<void>((resolve, reject) => {
       let command = ffmpeg(filePath)
@@ -290,6 +315,9 @@ export class TranscoderService implements OnModuleDestroy {
         const profile = (TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES]
           ?? TRANSCODING_PROFILES['1080p'])!;
         const videoCodec = this.getVideoCodec(hwAccel);
+        const videoRateOpts = enc.rateControl === 'crf'
+          ? ['-crf', String(enc.crf)]
+          : ['-b:v', profile.videoBitrate];
 
         command = command
           .videoCodec(videoCodec)
@@ -299,10 +327,10 @@ export class TranscoderService implements OnModuleDestroy {
             '-g', '48',
             '-sc_threshold', '0',
             '-b:a', profile.audioBitrate,
-            '-b:v', profile.videoBitrate,
+            ...videoRateOpts,
           ])
           .size(`${profile.width}x${profile.height}`)
-          .outputOptions(['-preset', profile.preset]);
+          .outputOptions(['-preset', enc.preset]);
 
         if (hwAccel === 'nvenc') {
           command = command.inputOptions(['-hwaccel', 'cuda']);
@@ -390,6 +418,16 @@ export class TranscoderService implements OnModuleDestroy {
       if (proc.pid != null && !proc.killed) pids.push(proc.pid);
     }
     return pids;
+  }
+
+  private getEncodingSettings() {
+    const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+    return {
+      hwAccel: enc?.hwAccel || 'none',
+      preset: enc?.preset || 'veryfast',
+      rateControl: enc?.rateControl || 'cbr',
+      crf: enc?.crf ?? 23,
+    };
   }
 
   private getVideoCodec(hwAccel: string): string {

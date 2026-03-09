@@ -15,6 +15,7 @@ import {
   streamSessions,
   userWatchHistory,
   users,
+  transcodeCache,
 } from '../database/schema/index.js';
 
 interface StartStreamOptions {
@@ -57,7 +58,7 @@ export class StreamService {
     const mode = this.determineStreamMode(file);
 
     const sessionId = crypto.randomUUID();
-    const quality = options.quality || '1080p';
+    const quality = options.quality || this.resolveDefaultQuality(file.id);
 
     await this.database.db.insert(streamSessions).values({
       id: sessionId,
@@ -359,6 +360,43 @@ export class StreamService {
       const bHeight = b.resolutionHeight ?? 0;
       return bHeight - aHeight;
     })[0];
+  }
+
+  /**
+   * Resolve the best default quality for a movie file.
+   * If "encode highest available" is on, prefer the highest cached quality.
+   * Otherwise use the configured default quality.
+   */
+  private resolveDefaultQuality(movieFileId: string): string {
+    const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+    const defaultQuality = enc?.quality || '1080p';
+    const encodeHighest = enc?.encodeHighestAvailable === true;
+
+    if (!encodeHighest) return defaultQuality;
+
+    // Look up all cached qualities for this file
+    const cached = this.database.db
+      .select({ quality: transcodeCache.quality })
+      .from(transcodeCache)
+      .where(eq(transcodeCache.movieFileId, movieFileId))
+      .all();
+
+    if (cached.length === 0) return defaultQuality;
+
+    // Pick the highest cached quality
+    const ranks: Record<string, number> = { '480p': 1, '720p': 2, '1080p': 3, '4k': 4 };
+    let best = defaultQuality;
+    let bestRank = ranks[defaultQuality] ?? 0;
+
+    for (const { quality } of cached) {
+      const rank = ranks[quality] ?? 0;
+      if (rank > bestRank) {
+        best = quality;
+        bestRank = rank;
+      }
+    }
+
+    return best;
   }
 
   /**

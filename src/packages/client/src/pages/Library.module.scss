@@ -4,9 +4,16 @@
 
 .header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-md);
   margin-bottom: var(--space-lg);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
 }
 
 .title {

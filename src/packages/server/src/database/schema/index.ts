@@ -45,3 +45,6 @@ export type { StreamSession, NewStreamSession } from './stream-sessions.ts';
 
 export { scanLog } from './scan-log.ts';
 export type { ScanLogEntry, NewScanLogEntry } from './scan-log.ts';
+
+export { transcodeCache } from './transcode-cache.ts';
+export type { TranscodeCacheEntry, NewTranscodeCacheEntry } from './transcode-cache.ts';

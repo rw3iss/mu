@@ -400,6 +400,16 @@
   }
 }
 
+.encodingSectionTitle {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  margin-bottom: var(--space-md);
+}
+
 .nextScan {
   color: var(--color-accent);
   font-weight: var(--font-weight-medium);
