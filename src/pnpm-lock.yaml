@@ -108,6 +108,9 @@ importers:
       drizzle-orm:
         specifier: ^0.38.0
         version: 0.38.4(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
       fastify:
         specifier: ^5.0.0
         version: 5.8.1

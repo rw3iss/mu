@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { readFileSync, readdirSync, existsSync } from 'fs';
-import { resolve, join } from 'path';
+import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { resolve, join, dirname } from 'path';
 import { pathToFileURL } from 'url';
 import crypto from 'crypto';
+import { transformSync } from 'esbuild';
 import { nowISO } from '@mu/shared';
 import { DatabaseService } from '../database/database.service.js';
 import { ConfigService } from '../config/config.service.js';
@@ -82,7 +83,8 @@ export class PluginManagerService {
       );
     }
 
-    const pluginModule = await import(pathToFileURL(entryPointPath).href);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pluginModule: any = await this.importPluginModule(entryPointPath);
     const PluginClass = pluginModule.default ?? pluginModule;
 
     let pluginInstance: IPlugin;
@@ -450,6 +452,43 @@ export class PluginManagerService {
         this.logger.error(
           `Failed to auto-load plugin "${row.name}": ${err instanceof Error ? err.message : err}`,
         );
+      }
+    }
+  }
+
+  /**
+   * Import a plugin entry point, transpiling .ts files on-the-fly via esbuild.
+   * The compiled server runs as plain JS so Node.js cannot import .ts directly.
+   */
+  private async importPluginModule(entryPointPath: string): Promise<Record<string, unknown>> {
+    if (!entryPointPath.endsWith('.ts')) {
+      return import(pathToFileURL(entryPointPath).href);
+    }
+
+    const source = readFileSync(entryPointPath, 'utf-8');
+    const result = transformSync(source, {
+      loader: 'ts',
+      format: 'esm',
+      target: 'node20',
+      // Strip type-only imports entirely
+      tsconfigRaw: '{"compilerOptions":{"verbatimModuleSyntax":true}}',
+    });
+
+    // Write to a temp .mjs file next to the original so relative imports still resolve
+    const tmpPath = entryPointPath.replace(/\.ts$/, '.__compiled__.mjs');
+    writeFileSync(tmpPath, result.code);
+
+    try {
+      // Cache-bust with a query param so re-enables get fresh code
+      const url = pathToFileURL(tmpPath).href + '?t=' + Date.now();
+      return await import(url);
+    } finally {
+      // Clean up temp file
+      try {
+        const { unlinkSync } = await import('fs');
+        unlinkSync(tmpPath);
+      } catch {
+        // ignore cleanup errors
       }
     }
   }
