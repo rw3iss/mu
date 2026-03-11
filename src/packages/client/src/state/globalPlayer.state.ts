@@ -1,22 +1,22 @@
-import { signal, computed, effect } from '@preact/signals';
+import { computed, effect, signal } from '@preact/signals';
 import { route } from 'preact-router';
-import {
-	currentSession,
-	startStream,
-	endStream,
-	initPlayerSettings,
-	currentTime,
-	volume,
-	isMuted,
-	isPlaying,
-	streamError,
-} from '@/state/player.state';
 import { moviesService } from '@/services/movies.service';
 import { streamService } from '@/services/stream.service';
-import { sharedVideoEngine } from '@/state/videoEngineRef';
 import { pushToHistory } from '@/state/history.state';
 import type { Movie } from '@/state/library.state';
 import type { StreamSession } from '@/state/player.state';
+import {
+	currentSession,
+	currentTime,
+	endStream,
+	initPlayerSettings,
+	isMuted,
+	isPlaying,
+	startStream,
+	streamError,
+	volume,
+} from '@/state/player.state';
+import { sharedVideoEngine } from '@/state/videoEngineRef';
 
 // ============================================
 // Types

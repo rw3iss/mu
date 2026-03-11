@@ -1,29 +1,29 @@
-import { useEffect, useState, useCallback } from 'preact/hooks';
-import { MovieGrid } from '@/components/movie/MovieGrid';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
-import {
-	movies,
-	totalMovies,
-	currentPage,
-	totalPages,
-	isLoading,
-	searchQuery,
-	viewMode,
-	filters,
-	fetchMovies,
-	searchMovies,
-	setFilters,
-	setViewMode,
-	initViewMode,
-	initSortPrefs,
-} from '@/state/library.state';
-import type { LibraryFilters } from '@/state/library.state';
+import { MovieGrid } from '@/components/movie/MovieGrid';
 import { useDebounce } from '@/hooks/useDebounce';
-import { moviesService } from '@/services/movies.service';
-import { sourcesService } from '@/services/sources.service';
-import { libraryEvents } from '@/services/library-events.service';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { libraryEvents } from '@/services/library-events.service';
+import { moviesService } from '@/services/movies.service';
+import { sourcesService } from '@/services/sources.service';
+import type { LibraryFilters } from '@/state/library.state';
+import {
+	currentPage,
+	fetchMovies,
+	filters,
+	initSortPrefs,
+	initViewMode,
+	isLoading,
+	movies,
+	searchMovies,
+	searchQuery,
+	setFilters,
+	setViewMode,
+	totalMovies,
+	totalPages,
+	viewMode,
+} from '@/state/library.state';
 import styles from './Library.module.scss';
 
 interface LibraryProps {

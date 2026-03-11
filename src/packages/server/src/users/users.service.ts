@@ -1,7 +1,7 @@
+import { nowISO } from '@mu/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import bcrypt from 'bcrypt';
 import { eq } from 'drizzle-orm';
-import { nowISO } from '@mu/shared';
 import { DatabaseService } from '../database/database.service.js';
 import { users } from '../database/schema/index.js';
 

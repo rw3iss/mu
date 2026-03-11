@@ -1,14 +1,14 @@
 import 'reflect-metadata';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import fastifyCookie from '@fastify/cookie';
+import fastifyCors from '@fastify/cors';
+import fastifyJwt from '@fastify/jwt';
+import fastifyStatic from '@fastify/static';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { WsAdapter } from '@nestjs/platform-ws';
-import { Logger } from '@nestjs/common';
-import { join } from 'node:path';
-import { readFileSync, existsSync } from 'node:fs';
-import fastifyCors from '@fastify/cors';
-import fastifyCookie from '@fastify/cookie';
-import fastifyJwt from '@fastify/jwt';
-import fastifyStatic from '@fastify/static';
 import { AppModule } from './app.module.js';
 import { ConfigService } from './config/config.service.js';
 

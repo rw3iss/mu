@@ -1,6 +1,6 @@
 import { useCallback } from 'preact/hooks';
-import { MediaPathEntry } from './MediaPathEntry';
 import type { MediaSourceDto } from '@/services/sources.service';
+import { MediaPathEntry } from './MediaPathEntry';
 import styles from './MediaPathList.module.scss';
 
 export interface MediaPathEntryData {

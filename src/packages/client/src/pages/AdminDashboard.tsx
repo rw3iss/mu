@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
-import { streamService } from '@/services/stream.service';
-import { notifySuccess, notifyError } from '@/state/notifications.state';
 import type { ActiveSession } from '@/services/stream.service';
+import { streamService } from '@/services/stream.service';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {

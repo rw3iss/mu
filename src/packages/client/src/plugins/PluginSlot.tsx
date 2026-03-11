@@ -1,6 +1,6 @@
-import type { UISlotName } from './ui-slots';
 import type { SlotRenderContext } from './plugin-client.interface';
 import { pluginSlotManager } from './plugin-slot-manager';
+import type { UISlotName } from './ui-slots';
 
 interface PluginSlotProps {
 	name: UISlotName;

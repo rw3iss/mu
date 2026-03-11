@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
+import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RecommendationsService } from './recommendations.service.js';
 import { TasteProfileService } from './taste-profile.service.js';
-import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 
 @Controller('recommendations')
 export class RecommendationsController {

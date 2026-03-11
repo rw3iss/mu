@@ -1,4 +1,4 @@
-import { Module, Global, OnModuleInit } from '@nestjs/common';
+import { Global, Module, OnModuleInit } from '@nestjs/common';
 import { DatabaseService } from './database.service.js';
 
 @Global()

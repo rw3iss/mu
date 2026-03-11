@@ -1,20 +1,19 @@
-import { Injectable, Inject, Logger, OnModuleInit, forwardRef } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
-import { StreamMode } from '@mu/shared';
-import { JobManagerService } from '../jobs/job-manager.service.js';
-import { ScannerService } from './scanner.service.js';
-import { LibraryService } from './library.service.js';
-import { MetadataService } from '../metadata/metadata.service.js';
-import { ThumbnailService } from '../media/thumbnail.service.js';
-import { SettingsService } from '../settings/settings.service.js';
-import { EventsService } from '../events/events.service.js';
-import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
-import { StreamService } from '../stream/stream.service.js';
-import { DatabaseService } from '../database/database.service.js';
-import { movieFiles, transcodeCache, movies } from '../database/schema/index.js';
-import { nowISO, WsEvent } from '@mu/shared';
 import crypto from 'node:crypto';
-import type { JobRecord, JobHelpers } from '../jobs/job.interface.js';
+import { nowISO, StreamMode, WsEvent } from '@mu/shared';
+import { forwardRef, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { and, eq } from 'drizzle-orm';
+import { DatabaseService } from '../database/database.service.js';
+import { movieFiles, movies, transcodeCache } from '../database/schema/index.js';
+import { EventsService } from '../events/events.service.js';
+import type { JobHelpers, JobRecord } from '../jobs/job.interface.js';
+import { JobManagerService } from '../jobs/job-manager.service.js';
+import { ThumbnailService } from '../media/thumbnail.service.js';
+import { MetadataService } from '../metadata/metadata.service.js';
+import { SettingsService } from '../settings/settings.service.js';
+import { StreamService } from '../stream/stream.service.js';
+import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
+import { LibraryService } from './library.service.js';
+import { ScannerService } from './scanner.service.js';
 
 /** Well-known job types */
 export const JOB_TYPE = {

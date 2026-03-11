@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
-import { PlaylistsService } from './playlists.service.js';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { PlaylistsService } from './playlists.service.js';
 
 @Controller('playlists')
 export class PlaylistsController {

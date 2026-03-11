@@ -1,16 +1,16 @@
-import { Controller, Get } from '@nestjs/common';
-import os from 'node:os';
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { execFile } from 'node:child_process';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { promisify } from 'node:util';
 import { nowISO } from '@mu/shared';
+import { Controller, Get } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { ConfigService } from '../config/config.service.js';
+import { JobManagerService } from '../jobs/job-manager.service.js';
 import { StreamService } from '../stream/stream.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
-import { JobManagerService } from '../jobs/job-manager.service.js';
-import { ConfigService } from '../config/config.service.js';
 
 const execFileAsync = promisify(execFile);
 

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
-import { VideoPlayer } from '@/components/player/VideoPlayer';
 import { Spinner } from '@/components/common/Spinner';
-import { playerMode, globalMovieId, globalMovie, playMovie } from '@/state/globalPlayer.state';
+import { VideoPlayer } from '@/components/player/VideoPlayer';
+import { globalMovie, globalMovieId, playerMode, playMovie } from '@/state/globalPlayer.state';
+import { notifyError } from '@/state/notifications.state';
 import { currentSession } from '@/state/player.state';
 import { sharedVideoEngine } from '@/state/videoEngineRef';
-import { notifyError } from '@/state/notifications.state';
 import styles from './Player.module.scss';
 
 interface PlayerProps {

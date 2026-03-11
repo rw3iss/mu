@@ -1,7 +1,7 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import { users } from './users.ts';
-import { movies } from './movies.ts';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { movieFiles } from './movie-files.ts';
+import { movies } from './movies.ts';
+import { users } from './users.ts';
 
 export const streamSessions = sqliteTable('stream_sessions', {
 	id: text('id').primaryKey(),

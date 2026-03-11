@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '../../config/config.service.js';
-import { CacheService } from '../../cache/cache.service.js';
 import { CACHE_NAMESPACES, CACHE_TTL } from '@mu/shared';
+import { Injectable, Logger } from '@nestjs/common';
+import { CacheService } from '../../cache/cache.service.js';
+import { ConfigService } from '../../config/config.service.js';
 
 const OMDB_BASE_URL = 'https://www.omdbapi.com';
 

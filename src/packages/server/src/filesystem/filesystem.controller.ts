@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { FilesystemService } from './filesystem.service.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { FilesystemService } from './filesystem.service.js';
 
 @Controller('filesystem')
 export class FilesystemController {

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { movies } from './movies.ts';
 
 export const movieMetadata = sqliteTable('movie_metadata', {

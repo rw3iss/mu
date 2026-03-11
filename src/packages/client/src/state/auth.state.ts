@@ -1,4 +1,4 @@
-import { signal, computed } from '@preact/signals';
+import { computed, signal } from '@preact/signals';
 import { route } from 'preact-router';
 import { api } from '@/services/api';
 

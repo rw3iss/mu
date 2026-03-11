@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import { getRatingColor } from '@/utils/rating-color';
 import styles from './RatingWidget.module.scss';
 

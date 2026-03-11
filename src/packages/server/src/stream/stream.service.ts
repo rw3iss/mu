@@ -1,23 +1,23 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
-import { statSync } from 'node:fs';
 import crypto from 'node:crypto';
-import { nowISO, WsEvent, StreamMode } from '@mu/shared';
-import { DatabaseService } from '../database/database.service.js';
+import { statSync } from 'node:fs';
+import { nowISO, StreamMode, WsEvent } from '@mu/shared';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { and, eq } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
+import { DatabaseService } from '../database/database.service.js';
+import {
+	movieFiles,
+	movies,
+	streamSessions,
+	transcodeCache,
+	users,
+	userWatchHistory,
+} from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
-import { TranscoderService } from './transcoder/transcoder.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { SubtitleService } from './subtitles/subtitle.service.js';
-import { SettingsService } from '../settings/settings.service.js';
-import {
-	movies,
-	movieFiles,
-	streamSessions,
-	userWatchHistory,
-	users,
-	transcodeCache,
-} from '../database/schema/index.js';
+import { TranscoderService } from './transcoder/transcoder.service.js';
 
 interface StartStreamOptions {
 	quality?: string;
@@ -115,14 +115,6 @@ export class StreamService {
 			subtitleTracks = await this.subtitleService.extractSubtitles(file.filePath, file.id);
 		} catch (err) {
 			this.logger.warn(`Failed to extract subtitles for file ${file.id}: ${err}`);
-		}
-
-		// Find external subtitle files alongside the video
-		let _externalSubs: string[] = [];
-		try {
-			_externalSubs = await this.subtitleService.findExternalSubtitles(file.filePath);
-		} catch (err) {
-			this.logger.warn(`Failed to find external subtitles: ${err}`);
 		}
 
 		// Start transcode or remux pipeline as needed

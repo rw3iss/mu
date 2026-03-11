@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { PluginEndpointConfig, HttpMethod } from './plugin.interface.js';
+import type { HttpMethod, PluginEndpointConfig } from './plugin.interface.js';
 
 @Injectable()
 export class PluginApiRegistryService {

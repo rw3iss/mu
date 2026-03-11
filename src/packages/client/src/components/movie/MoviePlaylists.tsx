@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import type { MoviePlaylistInfo, Playlist } from '@/services/playlists.service';
 import { playlistsService } from '@/services/playlists.service';
-import type { Playlist, MoviePlaylistInfo } from '@/services/playlists.service';
-import { notifySuccess, notifyError } from '@/state/notifications.state';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './MoviePlaylists.module.scss';
 
 function shouldNotifyPlaylist(): boolean {

@@ -1,5 +1,5 @@
-import { Controller, Get, Param, Query, Res, NotFoundException } from '@nestjs/common';
-import { existsSync, createReadStream } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
+import { Controller, Get, NotFoundException, Param, Query, Res } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator.js';
 import { ThumbnailService } from './thumbnail.service.js';
 

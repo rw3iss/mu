@@ -1,6 +1,6 @@
-import { Controller, Get, Delete, Query } from '@nestjs/common';
-import { HistoryService } from './history.service.js';
+import { Controller, Delete, Get, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { HistoryService } from './history.service.js';
 
 @Controller('history')
 export class HistoryController {

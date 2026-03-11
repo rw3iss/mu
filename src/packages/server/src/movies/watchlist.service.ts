@@ -1,8 +1,8 @@
-import { Injectable, ConflictException } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
 import { nowISO } from '@mu/shared';
+import { ConflictException, Injectable } from '@nestjs/common';
+import { and, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { userWatchlist, movies } from '../database/schema/index.js';
+import { movies, userWatchlist } from '../database/schema/index.js';
 
 @Injectable()
 export class WatchlistService {

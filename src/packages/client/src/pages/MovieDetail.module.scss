@@ -419,6 +419,126 @@
 }
 
 // ============================================
+// File Info
+// ============================================
+
+.fileInfoSection {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.fileInfoToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  width: 100%;
+  text-align: left;
+
+  .sectionTitle {
+    margin: 0;
+  }
+}
+
+.fileInfoArrow {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.fileInfoContent {
+  margin-top: var(--space-md);
+}
+
+.fileInfoGrid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-xs) var(--space-lg);
+  font-size: var(--font-size-sm);
+}
+
+.fileInfoLabel {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.fileInfoValue {
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.fileInfoBadge {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-left: var(--space-xs);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.fileInfoBadgeMuted {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.trackSection {
+  margin-top: var(--space-md);
+}
+
+.trackTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.trackList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trackItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  padding: 2px 0;
+}
+
+.trackCodec {
+  font-family: monospace;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-elevated);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+}
+
+.trackMeta {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.trackLang {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.trackExtraTitle {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-style: italic;
+}
+
+// ============================================
 // Management Bar
 // ============================================
 

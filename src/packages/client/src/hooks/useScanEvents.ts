@@ -1,6 +1,6 @@
 import { useEffect } from 'preact/hooks';
 import { wsService } from '@/services/websocket.service';
-import { notifySuccess, notifyError, notifyInfo } from '@/state/notifications.state';
+import { notifyError, notifyInfo, notifySuccess } from '@/state/notifications.state';
 
 interface ScanCompletedData {
 	sourceId: string;

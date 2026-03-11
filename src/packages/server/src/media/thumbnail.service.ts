@@ -1,12 +1,12 @@
+import { existsSync, mkdirSync, statSync, unlinkSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { existsSync, mkdirSync, statSync, unlinkSync } from 'node:fs';
-import { resolve, join } from 'node:path';
 import ffmpeg from 'fluent-ffmpeg';
-import { nowISO } from '@mu/shared';
-import { DatabaseService } from '../database/database.service.js';
 import { ConfigService } from '../config/config.service.js';
-import { movies, movieFiles } from '../database/schema/index.js';
+import { DatabaseService } from '../database/database.service.js';
+import { movieFiles, movies } from '../database/schema/index.js';
 
 /**
  * Minimum JPEG file size (in bytes) for a frame to be considered "non-blank".

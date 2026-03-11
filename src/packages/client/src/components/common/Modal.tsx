@@ -1,5 +1,5 @@
 import { ComponentChildren } from 'preact';
-import { useEffect, useCallback, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useRef } from 'preact/hooks';
 import styles from './Modal.module.scss';
 
 interface ModalProps {

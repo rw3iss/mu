@@ -1,7 +1,7 @@
-import { Controller, Get, All, Param, Req, NotFoundException } from '@nestjs/common';
+import { All, Controller, Get, NotFoundException, Param, Req } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
-import { PluginApiRegistryService } from './plugin-api-registry.service.js';
 import type { HttpMethod } from './plugin.interface.js';
+import { PluginApiRegistryService } from './plugin-api-registry.service.js';
 
 @Controller('plugins')
 export class PluginApiController {

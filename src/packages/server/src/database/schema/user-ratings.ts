@@ -1,6 +1,6 @@
-import { sqliteTable, text, real, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import { users } from './users.ts';
+import { real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { movies } from './movies.ts';
+import { users } from './users.ts';
 
 export const userRatings = sqliteTable(
 	'user_ratings',

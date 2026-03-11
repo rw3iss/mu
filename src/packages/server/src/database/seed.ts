@@ -1,8 +1,8 @@
-import Database from 'better-sqlite3';
-import bcrypt from 'bcrypt';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import bcrypt from 'bcrypt';
+import Database from 'better-sqlite3';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

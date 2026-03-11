@@ -1,7 +1,7 @@
-import { Controller, Get, Param, Res, NotFoundException } from '@nestjs/common';
 import { createReadStream } from 'node:fs';
-import { ImageService } from './image.service.js';
+import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator.js';
+import { ImageService } from './image.service.js';
 
 @Controller('images')
 export class ImageController {

@@ -1,30 +1,31 @@
-import { useEffect, useRef, useCallback, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { streamService } from '@/services/stream.service';
 import {
-	playerMode,
-	globalMovieId,
+	closePlayer,
+	forceStartPosition,
 	globalMovie,
+	globalMovieId,
 	isPlayerActive,
 	maximizePlayer,
 	minimizePlayer,
-	closePlayer,
-	startGlobalStream,
+	playerMode,
 	restoredAutoplay,
-	forceStartPosition,
+	startGlobalStream,
 } from '@/state/globalPlayer.state';
 import {
 	currentSession,
+	initPlayerSettings,
 	isFullscreen,
 	showControls,
 	showInfoPanel,
-	initPlayerSettings,
 	streamError,
+	subtitleTrack,
 } from '@/state/player.state';
-import { streamService } from '@/services/stream.service';
-import { useVideoEngine } from './useVideoEngine';
 import { setSharedVideoEngine } from '@/state/videoEngineRef';
-import { PlayerControls } from './PlayerControls';
-import { InfoPanel } from './InfoPanel';
 import styles from './GlobalPlayer.module.scss';
+import { InfoPanel } from './InfoPanel';
+import { PlayerControls } from './PlayerControls';
+import { useVideoEngine } from './useVideoEngine';
 
 export function GlobalPlayer() {
 	const engine = useVideoEngine();
@@ -111,6 +112,39 @@ export function GlobalPlayer() {
 			engine.moveVideoTo(miniVideoContainerRef.current);
 		}
 	}, [playerMode.value]);
+
+	// Apply selected subtitle track to the video element
+	useEffect(() => {
+		const video = engine.videoRef.current;
+		const session = currentSession.value;
+		if (!video) return;
+
+		// Remove existing track elements
+		for (const t of video.querySelectorAll('track')) {
+			video.removeChild(t);
+		}
+
+		// Also hide any active text tracks
+		for (let i = 0; i < video.textTracks.length; i++) {
+			video.textTracks[i]!.mode = 'hidden';
+		}
+
+		const selectedId = subtitleTrack.value;
+		if (!selectedId || !session) return;
+
+		const track = session.subtitles.find((t) => t.id === selectedId);
+		if (!track) return;
+
+		const trackEl = document.createElement('track');
+		trackEl.kind = 'subtitles';
+		trackEl.label = track.label;
+		trackEl.srclang = track.language;
+		const token = localStorage.getItem('mu_token');
+		trackEl.src = token ? `${track.url}?token=${encodeURIComponent(token)}` : track.url;
+		trackEl.default = true;
+		video.appendChild(trackEl);
+		trackEl.track.mode = 'showing';
+	}, [subtitleTrack.value, currentSession.value?.sessionId]);
 
 	// Fullscreen toggle — uses document.documentElement so both video and bar are visible
 	const handleToggleFullscreen = useCallback(async () => {

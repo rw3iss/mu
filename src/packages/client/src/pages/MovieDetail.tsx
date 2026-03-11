@@ -1,18 +1,18 @@
-import { useEffect, useState, useCallback, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
-import { RatingWidget } from '@/components/movie/RatingWidget';
-import { ExternalRatings } from '@/components/movie/ExternalRatings';
 import { Spinner } from '@/components/common/Spinner';
-import { moviesService } from '@/services/movies.service';
+import { ExternalRatings } from '@/components/movie/ExternalRatings';
 import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
-import { notifySuccess, notifyError } from '@/state/notifications.state';
-import { playMovie, globalMovieId, closePlayer } from '@/state/globalPlayer.state';
-import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
-import type { Movie } from '@/state/library.state';
+import { RatingWidget } from '@/components/movie/RatingWidget';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { moviesService } from '@/services/movies.service';
+import { closePlayer, globalMovieId, playMovie } from '@/state/globalPlayer.state';
+import type { Movie } from '@/state/library.state';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieDetail.module.scss';
 
 interface MovieDetailProps {
@@ -161,6 +161,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 		}
 	}, [movie]);
 
+	const [showFileInfo, setShowFileInfo] = useState(false);
 	const [confirmingRemove, setConfirmingRemove] = useState(false);
 	const [showDeleteModal, setShowDeleteModal] = useState(false);
 	const [deleteFolder, setDeleteFolder] = useState(false);
@@ -467,6 +468,210 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									</div>
 								))}
 							</div>
+						</div>
+					)}
+
+					{/* File Info */}
+					{movie.fileInfo && (
+						<div class={styles.fileInfoSection}>
+							<button
+								class={styles.fileInfoToggle}
+								onClick={() => setShowFileInfo(!showFileInfo)}
+							>
+								<h2 class={styles.sectionTitle}>File Info</h2>
+								<span class={styles.fileInfoArrow}>
+									{showFileInfo ? '\u25B2' : '\u25BC'}
+								</span>
+							</button>
+
+							{showFileInfo && (
+								<div class={styles.fileInfoContent}>
+									<div class={styles.fileInfoGrid}>
+										{movie.fileInfo.fileName && (
+											<>
+												<span class={styles.fileInfoLabel}>File</span>
+												<span class={styles.fileInfoValue}>
+													{movie.fileInfo.fileName}
+												</span>
+											</>
+										)}
+										{movie.fileInfo.containerFormat && (
+											<>
+												<span class={styles.fileInfoLabel}>Container</span>
+												<span class={styles.fileInfoValue}>
+													{movie.fileInfo.containerFormat}
+												</span>
+											</>
+										)}
+										{(movie.fileInfo.videoWidth ||
+											movie.fileInfo.resolution) && (
+											<>
+												<span class={styles.fileInfoLabel}>Resolution</span>
+												<span class={styles.fileInfoValue}>
+													{movie.fileInfo.videoWidth &&
+													movie.fileInfo.videoHeight
+														? `${movie.fileInfo.videoWidth}x${movie.fileInfo.videoHeight}`
+														: ''}{' '}
+													{movie.fileInfo.resolution
+														? `(${movie.fileInfo.resolution})`
+														: ''}
+												</span>
+											</>
+										)}
+										{movie.fileInfo.codecVideo && (
+											<>
+												<span class={styles.fileInfoLabel}>
+													Video Codec
+												</span>
+												<span class={styles.fileInfoValue}>
+													{movie.fileInfo.codecVideo.toUpperCase()}
+													{movie.fileInfo.videoProfile
+														? ` ${movie.fileInfo.videoProfile}`
+														: ''}
+												</span>
+											</>
+										)}
+										{movie.fileInfo.videoBitDepth && (
+											<>
+												<span class={styles.fileInfoLabel}>Bit Depth</span>
+												<span class={styles.fileInfoValue}>
+													{movie.fileInfo.videoBitDepth}-bit
+													{movie.fileInfo.hdr && (
+														<span class={styles.fileInfoBadge}>
+															HDR
+														</span>
+													)}
+												</span>
+											</>
+										)}
+										{movie.fileInfo.videoFrameRate && (
+											<>
+												<span class={styles.fileInfoLabel}>Frame Rate</span>
+												<span class={styles.fileInfoValue}>
+													{parseFloat(
+														movie.fileInfo.videoFrameRate,
+													).toFixed(
+														Number.isInteger(
+															parseFloat(
+																movie.fileInfo.videoFrameRate,
+															),
+														)
+															? 0
+															: 3,
+													)}{' '}
+													fps
+												</span>
+											</>
+										)}
+										{movie.fileInfo.bitrate && movie.fileInfo.bitrate > 0 && (
+											<>
+												<span class={styles.fileInfoLabel}>Bitrate</span>
+												<span class={styles.fileInfoValue}>
+													{(movie.fileInfo.bitrate / 1_000_000).toFixed(
+														1,
+													)}{' '}
+													Mbps
+												</span>
+											</>
+										)}
+										{movie.fileInfo.fileSize && movie.fileInfo.fileSize > 0 && (
+											<>
+												<span class={styles.fileInfoLabel}>File Size</span>
+												<span class={styles.fileInfoValue}>
+													{movie.fileInfo.fileSize > 1_073_741_824
+														? `${(movie.fileInfo.fileSize / 1_073_741_824).toFixed(2)} GB`
+														: `${(movie.fileInfo.fileSize / 1_048_576).toFixed(0)} MB`}
+												</span>
+											</>
+										)}
+										{movie.fileInfo.videoColorSpace && (
+											<>
+												<span class={styles.fileInfoLabel}>
+													Color Space
+												</span>
+												<span class={styles.fileInfoValue}>
+													{movie.fileInfo.videoColorSpace}
+												</span>
+											</>
+										)}
+									</div>
+
+									{movie.fileInfo.audioTracks.length > 0 && (
+										<div class={styles.trackSection}>
+											<h3 class={styles.trackTitle}>
+												Audio Tracks ({movie.fileInfo.audioTracks.length})
+											</h3>
+											<div class={styles.trackList}>
+												{movie.fileInfo.audioTracks.map((t) => (
+													<div key={t.index} class={styles.trackItem}>
+														<span class={styles.trackCodec}>
+															{t.codec.toUpperCase()}
+														</span>
+														<span class={styles.trackMeta}>
+															{t.channelLayout ||
+																(t.channels
+																	? `${t.channels}ch`
+																	: '')}
+														</span>
+														<span class={styles.trackLang}>
+															{t.language !== 'und'
+																? t.language?.toUpperCase()
+																: ''}
+														</span>
+														{t.title &&
+															t.title !== `Track ${t.index + 1}` && (
+																<span
+																	class={styles.trackExtraTitle}
+																>
+																	{t.title}
+																</span>
+															)}
+													</div>
+												))}
+											</div>
+										</div>
+									)}
+
+									{movie.fileInfo.subtitleTracks.length > 0 && (
+										<div class={styles.trackSection}>
+											<h3 class={styles.trackTitle}>
+												Subtitle Tracks (
+												{movie.fileInfo.subtitleTracks.length})
+											</h3>
+											<div class={styles.trackList}>
+												{movie.fileInfo.subtitleTracks.map((t) => (
+													<div key={t.index} class={styles.trackItem}>
+														{t.codec && (
+															<span class={styles.trackCodec}>
+																{t.codec.toUpperCase()}
+															</span>
+														)}
+														<span class={styles.trackLang}>
+															{t.language !== 'und'
+																? t.language?.toUpperCase()
+																: 'Unknown'}
+														</span>
+														{t.forced && (
+															<span
+																class={`${styles.fileInfoBadge} ${styles.fileInfoBadgeMuted}`}
+															>
+																Forced
+															</span>
+														)}
+														{t.external && (
+															<span
+																class={`${styles.fileInfoBadge} ${styles.fileInfoBadgeMuted}`}
+															>
+																External
+															</span>
+														)}
+													</div>
+												))}
+											</div>
+										</div>
+									)}
+								</div>
+							)}
 						</div>
 					)}
 

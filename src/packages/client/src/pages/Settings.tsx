@@ -1,20 +1,20 @@
-import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
-import { MediaPathList } from '@/components/library/MediaPathList';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
-import { theme, setTheme } from '@/state/theme.state';
-import { accentColor, setAccentColor, resetAccentColor } from '@/state/accentColor.state';
-import { currentUser } from '@/state/auth.state';
+import { MediaPathList } from '@/components/library/MediaPathList';
 import { useUiSetting } from '@/hooks/useUiSetting';
-import { notifySuccess, notifyError } from '@/state/notifications.state';
-import { api } from '@/services/api';
-import { sourcesService } from '@/services/sources.service';
-import { Plugins } from './Plugins';
-import { AdminDashboard } from './AdminDashboard';
-import type { Theme } from '@/state/theme.state';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { api } from '@/services/api';
+import { sourcesService } from '@/services/sources.service';
+import { accentColor, resetAccentColor, setAccentColor } from '@/state/accentColor.state';
+import { currentUser } from '@/state/auth.state';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
+import type { Theme } from '@/state/theme.state';
+import { setTheme, theme } from '@/state/theme.state';
+import { AdminDashboard } from './AdminDashboard';
+import { Plugins } from './Plugins';
 import styles from './Settings.module.scss';
 
 interface ServerStats {

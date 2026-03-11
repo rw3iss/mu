@@ -1,7 +1,7 @@
 import { useCallback } from 'preact/hooks';
-import { Modal } from './Modal';
 import { Button } from './Button';
 import styles from './ConfirmDialog.module.scss';
+import { Modal } from './Modal';
 
 interface ConfirmDialogProps {
 	isOpen: boolean;

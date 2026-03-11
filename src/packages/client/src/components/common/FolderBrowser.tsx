@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'preact/hooks';
-import { Modal } from './Modal';
-import { Button } from './Button';
-import { Spinner } from './Spinner';
-import { sourcesService } from '@/services/sources.service';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import type { BrowseResult } from '@/services/sources.service';
+import { sourcesService } from '@/services/sources.service';
+import { Button } from './Button';
 import styles from './FolderBrowser.module.scss';
+import { Modal } from './Modal';
+import { Spinner } from './Spinner';
 
 interface FolderBrowserProps {
 	isOpen: boolean;

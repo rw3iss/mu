@@ -1,12 +1,12 @@
+import { nowISO, WsEvent } from '@mu/shared';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { nowISO, WsEvent } from '@mu/shared';
-import { DatabaseService } from '../database/database.service.js';
-import { TmdbProvider } from './providers/tmdb.provider.js';
-import { OmdbProvider, OmdbSearchResult } from './providers/omdb.provider.js';
 import { CacheService } from '../cache/cache.service.js';
+import { DatabaseService } from '../database/database.service.js';
+import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
-import { movies, movieMetadata, movieFiles } from '../database/schema/index.js';
+import { OmdbProvider, OmdbSearchResult } from './providers/omdb.provider.js';
+import { TmdbProvider } from './providers/tmdb.provider.js';
 
 @Injectable()
 export class MetadataService {

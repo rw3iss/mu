@@ -1,9 +1,9 @@
+import { CACHE_NAMESPACES, nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
-import { eq, desc } from 'drizzle-orm';
-import { nowISO, CACHE_NAMESPACES } from '@mu/shared';
-import { DatabaseService } from '../database/database.service.js';
+import { desc, eq } from 'drizzle-orm';
 import { CacheService } from '../cache/cache.service.js';
-import { movies, movieMetadata, userRatings, userWatchHistory } from '../database/schema/index.js';
+import { DatabaseService } from '../database/database.service.js';
+import { movieMetadata, movies, userRatings, userWatchHistory } from '../database/schema/index.js';
 
 export interface TasteProfile {
 	userId: string;

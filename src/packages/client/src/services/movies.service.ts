@@ -1,5 +1,5 @@
-import { api } from './api';
 import type { Movie } from '@/state/library.state';
+import { api } from './api';
 
 // ============================================
 // Types

@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { eq, and, count, sql, asc, desc } from 'drizzle-orm';
 import { nowISO } from '@mu/shared';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { playlists, playlistMovies, movies } from '../database/schema/index.js';
+import { movies, playlistMovies, playlists } from '../database/schema/index.js';
 
 interface PlaylistMovieSummary {
 	movieId: string;

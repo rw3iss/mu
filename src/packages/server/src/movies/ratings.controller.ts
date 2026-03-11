@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { RatingsService } from './ratings.service.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { RatingsService } from './ratings.service.js';
 
 @Controller('ratings')
 export class RatingsController {

@@ -1,6 +1,6 @@
-import { Module, Global } from '@nestjs/common';
-import { JobManagerService } from './job-manager.service.js';
+import { Global, Module } from '@nestjs/common';
 import { JobController } from './job.controller.js';
+import { JobManagerService } from './job-manager.service.js';
 
 @Global()
 @Module({

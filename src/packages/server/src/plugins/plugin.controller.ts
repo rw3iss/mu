@@ -1,12 +1,12 @@
 import {
+	BadRequestException,
+	Body,
 	Controller,
 	Get,
+	NotFoundException,
+	Param,
 	Post,
 	Put,
-	Param,
-	Body,
-	NotFoundException,
-	BadRequestException,
 } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { PluginManagerService } from './plugin-manager.service.js';

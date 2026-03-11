@@ -1,17 +1,17 @@
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
 import { Tabs } from '@/components/common/Tabs';
+import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import {
-	pluginsService,
 	type PluginInfo,
 	type PluginSettingDefinition,
 	type PluginStatus,
+	pluginsService,
 } from '@/services/plugins.service';
-import { notifySuccess, notifyError } from '@/state/notifications.state';
-import { pluginClientManager } from '@/plugins/plugin-client-manager';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './Plugins.module.scss';
 
 // ============================================

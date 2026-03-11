@@ -1,13 +1,13 @@
-import { Module, OnModuleInit, Logger } from '@nestjs/common';
-import { DatabaseModule } from '../database/database.module.js';
+import { Logger, Module, OnModuleInit } from '@nestjs/common';
 import { CacheModule } from '../cache/cache.module.js';
+import { ConfigService } from '../config/config.service.js';
+import { DatabaseModule } from '../database/database.module.js';
 import { EventsModule } from '../events/events.module.js';
 import { PluginController } from './plugin.controller.js';
 import { PluginApiController } from './plugin-api.controller.js';
-import { PluginManagerService } from './plugin-manager.service.js';
-import { PluginContextFactory } from './plugin-context.factory.js';
 import { PluginApiRegistryService } from './plugin-api-registry.service.js';
-import { ConfigService } from '../config/config.service.js';
+import { PluginContextFactory } from './plugin-context.factory.js';
+import { PluginManagerService } from './plugin-manager.service.js';
 
 @Module({
 	imports: [DatabaseModule, CacheModule, EventsModule],

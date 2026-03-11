@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { Injectable, Logger } from '@nestjs/common';
 import { TranscoderService } from './transcoder.service.js';
 
 @Injectable()

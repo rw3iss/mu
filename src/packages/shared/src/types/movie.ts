@@ -71,6 +71,14 @@ export interface MovieFile {
 	codecAudio?: string;
 	bitrate?: number;
 	durationSeconds?: number;
+	videoWidth?: number;
+	videoHeight?: number;
+	videoBitDepth?: number;
+	videoFrameRate?: string;
+	videoProfile?: string;
+	videoColorSpace?: string;
+	hdr?: boolean;
+	containerFormat?: string;
 	subtitleTracks: SubtitleTrack[];
 	audioTracks: AudioTrack[];
 	available: boolean;
@@ -78,12 +86,33 @@ export interface MovieFile {
 	fileModifiedAt?: string;
 }
 
+export interface FileInfo {
+	containerFormat?: string;
+	codecVideo?: string;
+	codecAudio?: string;
+	resolution?: string;
+	videoWidth?: number;
+	videoHeight?: number;
+	videoBitDepth?: number;
+	videoFrameRate?: string;
+	videoProfile?: string;
+	videoColorSpace?: string;
+	hdr?: boolean;
+	bitrate?: number;
+	fileSize?: number;
+	fileName?: string;
+	audioTracks: AudioTrack[];
+	subtitleTracks: SubtitleTrack[];
+}
+
 export interface SubtitleTrack {
 	index: number;
 	language?: string;
 	title?: string;
-	codec: string;
+	codec?: string;
 	forced?: boolean;
+	external?: boolean;
+	filePath?: string;
 }
 
 export interface AudioTrack {
@@ -92,6 +121,9 @@ export interface AudioTrack {
 	title?: string;
 	codec: string;
 	channels?: number;
+	channelLayout?: string;
+	sampleRate?: number;
+	bitDepth?: number;
 }
 
 export interface MediaSource {

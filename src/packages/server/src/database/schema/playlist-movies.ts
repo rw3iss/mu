@@ -1,6 +1,6 @@
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import { playlists } from './playlists.ts';
+import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { movies } from './movies.ts';
+import { playlists } from './playlists.ts';
 
 export const playlistMovies = sqliteTable(
 	'playlist_movies',

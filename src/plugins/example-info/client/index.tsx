@@ -46,9 +46,17 @@ export default class ExampleInfoClient implements IPluginClient {
 		});
 
 		// Register a renderer for the INFO_PANELINFO_PANEL slot
-		context.slots.register(UI.DASHBOARD_TOP, ({}) => {
-			return ("Example info content.");
-		});
+		// context.slots.register(UI.PLAYER_BUTTON, ({}) => {
+		// 	return (
+		// 		<Button variant="primary" size="sm" onClick={() => { console.log('player button click') }}>
+		// 			{'\u25B6'} See more
+		// 		</Button>
+		// 	);
+		// });
+
+		// context.slots.register(UI.DASHBOARD_TOP, ({}) => {
+		// 	return ("Example info content.");
+		// });
 
 		console.log('[example-info] Client plugin loaded');
 	}

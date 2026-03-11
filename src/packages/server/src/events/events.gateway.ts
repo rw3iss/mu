@@ -1,16 +1,16 @@
+import { WsEvent } from '@mu/shared';
+import { Logger } from '@nestjs/common';
 import {
-	WebSocketGateway,
-	WebSocketServer,
-	SubscribeMessage,
+	ConnectedSocket,
+	MessageBody,
 	OnGatewayConnection,
 	OnGatewayDisconnect,
-	MessageBody,
-	ConnectedSocket,
+	SubscribeMessage,
+	WebSocketGateway,
+	WebSocketServer,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
 import { Server, WebSocket } from 'ws';
 import { EventsService } from './events.service.js';
-import { WsEvent } from '@mu/shared';
 
 interface ClientMeta {
 	channels: Set<string>;

@@ -1,13 +1,13 @@
+import crypto from 'node:crypto';
+import { nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { nowISO } from '@mu/shared';
-import { DatabaseService } from '../database/database.service.js';
 import { CacheService } from '../cache/cache.service.js';
+import { DatabaseService } from '../database/database.service.js';
+import { movieMetadata, movies, plugins } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
-import { PluginApiRegistryService } from './plugin-api-registry.service.js';
-import { plugins, movies, movieMetadata } from '../database/schema/index.js';
 import type { PluginContext } from './plugin.interface.js';
-import crypto from 'node:crypto';
+import { PluginApiRegistryService } from './plugin-api-registry.service.js';
 
 @Injectable()
 export class PluginContextFactory {

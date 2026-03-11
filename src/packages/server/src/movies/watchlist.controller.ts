@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Delete, Param, Body } from '@nestjs/common';
-import { WatchlistService } from './watchlist.service.js';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { WatchlistService } from './watchlist.service.js';
 
 @Controller('watchlist')
 export class WatchlistController {

@@ -1,6 +1,6 @@
-import type { Movie } from '@/state/library.state';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import type { Movie } from '@/state/library.state';
 import styles from './InfoPanel.module.scss';
 
 interface InfoPanelProps {

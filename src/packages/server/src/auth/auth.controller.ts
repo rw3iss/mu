@@ -1,13 +1,13 @@
-import { Controller, Post, Get, Body, Req, Res, UsePipes, Logger } from '@nestjs/common';
-import { AuthService } from './auth.service.js';
+import { Body, Controller, Get, Logger, Post, Req, Res, UsePipes } from '@nestjs/common';
+import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { Public } from '../common/decorators/public.decorator.js';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
+import { ConfigService } from '../config/config.service.js';
 import { LibraryService } from '../library/library.service.js';
 import { LibraryJobsService } from '../library/library-jobs.service.js';
-import { loginSchema, setupSchema } from './dto/login.dto.js';
+import { AuthService } from './auth.service.js';
 import type { LoginDto, SetupDto } from './dto/login.dto.js';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
-import { Public } from '../common/decorators/public.decorator.js';
-import { CurrentUser } from '../common/decorators/current-user.decorator.js';
-import { ConfigService } from '../config/config.service.js';
+import { loginSchema, setupSchema } from './dto/login.dto.js';
 
 @Controller('auth')
 export class AuthController {

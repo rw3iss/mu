@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
-import { login, isAuthenticated } from '@/state/auth.state';
+import { isAuthenticated, login } from '@/state/auth.state';
 import { notifyError } from '@/state/notifications.state';
 import styles from './Login.module.scss';
 

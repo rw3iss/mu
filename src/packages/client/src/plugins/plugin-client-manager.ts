@@ -1,6 +1,6 @@
 import { signal } from '@preact/signals';
 import { api } from '@/services/api';
-import { pluginsService, type PluginInfo } from '@/services/plugins.service';
+import { type PluginInfo, pluginsService } from '@/services/plugins.service';
 import type { IPluginClient, PluginClientContext } from './plugin-client.interface';
 import { pluginSlotManager } from './plugin-slot-manager';
 

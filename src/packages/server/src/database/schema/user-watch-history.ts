@@ -1,6 +1,6 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import { users } from './users.ts';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { movies } from './movies.ts';
+import { users } from './users.ts';
 
 export const userWatchHistory = sqliteTable('user_watch_history', {
 	id: text('id').primaryKey(),

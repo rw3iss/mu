@@ -1,16 +1,16 @@
-import { Controller, Post, Param, Logger } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
-import { basename } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
-import ffmpeg from 'fluent-ffmpeg';
+import { basename } from 'node:path';
 import { nowISO, WsEvent } from '@mu/shared';
-import { MetadataService } from './metadata.service.js';
+import { Controller, Logger, Param, Post } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
+import ffmpeg from 'fluent-ffmpeg';
+import { Roles } from '../common/decorators/roles.decorator.js';
 import { DatabaseService } from '../database/database.service.js';
-import { ThumbnailService } from '../media/thumbnail.service.js';
+import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { LibraryJobsService } from '../library/library-jobs.service.js';
-import { movies, movieMetadata, movieFiles } from '../database/schema/index.js';
-import { Roles } from '../common/decorators/roles.decorator.js';
+import { ThumbnailService } from '../media/thumbnail.service.js';
+import { MetadataService } from './metadata.service.js';
 
 @Controller()
 export class MetadataController {
@@ -165,6 +165,20 @@ export class MetadataController {
 					resolution: codecInfo.resolution ?? file.resolution,
 					durationSeconds: codecInfo.durationSeconds ?? null,
 					bitrate: codecInfo.bitrate ?? null,
+					videoWidth: codecInfo.videoWidth ?? null,
+					videoHeight: codecInfo.videoHeight ?? null,
+					videoBitDepth: codecInfo.videoBitDepth ?? null,
+					videoFrameRate: codecInfo.videoFrameRate ?? null,
+					videoProfile: codecInfo.videoProfile ?? null,
+					videoColorSpace: codecInfo.videoColorSpace ?? null,
+					hdr: codecInfo.hdr ?? false,
+					containerFormat: codecInfo.containerFormat ?? null,
+					audioTracks: codecInfo.audioTracks
+						? JSON.stringify(codecInfo.audioTracks)
+						: '[]',
+					subtitleTracks: codecInfo.subtitleTracks
+						? JSON.stringify(codecInfo.subtitleTracks)
+						: '[]',
 					fileMetadata: JSON.stringify(fileMetadata),
 				})
 				.where(eq(movieFiles.id, file.id))
@@ -272,6 +286,16 @@ export class MetadataController {
 			resolution?: string;
 			durationSeconds?: number;
 			bitrate?: number;
+			videoWidth?: number;
+			videoHeight?: number;
+			videoBitDepth?: number;
+			videoFrameRate?: string;
+			videoProfile?: string;
+			videoColorSpace?: string;
+			hdr?: boolean;
+			containerFormat?: string;
+			audioTracks?: any[];
+			subtitleTracks?: any[];
 		};
 		fileMetadata: {
 			formatTags: Record<string, string>;
@@ -302,7 +326,7 @@ export class MetadataController {
 				const videoStream = metadata.streams?.find((s) => s.codec_type === 'video');
 				const audioStream = metadata.streams?.find((s) => s.codec_type === 'audio');
 
-				// Structured codec info
+				const width = videoStream?.width;
 				const height = videoStream?.height;
 				let resolution: string | undefined;
 				if (height) {
@@ -312,6 +336,57 @@ export class MetadataController {
 					else if (height >= 480) resolution = '480p';
 					else resolution = `${height}p`;
 				}
+
+				// HDR detection
+				const colorTransfer = (videoStream as any)?.color_transfer ?? '';
+				const colorSpace = (videoStream as any)?.color_space ?? '';
+				const hdr =
+					colorTransfer === 'smpte2084' ||
+					colorTransfer === 'arib-std-b67' ||
+					colorSpace === 'bt2020nc' ||
+					colorSpace === 'bt2020c';
+
+				// Frame rate
+				const rFrameRate = (videoStream as any)?.r_frame_rate;
+				let videoFrameRate: string | undefined;
+				if (rFrameRate) {
+					const parts = rFrameRate.split('/');
+					if (parts.length === 2 && Number(parts[1])) {
+						videoFrameRate = (Number(parts[0]) / Number(parts[1])).toFixed(3);
+					} else {
+						videoFrameRate = rFrameRate;
+					}
+				}
+
+				// Audio tracks
+				const audioStreams = (metadata.streams ?? []).filter(
+					(s) => s.codec_type === 'audio',
+				);
+				const audioTracks = audioStreams.map((s: any, i: number) => ({
+					index: i,
+					codec: s.codec_name ?? 'unknown',
+					language: s.tags?.language ?? 'und',
+					title: s.tags?.title ?? `Track ${i + 1}`,
+					channels: s.channels ?? 0,
+					channelLayout: s.channel_layout ?? '',
+					sampleRate: s.sample_rate ? Number(s.sample_rate) : undefined,
+					bitDepth: s.bits_per_raw_sample
+						? parseInt(s.bits_per_raw_sample, 10)
+						: undefined,
+				}));
+
+				// Subtitle tracks
+				const subtitleStreams = (metadata.streams ?? []).filter(
+					(s) => s.codec_type === 'subtitle',
+				);
+				const subtitleTracks = subtitleStreams.map((s: any, i: number) => ({
+					index: i,
+					codec: s.codec_name ?? 'unknown',
+					language: s.tags?.language ?? 'und',
+					title: s.tags?.title ?? `Track ${i + 1}`,
+					forced: s.disposition?.forced === 1,
+					external: false,
+				}));
 
 				const codecInfo = {
 					codecVideo: videoStream?.codec_name ?? undefined,
@@ -323,9 +398,22 @@ export class MetadataController {
 					bitrate: metadata.format?.bit_rate
 						? Math.round(Number(metadata.format.bit_rate))
 						: undefined,
+					videoWidth: width,
+					videoHeight: height,
+					videoBitDepth: (videoStream as any)?.bits_per_raw_sample
+						? parseInt((videoStream as any).bits_per_raw_sample, 10)
+						: undefined,
+					videoFrameRate,
+					videoProfile:
+						videoStream?.profile != null ? String(videoStream.profile) : undefined,
+					videoColorSpace: colorSpace || undefined,
+					hdr,
+					containerFormat: metadata.format?.format_name ?? undefined,
+					audioTracks,
+					subtitleTracks,
 				};
 
-				// Raw metadata blob — all tags from format and each stream
+				// Raw metadata blob
 				const formatTags: Record<string, string> = {};
 				if (metadata.format?.tags) {
 					for (const [key, value] of Object.entries(metadata.format.tags)) {

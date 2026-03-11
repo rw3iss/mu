@@ -1,6 +1,6 @@
-import { useRef, useCallback, useState, useEffect } from 'preact/hooks';
-import { MovieCard } from './MovieCard';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import type { Movie } from '@/state/library.state';
+import { MovieCard } from './MovieCard';
 import styles from './MovieCarousel.module.scss';
 
 interface MovieCarouselProps {

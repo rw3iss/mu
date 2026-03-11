@@ -1,13 +1,13 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
 import { basename, extname } from 'node:path';
-import chokidar, { type FSWatcher } from 'chokidar';
 import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
-import { DatabaseService } from '../database/database.service.js';
-import { ScannerService } from './scanner.service.js';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import chokidar, { type FSWatcher } from 'chokidar';
+import { and, eq } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
-import { EventsService } from '../events/events.service.js';
+import { DatabaseService } from '../database/database.service.js';
 import { mediaSources, movieFiles } from '../database/schema/index.js';
+import { EventsService } from '../events/events.service.js';
+import { ScannerService } from './scanner.service.js';
 
 @Injectable()
 export class WatcherService implements OnModuleInit, OnModuleDestroy {

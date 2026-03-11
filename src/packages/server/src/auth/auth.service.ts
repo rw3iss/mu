@@ -1,9 +1,9 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { nowISO } from '@mu/shared';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcrypt';
 import { eq } from 'drizzle-orm';
-import { nowISO } from '@mu/shared';
-import { DatabaseService } from '../database/database.service.js';
 import { ConfigService } from '../config/config.service.js';
+import { DatabaseService } from '../database/database.service.js';
 import { users } from '../database/schema/index.js';
 import type { SetupDto } from './dto/login.dto.js';
 

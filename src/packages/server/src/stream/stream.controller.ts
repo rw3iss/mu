@@ -1,25 +1,25 @@
 import {
-	Controller,
-	Get,
-	Post,
-	Delete,
-	Param,
-	Query,
 	Body,
-	Req,
-	Res,
+	Controller,
+	Delete,
+	Get,
 	Logger,
 	NotFoundException,
+	Param,
+	Post,
+	Query,
+	Req,
+	Res,
 } from '@nestjs/common';
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { eq } from 'drizzle-orm';
+import { FastifyReply, FastifyRequest } from 'fastify';
+import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { DatabaseService } from '../database/database.service.js';
+import { movieFiles } from '../database/schema/index.js';
+import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { StreamService } from './stream.service.js';
 import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
-import { DirectPlayService } from './direct-play/direct-play.service.js';
-import { CurrentUser } from '../common/decorators/current-user.decorator.js';
-import { DatabaseService } from '../database/database.service.js';
-import { eq } from 'drizzle-orm';
-import { movieFiles } from '../database/schema/index.js';
 
 @Controller('stream')
 export class StreamController {

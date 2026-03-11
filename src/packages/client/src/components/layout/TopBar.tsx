@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
-import { theme, toggleTheme } from '@/state/theme.state';
 import { useDebounce } from '@/hooks/useDebounce';
+import { theme, toggleTheme } from '@/state/theme.state';
 import styles from './TopBar.module.scss';
 
 export function TopBar() {

@@ -1,25 +1,25 @@
+import crypto from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import crypto from 'node:crypto';
 import { transformSync } from 'esbuild';
-import { nowISO } from '@mu/shared';
-import { DatabaseService } from '../database/database.service.js';
 import { ConfigService } from '../config/config.service.js';
+import { DatabaseService } from '../database/database.service.js';
 import { plugins } from '../database/schema/index.js';
-import { PluginContextFactory } from './plugin-context.factory.js';
-import { PluginApiRegistryService } from './plugin-api-registry.service.js';
 import type {
 	IPlugin,
-	PluginManifest,
+	PluginContext,
 	PluginInfo,
+	PluginManifest,
 	PluginPermission,
 	PluginSettingDefinition,
 	PluginStatus,
-	PluginContext,
 } from './plugin.interface.js';
+import { PluginApiRegistryService } from './plugin-api-registry.service.js';
+import { PluginContextFactory } from './plugin-context.factory.js';
 
 interface LoadedPlugin {
 	instance: IPlugin;

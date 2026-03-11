@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
-import { MediaPathList } from '@/components/library/MediaPathList';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
+import { MediaPathList } from '@/components/library/MediaPathList';
 import { setup } from '@/state/auth.state';
-import { notifySuccess, notifyError } from '@/state/notifications.state';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './Setup.module.scss';
 
 interface SetupProps {

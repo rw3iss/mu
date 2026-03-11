@@ -1,10 +1,10 @@
-import { ComponentChildren } from 'preact';
 import { signal } from '@preact/signals';
-import { Sidebar } from './Sidebar';
-import { TopBar } from './TopBar';
-import { MobileNav } from './MobileNav';
+import { ComponentChildren } from 'preact';
 import { isPlayerActive, playerMode } from '@/state/globalPlayer.state';
 import styles from './AppShell.module.scss';
+import { MobileNav } from './MobileNav';
+import { Sidebar } from './Sidebar';
+import { TopBar } from './TopBar';
 
 export const sidebarCollapsed = signal(false);
 

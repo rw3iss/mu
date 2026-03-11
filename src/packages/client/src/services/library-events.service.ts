@@ -1,5 +1,5 @@
+import { currentPage, fetchMovies } from '@/state/library.state';
 import { wsService } from './websocket.service';
-import { fetchMovies, currentPage } from '@/state/library.state';
 
 type Callback = () => void;
 

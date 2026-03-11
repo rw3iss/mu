@@ -1,4 +1,4 @@
-import { signal, effect } from '@preact/signals';
+import { effect, signal } from '@preact/signals';
 import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
 
 // ============================================

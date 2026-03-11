@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
-import { api } from '@/services/api';
-import { notifySuccess, notifyError } from '@/state/notifications.state';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { api } from '@/services/api';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './PlaylistDetail.module.scss';
 
 // ============================================

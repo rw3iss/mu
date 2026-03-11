@@ -1,19 +1,53 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
-import { stat, opendir } from 'node:fs/promises';
+import { opendir, stat } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
-import ffmpeg from 'fluent-ffmpeg';
 import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
-import { DatabaseService } from '../database/database.service.js';
-import { ConfigService } from '../config/config.service.js';
-import { EventsService } from '../events/events.service.js';
+import { Injectable, Logger } from '@nestjs/common';
+import { and, eq } from 'drizzle-orm';
+import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
-import { mediaSources, movies, movieFiles, scanLog } from '../database/schema/index.js';
+import { ConfigService } from '../config/config.service.js';
+import { DatabaseService } from '../database/database.service.js';
+import { mediaSources, movieFiles, movies, scanLog } from '../database/schema/index.js';
+import { EventsService } from '../events/events.service.js';
 
 interface ParsedFilename {
 	title: string;
 	year?: number;
 	quality?: string;
+}
+
+interface ProbeResult {
+	codecVideo?: string;
+	codecAudio?: string;
+	resolution?: string;
+	durationSeconds?: number;
+	bitrate?: number;
+	videoWidth?: number;
+	videoHeight?: number;
+	videoBitDepth?: number;
+	videoFrameRate?: string;
+	videoProfile?: string;
+	videoColorSpace?: string;
+	hdr?: boolean;
+	containerFormat?: string;
+	audioTracks?: {
+		index: number;
+		codec: string;
+		language: string;
+		title: string;
+		channels: number;
+		channelLayout: string;
+		sampleRate?: number;
+		bitDepth?: number;
+	}[];
+	subtitleTracks?: {
+		index: number;
+		codec: string;
+		language: string;
+		title: string;
+		forced: boolean;
+		external: boolean;
+	}[];
 }
 
 @Injectable()
@@ -132,6 +166,20 @@ export class ScannerService {
 								codecAudio: probeInfo.codecAudio ?? null,
 								durationSeconds: probeInfo.durationSeconds ?? null,
 								bitrate: probeInfo.bitrate ?? null,
+								videoWidth: probeInfo.videoWidth ?? null,
+								videoHeight: probeInfo.videoHeight ?? null,
+								videoBitDepth: probeInfo.videoBitDepth ?? null,
+								videoFrameRate: probeInfo.videoFrameRate ?? null,
+								videoProfile: probeInfo.videoProfile ?? null,
+								videoColorSpace: probeInfo.videoColorSpace ?? null,
+								hdr: probeInfo.hdr ?? false,
+								containerFormat: probeInfo.containerFormat ?? null,
+								audioTracks: probeInfo.audioTracks
+									? JSON.stringify(probeInfo.audioTracks)
+									: '[]',
+								subtitleTracks: probeInfo.subtitleTracks
+									? JSON.stringify(probeInfo.subtitleTracks)
+									: '[]',
 								available: true,
 								addedAt: movieNow,
 								fileModifiedAt,
@@ -323,6 +371,20 @@ export class ScannerService {
 						resolution: probeInfo.resolution ?? file.resolution,
 						durationSeconds: probeInfo.durationSeconds ?? null,
 						bitrate: probeInfo.bitrate ?? null,
+						videoWidth: probeInfo.videoWidth ?? null,
+						videoHeight: probeInfo.videoHeight ?? null,
+						videoBitDepth: probeInfo.videoBitDepth ?? null,
+						videoFrameRate: probeInfo.videoFrameRate ?? null,
+						videoProfile: probeInfo.videoProfile ?? null,
+						videoColorSpace: probeInfo.videoColorSpace ?? null,
+						hdr: probeInfo.hdr ?? false,
+						containerFormat: probeInfo.containerFormat ?? null,
+						audioTracks: probeInfo.audioTracks
+							? JSON.stringify(probeInfo.audioTracks)
+							: '[]',
+						subtitleTracks: probeInfo.subtitleTracks
+							? JSON.stringify(probeInfo.subtitleTracks)
+							: '[]',
 					})
 					.where(eq(movieFiles.id, file.id))
 					.run();
@@ -337,16 +399,10 @@ export class ScannerService {
 	}
 
 	/**
-	 * Use FFprobe to extract codec, resolution, duration, and bitrate from a file.
-	 * Returns partial info on failure so scanning can continue.
+	 * Use FFprobe to extract codec, resolution, duration, bitrate, and detailed
+	 * stream info from a file. Returns partial info on failure so scanning can continue.
 	 */
-	async probeFile(filePath: string): Promise<{
-		codecVideo?: string;
-		codecAudio?: string;
-		resolution?: string;
-		durationSeconds?: number;
-		bitrate?: number;
-	}> {
+	async probeFile(filePath: string): Promise<ProbeResult> {
 		return new Promise((resolve) => {
 			ffmpeg.ffprobe(filePath, (err, metadata) => {
 				if (err) {
@@ -358,7 +414,7 @@ export class ScannerService {
 				const videoStream = metadata.streams?.find((s) => s.codec_type === 'video');
 				const audioStream = metadata.streams?.find((s) => s.codec_type === 'audio');
 
-				const _width = videoStream?.width;
+				const width = videoStream?.width;
 				const height = videoStream?.height;
 				let resolution: string | undefined;
 				if (height) {
@@ -368,6 +424,45 @@ export class ScannerService {
 					else if (height >= 480) resolution = '480p';
 					else resolution = `${height}p`;
 				}
+
+				// HDR detection from color transfer/space
+				const colorTransfer = (videoStream as any)?.color_transfer ?? '';
+				const colorSpace = (videoStream as any)?.color_space ?? '';
+				const hdr =
+					colorTransfer === 'smpte2084' ||
+					colorTransfer === 'arib-std-b67' ||
+					colorSpace === 'bt2020nc' ||
+					colorSpace === 'bt2020c';
+
+				// Audio tracks
+				const audioStreams = (metadata.streams ?? []).filter(
+					(s) => s.codec_type === 'audio',
+				);
+				const audioTracks = audioStreams.map((s, i) => ({
+					index: i,
+					codec: s.codec_name ?? 'unknown',
+					language: (s as any).tags?.language ?? 'und',
+					title: (s as any).tags?.title ?? `Track ${i + 1}`,
+					channels: (s as any).channels ?? 0,
+					channelLayout: (s as any).channel_layout ?? '',
+					sampleRate: (s as any).sample_rate ? Number((s as any).sample_rate) : undefined,
+					bitDepth: (s as any).bits_per_raw_sample
+						? parseInt((s as any).bits_per_raw_sample, 10)
+						: undefined,
+				}));
+
+				// Subtitle tracks
+				const subtitleStreams = (metadata.streams ?? []).filter(
+					(s) => s.codec_type === 'subtitle',
+				);
+				const subtitleTracks = subtitleStreams.map((s, i) => ({
+					index: i,
+					codec: s.codec_name ?? 'unknown',
+					language: (s as any).tags?.language ?? 'und',
+					title: (s as any).tags?.title ?? `Track ${i + 1}`,
+					forced: (s as any).disposition?.forced === 1,
+					external: false,
+				}));
 
 				resolve({
 					codecVideo: videoStream?.codec_name ?? undefined,
@@ -379,9 +474,32 @@ export class ScannerService {
 					bitrate: metadata.format?.bit_rate
 						? Math.round(Number(metadata.format.bit_rate))
 						: undefined,
+					videoWidth: width,
+					videoHeight: height,
+					videoBitDepth: (videoStream as any)?.bits_per_raw_sample
+						? parseInt((videoStream as any).bits_per_raw_sample, 10)
+						: undefined,
+					videoFrameRate: this.parseFrameRate((videoStream as any)?.r_frame_rate),
+					videoProfile:
+						videoStream?.profile != null ? String(videoStream.profile) : undefined,
+					videoColorSpace: colorSpace || undefined,
+					hdr,
+					containerFormat: metadata.format?.format_name ?? undefined,
+					audioTracks,
+					subtitleTracks,
 				});
 			});
 		});
+	}
+
+	private parseFrameRate(rFrameRate?: string): string | undefined {
+		if (!rFrameRate) return undefined;
+		const parts = rFrameRate.split('/');
+		if (parts.length !== 2) return rFrameRate;
+		const num = Number(parts[0]);
+		const den = Number(parts[1]);
+		if (!den) return rFrameRate;
+		return (num / den).toFixed(3);
 	}
 
 	async *walkDir(dirPath: string, extensions: readonly string[]): AsyncGenerator<string> {

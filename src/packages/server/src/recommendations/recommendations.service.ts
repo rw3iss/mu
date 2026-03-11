@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { eq, desc, sql, gt, inArray } from 'drizzle-orm';
 import { CACHE_NAMESPACES } from '@mu/shared';
-import { DatabaseService } from '../database/database.service.js';
+import { Injectable, Logger } from '@nestjs/common';
+import { desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { CacheService } from '../cache/cache.service.js';
-import { TasteProfileService, TasteProfile } from './taste-profile.service.js';
-import { movies, movieMetadata, userRatings, userWatchHistory } from '../database/schema/index.js';
+import { DatabaseService } from '../database/database.service.js';
+import { movieMetadata, movies, userRatings, userWatchHistory } from '../database/schema/index.js';
+import { TasteProfile, TasteProfileService } from './taste-profile.service.js';
 
 export interface ScoredMovie {
 	movieId: string;

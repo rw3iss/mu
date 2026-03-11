@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '../config/config.service.js';
-import { MemoryCacheProvider } from './providers/memory-cache.provider.js';
 import type { ICacheProvider } from './providers/cache-provider.interface.js';
+import { MemoryCacheProvider } from './providers/memory-cache.provider.js';
 
 @Injectable()
 export class CacheService {

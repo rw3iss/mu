@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { FolderBrowser } from '@/components/common/FolderBrowser';
-import { sourcesService } from '@/services/sources.service';
 import type { MediaSourceDto, ScanResult } from '@/services/sources.service';
+import { sourcesService } from '@/services/sources.service';
 import styles from './MediaPathEntry.module.scss';
 
 interface MediaPathEntryProps {

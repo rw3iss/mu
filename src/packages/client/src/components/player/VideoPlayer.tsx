@@ -1,18 +1,18 @@
-import { useEffect, useRef, useCallback } from 'preact/hooks';
-import type { VideoEngine } from './useVideoEngine';
-import { useVideoEngine } from './useVideoEngine';
+import { useCallback, useEffect, useRef } from 'preact/hooks';
+import type { Movie } from '@/state/library.state';
 import {
 	currentTime,
 	duration,
-	volume,
-	isMuted,
-	isFullscreen,
 	isBuffering,
-	showControls,
+	isFullscreen,
+	isMuted,
 	isPlaying,
+	showControls,
 	showInfoPanel,
+	volume,
 } from '@/state/player.state';
-import type { Movie } from '@/state/library.state';
+import type { VideoEngine } from './useVideoEngine';
+import { useVideoEngine } from './useVideoEngine';
 import styles from './VideoPlayer.module.scss';
 
 interface VideoPlayerProps {

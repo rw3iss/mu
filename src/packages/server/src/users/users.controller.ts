@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common';
-import { UsersService } from './users.service.js';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { UsersService } from './users.service.js';
 
 @Controller('users')
 export class UsersController {

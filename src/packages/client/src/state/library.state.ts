@@ -1,4 +1,4 @@
-import { signal, computed } from '@preact/signals';
+import { computed, signal } from '@preact/signals';
 import { moviesService } from '@/services/movies.service';
 
 // ============================================
@@ -29,6 +29,40 @@ export interface Movie {
 	durationSeconds?: number;
 	inWatchlist?: boolean;
 	status?: 'idle' | 'processing';
+	fileInfo?: {
+		containerFormat?: string;
+		codecVideo?: string;
+		codecAudio?: string;
+		resolution?: string;
+		videoWidth?: number;
+		videoHeight?: number;
+		videoBitDepth?: number;
+		videoFrameRate?: string;
+		videoProfile?: string;
+		videoColorSpace?: string;
+		hdr?: boolean;
+		bitrate?: number;
+		fileSize?: number;
+		fileName?: string;
+		audioTracks: {
+			index: number;
+			codec: string;
+			language?: string;
+			title?: string;
+			channels?: number;
+			channelLayout?: string;
+			sampleRate?: number;
+			bitDepth?: number;
+		}[];
+		subtitleTracks: {
+			index: number;
+			codec?: string;
+			language?: string;
+			title?: string;
+			forced?: boolean;
+			external?: boolean;
+		}[];
+	};
 }
 
 export interface LibraryFilters {

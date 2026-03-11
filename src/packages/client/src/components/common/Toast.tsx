@@ -1,5 +1,5 @@
-import { notifications, removeNotification } from '@/state/notifications.state';
 import type { NotificationType } from '@/state/notifications.state';
+import { notifications, removeNotification } from '@/state/notifications.state';
 import styles from './Toast.module.scss';
 
 const typeIcons: Record<NotificationType, string> = {

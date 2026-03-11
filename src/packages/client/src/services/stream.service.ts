@@ -1,5 +1,5 @@
-import { api } from './api';
 import type { StreamSession } from '@/state/player.state';
+import { api } from './api';
 
 // ============================================
 // Types

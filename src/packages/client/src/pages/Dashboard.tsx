@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
-import { MovieGrid } from '@/components/movie/MovieGrid';
 import { Button } from '@/components/common/Button';
-import { currentUser } from '@/state/auth.state';
-import { moviesService } from '@/services/movies.service';
-import type { Movie } from '@/state/library.state';
+import { MovieGrid } from '@/components/movie/MovieGrid';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { moviesService } from '@/services/movies.service';
+import { currentUser } from '@/state/auth.state';
+import type { Movie } from '@/state/library.state';
 import styles from './Dashboard.module.scss';
 
 interface DashboardProps {

@@ -1,9 +1,9 @@
-import { MovieCard } from './MovieCard';
-import { MovieLargeCard } from './MovieLargeCard';
-import { MovieListItem } from './MovieListItem';
 import { Spinner } from '@/components/common/Spinner';
 import type { Movie, ViewMode } from '@/state/library.state';
+import { MovieCard } from './MovieCard';
 import styles from './MovieGrid.module.scss';
+import { MovieLargeCard } from './MovieLargeCard';
+import { MovieListItem } from './MovieListItem';
 
 interface MovieGridProps {
 	movies: Movie[];

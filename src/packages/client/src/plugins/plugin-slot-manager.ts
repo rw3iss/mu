@@ -1,7 +1,7 @@
 import { signal } from '@preact/signals';
+import type { SlotRenderContext, SlotRenderer } from './plugin-client.interface';
 import type { UISlotName } from './ui-slots';
 import { UI_SLOT_NAMES } from './ui-slots';
-import type { SlotRenderer, SlotRenderContext } from './plugin-client.interface';
 
 interface SlotRegistration {
 	pluginName: string;

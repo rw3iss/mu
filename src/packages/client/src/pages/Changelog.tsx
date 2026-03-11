@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { Spinner } from '@/components/common/Spinner';
 import styles from './Changelog.module.scss';
 

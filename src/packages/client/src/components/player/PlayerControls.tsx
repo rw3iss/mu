@@ -1,20 +1,20 @@
 import type { VNode } from 'preact';
-import { useState, useCallback, useRef, useEffect } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import type { StreamSession } from '@/state/player.state';
 import {
-	isPlaying,
 	currentTime,
 	duration,
-	volume,
-	isMuted,
 	isFullscreen,
+	isMuted,
+	isPlaying,
 	quality,
-	subtitleTrack,
 	setVolume,
+	subtitleTrack,
 	toggleMute,
+	volume,
 } from '@/state/player.state';
-import type { StreamSession } from '@/state/player.state';
 import styles from './PlayerControls.module.scss';
 
 interface PlayerControlsProps {

@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { eq, and, desc, count, sql } from 'drizzle-orm';
 import { nowISO, paginationDefaults } from '@mu/shared';
+import { Injectable } from '@nestjs/common';
+import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { userWatchHistory, movies } from '../database/schema/index.js';
+import { movies, userWatchHistory } from '../database/schema/index.js';
 
 @Injectable()
 export class HistoryService {

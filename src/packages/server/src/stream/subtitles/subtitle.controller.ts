@@ -1,10 +1,10 @@
-import { Controller, Get, Param, Res, NotFoundException } from '@nestjs/common';
-import { FastifyReply } from 'fastify';
 import { readFile, stat } from 'node:fs/promises';
+import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { SubtitleService } from './subtitle.service.js';
+import { FastifyReply } from 'fastify';
 import { DatabaseService } from '../../database/database.service.js';
 import { streamSessions } from '../../database/schema/index.js';
+import { SubtitleService } from './subtitle.service.js';
 
 @Controller('stream')
 export class SubtitleController {

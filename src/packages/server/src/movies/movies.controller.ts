@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import type { MovieListQuery } from '@mu/shared';
-import { MoviesService } from './movies.service.js';
-import { RatingsService } from './ratings.service.js';
-import { HistoryService } from './history.service.js';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { HistoryService } from './history.service.js';
+import { MoviesService } from './movies.service.js';
+import { RatingsService } from './ratings.service.js';
 
 @Controller('movies')
 export class MoviesController {

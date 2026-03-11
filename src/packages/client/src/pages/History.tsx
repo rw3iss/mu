@@ -1,16 +1,16 @@
 import { useEffect } from 'preact/hooks';
-import { MovieGrid } from '@/components/movie/MovieGrid';
 import { Button } from '@/components/common/Button';
-import { api } from '@/services/api';
-import { notifySuccess, notifyError } from '@/state/notifications.state';
-import {
-	historyEntries,
-	historyLoading,
-	fetchHistory,
-	clearHistoryCache,
-} from '@/state/history.state';
+import { MovieGrid } from '@/components/movie/MovieGrid';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { api } from '@/services/api';
+import {
+	clearHistoryCache,
+	fetchHistory,
+	historyEntries,
+	historyLoading,
+} from '@/state/history.state';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './History.module.scss';
 
 interface HistoryProps {

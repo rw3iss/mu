@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ThumbnailService } from './thumbnail.service.js';
 import { ThumbnailController } from './thumbnail.controller.js';
+import { ThumbnailService } from './thumbnail.service.js';
 
 @Module({
 	controllers: [ThumbnailController],

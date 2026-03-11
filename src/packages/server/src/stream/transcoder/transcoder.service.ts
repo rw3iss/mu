@@ -1,13 +1,13 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ChildProcess } from 'node:child_process';
-import { mkdir, rm, writeFile, access } from 'node:fs/promises';
+import { access, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import ffmpeg from 'fluent-ffmpeg';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import ffmpeg from 'fluent-ffmpeg';
 import { ConfigService } from '../../config/config.service.js';
-import { SettingsService } from '../../settings/settings.service.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { transcodeCache } from '../../database/schema/index.js';
+import { SettingsService } from '../../settings/settings.service.js';
 import { TRANSCODING_PROFILES } from './transcoder.profiles.js';
 
 interface TranscodeOptions {

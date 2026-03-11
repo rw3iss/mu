@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { MovieGrid } from '@/components/movie/MovieGrid';
 import { moviesService } from '@/services/movies.service';
 import type { Movie } from '@/state/library.state';

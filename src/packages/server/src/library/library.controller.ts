@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Logger } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Logger, Param, Patch, Post, Put } from '@nestjs/common';
+import { Roles } from '../common/decorators/roles.decorator.js';
+import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from './library.service.js';
 import { LibraryJobsService } from './library-jobs.service.js';
 import { ScannerService } from './scanner.service.js';
-import { JobManagerService } from '../jobs/job-manager.service.js';
-import { Roles } from '../common/decorators/roles.decorator.js';
 
 @Controller('sources')
 export class LibraryController {

@@ -1,10 +1,10 @@
-import { Controller, Post, Delete, Param, Logger } from '@nestjs/common';
+import { Controller, Delete, Logger, Param, Post } from '@nestjs/common';
 import { isNull } from 'drizzle-orm';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { DatabaseService } from '../database/database.service.js';
-import { StreamService } from '../stream/stream.service.js';
-import { ThumbnailService } from '../media/thumbnail.service.js';
 import { movies } from '../database/schema/index.js';
+import { ThumbnailService } from '../media/thumbnail.service.js';
+import { StreamService } from '../stream/stream.service.js';
 
 @Controller('admin')
 export class AdminController {

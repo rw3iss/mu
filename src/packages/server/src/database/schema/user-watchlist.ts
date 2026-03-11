@@ -1,6 +1,6 @@
 import { sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import { users } from './users.ts';
 import { movies } from './movies.ts';
+import { users } from './users.ts';
 
 export const userWatchlist = sqliteTable(
 	'user_watchlist',

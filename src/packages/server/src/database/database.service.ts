@@ -1,9 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import Database from 'better-sqlite3';
-import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import Database from 'better-sqlite3';
+import { BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { ConfigService } from '../config/config.service.js';
 import * as schema from './schema/index.js';
 
@@ -133,6 +133,15 @@ export class DatabaseService implements OnModuleDestroy {
         duration_seconds INTEGER,
         subtitle_tracks TEXT DEFAULT '[]',
         audio_tracks TEXT DEFAULT '[]',
+        file_metadata TEXT,
+        video_width INTEGER,
+        video_height INTEGER,
+        video_bit_depth INTEGER,
+        video_frame_rate TEXT,
+        video_profile TEXT,
+        video_color_space TEXT,
+        hdr INTEGER DEFAULT 0,
+        container_format TEXT,
         available INTEGER DEFAULT 1,
         added_at TEXT NOT NULL,
         file_modified_at TEXT
@@ -267,6 +276,24 @@ export class DatabaseService implements OnModuleDestroy {
 			this.sqlite.exec(`ALTER TABLE plugins ADD COLUMN status TEXT DEFAULT 'not_installed'`);
 		} catch {
 			// Column already exists
+		}
+		// movie_files: enhanced FFprobe metadata columns
+		const newFileColumns = [
+			'video_width INTEGER',
+			'video_height INTEGER',
+			'video_bit_depth INTEGER',
+			'video_frame_rate TEXT',
+			'video_profile TEXT',
+			'video_color_space TEXT',
+			'hdr INTEGER DEFAULT 0',
+			'container_format TEXT',
+		];
+		for (const col of newFileColumns) {
+			try {
+				this.sqlite.exec(`ALTER TABLE movie_files ADD COLUMN ${col}`);
+			} catch {
+				// Column already exists
+			}
 		}
 
 		this.logger.log('Tables created from inline SQL');

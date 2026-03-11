@@ -1,15 +1,15 @@
-import { useRef, useEffect, useMemo, useCallback, useState } from 'preact/hooks';
 import Hls from 'hls.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { getUiSetting } from '@/hooks/useUiSetting';
 import {
-	isPlaying,
 	currentTime,
 	duration,
-	volume,
-	isMuted,
 	isBuffering,
+	isMuted,
+	isPlaying,
 	updateProgress,
+	volume,
 } from '@/state/player.state';
-import { getUiSetting } from '@/hooks/useUiSetting';
 
 const BUFFER_CONFIGS: Record<
 	string,

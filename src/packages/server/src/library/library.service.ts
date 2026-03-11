@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
 import { nowISO } from '@mu/shared';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { EventsService } from '../events/events.service.js';
 import { mediaSources } from '../database/schema/index.js';
+import { EventsService } from '../events/events.service.js';
 
 @Injectable()
 export class LibraryService {

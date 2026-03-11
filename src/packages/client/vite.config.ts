@@ -1,7 +1,7 @@
-import { defineConfig, type Plugin } from 'vite';
-import preact from '@preact/preset-vite';
 import { resolve } from 'node:path';
+import preact from '@preact/preset-vite';
 import { watch } from 'chokidar';
+import { defineConfig, type Plugin } from 'vite';
 
 const clientSrc = resolve(__dirname, 'src');
 const workspaceRoot = resolve(__dirname, '../..');

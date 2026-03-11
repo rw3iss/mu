@@ -1,6 +1,6 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import { movies } from './movies.ts';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { mediaSources } from './media-sources.ts';
+import { movies } from './movies.ts';
 
 export const movieFiles = sqliteTable('movie_files', {
 	id: text('id').primaryKey(),
@@ -22,6 +22,14 @@ export const movieFiles = sqliteTable('movie_files', {
 	subtitleTracks: text('subtitle_tracks'),
 	audioTracks: text('audio_tracks'),
 	fileMetadata: text('file_metadata'),
+	videoWidth: integer('video_width'),
+	videoHeight: integer('video_height'),
+	videoBitDepth: integer('video_bit_depth'),
+	videoFrameRate: text('video_frame_rate'),
+	videoProfile: text('video_profile'),
+	videoColorSpace: text('video_color_space'),
+	hdr: integer('hdr', { mode: 'boolean' }).default(false),
+	containerFormat: text('container_format'),
 	available: integer('available', { mode: 'boolean' }).default(true),
 	addedAt: text('added_at').notNull(),
 	fileModifiedAt: text('file_modified_at'),

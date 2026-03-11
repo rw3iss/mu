@@ -1,5 +1,5 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ToadScheduler, SimpleIntervalJob, AsyncTask } from 'toad-scheduler';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { AsyncTask, SimpleIntervalJob, ToadScheduler } from 'toad-scheduler';
 
 @Injectable()
 export class SchedulerService implements OnModuleInit, OnModuleDestroy {

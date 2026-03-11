@@ -1,24 +1,24 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { eq, like, and, desc, asc, sql, count } from 'drizzle-orm';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
-import { nowISO, paginationDefaults } from '@mu/shared';
 import type { MovieListQuery } from '@mu/shared';
+import { nowISO, paginationDefaults } from '@mu/shared';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { and, asc, count, desc, eq, like, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
+import {
+	movieFiles,
+	movieMetadata,
+	movies,
+	userRatings,
+	userWatchHistory,
+	userWatchlist,
+} from '../database/schema/index.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from '../library/library.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { ImageService } from '../metadata/image.service.js';
-import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
-import {
-	movies,
-	movieMetadata,
-	movieFiles,
-	userWatchlist,
-	userRatings,
-	userWatchHistory,
-} from '../database/schema/index.js';
+import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 
 @Injectable()
 export class MoviesService {
@@ -221,11 +221,42 @@ export class MoviesService {
 			}
 		}
 
-		// Get duration from movie file
+		// Get duration and file info from movie file
 		const firstFile = files[0];
 		if (firstFile) {
 			durationSeconds = firstFile.durationSeconds ?? 0;
 		}
+
+		const parseJson = (val: string | null | undefined): any[] => {
+			if (!val) return [];
+			try {
+				const parsed = JSON.parse(val);
+				return Array.isArray(parsed) ? parsed : [];
+			} catch {
+				return [];
+			}
+		};
+
+		const fileInfo = firstFile
+			? {
+					containerFormat: firstFile.containerFormat,
+					codecVideo: firstFile.codecVideo,
+					codecAudio: firstFile.codecAudio,
+					resolution: firstFile.resolution,
+					videoWidth: firstFile.videoWidth,
+					videoHeight: firstFile.videoHeight,
+					videoBitDepth: firstFile.videoBitDepth,
+					videoFrameRate: firstFile.videoFrameRate,
+					videoProfile: firstFile.videoProfile,
+					videoColorSpace: firstFile.videoColorSpace,
+					hdr: firstFile.hdr,
+					bitrate: firstFile.bitrate,
+					fileSize: firstFile.fileSize,
+					fileName: firstFile.fileName,
+					audioTracks: parseJson(firstFile.audioTracks),
+					subtitleTracks: parseJson(firstFile.subtitleTracks),
+				}
+			: null;
 
 		const activeJobs = this.jobManager.findJobsByPayload('movieId', id, 'pre-transcode', [
 			'pending',
@@ -238,6 +269,7 @@ export class MoviesService {
 			status,
 			watchPosition,
 			durationSeconds,
+			fileInfo,
 		};
 	}
 

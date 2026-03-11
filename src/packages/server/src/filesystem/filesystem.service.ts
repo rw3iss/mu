@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
 import { readdir, stat } from 'node:fs/promises';
-import { resolve, dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { Injectable } from '@nestjs/common';
 
 export interface BrowseResult {
 	currentPath: string;

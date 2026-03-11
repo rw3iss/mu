@@ -1,38 +1,38 @@
-import { useEffect } from 'preact/hooks';
 import { signal } from '@preact/signals';
+import { useEffect } from 'preact/hooks';
 import { Router, route } from 'preact-router';
-import { AppShell } from '@/components/layout/AppShell';
 import { Toast } from '@/components/common/Toast';
+import { AppShell } from '@/components/layout/AppShell';
+import { Changelog } from '@/pages/Changelog';
 import { Dashboard } from '@/pages/Dashboard';
-import { Library } from '@/pages/Library';
-import { MovieDetail } from '@/pages/MovieDetail';
-import { Player } from '@/pages/Player';
-import { Playlists } from '@/pages/Playlists';
-import { PlaylistDetail } from '@/pages/PlaylistDetail';
-import { Watchlist } from '@/pages/Watchlist';
-import { History } from '@/pages/History';
 import { Discover } from '@/pages/Discover';
+import { History } from '@/pages/History';
+import { Library } from '@/pages/Library';
+import { Login } from '@/pages/Login';
+import { MovieDetail } from '@/pages/MovieDetail';
+import { NotFound } from '@/pages/NotFound';
+import { PersonDetail } from '@/pages/PersonDetail';
+import { Player } from '@/pages/Player';
+import { PlaylistDetail } from '@/pages/PlaylistDetail';
+import { Playlists } from '@/pages/Playlists';
 import { Search } from '@/pages/Search';
 import { Settings } from '@/pages/Settings';
-import { Changelog } from '@/pages/Changelog';
-import { PersonDetail } from '@/pages/PersonDetail';
-import { Login } from '@/pages/Login';
 import { Setup } from '@/pages/Setup';
-import { NotFound } from '@/pages/NotFound';
+import { Watchlist } from '@/pages/Watchlist';
 import {
-	isAuthenticated,
-	isSetupComplete,
-	isLoading,
-	localBypass,
 	checkAuth,
+	isAuthenticated,
+	isLoading,
+	isSetupComplete,
+	localBypass,
 } from '@/state/auth.state';
 import { initTheme } from '@/state/theme.state';
 import '@/state/accentColor.state';
-import { wsService } from '@/services/websocket.service';
-import { useScanEvents } from '@/hooks/useScanEvents';
 import { GlobalPlayer } from '@/components/player/GlobalPlayer';
-import { initGlobalPlayer, playerMode, isPlayerActive } from '@/state/globalPlayer.state';
+import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
+import { wsService } from '@/services/websocket.service';
+import { initGlobalPlayer, isPlayerActive, playerMode } from '@/state/globalPlayer.state';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
 

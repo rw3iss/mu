@@ -1,8 +1,8 @@
+import { JSX } from 'preact';
+import { useCallback } from 'preact/hooks';
+import { route } from 'preact-router';
 import { currentPath } from '@/app';
 import { currentUser, logout } from '@/state/auth.state';
-import { JSX } from 'preact';
-import { route } from 'preact-router';
-import { useCallback } from 'preact/hooks';
 import styles from './Sidebar.module.scss';
 
 interface SidebarProps {
