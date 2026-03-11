@@ -28,5 +28,5 @@ jobs:
           netstat -aon | grep ":4000 " | grep LISTENING || echo "Warning: port 4000 not yet listening (may still be starting)"
           EOF
 
-          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} bash -s < /tmp/deploy.sh
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} < /tmp/deploy.sh
           rm -f /tmp/deploy_key /tmp/deploy.sh
