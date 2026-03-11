@@ -19,6 +19,10 @@ jobs:
           git pull
           cd src
           pnpm build
-          nohup pnpm dev > /dev/null 2>&1 &
+          nohup pnpm dev > /dev/null 2>&1 < /dev/null &
+          disown
+          sleep 2
+          echo "Server started, verifying..."
+          netstat -aon | grep ":4000 " | grep LISTENING || echo "Warning: port 4000 not yet listening (may still be starting)"
           DEPLOY_SCRIPT
           rm -f /tmp/deploy_key
