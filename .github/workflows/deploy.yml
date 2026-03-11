@@ -10,24 +10,20 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
+        env:
+          DEPLOY_DIR: ${{ secrets.DEPLOY_DIR }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           port: ${{ secrets.DEPLOY_PORT }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: DEPLOY_DIR
+          script_stop: true
           script: |
-            cd "${{ secrets.DEPLOY_DIR }}" || exit 1
-
-            # Kill process on port 4000 if running (Git Bash on Windows)
+            cd "$DEPLOY_DIR"
             PID=$(netstat -aon 2>/dev/null | grep ':4000 ' | grep LISTENING | awk '{print $NF}' | head -1)
-            if [ -n "$PID" ]; then
-              taskkill //PID "$PID" //F 2>/dev/null || true
-            fi
-
+            if [ -n "$PID" ]; then taskkill //PID "$PID" //F 2>/dev/null || true; fi
             git pull
-
             cd src
             pnpm build
-
-            # Start dev server detached from SSH session
             nohup pnpm dev > /dev/null 2>&1 &
