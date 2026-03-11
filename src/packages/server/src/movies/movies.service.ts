@@ -77,6 +77,11 @@ export class MoviesService {
 			case 'rating':
 				orderBy = sortOrder(userRatings.rating);
 				break;
+			case 'fileSize':
+				orderBy = sortOrder(
+					sql`(SELECT mf.file_size FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
+				);
+				break;
 			default:
 				orderBy = desc(movies.addedAt);
 		}

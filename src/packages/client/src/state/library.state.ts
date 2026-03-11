@@ -69,7 +69,7 @@ export interface LibraryFilters {
 	genres: string[];
 	yearRange: [number, number] | null;
 	ratingRange: [number, number] | null;
-	sortBy: 'title' | 'year' | 'rating' | 'addedAt' | 'runtime';
+	sortBy: 'title' | 'year' | 'rating' | 'addedAt' | 'runtime' | 'fileSize';
 	sortOrder: 'asc' | 'desc';
 }
 
@@ -91,8 +91,8 @@ export const filters = signal<LibraryFilters>({
 	genres: [],
 	yearRange: null,
 	ratingRange: null,
-	sortBy: 'addedAt',
-	sortOrder: 'desc',
+	sortBy: (localStorage.getItem('mu_sort_by') as LibraryFilters['sortBy']) || 'addedAt',
+	sortOrder: (localStorage.getItem('mu_sort_order') as LibraryFilters['sortOrder']) || 'desc',
 });
 
 export const totalPages = computed(() => Math.ceil(totalMovies.value / pageSize.value));
@@ -170,7 +170,7 @@ export function initViewMode(): void {
 export function initSortPrefs(): void {
 	const sortBy = localStorage.getItem('mu_sort_by') as LibraryFilters['sortBy'] | null;
 	const sortOrder = localStorage.getItem('mu_sort_order') as 'asc' | 'desc' | null;
-	if (sortBy && ['title', 'year', 'rating', 'addedAt', 'runtime'].includes(sortBy)) {
+	if (sortBy && ['title', 'year', 'rating', 'addedAt', 'runtime', 'fileSize'].includes(sortBy)) {
 		filters.value = { ...filters.value, sortBy };
 	}
 	if (sortOrder === 'asc' || sortOrder === 'desc') {

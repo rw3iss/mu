@@ -135,6 +135,7 @@ export function Library(_props: LibraryProps) {
 						<option value="year">Year</option>
 						<option value="rating">Rating</option>
 						<option value="runtime">Runtime</option>
+						<option value="fileSize">File Size</option>
 					</select>
 
 					<button

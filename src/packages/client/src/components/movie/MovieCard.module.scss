@@ -150,11 +150,6 @@
 .addedAt {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
-
-  &::before {
-    content: '\00b7';
-    margin-right: var(--space-xs);
-  }
 }
 
 .userRating {
