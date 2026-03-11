@@ -65,7 +65,7 @@ class PluginClient {
 
 	const registerUi(app) {
 		// the user would register custom UI components here...
-		app.registerUiElement(UI.INFO_PANEL, 'ref-id?', this.ui__movieInfoPanel); // this registers the method in an internal list for each "UI.*" element, replacing any with the given ref-id. When that section is rendered, it will ask the internal system to render each of the bound methods, with some given parameters, and show the returned components.
+		app.ui.registerElement(UI.INFO_PANEL, 'ref-id?', this.ui__movieInfoPanel); // this registers the method in an internal list for each "UI.*" element, replacing any with the given ref-id. When that section is rendered, it will ask the internal system to render each of the bound methods, with some given parameters, and show the returned components.
 	}
 
 	// example of what should happen when a custom UI component is requested

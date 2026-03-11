@@ -107,3 +107,45 @@ Plugin UI API examples:
 
 --------------------------------------------------------------------------------
 
+
+
+The plugin implementation seems a bit deficient on the client-side.
+The backend looks good, registration and binding the endpoints.
+
+These component should go into a custom "IPluginClient" kind of interface, that is for the client-side only.
+The 'plugin:generate-client-api' script should take the existing backend schema, generated in the first scaffolding step (and after the user fills in the backend class, registering api endpoints, etc), and perform a second generation step, where it generates the client-side templates in the ./plugins/client folder, for the clients to use there.
+The client-side code should include the functions to tie into the client-side hooks, or splots, and register the custom render methods for the plugins to display there.
+When the slots are "rendered" in the UI, it should call the underlying client-side plugin system to call all of the bound or registered ui slot methods for that slot, and display the results there in that slot position.
+
+Currently all of the client-side ui rendering is registered on the server, but we need to register it on the client to evoke custom client-side components.
+Later we may override the client-side component creation with a more strict API (Ie. "insert playbar button" with specific properties), but for now it will just be "register a custom component into this slot", and the plugins can render any kind of component they want, registered to that slot.
+
+Refactor the plugin system so there is client-side code, and a client-side plugin manager, that will load all installed and enabled plugins at startup or application initialization.
+The client-side plugin code will be created from the scaffolding scripts, to automatically generate the client-side api base client for the plugin, and the api class, if they registered api endpoints for it.
+However there should be existing client-side plugin initialization code, which goes through all existing ./plugins/*/manifest.json files, and registers all of the plugins to be checked for installation and whether they are enabled on app startup.
+If the plugin is enabled, it should call that plugin client's onLoad code, or initialization, code which the developer will fill in with code to call and register UI components in the underlying system.
+
+When the plugin instances are instantiated on the client, they should be passed the current app context, or some context, that they can use to register the ui slot items, during app initialization only.
+Then, later, in the application, wherever slot items are "rendered", it should talk to the underlying rendering manager, or plugin system, to call all registered methods for that slot item, and render the results into that slot area.
+The returned or rendered components for any plugin or slot could be entirely custom, for now, but each call to the custom render or slot methods should pass any custom information for that slot area (ie. the current movie, video context, etc).
+
+Can you ensure the plugin system is segregated correctly for the backend and frontent clients? Both should have independent systems to create and register the plugin on the server or client, based on the server or client scanning the plugins directory, and their manifest files, then checking the database for which are installed and enabled.
+
+Also, I notice we don't have an api endpoint for for the client-side schema generation.
+When the backend plugins each call 'registerApiEndpoint', the plugin context should register the endpoint information, and any calculated input and return property values and types, and save it to the internal registry of custom plugin api endpoints.
+This call should also register that custom plugin endpoint with NestJS, and bind it to the given handler. Customize or change the handler methods as needed to fit in there.
+
+It seems there are existing backend components that should be on the client (ie. plugin-ui-registry.service.ts)... that kind of stuff needs to go on the client-side plugin manager, and slot manager systems.
+Ensure the slot management and plugin systems can work together smoothly on the client, so all plugin clients can "register" their methods to "render" at each slot, and the slot will ask the slot manager to call all registered methods for that slot, in the plugin system, and render the results there.
+
+Also I notice that the example-info plugin, on the server, is registering an endpoint with methodName "getMovieTrivia", but the api schema for this plugin doesn't show or list it in the result at:
+http://localhost:4000/api/v1/plugins/example-info/schema
+
+This returns just:
+{"pluginName":"example-info","basePath":"/plugins/example-info/api","endpoints":[]}
+
+It should include the '/plugins/example-info/api/trivia/:movieId' endpoint, that was registered in the plugin's server-side onLoad method.
+Why didn't it show up in the schema?
+When the server-side plugins call "registerApiEndpoint", that method should call an internal class or service, in NestJs, to register the api endpoint with NestJs, bound to the given handler in the call, and then it should also store a reference to that schema or endpoint (it can render the json then, or on the fly), using a utility method to "generate a schema" from a given plugin's registered api endpoint. The schema should be saved in the registry, assigned to that plugin, and also registered with NestJs.
+Then, when the user requests the above /schema endpoint, the custom schema endpoint should lookup all registered endpoints for that plugin, registered in the schema, and print out there json in an array of api endpoint schemas.
+Can you make sure the internal registry and api schema generation are working, for the example-info getMovieTrivia as a test?
