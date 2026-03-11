@@ -12,7 +12,7 @@ jobs:
         run: |
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
-          timeout 120 ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} ./deploy.sh || EXIT_CODE=$?
+          timeout 30 ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} ./deploy.sh || EXIT_CODE=$?
           rm -f /tmp/deploy_key
           if [ "${EXIT_CODE:-0}" -eq 124 ]; then
             echo "SSH session timed out (expected - deploy completed successfully)"
