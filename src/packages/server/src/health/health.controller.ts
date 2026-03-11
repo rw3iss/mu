@@ -95,28 +95,38 @@ export class HealthController {
 	}
 
 	private async queryDisk(): Promise<DiskStats> {
+		// Try Node's built-in statfs first (works on all platforms, Node 18.15+)
+		try {
+			const stats = await fs.statfs(os.platform() === 'win32' ? 'C:\\' : '/');
+			return {
+				diskTotal: stats.bsize * stats.blocks,
+				diskFree: stats.bsize * stats.bavail,
+			};
+		} catch {
+			// statfs not available, fall back to platform commands
+		}
+
 		const platform = os.platform();
 
 		if (platform === 'win32') {
-			// WMIC: get root drive free/total in bytes
-			const { stdout } = await execFileAsync('wmic', [
-				'logicaldisk',
-				'where',
-				'DeviceID="C:"',
-				'get',
-				'FreeSpace,Size',
-				'/format:csv',
-			]);
-			const lines = stdout.trim().split('\n').filter(Boolean);
-			const last = lines[lines.length - 1] ?? '';
-			const cols = last.split(',');
-			return {
-				diskFree: parseInt(cols[1] ?? '0', 10) || 0,
-				diskTotal: parseInt(cols[2] ?? '0', 10) || 0,
-			};
+			// PowerShell: get root drive free/total in bytes
+			try {
+				const { stdout } = await execFileAsync('powershell', [
+					'-NoProfile',
+					'-Command',
+					'Get-PSDrive C | Select-Object -ExpandProperty Free; Get-PSDrive C | Select-Object -ExpandProperty Used',
+				]);
+				const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+				const free = parseInt(lines[0] ?? '0', 10) || 0;
+				const used = parseInt(lines[1] ?? '0', 10) || 0;
+				return { diskTotal: free + used, diskFree: free };
+			} catch {
+				// PowerShell unavailable, return zeros
+				return { diskTotal: 0, diskFree: 0 };
+			}
 		}
 
-		// Unix: df for the root filesystem, output in 1K blocks
+		// Unix/macOS: df for the root filesystem, output in 1K blocks
 		const { stdout } = await execFileAsync('df', ['-k', '/']);
 		const lines = stdout.trim().split('\n');
 		if (lines.length < 2) return { diskTotal: 0, diskFree: 0 };
