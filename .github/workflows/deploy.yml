@@ -16,20 +16,18 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            cd ${{ secrets.DEPLOY_DIR }}
+            cd "${{ secrets.DEPLOY_DIR }}" || exit 1
 
-            # Kill process on port 4000 if running
-            # Windows (cmd over SSH):
-            for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr :4000 ^| findstr LISTENING') do taskkill /PID %%a /F 2>nul
-            # Linux alternative (uncomment if needed):
-            # lsof -ti:4000 | xargs -r kill -9
+            # Kill process on port 4000 if running (Git Bash on Windows)
+            PID=$(netstat -aon 2>/dev/null | grep ':4000 ' | grep LISTENING | awk '{print $NF}' | head -1)
+            if [ -n "$PID" ]; then
+              taskkill //PID "$PID" //F 2>/dev/null || true
+            fi
 
             git pull
+
             cd src
             pnpm build
 
-            # Start dev server in background (detached from SSH session)
-            # Windows:
-            start "" /b pnpm dev
-            # Linux alternative:
-            # nohup pnpm dev > /dev/null 2>&1 &
+            # Start dev server detached from SSH session
+            nohup pnpm dev > /dev/null 2>&1 &
