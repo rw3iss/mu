@@ -23,6 +23,7 @@ export interface Movie {
 	metacriticRating?: number;
 	cast: Array<{ name: string; character: string; profileUrl?: string }>;
 	director?: string;
+	hidden?: boolean;
 	addedAt: string;
 	watchProgress?: number;
 	watchPosition?: number;
@@ -86,6 +87,7 @@ export const pageSize = signal(40);
 export const isLoading = signal(false);
 export const searchQuery = signal('');
 export const viewMode = signal<ViewMode>('grid');
+export const showHidden = signal(false);
 
 export const filters = signal<LibraryFilters>({
 	genres: [],
@@ -131,6 +133,10 @@ export async function fetchMovies(page = 1): Promise<void> {
 			params.ratingTo = String(filters.value.ratingRange[1]);
 		}
 
+		if (showHidden.value) {
+			params.showHidden = 'true';
+		}
+
 		const response = await moviesService.list(params);
 		movies.value = response.movies;
 		totalMovies.value = response.total;
@@ -165,6 +171,15 @@ export function initViewMode(): void {
 	if (saved === 'large' || saved === 'grid' || saved === 'list') {
 		viewMode.value = saved;
 	}
+}
+
+export function updateMovieInList(updated: Movie): void {
+	movies.value = movies.value.map((m) => (m.id === updated.id ? { ...m, ...updated } : m));
+}
+
+export function toggleShowHidden(): void {
+	showHidden.value = !showHidden.value;
+	fetchMovies(1);
 }
 
 export function initSortPrefs(): void {

@@ -20,6 +20,8 @@ import {
 	searchQuery,
 	setFilters,
 	setViewMode,
+	showHidden,
+	toggleShowHidden,
 	totalMovies,
 	totalPages,
 	viewMode,
@@ -123,6 +125,14 @@ export function Library(_props: LibraryProps) {
 						onInput={handleSearchInput}
 					/>
 				</div>
+
+				<button
+					class={`${styles.showHiddenBtn} ${showHidden.value ? styles.active : ''}`}
+					onClick={toggleShowHidden}
+					title={showHidden.value ? 'Showing all movies' : 'Show hidden movies'}
+				>
+					{showHidden.value ? '\u{1F441} Hidden' : '\u{1F441} Hidden'}
+				</button>
 
 				<div class={styles.toolbarActions}>
 					<select

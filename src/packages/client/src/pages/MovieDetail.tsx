@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
-import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
 import { ExternalRatings } from '@/components/movie/ExternalRatings';
+import { MovieOptionsMenu } from '@/components/movie/MovieOptionsMenu';
 import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { RatingWidget } from '@/components/movie/RatingWidget';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
-import { closePlayer, globalMovieId, playMovie } from '@/state/globalPlayer.state';
+import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
@@ -88,67 +88,6 @@ export function MovieDetail({ id }: MovieDetailProps) {
 		}
 	}, [movie]);
 
-	const [rescanState, setRescanState] = useState<'idle' | 'loading' | 'complete'>('idle');
-	const [refreshState, setRefreshState] = useState<'idle' | 'loading' | 'complete'>('idle');
-
-	const handleRefreshMetadata = useCallback(async () => {
-		if (!movie) return;
-		setRefreshState('loading');
-		try {
-			await moviesService.refreshMetadata(movie.id);
-			const updated = await moviesService.get(movie.id);
-			setMovie(updated);
-			setRefreshState('complete');
-			notifySuccess('Metadata refreshed');
-			setTimeout(() => setRefreshState('idle'), 3000);
-		} catch {
-			setRefreshState('idle');
-			notifyError('Failed to refresh metadata');
-		}
-	}, [movie]);
-
-	const handleRescan = useCallback(async () => {
-		if (!movie) return;
-		setRescanState('loading');
-		try {
-			const result = await moviesService.rescan(movie.id);
-			const missingFiles = result.files.filter((f: any) => f.missing);
-			const corruptFiles = result.files.filter((f: any) => f.corrupt);
-			const updatedCount = result.files.filter((f: any) => f.updated).length;
-			// Reload movie data after rescan
-			const updated = await moviesService.get(movie.id);
-			setMovie(updated);
-
-			if (corruptFiles.length > 0) {
-				notifyError(
-					`${corruptFiles.length} file(s) appear empty or corrupt (0 bytes). Re-download or replace the source file.`,
-				);
-			}
-			if (missingFiles.length === result.files.length && corruptFiles.length === 0) {
-				setRescanState('idle');
-				notifyError(
-					'Source file no longer exists on disk. It may have been moved or deleted.',
-				);
-				return;
-			}
-			if (missingFiles.length > 0 && corruptFiles.length === 0) {
-				notifyError(`${missingFiles.length} file(s) no longer found on disk.`);
-			}
-			if (corruptFiles.length === result.files.length) {
-				setRescanState('idle');
-				return;
-			}
-
-			setRescanState('complete');
-			const msg = `Re-scanned ${result.files.length} file(s), ${updatedCount} updated`;
-			notifySuccess(result.transcoding ? `${msg}. Transcoding started.` : msg);
-			setTimeout(() => setRescanState('idle'), 3000);
-		} catch {
-			setRescanState('idle');
-			notifyError('Failed to re-scan movie files');
-		}
-	}, [movie]);
-
 	const handleCancelProcessing = useCallback(async () => {
 		if (!movie) return;
 		try {
@@ -162,38 +101,10 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	}, [movie]);
 
 	const [showFileInfo, setShowFileInfo] = useState(false);
-	const [confirmingRemove, setConfirmingRemove] = useState(false);
-	const [showDeleteModal, setShowDeleteModal] = useState(false);
-	const [deleteFolder, setDeleteFolder] = useState(false);
-	const [isDeleting, setIsDeleting] = useState(false);
 
-	const handleDeleteFromDisk = useCallback(async () => {
-		if (!movie) return;
-		setIsDeleting(true);
-		try {
-			if (globalMovieId.value === movie.id) {
-				await closePlayer();
-			}
-			await moviesService.deleteFromDisk(movie.id, deleteFolder);
-			notifySuccess('Movie deleted from disk');
-			route('/library');
-		} catch (err: any) {
-			notifyError(err?.message || 'Failed to delete movie from disk');
-		} finally {
-			setIsDeleting(false);
-		}
-	}, [movie, deleteFolder]);
-
-	const handleRemove = useCallback(async () => {
-		if (!movie) return;
-		try {
-			await moviesService.remove(movie.id);
-			notifySuccess('Movie removed from library');
-			route('/library');
-		} catch {
-			notifyError('Failed to remove movie');
-		}
-	}, [movie]);
+	const handleMovieUpdate = useCallback((updated: Movie) => {
+		setMovie(updated);
+	}, []);
 
 	// -- Title editing --
 
@@ -287,20 +198,10 @@ export function MovieDetail({ id }: MovieDetailProps) {
 			{/* Back button */}
 			<button
 				class={styles.backButton}
-				onClick={() => {
-					// After going back, if we land on a player page, skip over it
-					const onPop = () => {
-						window.removeEventListener('popstate', onPop);
-						if (window.location.pathname.startsWith('/player/')) {
-							window.history.back();
-						}
-					};
-					window.addEventListener('popstate', onPop);
-					window.history.back();
-				}}
-				aria-label="Go back"
+				onClick={() => route('/library')}
+				aria-label="Back to Library"
 			>
-				{'\u2190'} Back
+				{'\u2190'} Library
 			</button>
 
 			{/* Content */}
@@ -358,6 +259,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 					<div class={styles.meta}>
 						{movie.year > 0 && <span>{movie.year}</span>}
+						{movie.hidden && <span class={styles.hiddenBadge}>Hidden</span>}
 						{runtimeText && <span>{runtimeText}</span>}
 						{movie.director && <span>Dir. {movie.director}</span>}
 					</div>
@@ -435,6 +337,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						>
 							{inWatchlist ? '\u2713 In Watchlist' : '\u2606 Watchlist'}
 						</Button>
+						<MovieOptionsMenu movie={movie} onMovieUpdate={handleMovieUpdate} />
 					</div>
 
 					{/* Overview */}
@@ -675,112 +578,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						</div>
 					)}
 
-					{/* Management */}
-					<div class={styles.managementSection}>
-						<h2 class={styles.sectionTitle}>Manage</h2>
-						<div class={styles.managementBar}>
-							<Button
-								variant="secondary"
-								loading={rescanState === 'loading'}
-								disabled={rescanState !== 'idle'}
-								onClick={handleRescan}
-							>
-								{rescanState === 'complete'
-									? '\u2713 Scanned'
-									: '\u{1F50D} Re-scan File'}
-							</Button>
-							<Button
-								variant="secondary"
-								loading={refreshState === 'loading'}
-								disabled={refreshState !== 'idle'}
-								onClick={handleRefreshMetadata}
-							>
-								{refreshState === 'complete'
-									? '\u2713 Complete'
-									: '\u21BB Refresh Metadata'}
-							</Button>
-							{confirmingRemove ? (
-								<span class={styles.confirmRemove}>
-									<span>Remove from library?</span>
-									<button class={styles.confirmYes} onClick={handleRemove}>
-										Yes
-									</button>
-									<button
-										class={styles.confirmNo}
-										onClick={() => setConfirmingRemove(false)}
-									>
-										Cancel
-									</button>
-								</span>
-							) : (
-								<button
-									class={`${styles.mgmtBtn} ${styles.mgmtBtnDanger}`}
-									onClick={() => setConfirmingRemove(true)}
-								>
-									{'\u2715'} Remove
-								</button>
-							)}
-							<button
-								class={`${styles.mgmtBtn} ${styles.mgmtBtnDanger}`}
-								onClick={() => {
-									setDeleteFolder(false);
-									setShowDeleteModal(true);
-								}}
-							>
-								{'\u{1F5D1}'} Delete from Disk
-							</button>
-						</div>
-					</div>
-
 					<PluginSlot name={UI.MOVIE_PAGE_CONTENT} context={{ movie }} />
-
-					{/* Delete from Disk Modal */}
-					<Modal
-						isOpen={showDeleteModal}
-						onClose={() => setShowDeleteModal(false)}
-						title="Delete from Disk"
-					>
-						<div class={styles.deleteModalBody}>
-							<p>
-								This will permanently delete the movie file(s) from disk and remove
-								all cached data. This action cannot be undone.
-							</p>
-							<label class={styles.deleteOption}>
-								<input
-									type="radio"
-									name="deleteMode"
-									checked={!deleteFolder}
-									onChange={() => setDeleteFolder(false)}
-								/>
-								Delete movie file only
-							</label>
-							<label class={styles.deleteOption}>
-								<input
-									type="radio"
-									name="deleteMode"
-									checked={deleteFolder}
-									onChange={() => setDeleteFolder(true)}
-								/>
-								Delete file and enclosing folder
-							</label>
-							<div class={styles.deleteActions}>
-								<Button
-									variant="secondary"
-									onClick={() => setShowDeleteModal(false)}
-									disabled={isDeleting}
-								>
-									Cancel
-								</Button>
-								<Button
-									variant="danger"
-									onClick={handleDeleteFromDisk}
-									loading={isDeleting}
-								>
-									Delete Permanently
-								</Button>
-							</div>
-						</div>
-					</Modal>
 				</div>
 
 				{/* Playlists (right column) */}

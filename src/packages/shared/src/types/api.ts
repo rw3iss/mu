@@ -30,6 +30,7 @@ export interface MovieListQuery extends PaginationQuery {
 	resolution?: string;
 	watched?: boolean;
 	hasSubtitles?: boolean;
+	showHidden?: boolean;
 }
 
 export interface StreamStartResponse {

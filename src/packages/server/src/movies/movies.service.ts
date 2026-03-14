@@ -39,6 +39,11 @@ export class MoviesService {
 
 		const conditions = [];
 
+		// By default, hide hidden movies unless showHidden is explicitly set
+		if (String(query.showHidden) !== 'true') {
+			conditions.push(sql`(${movies.hidden} IS NULL OR ${movies.hidden} = 0)`);
+		}
+
 		if (query.search) {
 			conditions.push(like(movies.title, `%${query.search}%`));
 		}
@@ -99,6 +104,7 @@ export class MoviesService {
 			imdbId: movies.imdbId,
 			tmdbId: movies.tmdbId,
 			contentRating: movies.contentRating,
+			hidden: movies.hidden,
 			addedAt: movies.addedAt,
 			updatedAt: movies.updatedAt,
 			rating: userRatings.rating,
@@ -307,6 +313,7 @@ export class MoviesService {
 			runtime: movie.runtimeMinutes ?? 0,
 			imdbId: movie.imdbId ?? undefined,
 			tmdbId: movie.tmdbId ?? undefined,
+			hidden: movie.hidden ?? false,
 			addedAt: movie.addedAt ?? '',
 			genres: parseJson(metadata?.genres),
 			cast: parseJson(metadata?.cast),
@@ -376,6 +383,7 @@ export class MoviesService {
 			language: string;
 			country: string;
 			trailerUrl: string;
+			hidden: boolean;
 		}>,
 	) {
 		const existing = this.database.db.select().from(movies).where(eq(movies.id, id)).get();

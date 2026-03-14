@@ -7,12 +7,14 @@ import type { Movie } from '@/state/library.state';
 import { getRatingColor } from '@/utils/rating-color';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieLargeCard.module.scss';
+import { MovieOptionsMenu } from './MovieOptionsMenu';
 
 interface MovieLargeCardProps {
 	movie: Movie;
+	onMovieUpdate?: (movie: Movie) => void;
 }
 
-export function MovieLargeCard({ movie }: MovieLargeCardProps) {
+export function MovieLargeCard({ movie, onMovieUpdate }: MovieLargeCardProps) {
 	const handleClick = useCallback(() => {
 		route(`/movie/${movie.id}`);
 	}, [movie.id]);
@@ -52,7 +54,13 @@ export function MovieLargeCard({ movie }: MovieLargeCardProps) {
 	const imageUrl = movie.backdropUrl || movie.thumbnailUrl || movie.posterUrl;
 
 	return (
-		<div class={styles.card} onClick={handleClick} role="button" tabIndex={0}>
+		<div
+			class={`${styles.card} ${movie.hidden ? styles.hidden : ''}`}
+			onClick={handleClick}
+			role="button"
+			tabIndex={0}
+		>
+			{movie.hidden && <span class={styles.hiddenLabel}>Hidden</span>}
 			<div class={styles.thumbnail}>
 				{imageUrl ? (
 					<img
@@ -109,6 +117,9 @@ export function MovieLargeCard({ movie }: MovieLargeCardProps) {
 					{runtimeStr && <span>{runtimeStr}</span>}
 					{formattedDate && <span>Added {formattedDate}</span>}
 					<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
+					<span class={styles.optionsWrap}>
+						<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+					</span>
 				</div>
 			</div>
 		</div>

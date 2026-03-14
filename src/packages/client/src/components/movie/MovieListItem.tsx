@@ -7,12 +7,14 @@ import type { Movie } from '@/state/library.state';
 import { getRatingColor } from '@/utils/rating-color';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieListItem.module.scss';
+import { MovieOptionsMenu } from './MovieOptionsMenu';
 
 interface MovieListItemProps {
 	movie: Movie;
+	onMovieUpdate?: (movie: Movie) => void;
 }
 
-export function MovieListItem({ movie }: MovieListItemProps) {
+export function MovieListItem({ movie, onMovieUpdate }: MovieListItemProps) {
 	const handleClick = useCallback(() => {
 		route(`/movie/${movie.id}`);
 	}, [movie.id]);
@@ -49,7 +51,12 @@ export function MovieListItem({ movie }: MovieListItemProps) {
 		: null;
 
 	return (
-		<div class={styles.row} onClick={handleClick} role="button" tabIndex={0}>
+		<div
+			class={`${styles.row} ${movie.hidden ? styles.hidden : ''}`}
+			onClick={handleClick}
+			role="button"
+			tabIndex={0}
+		>
 			<div class={styles.poster}>
 				{movie.posterUrl ? (
 					<img
@@ -74,7 +81,10 @@ export function MovieListItem({ movie }: MovieListItemProps) {
 			</div>
 
 			<div class={styles.info}>
-				<span class={styles.title}>{movie.title}</span>
+				<span class={styles.title}>
+					{movie.title}
+					{movie.hidden && <span class={styles.hiddenTag}>Hidden</span>}
+				</span>
 				<div class={styles.meta}>
 					{movie.year && <span>{movie.year}</span>}
 					{runtimeStr && <span>{runtimeStr}</span>}
@@ -105,6 +115,7 @@ export function MovieListItem({ movie }: MovieListItemProps) {
 						Resume
 					</button>
 				)}
+				<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
 			</div>
 		</div>
 	);

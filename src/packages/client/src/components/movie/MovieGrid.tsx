@@ -1,5 +1,6 @@
 import { Spinner } from '@/components/common/Spinner';
 import type { Movie, ViewMode } from '@/state/library.state';
+import { updateMovieInList } from '@/state/library.state';
 import { MovieCard } from './MovieCard';
 import styles from './MovieGrid.module.scss';
 import { MovieLargeCard } from './MovieLargeCard';
@@ -38,7 +39,7 @@ export function MovieGrid({
 		return (
 			<div class={styles.list}>
 				{movies.map((movie) => (
-					<MovieListItem key={movie.id} movie={movie} />
+					<MovieListItem key={movie.id} movie={movie} onMovieUpdate={updateMovieInList} />
 				))}
 			</div>
 		);
@@ -48,7 +49,11 @@ export function MovieGrid({
 		return (
 			<div class={styles.largeGrid}>
 				{movies.map((movie) => (
-					<MovieLargeCard key={movie.id} movie={movie} />
+					<MovieLargeCard
+						key={movie.id}
+						movie={movie}
+						onMovieUpdate={updateMovieInList}
+					/>
 				))}
 			</div>
 		);
@@ -57,7 +62,7 @@ export function MovieGrid({
 	return (
 		<div class={styles.grid}>
 			{movies.map((movie) => (
-				<MovieCard key={movie.id} movie={movie} />
+				<MovieCard key={movie.id} movie={movie} onMovieUpdate={updateMovieInList} />
 			))}
 		</div>
 	);

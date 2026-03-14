@@ -7,12 +7,14 @@ import type { Movie } from '@/state/library.state';
 import { getRatingColor } from '@/utils/rating-color';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieCard.module.scss';
+import { MovieOptionsMenu } from './MovieOptionsMenu';
 
 interface MovieCardProps {
 	movie: Movie;
+	onMovieUpdate?: (movie: Movie) => void;
 }
 
-export function MovieCard({ movie }: MovieCardProps) {
+export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 	const handleClick = useCallback(() => {
 		route(`/movie/${movie.id}`);
 	}, [movie.id]);
@@ -37,7 +39,13 @@ export function MovieCard({ movie }: MovieCardProps) {
 	const ratingColor = getRatingColor(rating);
 
 	return (
-		<div class={styles.card} onClick={handleClick} role="button" tabIndex={0}>
+		<div
+			class={`${styles.card} ${movie.hidden ? styles.hidden : ''}`}
+			onClick={handleClick}
+			role="button"
+			tabIndex={0}
+		>
+			{movie.hidden && <span class={styles.hiddenLabel}>Hidden</span>}
 			<div class={styles.poster}>
 				{movie.posterUrl ? (
 					<img
@@ -110,6 +118,9 @@ export function MovieCard({ movie }: MovieCardProps) {
 						</span>
 					)}
 					<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
+					<span class={styles.optionsWrap}>
+						<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+					</span>
 				</div>
 			</div>
 		</div>

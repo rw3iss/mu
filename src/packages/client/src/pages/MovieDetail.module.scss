@@ -222,10 +222,22 @@
   font-size: var(--font-size-sm);
   margin-bottom: var(--space-md);
 
-  span + span::before {
+  span + span:not(.hiddenBadge)::before {
     content: '\2022';
     margin-right: var(--space-md);
   }
+}
+
+.hiddenBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  margin-left: var(--space-xs);
 }
 
 .genres {

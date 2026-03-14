@@ -277,6 +277,11 @@ export class DatabaseService implements OnModuleDestroy {
 		} catch {
 			// Column already exists
 		}
+		try {
+			this.sqlite.exec(`ALTER TABLE movies ADD COLUMN hidden INTEGER DEFAULT 0`);
+		} catch {
+			// Column already exists
+		}
 		// movie_files: enhanced FFprobe metadata columns
 		const newFileColumns = [
 			'video_width INTEGER',

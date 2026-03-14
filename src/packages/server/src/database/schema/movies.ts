@@ -21,6 +21,7 @@ export const movies = sqliteTable(
 		imdbId: text('imdb_id'),
 		tmdbId: integer('tmdb_id'),
 		contentRating: text('content_rating'),
+		hidden: integer('hidden', { mode: 'boolean' }).default(false),
 		addedAt: text('added_at').notNull(),
 		updatedAt: text('updated_at').notNull(),
 	},
