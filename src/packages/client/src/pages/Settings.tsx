@@ -8,7 +8,7 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
 import { sourcesService } from '@/services/sources.service';
-import { accentColor, resetAccentColor, setAccentColor } from '@/state/accentColor.state';
+import { accentColor, setAccentColor } from '@/state/accentColor.state';
 import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import type { Theme } from '@/state/theme.state';
@@ -71,6 +71,7 @@ interface SettingsProps {
 
 type SettingsTab =
 	| 'general'
+	| 'appearance'
 	| 'playback'
 	| 'library'
 	| 'notifications'
@@ -80,6 +81,7 @@ type SettingsTab =
 
 const VALID_TABS: SettingsTab[] = [
 	'general',
+	'appearance',
 	'playback',
 	'library',
 	'notifications',
@@ -107,6 +109,10 @@ export function Settings(props: SettingsProps) {
 	const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
 	const [isSaving, setIsSaving] = useState(false);
 	const [_isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+	// Appearance settings
+	const [showRecentlyPlayed, setShowRecentlyPlayed] = useUiSetting('show_recently_played', true);
+	const colorInputRef = useRef<HTMLInputElement>(null);
 
 	// Playback settings
 	const [defaultQuality, setDefaultQuality] = useState('auto');
@@ -399,6 +405,7 @@ export function Settings(props: SettingsProps) {
 		{ id: 'general', label: 'General' },
 		{ id: 'playback', label: 'Playback' },
 		{ id: 'library', label: 'Library' },
+		{ id: 'appearance', label: 'Appearance' },
 		{ id: 'notifications', label: 'Notifications' },
 		...(isAdmin
 			? [
@@ -433,97 +440,6 @@ export function Settings(props: SettingsProps) {
 					{activeTab === 'general' && (
 						<div class={styles.panel}>
 							<h2 class={styles.panelTitle}>General</h2>
-
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Theme</span>
-									<span class={styles.settingDescription}>
-										Choose your preferred color scheme
-									</span>
-								</div>
-								<div class={styles.themeSelect}>
-									{(['dark', 'light', 'auto'] as Theme[]).map((t) => (
-										<button
-											key={t}
-											class={`${styles.themeOption} ${theme.value === t ? styles.active : ''}`}
-											onClick={() => setTheme(t)}
-										>
-											{t.charAt(0).toUpperCase() + t.slice(1)}
-										</button>
-									))}
-								</div>
-							</div>
-
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Accent Color</span>
-									<span class={styles.settingDescription}>
-										Customize the primary accent color across the app
-									</span>
-								</div>
-								<div class={styles.accentColorPicker}>
-									{[
-										{ label: 'Default', value: '' },
-										{ label: 'Cyan', value: '#06b6d4' },
-										{ label: 'Blue', value: '#3b82f6' },
-										{ label: 'Purple', value: '#8b5cf6' },
-										{ label: 'Pink', value: '#ec4899' },
-										{ label: 'Amber', value: '#f59e0b' },
-										{ label: 'Green', value: '#22c55e' },
-										{ label: 'Red', value: '#ef4444' },
-									].map((preset) => (
-										<button
-											key={preset.label}
-											class={`${styles.colorSwatch} ${
-												preset.value === ''
-													? !accentColor.value
-														? styles.activeSwatch
-														: ''
-													: accentColor.value === preset.value
-														? styles.activeSwatch
-														: ''
-											}`}
-											style={
-												preset.value
-													? { backgroundColor: preset.value }
-													: undefined
-											}
-											title={preset.label}
-											onClick={() =>
-												preset.value
-													? setAccentColor(preset.value)
-													: resetAccentColor()
-											}
-										>
-											{preset.value === '' && (
-												<svg
-													width="14"
-													height="14"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													stroke-width="2"
-													stroke-linecap="round"
-													stroke-linejoin="round"
-												>
-													<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
-													<path d="M12 7v10" />
-													<path d="M7 12h10" />
-												</svg>
-											)}
-										</button>
-									))}
-									<input
-										type="color"
-										class={styles.colorInput}
-										value={accentColor.value || '#06b6d4'}
-										onInput={(e) =>
-											setAccentColor((e.target as HTMLInputElement).value)
-										}
-										title="Custom color"
-									/>
-								</div>
-							</div>
 
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
@@ -588,6 +504,133 @@ export function Settings(props: SettingsProps) {
 								>
 									Save Changes
 								</Button>
+							</div>
+						</div>
+					)}
+
+					{/* Appearance Tab */}
+					{activeTab === 'appearance' && (
+						<div class={styles.panel}>
+							<h2 class={styles.panelTitle}>Appearance</h2>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Theme</span>
+									<span class={styles.settingDescription}>
+										Choose your preferred color scheme
+									</span>
+								</div>
+								<div class={styles.themeSelect}>
+									{(['dark', 'light', 'auto'] as Theme[]).map((t) => (
+										<button
+											key={t}
+											class={`${styles.themeOption} ${theme.value === t ? styles.active : ''}`}
+											onClick={() => setTheme(t)}
+										>
+											{t.charAt(0).toUpperCase() + t.slice(1)}
+										</button>
+									))}
+								</div>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Accent Color</span>
+									<span class={styles.settingDescription}>
+										Customize the primary accent color across the app
+									</span>
+								</div>
+								<div class={styles.accentColorPicker}>
+									{(() => {
+										const presets = [
+											{ label: 'Cyan', value: '#06b6d4' },
+											{ label: 'Blue', value: '#3b82f6' },
+											{ label: 'Purple', value: '#8b5cf6' },
+											{ label: 'Pink', value: '#ec4899' },
+											{ label: 'Amber', value: '#f59e0b' },
+											{ label: 'Green', value: '#22c55e' },
+											{ label: 'Red', value: '#ef4444' },
+										];
+										const presetValues = new Set(presets.map((p) => p.value));
+										const current = accentColor.value;
+										const isCustom = current && !presetValues.has(current);
+										const customBg = isCustom ? current : current || '#06b6d4';
+
+										return (
+											<>
+												<button
+													class={`${styles.colorSwatch} ${styles.customSwatch} ${isCustom ? styles.activeSwatch : !current ? styles.activeSwatch : ''}`}
+													style={{
+														backgroundColor: isCustom
+															? current
+															: undefined,
+													}}
+													title="Custom color"
+													onClick={() => colorInputRef.current?.click()}
+												>
+													{!isCustom && (
+														<svg
+															width="14"
+															height="14"
+															viewBox="0 0 24 24"
+															fill="none"
+															stroke="currentColor"
+															stroke-width="2"
+															stroke-linecap="round"
+															stroke-linejoin="round"
+														>
+															<path d="M12 5v14" />
+															<path d="M5 12h14" />
+														</svg>
+													)}
+												</button>
+												<input
+													ref={colorInputRef}
+													type="color"
+													class={styles.colorInputHidden}
+													value={customBg}
+													onInput={(e) =>
+														setAccentColor(
+															(e.target as HTMLInputElement).value,
+														)
+													}
+												/>
+												{presets.map((preset) => (
+													<button
+														key={preset.label}
+														class={`${styles.colorSwatch} ${accentColor.value === preset.value ? styles.activeSwatch : ''}`}
+														style={{
+															backgroundColor: preset.value,
+														}}
+														title={preset.label}
+														onClick={() => setAccentColor(preset.value)}
+													/>
+												))}
+											</>
+										);
+									})()}
+								</div>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Show Recently Played</span>
+									<span class={styles.settingDescription}>
+										Display recently played movies in the sidebar
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={showRecentlyPlayed}
+										onChange={(e) =>
+											setShowRecentlyPlayed(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
 							</div>
 						</div>
 					)}

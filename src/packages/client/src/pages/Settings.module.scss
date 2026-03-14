@@ -220,30 +220,21 @@
   }
 }
 
-.colorInput {
-  width: 28px;
-  height: 28px;
-  border: 2px solid var(--color-border);
-  border-radius: 50%;
-  cursor: pointer;
-  padding: 0;
-  background: none;
-  overflow: hidden;
-  flex-shrink: 0;
+.customSwatch {
+  border: 2px dashed var(--color-text-muted);
+  background: var(--color-bg-elevated);
 
-  &::-webkit-color-swatch-wrapper {
-    padding: 0;
+  &.activeSwatch {
+    border-style: solid;
   }
+}
 
-  &::-webkit-color-swatch {
-    border: none;
-    border-radius: 50%;
-  }
-
-  &::-moz-color-swatch {
-    border: none;
-    border-radius: 50%;
-  }
+.colorInputHidden {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .toggle {

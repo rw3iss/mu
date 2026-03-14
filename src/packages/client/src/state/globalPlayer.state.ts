@@ -125,9 +125,14 @@ export async function playMovie(
 		forceStartPosition.value = 0;
 	}
 
-	// Already loaded this movie - maximize and ensure it's playing
+	const wasMini = playerMode.value === 'mini';
+
+	// Already loaded this movie - ensure it's playing
 	if (globalMovieId.value === movieId && currentSession.value) {
-		playerMode.value = 'full';
+		if (!wasMini) {
+			playerMode.value = 'full';
+			route(`/player/${movieId}`);
+		}
 		const engine = sharedVideoEngine.value;
 		if (engine) {
 			engine.setIntendedPlaying(true);
@@ -142,7 +147,6 @@ export async function playMovie(
 		if (movie) {
 			pushToHistory(movie);
 		}
-		route(`/player/${movieId}`);
 		return;
 	}
 
@@ -151,9 +155,11 @@ export async function playMovie(
 		await endStream();
 	}
 
-	// Set up new movie
+	// Set up new movie — keep mini mode if already minimized
 	globalMovieId.value = movieId;
-	playerMode.value = 'full';
+	if (!wasMini) {
+		playerMode.value = 'full';
+	}
 
 	// Fetch movie data (non-blocking for UI)
 	moviesService
@@ -167,8 +173,10 @@ export async function playMovie(
 			globalMovie.value = null;
 		});
 
-	// Route to player page (push, not replace — so back button stays in the SPA)
-	route(`/player/${movieId}`);
+	// Only navigate to player page if not in mini mode
+	if (!wasMini) {
+		route(`/player/${movieId}`);
+	}
 }
 
 /**

@@ -67,13 +67,9 @@
 }
 
 .progressBar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  width: 100%;
   height: 3px;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 2;
+  background: var(--color-bg-tertiary);
 }
 
 .progressFill {
@@ -86,30 +82,30 @@
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--space-xs);
   background: rgba(0, 0, 0, 0.5);
   opacity: 0;
   transition: opacity var(--transition-normal);
   z-index: 1;
 }
 
-.playButton {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-full);
-  background: var(--color-accent);
+.playButton,
+.resumeButton {
+  padding: 6px 20px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   color: #ffffff;
-  font-size: var(--font-size-xl);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform var(--transition-fast), background var(--transition-fast);
-  padding-left: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(4px);
+  transition: background var(--transition-fast);
+  letter-spacing: 0.02em;
 
   &:hover {
-    transform: scale(1.1);
-    background: var(--color-accent-hover);
+    background: var(--color-accent);
   }
 }
 

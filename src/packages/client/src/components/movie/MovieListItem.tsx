@@ -2,6 +2,7 @@ import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { getRatingColor } from '@/utils/rating-color';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
@@ -19,7 +20,15 @@ export function MovieListItem({ movie }: MovieListItemProps) {
 	const handlePlay = useCallback(
 		(e: Event) => {
 			e.stopPropagation();
-			route(`/player/${movie.id}`);
+			playMovie(movie.id, { fromBeginning: true });
+		},
+		[movie.id],
+	);
+
+	const handleResume = useCallback(
+		(e: Event) => {
+			e.stopPropagation();
+			playMovie(movie.id);
 		},
 		[movie.id],
 	);
@@ -85,8 +94,17 @@ export function MovieListItem({ movie }: MovieListItemProps) {
 					onClick={handlePlay}
 					aria-label={`Play ${movie.title}`}
 				>
-					{'\u25B6'}
+					Play
 				</button>
+				{hasWatchProgress(movie) && (
+					<button
+						class={styles.resumeButton}
+						onClick={handleResume}
+						aria-label={`Resume ${movie.title}`}
+					>
+						Resume
+					</button>
+				)}
 			</div>
 		</div>
 	);

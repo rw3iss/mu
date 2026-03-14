@@ -65,6 +65,7 @@ export function PlayerControls({
 	const seekBarRef = useRef<HTMLDivElement>(null);
 	const settingsRef = useRef<HTMLDivElement>(null);
 	const volumeRef = useRef<HTMLDivElement>(null);
+	const volumeHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const dragLastSeek = useRef<number>(0);
 
 	const progress = duration.value > 0 ? (currentTime.value / duration.value) * 100 : 0;
@@ -82,17 +83,12 @@ export function PlayerControls({
 		return () => document.removeEventListener('mousedown', handleClick);
 	}, [showSettingsMenu]);
 
-	// Close volume on outside click
+	// Clean up volume hover timer on unmount
 	useEffect(() => {
-		if (!showVolume) return;
-		function handleClick(e: MouseEvent) {
-			if (volumeRef.current && !volumeRef.current.contains(e.target as Node)) {
-				setShowVolume(false);
-			}
-		}
-		document.addEventListener('mousedown', handleClick);
-		return () => document.removeEventListener('mousedown', handleClick);
-	}, [showVolume]);
+		return () => {
+			if (volumeHoverTimer.current) clearTimeout(volumeHoverTimer.current);
+		};
+	}, []);
 
 	// ── Seek bar: click ──
 	const seekFromEvent = useCallback((e: MouseEvent) => {
@@ -175,8 +171,14 @@ export function PlayerControls({
 		setVolume(parseFloat(target.value));
 	}, []);
 
-	const toggleVolumePopup = useCallback(() => {
-		setShowVolume((v) => !v);
+	const handleVolumeEnter = useCallback(() => {
+		if (volumeHoverTimer.current) clearTimeout(volumeHoverTimer.current);
+		volumeHoverTimer.current = setTimeout(() => setShowVolume(true), 100);
+	}, []);
+
+	const handleVolumeLeave = useCallback(() => {
+		if (volumeHoverTimer.current) clearTimeout(volumeHoverTimer.current);
+		volumeHoverTimer.current = setTimeout(() => setShowVolume(false), 200);
 	}, []);
 
 	// ── Skip ──
@@ -272,7 +274,7 @@ export function PlayerControls({
 				>
 					{speakerBody}
 					<path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-					<path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+					<path d="M17.7 6.3a7.5 7.5 0 0 1 0 11.4" />
 				</svg>
 			);
 		}
@@ -407,10 +409,15 @@ export function PlayerControls({
 						</button>
 
 						{/* Volume */}
-						<div class={styles.volumeWrap} ref={volumeRef}>
+						<div
+							class={styles.volumeWrap}
+							ref={volumeRef}
+							onMouseEnter={handleVolumeEnter}
+							onMouseLeave={handleVolumeLeave}
+						>
 							<button
 								class={styles.controlBtn}
-								onClick={toggleVolumePopup}
+								onClick={toggleMute}
 								aria-label={isMuted.value ? 'Unmute' : 'Mute'}
 							>
 								<VolumeIcon />

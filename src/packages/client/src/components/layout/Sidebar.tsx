@@ -3,6 +3,8 @@ import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import { currentPath } from '@/app';
 import { currentUser, logout } from '@/state/auth.state';
+import { isPlayerActive, playerMode } from '@/state/globalPlayer.state';
+import { RecentlyPlayed } from './RecentlyPlayed';
 import styles from './Sidebar.module.scss';
 
 interface SidebarProps {
@@ -148,6 +150,7 @@ const navItems: NavItem[] = [
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 	const user = currentUser.value;
 	const activePath = currentPath.value;
+	const showMiniPlayer = isPlayerActive.value && playerMode.value === 'mini';
 
 	const handleNav = useCallback((path: string) => {
 		route(path);
@@ -156,7 +159,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 	const filteredItems = navItems.filter((item) => !item.adminOnly || user?.role === 'admin');
 
 	return (
-		<nav class={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
+		<nav
+			class={`${styles.sidebar} ${collapsed ? styles.collapsed : ''} ${showMiniPlayer ? styles.withMiniPlayer : ''}`}
+		>
 			<div class={styles.header}>
 				<button class={styles.logo} onClick={() => handleNav('/')}>
 					<img src="/mu_logo_128w.png" alt="Mu" class={styles.logoImage} />
@@ -184,6 +189,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 					</li>
 				))}
 			</ul>
+
+			{!collapsed && <RecentlyPlayed />}
 
 			{user && !collapsed && (
 				<div class={styles.userInfo}>

@@ -1,5 +1,12 @@
 
+- Enable better cache control:
+	- clear cache button in Settings > About - show modal to select cache items, option for older than?
+	- show breakdown of app data: thumbnails, metadata, db, transcode data
+	- option to 'Cache transcodes for up to X days', and also 'Max transcode cache size' - 20gb recommended
+
 - Show "Info" panel in movie details page: file info, exif
+
+- Advanced display options to show buffering data sizes/graphs? avg while playing and overall/total bandwidth over time.,
 
 - Need to show option to "group" movies, or create sets to show as one (ie. tv series, etc):
 	- add group_id to movie collection items

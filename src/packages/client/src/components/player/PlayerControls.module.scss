@@ -237,7 +237,7 @@
 
 .volumePopup {
   position: absolute;
-  bottom: 100%;
+  bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -251,6 +251,16 @@
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(12px);
   animation: volumeFadeIn 120ms ease;
+
+  // Invisible hover bridge to the button below
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: -8px;
+    right: -8px;
+    height: 10px;
+  }
 }
 
 @keyframes volumeFadeIn {
