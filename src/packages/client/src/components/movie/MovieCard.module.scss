@@ -2,7 +2,6 @@
   position: relative;
   cursor: pointer;
   border-radius: 3px;
-  overflow: hidden;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   transition: transform var(--transition-normal), box-shadow var(--transition-normal), opacity var(--transition-normal);
@@ -53,6 +52,7 @@
   aspect-ratio: 2 / 3;
   overflow: hidden;
   background: var(--color-bg-elevated);
+  border-radius: 3px 3px 0 0;
 }
 
 .posterImage {
@@ -92,7 +92,7 @@
 .progressBar {
   width: 100%;
   height: 3px;
-  background: var(--color-bg-tertiary);
+  background: var(--color-bg-surface);
 }
 
 .progressFill {

@@ -66,10 +66,21 @@
 	}
 }
 
+.menuIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	flex-shrink: 0;
+	margin-right: var(--space-xs);
+	font-size: 14px;
+	text-align: center;
+}
+
 .menuItem {
 	display: flex;
 	align-items: center;
-	gap: var(--space-sm);
+	gap: var(--space-xs);
 	width: 100%;
 	padding: 8px 14px;
 	text-align: left;

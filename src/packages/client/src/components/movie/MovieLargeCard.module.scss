@@ -2,7 +2,6 @@
   position: relative;
   cursor: pointer;
   border-radius: 3px;
-  overflow: hidden;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   transition: transform var(--transition-normal), box-shadow var(--transition-normal), opacity var(--transition-normal);
@@ -53,6 +52,7 @@
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background: var(--color-bg-elevated);
+  border-radius: 3px 3px 0 0;
 }
 
 .thumbnailImage {
@@ -80,7 +80,7 @@
 .progressBar {
   width: 100%;
   height: 3px;
-  background: var(--color-bg-tertiary);
+  background: var(--color-bg-surface);
 }
 
 .progressFill {
@@ -141,6 +141,13 @@
   min-width: 0;
 }
 
+.infoRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
 .ratingBadge {
   padding: 2px 8px;
   border-radius: var(--radius-sm);
@@ -163,10 +170,3 @@
   }
 }
 
-.optionsWrap {
-  margin-left: auto;
-
-  &::before {
-    display: none;
-  }
-}

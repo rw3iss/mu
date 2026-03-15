@@ -86,15 +86,16 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 				</div>
 			</div>
 
+			{hasWatchProgress(movie) && (
+				<div class={styles.progressBar}>
+					<div
+						class={styles.progressFill}
+						style={{ width: `${getWatchPercent(movie)}%` }}
+					/>
+				</div>
+			)}
+
 			<div class={styles.info}>
-				{hasWatchProgress(movie) && (
-					<div class={styles.progressBar}>
-						<div
-							class={styles.progressFill}
-							style={{ width: `${getWatchPercent(movie)}%` }}
-						/>
-					</div>
-				)}
 				<h3 class={styles.title}>{movie.title}</h3>
 				<div class={styles.details}>
 					<span class={styles.year}>{movie.year}</span>

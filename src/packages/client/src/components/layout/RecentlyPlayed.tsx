@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect } from 'preact/hooks';
 import { route } from 'preact-router';
-import { getUiSetting } from '@/hooks/useUiSetting';
+import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
 import { playMovie } from '@/state/globalPlayer.state';
 import { fetchHistory, historyEntries } from '@/state/history.state';
 import styles from './RecentlyPlayed.module.scss';
@@ -8,7 +8,7 @@ import styles from './RecentlyPlayed.module.scss';
 const MAX_ITEMS = 8;
 
 export function RecentlyPlayed() {
-	const [collapsed, setCollapsed] = useState(false);
+	const [collapsed, setCollapsed] = useUiSetting('recently_played_collapsed', false);
 	const showSetting = getUiSetting('show_recently_played', true);
 
 	useEffect(() => {

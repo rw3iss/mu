@@ -95,31 +95,32 @@ export function MovieLargeCard({ movie, onMovieUpdate }: MovieLargeCardProps) {
 				</div>
 			</div>
 
+			{hasWatchProgress(movie) && (
+				<div class={styles.progressBar}>
+					<div
+						class={styles.progressFill}
+						style={{ width: `${getWatchPercent(movie)}%` }}
+					/>
+				</div>
+			)}
+
 			<div class={styles.info}>
-				{hasWatchProgress(movie) && (
-					<div class={styles.progressBar}>
-						<div
-							class={styles.progressFill}
-							style={{ width: `${getWatchPercent(movie)}%` }}
-						/>
-					</div>
-				)}
 				<div class={styles.infoTop}>
 					<h3 class={styles.title}>{movie.title}</h3>
-					{rating > 0 && (
-						<span class={styles.ratingBadge} style={{ background: ratingColor }}>
-							{rating.toFixed(1)}
-						</span>
-					)}
+					<div class={styles.infoRight}>
+						{rating > 0 && (
+							<span class={styles.ratingBadge} style={{ background: ratingColor }}>
+								{rating.toFixed(1)}
+							</span>
+						)}
+						<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
+						<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+					</div>
 				</div>
 				<div class={styles.meta}>
 					{movie.year && <span>{movie.year}</span>}
 					{runtimeStr && <span>{runtimeStr}</span>}
 					{formattedDate && <span>Added {formattedDate}</span>}
-					<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
-					<span class={styles.optionsWrap}>
-						<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
-					</span>
 				</div>
 			</div>
 		</div>

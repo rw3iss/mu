@@ -33,7 +33,15 @@
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+
+  > :first-child {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  > :last-child {
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    border-bottom: none;
+  }
 }
 
 .loading {

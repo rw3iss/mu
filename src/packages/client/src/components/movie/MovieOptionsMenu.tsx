@@ -25,9 +25,17 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 	const [isDeleting, setIsDeleting] = useState(false);
 	const menuRef = useRef<HTMLDivElement>(null);
 
-	// Close on outside click
+	// Close on outside click + raise parent card z-index while open
 	useEffect(() => {
 		if (!open) return;
+
+		// Raise the nearest card/row ancestor so the menu overlays sibling cards
+		const card = menuRef.current?.closest('[role="button"]') as HTMLElement | null;
+		if (card) {
+			card.style.zIndex = '50';
+			card.style.position = 'relative';
+		}
+
 		const handleClick = (e: MouseEvent) => {
 			if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
 				setOpen(false);
@@ -35,7 +43,12 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 			}
 		};
 		document.addEventListener('mousedown', handleClick);
-		return () => document.removeEventListener('mousedown', handleClick);
+		return () => {
+			document.removeEventListener('mousedown', handleClick);
+			if (card) {
+				card.style.zIndex = '';
+			}
+		};
 	}, [open]);
 
 	const refreshMovie = useCallback(async () => {
@@ -160,34 +173,41 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 
 			{open && (
 				<div class={styles.menu} onClick={(e: Event) => e.stopPropagation()}>
-					<button class={styles.menuItem} onClick={handleHideToggle}>
-						{movie.hidden
-							? '\u{1F441} Unhide from Library'
-							: '\u{1F6AB} Hide from Library'}
-					</button>
 					<button
 						class={styles.menuItem}
 						onClick={handleRescan}
 						disabled={rescanState !== 'idle'}
 					>
+						<span class={styles.menuIcon}>
+							{rescanState === 'complete' ? '\u2713' : '\u{1F50D}'}
+						</span>
 						{rescanState === 'loading'
 							? 'Scanning...'
 							: rescanState === 'complete'
-								? '\u2713 Scanned'
-								: '\u{1F50D} Re-scan File'}
+								? 'Scanned'
+								: 'Re-scan File'}
 					</button>
 					<button
 						class={styles.menuItem}
 						onClick={handleRefreshMetadata}
 						disabled={refreshState !== 'idle'}
 					>
+						<span class={styles.menuIcon}>
+							{refreshState === 'complete' ? '\u2713' : '\u21BB'}
+						</span>
 						{refreshState === 'loading'
 							? 'Refreshing...'
 							: refreshState === 'complete'
-								? '\u2713 Complete'
-								: '\u21BB Refresh Metadata'}
+								? 'Complete'
+								: 'Refresh Metadata'}
 					</button>
 					<div class={styles.menuDivider} />
+					<button class={styles.menuItem} onClick={handleHideToggle}>
+						<span class={styles.menuIcon}>
+							{movie.hidden ? '\u{1F441}' : '\u{1F6AB}'}
+						</span>
+						{movie.hidden ? 'Unhide from Library' : 'Hide from Library'}
+					</button>
 					{confirmingRemove ? (
 						<div class={styles.confirmRow}>
 							<span>Remove?</span>
@@ -212,7 +232,8 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 								setConfirmingRemove(true);
 							}}
 						>
-							{'\u2715'} Remove from Library
+							<span class={styles.menuIcon}>{'\u2715'}</span>
+							Remove from Library
 						</button>
 					)}
 					<button
@@ -223,7 +244,8 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 							setShowDeleteModal(true);
 						}}
 					>
-						{'\u{1F5D1}'} Delete from Disk
+						<span class={styles.menuIcon}>{'\u{1F5D1}'}</span>
+						Delete from Disk
 					</button>
 				</div>
 			)}
