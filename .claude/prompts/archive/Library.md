@@ -8,3 +8,38 @@ Possibly later we could store the number of scanned or existing items in a media
 The user could enter strings, and if the backend sees a plain string, it knows it a new directory, and should try to save it (create a full "MediaPath" object from it). In that object it can add status properties of whether the directory is being scanned, how many items are being processed, how many are finished processing, etc. Then the frontend can see either the plain string, or the full objects, and know if that media path is new (hasn't been saved yet, ie. don't show the 'scan' button on that item), or if it has been saved, and is being scanned or not (based on the full object's properties for that media path entry). That is a good approach. Can you modify the scanning system to support the array entries, and have the client frontend and backend differentiate between the strings and objects, depending on whether a media path has been saved, and is being scanned or not, including it's scan progress details?
 
 --------------------------------------------------------------------------------
+
+# Share/Add remote servers:
+I'd now like to create a feature for hosts of the application to 'share' their server with other people running CineHost servers, who can then add the other servers library to their current library for perusing, and playing.
+For this to happen, the server host will enable the share setting, and any credentials to access to file system (ie. a simple password they should be required to set, which can be basically encrypted, if they want the share to be secured, otherwise it would be public).
+
+Let's make the 'Share' setting a new section in the Settings > Library page. Also, in the Library settings currently, move the entire "Encoding" section, and all encoding settings, to the 'Playback' section, at the bottom. Ensure all app areas that use any of those settings are updated appropriately, if they need to be.
+
+In the new 'Share' settings section, enable the toggle button to 'Share my libray', and then if enabled, show the option to 'set a password', and if clicked, show the input to enter and set the password.
+
+If a user shares their library, it should allow for other server configuration to 'Add another server' in the Library Media Paths section. Add this new link under the existing 'Add another folder' link, for a section with "Connected servers".
+When 'add another server' is clicked, show a row item to enter the address/url/ip of the other server, and then show a config icon next to it, which when clicked, should show another row below to enter an optional password, and also an option to give the connected library an id or name, which can be displayed in the UI for results from that server connection.
+Then an 'add' button at the end of the row, which when clicked, should try to connect to that url, and if successful, add that server as a reference in the current local server's media library settings (like the media paths do, but for servers separately).
+
+If a server is added, shows the list of servers in rows, with button to edit and remove each server at the end.
+Server entries added can also be 'disabled', so add a flag in their configuration for that as well, and a toggle icon on the UI to be able to temporarily disable (and not read from) that server.
+
+Implement the new backend endpoints to configure sharing, and also adding new servers to the current server, and storing their passwords if given in their configuration.
+When a server is shared, it should expose two new endpoints on itself, for "verifying" it can be connected to (ie. obtaining server details and connected requirements, etc), and then other servers can use that to obtain the connection information when adding and testing it. A password should not be required unless given. When a server starts, if it has library server entries, it should try to connect to that server, using the password, and obtain and store a "movie read-only" token to be used for subsequent requests to that server. That token can only be used to fetch media library information (movie list, movie details, etc).
+It may be better to design a 'connect' endpoint, on a shared server, and have it generate tokens based on the password, but it may not matter. Design a good and decently secure solution.
+
+Perhaps the easiest way to do this is... if a server is 'shared', new endpoints should be created specifically for querying the movies (getting the list, search movies from it, and playing and streaming any movie), which can return that data for other "reading" servers that have added that server. These endpoints would be public, unless the user set a password for sharing their library. In that case, these endpoints should validate that all requests include that password. Perhaps these endpoints could return additional information signifying that the movies are from a remote server, and some details etc, so the app can do stuff with remote files.
+
+Therefore, when a server is shared, it should expose other endpoints to do that, and can perform and custom request or response work for it.
+When another server 'adds' that server, it should first check the 'test' or connection endpoint of the shared server, to ensure it exists and works (or otherwise show a toast error, with the option to disable that server entry).
+If the connection is successful, the server should be added.
+
+Then, the api endpoints to query the current user's movie library should be modified to "append" results from the other servers that were added, and combine the results as if it were one library. Ensure the requests will automatically append the password, if given, to any requests. The original remote api requests should take into account any query parameters from the original request, and the merged results should also take into account those filters, and any sorting, and ensure the results are correct for the query.
+
+We will have other means in the the UI to filter by "Media Server", later, so ensure these endpoint also include the ability to filter by that type of param "media server"=all, or "media server"=<some-specific-server-path-or-id>.
+It should also support negation and querying by ie. "local movies only", so in the library we can show "Local Movies Only" option, and omit any results from remotely added servers.
+Then, on the Library page, show the toggle button in the top toolbar for "Local only", if the application detects the server has other 'media servers' added as server entries in their library config.
+The results in the library can show a special flag or small indication if they are a remote movie, from a remote server connected endpoint, and show it's given assigned name or id in small letters, if one was provider, otherwise just an icon or something.
+
+Implement the above library sharing feature, and fix or improve any aspects as you see fit.
+

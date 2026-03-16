@@ -276,11 +276,12 @@ export class RemoteService {
 		const isDirectPlay = session.directPlay === true;
 		let streamUrl: string;
 		if (isDirectPlay && session.streamUrl) {
-			// Direct play: stream directly from remote server (no proxy needed).
-			// The <video> element loads the src attribute without CORS restrictions.
+			// Direct play: proxy through local server so audio works with Web Audio API.
+			// Cross-origin direct streams get silenced by MediaElementAudioSourceNode
+			// even with correct CORS headers in some browsers.
 			const fileIdMatch = session.streamUrl.match(/\/direct\/([^/?]+)/);
 			const fileId = fileIdMatch?.[1] ?? session.sessionId;
-			streamUrl = `${baseUrl}/api/v1/shared/stream/direct/${fileId}${tokenParam}`;
+			streamUrl = `/api/v1/remote/stream/${serverId}/direct/${fileId}`;
 		} else {
 			// HLS: proxy through local server because HLS.js segment requests
 			// need auth headers that can't easily be added to manifest URLs.

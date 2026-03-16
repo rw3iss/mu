@@ -1,8 +1,8 @@
-# Mu
+# CineHost
 
 **A lightweight, self-hosted movie streaming and management platform.**
 
-Mu is an all-in-one solution for organizing your local movie collection, streaming to any device, fetching metadata and ratings from TMDB/IMDb, discovering new movies, and managing your watch history -- all from a single server you control.
+CineHost is an all-in-one solution for organizing your local movie collection, streaming to any device, fetching metadata and ratings from TMDB/IMDb, discovering new movies, and managing your watch history -- all from a single server you control.
 
 ---
 
@@ -115,7 +115,7 @@ Mu is an all-in-one solution for organizing your local movie collection, streami
 curl -fsSL https://get.mu.app/install | bash
 ```
 
-This installs Node.js and FFmpeg if needed, downloads Mu, generates a config file, creates a systemd service, and starts the server.
+This installs Node.js and FFmpeg if needed, downloads CineHost, generates a config file, creates a systemd service, and starts the server.
 
 ### Manual Install
 
@@ -149,7 +149,7 @@ See [QUICKSTART.md](./QUICKSTART.md) for detailed setup instructions.
 
 ## Configuration
 
-Mu is configured through (in priority order):
+CineHost is configured through (in priority order):
 
 1. **Environment variables** (prefixed with `MU_`)
 2. **Config file** (`data/config/config.yml`, auto-generated on first run)
@@ -258,7 +258,7 @@ Full API documentation: [DEV_HIGH_LEVEL.md](./.claude/plans/DEV_HIGH_LEVEL.md#15
 
 ### Job System
 
-Mu includes a lightweight, in-process job system for background work. No external queue server is required -- jobs run inside the NestJS process using an in-memory priority queue with configurable concurrency.
+CineHost includes a lightweight, in-process job system for background work. No external queue server is required -- jobs run inside the NestJS process using an in-memory priority queue with configurable concurrency.
 
 #### Built-in Job Types
 

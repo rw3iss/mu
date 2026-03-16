@@ -174,8 +174,13 @@ export class RemoteController {
 			}
 		}
 
-		const body = Buffer.from(await response.arrayBuffer());
-		return reply.send(body);
+		// Stream the response body instead of buffering the entire file
+		if (response.body) {
+			const { Readable } = await import('node:stream');
+			const nodeStream = Readable.fromWeb(response.body as any);
+			return reply.send(nodeStream);
+		}
+		return reply.send(Buffer.alloc(0));
 	}
 
 	/**
