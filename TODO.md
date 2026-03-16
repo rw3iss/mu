@@ -1,5 +1,4 @@
 
-
 - Enable better cache control:
 	- clear cache button in Settings > About - show modal to select cache items, option for older than?
 	- show breakdown of app data: thumbnails, metadata, db, transcode data
@@ -36,11 +35,6 @@
 		- fetch reviews: load reviews, similarly.
 
 - add 'Pick a movie' for movie... open page user can page through movie options, set filters, "Movie Picker"
-
-- Need easier "install script" or setup method.
-	- can code be bundled? it's open source?
-	- for now: checkout code, run server?
-	- do background research, how does plex/jellyfin do this?
 
 - Play Queue: add item to queue, remove, move to front of queue, play playlist, clear queue, see queue
 

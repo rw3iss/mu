@@ -8,6 +8,7 @@ const OMDB_BASE_URL = 'https://www.omdbapi.com';
 interface OmdbResult {
 	Title: string;
 	Year: string;
+	Rated: string;
 	imdbRating: string;
 	imdbVotes: string;
 	imdbID: string;
@@ -21,6 +22,9 @@ interface OmdbResult {
 	Ratings: { Source: string; Value: string }[];
 	Metascore: string;
 	Response: string;
+	Language: string;
+	Country: string;
+	Awards: string;
 	Error?: string;
 }
 
@@ -34,6 +38,10 @@ export interface OmdbData {
 	writer: string | null;
 	actors: string | null;
 	genre: string | null;
+	rated: string | null;
+	language: string | null;
+	country: string | null;
+	awards: string | null;
 }
 
 export interface OmdbSearchResult extends OmdbData {
@@ -52,7 +60,7 @@ export class OmdbProvider {
 		private readonly config: ConfigService,
 		private readonly cache: CacheService,
 	) {
-		this.apiKey = this.config.get<string>('metadata.omdbApiKey', '') || null;
+		this.apiKey = this.config.get<string>('thirdParty.omdb.apiKey', '') || null;
 		if (this.apiKey) {
 			this.logger.log('OMDB provider initialized');
 		} else {
@@ -104,6 +112,10 @@ export class OmdbProvider {
 				writer: raw.Writer && raw.Writer !== 'N/A' ? raw.Writer : null,
 				actors: raw.Actors && raw.Actors !== 'N/A' ? raw.Actors : null,
 				genre: raw.Genre && raw.Genre !== 'N/A' ? raw.Genre : null,
+				rated: raw.Rated && raw.Rated !== 'N/A' ? raw.Rated : null,
+				language: raw.Language && raw.Language !== 'N/A' ? raw.Language : null,
+				country: raw.Country && raw.Country !== 'N/A' ? raw.Country : null,
+				awards: raw.Awards && raw.Awards !== 'N/A' ? raw.Awards : null,
 			};
 
 			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, result, CACHE_TTL.METADATA);
@@ -169,6 +181,10 @@ export class OmdbProvider {
 				writer: raw.Writer && raw.Writer !== 'N/A' ? raw.Writer : null,
 				actors: raw.Actors && raw.Actors !== 'N/A' ? raw.Actors : null,
 				genre: raw.Genre && raw.Genre !== 'N/A' ? raw.Genre : null,
+				rated: raw.Rated && raw.Rated !== 'N/A' ? raw.Rated : null,
+				language: raw.Language && raw.Language !== 'N/A' ? raw.Language : null,
+				country: raw.Country && raw.Country !== 'N/A' ? raw.Country : null,
+				awards: raw.Awards && raw.Awards !== 'N/A' ? raw.Awards : null,
 			};
 
 			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, result, CACHE_TTL.METADATA);

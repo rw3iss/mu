@@ -50,6 +50,12 @@ interface TmdbMovieDetails {
 	videos?: {
 		results: { key: string; site: string; type: string }[];
 	};
+	keywords?: {
+		keywords: { id: number; name: string }[];
+	};
+	release_dates?: {
+		results: { iso_3166_1: string; release_dates: { certification: string; type: number }[] }[];
+	};
 }
 
 @Injectable()
@@ -61,7 +67,7 @@ export class TmdbProvider {
 		private readonly config: ConfigService,
 		private readonly cache: CacheService,
 	) {
-		this.apiKey = this.config.get<string>('metadata.tmdbApiKey', '') || null;
+		this.apiKey = this.config.get<string>('thirdParty.tmdb.apiKey', '') || null;
 		if (this.apiKey) {
 			this.logger.log('TMDB provider initialized');
 		} else {
@@ -113,7 +119,7 @@ export class TmdbProvider {
 
 		const params = new URLSearchParams({
 			api_key: this.apiKey,
-			append_to_response: 'credits,similar,images,videos',
+			append_to_response: 'credits,similar,images,videos,keywords,release_dates',
 		});
 
 		try {

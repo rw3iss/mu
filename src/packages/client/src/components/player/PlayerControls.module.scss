@@ -247,17 +247,86 @@
 }
 
 // ============================================
-// Skip buttons
+// Skip buttons — rollover extended options
 // ============================================
 
-.skipBtn {
-  // Square like all other buttons (aspect-ratio from controlBtn)
+.skipWrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: 100%;
 }
 
-.skipText {
-  font-size: 16px;
+.skipBtn {
+  // Default back/forward icon button
+  transition: opacity 150ms ease;
+
+  &.skipBtnHidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.skipExtended {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  z-index: 2;
+}
+
+.skipExtendedLeft {
+  right: 0;
+  animation: skipSlideLeft 150ms ease-out both;
+}
+
+.skipExtendedRight {
+  left: 0;
+  animation: skipSlideRight 150ms ease-out both;
+}
+
+@keyframes skipSlideLeft {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateX(0);
+  }
+}
+
+@keyframes skipSlideRight {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateX(0);
+  }
+}
+
+.skipExtBtn {
+  aspect-ratio: auto;
+  padding: 0 6px;
+  min-width: 36px;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+}
+
+.skipExtText {
+  font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.8);
   line-height: 1;
   letter-spacing: 0.01em;
 }

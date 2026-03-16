@@ -337,7 +337,12 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						</div>
 					)}
 
+					{movie.tagline && <p class={styles.tagline}>{movie.tagline}</p>}
+
 					<div class={styles.meta}>
+						{movie.contentRating && (
+							<span class={styles.contentRatingBadge}>{movie.contentRating}</span>
+						)}
 						{movie.year > 0 && <span>{movie.year}</span>}
 						{movie.hidden && <span class={styles.hiddenBadge}>Hidden</span>}
 						{isRemote && movie.remoteOrigin && (
@@ -434,6 +439,107 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						<div class={styles.overviewSection}>
 							<h2 class={styles.sectionTitle}>Overview</h2>
 							<p class={styles.overview}>{movie.overview}</p>
+						</div>
+					)}
+
+					{/* Details */}
+					{(movie.writers?.length ||
+						movie.productionCompanies?.length ||
+						movie.budget ||
+						movie.revenue ||
+						movie.language ||
+						movie.releaseDate ||
+						movie.trailerUrl) && (
+						<div class={styles.detailsSection}>
+							<h2 class={styles.sectionTitle}>Details</h2>
+							<div class={styles.detailsGrid}>
+								{movie.writers && movie.writers.length > 0 && (
+									<>
+										<span class={styles.detailLabel}>Writers</span>
+										<span class={styles.detailValue}>
+											{movie.writers.join(', ')}
+										</span>
+									</>
+								)}
+								{movie.releaseDate && (
+									<>
+										<span class={styles.detailLabel}>Release Date</span>
+										<span class={styles.detailValue}>
+											{new Date(movie.releaseDate).toLocaleDateString(
+												undefined,
+												{ year: 'numeric', month: 'long', day: 'numeric' },
+											)}
+										</span>
+									</>
+								)}
+								{movie.language && (
+									<>
+										<span class={styles.detailLabel}>Language</span>
+										<span class={styles.detailValue}>
+											{movie.language.toUpperCase()}
+										</span>
+									</>
+								)}
+								{movie.country && (
+									<>
+										<span class={styles.detailLabel}>Country</span>
+										<span class={styles.detailValue}>{movie.country}</span>
+									</>
+								)}
+								{movie.productionCompanies &&
+									movie.productionCompanies.length > 0 && (
+										<>
+											<span class={styles.detailLabel}>Production</span>
+											<span class={styles.detailValue}>
+												{movie.productionCompanies.join(', ')}
+											</span>
+										</>
+									)}
+								{movie.budget != null && movie.budget > 0 && (
+									<>
+										<span class={styles.detailLabel}>Budget</span>
+										<span class={styles.detailValue}>
+											${(movie.budget / 1_000_000).toFixed(0)}M
+										</span>
+									</>
+								)}
+								{movie.revenue != null && movie.revenue > 0 && (
+									<>
+										<span class={styles.detailLabel}>Box Office</span>
+										<span class={styles.detailValue}>
+											${(movie.revenue / 1_000_000).toFixed(1)}M
+										</span>
+									</>
+								)}
+								{movie.trailerUrl && (
+									<>
+										<span class={styles.detailLabel}>Trailer</span>
+										<span class={styles.detailValue}>
+											<a
+												href={movie.trailerUrl}
+												target="_blank"
+												rel="noopener noreferrer"
+												class={styles.trailerLink}
+											>
+												Watch on YouTube
+											</a>
+										</span>
+									</>
+								)}
+							</div>
+						</div>
+					)}
+
+					{/* Keywords */}
+					{movie.keywords && movie.keywords.length > 0 && (
+						<div class={styles.keywordsSection}>
+							<div class={styles.genres}>
+								{movie.keywords.map((kw) => (
+									<span key={kw} class={styles.keywordTag}>
+										{kw}
+									</span>
+								))}
+							</div>
 						</div>
 					)}
 

@@ -321,30 +321,45 @@ export class MoviesService {
 		const posterUrl = movie.posterUrl || movie.thumbnailUrl || '';
 		const thumbnailUrl = movie.thumbnailUrl || '';
 
+		const directors = parseJson(metadata?.directors);
+		const writers = parseJson(metadata?.writers);
+
 		return {
 			id: movie.id,
 			title: movie.title,
 			year: movie.year ?? 0,
 			overview: movie.overview ?? '',
+			tagline: movie.tagline ?? undefined,
 			posterUrl,
 			thumbnailUrl,
 			backdropUrl: movie.backdropUrl ?? '',
+			trailerUrl: movie.trailerUrl ?? undefined,
 			runtime: movie.runtimeMinutes ?? 0,
+			releaseDate: movie.releaseDate ?? undefined,
+			contentRating: movie.contentRating ?? undefined,
+			language: movie.language ?? undefined,
+			country: movie.country ?? undefined,
 			imdbId: movie.imdbId ?? undefined,
 			tmdbId: movie.tmdbId ?? undefined,
 			hidden: movie.hidden ?? false,
 			addedAt: movie.addedAt ?? '',
 			genres: parseJson(metadata?.genres),
 			cast: parseJson(metadata?.cast),
-			director: (() => {
-				const directors = parseJson(metadata?.directors);
-				return directors.length > 0
+			director:
+				directors.length > 0
 					? typeof directors[0] === 'string'
 						? directors[0]
 						: (directors[0]?.name ?? '')
-					: undefined;
-			})(),
+					: undefined,
+			directors: directors.length > 0 ? directors : undefined,
+			writers: writers.length > 0 ? writers : undefined,
+			keywords: parseJson(metadata?.keywords),
+			productionCompanies: parseJson(metadata?.productionCompanies),
+			budget: metadata?.budget ?? undefined,
+			revenue: metadata?.revenue ?? undefined,
 			imdbRating: metadata?.imdbRating ?? undefined,
+			imdbVotes: metadata?.imdbVotes ?? undefined,
+			tmdbRating: metadata?.tmdbRating ?? undefined,
 			rtRating: metadata?.rottenTomatoesScore ?? undefined,
 			metacriticRating: metadata?.metacriticScore ?? undefined,
 			rating: userRating,

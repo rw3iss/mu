@@ -20,7 +20,7 @@ export class MetadataService {
 		private readonly events: EventsService,
 	) {}
 
-	async fetchForMovie(movieId: string) {
+	async fetchForMovie(movieId: string): Promise<any> {
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
 
 		if (!movie) {
@@ -109,11 +109,10 @@ export class MetadataService {
 		}
 
 		// Step 4: If we have TMDB details but no OMDB data yet, try OMDB by IMDB ID
+		let omdbSupplementary: Awaited<ReturnType<OmdbProvider['getByImdbId']>> = null;
 		if (details?.imdb_id && !omdbData) {
-			const omdbById = await this.omdb.getByImdbId(details.imdb_id);
-			if (omdbById) {
-				// Merge OMDB-by-ID data into our flow (it's OmdbData, not OmdbSearchResult,
-				// but we only need the rating fields from it)
+			omdbSupplementary = await this.omdb.getByImdbId(details.imdb_id);
+			if (omdbSupplementary) {
 				this.logger.log(`Supplementing with OMDB data via IMDB ID ${details.imdb_id}`);
 			}
 		}
@@ -140,6 +139,8 @@ export class MetadataService {
 		if (details) {
 			movieUpdate.overview = details.overview || (omdbData?.plot ?? null);
 			movieUpdate.tagline = details.tagline || null;
+			movieUpdate.originalTitle =
+				details.original_title !== details.title ? details.original_title : null;
 			movieUpdate.runtimeMinutes = details.runtime || (omdbData?.runtimeMinutes ?? null);
 			movieUpdate.releaseDate = details.release_date || null;
 			movieUpdate.language = details.spoken_languages?.[0]?.iso_639_1 ?? null;
@@ -150,10 +151,19 @@ export class MetadataService {
 			movieUpdate.year = details.release_date
 				? parseInt(details.release_date.slice(0, 4), 10)
 				: movie.year;
+
+			// Content rating from TMDB release_dates (US certification) or OMDB Rated
+			const usRelease = details.release_dates?.results?.find((r) => r.iso_3166_1 === 'US');
+			const certification = usRelease?.release_dates
+				?.map((rd) => rd.certification)
+				.find((c) => c && c.length > 0);
+			movieUpdate.contentRating =
+				certification || omdbData?.rated || omdbSupplementary?.rated || null;
 		} else if (omdbData) {
 			// OMDB-only path
 			movieUpdate.overview = omdbData.plot;
 			movieUpdate.runtimeMinutes = omdbData.runtimeMinutes;
+			movieUpdate.contentRating = omdbData.rated;
 			if (omdbData.year) movieUpdate.year = omdbData.year;
 		}
 
@@ -197,27 +207,19 @@ export class MetadataService {
 				? JSON.stringify(omdbData.writer.split(', '))
 				: JSON.stringify([]);
 
-		const keywords = JSON.stringify([]);
+		const keywords = details?.keywords?.keywords
+			? JSON.stringify(details.keywords.keywords.map((k) => k.name))
+			: JSON.stringify([]);
 		const productionCompanies = details
 			? JSON.stringify(details.production_companies.map((c) => c.name))
 			: JSON.stringify([]);
 
 		// Get OMDB ratings — either from title search or by IMDB ID lookup
-		let imdbRating = omdbData?.imdbRating ?? null;
-		let imdbVotes = omdbData?.imdbVotes ?? null;
-		let rottenTomatoesScore = omdbData?.rottenTomatoesScore ?? null;
-		let metacriticScore = omdbData?.metacriticScore ?? null;
-
-		// If we have an IMDB ID from TMDB but no OMDB title search result, fetch ratings by ID
-		if (!omdbData && imdbId) {
-			const omdbById = await this.omdb.getByImdbId(imdbId);
-			if (omdbById) {
-				imdbRating = omdbById.imdbRating;
-				imdbVotes = omdbById.imdbVotes;
-				rottenTomatoesScore = omdbById.rottenTomatoesScore;
-				metacriticScore = omdbById.metacriticScore;
-			}
-		}
+		const omdbRatingsSource = omdbData ?? omdbSupplementary;
+		const imdbRating = omdbRatingsSource?.imdbRating ?? null;
+		const imdbVotes = omdbRatingsSource?.imdbVotes ?? null;
+		const rottenTomatoesScore = omdbRatingsSource?.rottenTomatoesScore ?? null;
+		const metacriticScore = omdbRatingsSource?.metacriticScore ?? null;
 
 		const existingMeta = this.database.db
 			.select()
