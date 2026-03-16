@@ -262,29 +262,34 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 		// Look up resume position from watch history, and ensure a history
 		// entry exists (so the movie appears in history immediately on play).
+		// Skip for shared/anonymous sessions — __shared__ user has no DB record.
 		let resumePosition = 0;
-		const historyRows = await this.database.db
-			.select()
-			.from(userWatchHistory)
-			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, movieId)));
+		if (userId !== '__shared__') {
+			const historyRows = await this.database.db
+				.select()
+				.from(userWatchHistory)
+				.where(
+					and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, movieId)),
+				);
 
-		if (historyRows.length > 0) {
-			resumePosition = historyRows[0]!.positionSeconds ?? 0;
-			// Touch watchedAt so it sorts to the top of history
-			await this.database.db
-				.update(userWatchHistory)
-				.set({ watchedAt: nowISO() })
-				.where(eq(userWatchHistory.id, historyRows[0]!.id));
-		} else {
-			// Create history entry immediately on play
-			await this.database.db.insert(userWatchHistory).values({
-				id: crypto.randomUUID(),
-				userId,
-				movieId,
-				positionSeconds: 0,
-				durationWatchedSeconds: 0,
-				watchedAt: nowISO(),
-			});
+			if (historyRows.length > 0) {
+				resumePosition = historyRows[0]!.positionSeconds ?? 0;
+				// Touch watchedAt so it sorts to the top of history
+				await this.database.db
+					.update(userWatchHistory)
+					.set({ watchedAt: nowISO() })
+					.where(eq(userWatchHistory.id, historyRows[0]!.id));
+			} else {
+				// Create history entry immediately on play
+				await this.database.db.insert(userWatchHistory).values({
+					id: crypto.randomUUID(),
+					userId,
+					movieId,
+					positionSeconds: 0,
+					durationWatchedSeconds: 0,
+					watchedAt: nowISO(),
+				});
+			}
 		}
 
 		// Build stream URL based on mode

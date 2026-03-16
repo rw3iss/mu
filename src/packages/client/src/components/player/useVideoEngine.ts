@@ -211,11 +211,18 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			}
 
 			if (directPlay || !Hls.isSupported()) {
-				const token = localStorage.getItem('mu_token');
-				const sep = streamUrl.includes('?') ? '&' : '?';
-				video.src = token
-					? `${streamUrl}${sep}token=${encodeURIComponent(token)}`
-					: streamUrl;
+				const isAbsoluteUrl = streamUrl.startsWith('http');
+				// Only add local auth token for relative URLs (local server).
+				// Absolute URLs (remote servers) already have their own auth token.
+				if (!isAbsoluteUrl) {
+					const token = localStorage.getItem('mu_token');
+					const sep = streamUrl.includes('?') ? '&' : '?';
+					video.src = token
+						? `${streamUrl}${sep}token=${encodeURIComponent(token)}`
+						: streamUrl;
+				} else {
+					video.src = streamUrl;
+				}
 				if (startPosition > 0) video.currentTime = startPosition;
 				if (autoplay) video.play().catch(() => {});
 			} else {

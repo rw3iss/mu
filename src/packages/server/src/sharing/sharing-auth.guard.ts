@@ -37,11 +37,16 @@ export class SharingAuthGuard implements CanActivate {
 		const request = context.switchToHttp().getRequest();
 		const authHeader = request.headers?.authorization as string | undefined;
 
-		if (!authHeader?.startsWith('Bearer ')) {
+		// Accept token from Authorization header or ?token= query param
+		// (query param needed for direct video URLs where custom headers aren't possible)
+		const token = authHeader?.startsWith('Bearer ')
+			? authHeader.slice(7)
+			: (request.query?.token as string | undefined);
+
+		if (!token) {
 			throw new ForbiddenException('Password required');
 		}
 
-		const token = authHeader.slice(7);
 		const expected = hashPassword(config.password);
 
 		if (token !== expected) {

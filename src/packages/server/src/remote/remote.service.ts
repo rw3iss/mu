@@ -267,25 +267,37 @@ export class RemoteService {
 
 		const session = (await response.json()) as any;
 
-		// Rewrite stream URLs to proxy through local server
+		// Build auth token for direct remote URLs
+		const authToken = server.password
+			? createHash('sha256').update(server.password).digest('hex')
+			: '';
+		const tokenParam = authToken ? `?token=${authToken}` : '';
+
 		const isDirectPlay = session.directPlay === true;
 		let streamUrl: string;
 		if (isDirectPlay && session.streamUrl) {
-			// Direct play: proxy through local server's direct endpoint
-			// Extract file ID from the remote streamUrl (e.g. /api/v1/stream/direct/<fileId>)
+			// Direct play: stream directly from remote server (no proxy needed).
+			// The <video> element loads the src attribute without CORS restrictions.
 			const fileIdMatch = session.streamUrl.match(/\/direct\/([^/?]+)/);
 			const fileId = fileIdMatch?.[1] ?? session.sessionId;
-			streamUrl = `/api/v1/remote/stream/${serverId}/direct/${fileId}`;
+			streamUrl = `${baseUrl}/api/v1/shared/stream/direct/${fileId}${tokenParam}`;
 		} else {
-			// HLS: proxy manifest through local server
+			// HLS: proxy through local server because HLS.js segment requests
+			// need auth headers that can't easily be added to manifest URLs.
 			streamUrl = `/api/v1/remote/stream/${serverId}/${session.sessionId}/manifest.m3u8`;
 		}
 
+		// Rewrite subtitle URLs to point at remote server directly
+		const subtitles = session.subtitles?.map((s: any) => ({
+			...s,
+			url: `${baseUrl}${s.url}${tokenParam}`,
+		}));
+
 		return {
 			...session,
-			// Use a prefixed sessionId so client-side code can detect remote sessions
 			sessionId: `remote:${session.sessionId}`,
 			streamUrl,
+			subtitles,
 			ready: isDirectPlay ? true : session.ready,
 		};
 	}

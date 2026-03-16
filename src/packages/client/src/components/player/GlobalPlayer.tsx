@@ -154,8 +154,14 @@ export function GlobalPlayer() {
 		trackEl.kind = 'subtitles';
 		trackEl.label = track.label;
 		trackEl.srclang = track.language;
-		const token = localStorage.getItem('mu_token');
-		trackEl.src = token ? `${track.url}?token=${encodeURIComponent(token)}` : track.url;
+		// Only add local auth token for relative URLs — remote subtitle URLs
+		// already include their own auth token in the query string
+		if (track.url.startsWith('http')) {
+			trackEl.src = track.url;
+		} else {
+			const token = localStorage.getItem('mu_token');
+			trackEl.src = token ? `${track.url}?token=${encodeURIComponent(token)}` : track.url;
+		}
 		trackEl.default = true;
 		video.appendChild(trackEl);
 		trackEl.track.mode = 'showing';
