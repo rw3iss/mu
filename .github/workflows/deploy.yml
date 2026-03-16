@@ -12,10 +12,12 @@ jobs:
         run: |
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
-          timeout 30 ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} ./deploy.sh || EXIT_CODE=$?
+          # Run the repo's deploy script. DEPLOY_DIR should point to the repo root.
+          # Falls back to ~/deploy.sh if DEPLOY_DIR is not set.
+          timeout 120 ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} 'bash -c "if [ -n \"$DEPLOY_DIR\" ]; then cd \"$DEPLOY_DIR\" && bash src/deploy.sh; else ./deploy.sh; fi"' || EXIT_CODE=$?
           rm -f /tmp/deploy_key
           if [ "${EXIT_CODE:-0}" -eq 124 ]; then
-            echo "SSH session timed out (expected - deploy completed successfully)"
+            echo "SSH session timed out — deploy may still be running on server"
             exit 0
           elif [ "${EXIT_CODE:-0}" -ne 0 ]; then
             exit $EXIT_CODE
