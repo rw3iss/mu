@@ -8,7 +8,28 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
 import { sourcesService } from '@/services/sources.service';
-import { accentColor, setAccentColor } from '@/state/accentColor.state';
+import { accentColor, resetAccentColor, setAccentColor } from '@/state/accentColor.state';
+import {
+	type ItemSpacing,
+	cardBorder,
+	disableHover,
+	itemRadius,
+	itemSpacing as itemSpacingSignal,
+	pageBg,
+	panelBg,
+	resetCardBorder,
+	resetDisableHover,
+	resetItemRadius,
+	resetItemSpacing,
+	resetPageBg,
+	resetPanelBg,
+	setCardBorder,
+	setDisableHover,
+	setItemRadius,
+	setItemSpacing,
+	setPageBg,
+	setPanelBg,
+} from '@/state/appearance.state';
 import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import type { Theme } from '@/state/theme.state';
@@ -113,6 +134,10 @@ export function Settings(props: SettingsProps) {
 	// Appearance settings
 	const [showRecentlyPlayed, setShowRecentlyPlayed] = useUiSetting('show_recently_played', true);
 	const colorInputRef = useRef<HTMLInputElement>(null);
+	const pageBgInputRef = useRef<HTMLInputElement>(null);
+	const panelBgInputRef = useRef<HTMLInputElement>(null);
+	const borderColorInputRef = useRef<HTMLInputElement>(null);
+	const [showBorderEditor, setShowBorderEditor] = useState(false);
 
 	// Playback settings
 	const [defaultQuality, setDefaultQuality] = useState('auto');
@@ -518,6 +543,7 @@ export function Settings(props: SettingsProps) {
 						<div class={styles.panel}>
 							<h2 class={styles.panelTitle}>Appearance</h2>
 
+							{/* Theme */}
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Theme</span>
@@ -538,6 +564,7 @@ export function Settings(props: SettingsProps) {
 								</div>
 							</div>
 
+							{/* Accent Color */}
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Accent Color</span>
@@ -545,35 +572,35 @@ export function Settings(props: SettingsProps) {
 										Customize the primary accent color across the app
 									</span>
 								</div>
-								<div class={styles.accentColorPicker}>
-									{(() => {
-										const presets = [
-											{ label: 'Cyan', value: '#06b6d4' },
-											{ label: 'Blue', value: '#3b82f6' },
-											{ label: 'Purple', value: '#8b5cf6' },
-											{ label: 'Pink', value: '#ec4899' },
-											{ label: 'Amber', value: '#f59e0b' },
-											{ label: 'Green', value: '#22c55e' },
-											{ label: 'Red', value: '#ef4444' },
-										];
-										const presetValues = new Set(presets.map((p) => p.value));
-										const current = accentColor.value;
-										const isCustom = current && !presetValues.has(current);
-										const customBg = isCustom ? current : current || '#06b6d4';
+								<div class={styles.settingControl}>
+									<div class={styles.accentColorPicker}>
+										{(() => {
+											const presets = [
+												{ label: 'Cyan', value: '#06b6d4' },
+												{ label: 'Blue', value: '#3b82f6' },
+												{ label: 'Purple', value: '#8b5cf6' },
+												{ label: 'Pink', value: '#ec4899' },
+												{ label: 'Amber', value: '#f59e0b' },
+												{ label: 'Green', value: '#22c55e' },
+												{ label: 'Red', value: '#ef4444' },
+											];
+											const presetValues = new Set(presets.map((p) => p.value));
+											const current = accentColor.value;
+											const isCustom = current && !presetValues.has(current);
+											const customBg = isCustom ? current : current || '#06b6d4';
 
-										return (
-											<>
-												<button
-													class={`${styles.colorSwatch} ${styles.customSwatch} ${isCustom ? styles.activeSwatch : !current ? styles.activeSwatch : ''}`}
-													style={{
-														backgroundColor: isCustom
-															? current
-															: undefined,
-													}}
-													title="Custom color"
-													onClick={() => colorInputRef.current?.click()}
-												>
-													{!isCustom && (
+											return (
+												<>
+													<button
+														class={`${styles.colorSwatch} ${styles.customSwatch} ${isCustom ? styles.activeSwatch : !current ? styles.activeSwatch : ''}`}
+														style={{
+															backgroundColor: isCustom
+																? current
+																: undefined,
+														}}
+														title="Custom color — click to change"
+														onClick={() => colorInputRef.current?.click()}
+													>
 														<svg
 															width="14"
 															height="14"
@@ -583,40 +610,289 @@ export function Settings(props: SettingsProps) {
 															stroke-width="2"
 															stroke-linecap="round"
 															stroke-linejoin="round"
+															style={isCustom ? { opacity: 0.7, filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.5))' } : undefined}
 														>
-															<path d="M12 5v14" />
-															<path d="M5 12h14" />
+															<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+															<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
 														</svg>
-													)}
-												</button>
-												<input
-													ref={colorInputRef}
-													type="color"
-													class={styles.colorInputHidden}
-													value={customBg}
-													onInput={(e) =>
-														setAccentColor(
-															(e.target as HTMLInputElement).value,
-														)
-													}
-												/>
-												{presets.map((preset) => (
-													<button
-														key={preset.label}
-														class={`${styles.colorSwatch} ${accentColor.value === preset.value ? styles.activeSwatch : ''}`}
-														style={{
-															backgroundColor: preset.value,
-														}}
-														title={preset.label}
-														onClick={() => setAccentColor(preset.value)}
+													</button>
+													<input
+														ref={colorInputRef}
+														type="color"
+														class={styles.colorInputHidden}
+														value={customBg}
+														onInput={(e) =>
+															setAccentColor(
+																(e.target as HTMLInputElement).value,
+															)
+														}
 													/>
-												))}
-											</>
-										);
-									})()}
+													{presets.map((preset) => (
+														<button
+															key={preset.label}
+															class={`${styles.colorSwatch} ${accentColor.value === preset.value ? styles.activeSwatch : ''}`}
+															style={{
+																backgroundColor: preset.value,
+															}}
+															title={preset.label}
+															onClick={() => setAccentColor(preset.value)}
+														/>
+													))}
+												</>
+											);
+										})()}
+									</div>
+									<button
+										class={styles.resetBtn}
+										onClick={resetAccentColor}
+										title="Reset to default"
+									>
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									</button>
 								</div>
 							</div>
 
+							{/* Page Background */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Page Background</span>
+									<span class={styles.settingDescription}>
+										Main app background color
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<button
+										class={`${styles.colorSwatch} ${pageBg.value ? styles.activeSwatch : ''}`}
+										style={{ backgroundColor: pageBg.value || '#050709' }}
+										title="Pick page background color"
+										onClick={() => pageBgInputRef.current?.click()}
+									/>
+									<input
+										ref={pageBgInputRef}
+										type="color"
+										class={styles.colorInputHidden}
+										value={pageBg.value || '#050709'}
+										onInput={(e) =>
+											setPageBg((e.target as HTMLInputElement).value)
+										}
+									/>
+									<button class={styles.resetBtn} onClick={resetPageBg} title="Reset to default">
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									</button>
+								</div>
+							</div>
+
+							{/* Panel Background */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Panel Background</span>
+									<span class={styles.settingDescription}>
+										Sidebar, header, and card background color
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<button
+										class={`${styles.colorSwatch} ${panelBg.value ? styles.activeSwatch : ''}`}
+										style={{ backgroundColor: panelBg.value || '#090b12' }}
+										title="Pick panel background color"
+										onClick={() => panelBgInputRef.current?.click()}
+									/>
+									<input
+										ref={panelBgInputRef}
+										type="color"
+										class={styles.colorInputHidden}
+										value={panelBg.value || '#090b12'}
+										onInput={(e) =>
+											setPanelBg((e.target as HTMLInputElement).value)
+										}
+									/>
+									<button class={styles.resetBtn} onClick={resetPanelBg} title="Reset to default">
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									</button>
+								</div>
+							</div>
+
+							{/* Item Spacing */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Item Spacing</span>
+									<span class={styles.settingDescription}>
+										Gap between cards and items across the site
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<select
+										class={styles.select}
+										value={itemSpacingSignal.value}
+										onChange={(e) =>
+											setItemSpacing(
+												(e.target as HTMLSelectElement).value as ItemSpacing,
+											)
+										}
+									>
+										<option value="none">None</option>
+										<option value="minimal">Minimal</option>
+										<option value="compact">Compact</option>
+										<option value="normal">Normal</option>
+										<option value="comfortable">Comfortable</option>
+										<option value="spaced">Spaced</option>
+									</select>
+									<button class={styles.resetBtn} onClick={resetItemSpacing} title="Reset to default">
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									</button>
+								</div>
+							</div>
+
+							{/* Item Radius */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Item Radius</span>
+									<span class={styles.settingDescription}>
+										Border radius on cards and items (0-30px)
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<div class={styles.rangeWithValue}>
+										<input
+											type="range"
+											class={styles.rangeInput}
+											min="0"
+											max="30"
+											step="1"
+											value={itemRadius.value}
+											onInput={(e) =>
+												setItemRadius(
+													parseInt((e.target as HTMLInputElement).value, 10),
+												)
+											}
+										/>
+										<span class={styles.rangeValue}>{itemRadius.value}px</span>
+									</div>
+									<button class={styles.resetBtn} onClick={resetItemRadius} title="Reset to default">
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									</button>
+								</div>
+							</div>
+
+							{/* Card Border */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Card Border</span>
+									<span class={styles.settingDescription}>
+										Customize card border style
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<button
+										class={styles.borderPreview}
+										onClick={() => setShowBorderEditor(!showBorderEditor)}
+										title="Edit card border"
+									>
+										<span
+											class={styles.borderPreviewSample}
+											style={{
+												border: `${cardBorder.value.width}px solid ${cardBorder.value.color}`,
+												opacity: cardBorder.value.opacity,
+											}}
+										/>
+										<span class={styles.borderPreviewLabel}>
+											{cardBorder.value.width}px
+										</span>
+									</button>
+									<button class={styles.resetBtn} onClick={() => { resetCardBorder(); setShowBorderEditor(false); }} title="Reset to default">
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									</button>
+								</div>
+							</div>
+							{showBorderEditor && (
+								<div class={styles.borderEditor}>
+									<div class={styles.borderEditorRow}>
+										<span class={styles.borderEditorLabel}>Width</span>
+										<input
+											type="range"
+											class={styles.rangeInput}
+											min="0"
+											max="5"
+											step="1"
+											value={cardBorder.value.width}
+											onInput={(e) =>
+												setCardBorder({
+													...cardBorder.value,
+													width: parseInt((e.target as HTMLInputElement).value, 10),
+												})
+											}
+										/>
+										<span class={styles.rangeValue}>{cardBorder.value.width}px</span>
+									</div>
+									<div class={styles.borderEditorRow}>
+										<span class={styles.borderEditorLabel}>Color</span>
+										<button
+											class={styles.colorSwatch}
+											style={{ backgroundColor: cardBorder.value.color, width: 24, height: 24 }}
+											onClick={() => borderColorInputRef.current?.click()}
+										/>
+										<input
+											ref={borderColorInputRef}
+											type="color"
+											class={styles.colorInputHidden}
+											value={cardBorder.value.color}
+											onInput={(e) =>
+												setCardBorder({
+													...cardBorder.value,
+													color: (e.target as HTMLInputElement).value,
+												})
+											}
+										/>
+									</div>
+									<div class={styles.borderEditorRow}>
+										<span class={styles.borderEditorLabel}>Opacity</span>
+										<input
+											type="range"
+											class={styles.rangeInput}
+											min="0"
+											max="1"
+											step="0.01"
+											value={cardBorder.value.opacity}
+											onInput={(e) =>
+												setCardBorder({
+													...cardBorder.value,
+													opacity: parseFloat((e.target as HTMLInputElement).value),
+												})
+											}
+										/>
+										<span class={styles.rangeValue}>{Math.round(cardBorder.value.opacity * 100)}%</span>
+									</div>
+								</div>
+							)}
+
+							{/* Disable Hover Effects */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Disable Hover Effects</span>
+									<span class={styles.settingDescription}>
+										Stop cards from animating on hover
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<label class={styles.toggle}>
+										<input
+											type="checkbox"
+											checked={disableHover.value}
+											onChange={(e) =>
+												setDisableHover(
+													(e.target as HTMLInputElement).checked,
+												)
+											}
+										/>
+										<span class={styles.toggleTrack} />
+									</label>
+									<button class={styles.resetBtn} onClick={resetDisableHover} title="Reset to default">
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									</button>
+								</div>
+							</div>
+
+							{/* Show Recently Played */}
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Show Recently Played</span>

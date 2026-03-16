@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useUiSetting } from '@/hooks/useUiSetting';
 import { audioEngine } from '@/audio/audio-engine';
 import type { AudioProfile } from '@/services/audio-profiles.service';
 import {
@@ -213,8 +214,11 @@ function ProfileControls({
 
 // ── Collapsible Settings Wrapper ──
 
-function CollapsibleSettings({ children }: { children: preact.ComponentChildren }) {
-	const [open, setOpen] = useState(false);
+function CollapsibleSettings({
+	settingKey,
+	children,
+}: { settingKey: string; children: preact.ComponentChildren }) {
+	const [open, setOpen] = useUiSetting(settingKey, false);
 	return (
 		<div class={styles.collapsible}>
 			<button class={styles.collapsibleToggle} onClick={() => setOpen(!open)}>
@@ -253,7 +257,7 @@ function EqTab() {
 				onUpdate={updateEqProfile}
 			/>
 
-			<CollapsibleSettings>
+			<CollapsibleSettings settingKey="effects_eq_settings_open">
 				<div class={styles.eqGrid}>
 					<div class={styles.eqBand}>
 						<span class={styles.eqValue}>
@@ -365,7 +369,7 @@ function CompressorTab() {
 				onUpdate={updateCompProfile}
 			/>
 
-			<CollapsibleSettings>
+			<CollapsibleSettings settingKey="effects_comp_settings_open">
 				{COMP_PARAMS.map((param) => (
 					<div class={styles.compParam} key={param.key}>
 						<div class={styles.compParamHeader}>

@@ -98,6 +98,12 @@
   --z-toast: 500;
   --z-player-controls: 600;
 
+  // Appearance overrides (set at runtime by appearance.state.ts)
+  --item-gap: var(--space-lg);
+  --item-radius: 3px;
+  --card-border: 1px solid rgba(120, 140, 180, 0.07);
+  --panel-bg: #090b12;
+
   // Layout
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 64px;
@@ -143,6 +149,8 @@
   --shadow-xl: 0 16px 32px rgba(0, 0, 0, 0.12);
   --shadow-glow: 0 0 24px rgba(8, 145, 178, 0.12);
   --shadow-glow-blue: 0 0 24px rgba(37, 99, 235, 0.12);
+
+  --panel-bg: #f7f8fa;
 }
 
 // ============================================

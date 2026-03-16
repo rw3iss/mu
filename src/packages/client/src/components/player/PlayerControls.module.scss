@@ -28,18 +28,18 @@
   display: flex;
   align-items: center;
   padding: 0;
-  // Pull up so the 11px hit area above the track extends above the bar,
-  // and the 3px track sits flush at the bar's top edge.
-  margin-top: -11px;
+  margin-top: -20px;
+  background: rgba(12, 12, 12, 0.97);
 }
 
 .seekBar {
   position: relative;
   flex: 1;
-  height: 14px;
+  height: 22px;
   display: flex;
   align-items: flex-end;
   cursor: pointer;
+  padding: 0 0 3px;
 
   &.dragging {
     cursor: grabbing;
@@ -86,7 +86,7 @@
 
 .seekTooltip {
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 10px);
   transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.9);
   color: #ffffff;

@@ -1,20 +1,22 @@
 .card {
   position: relative;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--item-radius);
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-border);
+  border: var(--card-border);
   transition: transform var(--transition-normal), box-shadow var(--transition-normal), opacity var(--transition-normal);
 
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
+    :root:not([data-no-hover]) & {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
 
     .overlay {
       opacity: 1;
     }
 
-    .thumbnailImage {
+    :root:not([data-no-hover]) & .thumbnailImage {
       transform: scale(1.03);
     }
   }
@@ -52,7 +54,7 @@
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background: var(--color-bg-elevated);
-  border-radius: 3px 3px 0 0;
+  border-radius: var(--item-radius) var(--item-radius) 0 0;
 }
 
 .thumbnailImage {

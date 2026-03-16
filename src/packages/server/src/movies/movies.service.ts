@@ -165,6 +165,13 @@ export class MoviesService {
 			total = countResult?.count ?? 0;
 		}
 
+		const hiddenResult = this.database.db
+			.select({ count: count() })
+			.from(movies)
+			.where(sql`${movies.hidden} = 1`)
+			.get();
+		const hiddenCount = hiddenResult?.count ?? 0;
+
 		return {
 			movies: data.map((row) => {
 				const position = row.watchCompleted ? 0 : (row.watchPosition ?? 0);
@@ -177,6 +184,7 @@ export class MoviesService {
 				});
 			}),
 			total,
+			hiddenCount,
 			page,
 			pageSize,
 			totalPages: Math.ceil(total / pageSize),

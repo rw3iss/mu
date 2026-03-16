@@ -86,6 +86,7 @@ export type ViewMode = 'large' | 'grid' | 'list';
 
 export const movies = signal<Movie[]>([]);
 export const totalMovies = signal(0);
+export const hiddenCount = signal(0);
 export const currentPage = signal(1);
 export const pageSize = signal(40);
 export const isLoading = signal(false);
@@ -144,6 +145,7 @@ export async function fetchMovies(page = 1): Promise<void> {
 		const response = await moviesService.list(params);
 		movies.value = response.movies;
 		totalMovies.value = response.total;
+		hiddenCount.value = response.hiddenCount ?? 0;
 	} catch (error) {
 		console.error('Failed to fetch movies:', error);
 	} finally {

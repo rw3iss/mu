@@ -8,6 +8,7 @@ import { api } from './api';
 export interface MovieListResponse {
 	movies: Movie[];
 	total: number;
+	hiddenCount?: number;
 	page: number;
 	pageSize: number;
 }

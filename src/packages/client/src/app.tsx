@@ -28,6 +28,7 @@ import {
 } from '@/state/auth.state';
 import { initTheme } from '@/state/theme.state';
 import '@/state/accentColor.state';
+import '@/state/appearance.state';
 import { GlobalPlayer } from '@/components/player/GlobalPlayer';
 import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';

@@ -20,6 +20,7 @@ import {
 	searchQuery,
 	setFilters,
 	setViewMode,
+	hiddenCount,
 	showHidden,
 	toggleShowHidden,
 	totalMovies,
@@ -107,7 +108,12 @@ export function Library(_props: LibraryProps) {
 			<div class={styles.header}>
 				<div class={styles.headerLeft}>
 					<h1 class={styles.title}>Library</h1>
-					<span class={styles.count}>{totalMovies.value} movies</span>
+					<span class={styles.count}>
+						{totalMovies.value} movies
+						{hiddenCount.value > 0 && !showHidden.value && (
+							<span class={styles.hiddenCount}> ({hiddenCount.value} hidden)</span>
+						)}
+					</span>
 				</div>
 				<Button variant="secondary" size="sm" loading={isUpdating} onClick={handleUpdate}>
 					{isUpdating ? 'Updating...' : 'Update'}
