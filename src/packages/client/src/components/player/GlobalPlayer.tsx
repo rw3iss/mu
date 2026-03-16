@@ -16,6 +16,7 @@ import {
 	currentSession,
 	initPlayerSettings,
 	isFullscreen,
+	isHoveringControls,
 	showControls,
 	showInfoPanel,
 	streamError,
@@ -211,6 +212,8 @@ export function GlobalPlayer() {
 			{!isMini && (
 				<div
 					class={`${styles.topHeader} ${showControls.value ? styles.topHeaderVisible : ''}`}
+					onMouseEnter={() => { isHoveringControls.value = true; }}
+					onMouseLeave={() => { isHoveringControls.value = false; }}
 				>
 					<button
 						class={styles.topBtn}
@@ -263,7 +266,11 @@ export function GlobalPlayer() {
 			<EffectsPanel />
 
 			{/* Bottom bar — same layout in both modes */}
-			<div class={`${styles.playerBar} ${barVisible ? '' : styles.hidden}`}>
+			<div
+				class={`${styles.playerBar} ${barVisible ? '' : styles.hidden}`}
+				onMouseEnter={() => { isHoveringControls.value = true; }}
+				onMouseLeave={() => { isHoveringControls.value = false; }}
+			>
 				<PlayerControls
 					visible={barVisible}
 					onTogglePlay={engine.togglePlay}

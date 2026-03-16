@@ -5,6 +5,7 @@ import {
 	duration,
 	isBuffering,
 	isFullscreen,
+	isHoveringControls,
 	isMuted,
 	isPlaying,
 	showControls,
@@ -87,7 +88,9 @@ export function VideoPlayer({
 
 		if (isPlaying.value) {
 			controlsTimerRef.current = setTimeout(() => {
-				showControls.value = false;
+				if (!isHoveringControls.value) {
+					showControls.value = false;
+				}
 			}, 3000);
 		}
 	}, []);
@@ -99,7 +102,9 @@ export function VideoPlayer({
 	const handleMouseLeave = useCallback(() => {
 		if (isPlaying.value) {
 			controlsTimerRef.current = setTimeout(() => {
-				showControls.value = false;
+				if (!isHoveringControls.value) {
+					showControls.value = false;
+				}
 			}, 1000);
 		}
 	}, []);

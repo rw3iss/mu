@@ -54,6 +54,7 @@ export const subtitleTrack = signal<string | null>(null);
 export const audioTrack = signal<string | null>(null);
 export const isBuffering = signal(false);
 export const showControls = signal(true);
+export const isHoveringControls = signal(false);
 export const showInfoPanel = signal(false);
 export const streamError = signal<string | null>(null);
 
