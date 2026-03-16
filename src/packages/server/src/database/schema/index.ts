@@ -1,3 +1,5 @@
+export type { AudioProfile, NewAudioProfile } from './audio-profiles.ts';
+export { audioProfiles } from './audio-profiles.ts';
 export type { ApiKey, NewApiKey } from './api-keys.ts';
 export { apiKeys } from './api-keys.ts';
 export type { Device, NewDevice } from './devices.ts';

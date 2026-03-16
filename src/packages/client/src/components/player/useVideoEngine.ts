@@ -1,6 +1,8 @@
 import Hls from 'hls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting } from '@/hooks/useUiSetting';
+import { initAudioEffects } from '@/state/audio-effects.state';
 import {
 	currentTime,
 	duration,
@@ -116,6 +118,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			video.addEventListener('canplay', () => {
 				isBuffering.value = false;
 			});
+
+			// Attach Web Audio API processing chain
+			audioEngine.attach(video);
+			initAudioEffects();
 		}
 
 		// 60fps time tracking via requestAnimationFrame
@@ -290,6 +296,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		if (!video) return;
 		if (video.paused) {
 			intendedPlayingRef.current = true;
+			audioEngine.resume();
 			video.play();
 		} else {
 			intendedPlayingRef.current = false;

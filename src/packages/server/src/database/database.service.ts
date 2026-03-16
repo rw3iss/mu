@@ -255,6 +255,16 @@ export class DatabaseService implements OnModuleDestroy {
         encoding_settings TEXT NOT NULL,
         completed_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS audio_profiles (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        config TEXT NOT NULL DEFAULT '{}',
+        is_default INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
     `);
 		// Add columns that may not exist in older databases
 		try {

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AdminModule } from './admin/admin.module.js';
+import { AudioProfilesModule } from './audio-profiles/audio-profiles.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CacheModule } from './cache/cache.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
@@ -43,6 +44,7 @@ import { UsersModule } from './users/users.module.js';
 		SettingsModule,
 		FilesystemModule,
 		AdminModule,
+		AudioProfilesModule,
 	],
 	providers: [
 		{

@@ -23,6 +23,7 @@ import {
 } from '@/state/player.state';
 import { setSharedVideoEngine } from '@/state/videoEngineRef';
 import styles from './GlobalPlayer.module.scss';
+import { EffectsPanel } from './EffectsPanel';
 import { InfoPanel } from './InfoPanel';
 import { PlayerControls } from './PlayerControls';
 import { useVideoEngine } from './useVideoEngine';
@@ -257,6 +258,9 @@ export function GlobalPlayer() {
 					}}
 				/>
 			)}
+
+			{/* Effects panel — floating over the player */}
+			<EffectsPanel />
 
 			{/* Bottom bar — same layout in both modes */}
 			<div class={`${styles.playerBar} ${barVisible ? '' : styles.hidden}`}>
