@@ -246,17 +246,25 @@ export class RemoteService {
 		const session = (await response.json()) as any;
 
 		// Rewrite stream URLs to proxy through local server
+		const isDirectPlay = session.directPlay === true;
+		let streamUrl: string;
+		if (isDirectPlay && session.streamUrl) {
+			// Direct play: proxy through local server's direct endpoint
+			// Extract file ID from the remote streamUrl (e.g. /api/v1/stream/direct/<fileId>)
+			const fileIdMatch = session.streamUrl.match(/\/direct\/([^/?]+)/);
+			const fileId = fileIdMatch?.[1] ?? session.sessionId;
+			streamUrl = `/api/v1/remote/stream/${serverId}/direct/${fileId}`;
+		} else {
+			// HLS: proxy manifest through local server
+			streamUrl = `/api/v1/remote/stream/${serverId}/${session.sessionId}/manifest.m3u8`;
+		}
+
 		return {
 			...session,
-			streamUrl: session.streamUrl
-				? `/api/v1/remote/stream/${serverId}/${session.sessionId}/manifest.m3u8`
-				: undefined,
-			directPlayUrl: session.directPlayUrl
-				? `/api/v1/remote/stream/${serverId}/direct/${session.fileId}`
-				: undefined,
-			_remoteSessionId: session.sessionId,
-			_remoteBaseUrl: baseUrl,
-			_remoteAuth: headers.Authorization,
+			// Use a prefixed sessionId so client-side code can detect remote sessions
+			sessionId: `remote:${session.sessionId}`,
+			streamUrl,
+			ready: isDirectPlay ? true : session.ready,
 		};
 	}
 

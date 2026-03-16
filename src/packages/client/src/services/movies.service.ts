@@ -39,9 +39,18 @@ export const moviesService = {
 	},
 
 	/**
-	 * Get a single movie by ID
+	 * Get a single movie by ID.
+	 * Remote movies are fetched via the proxy endpoint.
 	 */
 	get(id: string): Promise<Movie> {
+		if (id.startsWith('remote:')) {
+			const parts = id.split(':');
+			if (parts.length >= 3) {
+				const serverId = parts[1]!;
+				const remoteMovieId = parts.slice(2).join(':');
+				return api.get<Movie>(`/remote/movies/${serverId}/${remoteMovieId}`);
+			}
+		}
 		return api.get<Movie>(`/movies/${id}`);
 	},
 

@@ -2,6 +2,17 @@ import type { StreamSession } from '@/state/player.state';
 import { api } from './api';
 
 // ============================================
+// Remote movie ID helpers
+// ============================================
+
+function parseRemoteId(movieId: string): { serverId: string; remoteMovieId: string } | null {
+	if (!movieId.startsWith('remote:')) return null;
+	const parts = movieId.split(':');
+	if (parts.length < 3) return null;
+	return { serverId: parts[1]!, remoteMovieId: parts.slice(2).join(':') };
+}
+
+// ============================================
 // Types
 // ============================================
 
@@ -44,16 +55,26 @@ export const streamService = {
 	},
 
 	/**
-	 * Start a new stream session for a movie
+	 * Start a new stream session for a movie.
+	 * For remote movies, routes through the local proxy.
 	 */
 	startStream(movieId: string): Promise<StreamSession> {
+		const remote = parseRemoteId(movieId);
+		if (remote) {
+			return api.get<StreamSession>(
+				`/remote/stream/${remote.serverId}/${remote.remoteMovieId}/start`,
+			);
+		}
 		return api.get<StreamSession>(`/stream/${movieId}/start`);
 	},
 
 	/**
-	 * Check readiness of a streaming session
+	 * Check readiness of a streaming session.
+	 * Remote sessions report as always ready.
 	 */
 	getStreamStatus(sessionId: string): Promise<StreamStatus> {
+		if (sessionId.startsWith('remote:'))
+			return Promise.resolve({ state: 'running', ready: true });
 		return api.get<StreamStatus>(`/stream/${sessionId}/status`);
 	},
 
@@ -87,16 +108,20 @@ export const streamService = {
 	},
 
 	/**
-	 * Update playback progress for a stream session
+	 * Update playback progress for a stream session.
+	 * No-op for remote sessions (progress is not tracked cross-server).
 	 */
 	updateProgress(sessionId: string, position: number): Promise<void> {
+		if (sessionId.startsWith('remote:')) return Promise.resolve();
 		return api.post<void>(`/stream/${sessionId}/progress`, { positionSeconds: position });
 	},
 
 	/**
-	 * End a stream session
+	 * End a stream session.
+	 * No-op for remote sessions.
 	 */
 	endStream(sessionId: string): Promise<void> {
+		if (sessionId.startsWith('remote:')) return Promise.resolve();
 		return api.delete<void>(`/stream/${sessionId}`);
 	},
 

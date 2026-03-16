@@ -8,9 +8,10 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 	Res,
 } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { RemoteService } from './remote.service.js';
 
@@ -127,6 +128,48 @@ export class RemoteController {
 		reply.status(response.status);
 		for (const [key, value] of response.headers.entries()) {
 			if (['content-type', 'cache-control'].includes(key.toLowerCase())) {
+				reply.header(key, value);
+			}
+		}
+
+		const body = Buffer.from(await response.arrayBuffer());
+		return reply.send(body);
+	}
+
+	/**
+	 * GET /remote/stream/:serverId/direct/:fileId — Proxy direct play with range support.
+	 * Must be defined before the segment catch-all to avoid route conflict.
+	 */
+	@Get('stream/:serverId/direct/:fileId')
+	async proxyDirectPlay(
+		@Param('serverId') serverId: string,
+		@Param('fileId') fileId: string,
+		@Req() request: FastifyRequest,
+		@Res() reply: FastifyReply,
+	) {
+		const auth = this.remoteService.getServerAuth(serverId);
+		if (!auth) throw new NotFoundException('Server not found');
+
+		const headers: Record<string, string> = { ...auth.headers };
+		const range = request.headers.range;
+		if (range) headers.Range = range;
+
+		const response = await fetch(`${auth.baseUrl}/api/v1/shared/stream/direct/${fileId}`, {
+			headers,
+		});
+
+		reply.status(response.status);
+		for (const [key, value] of response.headers.entries()) {
+			const lower = key.toLowerCase();
+			if (
+				[
+					'content-type',
+					'content-length',
+					'content-range',
+					'accept-ranges',
+					'cache-control',
+				].includes(lower)
+			) {
 				reply.header(key, value);
 			}
 		}
