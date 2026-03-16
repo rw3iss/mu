@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { LibraryModule } from '../library/library.module.js';
 import { MediaModule } from '../media/media.module.js';
 import { MetadataModule } from '../metadata/metadata.module.js';
+import { RemoteModule } from '../remote/remote.module.js';
 import { StreamModule } from '../stream/stream.module.js';
 import { HistoryController } from './history.controller.js';
 import { HistoryService } from './history.service.js';
@@ -15,7 +16,7 @@ import { WatchlistController } from './watchlist.controller.js';
 import { WatchlistService } from './watchlist.service.js';
 
 @Module({
-	imports: [LibraryModule, MediaModule, MetadataModule, StreamModule],
+	imports: [LibraryModule, MediaModule, MetadataModule, RemoteModule, StreamModule],
 	controllers: [
 		MoviesController,
 		RatingsController,

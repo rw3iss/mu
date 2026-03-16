@@ -12,9 +12,11 @@ import {
 	currentPage,
 	fetchMovies,
 	filters,
+	hasRemoteServers,
 	initSortPrefs,
 	initViewMode,
 	isLoading,
+	localOnly,
 	movies,
 	searchMovies,
 	searchQuery,
@@ -22,6 +24,7 @@ import {
 	setViewMode,
 	hiddenCount,
 	showHidden,
+	toggleLocalOnly,
 	toggleShowHidden,
 	totalMovies,
 	totalPages,
@@ -131,6 +134,16 @@ export function Library(_props: LibraryProps) {
 						onInput={handleSearchInput}
 					/>
 				</div>
+
+				{hasRemoteServers.value && (
+					<button
+						class={`${styles.showHiddenBtn} ${localOnly.value ? styles.active : ''}`}
+						onClick={toggleLocalOnly}
+						title={localOnly.value ? 'Showing local movies only' : 'Show all movies'}
+					>
+						{localOnly.value ? 'Local Only' : 'All Servers'}
+					</button>
+				)}
 
 				<button
 					class={`${styles.showHiddenBtn} ${showHidden.value ? styles.active : ''}`}

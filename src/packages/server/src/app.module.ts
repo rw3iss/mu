@@ -18,8 +18,10 @@ import { MetadataModule } from './metadata/metadata.module.js';
 import { MoviesModule } from './movies/movies.module.js';
 import { PluginModule } from './plugins/plugin.module.js';
 import { RecommendationsModule } from './recommendations/recommendations.module.js';
+import { RemoteModule } from './remote/remote.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { SharingModule } from './sharing/sharing.module.js';
 import { StreamModule } from './stream/stream.module.js';
 import { UsersModule } from './users/users.module.js';
 
@@ -41,7 +43,9 @@ import { UsersModule } from './users/users.module.js';
 		StreamModule,
 		PluginModule,
 		RecommendationsModule,
+		RemoteModule,
 		SettingsModule,
+		SharingModule,
 		FilesystemModule,
 		AdminModule,
 		AudioProfilesModule,

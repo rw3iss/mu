@@ -160,6 +160,30 @@ export function Settings(props: SettingsProps) {
 	const [segmentDuration, setSegmentDuration] = useState('4');
 	const [reEncodeOnScan, setReEncodeOnScan] = useState(false);
 
+	// Sharing settings
+	const [sharingEnabled, setSharingEnabled] = useState(false);
+	const [sharingPassword, setSharingPassword] = useState('');
+	const [sharingServerName, setSharingServerName] = useState('My Library');
+	const [showPasswordInput, setShowPasswordInput] = useState(false);
+
+	// Remote servers
+	const [remoteServers, setRemoteServers] = useState<
+		Array<{
+			id: string;
+			url: string;
+			password: string;
+			name: string;
+			enabled: boolean;
+		}>
+	>([]);
+	const [showAddServer, setShowAddServer] = useState(false);
+	const [newServerUrl, setNewServerUrl] = useState('');
+	const [newServerPassword, setNewServerPassword] = useState('');
+	const [newServerName, setNewServerName] = useState('');
+	const [showNewServerConfig, setShowNewServerConfig] = useState(false);
+	const [testingServer, setTestingServer] = useState<string | null>(null);
+	const [editingServer, setEditingServer] = useState<string | null>(null);
+
 	// Rating settings
 	const [ratingScale, setRatingScale] = useState('10');
 	const [showExternalRatings, setShowExternalRatings] = useState(true);
@@ -244,6 +268,24 @@ export function Settings(props: SettingsProps) {
 					// ignore
 				}
 
+				// Load sharing settings
+				const sharing = data.sharing as Record<string, unknown> | undefined;
+				if (sharing) {
+					if (typeof sharing.enabled === 'boolean') setSharingEnabled(sharing.enabled);
+					if (typeof sharing.password === 'string') setSharingPassword(sharing.password);
+					if (typeof sharing.serverName === 'string')
+						setSharingServerName(sharing.serverName);
+					if (sharing.password) setShowPasswordInput(true);
+				}
+
+				// Load remote servers
+				try {
+					const servers = await api.get<any[]>('/remote/servers');
+					if (Array.isArray(servers)) setRemoteServers(servers);
+				} catch {
+					// ignore
+				}
+
 				const rating = data.rating as Record<string, unknown> | undefined;
 				if (rating) {
 					if (typeof rating.ratingScale === 'string') setRatingScale(rating.ratingScale);
@@ -271,13 +313,40 @@ export function Settings(props: SettingsProps) {
 				value: { defaultQuality, autoplay, bufferSize },
 			});
 			setBufferSizeSetting(bufferSize);
+
+			// Save encoding settings (now in Playback tab)
+			await api.put('/settings/encoding', {
+				value: {
+					hwAccel,
+					preset: encodingPreset,
+					quality: encodeQuality,
+					encodeHighestAvailable,
+					rateControl,
+					crf: parseInt(crfValue, 10),
+					maxConcurrentJobs: parseInt(maxConcurrentJobs, 10),
+					segmentDuration: parseInt(segmentDuration, 10),
+				},
+			});
+
 			notifySuccess('Playback settings saved');
 		} catch {
 			notifyError('Failed to save settings');
 		} finally {
 			setIsSaving(false);
 		}
-	}, [defaultQuality, autoplay, bufferSize]);
+	}, [
+		defaultQuality,
+		autoplay,
+		bufferSize,
+		hwAccel,
+		encodingPreset,
+		encodeQuality,
+		encodeHighestAvailable,
+		rateControl,
+		crfValue,
+		maxConcurrentJobs,
+		segmentDuration,
+	]);
 
 	const handleSaveLibrary = useCallback(async () => {
 		setIsSaving(true);
@@ -304,17 +373,12 @@ export function Settings(props: SettingsProps) {
 				},
 			});
 
-			// Save encoding settings
-			await api.put('/settings/encoding', {
+			// Save sharing settings
+			await api.put('/settings/sharing', {
 				value: {
-					hwAccel,
-					preset: encodingPreset,
-					quality: encodeQuality,
-					encodeHighestAvailable,
-					rateControl,
-					crf: parseInt(crfValue, 10),
-					maxConcurrentJobs: parseInt(maxConcurrentJobs, 10),
-					segmentDuration: parseInt(segmentDuration, 10),
+					enabled: sharingEnabled,
+					password: sharingPassword || null,
+					serverName: sharingServerName,
 				},
 			});
 
@@ -334,14 +398,9 @@ export function Settings(props: SettingsProps) {
 		fetchExtendedMetadata,
 		persistTranscodes,
 		autoScanEnabled,
-		hwAccel,
-		encodingPreset,
-		encodeQuality,
-		encodeHighestAvailable,
-		rateControl,
-		crfValue,
-		maxConcurrentJobs,
-		segmentDuration,
+		sharingEnabled,
+		sharingPassword,
+		sharingServerName,
 	]);
 
 	const handleSaveRating = useCallback(async () => {
@@ -1038,6 +1097,189 @@ export function Settings(props: SettingsProps) {
 								</select>
 							</div>
 
+							<h3 class={styles.encodingSectionTitle}>Encoding</h3>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Hardware Acceleration</span>
+									<span class={styles.settingDescription}>
+										Use GPU hardware for faster encoding when available
+									</span>
+								</div>
+								<select
+									class={styles.select}
+									value={hwAccel}
+									onChange={(e) =>
+										setHwAccel((e.target as HTMLSelectElement).value)
+									}
+								>
+									<option value="none">Software</option>
+									<option value="nvenc">NVIDIA GPU (NVENC)</option>
+									<option value="vaapi">Intel/AMD Linux (VAAPI)</option>
+									<option value="qsv">Intel Quick Sync (QSV)</option>
+									<option value="videotoolbox">macOS (VideoToolbox)</option>
+								</select>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Encoding Preset</span>
+									<span class={styles.settingDescription}>
+										Slower presets produce better quality but take longer
+									</span>
+								</div>
+								<select
+									class={styles.select}
+									value={encodingPreset}
+									onChange={(e) =>
+										setEncodingPreset((e.target as HTMLSelectElement).value)
+									}
+								>
+									<option value="ultrafast">Ultra Fast</option>
+									<option value="superfast">Super Fast</option>
+									<option value="veryfast">Very Fast</option>
+									<option value="faster">Faster</option>
+									<option value="fast">Fast</option>
+									<option value="medium">Medium</option>
+									<option value="slow">Slow</option>
+								</select>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Default Transcode Quality
+									</span>
+									<span class={styles.settingDescription}>
+										Resolution used for background transcoding
+									</span>
+								</div>
+								<select
+									class={styles.select}
+									value={encodeQuality}
+									onChange={(e) =>
+										setEncodeQuality((e.target as HTMLSelectElement).value)
+									}
+								>
+									<option value="480p">480p</option>
+									<option value="720p">720p</option>
+									<option value="1080p">1080p</option>
+									<option value="4k">4K</option>
+								</select>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Encode at Highest Quality
+									</span>
+									<span class={styles.settingDescription}>
+										Also transcode at source resolution when it exceeds the
+										default quality
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={encodeHighestAvailable}
+										onChange={(e) =>
+											setEncodeHighestAvailable(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Rate Control</span>
+									<span class={styles.settingDescription}>
+										CRF adapts bitrate to scene complexity for better quality
+									</span>
+								</div>
+								<select
+									class={styles.select}
+									value={rateControl}
+									onChange={(e) =>
+										setRateControl((e.target as HTMLSelectElement).value)
+									}
+								>
+									<option value="cbr">Constant Bitrate (CBR)</option>
+									<option value="crf">Constant Quality (CRF)</option>
+								</select>
+							</div>
+
+							{rateControl === 'crf' && (
+								<div class={styles.settingRow}>
+									<div class={styles.settingInfo}>
+										<span class={styles.settingLabel}>CRF Value</span>
+										<span class={styles.settingDescription}>
+											Lower values produce higher quality but larger files
+										</span>
+									</div>
+									<select
+										class={styles.select}
+										value={crfValue}
+										onChange={(e) =>
+											setCrfValue((e.target as HTMLSelectElement).value)
+										}
+									>
+										<option value="18">18 — Near Lossless</option>
+										<option value="20">20 — High Quality</option>
+										<option value="23">23 — Balanced</option>
+										<option value="26">26 — Smaller Files</option>
+										<option value="28">28 — Low Quality</option>
+									</select>
+								</div>
+							)}
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Max Concurrent Jobs</span>
+									<span class={styles.settingDescription}>
+										Background encoding jobs that can run simultaneously
+									</span>
+								</div>
+								<select
+									class={styles.select}
+									value={maxConcurrentJobs}
+									onChange={(e) =>
+										setMaxConcurrentJobs((e.target as HTMLSelectElement).value)
+									}
+								>
+									<option value="1">1</option>
+									<option value="2">2</option>
+									<option value="3">3</option>
+									<option value="4">4</option>
+									<option value="6">6</option>
+									<option value="8">8</option>
+								</select>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>HLS Segment Duration</span>
+									<span class={styles.settingDescription}>
+										Shorter segments reduce initial load time but increase
+										overhead
+									</span>
+								</div>
+								<select
+									class={styles.select}
+									value={segmentDuration}
+									onChange={(e) =>
+										setSegmentDuration((e.target as HTMLSelectElement).value)
+									}
+								>
+									<option value="2">2s (Fast start)</option>
+									<option value="4">4s (Balanced)</option>
+									<option value="6">6s (Efficient)</option>
+									<option value="10">10s (Maximum efficiency)</option>
+								</select>
+							</div>
+
 							<div class={styles.actions}>
 								<Button
 									variant="primary"
@@ -1165,96 +1407,21 @@ export function Settings(props: SettingsProps) {
 								</label>
 							</div>
 
-							<h3 class={styles.encodingSectionTitle}>Encoding</h3>
+							<h3 class={styles.encodingSectionTitle}>Library Sharing</h3>
 
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Hardware Acceleration</span>
+									<span class={styles.settingLabel}>Share My Library</span>
 									<span class={styles.settingDescription}>
-										Use GPU hardware for faster encoding when available
-									</span>
-								</div>
-								<select
-									class={styles.select}
-									value={hwAccel}
-									onChange={(e) =>
-										setHwAccel((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="none">Software</option>
-									<option value="nvenc">NVIDIA GPU (NVENC)</option>
-									<option value="vaapi">Intel/AMD Linux (VAAPI)</option>
-									<option value="qsv">Intel Quick Sync (QSV)</option>
-									<option value="videotoolbox">macOS (VideoToolbox)</option>
-								</select>
-							</div>
-
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Encoding Preset</span>
-									<span class={styles.settingDescription}>
-										Slower presets produce better quality but take longer to
-										encode
-									</span>
-								</div>
-								<select
-									class={styles.select}
-									value={encodingPreset}
-									onChange={(e) =>
-										setEncodingPreset((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="ultrafast">Ultra Fast</option>
-									<option value="superfast">Super Fast</option>
-									<option value="veryfast">Very Fast</option>
-									<option value="faster">Faster</option>
-									<option value="fast">Fast</option>
-									<option value="medium">Medium</option>
-									<option value="slow">Slow</option>
-								</select>
-							</div>
-
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>
-										Default Transcode Quality
-									</span>
-									<span class={styles.settingDescription}>
-										Resolution used for background transcoding of movies
-									</span>
-								</div>
-								<select
-									class={styles.select}
-									value={encodeQuality}
-									onChange={(e) =>
-										setEncodeQuality((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="480p">480p</option>
-									<option value="720p">720p</option>
-									<option value="1080p">1080p</option>
-									<option value="4k">4K</option>
-								</select>
-							</div>
-
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>
-										Encode at Highest Quality
-									</span>
-									<span class={styles.settingDescription}>
-										When enabled, movies whose source file exceeds the default
-										quality will also be transcoded at the source's native
-										resolution. Playback defaults to the highest available
-										cached quality.
+										Allow other servers to connect and browse your movie library
 									</span>
 								</div>
 								<label class={styles.toggle}>
 									<input
 										type="checkbox"
-										checked={encodeHighestAvailable}
+										checked={sharingEnabled}
 										onChange={(e) =>
-											setEncodeHighestAvailable(
+											setSharingEnabled(
 												(e.target as HTMLInputElement).checked,
 											)
 										}
@@ -1263,95 +1430,349 @@ export function Settings(props: SettingsProps) {
 								</label>
 							</div>
 
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Rate Control</span>
-									<span class={styles.settingDescription}>
-										CRF adapts bitrate to scene complexity for better quality at
-										smaller file sizes
-									</span>
-								</div>
-								<select
-									class={styles.select}
-									value={rateControl}
-									onChange={(e) =>
-										setRateControl((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="cbr">Constant Bitrate (CBR)</option>
-									<option value="crf">Constant Quality (CRF)</option>
-								</select>
-							</div>
-
-							{rateControl === 'crf' && (
-								<div class={styles.settingRow}>
-									<div class={styles.settingInfo}>
-										<span class={styles.settingLabel}>CRF Value</span>
-										<span class={styles.settingDescription}>
-											Lower values produce higher quality but larger files
-										</span>
+							{sharingEnabled && (
+								<>
+									<div class={styles.settingRow}>
+										<div class={styles.settingInfo}>
+											<span class={styles.settingLabel}>Server Name</span>
+											<span class={styles.settingDescription}>
+												Name shown to other servers when they connect
+											</span>
+										</div>
+										<input
+											type="text"
+											class={styles.textInput}
+											value={sharingServerName}
+											onInput={(e) =>
+												setSharingServerName(
+													(e.target as HTMLInputElement).value,
+												)
+											}
+											placeholder="My Library"
+										/>
 									</div>
-									<select
-										class={styles.select}
-										value={crfValue}
-										onChange={(e) =>
-											setCrfValue((e.target as HTMLSelectElement).value)
-										}
-									>
-										<option value="18">18 — Near Lossless</option>
-										<option value="20">20 — High Quality</option>
-										<option value="23">23 — Balanced</option>
-										<option value="26">26 — Smaller Files</option>
-										<option value="28">28 — Low Quality</option>
-									</select>
-								</div>
+
+									<div class={styles.settingGroup}>
+										<div class={styles.settingInfo}>
+											<span class={styles.settingLabel}>
+												Password Protection
+											</span>
+											<span class={styles.settingDescription}>
+												Require a password to access your shared library
+											</span>
+										</div>
+										{!showPasswordInput ? (
+											<button
+												class={styles.linkButton}
+												onClick={() => setShowPasswordInput(true)}
+											>
+												Set a password
+											</button>
+										) : (
+											<div class={styles.passwordRow}>
+												<input
+													type="password"
+													class={styles.textInput}
+													value={sharingPassword}
+													onInput={(e) =>
+														setSharingPassword(
+															(e.target as HTMLInputElement).value,
+														)
+													}
+													placeholder="Enter password"
+												/>
+												<button
+													class={styles.linkButton}
+													onClick={() => {
+														setSharingPassword('');
+														setShowPasswordInput(false);
+													}}
+												>
+													Remove
+												</button>
+											</div>
+										)}
+									</div>
+								</>
 							)}
 
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Max Concurrent Jobs</span>
-									<span class={styles.settingDescription}>
-										Number of background encoding jobs that can run
-										simultaneously
-									</span>
-								</div>
-								<select
-									class={styles.select}
-									value={maxConcurrentJobs}
-									onChange={(e) =>
-										setMaxConcurrentJobs((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="1">1</option>
-									<option value="2">2</option>
-									<option value="3">3</option>
-									<option value="4">4</option>
-									<option value="6">6</option>
-									<option value="8">8</option>
-								</select>
-							</div>
+							<h3 class={styles.encodingSectionTitle}>Connected Servers</h3>
 
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>HLS Segment Duration</span>
-									<span class={styles.settingDescription}>
-										Length of each HLS segment in seconds. Shorter segments
-										reduce initial load time but increase overhead. Longer
-										segments are more efficient but slower to start.
-									</span>
-								</div>
-								<select
-									class={styles.select}
-									value={segmentDuration}
-									onChange={(e) =>
-										setSegmentDuration((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="2">2s (Fast start)</option>
-									<option value="4">4s (Balanced)</option>
-									<option value="6">6s (Efficient)</option>
-									<option value="10">10s (Maximum efficiency)</option>
-								</select>
+							<div class={styles.settingGroup}>
+								<span class={styles.settingDescription}>
+									Add other servers to merge their libraries into yours
+								</span>
+
+								{remoteServers.map((server) => (
+									<div key={server.id} class={styles.serverEntry}>
+										<div class={styles.serverInfo}>
+											<span class={styles.serverName}>{server.name}</span>
+											<span class={styles.serverUrl}>{server.url}</span>
+										</div>
+										<div class={styles.serverActions}>
+											<label
+												class={styles.toggle}
+												title={server.enabled ? 'Enabled' : 'Disabled'}
+											>
+												<input
+													type="checkbox"
+													checked={server.enabled}
+													onChange={async () => {
+														try {
+															await api.put(
+																`/remote/servers/${server.id}`,
+																{ enabled: !server.enabled },
+															);
+															setRemoteServers((prev) =>
+																prev.map((s) =>
+																	s.id === server.id
+																		? {
+																				...s,
+																				enabled: !s.enabled,
+																			}
+																		: s,
+																),
+															);
+														} catch {
+															notifyError('Failed to update server');
+														}
+													}}
+												/>
+												<span class={styles.toggleTrack} />
+											</label>
+											<button
+												class={styles.iconBtn}
+												title="Edit"
+												onClick={() =>
+													setEditingServer(
+														editingServer === server.id
+															? null
+															: server.id,
+													)
+												}
+											>
+												{'\u2699'}
+											</button>
+											<button
+												class={styles.iconBtn}
+												title="Test connection"
+												disabled={testingServer === server.id}
+												onClick={async () => {
+													setTestingServer(server.id);
+													try {
+														const result = await api.post<{
+															success: boolean;
+															error?: string;
+															serverName?: string;
+															movieCount?: number;
+														}>('/remote/servers/test', {
+															url: server.url,
+															password: server.password || undefined,
+														});
+														if (result.success) {
+															notifySuccess(
+																`Connected: ${result.serverName} (${result.movieCount} movies)`,
+															);
+														} else {
+															notifyError(
+																`Connection failed: ${result.error}`,
+															);
+														}
+													} catch {
+														notifyError('Connection test failed');
+													} finally {
+														setTestingServer(null);
+													}
+												}}
+											>
+												{testingServer === server.id ? '...' : '\u21BB'}
+											</button>
+											<button
+												class={styles.iconBtn}
+												title="Remove"
+												onClick={async () => {
+													try {
+														await api.delete(
+															`/remote/servers/${server.id}`,
+														);
+														setRemoteServers((prev) =>
+															prev.filter((s) => s.id !== server.id),
+														);
+														notifySuccess('Server removed');
+													} catch {
+														notifyError('Failed to remove server');
+													}
+												}}
+											>
+												{'\u2715'}
+											</button>
+										</div>
+										{editingServer === server.id && (
+											<div class={styles.serverEditRow}>
+												<input
+													type="text"
+													class={styles.textInput}
+													placeholder="Server name"
+													value={server.name}
+													onInput={(e) => {
+														const val = (e.target as HTMLInputElement)
+															.value;
+														setRemoteServers((prev) =>
+															prev.map((s) =>
+																s.id === server.id
+																	? { ...s, name: val }
+																	: s,
+															),
+														);
+													}}
+												/>
+												<input
+													type="password"
+													class={styles.textInput}
+													placeholder="Password (optional)"
+													value={server.password}
+													onInput={(e) => {
+														const val = (e.target as HTMLInputElement)
+															.value;
+														setRemoteServers((prev) =>
+															prev.map((s) =>
+																s.id === server.id
+																	? { ...s, password: val }
+																	: s,
+															),
+														);
+													}}
+												/>
+												<button
+													class={styles.linkButton}
+													onClick={async () => {
+														try {
+															await api.put(
+																`/remote/servers/${server.id}`,
+																{
+																	name: server.name,
+																	password: server.password,
+																},
+															);
+															notifySuccess('Server updated');
+															setEditingServer(null);
+														} catch {
+															notifyError('Failed to update server');
+														}
+													}}
+												>
+													Save
+												</button>
+											</div>
+										)}
+									</div>
+								))}
+
+								{!showAddServer ? (
+									<button
+										class={styles.linkButton}
+										onClick={() => setShowAddServer(true)}
+									>
+										+ Add another server
+									</button>
+								) : (
+									<div class={styles.addServerForm}>
+										<input
+											type="text"
+											class={styles.textInput}
+											placeholder="Server URL (e.g. https://friend.example.com)"
+											value={newServerUrl}
+											onInput={(e) =>
+												setNewServerUrl(
+													(e.target as HTMLInputElement).value,
+												)
+											}
+										/>
+										<button
+											class={styles.iconBtn}
+											title="Configure"
+											onClick={() =>
+												setShowNewServerConfig(!showNewServerConfig)
+											}
+										>
+											{'\u2699'}
+										</button>
+										{showNewServerConfig && (
+											<div class={styles.serverEditRow}>
+												<input
+													type="text"
+													class={styles.textInput}
+													placeholder="Display name (optional)"
+													value={newServerName}
+													onInput={(e) =>
+														setNewServerName(
+															(e.target as HTMLInputElement).value,
+														)
+													}
+												/>
+												<input
+													type="password"
+													class={styles.textInput}
+													placeholder="Password (optional)"
+													value={newServerPassword}
+													onInput={(e) =>
+														setNewServerPassword(
+															(e.target as HTMLInputElement).value,
+														)
+													}
+												/>
+											</div>
+										)}
+										<div class={styles.addServerActions}>
+											<Button
+												variant="primary"
+												size="sm"
+												onClick={async () => {
+													if (!newServerUrl.trim()) return;
+													try {
+														const server = await api.post<any>(
+															'/remote/servers',
+															{
+																url: newServerUrl.trim(),
+																password:
+																	newServerPassword || undefined,
+																name:
+																	newServerName.trim() ||
+																	newServerUrl.trim(),
+															},
+														);
+														setRemoteServers((prev) => [
+															...prev,
+															server,
+														]);
+														setNewServerUrl('');
+														setNewServerPassword('');
+														setNewServerName('');
+														setShowAddServer(false);
+														setShowNewServerConfig(false);
+														notifySuccess('Server added');
+													} catch {
+														notifyError('Failed to add server');
+													}
+												}}
+											>
+												Add
+											</Button>
+											<button
+												class={styles.linkButton}
+												onClick={() => {
+													setShowAddServer(false);
+													setShowNewServerConfig(false);
+													setNewServerUrl('');
+													setNewServerPassword('');
+													setNewServerName('');
+												}}
+											>
+												Cancel
+											</button>
+										</div>
+									</div>
+								)}
 							</div>
 
 							<div class={styles.scanSection}>

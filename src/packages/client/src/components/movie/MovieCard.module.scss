@@ -49,6 +49,24 @@
   pointer-events: none;
 }
 
+.remoteBadge {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #60a5fa;
+  font-size: 9px;
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-sm);
+  z-index: 3;
+  pointer-events: none;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .transcodeBadge {
   position: absolute;
   bottom: 42px;

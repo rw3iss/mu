@@ -209,6 +209,36 @@
   }
 }
 
+.effectsBtnWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.effectsDots {
+  position: absolute;
+  top: 18px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.effectsDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+
+  &.effectsDotActive {
+    background: var(--color-accent);
+  }
+}
+
 .playBtn {
   svg {
     width: 27px;

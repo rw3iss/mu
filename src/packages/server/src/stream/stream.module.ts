@@ -19,6 +19,13 @@ import { TranscoderService } from './transcoder/transcoder.service.js';
 		SubtitleService,
 		SubtitleSearchService,
 	],
-	exports: [StreamService, TranscoderService, SubtitleService, SubtitleSearchService],
+	exports: [
+		StreamService,
+		TranscoderService,
+		DirectPlayService,
+		HlsGeneratorService,
+		SubtitleService,
+		SubtitleSearchService,
+	],
 })
 export class StreamModule {}

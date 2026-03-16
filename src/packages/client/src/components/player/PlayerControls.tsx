@@ -5,7 +5,12 @@ import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import { UI } from '@/plugins/ui-slots';
-import { showEffectsPanel, toggleEffectsPanel } from '@/state/audio-effects.state';
+import {
+	compressorEnabled,
+	eqEnabled,
+	showEffectsPanel,
+	toggleEffectsPanel,
+} from '@/state/audio-effects.state';
 import type { StreamSession } from '@/state/player.state';
 import {
 	currentTime,
@@ -429,33 +434,43 @@ export function PlayerControls({
 						</button>
 
 						{/* Effects */}
-						<button
-							class={`${styles.controlBtn} ${showEffectsPanel.value ? styles.active : ''}`}
-							onClick={toggleEffectsPanel}
-							aria-label="Audio effects"
-							title="Effects"
-						>
-							<svg
-								width="20"
-								height="20"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="white"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
+						<div class={styles.effectsBtnWrap}>
+							<div class={styles.effectsDots}>
+								<span
+									class={`${styles.effectsDot} ${eqEnabled.value ? styles.effectsDotActive : ''}`}
+								/>
+								<span
+									class={`${styles.effectsDot} ${compressorEnabled.value ? styles.effectsDotActive : ''}`}
+								/>
+							</div>
+							<button
+								class={`${styles.controlBtn} ${showEffectsPanel.value ? styles.active : ''}`}
+								onClick={toggleEffectsPanel}
+								aria-label="Audio effects"
+								title="Effects"
 							>
-								<line x1="4" y1="21" x2="4" y2="14" />
-								<line x1="4" y1="10" x2="4" y2="3" />
-								<line x1="12" y1="21" x2="12" y2="12" />
-								<line x1="12" y1="8" x2="12" y2="3" />
-								<line x1="20" y1="21" x2="20" y2="16" />
-								<line x1="20" y1="12" x2="20" y2="3" />
-								<line x1="1" y1="14" x2="7" y2="14" />
-								<line x1="9" y1="8" x2="15" y2="8" />
-								<line x1="17" y1="16" x2="23" y2="16" />
-							</svg>
-						</button>
+								<svg
+									width="20"
+									height="20"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="white"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<line x1="4" y1="21" x2="4" y2="14" />
+									<line x1="4" y1="10" x2="4" y2="3" />
+									<line x1="12" y1="21" x2="12" y2="12" />
+									<line x1="12" y1="8" x2="12" y2="3" />
+									<line x1="20" y1="21" x2="20" y2="16" />
+									<line x1="20" y1="12" x2="20" y2="3" />
+									<line x1="1" y1="14" x2="7" y2="14" />
+									<line x1="9" y1="8" x2="15" y2="8" />
+									<line x1="17" y1="16" x2="23" y2="16" />
+								</svg>
+							</button>
+						</div>
 
 						{/* Volume */}
 						<div
@@ -485,13 +500,6 @@ export function PlayerControls({
 										aria-label="Volume"
 										orient="vertical"
 									/>
-									<button
-										class={styles.volumeMuteBtn}
-										onClick={toggleMute}
-										aria-label={isMuted.value ? 'Unmute' : 'Mute'}
-									>
-										<VolumeIcon />
-									</button>
 								</div>
 							)}
 						</div>

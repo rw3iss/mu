@@ -49,6 +49,11 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 			tabIndex={0}
 		>
 			{movie.hidden && <span class={styles.hiddenLabel}>Hidden</span>}
+			{movie.remoteOrigin && (
+				<span class={styles.remoteBadge} title={`From: ${movie.remoteOrigin.serverName}`}>
+					{movie.remoteOrigin.serverName}
+				</span>
+			)}
 			{transcodeNeeded && streamLabel && (
 				<span class={styles.transcodeBadge}>{streamLabel}</span>
 			)}

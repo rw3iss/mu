@@ -182,12 +182,7 @@ export function GlobalPlayer() {
 
 	// Info panel toggle
 	const handleToggleInfo = useCallback(() => {
-		if (playerMode.value === 'mini') {
-			showInfoPanel.value = true;
-			maximizePlayer();
-		} else {
-			showInfoPanel.value = !showInfoPanel.value;
-		}
+		showInfoPanel.value = !showInfoPanel.value;
 	}, []);
 
 	// Don't render anything if player is hidden
@@ -268,16 +263,14 @@ export function GlobalPlayer() {
 				</div>
 			)}
 
-			{/* Info panel — fixed flyout, sits above top header */}
-			{!isMini && (
-				<InfoPanel
-					movie={movie}
-					visible={showInfoPanel.value}
-					onClose={() => {
-						showInfoPanel.value = false;
-					}}
-				/>
-			)}
+			{/* Info panel — fixed flyout, independent of player mode */}
+			<InfoPanel
+				movie={movie}
+				visible={showInfoPanel.value}
+				onClose={() => {
+					showInfoPanel.value = false;
+				}}
+			/>
 
 			{/* Effects panel — floating over the player */}
 			<EffectsPanel />

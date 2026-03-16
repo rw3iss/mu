@@ -5,6 +5,12 @@ import { moviesService } from '@/services/movies.service';
 // Types
 // ============================================
 
+export interface RemoteOrigin {
+	serverId: string;
+	serverName: string;
+	remoteMovieId: string;
+}
+
 export interface Movie {
 	id: string;
 	title: string;
@@ -30,6 +36,7 @@ export interface Movie {
 	durationSeconds?: number;
 	inWatchlist?: boolean;
 	status?: 'idle' | 'processing';
+	remoteOrigin?: RemoteOrigin;
 	playSettings?: {
 		eqProfileId?: string | null;
 		compressorProfileId?: string | null;
@@ -93,6 +100,8 @@ export const isLoading = signal(false);
 export const searchQuery = signal('');
 export const viewMode = signal<ViewMode>('grid');
 export const showHidden = signal(false);
+export const localOnly = signal(localStorage.getItem('mu_local_only') === 'true');
+export const hasRemoteServers = signal(false);
 
 export const filters = signal<LibraryFilters>({
 	genres: [],
@@ -142,10 +151,19 @@ export async function fetchMovies(page = 1): Promise<void> {
 			params.showHidden = 'true';
 		}
 
+		if (localOnly.value) {
+			params.server = 'local';
+		}
+
 		const response = await moviesService.list(params);
 		movies.value = response.movies;
 		totalMovies.value = response.total;
 		hiddenCount.value = response.hiddenCount ?? 0;
+
+		// Track whether remote servers exist
+		if ((response as any).remoteServers?.length > 0) {
+			hasRemoteServers.value = true;
+		}
 	} catch (error) {
 		console.error('Failed to fetch movies:', error);
 	} finally {
@@ -185,6 +203,12 @@ export function updateMovieInList(updated: Movie): void {
 
 export function toggleShowHidden(): void {
 	showHidden.value = !showHidden.value;
+	fetchMovies(1);
+}
+
+export function toggleLocalOnly(): void {
+	localOnly.value = !localOnly.value;
+	localStorage.setItem('mu_local_only', String(localOnly.value));
 	fetchMovies(1);
 }
 

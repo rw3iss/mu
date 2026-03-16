@@ -31,6 +31,8 @@ export interface MovieListQuery extends PaginationQuery {
 	watched?: boolean;
 	hasSubtitles?: boolean;
 	showHidden?: boolean;
+	/** Filter by media server: 'local', 'all', or a specific remote server ID */
+	server?: string;
 }
 
 export interface StreamStartResponse {
