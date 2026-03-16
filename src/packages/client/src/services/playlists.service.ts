@@ -98,11 +98,20 @@ export const playlistsService = {
 
 	/**
 	 * Add a movie to a playlist.
-	 * @param playlistId - The playlist ID.
-	 * @param movieId - The movie ID to add.
+	 * For remote movies, pass remoteInfo to store metadata alongside the entry.
 	 */
-	addMovie(playlistId: string, movieId: string): Promise<void> {
-		return api.post<void>(`/playlists/${playlistId}/movies`, { movieId });
+	addMovie(
+		playlistId: string,
+		movieId: string,
+		remoteInfo?: { title: string; posterUrl?: string; serverId: string },
+	): Promise<void> {
+		const body: Record<string, unknown> = { movieId };
+		if (remoteInfo) {
+			body.remoteTitle = remoteInfo.title;
+			body.remotePosterUrl = remoteInfo.posterUrl;
+			body.remoteServerId = remoteInfo.serverId;
+		}
+		return api.post<void>(`/playlists/${playlistId}/movies`, body);
 	},
 
 	/**

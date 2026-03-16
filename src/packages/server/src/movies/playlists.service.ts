@@ -13,6 +13,7 @@ interface PlaylistMovieSummary {
 	runtimeMinutes: number | null;
 	durationSeconds: number | null;
 	addedAt: string | null;
+	isRemote?: boolean;
 }
 
 @Injectable()
@@ -169,7 +170,7 @@ export class PlaylistsService {
 
 	private attachMovieSummaries<T extends { id: string }>(playlists_list: T[]) {
 		return playlists_list.map((playlist) => {
-			const movieSummaries = this.database.db
+			const rows = this.database.db
 				.select({
 					movieId: playlistMovies.movieId,
 					title: movies.title,
@@ -179,12 +180,27 @@ export class PlaylistsService {
 					runtimeMinutes: movies.runtimeMinutes,
 					durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
 					addedAt: playlistMovies.addedAt,
+					remoteTitle: playlistMovies.remoteTitle,
+					remotePosterUrl: playlistMovies.remotePosterUrl,
+					remoteServerId: playlistMovies.remoteServerId,
 				})
 				.from(playlistMovies)
-				.innerJoin(movies, eq(playlistMovies.movieId, movies.id))
+				.leftJoin(movies, eq(playlistMovies.movieId, movies.id))
 				.where(eq(playlistMovies.playlistId, playlist.id))
 				.orderBy(asc(playlistMovies.position))
-				.all() as PlaylistMovieSummary[];
+				.all();
+
+			const movieSummaries = rows.map((r) => ({
+				movieId: r.movieId,
+				title: r.title ?? r.remoteTitle ?? 'Unknown',
+				year: r.year,
+				posterUrl: r.posterUrl ?? r.remotePosterUrl,
+				thumbnailUrl: r.thumbnailUrl,
+				runtimeMinutes: r.runtimeMinutes,
+				durationSeconds: r.durationSeconds,
+				addedAt: r.addedAt,
+				isRemote: !!r.remoteServerId,
+			})) as PlaylistMovieSummary[];
 
 			return { ...playlist, movies: movieSummaries };
 		});
@@ -201,7 +217,7 @@ export class PlaylistsService {
 			throw new NotFoundException(`Playlist ${id} not found`);
 		}
 
-		const items = this.database.db
+		const rows = this.database.db
 			.select({
 				id: playlistMovies.id,
 				movieId: playlistMovies.movieId,
@@ -212,12 +228,22 @@ export class PlaylistsService {
 				moviePosterUrl: movies.posterUrl,
 				movieThumbnailUrl: movies.thumbnailUrl,
 				movieRuntimeMinutes: movies.runtimeMinutes,
+				remoteTitle: playlistMovies.remoteTitle,
+				remotePosterUrl: playlistMovies.remotePosterUrl,
+				remoteServerId: playlistMovies.remoteServerId,
 			})
 			.from(playlistMovies)
-			.innerJoin(movies, eq(playlistMovies.movieId, movies.id))
+			.leftJoin(movies, eq(playlistMovies.movieId, movies.id))
 			.where(eq(playlistMovies.playlistId, id))
 			.orderBy(asc(playlistMovies.position))
 			.all();
+
+		const items = rows.map((r) => ({
+			...r,
+			movieTitle: r.movieTitle ?? r.remoteTitle ?? 'Unknown',
+			moviePosterUrl: r.moviePosterUrl ?? r.remotePosterUrl,
+			isRemote: !!r.remoteServerId,
+		}));
 
 		return { ...playlist, movies: items };
 	}
@@ -256,7 +282,11 @@ export class PlaylistsService {
 		this.database.db.delete(playlists).where(eq(playlists.id, id)).run();
 	}
 
-	addMovie(playlistId: string, movieId: string) {
+	addMovie(
+		playlistId: string,
+		movieId: string,
+		remoteInfo?: { title: string; posterUrl?: string; serverId: string },
+	) {
 		const existing = this.database.db
 			.select()
 			.from(playlistMovies)
@@ -286,6 +316,9 @@ export class PlaylistsService {
 				movieId,
 				position,
 				addedAt: nowISO(),
+				remoteTitle: remoteInfo?.title ?? null,
+				remotePosterUrl: remoteInfo?.posterUrl ?? null,
+				remoteServerId: remoteInfo?.serverId ?? null,
 			})
 			.run();
 

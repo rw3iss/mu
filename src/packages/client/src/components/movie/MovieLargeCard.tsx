@@ -114,7 +114,9 @@ export function MovieLargeCard({ movie, onMovieUpdate }: MovieLargeCardProps) {
 							</span>
 						)}
 						<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
-						<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+						{!movie.remoteOrigin && (
+							<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+						)}
 					</div>
 				</div>
 				<div class={styles.meta}>

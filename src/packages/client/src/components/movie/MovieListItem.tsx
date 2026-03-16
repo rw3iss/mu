@@ -115,7 +115,9 @@ export function MovieListItem({ movie, onMovieUpdate }: MovieListItemProps) {
 						Resume
 					</button>
 				)}
-				<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+				{!movie.remoteOrigin && (
+					<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+				)}
 			</div>
 		</div>
 	);

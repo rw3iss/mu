@@ -316,6 +316,52 @@ export class DatabaseService implements OnModuleDestroy {
 			}
 		}
 
+		// playlist_movies: remove FK on movie_id to allow remote movie IDs,
+		// and add columns for remote movie metadata
+		try {
+			const fkList = this.sqlite.pragma('foreign_key_list(playlist_movies)') as {
+				table: string;
+			}[];
+			const hasMovieFK = fkList.some((fk) => fk.table === 'movies');
+			if (hasMovieFK) {
+				this.sqlite.pragma('foreign_keys = OFF');
+				this.sqlite.exec(`
+					CREATE TABLE playlist_movies_new (
+						id TEXT PRIMARY KEY,
+						playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+						movie_id TEXT NOT NULL,
+						position INTEGER NOT NULL,
+						added_at TEXT NOT NULL,
+						remote_title TEXT,
+						remote_poster_url TEXT,
+						remote_server_id TEXT
+					);
+					INSERT INTO playlist_movies_new (id, playlist_id, movie_id, position, added_at)
+						SELECT id, playlist_id, movie_id, position, added_at FROM playlist_movies;
+					DROP TABLE playlist_movies;
+					ALTER TABLE playlist_movies_new RENAME TO playlist_movies;
+					CREATE UNIQUE INDEX idx_playlist_movies_unique ON playlist_movies(playlist_id, movie_id);
+				`);
+				this.sqlite.pragma('foreign_keys = ON');
+				this.logger.log('Migrated playlist_movies to support remote movies');
+			}
+		} catch (err) {
+			this.sqlite.pragma('foreign_keys = ON');
+			this.logger.warn(`playlist_movies migration skipped: ${err}`);
+		}
+		// Add remote columns if table was already migrated but missing columns
+		for (const col of [
+			'remote_title TEXT',
+			'remote_poster_url TEXT',
+			'remote_server_id TEXT',
+		]) {
+			try {
+				this.sqlite.exec(`ALTER TABLE playlist_movies ADD COLUMN ${col}`);
+			} catch {
+				// already exists
+			}
+		}
+
 		this.logger.log('Tables created from inline SQL');
 	}
 

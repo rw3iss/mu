@@ -251,6 +251,8 @@ export function MovieDetail({ id }: MovieDetailProps) {
 		);
 	}
 
+	const isRemote = !!movie.remoteOrigin;
+
 	const hours = Math.floor(movie.runtime / 60);
 	const mins = movie.runtime % 60;
 	const runtimeText = movie.runtime
@@ -297,8 +299,8 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 				{/* Info */}
 				<div class={styles.infoColumn}>
-					{/* Editable Title */}
-					{editingTitle ? (
+					{/* Title */}
+					{!isRemote && editingTitle ? (
 						<div class={styles.titleEditRow}>
 							<input
 								ref={titleInputRef}
@@ -326,6 +328,8 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								{'\u2715'}
 							</button>
 						</div>
+					) : isRemote ? (
+						<h1 class={styles.title}>{movie.title}</h1>
 					) : (
 						<div class={styles.titleRow} onClick={startEditingTitle}>
 							<h1 class={styles.title}>{movie.title}</h1>
@@ -336,6 +340,9 @@ export function MovieDetail({ id }: MovieDetailProps) {
 					<div class={styles.meta}>
 						{movie.year > 0 && <span>{movie.year}</span>}
 						{movie.hidden && <span class={styles.hiddenBadge}>Hidden</span>}
+						{isRemote && movie.remoteOrigin && (
+							<span class={styles.remoteBadge}>{movie.remoteOrigin.serverName}</span>
+						)}
 						{runtimeText && <span>{runtimeText}</span>}
 						{movie.director && <span>Dir. {movie.director}</span>}
 					</div>
@@ -353,15 +360,17 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 					{/* Ratings */}
 					<div class={styles.ratings}>
-						<div class={styles.userRating}>
-							<span class={styles.ratingLabel}>Your Rating</span>
-							<RatingWidget
-								value={movie.rating}
-								editable
-								onChange={handleRate}
-								size="lg"
-							/>
-						</div>
+						{!isRemote && (
+							<div class={styles.userRating}>
+								<span class={styles.ratingLabel}>Your Rating</span>
+								<RatingWidget
+									value={movie.rating}
+									editable
+									onChange={handleRate}
+									size="lg"
+								/>
+							</div>
+						)}
 						<ExternalRatings
 							imdbRating={movie.imdbRating}
 							rtRating={movie.rtRating}
@@ -372,7 +381,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 					{/* Actions */}
 					<div class={styles.actions}>
-						{movie.status === 'processing' ? (
+						{movie.status === 'processing' && !isRemote ? (
 							<div class={styles.processingStatus}>
 								<Spinner size="sm" />
 								<span>Processing...</span>
@@ -406,14 +415,18 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								{'\u25B6'} Play
 							</Button>
 						)}
-						<Button
-							variant={inWatchlist ? 'secondary' : 'ghost'}
-							size="lg"
-							onClick={handleWatchlistToggle}
-						>
-							{inWatchlist ? '\u2713 In Watchlist' : '\u2606 Watchlist'}
-						</Button>
-						<MovieOptionsMenu movie={movie} onMovieUpdate={handleMovieUpdate} />
+						{!isRemote && (
+							<Button
+								variant={inWatchlist ? 'secondary' : 'ghost'}
+								size="lg"
+								onClick={handleWatchlistToggle}
+							>
+								{inWatchlist ? '\u2713 In Watchlist' : '\u2606 Watchlist'}
+							</Button>
+						)}
+						{!isRemote && (
+							<MovieOptionsMenu movie={movie} onMovieUpdate={handleMovieUpdate} />
+						)}
 					</div>
 
 					{/* Overview */}
@@ -450,74 +463,81 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						</div>
 					)}
 
-					{/* Play Settings */}
-					<div class={styles.fileInfoSection}>
-						<button
-							class={styles.fileInfoToggle}
-							onClick={() => setShowPlaySettings(!showPlaySettings)}
-						>
-							<h2 class={styles.sectionTitle}>Play Settings</h2>
-							<span class={styles.fileInfoArrow}>
-								{showPlaySettings ? '\u25B2' : '\u25BC'}
-							</span>
-						</button>
+					{/* Play Settings (local only) */}
+					{!isRemote && (
+						<div class={styles.fileInfoSection}>
+							<button
+								class={styles.fileInfoToggle}
+								onClick={() => setShowPlaySettings(!showPlaySettings)}
+							>
+								<h2 class={styles.sectionTitle}>Play Settings</h2>
+								<span class={styles.fileInfoArrow}>
+									{showPlaySettings ? '\u25B2' : '\u25BC'}
+								</span>
+							</button>
 
-						{showPlaySettings && (
-							<div class={styles.fileInfoContent}>
-								<p class={styles.playSettingsDescription}>
-									Override default audio settings when playing this movie.
-								</p>
-								<div class={styles.playSettingsGrid}>
-									<label class={styles.playSettingsLabel}>EQ Profile</label>
-									<select
-										class={styles.playSettingsSelect}
-										value={selectedEqProfile}
-										onChange={(e) => {
-											const val = (e.target as HTMLSelectElement).value;
-											setSelectedEqProfile(val);
-											updatePlaySetting('eqProfileId', val || null);
-										}}
-									>
-										<option value="">None (use default)</option>
-										{audioProfiles
-											.filter((p) => p.type === 'eq' || p.type === 'full')
-											.map((p) => (
-												<option key={p.id} value={p.id}>
-													{p.name}
-												</option>
-											))}
-									</select>
+							{showPlaySettings && (
+								<div class={styles.fileInfoContent}>
+									<p class={styles.playSettingsDescription}>
+										Override default audio settings when playing this movie.
+									</p>
+									<div class={styles.playSettingsGrid}>
+										<label class={styles.playSettingsLabel}>EQ Profile</label>
+										<select
+											class={styles.playSettingsSelect}
+											value={selectedEqProfile}
+											onChange={(e) => {
+												const val = (e.target as HTMLSelectElement).value;
+												setSelectedEqProfile(val);
+												updatePlaySetting('eqProfileId', val || null);
+											}}
+										>
+											<option value="">None (use default)</option>
+											{audioProfiles
+												.filter((p) => p.type === 'eq' || p.type === 'full')
+												.map((p) => (
+													<option key={p.id} value={p.id}>
+														{p.name}
+													</option>
+												))}
+										</select>
 
-									<label class={styles.playSettingsLabel}>
-										Compressor Profile
-									</label>
-									<select
-										class={styles.playSettingsSelect}
-										value={selectedCompProfile}
-										onChange={(e) => {
-											const val = (e.target as HTMLSelectElement).value;
-											setSelectedCompProfile(val);
-											updatePlaySetting('compressorProfileId', val || null);
-										}}
-									>
-										<option value="">None (use default)</option>
-										{audioProfiles
-											.filter(
-												(p) => p.type === 'compressor' || p.type === 'full',
-											)
-											.map((p) => (
-												<option key={p.id} value={p.id}>
-													{p.name}
-												</option>
-											))}
-									</select>
+										<label class={styles.playSettingsLabel}>
+											Compressor Profile
+										</label>
+										<select
+											class={styles.playSettingsSelect}
+											value={selectedCompProfile}
+											onChange={(e) => {
+												const val = (e.target as HTMLSelectElement).value;
+												setSelectedCompProfile(val);
+												updatePlaySetting(
+													'compressorProfileId',
+													val || null,
+												);
+											}}
+										>
+											<option value="">None (use default)</option>
+											{audioProfiles
+												.filter(
+													(p) =>
+														p.type === 'compressor' ||
+														p.type === 'full',
+												)
+												.map((p) => (
+													<option key={p.id} value={p.id}>
+														{p.name}
+													</option>
+												))}
+										</select>
+									</div>
 								</div>
-							</div>
-						)}
-					</div>
+							)}
+						</div>
+					)}
 
-					{/* File Info */}
-					{movie.fileInfo && (
+					{/* File Info (local only) */}
+					{!isRemote && movie.fileInfo && (
 						<div class={styles.fileInfoSection}>
 							<button
 								class={styles.fileInfoToggle}
@@ -739,7 +759,18 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 				{/* Playlists (right column) */}
 				<div class={styles.playlistsColumn}>
-					<MoviePlaylists movieId={movie.id} />
+					<MoviePlaylists
+						movieId={movie.id}
+						remoteInfo={
+							isRemote && movie.remoteOrigin
+								? {
+										title: movie.title,
+										posterUrl: movie.posterUrl,
+										serverId: movie.remoteOrigin.serverId,
+									}
+								: undefined
+						}
+					/>
 				</div>
 			</div>
 		</div>

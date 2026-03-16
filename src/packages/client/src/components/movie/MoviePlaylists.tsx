@@ -12,9 +12,10 @@ function shouldNotifyPlaylist(): boolean {
 
 interface MoviePlaylistsProps {
 	movieId: string;
+	remoteInfo?: { title: string; posterUrl?: string; serverId: string };
 }
 
-export function MoviePlaylists({ movieId }: MoviePlaylistsProps) {
+export function MoviePlaylists({ movieId, remoteInfo }: MoviePlaylistsProps) {
 	const [allPlaylists, setAllPlaylists] = useState<Playlist[]>([]);
 	const [memberPlaylists, setMemberPlaylists] = useState<MoviePlaylistInfo[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +57,7 @@ export function MoviePlaylists({ movieId }: MoviePlaylistsProps) {
 
 		select.value = '';
 		try {
-			await playlistsService.addMovie(playlistId, movieId);
+			await playlistsService.addMovie(playlistId, movieId, remoteInfo);
 			const playlist = allPlaylists.find((p) => p.id === playlistId);
 			if (playlist) {
 				setMemberPlaylists((prev) => [...prev, { id: playlist.id, name: playlist.name }]);

@@ -222,7 +222,7 @@
   font-size: var(--font-size-sm);
   margin-bottom: var(--space-md);
 
-  span + span:not(.hiddenBadge)::before {
+  span + span:not(.hiddenBadge):not(.remoteBadge)::before {
     content: '\2022';
     margin-right: var(--space-md);
   }
@@ -237,6 +237,18 @@
   font-weight: var(--font-weight-semibold);
   border-radius: var(--radius-sm);
   border: 1px solid rgba(239, 68, 68, 0.3);
+  margin-left: var(--space-xs);
+}
+
+.remoteBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(59, 130, 246, 0.3);
   margin-left: var(--space-xs);
 }
 

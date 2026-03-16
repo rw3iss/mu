@@ -53,8 +53,24 @@ export class PlaylistsController {
 	}
 
 	@Post(':id/movies')
-	addMovie(@Param('id') playlistId: string, @Body() body: { movieId: string }) {
-		this.playlistsService.addMovie(playlistId, body.movieId);
+	addMovie(
+		@Param('id') playlistId: string,
+		@Body()
+		body: {
+			movieId: string;
+			remoteTitle?: string;
+			remotePosterUrl?: string;
+			remoteServerId?: string;
+		},
+	) {
+		const remoteInfo = body.remoteServerId
+			? {
+					title: body.remoteTitle ?? 'Unknown',
+					posterUrl: body.remotePosterUrl,
+					serverId: body.remoteServerId,
+				}
+			: undefined;
+		this.playlistsService.addMovie(playlistId, body.movieId, remoteInfo);
 		return { success: true };
 	}
 

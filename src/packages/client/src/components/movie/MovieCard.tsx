@@ -130,9 +130,11 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 						</span>
 					)}
 					<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
-					<span class={styles.optionsWrap}>
-						<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
-					</span>
+					{!movie.remoteOrigin && (
+						<span class={styles.optionsWrap}>
+							<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+						</span>
+					)}
 				</div>
 			</div>
 		</div>
