@@ -139,7 +139,8 @@ export class LibraryJobsService implements OnModuleInit {
 		this.jobManager.registerHandler(
 			JOB_TYPE.PRE_TRANSCODE,
 			async (job: JobRecord, helpers: JobHelpers) => {
-				const { movieFileId, filePath, mode, quality } = job.payload as {
+				const { movieId, movieFileId, filePath, mode, quality } = job.payload as {
+					movieId?: string;
 					movieFileId: string;
 					filePath: string;
 					mode: string;
@@ -157,6 +158,14 @@ export class LibraryJobsService implements OnModuleInit {
 
 				// Record the cached transcode with encoding settings used
 				this.recordTranscodeCache(movieFileId, quality);
+
+				// Notify clients so movie detail pages can refresh their file info
+				if (movieId) {
+					this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+						movieId,
+						source: 'pre-transcode',
+					});
+				}
 
 				helpers.reportProgress(100);
 				return { movieFileId, quality };

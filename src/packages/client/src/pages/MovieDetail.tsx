@@ -9,6 +9,7 @@ import { RatingWidget } from '@/components/movie/RatingWidget';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
+import { wsService } from '@/services/websocket.service';
 import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
@@ -50,6 +51,25 @@ export function MovieDetail({ id }: MovieDetailProps) {
 		}
 
 		load();
+	}, [id]);
+
+	// Re-fetch movie when the server notifies us of an update
+	// (e.g. after re-scan, pre-transcode completion, metadata refresh)
+	useEffect(() => {
+		if (!id) return;
+
+		const handler = (data: unknown) => {
+			const event = data as { movieId?: string; source?: string };
+			if (event.movieId === id) {
+				moviesService
+					.get(id)
+					.then((updated) => setMovie(updated))
+					.catch(() => {});
+			}
+		};
+
+		wsService.on('library:movie-updated', handler);
+		return () => wsService.off('library:movie-updated', handler);
 	}, [id]);
 
 	const handlePlay = useCallback(() => {
