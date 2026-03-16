@@ -543,6 +543,19 @@
   margin-top: var(--space-xs);
 }
 
+.sharingUrlRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.sharingUrlInput {
+  flex: 1;
+  user-select: all;
+  cursor: default;
+  opacity: 0.85;
+}
+
 .serverEntry {
   display: flex;
   flex-wrap: wrap;

@@ -165,6 +165,7 @@ export function Settings(props: SettingsProps) {
 	const [sharingPassword, setSharingPassword] = useState('');
 	const [sharingServerName, setSharingServerName] = useState('My Library');
 	const [showPasswordInput, setShowPasswordInput] = useState(false);
+	const [sharingUrl, setSharingUrl] = useState('');
 
 	// Remote servers
 	const [remoteServers, setRemoteServers] = useState<
@@ -276,6 +277,14 @@ export function Settings(props: SettingsProps) {
 					if (typeof sharing.serverName === 'string')
 						setSharingServerName(sharing.serverName);
 					if (sharing.password) setShowPasswordInput(true);
+				}
+
+				// Load server URL for sharing
+				try {
+					const urlData = await api.get<{ url: string }>('/settings/server-url');
+					if (urlData?.url) setSharingUrl(urlData.url);
+				} catch {
+					// ignore
 				}
 
 				// Load remote servers
@@ -1493,6 +1502,54 @@ export function Settings(props: SettingsProps) {
 											</div>
 										)}
 									</div>
+
+									{sharingUrl && (
+										<div class={styles.settingRow}>
+											<div class={styles.settingInfo}>
+												<span class={styles.settingLabel}>Server URL</span>
+												<span class={styles.settingDescription}>
+													Share this URL with others to connect to your
+													library
+												</span>
+											</div>
+											<div class={styles.sharingUrlRow}>
+												<input
+													type="text"
+													class={`${styles.textInput} ${styles.sharingUrlInput}`}
+													value={sharingUrl}
+													readOnly
+												/>
+												<button
+													class={styles.iconBtn}
+													title="Copy to clipboard"
+													onClick={() => {
+														navigator.clipboard.writeText(sharingUrl);
+														notifySuccess('URL copied to clipboard');
+													}}
+												>
+													<svg
+														width="14"
+														height="14"
+														viewBox="0 0 24 24"
+														fill="none"
+														stroke="currentColor"
+														stroke-width="2"
+														stroke-linecap="round"
+														stroke-linejoin="round"
+													>
+														<rect
+															x="9"
+															y="9"
+															width="13"
+															height="13"
+															rx="2"
+														/>
+														<path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+													</svg>
+												</button>
+											</div>
+										</div>
+									)}
 								</>
 							)}
 

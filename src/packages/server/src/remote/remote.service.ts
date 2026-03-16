@@ -122,9 +122,13 @@ export class RemoteService {
 
 		const data = (await response.json()) as any;
 
-		// Tag each movie with its remote origin
+		// Tag each movie with its remote origin and absolutize image URLs
 		const movies = (data.movies ?? []).map((m: any) => ({
 			...m,
+			posterUrl: m.posterUrl ? this.absolutizeUrl(baseUrl, m.posterUrl) : m.posterUrl,
+			thumbnailUrl: m.thumbnailUrl
+				? this.absolutizeUrl(baseUrl, m.thumbnailUrl)
+				: m.thumbnailUrl,
 			remoteOrigin: {
 				serverId: server.id,
 				serverName: server.name,
@@ -197,6 +201,12 @@ export class RemoteService {
 		const movie = (await response.json()) as Record<string, unknown>;
 		return {
 			...movie,
+			posterUrl: movie.posterUrl
+				? this.absolutizeUrl(baseUrl, movie.posterUrl as string)
+				: movie.posterUrl,
+			thumbnailUrl: movie.thumbnailUrl
+				? this.absolutizeUrl(baseUrl, movie.thumbnailUrl as string)
+				: movie.thumbnailUrl,
 			remoteOrigin: {
 				serverId: server.id,
 				serverName: server.name,
@@ -262,5 +272,10 @@ export class RemoteService {
 			headers.Authorization = `Bearer ${createHash('sha256').update(server.password).digest('hex')}`;
 		}
 		return { baseUrl: server.url.replace(/\/+$/, ''), headers };
+	}
+
+	private absolutizeUrl(baseUrl: string, url: string): string {
+		if (url.startsWith('http://') || url.startsWith('https://')) return url;
+		return `${baseUrl}${url}`;
 	}
 }

@@ -1,10 +1,34 @@
+import { networkInterfaces } from 'node:os';
 import { Body, Controller, Delete, Get, Param, Put } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { ConfigService } from '../config/config.service.js';
 import { SettingsService } from './settings.service.js';
 
 @Controller('settings')
 export class SettingsController {
-	constructor(private readonly settingsService: SettingsService) {}
+	constructor(
+		private readonly settingsService: SettingsService,
+		private readonly configService: ConfigService,
+	) {}
+
+	@Get('server-url')
+	@Roles('admin')
+	getServerUrl() {
+		const port = this.configService.get<number>('server.port', 4000);
+		const nets = networkInterfaces();
+		let ip = '127.0.0.1';
+		for (const addrs of Object.values(nets)) {
+			if (!addrs) continue;
+			for (const addr of addrs) {
+				if (addr.family === 'IPv4' && !addr.internal) {
+					ip = addr.address;
+					break;
+				}
+			}
+			if (ip !== '127.0.0.1') break;
+		}
+		return { url: `http://${ip}:${port}` };
+	}
 
 	@Get()
 	@Roles('admin')
