@@ -1,8 +1,15 @@
 import crypto from 'node:crypto';
 import { statSync } from 'node:fs';
 import { nowISO, StreamMode, WsEvent } from '@mu/shared';
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import {
+	BadRequestException,
+	Injectable,
+	Logger,
+	NotFoundException,
+	OnModuleDestroy,
+	OnModuleInit,
+} from '@nestjs/common';
+import { and, eq, lt } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
@@ -25,12 +32,20 @@ interface StartStreamOptions {
 	subtitleTrack?: number;
 }
 
+/** Stale session timeout in minutes — sessions with no heartbeat for this long are reaped. */
+const SESSION_TIMEOUT_MINUTES = 30;
+/** How often to check for stale sessions (ms). */
+const SESSION_REAP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
 @Injectable()
-export class StreamService {
+export class StreamService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger(StreamService.name);
 
 	/** Maps sessionId → the directory where HLS segments live (persistent or ephemeral) */
 	private readonly sessionDirs = new Map<string, string>();
+
+	/** Interval timer for reaping stale sessions */
+	private reapInterval: ReturnType<typeof setInterval> | null = null;
 
 	constructor(
 		private readonly database: DatabaseService,
@@ -41,6 +56,96 @@ export class StreamService {
 		private readonly subtitleService: SubtitleService,
 		private readonly settings: SettingsService,
 	) {}
+
+	onModuleInit(): void {
+		// Start the stale session reaper
+		this.reapInterval = setInterval(() => {
+			this.reapStaleSessions().catch((err) => {
+				this.logger.error(`Session reaper error: ${err.message}`);
+			});
+		}, SESSION_REAP_INTERVAL_MS);
+		this.logger.log(
+			`Session reaper started (timeout: ${SESSION_TIMEOUT_MINUTES}min, interval: ${SESSION_REAP_INTERVAL_MS / 1000}s)`,
+		);
+	}
+
+	onModuleDestroy(): void {
+		if (this.reapInterval) {
+			clearInterval(this.reapInterval);
+			this.reapInterval = null;
+		}
+	}
+
+	/**
+	 * Reap stale sessions — sessions with no heartbeat/progress update
+	 * for longer than SESSION_TIMEOUT_MINUTES.
+	 */
+	async reapStaleSessions(): Promise<number> {
+		const cutoff = new Date(Date.now() - SESSION_TIMEOUT_MINUTES * 60 * 1000).toISOString();
+
+		const staleSessions = this.database.db
+			.select()
+			.from(streamSessions)
+			.where(lt(streamSessions.lastActiveAt, cutoff))
+			.all();
+
+		if (staleSessions.length === 0) return 0;
+
+		this.logger.log(
+			`Reaping ${staleSessions.length} stale session(s) (last active before ${cutoff})`,
+		);
+
+		let reaped = 0;
+		for (const session of staleSessions) {
+			try {
+				await this.endStream(session.id);
+				reaped++;
+				this.logger.log(`Reaped stale session ${session.id} (movie: ${session.movieId})`);
+			} catch (err: any) {
+				this.logger.warn(`Failed to reap session ${session.id}: ${err.message}`);
+			}
+		}
+
+		return reaped;
+	}
+
+	/**
+	 * Get the stream mode for a movie without starting a session.
+	 * Used to show "needs transcode" indicators on movie cards.
+	 */
+	async getMovieStreamInfo(movieId: string): Promise<{
+		streamMode: string;
+		needsTranscode: boolean;
+		hasCache: boolean;
+		codecVideo: string | null;
+		codecAudio: string | null;
+		videoHeight: number | null;
+	} | null> {
+		const fileList = await this.database.db
+			.select()
+			.from(movieFiles)
+			.where(and(eq(movieFiles.movieId, movieId), eq(movieFiles.available, true)));
+
+		if (fileList.length === 0) return null;
+
+		const file = this.selectBestFile(fileList);
+		const mode = this.determineStreamMode(file);
+		const quality = this.resolveDefaultQuality(file.id, file.videoHeight);
+
+		const lib = this.settings.get<Record<string, unknown>>('library', {});
+		const persistEnabled = (lib as any)?.persistTranscodes !== false;
+		const hasCache =
+			persistEnabled && (await this.transcoderService.hasCachedTranscode(file.id, quality));
+
+		return {
+			streamMode: mode,
+			needsTranscode: mode === StreamMode.TRANSCODE || mode === StreamMode.DIRECT_STREAM,
+			hasCache,
+			codecVideo: file.codecVideo,
+			codecAudio: file.codecAudio,
+			videoHeight: file.videoHeight,
+		};
+	}
 
 	async startStream(movieId: string, userId: string, options: StartStreamOptions = {}) {
 		const movieFileList = await this.database.db
@@ -91,11 +196,11 @@ export class StreamService {
 			);
 		}
 
-		// Determine stream mode based on container and codec
+		// Determine stream mode based on container, video codec, and audio codec
 		const mode = this.determineStreamMode(file);
 
 		const sessionId = crypto.randomUUID();
-		const quality = options.quality || this.resolveDefaultQuality(file.id);
+		const quality = options.quality || this.resolveDefaultQuality(file.id, file.videoHeight);
 
 		await this.database.db.insert(streamSessions).values({
 			id: sessionId,
@@ -209,21 +314,29 @@ export class StreamService {
 		// live transcodes need time for ffmpeg to produce the first segment.
 		const ready = directPlay || (mode !== StreamMode.DIRECT_PLAY && hasCached);
 
+		// Parse audio tracks from file metadata
+		const audioTracks = this.parseAudioTracks(file);
+
+		// Build available quality options (capped at source resolution)
+		const qualities = this.getAvailableQualities(file.videoHeight);
+
 		return {
 			sessionId,
 			movieId,
 			streamUrl,
+			streamMode: mode,
 			directPlay,
 			ready,
 			format: directPlay ? 'native' : 'hls',
+			quality,
 			subtitles: subtitleTracks.map((t) => ({
 				id: String(t.index),
 				label: t.title || t.language,
 				language: t.language,
 				url: `/api/v1/stream/${sessionId}/subtitles/${t.index}.vtt`,
 			})),
-			audioTracks: [],
-			qualities: [],
+			audioTracks,
+			qualities,
 			startPosition: resumePosition,
 		};
 	}
@@ -394,42 +507,63 @@ export class StreamService {
 
 		// Sort by resolution height descending, pick the first
 		return files.sort((a, b) => {
-			const aHeight = a.resolutionHeight ?? 0;
-			const bHeight = b.resolutionHeight ?? 0;
+			const aHeight = a.videoHeight ?? 0;
+			const bHeight = b.videoHeight ?? 0;
 			return bHeight - aHeight;
 		})[0];
 	}
 
 	/**
 	 * Resolve the best default quality for a movie file.
-	 * If "encode highest available" is on, prefer the highest cached quality.
-	 * Otherwise use the configured default quality.
+	 * Considers: source file resolution, cached transcodes, and configured default.
+	 * Never upscales — caps quality at source resolution.
 	 */
-	private resolveDefaultQuality(movieFileId: string): string {
+	private resolveDefaultQuality(movieFileId: string, sourceHeight?: number | null): string {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const defaultQuality = enc?.quality || '1080p';
 		const encodeHighest = enc?.encodeHighestAvailable === true;
 
-		if (!encodeHighest) return defaultQuality;
+		const ranks: Record<string, number> = { '480p': 1, '720p': 2, '1080p': 3, '4k': 4 };
+
+		// Cap quality at source resolution to avoid upscaling
+		let maxQuality = defaultQuality;
+		if (sourceHeight && sourceHeight > 0) {
+			if (sourceHeight < 720) maxQuality = '480p';
+			else if (sourceHeight < 1080) maxQuality = '720p';
+			else if (sourceHeight < 2160) maxQuality = '1080p';
+			else maxQuality = '4k';
+
+			// Don't exceed source-capped quality
+			const defaultRank = ranks[defaultQuality] ?? 3;
+			const sourceMaxRank = ranks[maxQuality] ?? 3;
+			if (defaultRank <= sourceMaxRank) {
+				maxQuality = defaultQuality;
+			} else {
+				this.logger.debug(
+					`Capping quality from ${defaultQuality} to ${maxQuality} (source height: ${sourceHeight}px)`,
+				);
+			}
+		}
+
+		if (!encodeHighest) return maxQuality;
 
 		try {
-			// Look up all cached qualities for this file
 			const cached = this.database.db
 				.select({ quality: transcodeCache.quality })
 				.from(transcodeCache)
 				.where(eq(transcodeCache.movieFileId, movieFileId))
 				.all();
 
-			if (cached.length === 0) return defaultQuality;
+			if (cached.length === 0) return maxQuality;
 
-			// Pick the highest cached quality
-			const ranks: Record<string, number> = { '480p': 1, '720p': 2, '1080p': 3, '4k': 4 };
-			let best = defaultQuality;
-			let bestRank = ranks[defaultQuality] ?? 0;
+			const maxRank = ranks[maxQuality] ?? 3;
+			let best = maxQuality;
+			let bestRank = ranks[maxQuality] ?? 0;
 
 			for (const { quality } of cached) {
 				const rank = ranks[quality] ?? 0;
-				if (rank > bestRank) {
+				// Don't exceed source resolution
+				if (rank > bestRank && rank <= maxRank) {
 					best = quality;
 					bestRank = rank;
 				}
@@ -437,23 +571,27 @@ export class StreamService {
 
 			return best;
 		} catch {
-			return defaultQuality;
+			return maxQuality;
 		}
 	}
 
 	/**
-	 * Determine the optimal stream mode based on container format and video codec.
+	 * Determine the optimal stream mode based on container, video codec, and audio codec.
 	 *
-	 * Browser-native playback requires H.264/AAC in an MP4 or WebM container.
-	 * Everything else must be transcoded to HLS.
+	 * Browser-native playback requires:
+	 * - Video: H.264 (or VP8/VP9 in WebM)
+	 * - Audio: AAC, MP3, Opus, FLAC, Vorbis (NOT DTS, TrueHD, AC3, EAC3)
+	 * - Container: MP4, WebM, or M4V
+	 *
+	 * Decision hierarchy: DIRECT_PLAY → DIRECT_STREAM → TRANSCODE
 	 */
 	determineStreamMode(file: any): string {
 		const filePath = (file.filePath || '').toLowerCase();
-		const codec = (file.codecVideo || '').toLowerCase();
+		const videoCodec = (file.codecVideo || '').toLowerCase();
+		const audioCodec = (file.codecAudio || '').toLowerCase();
 		const ext = filePath.slice(filePath.lastIndexOf('.'));
 
-		const isH264 = codec === 'h264' || codec === 'avc' || codec === 'h.264';
-		const _isHevc = codec === 'hevc' || codec === 'h265' || codec === 'h.265';
+		const isH264 = videoCodec === 'h264' || videoCodec === 'avc' || videoCodec === 'h.264';
 		const isMp4 = ext === '.mp4' || ext === '.m4v';
 		const isMkv = ext === '.mkv';
 		const isWebm = ext === '.webm';
@@ -461,20 +599,95 @@ export class StreamService {
 		// Browser-compatible containers
 		const isBrowserContainer = isMp4 || isWebm;
 
+		// Browser-compatible audio codecs — these can play natively
+		const BROWSER_AUDIO_CODECS = ['aac', 'mp3', 'opus', 'flac', 'vorbis', 'mp4a', 'pcm_s16le'];
+		const isBrowserAudio =
+			!audioCodec || BROWSER_AUDIO_CODECS.some((c) => audioCodec.includes(c));
+
+		// Audio codecs that ALWAYS require transcoding (common in movie files)
+		const TRANSCODE_AUDIO_CODECS = ['dts', 'truehd', 'ac3', 'eac3', 'dca', 'mlp'];
+		const needsAudioTranscode = TRANSCODE_AUDIO_CODECS.some((c) => audioCodec.includes(c));
+
+		this.logger.debug(
+			`Stream mode decision: file=${filePath}, video=${videoCodec}, audio=${audioCodec}, ` +
+				`ext=${ext}, browserAudio=${isBrowserAudio}, needsAudioTranscode=${needsAudioTranscode}`,
+		);
+
 		// If we have codec info, use it for precise decisions
-		if (codec) {
-			if (isH264 && isBrowserContainer) return StreamMode.DIRECT_PLAY;
-			if (isH264 && isMkv) return StreamMode.DIRECT_STREAM;
-			// HEVC, XviD, MPEG-4, VP8/9, etc. all need transcoding
+		if (videoCodec) {
+			if (isH264 && isBrowserContainer && isBrowserAudio && !needsAudioTranscode) {
+				return StreamMode.DIRECT_PLAY;
+			}
+			if (isH264 && isMkv && isBrowserAudio && !needsAudioTranscode) {
+				// H.264 video is fine, just wrong container — remux to HLS
+				return StreamMode.DIRECT_STREAM;
+			}
+			// If video is H.264 but audio needs transcoding, we must transcode
+			// (can't remux with copy if audio codec is incompatible)
+			if (isH264 && needsAudioTranscode) {
+				this.logger.debug(
+					`Audio codec "${audioCodec}" requires transcoding despite H.264 video`,
+				);
+				return StreamMode.TRANSCODE;
+			}
+			// HEVC, XviD, MPEG-4, etc. all need transcoding
 			return StreamMode.TRANSCODE;
 		}
 
 		// No codec info — decide based on container only.
-		// Only MP4/WebM are safe to attempt direct play without knowing the codec.
-		// MKV without codec info must transcode (can't assume H.264 for remux).
 		if (isMp4 || isWebm) return StreamMode.DIRECT_PLAY;
 
-		// Default: transcode anything we're not sure about
 		return StreamMode.TRANSCODE;
+	}
+
+	/**
+	 * Parse audio tracks from the file's stored metadata.
+	 * Returns a list of { index, codec, language, title, channels } objects.
+	 */
+	private parseAudioTracks(
+		file: any,
+	): { index: number; codec: string; language: string; title: string; channels?: number }[] {
+		try {
+			const raw = file.audioTracks;
+			if (!raw) {
+				// Fall back to basic info from codecAudio
+				if (file.codecAudio) {
+					return [
+						{
+							index: 0,
+							codec: file.codecAudio,
+							language: 'und',
+							title: file.codecAudio.toUpperCase(),
+						},
+					];
+				}
+				return [];
+			}
+			const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+			if (Array.isArray(parsed)) return parsed;
+			return [];
+		} catch {
+			return [];
+		}
+	}
+
+	/**
+	 * Get available quality options, capped at the source file's resolution.
+	 * Returns qualities from lowest to highest that don't exceed the source.
+	 */
+	private getAvailableQualities(
+		sourceHeight?: number | null,
+	): { quality: string; height: number; label: string }[] {
+		const allQualities = [
+			{ quality: '480p', height: 480, label: '480p (SD)' },
+			{ quality: '720p', height: 720, label: '720p (HD)' },
+			{ quality: '1080p', height: 1080, label: '1080p (Full HD)' },
+			{ quality: '4k', height: 2160, label: '4K (Ultra HD)' },
+		];
+
+		if (!sourceHeight || sourceHeight <= 0) return allQualities;
+
+		// Only include qualities at or below source resolution
+		return allQualities.filter((q) => q.height <= sourceHeight);
 	}
 }

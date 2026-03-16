@@ -12,6 +12,7 @@ import { moviesService } from '@/services/movies.service';
 import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieDetail.module.scss';
 
@@ -390,6 +391,18 @@ export function MovieDetail({ id }: MovieDetailProps) {
 							{showFileInfo && (
 								<div class={styles.fileInfoContent}>
 									<div class={styles.fileInfoGrid}>
+										<span class={styles.fileInfoLabel}>Playback</span>
+										<span class={styles.fileInfoValue}>
+											<span
+												class={`${styles.fileInfoBadge} ${
+													needsTranscode(movie)
+														? styles.fileInfoBadgeWarn
+														: styles.fileInfoBadgeSuccess
+												}`}
+											>
+												{getStreamModeLabel(movie) ?? 'Unknown'}
+											</span>
+										</span>
 										{movie.fileInfo.fileName && (
 											<>
 												<span class={styles.fileInfoLabel}>File</span>

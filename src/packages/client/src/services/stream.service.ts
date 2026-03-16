@@ -26,7 +26,23 @@ export interface StreamStatus {
 	error?: string;
 }
 
+export interface StreamInfo {
+	streamMode: string;
+	needsTranscode: boolean;
+	hasCache: boolean;
+	codecVideo: string | null;
+	codecAudio: string | null;
+	videoHeight: number | null;
+}
+
 export const streamService = {
+	/**
+	 * Get stream mode info for a movie (needs transcode, has cache, etc.)
+	 */
+	getStreamInfo(movieId: string): Promise<StreamInfo> {
+		return api.get<StreamInfo>(`/stream/info/${movieId}`);
+	},
+
 	/**
 	 * Start a new stream session for a movie
 	 */

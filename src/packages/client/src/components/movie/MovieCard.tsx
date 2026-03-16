@@ -5,6 +5,7 @@ import { UI } from '@/plugins/ui-slots';
 import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { getRatingColor } from '@/utils/rating-color';
+import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieCard.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
@@ -37,6 +38,8 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 
 	const rating = movie.rating ?? 0;
 	const ratingColor = getRatingColor(rating);
+	const transcodeNeeded = needsTranscode(movie);
+	const streamLabel = getStreamModeLabel(movie);
 
 	return (
 		<div
@@ -46,6 +49,9 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 			tabIndex={0}
 		>
 			{movie.hidden && <span class={styles.hiddenLabel}>Hidden</span>}
+			{transcodeNeeded && streamLabel && (
+				<span class={styles.transcodeBadge}>{streamLabel}</span>
+			)}
 			<div class={styles.poster}>
 				{movie.posterUrl ? (
 					<img

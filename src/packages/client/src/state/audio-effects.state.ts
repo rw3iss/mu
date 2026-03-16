@@ -17,6 +17,7 @@ export const showEffectsPanel = signal(false);
 export const effectsTab = signal<'eq' | 'compressor'>('eq');
 
 export const eqEnabled = signal(false);
+export const eqInputGain = signal(0);
 export const eqBands = signal<EqBand[]>(DEFAULT_EQ_BANDS.map((b) => ({ ...b })));
 
 export const compressorEnabled = signal(false);
@@ -39,15 +40,19 @@ export function initAudioEffects(): void {
 		null,
 	);
 
+	const savedInputGain = getUiSetting('audio_eq_input_gain', 0);
+
 	// Apply to engine first
 	if (savedBands) audioEngine.setBands(savedBands);
 	if (savedCompSettings) audioEngine.setCompressorSettings(savedCompSettings);
 	audioEngine.setEqEnabled(savedEq);
 	audioEngine.setCompressorEnabled(savedComp);
+	audioEngine.setInputGain(savedInputGain);
 
 	// Batch signal updates
 	batch(() => {
 		eqEnabled.value = savedEq;
+		eqInputGain.value = savedInputGain;
 		compressorEnabled.value = savedComp;
 		if (savedBands) eqBands.value = savedBands;
 		if (savedCompSettings) compressorSettings.value = savedCompSettings;
@@ -60,6 +65,10 @@ export function initAudioEffects(): void {
 
 export function toggleEffectsPanel(): void {
 	showEffectsPanel.value = !showEffectsPanel.value;
+}
+
+export function closeEffectsPanel(): void {
+	showEffectsPanel.value = false;
 }
 
 export function setEffectsTab(tab: 'eq' | 'compressor'): void {
@@ -80,6 +89,12 @@ export function toggleCompressor(): void {
 	setUiSetting('audio_compressor_enabled', next);
 }
 
+export function updateInputGain(db: number): void {
+	eqInputGain.value = db;
+	audioEngine.setInputGain(db);
+	setUiSetting('audio_eq_input_gain', db);
+}
+
 export function updateEqBand(index: number, gain: number): void {
 	audioEngine.updateBand(index, gain);
 	const bands = audioEngine.getBands();
@@ -97,8 +112,11 @@ export function updateEqBandQ(index: number, q: number): void {
 export function resetEq(): void {
 	const freshBands = DEFAULT_EQ_BANDS.map((b) => ({ ...b }));
 	audioEngine.setBands(freshBands);
+	audioEngine.setInputGain(0);
 	eqBands.value = freshBands;
+	eqInputGain.value = 0;
 	setUiSetting('audio_eq_bands', freshBands);
+	setUiSetting('audio_eq_input_gain', 0);
 }
 
 export function updateCompressorParam<K extends keyof CompressorSettings>(
@@ -162,10 +180,14 @@ export function loadProfile(id: string): void {
 		audioEngine.setCompressorEnabled(config.compressorEnabled);
 		setUiSetting('audio_compressor_enabled', config.compressorEnabled);
 	}
+	const loadedInputGain = config.inputGain ?? 0;
+	audioEngine.setInputGain(loadedInputGain);
+	setUiSetting('audio_eq_input_gain', loadedInputGain);
 
 	// Batch all signal updates so components re-render once with consistent state
 	batch(() => {
 		activeProfileId.value = id;
+		eqInputGain.value = loadedInputGain;
 		if (bands) eqBands.value = bands;
 		if (compSettings) compressorSettings.value = compSettings;
 		if (config.eqEnabled !== undefined) eqEnabled.value = config.eqEnabled;
@@ -174,18 +196,32 @@ export function loadProfile(id: string): void {
 	});
 }
 
-export async function saveProfile(name: string): Promise<AudioProfile> {
-	const config = JSON.stringify({
+function buildConfigJson(): string {
+	return JSON.stringify({
+		inputGain: eqInputGain.value,
 		eqEnabled: eqEnabled.value,
 		eqBands: eqBands.value,
 		compressorEnabled: compressorEnabled.value,
 		compressorSettings: compressorSettings.value,
 	});
+}
+
+function generateUntitledName(): string {
+	const existing = profiles.value;
+	let n = 1;
+	while (existing.some((p) => p.name === `Untitled ${n}`)) {
+		n++;
+	}
+	return `Untitled ${n}`;
+}
+
+export async function saveProfile(name: string): Promise<AudioProfile> {
+	const resolvedName = name.trim() || generateUntitledName();
 
 	const profile = await audioProfilesService.create({
-		name,
+		name: resolvedName,
 		type: 'full',
-		config,
+		config: buildConfigJson(),
 	});
 
 	profiles.value = [...profiles.value, profile];
@@ -193,15 +229,13 @@ export async function saveProfile(name: string): Promise<AudioProfile> {
 	return profile;
 }
 
-export async function updateProfile(id: string): Promise<void> {
-	const config = JSON.stringify({
-		eqEnabled: eqEnabled.value,
-		eqBands: eqBands.value,
-		compressorEnabled: compressorEnabled.value,
-		compressorSettings: compressorSettings.value,
-	});
+export async function updateProfile(id: string, newName?: string): Promise<void> {
+	const updateData: { config: string; name?: string } = { config: buildConfigJson() };
+	if (newName !== undefined) {
+		updateData.name = newName;
+	}
 
-	const updated = await audioProfilesService.update(id, { config });
+	const updated = await audioProfilesService.update(id, updateData);
 	profiles.value = profiles.value.map((p) => (p.id === id ? updated : p));
 }
 
@@ -225,9 +259,4 @@ export async function deleteProfile(id: string): Promise<void> {
 	if (activeProfileId.value === id) {
 		activeProfileId.value = null;
 	}
-}
-
-export async function renameProfile(id: string, name: string): Promise<void> {
-	const updated = await audioProfilesService.update(id, { name });
-	profiles.value = profiles.value.map((p) => (p.id === id ? updated : p));
 }

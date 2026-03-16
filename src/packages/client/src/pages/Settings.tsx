@@ -135,6 +135,7 @@ export function Settings(props: SettingsProps) {
 	const [rateControl, setRateControl] = useState('cbr');
 	const [crfValue, setCrfValue] = useState('23');
 	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState('2');
+	const [segmentDuration, setSegmentDuration] = useState('4');
 	const [reEncodeOnScan, setReEncodeOnScan] = useState(false);
 
 	// Rating settings
@@ -197,6 +198,8 @@ export function Settings(props: SettingsProps) {
 					if (encoding.crf != null) setCrfValue(String(encoding.crf));
 					if (encoding.maxConcurrentJobs != null)
 						setMaxConcurrentJobs(String(encoding.maxConcurrentJobs));
+					if (encoding.segmentDuration != null)
+						setSegmentDuration(String(encoding.segmentDuration));
 				}
 
 				// Load sources from the API
@@ -289,6 +292,7 @@ export function Settings(props: SettingsProps) {
 					rateControl,
 					crf: parseInt(crfValue, 10),
 					maxConcurrentJobs: parseInt(maxConcurrentJobs, 10),
+					segmentDuration: parseInt(segmentDuration, 10),
 				},
 			});
 
@@ -315,6 +319,7 @@ export function Settings(props: SettingsProps) {
 		rateControl,
 		crfValue,
 		maxConcurrentJobs,
+		segmentDuration,
 	]);
 
 	const handleSaveRating = useCallback(async () => {
@@ -993,6 +998,29 @@ export function Settings(props: SettingsProps) {
 									<option value="4">4</option>
 									<option value="6">6</option>
 									<option value="8">8</option>
+								</select>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>HLS Segment Duration</span>
+									<span class={styles.settingDescription}>
+										Length of each HLS segment in seconds. Shorter segments
+										reduce initial load time but increase overhead. Longer
+										segments are more efficient but slower to start.
+									</span>
+								</div>
+								<select
+									class={styles.select}
+									value={segmentDuration}
+									onChange={(e) =>
+										setSegmentDuration((e.target as HTMLSelectElement).value)
+									}
+								>
+									<option value="2">2s (Fast start)</option>
+									<option value="4">4s (Balanced)</option>
+									<option value="6">6s (Efficient)</option>
+									<option value="10">10s (Maximum efficiency)</option>
 								</select>
 							</div>
 

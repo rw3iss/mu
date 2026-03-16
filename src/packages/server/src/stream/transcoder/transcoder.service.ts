@@ -139,6 +139,9 @@ export class TranscoderService implements OnModuleDestroy {
 		const enc = this.getEncodingSettings();
 		const hwAccel = enc.hwAccel;
 		const videoCodec = this.getVideoCodec(hwAccel);
+		const segDuration = String(enc.segmentDuration);
+		// GOP size = segment_duration × assumed_fps (round to nearest even)
+		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
 		return new Promise<void>((resolve, reject) => {
 			const videoRateOpts =
@@ -146,12 +149,15 @@ export class TranscoderService implements OnModuleDestroy {
 					? ['-crf', String(enc.crf)]
 					: ['-b:v', profile.videoBitrate];
 
+			// Use scale filter instead of .size() to preserve aspect ratio
+			const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+
 			let command = ffmpeg(filePath)
 				.outputOptions([
 					'-f',
 					'hls',
 					'-hls_time',
-					'2',
+					segDuration,
 					'-hls_list_size',
 					'0',
 					'-hls_segment_filename',
@@ -164,17 +170,18 @@ export class TranscoderService implements OnModuleDestroy {
 				.videoCodec(videoCodec)
 				.audioCodec('aac')
 				.outputOptions([
+					'-vf',
+					scaleFilter,
 					'-threads',
 					'0',
 					'-g',
-					'48',
+					gopSize,
 					'-sc_threshold',
 					'0',
 					'-b:a',
 					profile.audioBitrate,
 					...videoRateOpts,
 				])
-				.size(`${profile.width}x${profile.height}`)
 				.outputOptions(['-preset', enc.preset]);
 
 			// Apply hardware acceleration input options
@@ -282,6 +289,8 @@ export class TranscoderService implements OnModuleDestroy {
 
 		const outputPath = path.join(targetDir, 'stream.m3u8');
 		const segmentPattern = path.join(targetDir, 'segment_%04d.ts');
+		const enc = this.getEncodingSettings();
+		const segDuration = String(enc.segmentDuration);
 
 		return new Promise<void>((resolve, reject) => {
 			const command = ffmpeg(filePath)
@@ -289,7 +298,7 @@ export class TranscoderService implements OnModuleDestroy {
 					'-f',
 					'hls',
 					'-hls_time',
-					'2',
+					segDuration,
 					'-hls_list_size',
 					'0',
 					'-hls_segment_filename',
@@ -379,13 +388,14 @@ export class TranscoderService implements OnModuleDestroy {
 
 		const enc = this.getEncodingSettings();
 		const hwAccel = enc.hwAccel;
+		const segDuration = String(enc.segmentDuration);
 
 		return new Promise<void>((resolve, reject) => {
 			let command = ffmpeg(filePath).outputOptions([
 				'-f',
 				'hls',
 				'-hls_time',
-				'2',
+				segDuration,
 				'-hls_list_size',
 				'0',
 				'-hls_segment_filename',
@@ -405,22 +415,25 @@ export class TranscoderService implements OnModuleDestroy {
 					enc.rateControl === 'crf'
 						? ['-crf', String(enc.crf)]
 						: ['-b:v', profile.videoBitrate];
+				const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+				const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
 				command = command
 					.videoCodec(videoCodec)
 					.audioCodec('aac')
 					.outputOptions([
+						'-vf',
+						scaleFilter,
 						'-threads',
 						'0',
 						'-g',
-						'48',
+						gopSize,
 						'-sc_threshold',
 						'0',
 						'-b:a',
 						profile.audioBitrate,
 						...videoRateOpts,
 					])
-					.size(`${profile.width}x${profile.height}`)
 					.outputOptions(['-preset', enc.preset]);
 
 				if (hwAccel === 'nvenc') {
@@ -565,6 +578,9 @@ export class TranscoderService implements OnModuleDestroy {
 		const outputPath = path.join(targetDir, 'stream.m3u8');
 		const segmentPattern = path.join(targetDir, 'segment_%04d.ts');
 		const enc = this.getEncodingSettings();
+		const segDuration = String(enc.segmentDuration);
+		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
 		return new Promise<void>((resolve, reject) => {
 			const videoRateOpts =
@@ -577,7 +593,7 @@ export class TranscoderService implements OnModuleDestroy {
 					'-f',
 					'hls',
 					'-hls_time',
-					'2',
+					segDuration,
 					'-hls_list_size',
 					'0',
 					'-hls_segment_filename',
@@ -590,17 +606,18 @@ export class TranscoderService implements OnModuleDestroy {
 				.videoCodec('libx264')
 				.audioCodec('aac')
 				.outputOptions([
+					'-vf',
+					scaleFilter,
 					'-threads',
 					'0',
 					'-g',
-					'48',
+					gopSize,
 					'-sc_threshold',
 					'0',
 					'-b:a',
 					profile.audioBitrate,
 					...videoRateOpts,
 				])
-				.size(`${profile.width}x${profile.height}`)
 				.outputOptions(['-preset', enc.preset])
 				.outputOptions(['-map', '0:v:0']);
 
@@ -670,6 +687,9 @@ export class TranscoderService implements OnModuleDestroy {
 		const enc = this.getEncodingSettings();
 		const videoRateOpts =
 			enc.rateControl === 'crf' ? ['-crf', String(enc.crf)] : ['-b:v', profile.videoBitrate];
+		const segDuration = String(enc.segmentDuration);
+		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
 		const outputPath = path.join(persistDir, 'stream.m3u8');
 		const segmentPattern = path.join(persistDir, 'segment_%04d.ts');
@@ -681,7 +701,7 @@ export class TranscoderService implements OnModuleDestroy {
 					'-f',
 					'hls',
 					'-hls_time',
-					'2',
+					segDuration,
 					'-hls_list_size',
 					'0',
 					'-hls_segment_filename',
@@ -694,17 +714,18 @@ export class TranscoderService implements OnModuleDestroy {
 				.videoCodec('libx264')
 				.audioCodec('aac')
 				.outputOptions([
+					'-vf',
+					scaleFilter,
 					'-threads',
 					'0',
 					'-g',
-					'48',
+					gopSize,
 					'-sc_threshold',
 					'0',
 					'-b:a',
 					profile.audioBitrate,
 					...videoRateOpts,
 				])
-				.size(`${profile.width}x${profile.height}`)
 				.outputOptions(['-preset', enc.preset])
 				.outputOptions(['-map', '0:v:0', '-map', '0:a:0?'])
 				.output(outputPath)
@@ -750,6 +771,7 @@ export class TranscoderService implements OnModuleDestroy {
 			preset: enc?.preset || 'veryfast',
 			rateControl: enc?.rateControl || 'cbr',
 			crf: enc?.crf ?? 23,
+			segmentDuration: enc?.segmentDuration ?? 4,
 		};
 	}
 

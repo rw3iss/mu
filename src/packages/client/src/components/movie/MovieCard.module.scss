@@ -47,6 +47,22 @@
   pointer-events: none;
 }
 
+.transcodeBadge {
+  position: absolute;
+  bottom: 42px;
+  left: var(--space-sm);
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #f59e0b;
+  font-size: 9px;
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-sm);
+  z-index: 3;
+  pointer-events: none;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .poster {
   position: relative;
   aspect-ratio: 2 / 3;

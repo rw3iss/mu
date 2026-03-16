@@ -48,11 +48,13 @@ export const DEFAULT_COMPRESSOR: CompressorSettings = {
 export class AudioEngine {
 	private ctx: AudioContext | null = null;
 	private source: MediaElementAudioSourceNode | null = null;
+	private inputGainNode: GainNode | null = null;
 	private filters: BiquadFilterNode[] = [];
 	private compressor: DynamicsCompressorNode | null = null;
 	private makeupGainNode: GainNode | null = null;
 	private eqEnabled = false;
 	private compressorEnabled = false;
+	private inputGainDb = 0;
 	private currentBands: EqBand[] = [...DEFAULT_EQ_BANDS];
 	private currentCompressor: CompressorSettings = { ...DEFAULT_COMPRESSOR };
 	private attached = false;
@@ -66,6 +68,10 @@ export class AudioEngine {
 
 		this.ctx = new AudioContext();
 		this.source = this.ctx.createMediaElementSource(element);
+
+		// Create input gain (Amp) node
+		this.inputGainNode = this.ctx.createGain();
+		this.inputGainNode.gain.value = this.dbToLinear(this.inputGainDb);
 
 		// Create EQ filter chain
 		this.filters = this.currentBands.map((band) => {
@@ -109,6 +115,17 @@ export class AudioEngine {
 
 	getCompressorEnabled(): boolean {
 		return this.compressorEnabled;
+	}
+
+	setInputGain(db: number): void {
+		this.inputGainDb = db;
+		if (this.inputGainNode) {
+			this.inputGainNode.gain.value = this.dbToLinear(db);
+		}
+	}
+
+	getInputGain(): number {
+		return this.inputGainDb;
 	}
 
 	updateBand(index: number, gain: number): void {
@@ -185,6 +202,7 @@ export class AudioEngine {
 			this.ctx.close().catch(() => {});
 			this.ctx = null;
 		}
+		this.inputGainNode = null;
 		this.filters = [];
 		this.compressor = null;
 		this.makeupGainNode = null;
@@ -198,12 +216,18 @@ export class AudioEngine {
 
 		// Disconnect everything
 		this.source.disconnect();
+		this.inputGainNode?.disconnect();
 		for (const f of this.filters) f.disconnect();
 		this.compressor?.disconnect();
 		this.makeupGainNode?.disconnect();
 
-		// Build chain based on what's enabled
+		// Build chain: source → inputGain → [EQ] → [Compressor] → destination
 		let current: AudioNode = this.source;
+
+		if (this.inputGainNode) {
+			current.connect(this.inputGainNode);
+			current = this.inputGainNode;
+		}
 
 		if (this.eqEnabled && this.filters.length > 0) {
 			for (const filter of this.filters) {
@@ -231,7 +255,7 @@ export class AudioEngine {
 	}
 
 	private dbToLinear(db: number): number {
-		return Math.pow(10, db / 20);
+		return 10 ** (db / 20);
 	}
 }
 

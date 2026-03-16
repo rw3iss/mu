@@ -34,6 +34,19 @@ export class StreamController {
 	) {}
 
 	/**
+	 * Get stream mode info for a movie (whether it needs transcoding, has cache, etc.).
+	 * Used by the client to show indicators on movie cards.
+	 */
+	@Get('info/:movieId')
+	async getStreamInfo(@Param('movieId') movieId: string) {
+		const info = await this.streamService.getMovieStreamInfo(movieId);
+		if (!info) {
+			throw new NotFoundException(`No available file for movie ${movieId}`);
+		}
+		return info;
+	}
+
+	/**
 	 * Start a new streaming session for a movie.
 	 */
 	@Get(':movieId/start')

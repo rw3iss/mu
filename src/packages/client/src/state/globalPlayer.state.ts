@@ -2,6 +2,7 @@ import { computed, effect, signal } from '@preact/signals';
 import { route } from 'preact-router';
 import { moviesService } from '@/services/movies.service';
 import { streamService } from '@/services/stream.service';
+import { closeEffectsPanel } from '@/state/audio-effects.state';
 import { pushToHistory } from '@/state/history.state';
 import type { Movie } from '@/state/library.state';
 import type { StreamSession } from '@/state/player.state';
@@ -120,6 +121,7 @@ export async function playMovie(
 	opts?: { fromBeginning?: boolean },
 ): Promise<void> {
 	initPlayerSettings();
+	closeEffectsPanel();
 
 	if (opts?.fromBeginning) {
 		forceStartPosition.value = 0;

@@ -9,10 +9,10 @@ import {
 	effectsTab,
 	eqBands,
 	eqEnabled,
+	eqInputGain,
 	fetchProfiles,
 	loadProfile,
 	profiles,
-	renameProfile,
 	resetCompressor,
 	resetEq,
 	saveProfile,
@@ -23,6 +23,7 @@ import {
 	toggleEffectsPanel,
 	updateCompressorParam,
 	updateEqBand,
+	updateInputGain,
 	updateProfile,
 } from '@/state/audio-effects.state';
 import styles from './EffectsPanel.module.scss';
@@ -34,6 +35,7 @@ function formatFreq(hz: number): string {
 function EqTab() {
 	const bands = eqBands.value;
 	const enabled = eqEnabled.value;
+	const inputGain = eqInputGain.value;
 
 	return (
 		<div>
@@ -47,6 +49,25 @@ function EqTab() {
 			</div>
 
 			<div class={styles.eqGrid}>
+				<div class={styles.eqBand}>
+					<span class={styles.eqValue}>
+						{inputGain > 0 ? '+' : ''}
+						{inputGain.toFixed(1)}
+					</span>
+					<input
+						type="range"
+						class={styles.eqSlider}
+						min="-12"
+						max="12"
+						step="0.5"
+						value={inputGain}
+						onInput={(e) =>
+							updateInputGain(parseFloat((e.target as HTMLInputElement).value))
+						}
+						disabled={!enabled}
+					/>
+					<span class={`${styles.eqLabel} ${styles.eqLabelAmp}`}>Amp</span>
+				</div>
 				{bands.map((band, i) => (
 					<div class={styles.eqBand} key={band.frequency}>
 						<span class={styles.eqValue}>
@@ -172,31 +193,38 @@ function ProfileSection() {
 	const [saving, setSaving] = useState(false);
 	const [newName, setNewName] = useState('');
 	const [confirmDelete, setConfirmDelete] = useState(false);
-	const [renaming, setRenaming] = useState(false);
-	const [renameName, setRenameName] = useState('');
+	const [editName, setEditName] = useState('');
 
 	useEffect(() => {
 		fetchProfiles();
 	}, []);
 
-	const handleSave = useCallback(async () => {
-		if (!newName.trim()) return;
-		await saveProfile(newName.trim());
+	// Sync edit name when active profile changes
+	useEffect(() => {
+		if (active) {
+			const p = allProfiles.find((pr) => pr.id === active);
+			setEditName(p?.name ?? '');
+		} else {
+			setEditName('');
+		}
+	}, [active, allProfiles]);
+
+	const handleSaveNew = useCallback(async () => {
+		await saveProfile(newName);
 		setNewName('');
 		setSaving(false);
 	}, [newName]);
+
+	const handleUpdate = useCallback(async () => {
+		if (!active) return;
+		await updateProfile(active, editName.trim() || undefined);
+	}, [active, editName]);
 
 	const handleDelete = useCallback(async () => {
 		if (!active) return;
 		await deleteProfile(active);
 		setConfirmDelete(false);
 	}, [active]);
-
-	const handleRename = useCallback(async () => {
-		if (!active || !renameName.trim()) return;
-		await renameProfile(active, renameName.trim());
-		setRenaming(false);
-	}, [active, renameName]);
 
 	return (
 		<div class={styles.profileSection}>
@@ -208,6 +236,9 @@ function ProfileSection() {
 					onChange={(e) => {
 						const val = (e.target as HTMLSelectElement).value;
 						if (val) loadProfile(val);
+						else {
+							activeProfileId.value = null;
+						}
 					}}
 				>
 					<option value="">-- None --</option>
@@ -219,6 +250,17 @@ function ProfileSection() {
 				</select>
 			</div>
 
+			{active && (
+				<input
+					type="text"
+					value={editName}
+					onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
+					class={styles.profileSelect}
+					style={{ marginLeft: 0, marginBottom: 6, width: '100%' }}
+					placeholder="Profile name"
+				/>
+			)}
+
 			<div class={styles.profileActions}>
 				{saving ? (
 					<>
@@ -226,39 +268,26 @@ function ProfileSection() {
 							type="text"
 							value={newName}
 							onInput={(e) => setNewName((e.target as HTMLInputElement).value)}
-							onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-							placeholder="Profile name"
+							onKeyDown={(e) => e.key === 'Enter' && handleSaveNew()}
+							placeholder="Profile name (optional)"
 							class={styles.profileSelect}
 							style={{ flex: 1, marginLeft: 0 }}
 							autoFocus
 						/>
-						<button class={styles.profileBtn} onClick={handleSave}>
+						<button class={styles.profileBtn} onClick={handleSaveNew}>
 							Save
 						</button>
 						<button class={styles.profileBtn} onClick={() => setSaving(false)}>
 							Cancel
 						</button>
 					</>
-				) : renaming ? (
-					<>
-						<input
-							type="text"
-							value={renameName}
-							onInput={(e) => setRenameName((e.target as HTMLInputElement).value)}
-							onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-							class={styles.profileSelect}
-							style={{ flex: 1, marginLeft: 0 }}
-							autoFocus
-						/>
-						<button class={styles.profileBtn} onClick={handleRename}>
-							Rename
-						</button>
-						<button class={styles.profileBtn} onClick={() => setRenaming(false)}>
-							Cancel
-						</button>
-					</>
 				) : (
 					<>
+						{active && (
+							<button class={styles.profileBtn} onClick={handleUpdate}>
+								Save
+							</button>
+						)}
 						<button class={styles.profileBtn} onClick={() => setSaving(true)}>
 							Save New
 						</button>
@@ -266,25 +295,9 @@ function ProfileSection() {
 							<>
 								<button
 									class={styles.profileBtn}
-									onClick={() => updateProfile(active)}
-								>
-									Update
-								</button>
-								<button
-									class={styles.profileBtn}
 									onClick={() => copyProfile(active)}
 								>
-									Copy
-								</button>
-								<button
-									class={styles.profileBtn}
-									onClick={() => {
-										const p = allProfiles.find((pr) => pr.id === active);
-										setRenameName(p?.name ?? '');
-										setRenaming(true);
-									}}
-								>
-									Rename
+									Clone
 								</button>
 								{confirmDelete ? (
 									<>
