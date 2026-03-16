@@ -313,9 +313,7 @@
 }
 
 .skipExtBtn {
-  aspect-ratio: auto;
-  padding: 0 6px;
-  min-width: 36px;
+  // Match the original skip button size (square, same as controlBtn)
   white-space: nowrap;
 
   &:hover {

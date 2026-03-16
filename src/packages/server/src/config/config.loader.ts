@@ -117,7 +117,7 @@ function buildDefaultYaml(): string {
 			jwtSecret: generateSecret(),
 			cookieSecret: generateSecret(),
 		},
-		dataDir: './data',
+		dataDir: '../../data',
 	};
 
 	return (

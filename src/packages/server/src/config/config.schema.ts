@@ -136,5 +136,5 @@ export const configSchema = z.object({
 		})
 		.default({}),
 
-	dataDir: z.string().default('./data'),
+	dataDir: z.string().default('../../data'),
 });
