@@ -43,13 +43,30 @@ export function VideoPlayer({
 		if (containerRef.current && engine.videoRef.current) {
 			engine.moveVideoTo(containerRef.current);
 
-			// Add click/dblclick handlers to the video element
+			// Add click/dblclick handlers to the video element.
+			// Delay single-click (toggle play) so a double-click (fullscreen)
+			// can cancel it, preventing the pause/unpause flicker.
 			const video = engine.videoRef.current;
-			const handleClick = () => engine.togglePlay();
-			const handleDblClick = () => toggleFullscreen();
+			let clickTimer: ReturnType<typeof setTimeout> | null = null;
+			const handleClick = (e: MouseEvent) => {
+				if (e.detail === 1) {
+					clickTimer = setTimeout(() => {
+						clickTimer = null;
+						engine.togglePlay();
+					}, 200);
+				}
+			};
+			const handleDblClick = () => {
+				if (clickTimer) {
+					clearTimeout(clickTimer);
+					clickTimer = null;
+				}
+				toggleFullscreen();
+			};
 			video.addEventListener('click', handleClick);
 			video.addEventListener('dblclick', handleDblClick);
 			return () => {
+				if (clickTimer) clearTimeout(clickTimer);
 				video.removeEventListener('click', handleClick);
 				video.removeEventListener('dblclick', handleDblClick);
 			};
