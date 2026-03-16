@@ -202,17 +202,20 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		const sessionId = crypto.randomUUID();
 		const quality = options.quality || this.resolveDefaultQuality(file.id, file.videoHeight);
 
-		await this.database.db.insert(streamSessions).values({
-			id: sessionId,
-			movieId,
-			userId,
-			movieFileId: file.id,
-			quality,
-			transcoding: mode !== StreamMode.DIRECT_PLAY,
-			startedAt: nowISO(),
-			lastActiveAt: nowISO(),
-			positionSeconds: 0,
-		});
+		// Skip session tracking for shared/anonymous streams (__shared__ has no DB user record)
+		if (userId !== '__shared__') {
+			await this.database.db.insert(streamSessions).values({
+				id: sessionId,
+				movieId,
+				userId,
+				movieFileId: file.id,
+				quality,
+				transcoding: mode !== StreamMode.DIRECT_PLAY,
+				startedAt: nowISO(),
+				lastActiveAt: nowISO(),
+				positionSeconds: 0,
+			});
+		}
 
 		// Extract subtitles from the file
 		let subtitleTracks: { index: number; language: string; title: string }[] = [];
