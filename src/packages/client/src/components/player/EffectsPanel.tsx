@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { useUiSetting } from '@/hooks/useUiSetting';
 import { audioEngine } from '@/audio/audio-engine';
+import { useUiSetting } from '@/hooks/useUiSetting';
 import type { AudioProfile } from '@/services/audio-profiles.service';
 import {
 	activeCompProfileId,
@@ -24,8 +24,8 @@ import {
 	setEffectsTab,
 	showEffectsPanel,
 	toggleCompressor,
-	toggleEq,
 	toggleEffectsPanel,
+	toggleEq,
 	updateCompProfile,
 	updateCompressorParam,
 	updateEqBand,

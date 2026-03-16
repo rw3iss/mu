@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
 import {
 	BadRequestException,
 	Body,
@@ -13,12 +14,10 @@ import {
 } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
-import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
 import { DatabaseService } from '../../database/database.service.js';
-import { movieFiles } from '../../database/schema/index.js';
-import { movies } from '../../database/schema/index.js';
-import { SubtitleSearchService } from './subtitle-search.service.js';
+import { movieFiles, movies } from '../../database/schema/index.js';
 import { SubtitleService } from './subtitle.service.js';
+import { SubtitleSearchService } from './subtitle-search.service.js';
 
 @Controller('subtitles')
 export class SubtitleManageController {

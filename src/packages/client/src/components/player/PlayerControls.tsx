@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { PluginSlot } from '@/plugins/PluginSlot';
-import { globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import { UI } from '@/plugins/ui-slots';
 import {
 	compressorEnabled,
@@ -11,6 +10,7 @@ import {
 	showEffectsPanel,
 	toggleEffectsPanel,
 } from '@/state/audio-effects.state';
+import { globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import type { StreamSession } from '@/state/player.state';
 import {
 	currentTime,

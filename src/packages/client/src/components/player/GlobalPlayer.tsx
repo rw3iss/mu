@@ -23,8 +23,8 @@ import {
 	subtitleTrack,
 } from '@/state/player.state';
 import { setSharedVideoEngine } from '@/state/videoEngineRef';
-import styles from './GlobalPlayer.module.scss';
 import { EffectsPanel } from './EffectsPanel';
+import styles from './GlobalPlayer.module.scss';
 import { InfoPanel } from './InfoPanel';
 import { PlayerControls } from './PlayerControls';
 import { useVideoEngine } from './useVideoEngine';

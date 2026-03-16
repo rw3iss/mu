@@ -20,4 +20,19 @@ Can you refactor the player to work in a hybrid way like that, as an independent
 
 --------------------------------------------------------------------------------
 
+- I'd like you to add a new movie-specific play configuration overrides on the Movie Details page.
+In the Movie Details page, add a section above "File Info" called "Play Settings', similarly expandable.
+The Play Settings section should over default overrides that the user wants to always use when playing that movie.
+In the play settings, the user should be able optionally select:
+- an eq profile to automatically load when the movie is played (load the current eq profiles into a dropdown).
+- a similar compressor profile to automatically load when the movie is played.
+- maybe some other settings here for play overrides, if you can think of any, but otherwise can add more later
+
+When the user 'saves' the movie, after setting play setting overrides, they should save in a new "play_settings" column on the movies.
+When the global movie player is asked to play any new movie, the movie details that it receives should also include the 'play_settings', and the player on the server and client should both detect if it needs to override any play settings from the given configuration options, if any exist. This means that... if the client starts playing the movie, and "play_settings" exist that define an eq profile, or compressor profile, to use during playback for that movie, then the player should automatically:
+- enable that effect (ie. eq or compressor), if a profile is given
+- load the movie's eq or compressor "saved" profile, if one is given in its play_settings (if the profile cannot be found, show a toast error that the profile no longer exists, and will be removed from the movie settings).
+
+---------------------
+Subtitles:
 

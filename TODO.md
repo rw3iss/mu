@@ -1,10 +1,9 @@
 
+
 - Enable better cache control:
 	- clear cache button in Settings > About - show modal to select cache items, option for older than?
 	- show breakdown of app data: thumbnails, metadata, db, transcode data
 	- option to 'Cache transcodes for up to X days', and also 'Max transcode cache size' - 20gb recommended
-
-- Show "Info" panel in movie details page: file info, exif
 
 - Advanced display options to show buffering data sizes/graphs? avg while playing and overall/total bandwidth over time.,
 
@@ -29,7 +28,7 @@
 		- plugin hook: pluginInit: addInfoPanel(movie) => { registers function to render a component with data }
 	- when flyout renders, calls 'addInfoPanel' for any plugin, passes current movie, component renders custom
 
-- Subtitle integration... is?
+- Subtitle integration... works?
 
 - Movie Page:
 	- add mini features to grab extended data for a movie, like:
@@ -38,18 +37,24 @@
 
 - add 'Pick a movie' for movie... open page user can page through movie options, set filters, "Movie Picker"
 
-- Show modal to 'Resume or Restart' if a movie is played with a previous history position?
-
 - Need easier "install script" or setup method.
 	- can code be bundled? it's open source?
 	- for now: checkout code, run server?
 	- do background research, how does plex/jellyfin do this?
 
-- need a 'play queue': add item to queue, remove, move to front of queue, play playlist, clear queue, see queue
+- Play Queue: add item to queue, remove, move to front of queue, play playlist, clear queue, see queue
 
-- Discover > Trending: other movies cross joined with mine? filter by personalized vs not.
+- Discover: Trending: other movies cross joined with mine? filter by personalized vs not.
+
 
 # PLUGINS:
+
+
+- Actor/Movie lookup:
+	- on movie page, see extended movie info: actors, director, etc
+	- clicking any shows movie results from them..
+	- filter by movies i haven't watched.
+	- sort by rating, year, min votes, etc.
 
 - Movie Bookmarks:
 	- add location + name/comment, see new button in player bar

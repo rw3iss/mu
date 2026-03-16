@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'preact/hooks';
 import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
+import { useCallback, useRef, useState } from 'preact/hooks';
 import { subtitlesService } from '@/services/subtitles.service';
 import styles from './SubtitlePanel.module.scss';
 

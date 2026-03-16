@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { SettingsService } from '../settings/settings.service.js';
 
 export interface RemoteServerConfig {
@@ -181,7 +181,7 @@ export class RemoteService {
 	 */
 	async fetchMovieDetail(serverId: string, remoteMovieId: string): Promise<any> {
 		const server = this.getServers().find((s) => s.id === serverId);
-		if (!server) throw new Error(`Remote server ${serverId} not found`);
+		if (!server) throw new NotFoundException(`Remote server ${serverId} not found`);
 
 		const baseUrl = server.url.replace(/\/+$/, '');
 		const headers: Record<string, string> = {};
@@ -189,13 +189,23 @@ export class RemoteService {
 			headers.Authorization = `Bearer ${createHash('sha256').update(server.password).digest('hex')}`;
 		}
 
-		const response = await fetch(`${baseUrl}/api/v1/shared/movies/${remoteMovieId}`, {
-			headers,
-			signal: AbortSignal.timeout(15000),
-		});
+		let response: Response;
+		try {
+			response = await fetch(`${baseUrl}/api/v1/shared/movies/${remoteMovieId}`, {
+				headers,
+				signal: AbortSignal.timeout(15000),
+			});
+		} catch (err: any) {
+			throw new BadGatewayException(
+				`Cannot reach remote server "${server.name}": ${err.message}`,
+			);
+		}
 
 		if (!response.ok) {
-			throw new Error(`Failed to fetch movie: ${response.status}`);
+			const body = await response.text().catch(() => '');
+			throw new BadGatewayException(
+				`Remote server returned ${response.status}: ${body || response.statusText}`,
+			);
 		}
 
 		const movie = (await response.json()) as Record<string, unknown>;
@@ -225,7 +235,7 @@ export class RemoteService {
 		quality?: string,
 	): Promise<any> {
 		const server = this.getServers().find((s) => s.id === serverId);
-		if (!server) throw new Error(`Remote server ${serverId} not found`);
+		if (!server) throw new NotFoundException(`Remote server ${serverId} not found`);
 
 		const baseUrl = server.url.replace(/\/+$/, '');
 		const headers: Record<string, string> = {};
@@ -234,13 +244,25 @@ export class RemoteService {
 		}
 
 		const qs = quality ? `?quality=${quality}` : '';
-		const response = await fetch(
-			`${baseUrl}/api/v1/shared/stream/${remoteMovieId}/start${qs}`,
-			{ headers, signal: AbortSignal.timeout(15000) },
-		);
+		const url = `${baseUrl}/api/v1/shared/stream/${remoteMovieId}/start${qs}`;
+		let response: Response;
+		try {
+			response = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+		} catch (err: any) {
+			this.logger.error(`Failed to connect to remote server ${server.name}: ${err.message}`);
+			throw new BadGatewayException(
+				`Cannot reach remote server "${server.name}": ${err.message}`,
+			);
+		}
 
 		if (!response.ok) {
-			throw new Error(`Failed to start stream: ${response.status}`);
+			const body = await response.text().catch(() => '');
+			this.logger.warn(
+				`Remote stream start failed (${response.status}) from ${server.name}: ${body}`,
+			);
+			throw new BadGatewayException(
+				`Remote server returned ${response.status}: ${body || response.statusText}`,
+			);
 		}
 
 		const session = (await response.json()) as any;

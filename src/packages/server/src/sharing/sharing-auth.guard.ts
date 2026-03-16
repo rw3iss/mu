@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { CanActivate, ExecutionContext, Injectable, ForbiddenException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { SettingsService } from '../settings/settings.service.js';
 
 export interface SharingConfig {

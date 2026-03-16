@@ -1,8 +1,8 @@
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
-import { Injectable, Logger } from '@nestjs/common';
 import type { SubtitleSearchResult } from '@mu/shared';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '../../config/config.service.js';
 
 // ── OpenSubtitles hash algorithm ──

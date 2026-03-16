@@ -11,9 +11,9 @@ import { api } from '@/services/api';
 import { sourcesService } from '@/services/sources.service';
 import { accentColor, resetAccentColor, setAccentColor } from '@/state/accentColor.state';
 import {
-	type ItemSpacing,
 	cardBorder,
 	disableHover,
+	type ItemSpacing,
 	itemRadius,
 	itemSpacing as itemSpacingSignal,
 	pageBg,

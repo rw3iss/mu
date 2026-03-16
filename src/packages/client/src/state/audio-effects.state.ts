@@ -1,10 +1,10 @@
 import { batch, signal } from '@preact/signals';
 import {
+	audioEngine,
 	type CompressorSettings,
 	DEFAULT_COMPRESSOR,
 	DEFAULT_EQ_BANDS,
 	type EqBand,
-	audioEngine,
 } from '@/audio/audio-engine';
 import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
 import { type AudioProfile, audioProfilesService } from '@/services/audio-profiles.service';

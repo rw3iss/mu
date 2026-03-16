@@ -1,6 +1,6 @@
 import { nowISO } from '@mu/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { audioProfiles } from '../database/schema/index.js';
 

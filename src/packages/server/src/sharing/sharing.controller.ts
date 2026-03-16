@@ -1,3 +1,4 @@
+import type { MovieListQuery } from '@mu/shared';
 import {
 	Controller,
 	Get,
@@ -10,17 +11,16 @@ import {
 } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { MovieListQuery } from '@mu/shared';
 import { Public } from '../common/decorators/public.decorator.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles } from '../database/schema/index.js';
 import { MoviesService } from '../movies/movies.service.js';
 import { DirectPlayService } from '../stream/direct-play/direct-play.service.js';
-import { HlsGeneratorService } from '../stream/transcoder/hls-generator.service.js';
 import { StreamService } from '../stream/stream.service.js';
+import { HlsGeneratorService } from '../stream/transcoder/hls-generator.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
-import { SharingAuthGuard } from './sharing-auth.guard.js';
 import { SharingService } from './sharing.service.js';
+import { SharingAuthGuard } from './sharing-auth.guard.js';
 
 @Controller('shared')
 @Public()
