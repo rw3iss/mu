@@ -8,6 +8,7 @@ import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { RatingWidget } from '@/components/movie/RatingWidget';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { type AudioProfile, audioProfilesService } from '@/services/audio-profiles.service';
 import { moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
 import { playMovie } from '@/state/globalPlayer.state';
@@ -122,6 +123,58 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	}, [movie]);
 
 	const [showFileInfo, setShowFileInfo] = useState(false);
+	const [showPlaySettings, setShowPlaySettings] = useState(false);
+	const [audioProfiles, setAudioProfiles] = useState<AudioProfile[]>([]);
+	const [selectedEqProfile, setSelectedEqProfile] = useState<string>('');
+	const [selectedCompProfile, setSelectedCompProfile] = useState<string>('');
+	// Load audio profiles when play settings section is opened
+	useEffect(() => {
+		if (!showPlaySettings) return;
+		audioProfilesService
+			.getAll()
+			.then(setAudioProfiles)
+			.catch(() => {});
+	}, [showPlaySettings]);
+
+	// Sync play settings state from movie data
+	useEffect(() => {
+		if (!movie) return;
+		const ps = movie.playSettings;
+		setSelectedEqProfile(ps?.eqProfileId ?? '');
+		setSelectedCompProfile(ps?.compressorProfileId ?? '');
+		if (ps && Object.keys(ps).length > 0) {
+			setShowPlaySettings(true);
+		}
+	}, [movie?.id, movie?.playSettings]);
+
+	const updatePlaySetting = useCallback(
+		async (key: string, value: string | null) => {
+			if (!movie) return;
+			const parsed = value || null;
+			const patch = { [key]: parsed };
+			try {
+				await moviesService.update(movie.id, {
+					playSettings: JSON.stringify(patch),
+				});
+				setMovie((prev) => {
+					if (!prev) return prev;
+					const merged = { ...prev.playSettings, ...patch };
+					// Remove null keys
+					for (const k of Object.keys(merged)) {
+						if ((merged as any)[k] === null) delete (merged as any)[k];
+					}
+					const hasSettings = Object.keys(merged).length > 0;
+					return {
+						...prev,
+						playSettings: hasSettings ? (merged as Movie['playSettings']) : null,
+					};
+				});
+			} catch {
+				notifyError('Failed to save play setting');
+			}
+		},
+		[movie],
+	);
 
 	const handleMovieUpdate = useCallback((updated: Movie) => {
 		setMovie(updated);
@@ -394,6 +447,72 @@ export function MovieDetail({ id }: MovieDetailProps) {
 							</div>
 						</div>
 					)}
+
+					{/* Play Settings */}
+					<div class={styles.fileInfoSection}>
+						<button
+							class={styles.fileInfoToggle}
+							onClick={() => setShowPlaySettings(!showPlaySettings)}
+						>
+							<h2 class={styles.sectionTitle}>Play Settings</h2>
+							<span class={styles.fileInfoArrow}>
+								{showPlaySettings ? '\u25B2' : '\u25BC'}
+							</span>
+						</button>
+
+						{showPlaySettings && (
+							<div class={styles.fileInfoContent}>
+								<p class={styles.playSettingsDescription}>
+									Override default audio settings when playing this movie.
+								</p>
+								<div class={styles.playSettingsGrid}>
+									<label class={styles.playSettingsLabel}>EQ Profile</label>
+									<select
+										class={styles.playSettingsSelect}
+										value={selectedEqProfile}
+										onChange={(e) => {
+											const val = (e.target as HTMLSelectElement).value;
+											setSelectedEqProfile(val);
+											updatePlaySetting('eqProfileId', val || null);
+										}}
+									>
+										<option value="">None (use default)</option>
+										{audioProfiles
+											.filter((p) => p.type === 'eq' || p.type === 'full')
+											.map((p) => (
+												<option key={p.id} value={p.id}>
+													{p.name}
+												</option>
+											))}
+									</select>
+
+									<label class={styles.playSettingsLabel}>
+										Compressor Profile
+									</label>
+									<select
+										class={styles.playSettingsSelect}
+										value={selectedCompProfile}
+										onChange={(e) => {
+											const val = (e.target as HTMLSelectElement).value;
+											setSelectedCompProfile(val);
+											updatePlaySetting('compressorProfileId', val || null);
+										}}
+									>
+										<option value="">None (use default)</option>
+										{audioProfiles
+											.filter(
+												(p) => p.type === 'compressor' || p.type === 'full',
+											)
+											.map((p) => (
+												<option key={p.id} value={p.id}>
+													{p.name}
+												</option>
+											))}
+									</select>
+								</div>
+							</div>
+						)}
+					</div>
 
 					{/* File Info */}
 					{movie.fileInfo && (

@@ -29,7 +29,7 @@ function watchPluginClients(): Plugin {
 			function handlePluginChange(path: string, event: string) {
 				if (!path.includes('/client/')) return;
 				server.config.logger.info(
-					`\x1b[35m[plugins]\x1b[0m ${path.replace(workspaceRoot + '/', '')} ${event}, restarting...`,
+					`\x1b[35m[plugins]\x1b[0m ${path.replace(`${workspaceRoot}/`, '')} ${event}, restarting...`,
 					{ timestamp: true },
 				);
 				server.restart();

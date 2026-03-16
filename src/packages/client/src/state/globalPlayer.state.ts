@@ -2,9 +2,16 @@ import { computed, effect, signal } from '@preact/signals';
 import { route } from 'preact-router';
 import { moviesService } from '@/services/movies.service';
 import { streamService } from '@/services/stream.service';
-import { closeEffectsPanel } from '@/state/audio-effects.state';
+import {
+	closeEffectsPanel,
+	fetchProfiles,
+	loadCompProfile,
+	loadEqProfile,
+	profiles,
+} from '@/state/audio-effects.state';
 import { pushToHistory } from '@/state/history.state';
 import type { Movie } from '@/state/library.state';
+import { notifyError } from '@/state/notifications.state';
 import type { StreamSession } from '@/state/player.state';
 import {
 	currentSession,
@@ -170,6 +177,8 @@ export async function playMovie(
 			globalMovie.value = m;
 			// Push to history cache as soon as we have the movie metadata
 			pushToHistory(m);
+			// Apply movie-specific play settings (EQ/compressor profiles, volume)
+			applyPlaySettings(m);
 		})
 		.catch(() => {
 			globalMovie.value = null;
@@ -236,6 +245,53 @@ export async function startGlobalStream(): Promise<StreamSession | null> {
 		const message = err?.body?.message || err?.message || 'Failed to start playback';
 		streamError.value = message;
 		return null;
+	}
+}
+
+/**
+ * Apply movie-specific play settings (EQ/compressor profiles).
+ * Called after movie metadata is fetched during playMovie().
+ */
+async function applyPlaySettings(movie: Movie): Promise<void> {
+	const settings = movie.playSettings;
+	if (!settings) return;
+
+	const { eqProfileId, compressorProfileId } = settings;
+	if (!eqProfileId && !compressorProfileId) return;
+
+	// Ensure profiles are loaded
+	if (profiles.value.length === 0) {
+		await fetchProfiles();
+	}
+
+	if (eqProfileId) {
+		const found = profiles.value.find((p) => p.id === eqProfileId);
+		if (found) {
+			loadEqProfile(eqProfileId);
+		} else {
+			notifyError(`EQ profile no longer exists and will be removed from play settings.`);
+			moviesService
+				.update(movie.id, {
+					playSettings: JSON.stringify({ eqProfileId: null }),
+				})
+				.catch(() => {});
+		}
+	}
+
+	if (compressorProfileId) {
+		const found = profiles.value.find((p) => p.id === compressorProfileId);
+		if (found) {
+			loadCompProfile(compressorProfileId);
+		} else {
+			notifyError(
+				`Compressor profile no longer exists and will be removed from play settings.`,
+			);
+			moviesService
+				.update(movie.id, {
+					playSettings: JSON.stringify({ compressorProfileId: null }),
+				})
+				.catch(() => {});
+		}
 	}
 }
 

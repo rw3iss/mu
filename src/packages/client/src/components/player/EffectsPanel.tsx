@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { audioEngine } from '@/audio/audio-engine';
+import type { AudioProfile } from '@/services/audio-profiles.service';
 import {
-	activeProfileId,
+	activeCompProfileId,
+	activeEqProfileId,
 	compressorEnabled,
 	compressorSettings,
 	copyProfile,
@@ -11,20 +13,23 @@ import {
 	eqEnabled,
 	eqInputGain,
 	fetchProfiles,
-	loadProfile,
+	loadCompProfile,
+	loadEqProfile,
 	profiles,
 	resetCompressor,
 	resetEq,
-	saveProfile,
+	saveCompProfile,
+	saveEqProfile,
 	setEffectsTab,
 	showEffectsPanel,
 	toggleCompressor,
 	toggleEq,
 	toggleEffectsPanel,
+	updateCompProfile,
 	updateCompressorParam,
 	updateEqBand,
+	updateEqProfile,
 	updateInputGain,
-	updateProfile,
 } from '@/state/audio-effects.state';
 import styles from './EffectsPanel.module.scss';
 
@@ -32,10 +37,202 @@ function formatFreq(hz: number): string {
 	return hz >= 1000 ? `${hz / 1000}k` : `${hz}`;
 }
 
+// ── Inline Profile Section (used inside each tab) ──
+
+function ProfileControls({
+	type,
+	activeId,
+	onLoad,
+	onSave,
+	onUpdate,
+}: {
+	type: 'eq' | 'compressor';
+	activeId: string | null;
+	onLoad: (id: string) => void;
+	onSave: (name: string) => Promise<AudioProfile>;
+	onUpdate: (id: string, name?: string) => Promise<void>;
+}) {
+	const allProfiles = profiles.value.filter((p) => p.type === type || p.type === 'full');
+	const [editName, setEditName] = useState('');
+	const [confirmDelete, setConfirmDelete] = useState(false);
+
+	useEffect(() => {
+		fetchProfiles();
+	}, []);
+
+	useEffect(() => {
+		if (activeId) {
+			const p = allProfiles.find((pr) => pr.id === activeId);
+			setEditName(p?.name ?? '');
+		} else {
+			setEditName('');
+		}
+	}, [activeId]);
+
+	const handleSave = useCallback(async () => {
+		if (activeId) {
+			await onUpdate(activeId, editName.trim() || undefined);
+		} else {
+			await onSave(editName.trim());
+		}
+	}, [activeId, editName, onUpdate, onSave]);
+
+	const handleDelete = useCallback(async () => {
+		if (!activeId) return;
+		await deleteProfile(activeId);
+		setConfirmDelete(false);
+	}, [activeId]);
+
+	return (
+		<div class={styles.profileSection}>
+			{/* Profile select + clone/delete */}
+			<div class={styles.profileRow}>
+				<span class={styles.profileLabel}>Profile</span>
+				<select
+					class={styles.profileSelect}
+					value={activeId ?? ''}
+					onChange={(e) => {
+						const val = (e.target as HTMLSelectElement).value;
+						if (val) onLoad(val);
+						else {
+							if (type === 'eq') activeEqProfileId.value = null;
+							else activeCompProfileId.value = null;
+						}
+					}}
+				>
+					<option value="">-- None --</option>
+					{allProfiles.map((p) => (
+						<option key={p.id} value={p.id}>
+							{p.name}
+						</option>
+					))}
+				</select>
+				{activeId && (
+					<>
+						<button
+							class={styles.iconBtn}
+							onClick={() => copyProfile(activeId)}
+							title="Clone profile"
+						>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<rect x="9" y="9" width="13" height="13" rx="2" />
+								<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+							</svg>
+						</button>
+						{confirmDelete ? (
+							<>
+								<button
+									class={`${styles.iconBtn} ${styles.danger}`}
+									onClick={handleDelete}
+									title="Confirm delete"
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<polyline points="20 6 9 17 4 12" />
+									</svg>
+								</button>
+								<button
+									class={styles.iconBtn}
+									onClick={() => setConfirmDelete(false)}
+									title="Cancel"
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+									>
+										<line x1="18" y1="6" x2="6" y2="18" />
+										<line x1="6" y1="6" x2="18" y2="18" />
+									</svg>
+								</button>
+							</>
+						) : (
+							<button
+								class={`${styles.iconBtn} ${styles.danger}`}
+								onClick={() => setConfirmDelete(true)}
+								title="Delete profile"
+							>
+								<svg
+									width="14"
+									height="14"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<polyline points="3 6 5 6 21 6" />
+									<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+									<path d="M10 11v6" />
+									<path d="M14 11v6" />
+									<path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+								</svg>
+							</button>
+						)}
+					</>
+				)}
+			</div>
+
+			{/* Name input + save */}
+			<div class={styles.profileRow}>
+				<span class={styles.profileLabel}>Name</span>
+				<input
+					type="text"
+					value={editName}
+					onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
+					onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+					class={styles.profileSelect}
+					placeholder={activeId ? 'Profile name' : 'New profile name'}
+				/>
+				<button class={styles.saveBtn} onClick={handleSave} title="Save profile">
+					Save
+				</button>
+			</div>
+		</div>
+	);
+}
+
+// ── Collapsible Settings Wrapper ──
+
+function CollapsibleSettings({ children }: { children: preact.ComponentChildren }) {
+	const [open, setOpen] = useState(false);
+	return (
+		<div class={styles.collapsible}>
+			<button class={styles.collapsibleToggle} onClick={() => setOpen(!open)}>
+				<span>Settings</span>
+				<span class={styles.collapsibleArrow}>{open ? '\u25B2' : '\u25BC'}</span>
+			</button>
+			{open && <div class={styles.collapsibleContent}>{children}</div>}
+		</div>
+	);
+}
+
+// ── EQ Tab ──
+
 function EqTab() {
 	const bands = eqBands.value;
 	const enabled = eqEnabled.value;
 	const inputGain = eqInputGain.value;
+	const activeId = activeEqProfileId.value;
 
 	return (
 		<div>
@@ -48,31 +245,20 @@ function EqTab() {
 				/>
 			</div>
 
-			<div class={styles.eqGrid}>
-				<div class={styles.eqBand}>
-					<span class={styles.eqValue}>
-						{inputGain > 0 ? '+' : ''}
-						{inputGain.toFixed(1)}
-					</span>
-					<input
-						type="range"
-						class={styles.eqSlider}
-						min="-12"
-						max="12"
-						step="0.5"
-						value={inputGain}
-						onInput={(e) =>
-							updateInputGain(parseFloat((e.target as HTMLInputElement).value))
-						}
-						disabled={!enabled}
-					/>
-					<span class={`${styles.eqLabel} ${styles.eqLabelAmp}`}>Amp</span>
-				</div>
-				{bands.map((band, i) => (
-					<div class={styles.eqBand} key={band.frequency}>
+			<ProfileControls
+				type="eq"
+				activeId={activeId}
+				onLoad={loadEqProfile}
+				onSave={saveEqProfile}
+				onUpdate={updateEqProfile}
+			/>
+
+			<CollapsibleSettings>
+				<div class={styles.eqGrid}>
+					<div class={styles.eqBand}>
 						<span class={styles.eqValue}>
-							{band.gain > 0 ? '+' : ''}
-							{band.gain.toFixed(1)}
+							{inputGain > 0 ? '+' : ''}
+							{inputGain.toFixed(1)}
 						</span>
 						<input
 							type="range"
@@ -80,23 +266,49 @@ function EqTab() {
 							min="-12"
 							max="12"
 							step="0.5"
-							value={band.gain}
+							value={inputGain}
 							onInput={(e) =>
-								updateEqBand(i, parseFloat((e.target as HTMLInputElement).value))
+								updateInputGain(parseFloat((e.target as HTMLInputElement).value))
 							}
 							disabled={!enabled}
 						/>
-						<span class={styles.eqLabel}>{formatFreq(band.frequency)}</span>
+						<span class={`${styles.eqLabel} ${styles.eqLabelAmp}`}>Amp</span>
 					</div>
-				))}
-			</div>
+					{bands.map((band, i) => (
+						<div class={styles.eqBand} key={band.frequency}>
+							<span class={styles.eqValue}>
+								{band.gain > 0 ? '+' : ''}
+								{band.gain.toFixed(1)}
+							</span>
+							<input
+								type="range"
+								class={styles.eqSlider}
+								min="-12"
+								max="12"
+								step="0.5"
+								value={band.gain}
+								onInput={(e) =>
+									updateEqBand(
+										i,
+										parseFloat((e.target as HTMLInputElement).value),
+									)
+								}
+								disabled={!enabled}
+							/>
+							<span class={styles.eqLabel}>{formatFreq(band.frequency)}</span>
+						</div>
+					))}
+				</div>
 
-			<button class={styles.resetBtn} onClick={resetEq}>
-				Reset EQ
-			</button>
+				<button class={styles.resetBtn} onClick={resetEq}>
+					Reset EQ
+				</button>
+			</CollapsibleSettings>
 		</div>
 	);
 }
+
+// ── Compressor Tab ──
 
 const COMP_PARAMS = [
 	{ key: 'threshold' as const, label: 'Threshold', min: -100, max: 0, step: 1, unit: 'dB' },
@@ -104,12 +316,20 @@ const COMP_PARAMS = [
 	{ key: 'ratio' as const, label: 'Ratio', min: 1, max: 20, step: 0.5, unit: ':1' },
 	{ key: 'attack' as const, label: 'Attack', min: 0, max: 1, step: 0.001, unit: 's' },
 	{ key: 'release' as const, label: 'Release', min: 0, max: 1, step: 0.01, unit: 's' },
-	{ key: 'makeupGain' as const, label: 'Makeup Gain', min: 0, max: 24, step: 0.5, unit: 'dB' },
+	{
+		key: 'makeupGain' as const,
+		label: 'Makeup Gain',
+		min: 0,
+		max: 24,
+		step: 0.5,
+		unit: 'dB',
+	},
 ];
 
 function CompressorTab() {
 	const enabled = compressorEnabled.value;
 	const settings = compressorSettings.value;
+	const activeId = activeCompProfileId.value;
 	const [reduction, setReduction] = useState(0);
 	const rafRef = useRef<number>(0);
 
@@ -137,204 +357,85 @@ function CompressorTab() {
 				/>
 			</div>
 
-			{COMP_PARAMS.map((param) => (
-				<div class={styles.compParam} key={param.key}>
-					<div class={styles.compParamHeader}>
-						<span class={styles.compParamLabel}>{param.label}</span>
-						<span class={styles.compParamValue}>
-							{param.key === 'attack' || param.key === 'release'
-								? settings[param.key].toFixed(3)
-								: settings[param.key].toFixed(1)}
-							{param.unit}
-						</span>
-					</div>
-					<input
-						type="range"
-						class={styles.compSlider}
-						min={param.min}
-						max={param.max}
-						step={param.step}
-						value={settings[param.key]}
-						onInput={(e) =>
-							updateCompressorParam(
-								param.key,
-								parseFloat((e.target as HTMLInputElement).value),
-							)
-						}
-						disabled={!enabled}
-					/>
-				</div>
-			))}
+			<ProfileControls
+				type="compressor"
+				activeId={activeId}
+				onLoad={loadCompProfile}
+				onSave={saveCompProfile}
+				onUpdate={updateCompProfile}
+			/>
 
-			{enabled && (
-				<div class={styles.reductionMeter}>
-					<div class={styles.reductionLabel}>
-						Gain Reduction: {reduction.toFixed(1)} dB
-					</div>
-					<div class={styles.reductionBar}>
-						<div
-							class={styles.reductionFill}
-							style={{ width: `${Math.min(100, Math.abs(reduction) * 2)}%` }}
+			<CollapsibleSettings>
+				{COMP_PARAMS.map((param) => (
+					<div class={styles.compParam} key={param.key}>
+						<div class={styles.compParamHeader}>
+							<span class={styles.compParamLabel}>{param.label}</span>
+							<span class={styles.compParamValue}>
+								{param.key === 'attack' || param.key === 'release'
+									? settings[param.key].toFixed(3)
+									: settings[param.key].toFixed(1)}
+								{param.unit}
+							</span>
+						</div>
+						<input
+							type="range"
+							class={styles.compSlider}
+							min={param.min}
+							max={param.max}
+							step={param.step}
+							value={settings[param.key]}
+							onInput={(e) =>
+								updateCompressorParam(
+									param.key,
+									parseFloat((e.target as HTMLInputElement).value),
+								)
+							}
+							disabled={!enabled}
 						/>
 					</div>
-				</div>
-			)}
+				))}
 
-			<button class={styles.resetBtn} onClick={resetCompressor}>
-				Reset Compressor
-			</button>
+				{enabled && (
+					<div class={styles.reductionMeter}>
+						<div class={styles.reductionLabel}>
+							Gain Reduction: {reduction.toFixed(1)} dB
+						</div>
+						<div class={styles.reductionBar}>
+							<div
+								class={styles.reductionFill}
+								style={{
+									width: `${Math.min(100, Math.abs(reduction) * 2)}%`,
+								}}
+							/>
+						</div>
+					</div>
+				)}
+
+				<button class={styles.resetBtn} onClick={resetCompressor}>
+					Reset Compressor
+				</button>
+			</CollapsibleSettings>
 		</div>
 	);
 }
 
-function ProfileSection() {
-	const allProfiles = profiles.value;
-	const active = activeProfileId.value;
-	const [saving, setSaving] = useState(false);
-	const [newName, setNewName] = useState('');
-	const [confirmDelete, setConfirmDelete] = useState(false);
-	const [editName, setEditName] = useState('');
+// ── Main Panel ──
 
-	useEffect(() => {
-		fetchProfiles();
-	}, []);
-
-	// Sync edit name when active profile changes
-	useEffect(() => {
-		if (active) {
-			const p = allProfiles.find((pr) => pr.id === active);
-			setEditName(p?.name ?? '');
-		} else {
-			setEditName('');
-		}
-	}, [active, allProfiles]);
-
-	const handleSaveNew = useCallback(async () => {
-		await saveProfile(newName);
-		setNewName('');
-		setSaving(false);
-	}, [newName]);
-
-	const handleUpdate = useCallback(async () => {
-		if (!active) return;
-		await updateProfile(active, editName.trim() || undefined);
-	}, [active, editName]);
-
-	const handleDelete = useCallback(async () => {
-		if (!active) return;
-		await deleteProfile(active);
-		setConfirmDelete(false);
-	}, [active]);
-
-	return (
-		<div class={styles.profileSection}>
-			<div class={styles.profileHeader}>
-				<span class={styles.profileLabel}>Profile</span>
-				<select
-					class={styles.profileSelect}
-					value={active ?? ''}
-					onChange={(e) => {
-						const val = (e.target as HTMLSelectElement).value;
-						if (val) loadProfile(val);
-						else {
-							activeProfileId.value = null;
-						}
-					}}
-				>
-					<option value="">-- None --</option>
-					{allProfiles.map((p) => (
-						<option key={p.id} value={p.id}>
-							{p.name}
-						</option>
-					))}
-				</select>
-			</div>
-
-			{active && (
-				<input
-					type="text"
-					value={editName}
-					onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
-					class={styles.profileSelect}
-					style={{ marginLeft: 0, marginBottom: 6, width: '100%' }}
-					placeholder="Profile name"
-				/>
-			)}
-
-			<div class={styles.profileActions}>
-				{saving ? (
-					<>
-						<input
-							type="text"
-							value={newName}
-							onInput={(e) => setNewName((e.target as HTMLInputElement).value)}
-							onKeyDown={(e) => e.key === 'Enter' && handleSaveNew()}
-							placeholder="Profile name (optional)"
-							class={styles.profileSelect}
-							style={{ flex: 1, marginLeft: 0 }}
-							autoFocus
-						/>
-						<button class={styles.profileBtn} onClick={handleSaveNew}>
-							Save
-						</button>
-						<button class={styles.profileBtn} onClick={() => setSaving(false)}>
-							Cancel
-						</button>
-					</>
-				) : (
-					<>
-						{active && (
-							<button class={styles.profileBtn} onClick={handleUpdate}>
-								Save
-							</button>
-						)}
-						<button class={styles.profileBtn} onClick={() => setSaving(true)}>
-							Save New
-						</button>
-						{active && (
-							<>
-								<button
-									class={styles.profileBtn}
-									onClick={() => copyProfile(active)}
-								>
-									Clone
-								</button>
-								{confirmDelete ? (
-									<>
-										<button
-											class={`${styles.profileBtn} ${styles.danger}`}
-											onClick={handleDelete}
-										>
-											Confirm
-										</button>
-										<button
-											class={styles.profileBtn}
-											onClick={() => setConfirmDelete(false)}
-										>
-											Cancel
-										</button>
-									</>
-								) : (
-									<button
-										class={`${styles.profileBtn} ${styles.danger}`}
-										onClick={() => setConfirmDelete(true)}
-									>
-										Delete
-									</button>
-								)}
-							</>
-						)}
-					</>
-				)}
-			</div>
-		</div>
-	);
+function getActiveProfileName(allProfiles: AudioProfile[], activeId: string | null): string | null {
+	if (!activeId) return null;
+	const p = allProfiles.find((pr) => pr.id === activeId);
+	return p?.name ?? null;
 }
 
 export function EffectsPanel() {
 	if (!showEffectsPanel.value) return null;
 
 	const tab = effectsTab.value;
+	const allProfiles = profiles.value;
+	const isEqEnabled = eqEnabled.value;
+	const isCompEnabled = compressorEnabled.value;
+	const eqProfileName = getActiveProfileName(allProfiles, activeEqProfileId.value);
+	const compProfileName = getActiveProfileName(allProfiles, activeCompProfileId.value);
 
 	return (
 		<div class={styles.panel} onClick={(e) => e.stopPropagation()}>
@@ -360,20 +461,21 @@ export function EffectsPanel() {
 					class={`${styles.tab} ${tab === 'eq' ? styles.active : ''}`}
 					onClick={() => setEffectsTab('eq')}
 				>
-					Equalizer
+					<span>Equalizer{isEqEnabled && <span class={styles.onBadge}>ON</span>}</span>
+					{eqProfileName && <span class={styles.tabProfileName}>{eqProfileName}</span>}
 				</button>
 				<button
 					class={`${styles.tab} ${tab === 'compressor' ? styles.active : ''}`}
 					onClick={() => setEffectsTab('compressor')}
 				>
-					Compressor
+					<span>Compressor{isCompEnabled && <span class={styles.onBadge}>ON</span>}</span>
+					{compProfileName && (
+						<span class={styles.tabProfileName}>{compProfileName}</span>
+					)}
 				</button>
 			</div>
 
-			<div class={styles.body}>
-				{tab === 'eq' ? <EqTab /> : <CompressorTab />}
-				<ProfileSection />
-			</div>
+			<div class={styles.body}>{tab === 'eq' ? <EqTab /> : <CompressorTab />}</div>
 		</div>
 	);
 }

@@ -79,6 +79,7 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 	const handleRescan = useCallback(
 		async (e: Event) => {
 			e.stopPropagation();
+			setOpen(false);
 			setRescanState('loading');
 			try {
 				const result = await moviesService.rescan(movie.id);
@@ -98,6 +99,7 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 	const handleRefreshMetadata = useCallback(
 		async (e: Event) => {
 			e.stopPropagation();
+			setOpen(false);
 			setRefreshState('loading');
 			try {
 				await moviesService.refreshMetadata(movie.id);
@@ -118,7 +120,7 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 			e.stopPropagation();
 			try {
 				await moviesService.remove(movie.id);
-				notifySuccess('Movie removed from library');
+				notifySuccess(`'${movie.title}' removed from library`);
 				setOpen(false);
 				route('/library');
 			} catch {
@@ -135,7 +137,7 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 				await closePlayer();
 			}
 			await moviesService.deleteFromDisk(movie.id, deleteFolder);
-			notifySuccess('Movie deleted from disk');
+			notifySuccess(`'${movie.title}' deleted from disk`);
 			setShowDeleteModal(false);
 			setOpen(false);
 			route('/library');

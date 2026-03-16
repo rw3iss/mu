@@ -47,6 +47,9 @@
 
 .tab {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: 8px 12px;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
@@ -64,6 +67,26 @@
     background: rgba(255, 255, 255, 0.06);
     border-bottom: 2px solid var(--color-accent);
   }
+
+}
+
+.onBadge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--color-accent);
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+.tabProfileName {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 1px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .body {
@@ -124,6 +147,122 @@
     &::after {
       transform: translateX(16px);
     }
+  }
+}
+
+// ── Collapsible Settings ──
+
+.collapsible {
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.collapsibleToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 0;
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+.collapsibleArrow {
+  font-size: 9px;
+}
+
+.collapsibleContent {
+  padding-bottom: 4px;
+}
+
+// ── Profile Section (inline in each tab) ──
+
+.profileSection {
+  margin-bottom: 8px;
+}
+
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.profileLabel {
+  min-width: 42px;
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.5);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.profileSelect {
+  flex: 1;
+  min-width: 0;
+  margin-left: 4px;
+  padding: 4px 8px;
+  font-size: var(--font-size-xs);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  appearance: none;
+  cursor: pointer;
+
+  option {
+    background: #1a1a1a;
+    color: #fff;
+  }
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+
+  &.danger {
+    color: #ef4444;
+
+    &:hover {
+      background: rgba(239, 68, 68, 0.15);
+    }
+  }
+}
+
+.saveBtn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
   }
 }
 
@@ -288,75 +427,6 @@
   height: 100%;
   background: var(--color-accent);
   transition: width 50ms linear;
-}
-
-// ── Profile Section ──
-
-.profileSection {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.profileHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.profileLabel {
-  font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.profileSelect {
-  flex: 1;
-  margin-left: 8px;
-  padding: 4px 8px;
-  font-size: var(--font-size-xs);
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-sm);
-  appearance: none;
-  cursor: pointer;
-
-  option {
-    background: #1a1a1a;
-    color: #fff;
-  }
-}
-
-.profileActions {
-  display: flex;
-  gap: 4px;
-  margin-top: 6px;
-  flex-wrap: wrap;
-}
-
-.profileBtn {
-  padding: 4px 10px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-sm);
-  transition: background var(--transition-fast), color var(--transition-fast);
-  cursor: pointer;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
-  }
-
-  &.danger {
-    color: #ef4444;
-
-    &:hover {
-      background: rgba(239, 68, 68, 0.15);
-    }
-  }
 }
 
 .resetBtn {

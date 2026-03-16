@@ -30,6 +30,10 @@ export interface Movie {
 	durationSeconds?: number;
 	inWatchlist?: boolean;
 	status?: 'idle' | 'processing';
+	playSettings?: {
+		eqProfileId?: string | null;
+		compressorProfileId?: string | null;
+	} | null;
 	fileInfo?: {
 		containerFormat?: string;
 		codecVideo?: string;

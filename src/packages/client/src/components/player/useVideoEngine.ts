@@ -191,11 +191,24 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			setPlaybackError(null);
 
 			intendedPlayingRef.current = autoplay;
+			if (autoplay) audioEngine.resume();
 
 			// Re-enable pause tracking after async events settle
 			requestAnimationFrame(() => {
 				suppressPauseRef.current = false;
 			});
+
+			// Robust autoplay: listen for canplay to guarantee playback starts
+			// once the browser has enough data, regardless of timing.
+			if (autoplay) {
+				const onCanPlay = () => {
+					if (intendedPlayingRef.current && video.paused) {
+						video.play().catch(() => {});
+					}
+					video.removeEventListener('canplay', onCanPlay);
+				};
+				video.addEventListener('canplay', onCanPlay);
+			}
 
 			if (directPlay || !Hls.isSupported()) {
 				const token = localStorage.getItem('mu_token');

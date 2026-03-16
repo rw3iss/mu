@@ -275,12 +275,23 @@ export class MoviesService {
 		]);
 		const status = activeJobs.length > 0 ? 'processing' : 'idle';
 
+		// Parse play settings JSON
+		let playSettings = null;
+		if (movie.playSettings) {
+			try {
+				playSettings = JSON.parse(movie.playSettings);
+			} catch {
+				playSettings = null;
+			}
+		}
+
 		return {
 			...this.flattenMovie(movie, metadata, inWatchlist, userRating),
 			status,
 			watchPosition,
 			durationSeconds,
 			fileInfo,
+			playSettings,
 		};
 	}
 
@@ -384,12 +395,42 @@ export class MoviesService {
 			country: string;
 			trailerUrl: string;
 			hidden: boolean;
+			playSettings: string | null;
 		}>,
 	) {
 		const existing = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 
 		if (!existing) {
 			throw new NotFoundException(`Movie ${id} not found`);
+		}
+
+		// Merge partial playSettings into existing JSON rather than replacing wholesale
+		if (data.playSettings !== undefined && data.playSettings !== null) {
+			try {
+				const incoming = JSON.parse(data.playSettings);
+				if (typeof incoming === 'object' && incoming !== null) {
+					let merged = incoming;
+					if (existing.playSettings) {
+						try {
+							const current = JSON.parse(existing.playSettings);
+							merged = { ...current, ...incoming };
+						} catch {
+							// existing was invalid — just use incoming
+						}
+					}
+					// Remove keys set to null
+					for (const key of Object.keys(merged)) {
+						if (merged[key] === null) delete merged[key];
+					}
+					data = {
+						...data,
+						playSettings:
+							Object.keys(merged).length > 0 ? JSON.stringify(merged) : null,
+					};
+				}
+			} catch {
+				// incoming is not valid JSON — pass through as-is
+			}
 		}
 
 		this.database.db

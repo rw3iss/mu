@@ -563,6 +563,47 @@
 }
 
 // ============================================
+// Play Settings
+// ============================================
+
+.playSettingsDescription {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-md);
+}
+
+.playSettingsGrid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-sm) var(--space-md);
+  align-items: center;
+}
+
+.playSettingsLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.playSettingsSelect {
+  width: 100%;
+  max-width: 200px;
+  padding: 6px 10px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  appearance: none;
+  cursor: pointer;
+
+  option {
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
+  }
+}
+
+// ============================================
 // Management Bar
 // ============================================
 

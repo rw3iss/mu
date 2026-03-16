@@ -24,8 +24,12 @@ export const compressorEnabled = signal(false);
 export const compressorSettings = signal<CompressorSettings>({ ...DEFAULT_COMPRESSOR });
 
 export const profiles = signal<AudioProfile[]>([]);
-export const activeProfileId = signal<string | null>(null);
+export const activeEqProfileId = signal<string | null>(null);
+export const activeCompProfileId = signal<string | null>(null);
 export const profilesLoading = signal(false);
+
+/** @deprecated Use activeEqProfileId / activeCompProfileId instead */
+export const activeProfileId = activeEqProfileId;
 
 // ============================================
 // Initialization
@@ -151,63 +155,100 @@ export async function fetchProfiles(): Promise<void> {
 	}
 }
 
-export function loadProfile(id: string): void {
+/**
+ * Load an EQ profile — only applies EQ-related settings.
+ */
+export function loadEqProfile(id: string): void {
 	const profile = profiles.value.find((p) => p.id === id);
 	if (!profile) return;
 
 	const config = JSON.parse(profile.config);
-
-	// Deep-clone bands to ensure fresh object references
 	const bands: EqBand[] = config.eqBands ? config.eqBands.map((b: EqBand) => ({ ...b })) : null;
-	const compSettings: CompressorSettings | null = config.compressorSettings
-		? { ...config.compressorSettings }
-		: null;
+	const loadedInputGain = config.inputGain ?? 0;
 
-	// Apply to audio engine first (synchronous, outside batch)
 	if (bands) {
 		audioEngine.setBands(bands);
 		setUiSetting('audio_eq_bands', bands);
-	}
-	if (compSettings) {
-		audioEngine.setCompressorSettings(compSettings);
-		setUiSetting('audio_compressor_settings', compSettings);
 	}
 	if (config.eqEnabled !== undefined) {
 		audioEngine.setEqEnabled(config.eqEnabled);
 		setUiSetting('audio_eq_enabled', config.eqEnabled);
 	}
+	audioEngine.setInputGain(loadedInputGain);
+	setUiSetting('audio_eq_input_gain', loadedInputGain);
+
+	batch(() => {
+		activeEqProfileId.value = id;
+		eqInputGain.value = loadedInputGain;
+		if (bands) eqBands.value = bands;
+		if (config.eqEnabled !== undefined) eqEnabled.value = config.eqEnabled;
+	});
+}
+
+/**
+ * Load a compressor profile — only applies compressor-related settings.
+ */
+export function loadCompProfile(id: string): void {
+	const profile = profiles.value.find((p) => p.id === id);
+	if (!profile) return;
+
+	const config = JSON.parse(profile.config);
+	const compSettings: CompressorSettings | null = config.compressorSettings
+		? { ...config.compressorSettings }
+		: null;
+
+	if (compSettings) {
+		audioEngine.setCompressorSettings(compSettings);
+		setUiSetting('audio_compressor_settings', compSettings);
+	}
 	if (config.compressorEnabled !== undefined) {
 		audioEngine.setCompressorEnabled(config.compressorEnabled);
 		setUiSetting('audio_compressor_enabled', config.compressorEnabled);
 	}
-	const loadedInputGain = config.inputGain ?? 0;
-	audioEngine.setInputGain(loadedInputGain);
-	setUiSetting('audio_eq_input_gain', loadedInputGain);
 
-	// Batch all signal updates so components re-render once with consistent state
 	batch(() => {
-		activeProfileId.value = id;
-		eqInputGain.value = loadedInputGain;
-		if (bands) eqBands.value = bands;
+		activeCompProfileId.value = id;
 		if (compSettings) compressorSettings.value = compSettings;
-		if (config.eqEnabled !== undefined) eqEnabled.value = config.eqEnabled;
 		if (config.compressorEnabled !== undefined)
 			compressorEnabled.value = config.compressorEnabled;
 	});
 }
 
-function buildConfigJson(): string {
+/**
+ * Legacy: load a profile applying both EQ and compressor settings.
+ */
+export function loadProfile(id: string): void {
+	const profile = profiles.value.find((p) => p.id === id);
+	if (!profile) return;
+
+	if (profile.type === 'eq') {
+		loadEqProfile(id);
+	} else if (profile.type === 'compressor') {
+		loadCompProfile(id);
+	} else {
+		// Full profile — load both
+		loadEqProfile(id);
+		loadCompProfile(id);
+	}
+}
+
+function buildEqConfigJson(): string {
 	return JSON.stringify({
 		inputGain: eqInputGain.value,
 		eqEnabled: eqEnabled.value,
 		eqBands: eqBands.value,
+	});
+}
+
+function buildCompConfigJson(): string {
+	return JSON.stringify({
 		compressorEnabled: compressorEnabled.value,
 		compressorSettings: compressorSettings.value,
 	});
 }
 
-function generateUntitledName(): string {
-	const existing = profiles.value;
+function generateUntitledName(type: string): string {
+	const existing = profiles.value.filter((p) => p.type === type);
 	let n = 1;
 	while (existing.some((p) => p.name === `Untitled ${n}`)) {
 		n++;
@@ -215,28 +256,57 @@ function generateUntitledName(): string {
 	return `Untitled ${n}`;
 }
 
-export async function saveProfile(name: string): Promise<AudioProfile> {
-	const resolvedName = name.trim() || generateUntitledName();
-
+export async function saveEqProfile(name: string): Promise<AudioProfile> {
+	const resolvedName = name.trim() || generateUntitledName('eq');
 	const profile = await audioProfilesService.create({
 		name: resolvedName,
-		type: 'full',
-		config: buildConfigJson(),
+		type: 'eq',
+		config: buildEqConfigJson(),
 	});
-
 	profiles.value = [...profiles.value, profile];
-	activeProfileId.value = profile.id;
+	activeEqProfileId.value = profile.id;
 	return profile;
 }
 
-export async function updateProfile(id: string, newName?: string): Promise<void> {
-	const updateData: { config: string; name?: string } = { config: buildConfigJson() };
-	if (newName !== undefined) {
-		updateData.name = newName;
-	}
+export async function saveCompProfile(name: string): Promise<AudioProfile> {
+	const resolvedName = name.trim() || generateUntitledName('compressor');
+	const profile = await audioProfilesService.create({
+		name: resolvedName,
+		type: 'compressor',
+		config: buildCompConfigJson(),
+	});
+	profiles.value = [...profiles.value, profile];
+	activeCompProfileId.value = profile.id;
+	return profile;
+}
 
+export async function updateEqProfile(id: string, newName?: string): Promise<void> {
+	const updateData: { config: string; name?: string } = { config: buildEqConfigJson() };
+	if (newName !== undefined) updateData.name = newName;
 	const updated = await audioProfilesService.update(id, updateData);
 	profiles.value = profiles.value.map((p) => (p.id === id ? updated : p));
+}
+
+export async function updateCompProfile(id: string, newName?: string): Promise<void> {
+	const updateData: { config: string; name?: string } = { config: buildCompConfigJson() };
+	if (newName !== undefined) updateData.name = newName;
+	const updated = await audioProfilesService.update(id, updateData);
+	profiles.value = profiles.value.map((p) => (p.id === id ? updated : p));
+}
+
+/** @deprecated Use saveEqProfile / saveCompProfile instead */
+export async function saveProfile(name: string): Promise<AudioProfile> {
+	return saveEqProfile(name);
+}
+
+/** @deprecated Use updateEqProfile / updateCompProfile instead */
+export async function updateProfile(id: string, newName?: string): Promise<void> {
+	const profile = profiles.value.find((p) => p.id === id);
+	if (!profile) return;
+	if (profile.type === 'compressor') {
+		return updateCompProfile(id, newName);
+	}
+	return updateEqProfile(id, newName);
 }
 
 export async function copyProfile(id: string): Promise<void> {
@@ -250,13 +320,20 @@ export async function copyProfile(id: string): Promise<void> {
 	});
 
 	profiles.value = [...profiles.value, copy];
-	activeProfileId.value = copy.id;
+	if (copy.type === 'compressor') {
+		activeCompProfileId.value = copy.id;
+	} else {
+		activeEqProfileId.value = copy.id;
+	}
 }
 
 export async function deleteProfile(id: string): Promise<void> {
 	await audioProfilesService.remove(id);
 	profiles.value = profiles.value.filter((p) => p.id !== id);
-	if (activeProfileId.value === id) {
-		activeProfileId.value = null;
+	if (activeEqProfileId.value === id) {
+		activeEqProfileId.value = null;
+	}
+	if (activeCompProfileId.value === id) {
+		activeCompProfileId.value = null;
 	}
 }
