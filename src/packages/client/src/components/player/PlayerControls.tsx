@@ -1,6 +1,9 @@
 import type { VNode } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { route } from 'preact-router';
+import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { PluginSlot } from '@/plugins/PluginSlot';
+import { globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import { UI } from '@/plugins/ui-slots';
 import { showEffectsPanel, toggleEffectsPanel } from '@/state/audio-effects.state';
 import type { StreamSession } from '@/state/player.state';
@@ -59,7 +62,9 @@ export function PlayerControls({
 	leftSlot,
 }: PlayerControlsProps) {
 	const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-	const [settingsPanel, setSettingsPanel] = useState<'main' | 'quality' | 'subtitles'>('main');
+	const [settingsPanel, setSettingsPanel] = useState<
+		'main' | 'quality' | 'subtitles' | 'subtitle-manage'
+	>('main');
 	const [seekHover, setSeekHover] = useState<number | null>(null);
 	const [showVolume, setShowVolume] = useState(false);
 	const [isDragging, setIsDragging] = useState(false);
@@ -341,7 +346,21 @@ export function PlayerControls({
 				<div class={styles.mainRow}>
 					{/* Left: title + timing */}
 					<div class={styles.leftSection}>
-						{title && <span class={styles.titleText}>{title}</span>}
+						{title && globalMovieId.value && (
+							<a
+								href={`/movie/${globalMovieId.value}`}
+								class={styles.titleText}
+								onClick={(e) => {
+									e.preventDefault();
+									if (playerMode.value !== 'mini') {
+										minimizePlayer();
+									}
+									route(`/movie/${globalMovieId.value}`);
+								}}
+							>
+								{title}
+							</a>
+						)}
 						<span class={styles.timingLabel}>
 							{formatTime(currentTime.value)} / {formatTime(duration.value)}
 						</span>
@@ -517,26 +536,20 @@ export function PlayerControls({
 												</span>
 											</button>
 
-											{session?.subtitles && session.subtitles.length > 0 && (
-												<button
-													class={styles.menuRow}
-													onClick={() => setSettingsPanel('subtitles')}
-												>
-													<span class={styles.menuRowLabel}>
-														Subtitles
-													</span>
-													<span class={styles.menuRowValue}>
-														{subtitleTrack.value
-															? (session.subtitles.find(
-																	(t) =>
-																		t.id ===
-																		subtitleTrack.value,
-																)?.label ?? 'On')
-															: 'Off'}
-														{' \u203A'}
-													</span>
-												</button>
-											)}
+											<button
+												class={styles.menuRow}
+												onClick={() => setSettingsPanel('subtitles')}
+											>
+												<span class={styles.menuRowLabel}>Subtitles</span>
+												<span class={styles.menuRowValue}>
+													{subtitleTrack.value
+														? (session?.subtitles?.find(
+																(t) => t.id === subtitleTrack.value,
+															)?.label ?? 'On')
+														: 'Off'}
+													{' \u203A'}
+												</span>
+											</button>
 										</>
 									)}
 
@@ -597,6 +610,29 @@ export function PlayerControls({
 													{track.label}
 												</button>
 											))}
+											<div class={styles.menuDivider} />
+											<button
+												class={styles.menuItem}
+												onClick={() => setSettingsPanel('subtitle-manage')}
+											>
+												Manage Subtitles {'\u203A'}
+											</button>
+										</>
+									)}
+
+									{settingsPanel === 'subtitle-manage' && (
+										<>
+											<button
+												class={styles.menuBack}
+												onClick={() => setSettingsPanel('subtitles')}
+											>
+												{'\u2039'} Manage Subtitles
+											</button>
+											<div class={styles.menuPanelContent}>
+												{globalMovieId.value && (
+													<SubtitlePanel movieId={globalMovieId.value} />
+												)}
+											</div>
 										</>
 									)}
 								</div>

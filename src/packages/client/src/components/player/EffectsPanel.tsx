@@ -217,7 +217,10 @@ function ProfileControls({
 function CollapsibleSettings({
 	settingKey,
 	children,
-}: { settingKey: string; children: preact.ComponentChildren }) {
+}: {
+	settingKey: string;
+	children: preact.ComponentChildren;
+}) {
 	const [open, setOpen] = useUiSetting(settingKey, false);
 	return (
 		<div class={styles.collapsible}>

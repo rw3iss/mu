@@ -515,6 +515,26 @@
   margin-top: var(--space-md);
 }
 
+.subtitleToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.subtitlePanelWrap {
+  margin-top: var(--space-sm);
+  max-width: 400px;
+}
+
 .trackTitle {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);

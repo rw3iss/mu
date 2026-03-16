@@ -183,4 +183,3 @@ export function resetPanelBg(): void {
 export function resetDisableHover(): void {
 	setDisableHover(DEFAULT_DISABLE_HOVER);
 }
-

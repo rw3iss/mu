@@ -112,6 +112,11 @@ export const configSchema = z.object({
 					baseUrl: z.string().url().default('https://www.omdbapi.com'),
 				})
 				.default({}),
+			opensubtitles: z
+				.object({
+					apiKey: z.string().default(''),
+				})
+				.default({}),
 		})
 		.default({}),
 

@@ -1,0 +1,264 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+// ── Section header (collapsible) ──
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 120ms ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.arrow {
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+// ── Track list ──
+
+.trackList {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.trackItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  transition: background 120ms ease;
+  cursor: default;
+
+  &[role='button'] {
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+}
+
+.trackLang {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  min-width: 28px;
+}
+
+.trackLabel {
+  color: var(--color-text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.badgeMuted {
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.badgeAccent {
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 3px;
+  background: rgba(var(--color-accent-rgb, 6, 182, 212), 0.15);
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.emptyText {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+// ── Search section ──
+
+.searchSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 6px;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  transition: background 120ms ease, color 120ms ease;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// ── Search results ──
+
+.resultsList {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.resultItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  transition: background 120ms ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.resultInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.resultLang {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  min-width: 24px;
+}
+
+.resultLabel {
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.resultDownloads {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.downloadBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  transition: color 120ms ease, background 120ms ease;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--color-accent);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// ── Upload section ──
+
+.uploadSection {
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 6px;
+}
+
+.hiddenInput {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+// ── Spinner ──
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 600ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ── Error ──
+
+.error {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 4px;
+}

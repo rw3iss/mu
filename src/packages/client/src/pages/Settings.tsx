@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { ColorPicker } from '@/components/common/ColorPicker';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { useUiSetting } from '@/hooks/useUiSetting';
@@ -133,10 +134,6 @@ export function Settings(props: SettingsProps) {
 
 	// Appearance settings
 	const [showRecentlyPlayed, setShowRecentlyPlayed] = useUiSetting('show_recently_played', true);
-	const colorInputRef = useRef<HTMLInputElement>(null);
-	const pageBgInputRef = useRef<HTMLInputElement>(null);
-	const panelBgInputRef = useRef<HTMLInputElement>(null);
-	const borderColorInputRef = useRef<HTMLInputElement>(null);
 	const [showBorderEditor, setShowBorderEditor] = useState(false);
 
 	// Playback settings
@@ -573,81 +570,55 @@ export function Settings(props: SettingsProps) {
 									</span>
 								</div>
 								<div class={styles.settingControl}>
-									<div class={styles.accentColorPicker}>
-										{(() => {
-											const presets = [
-												{ label: 'Cyan', value: '#06b6d4' },
-												{ label: 'Blue', value: '#3b82f6' },
-												{ label: 'Purple', value: '#8b5cf6' },
-												{ label: 'Pink', value: '#ec4899' },
-												{ label: 'Amber', value: '#f59e0b' },
-												{ label: 'Green', value: '#22c55e' },
-												{ label: 'Red', value: '#ef4444' },
-											];
-											const presetValues = new Set(presets.map((p) => p.value));
-											const current = accentColor.value;
-											const isCustom = current && !presetValues.has(current);
-											const customBg = isCustom ? current : current || '#06b6d4';
+									<div class={styles.accentColorColumn}>
+										<div class={styles.accentColorPicker}>
+											{(() => {
+												const presets = [
+													{ label: 'Cyan', value: '#06b6d4' },
+													{ label: 'Blue', value: '#3b82f6' },
+													{ label: 'Purple', value: '#8b5cf6' },
+													{ label: 'Pink', value: '#ec4899' },
+													{ label: 'Amber', value: '#f59e0b' },
+													{ label: 'Green', value: '#22c55e' },
+													{ label: 'Red', value: '#ef4444' },
+												];
 
-											return (
-												<>
+												return presets.map((preset) => (
 													<button
-														class={`${styles.colorSwatch} ${styles.customSwatch} ${isCustom ? styles.activeSwatch : !current ? styles.activeSwatch : ''}`}
+														key={preset.label}
+														class={`${styles.colorSwatch} ${accentColor.value === preset.value ? styles.activeSwatch : ''}`}
 														style={{
-															backgroundColor: isCustom
-																? current
-																: undefined,
+															backgroundColor: preset.value,
 														}}
-														title="Custom color — click to change"
-														onClick={() => colorInputRef.current?.click()}
-													>
-														<svg
-															width="14"
-															height="14"
-															viewBox="0 0 24 24"
-															fill="none"
-															stroke="currentColor"
-															stroke-width="2"
-															stroke-linecap="round"
-															stroke-linejoin="round"
-															style={isCustom ? { opacity: 0.7, filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.5))' } : undefined}
-														>
-															<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-															<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-														</svg>
-													</button>
-													<input
-														ref={colorInputRef}
-														type="color"
-														class={styles.colorInputHidden}
-														value={customBg}
-														onInput={(e) =>
-															setAccentColor(
-																(e.target as HTMLInputElement).value,
-															)
-														}
+														title={preset.label}
+														onClick={() => setAccentColor(preset.value)}
 													/>
-													{presets.map((preset) => (
-														<button
-															key={preset.label}
-															class={`${styles.colorSwatch} ${accentColor.value === preset.value ? styles.activeSwatch : ''}`}
-															style={{
-																backgroundColor: preset.value,
-															}}
-															title={preset.label}
-															onClick={() => setAccentColor(preset.value)}
-														/>
-													))}
-												</>
-											);
-										})()}
+												));
+											})()}
+										</div>
+										<ColorPicker
+											value={accentColor.value || '#06b6d4'}
+											onChange={setAccentColor}
+										/>
 									</div>
 									<button
 										class={styles.resetBtn}
 										onClick={resetAccentColor}
 										title="Reset to default"
 									>
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="1 4 1 10 7 10" />
+											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+										</svg>
 									</button>
 								</div>
 							</div>
@@ -661,23 +632,28 @@ export function Settings(props: SettingsProps) {
 									</span>
 								</div>
 								<div class={styles.settingControl}>
-									<button
-										class={`${styles.colorSwatch} ${pageBg.value ? styles.activeSwatch : ''}`}
-										style={{ backgroundColor: pageBg.value || '#050709' }}
-										title="Pick page background color"
-										onClick={() => pageBgInputRef.current?.click()}
-									/>
-									<input
-										ref={pageBgInputRef}
-										type="color"
-										class={styles.colorInputHidden}
+									<ColorPicker
 										value={pageBg.value || '#050709'}
-										onInput={(e) =>
-											setPageBg((e.target as HTMLInputElement).value)
-										}
+										onChange={setPageBg}
 									/>
-									<button class={styles.resetBtn} onClick={resetPageBg} title="Reset to default">
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									<button
+										class={styles.resetBtn}
+										onClick={resetPageBg}
+										title="Reset to default"
+									>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="1 4 1 10 7 10" />
+											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+										</svg>
 									</button>
 								</div>
 							</div>
@@ -691,23 +667,28 @@ export function Settings(props: SettingsProps) {
 									</span>
 								</div>
 								<div class={styles.settingControl}>
-									<button
-										class={`${styles.colorSwatch} ${panelBg.value ? styles.activeSwatch : ''}`}
-										style={{ backgroundColor: panelBg.value || '#090b12' }}
-										title="Pick panel background color"
-										onClick={() => panelBgInputRef.current?.click()}
-									/>
-									<input
-										ref={panelBgInputRef}
-										type="color"
-										class={styles.colorInputHidden}
+									<ColorPicker
 										value={panelBg.value || '#090b12'}
-										onInput={(e) =>
-											setPanelBg((e.target as HTMLInputElement).value)
-										}
+										onChange={setPanelBg}
 									/>
-									<button class={styles.resetBtn} onClick={resetPanelBg} title="Reset to default">
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									<button
+										class={styles.resetBtn}
+										onClick={resetPanelBg}
+										title="Reset to default"
+									>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="1 4 1 10 7 10" />
+											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+										</svg>
 									</button>
 								</div>
 							</div>
@@ -726,7 +707,8 @@ export function Settings(props: SettingsProps) {
 										value={itemSpacingSignal.value}
 										onChange={(e) =>
 											setItemSpacing(
-												(e.target as HTMLSelectElement).value as ItemSpacing,
+												(e.target as HTMLSelectElement)
+													.value as ItemSpacing,
 											)
 										}
 									>
@@ -737,8 +719,24 @@ export function Settings(props: SettingsProps) {
 										<option value="comfortable">Comfortable</option>
 										<option value="spaced">Spaced</option>
 									</select>
-									<button class={styles.resetBtn} onClick={resetItemSpacing} title="Reset to default">
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									<button
+										class={styles.resetBtn}
+										onClick={resetItemSpacing}
+										title="Reset to default"
+									>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="1 4 1 10 7 10" />
+											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+										</svg>
 									</button>
 								</div>
 							</div>
@@ -748,7 +746,7 @@ export function Settings(props: SettingsProps) {
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Item Radius</span>
 									<span class={styles.settingDescription}>
-										Border radius on cards and items (0-30px)
+										Border radius on cards and items (0-40px)
 									</span>
 								</div>
 								<div class={styles.settingControl}>
@@ -757,19 +755,38 @@ export function Settings(props: SettingsProps) {
 											type="range"
 											class={styles.rangeInput}
 											min="0"
-											max="30"
+											max="40"
 											step="1"
 											value={itemRadius.value}
 											onInput={(e) =>
 												setItemRadius(
-													parseInt((e.target as HTMLInputElement).value, 10),
+													parseInt(
+														(e.target as HTMLInputElement).value,
+														10,
+													),
 												)
 											}
 										/>
 										<span class={styles.rangeValue}>{itemRadius.value}px</span>
 									</div>
-									<button class={styles.resetBtn} onClick={resetItemRadius} title="Reset to default">
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									<button
+										class={styles.resetBtn}
+										onClick={resetItemRadius}
+										title="Reset to default"
+									>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="1 4 1 10 7 10" />
+											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+										</svg>
 									</button>
 								</div>
 							</div>
@@ -799,8 +816,27 @@ export function Settings(props: SettingsProps) {
 											{cardBorder.value.width}px
 										</span>
 									</button>
-									<button class={styles.resetBtn} onClick={() => { resetCardBorder(); setShowBorderEditor(false); }} title="Reset to default">
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									<button
+										class={styles.resetBtn}
+										onClick={() => {
+											resetCardBorder();
+											setShowBorderEditor(false);
+										}}
+										title="Reset to default"
+									>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="1 4 1 10 7 10" />
+											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+										</svg>
 									</button>
 								</div>
 							</div>
@@ -818,30 +854,28 @@ export function Settings(props: SettingsProps) {
 											onInput={(e) =>
 												setCardBorder({
 													...cardBorder.value,
-													width: parseInt((e.target as HTMLInputElement).value, 10),
+													width: parseInt(
+														(e.target as HTMLInputElement).value,
+														10,
+													),
 												})
 											}
 										/>
-										<span class={styles.rangeValue}>{cardBorder.value.width}px</span>
+										<span class={styles.rangeValue}>
+											{cardBorder.value.width}px
+										</span>
 									</div>
 									<div class={styles.borderEditorRow}>
 										<span class={styles.borderEditorLabel}>Color</span>
-										<button
-											class={styles.colorSwatch}
-											style={{ backgroundColor: cardBorder.value.color, width: 24, height: 24 }}
-											onClick={() => borderColorInputRef.current?.click()}
-										/>
-										<input
-											ref={borderColorInputRef}
-											type="color"
-											class={styles.colorInputHidden}
+										<ColorPicker
 											value={cardBorder.value.color}
-											onInput={(e) =>
+											onChange={(hex) =>
 												setCardBorder({
 													...cardBorder.value,
-													color: (e.target as HTMLInputElement).value,
+													color: hex,
 												})
 											}
+											size={24}
 										/>
 									</div>
 									<div class={styles.borderEditorRow}>
@@ -856,11 +890,15 @@ export function Settings(props: SettingsProps) {
 											onInput={(e) =>
 												setCardBorder({
 													...cardBorder.value,
-													opacity: parseFloat((e.target as HTMLInputElement).value),
+													opacity: parseFloat(
+														(e.target as HTMLInputElement).value,
+													),
 												})
 											}
 										/>
-										<span class={styles.rangeValue}>{Math.round(cardBorder.value.opacity * 100)}%</span>
+										<span class={styles.rangeValue}>
+											{Math.round(cardBorder.value.opacity * 100)}%
+										</span>
 									</div>
 								</div>
 							)}
@@ -886,8 +924,24 @@ export function Settings(props: SettingsProps) {
 										/>
 										<span class={styles.toggleTrack} />
 									</label>
-									<button class={styles.resetBtn} onClick={resetDisableHover} title="Reset to default">
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+									<button
+										class={styles.resetBtn}
+										onClick={resetDisableHover}
+										title="Reset to default"
+									>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="1 4 1 10 7 10" />
+											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+										</svg>
 									</button>
 								</div>
 							</div>
@@ -1459,6 +1513,25 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.aboutLabel}>Platform</span>
 									<span class={styles.aboutValue}>Self-hosted</span>
 								</div>
+								<a
+									href="https://github.com/rw3iss/mu"
+									target="_blank"
+									rel="noopener noreferrer"
+									class={styles.aboutItem}
+									style={{ textDecoration: 'none' }}
+								>
+									<span class={styles.aboutLabel}>GitHub</span>
+									<span class={styles.aboutValue}>
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="currentColor"
+										>
+											<path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+										</svg>
+									</span>
+								</a>
 							</div>
 
 							<p class={styles.aboutDescription}>
@@ -1736,87 +1809,9 @@ export function Settings(props: SettingsProps) {
 										</div>
 									</div>
 
-									{/* ── Activity section ── */}
-									<div class={styles.statSectionLabel}>Activity</div>
-									<div class={styles.statActivityGrid}>
-										<div class={styles.statActivityCard}>
-											<span class={styles.statActivityValue}>
-												{serverStats.services.activeStreams}
-											</span>
-											<span class={styles.statActivityLabel}>
-												Active Streams
-											</span>
-											<span class={styles.statTooltip}>
-												Number of users currently watching a video stream
-												from this server
-											</span>
-										</div>
-										<div class={styles.statActivityCard}>
-											<span class={styles.statActivityValue}>
-												{serverStats.services.activeTranscodes}
-											</span>
-											<span class={styles.statActivityLabel}>Transcodes</span>
-											<span class={styles.statTooltip}>
-												Active video transcoding processes converting media
-												to a compatible format in real time
-											</span>
-										</div>
-										<div class={styles.statActivityCard}>
-											<span class={styles.statActivityValue}>
-												{serverStats.services.runningJobs}
-											</span>
-											<span class={styles.statActivityLabel}>
-												Running Jobs
-											</span>
-											<span class={styles.statTooltip}>
-												Background tasks currently executing, such as
-												thumbnail generation or metadata fetching
-											</span>
-										</div>
-										<div class={styles.statActivityCard}>
-											<span class={styles.statActivityValue}>
-												{serverStats.services.pendingJobs}
-											</span>
-											<span class={styles.statActivityLabel}>
-												Pending Jobs
-											</span>
-											<span class={styles.statTooltip}>
-												Queued background tasks waiting to be processed
-											</span>
-										</div>
-									</div>
+									{/* Activity section — disabled for now */}
 								</>
 							)}
-
-							<h3 class={styles.aboutSectionTitle}>Developer</h3>
-							<div class={styles.developerLinks}>
-								<a
-									href="https://www.ryanweiss.net"
-									target="_blank"
-									rel="noopener noreferrer"
-									class={styles.developerLink}
-								>
-									Ryan Weiss
-								</a>
-								<a
-									href="https://github.com/rw3iss/mu"
-									target="_blank"
-									rel="noopener noreferrer"
-									class={styles.developerLink}
-								>
-									Project Website
-								</a>
-								<a
-									href="/changelog"
-									class={styles.developerLink}
-									onClick={(e) => {
-										e.preventDefault();
-										route('/changelog');
-									}}
-								>
-									Recent Changes
-								</a>
-							</div>
 						</div>
 					)}
 				</div>

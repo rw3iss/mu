@@ -4,6 +4,7 @@ import { Button } from '@/components/common/Button';
 import { Spinner } from '@/components/common/Spinner';
 import { ExternalRatings } from '@/components/movie/ExternalRatings';
 import { MovieOptionsMenu } from '@/components/movie/MovieOptionsMenu';
+import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { RatingWidget } from '@/components/movie/RatingWidget';
 import { PluginSlot } from '@/plugins/PluginSlot';
@@ -124,6 +125,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 	const [showFileInfo, setShowFileInfo] = useState(false);
 	const [showPlaySettings, setShowPlaySettings] = useState(false);
+	const [showSubtitles, setShowSubtitles] = useState(false);
 	const [audioProfiles, setAudioProfiles] = useState<AudioProfile[]>([]);
 	const [selectedEqProfile, setSelectedEqProfile] = useState<string>('');
 	const [selectedCompProfile, setSelectedCompProfile] = useState<string>('');
@@ -687,44 +689,46 @@ export function MovieDetail({ id }: MovieDetailProps) {
 										</div>
 									)}
 
-									{movie.fileInfo.subtitleTracks.length > 0 && (
-										<div class={styles.trackSection}>
-											<h3 class={styles.trackTitle}>
-												Subtitle Tracks (
-												{movie.fileInfo.subtitleTracks.length})
-											</h3>
-											<div class={styles.trackList}>
-												{movie.fileInfo.subtitleTracks.map((t) => (
-													<div key={t.index} class={styles.trackItem}>
-														{t.codec && (
-															<span class={styles.trackCodec}>
-																{t.codec.toUpperCase()}
-															</span>
-														)}
-														<span class={styles.trackLang}>
-															{t.language !== 'und'
-																? t.language?.toUpperCase()
-																: 'Unknown'}
-														</span>
-														{t.forced && (
-															<span
-																class={`${styles.fileInfoBadge} ${styles.fileInfoBadgeMuted}`}
-															>
-																Forced
-															</span>
-														)}
-														{t.external && (
-															<span
-																class={`${styles.fileInfoBadge} ${styles.fileInfoBadgeMuted}`}
-															>
-																External
-															</span>
-														)}
-													</div>
-												))}
+									{/* Subtitles */}
+									<div class={styles.trackSection}>
+										<button
+											class={styles.subtitleToggle}
+											onClick={() => setShowSubtitles(!showSubtitles)}
+										>
+											{movie.fileInfo.subtitleTracks.length > 0
+												? `${movie.fileInfo.subtitleTracks.length} subtitle${movie.fileInfo.subtitleTracks.length === 1 ? '' : 's'} found`
+												: 'No subtitles found'}
+											<span class={styles.fileInfoArrow}>
+												{showSubtitles ? '\u25B2' : '\u25BC'}
+											</span>
+										</button>
+										{showSubtitles && (
+											<div class={styles.subtitlePanelWrap}>
+												<SubtitlePanel
+													movieId={movie.id}
+													existingTracks={(
+														movie.fileInfo?.subtitleTracks ?? []
+													).map((t) => ({
+														index: t.index,
+														language: t.language || 'und',
+														label:
+															t.title ||
+															t.language ||
+															`Track ${t.index}`,
+														codec: t.codec,
+														forced: t.forced,
+														external: t.external,
+													}))}
+													onSubtitlesChanged={async () => {
+														const data = await moviesService.get(
+															movie.id,
+														);
+														setMovie(data);
+													}}
+												/>
 											</div>
-										</div>
-									)}
+										)}
+									</div>
 								</div>
 							)}
 						</div>

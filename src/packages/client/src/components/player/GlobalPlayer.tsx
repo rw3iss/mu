@@ -44,6 +44,19 @@ export function GlobalPlayer() {
 		};
 	}, [engine]);
 
+	// Set browser tab title to movie name while playing
+	useEffect(() => {
+		const movie = globalMovie.value;
+		if (!isPlayerActive.value || !movie) {
+			document.title = 'Mu';
+			return;
+		}
+		document.title = `${movie.title} — Mu`;
+		return () => {
+			document.title = 'Mu';
+		};
+	}, [isPlayerActive.value, globalMovie.value]);
+
 	// When mode changes or a new movie starts, handle stream initialization
 	useEffect(() => {
 		if (!isPlayerActive.value || !globalMovieId.value) return;
@@ -212,8 +225,12 @@ export function GlobalPlayer() {
 			{!isMini && (
 				<div
 					class={`${styles.topHeader} ${showControls.value ? styles.topHeaderVisible : ''}`}
-					onMouseEnter={() => { isHoveringControls.value = true; }}
-					onMouseLeave={() => { isHoveringControls.value = false; }}
+					onMouseEnter={() => {
+						isHoveringControls.value = true;
+					}}
+					onMouseLeave={() => {
+						isHoveringControls.value = false;
+					}}
 				>
 					<button
 						class={styles.topBtn}
@@ -268,8 +285,12 @@ export function GlobalPlayer() {
 			{/* Bottom bar — same layout in both modes */}
 			<div
 				class={`${styles.playerBar} ${barVisible ? '' : styles.hidden}`}
-				onMouseEnter={() => { isHoveringControls.value = true; }}
-				onMouseLeave={() => { isHoveringControls.value = false; }}
+				onMouseEnter={() => {
+					isHoveringControls.value = true;
+				}}
+				onMouseLeave={() => {
+					isHoveringControls.value = false;
+				}}
 			>
 				<PlayerControls
 					visible={barVisible}

@@ -164,7 +164,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 		>
 			<div class={styles.header}>
 				<button class={styles.logo} onClick={() => handleNav('/')}>
-					<img src="/mu_logo_128w.png" alt="Mu" class={styles.logoImage} />
+					<img src="/cinehost_dark_small.png" alt="Mu" class={styles.logoImage} />
 				</button>
 				<button
 					class={styles.toggle}

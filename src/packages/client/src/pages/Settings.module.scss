@@ -220,23 +220,6 @@
   }
 }
 
-.customSwatch {
-  border: 2px dashed var(--color-text-muted);
-  background: var(--color-bg-elevated);
-
-  &.activeSwatch {
-    border-style: solid;
-  }
-}
-
-.colorInputHidden {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
 // ── Setting control row (value + reset button) ──
 
 .settingControl {
@@ -507,23 +490,6 @@
   border-top: 1px solid var(--color-border);
 }
 
-.developerLinks {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.developerLink {
-  font-size: var(--font-size-sm);
-  color: var(--color-accent);
-  text-decoration: none;
-  transition: color var(--transition-fast);
-
-  &:hover {
-    color: var(--color-accent-hover);
-    text-decoration: underline;
-  }
-}
 
 .encodingSectionTitle {
   font-size: var(--font-size-md);
@@ -790,4 +756,10 @@
   font-size: 11px;
   color: var(--color-text-muted);
   white-space: nowrap;
+}
+
+.accentColorColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }

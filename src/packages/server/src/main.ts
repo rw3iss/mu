@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import fastifyCookie from '@fastify/cookie';
 import fastifyCors from '@fastify/cors';
 import fastifyJwt from '@fastify/jwt';
+import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -51,6 +52,10 @@ async function bootstrap() {
 	await register(fastifyJwt, {
 		secret: config.get<string>('auth.jwtSecret'),
 		cookie: { cookieName: 'mu_access_token', signed: false },
+	});
+
+	await register(fastifyMultipart, {
+		limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max subtitle file
 	});
 
 	// Rate limiting disabled for now
