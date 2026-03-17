@@ -473,7 +473,7 @@ export function EffectsPanel() {
 	const compProfileName = getActiveProfileName(allProfiles, activeCompProfileId.value);
 
 	return (
-		<div class={styles.panel} onClick={(e) => e.stopPropagation()}>
+		<div class={styles.panel} data-player-panel onClick={(e) => e.stopPropagation()}>
 			<div class={styles.header}>
 				<span class={styles.headerTitle}>Audio Effects</span>
 				<button class={styles.closeBtn} onClick={toggleEffectsPanel} aria-label="Close">

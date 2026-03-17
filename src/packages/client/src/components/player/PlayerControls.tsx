@@ -1,6 +1,7 @@
 import type { VNode } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { getUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
@@ -21,6 +22,7 @@ import {
 	isMuted,
 	isPlaying,
 	quality,
+	saveSubtitleChoice,
 	setVolume,
 	subtitleTrack,
 	toggleMute,
@@ -219,7 +221,12 @@ export function PlayerControls({
 	}, []);
 
 	const handleSubtitleSelect = useCallback((trackId: string | null) => {
-		subtitleTrack.value = trackId;
+		const movieId = globalMovieId.value;
+		if (movieId) {
+			saveSubtitleChoice(movieId, trackId);
+		} else {
+			subtitleTrack.value = trackId;
+		}
 		setShowSettingsMenu(false);
 		setSettingsPanel('main');
 	}, []);
@@ -315,6 +322,7 @@ export function PlayerControls({
 
 	return (
 		<div
+			data-player-panel
 			class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''}`}
 		>
 			{/* ── Row 1: Seek bar — flush to top, full width ── */}
@@ -749,11 +757,17 @@ export function PlayerControls({
 												{'\u2039'} Manage Subtitles
 											</button>
 											<div class={styles.menuPanelContent}>
+												<SubtitleAppearance compact />
+												<div class={styles.menuDivider} />
 												{globalMovieId.value && (
 													<SubtitlePanel
 														movieId={globalMovieId.value}
+														existingTracks={(session?.subtitles ?? []).map((t, i) => ({
+															index: i,
+															language: t.language,
+															label: t.label,
+														}))}
 														onTrackAdded={(track) => {
-															// Add the new subtitle to the session and auto-select it
 															const s = currentSession.value;
 															if (!s) return;
 															const trackId = `sub-${track.index}`;
@@ -770,7 +784,12 @@ export function PlayerControls({
 																	newTrack,
 																],
 															};
-															subtitleTrack.value = trackId;
+															const movieId = globalMovieId.value;
+															if (movieId) {
+																saveSubtitleChoice(movieId, trackId);
+															} else {
+																subtitleTrack.value = trackId;
+															}
 														}}
 													/>
 												)}

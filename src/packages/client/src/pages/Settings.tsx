@@ -4,6 +4,7 @@ import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
+import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
 import { useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
@@ -1040,6 +1041,11 @@ export function Settings(props: SettingsProps) {
 									/>
 									<span class={styles.toggleTrack} />
 								</label>
+							</div>
+
+							{/* Subtitles Appearance */}
+							<div class={styles.settingGroup}>
+								<SubtitleAppearance />
 							</div>
 						</div>
 					)}

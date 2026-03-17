@@ -25,7 +25,7 @@ export function InfoPanel({ movie, visible, onClose }: InfoPanelProps) {
 			{/* Backdrop overlay */}
 			{visible && <div class={styles.backdrop} onClick={onClose} />}
 
-			<div class={`${styles.panel} ${visible ? styles.open : ''}`}>
+			<div class={`${styles.panel} ${visible ? styles.open : ''}`} data-player-panel>
 				<button class={styles.closeBtn} onClick={onClose} aria-label="Close info">
 					{'\u2715'}
 				</button>

@@ -51,6 +51,32 @@ export const isMuted = signal(false);
 export const isFullscreen = signal(false);
 export const quality = signal<string>('auto');
 export const subtitleTrack = signal<string | null>(null);
+
+/** Save the selected subtitle track for a movie so it persists across refreshes. */
+export function saveSubtitleChoice(movieId: string, trackId: string | null): void {
+	subtitleTrack.value = trackId;
+	try {
+		if (trackId) {
+			localStorage.setItem(`mu_subtitle_${movieId}`, trackId);
+		} else {
+			localStorage.removeItem(`mu_subtitle_${movieId}`);
+		}
+	} catch { /* ignore */ }
+}
+
+/** Restore the previously selected subtitle track for a movie. */
+export function restoreSubtitleChoice(movieId: string, availableTracks: SubtitleTrack[]): void {
+	try {
+		const saved = localStorage.getItem(`mu_subtitle_${movieId}`);
+		if (saved && availableTracks.some((t) => t.id === saved)) {
+			subtitleTrack.value = saved;
+		} else {
+			subtitleTrack.value = null;
+		}
+	} catch {
+		subtitleTrack.value = null;
+	}
+}
 export const audioTrack = signal<string | null>(null);
 export const isBuffering = signal(false);
 export const showControls = signal(true);

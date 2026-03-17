@@ -17,17 +17,44 @@ import {
 	initPlayerSettings,
 	isFullscreen,
 	isHoveringControls,
+	restoreSubtitleChoice,
 	showControls,
 	showInfoPanel,
 	streamError,
 	subtitleTrack,
 } from '@/state/player.state';
+import { useSubtitleSettings } from '@/components/movie/SubtitleAppearance';
+import { closeEffectsPanel, showEffectsPanel } from '@/state/audio-effects.state';
 import { setSharedVideoEngine } from '@/state/videoEngineRef';
 import { EffectsPanel } from './EffectsPanel';
 import styles from './GlobalPlayer.module.scss';
 import { InfoPanel } from './InfoPanel';
 import { PlayerControls } from './PlayerControls';
 import { useVideoEngine } from './useVideoEngine';
+
+/** Shift all VTT timestamp cues by the given offset in milliseconds. */
+function offsetVttTimings(vtt: string, offsetMs: number): string {
+	if (offsetMs === 0) return vtt;
+	// Match VTT timestamps: HH:MM:SS.mmm or MM:SS.mmm
+	return vtt.replace(
+		/(\d{2}:)?(\d{2}):(\d{2})\.(\d{3})/g,
+		(_match, hours, mins, secs, ms) => {
+			const h = hours ? parseInt(hours, 10) : 0;
+			const totalMs =
+				h * 3600000 +
+				parseInt(mins, 10) * 60000 +
+				parseInt(secs, 10) * 1000 +
+				parseInt(ms, 10) +
+				offsetMs;
+			const clamped = Math.max(0, totalMs);
+			const hh = String(Math.floor(clamped / 3600000)).padStart(2, '0');
+			const mm = String(Math.floor((clamped % 3600000) / 60000)).padStart(2, '0');
+			const ss = String(Math.floor((clamped % 60000) / 1000)).padStart(2, '0');
+			const mmm = String(clamped % 1000).padStart(3, '0');
+			return `${hh}:${mm}:${ss}.${mmm}`;
+		},
+	);
+}
 
 export function GlobalPlayer() {
 	const engine = useVideoEngine();
@@ -97,6 +124,12 @@ export function GlobalPlayer() {
 					forceStartPosition.value = null;
 					engine.initPlayback(session.streamUrl, session.directPlay, pos);
 					playbackInitRef.current = true;
+
+					// Restore previously selected subtitle for this movie
+					const movieId = globalMovieId.value;
+					if (movieId && session.subtitles.length > 0) {
+						restoreSubtitleChoice(movieId, session.subtitles);
+					}
 				} else if (streamError.value) {
 					// Stream failed to start — show the error
 					setPreparingMessage(streamError.value);
@@ -128,6 +161,51 @@ export function GlobalPlayer() {
 		}
 	}, [playerMode.value]);
 
+	// Subtitle appearance settings
+	const [subSettings] = useSubtitleSettings();
+
+	// Apply subtitle appearance styles via a dynamic <style> element
+	useEffect(() => {
+		const s = subSettings;
+		const styleId = 'mu-subtitle-style';
+		let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+		if (!styleEl) {
+			styleEl = document.createElement('style');
+			styleEl.id = styleId;
+			document.head.appendChild(styleEl);
+		}
+
+		// Parse hex color to rgba with opacity
+		const hexToRgba = (hex: string, alpha: number) => {
+			const r = parseInt(hex.slice(1, 3), 16);
+			const g = parseInt(hex.slice(3, 5), 16);
+			const b = parseInt(hex.slice(5, 7), 16);
+			return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+		};
+
+		const fontColor = hexToRgba(s.fontColor, s.textOpacity);
+		const bgColor = hexToRgba(s.backgroundColor, s.backgroundOpacity);
+		const shadowColor = s.shadowColor;
+		const fontSize = `${(s.fontSize / 100) * 1.3}em`;
+		const verticalOffset = s.verticalOffset;
+
+		styleEl.textContent = `
+			video::cue {
+				color: ${fontColor};
+				background-color: ${bgColor};
+				font-size: ${fontSize};
+				text-shadow: 1px 1px 2px ${shadowColor}, -1px -1px 2px ${shadowColor};
+			}
+			video::-webkit-media-text-track-display {
+				transform: translateY(${verticalOffset}px);
+			}
+		`;
+
+		return () => {
+			styleEl?.remove();
+		};
+	}, [subSettings]);
+
 	// Apply selected subtitle track to the video element
 	useEffect(() => {
 		const video = engine.videoRef.current;
@@ -150,22 +228,62 @@ export function GlobalPlayer() {
 		const track = session.subtitles.find((t) => t.id === selectedId);
 		if (!track) return;
 
-		const trackEl = document.createElement('track');
-		trackEl.kind = 'subtitles';
-		trackEl.label = track.label;
-		trackEl.srclang = track.language;
-		// Only add local auth token for relative URLs — remote subtitle URLs
-		// already include their own auth token in the query string
-		if (track.url.startsWith('http')) {
-			trackEl.src = track.url;
-		} else {
+		// Build the subtitle URL with auth
+		let subtitleUrl = track.url;
+		if (!subtitleUrl.startsWith('http')) {
 			const token = localStorage.getItem('mu_token');
-			trackEl.src = token ? `${track.url}?token=${encodeURIComponent(token)}` : track.url;
+			if (token) {
+				const sep = subtitleUrl.includes('?') ? '&' : '?';
+				subtitleUrl = `${subtitleUrl}${sep}token=${encodeURIComponent(token)}`;
+			}
 		}
-		trackEl.default = true;
-		video.appendChild(trackEl);
-		trackEl.track.mode = 'showing';
-	}, [subtitleTrack.value, currentSession.value?.sessionId]);
+
+		// Fetch the VTT content and create a blob URL to avoid CORS issues
+		// with crossOrigin='anonymous' on the video element
+		fetch(subtitleUrl)
+			.then((res) => {
+				if (!res.ok) throw new Error(`Subtitle fetch failed: ${res.status}`);
+				return res.text();
+			})
+			.then((vttText) => {
+				// Apply timing offset to the VTT content
+				const timingOffset = subSettings.timingOffsetMs;
+				let processedVtt = vttText;
+				if (timingOffset !== 0) {
+					processedVtt = offsetVttTimings(vttText, timingOffset);
+				}
+
+				const blob = new Blob([processedVtt], { type: 'text/vtt' });
+				const blobUrl = URL.createObjectURL(blob);
+
+				// Check video is still current
+				if (engine.videoRef.current !== video) {
+					URL.revokeObjectURL(blobUrl);
+					return;
+				}
+
+				const trackEl = document.createElement('track');
+				trackEl.kind = 'subtitles';
+				trackEl.label = track.label;
+				trackEl.srclang = track.language;
+				trackEl.src = blobUrl;
+				trackEl.default = true;
+				video.appendChild(trackEl);
+				trackEl.track.mode = 'showing';
+			})
+			.catch((err) => {
+				console.error('[Subtitles] Failed to load subtitle track:', err);
+			});
+
+		return () => {
+			// Clean up blob URLs
+			for (const t of video.querySelectorAll('track')) {
+				if (t.src.startsWith('blob:')) {
+					URL.revokeObjectURL(t.src);
+				}
+			}
+		};
+	}, [subtitleTrack.value, currentSession.value?.sessionId, subSettings.timingOffsetMs]);
 
 	// Fullscreen toggle — uses document.documentElement so both video and bar are visible
 	const handleToggleFullscreen = useCallback(async () => {
@@ -189,6 +307,26 @@ export function GlobalPlayer() {
 	// Info panel toggle
 	const handleToggleInfo = useCallback(() => {
 		showInfoPanel.value = !showInfoPanel.value;
+	}, []);
+
+	// Close panels when clicking outside (e.g. on the main app, minimized player area, etc.)
+	useEffect(() => {
+		const handleGlobalClick = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			// If click is inside the player controls or panels, ignore (they handle their own clicks)
+			if (target.closest('[data-player-panel]')) return;
+
+			// Close effects panel if open
+			if (showEffectsPanel.value) {
+				closeEffectsPanel();
+			}
+			// Close info panel if open
+			if (showInfoPanel.value) {
+				showInfoPanel.value = false;
+			}
+		};
+		document.addEventListener('mousedown', handleGlobalClick);
+		return () => document.removeEventListener('mousedown', handleGlobalClick);
 	}, []);
 
 	// Don't render anything if player is hidden
