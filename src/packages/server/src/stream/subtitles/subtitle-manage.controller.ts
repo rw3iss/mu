@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
 import {
+	BadGatewayException,
 	BadRequestException,
 	Body,
 	Controller,
@@ -16,6 +18,7 @@ import { and, eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, movies } from '../../database/schema/index.js';
+import { RemoteService } from '../../remote/remote.service.js';
 import { SubtitleService } from './subtitle.service.js';
 import { SubtitleSearchService } from './subtitle-search.service.js';
 
@@ -27,6 +30,7 @@ export class SubtitleManageController {
 		private readonly subtitleSearch: SubtitleSearchService,
 		private readonly subtitleService: SubtitleService,
 		private readonly database: DatabaseService,
+		private readonly remoteService: RemoteService,
 	) {}
 
 	/**
@@ -36,6 +40,14 @@ export class SubtitleManageController {
 	async listSubtitles(
 		@Param('movieId') movieId: string,
 	): Promise<{ subtitles: MovieSubtitleInfo[] }> {
+		const remote = this.parseRemoteId(movieId);
+		if (remote) {
+			return this.proxyRemoteGet(
+				remote.serverId,
+				`/shared/subtitles/${remote.remoteMovieId}`,
+			);
+		}
+
 		const file = await this.getMovieFile(movieId);
 		const tracks = this.parseSubtitleTracks(file.subtitleTracks);
 		return {
@@ -58,6 +70,15 @@ export class SubtitleManageController {
 		@Param('movieId') movieId: string,
 		@Body() body: { language?: string },
 	): Promise<{ results: SubtitleSearchResult[] }> {
+		const remote = this.parseRemoteId(movieId);
+		if (remote) {
+			return this.proxyRemotePost(
+				remote.serverId,
+				`/shared/subtitles/${remote.remoteMovieId}/search`,
+				body,
+			);
+		}
+
 		const movie = await this.getMovie(movieId);
 		const file = await this.getMovieFile(movieId);
 
@@ -83,6 +104,15 @@ export class SubtitleManageController {
 	): Promise<{ subtitle: MovieSubtitleInfo }> {
 		if (!body.provider || !body.fileId) {
 			throw new BadRequestException('provider and fileId are required');
+		}
+
+		const remote = this.parseRemoteId(movieId);
+		if (remote) {
+			return this.proxyRemotePost(
+				remote.serverId,
+				`/shared/subtitles/${remote.remoteMovieId}/download`,
+				body,
+			);
 		}
 
 		const file = await this.getMovieFile(movieId);
@@ -131,6 +161,26 @@ export class SubtitleManageController {
 		@Param('movieId') movieId: string,
 		@Req() req: FastifyRequest,
 	): Promise<{ subtitle: MovieSubtitleInfo }> {
+		const remote = this.parseRemoteId(movieId);
+		if (remote) {
+			// Parse the multipart upload, then proxy it to the remote server
+			const data = await (req as any).file();
+			if (!data) throw new BadRequestException('No file uploaded');
+
+			const chunks: Buffer[] = [];
+			for await (const chunk of data.file) {
+				chunks.push(chunk);
+			}
+			const fileBuffer = Buffer.concat(chunks);
+
+			return this.proxyRemoteUpload(
+				remote.serverId,
+				`/shared/subtitles/${remote.remoteMovieId}/upload`,
+				fileBuffer,
+				data.filename as string,
+			);
+		}
+
 		const file = await this.getMovieFile(movieId);
 
 		// Parse multipart data
@@ -182,6 +232,81 @@ export class SubtitleManageController {
 				external: true,
 			},
 		};
+	}
+
+	// ── Remote helpers ──
+
+	private parseRemoteId(movieId: string): { serverId: string; remoteMovieId: string } | null {
+		const match = movieId.match(/^remote:([^:]+):(.+)$/);
+		if (!match) return null;
+		return { serverId: match[1]!, remoteMovieId: match[2]! };
+	}
+
+	private getRemoteAuth(serverId: string): { baseUrl: string; headers: Record<string, string> } {
+		const auth = this.remoteService.getServerAuth(serverId);
+		if (!auth) throw new NotFoundException(`Remote server ${serverId} not found`);
+		return auth;
+	}
+
+	private async proxyRemoteGet<T>(serverId: string, path: string): Promise<T> {
+		const { baseUrl, headers } = this.getRemoteAuth(serverId);
+		const response = await fetch(`${baseUrl}/api/v1${path}`, {
+			headers,
+			signal: AbortSignal.timeout(15000),
+		});
+		if (!response.ok) {
+			const body = await response.text().catch(() => '');
+			throw new BadGatewayException(`Remote server error ${response.status}: ${body}`);
+		}
+		return (await response.json()) as T;
+	}
+
+	private async proxyRemotePost<T>(serverId: string, path: string, body: unknown): Promise<T> {
+		const { baseUrl, headers } = this.getRemoteAuth(serverId);
+		const response = await fetch(`${baseUrl}/api/v1${path}`, {
+			method: 'POST',
+			headers: { ...headers, 'Content-Type': 'application/json' },
+			body: JSON.stringify(body),
+			signal: AbortSignal.timeout(30000),
+		});
+		if (!response.ok) {
+			const text = await response.text().catch(() => '');
+			throw new BadGatewayException(`Remote server error ${response.status}: ${text}`);
+		}
+		return (await response.json()) as T;
+	}
+
+	private async proxyRemoteUpload<T>(
+		serverId: string,
+		path: string,
+		fileBuffer: Buffer,
+		fileName: string,
+	): Promise<T> {
+		const { baseUrl, headers } = this.getRemoteAuth(serverId);
+		const boundary = `----CineHostBoundary${Date.now()}`;
+		const parts = [
+			`--${boundary}\r\n`,
+			`Content-Disposition: form-data; name="subtitle"; filename="${fileName}"\r\n`,
+			'Content-Type: application/octet-stream\r\n\r\n',
+		];
+		const header = Buffer.from(parts.join(''));
+		const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
+		const body = Buffer.concat([header, fileBuffer, footer]);
+
+		const response = await fetch(`${baseUrl}/api/v1${path}`, {
+			method: 'POST',
+			headers: {
+				...headers,
+				'Content-Type': `multipart/form-data; boundary=${boundary}`,
+			},
+			body,
+			signal: AbortSignal.timeout(30000),
+		});
+		if (!response.ok) {
+			const text = await response.text().catch(() => '');
+			throw new BadGatewayException(`Remote server error ${response.status}: ${text}`);
+		}
+		return (await response.json()) as T;
 	}
 
 	// ── Helpers ──

@@ -97,7 +97,11 @@ export class SubtitleSearchService {
 				this.logger.warn(`OpenSubtitles search failed: ${err}`);
 			}
 		} else {
-			this.logger.debug('OpenSubtitles API key not configured, skipping');
+			this.logger.warn(
+				'OpenSubtitles API key not configured — subtitle search unavailable. ' +
+					'Add thirdParty.opensubtitles.apiKey to config.yml ' +
+					'(free key from https://www.opensubtitles.com/consumers)',
+			);
 		}
 
 		// Cache results

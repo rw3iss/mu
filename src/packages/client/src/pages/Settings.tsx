@@ -140,6 +140,7 @@ export function Settings(props: SettingsProps) {
 	const [defaultQuality, setDefaultQuality] = useState('auto');
 	const [autoplay, setAutoplay] = useState(true);
 	const [bufferSize, setBufferSizeSetting] = useUiSetting('buffer_size', 'normal');
+	const [skipTimes, setSkipTimes] = useUiSetting<number[]>('skip_times', [5, 10, 20]);
 
 	// Library settings
 	const [scanInterval, setScanInterval] = useState('6');
@@ -218,6 +219,9 @@ export function Settings(props: SettingsProps) {
 					if (typeof playback.autoplay === 'boolean') setAutoplay(playback.autoplay);
 					if (typeof playback.bufferSize === 'string') {
 						setBufferSizeSetting(playback.bufferSize);
+					}
+					if (Array.isArray(playback.skipTimes) && playback.skipTimes.length === 3) {
+						setSkipTimes(playback.skipTimes as number[]);
 					}
 				}
 
@@ -319,9 +323,10 @@ export function Settings(props: SettingsProps) {
 		setIsSaving(true);
 		try {
 			await api.put('/settings/playback', {
-				value: { defaultQuality, autoplay, bufferSize },
+				value: { defaultQuality, autoplay, bufferSize, skipTimes },
 			});
 			setBufferSizeSetting(bufferSize);
+			setSkipTimes(skipTimes);
 
 			// Save encoding settings (now in Playback tab)
 			await api.put('/settings/encoding', {
@@ -347,6 +352,7 @@ export function Settings(props: SettingsProps) {
 		defaultQuality,
 		autoplay,
 		bufferSize,
+		skipTimes,
 		hwAccel,
 		encodingPreset,
 		encodeQuality,
@@ -1104,6 +1110,47 @@ export function Settings(props: SettingsProps) {
 									<option value="large">Large (60s)</option>
 									<option value="max">Maximum (120s)</option>
 								</select>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Skip Times</span>
+									<span class={styles.settingDescription}>
+										Custom back/forward skip durations (1-300 seconds)
+									</span>
+								</div>
+								<div class={styles.skipTimesRow}>
+									{skipTimes.map((val, i) => (
+										<input
+											key={i}
+											type="number"
+											class={styles.skipTimeInput}
+											min={1}
+											max={300}
+											value={val}
+											onInput={(e) => {
+												const raw = parseInt(
+													(e.target as HTMLInputElement).value,
+													10,
+												);
+												const clamped = Number.isNaN(raw)
+													? skipTimes[i]
+													: Math.max(1, Math.min(300, raw));
+												const next = [...skipTimes];
+												next[i] = clamped;
+												setSkipTimes(next);
+											}}
+										/>
+									))}
+									<button
+										class={styles.resetBtn}
+										onClick={() => setSkipTimes([5, 10, 20])}
+										aria-label="Reset skip times"
+										title="Reset to defaults"
+									>
+										Reset
+									</button>
+								</div>
 							</div>
 
 							<h3 class={styles.encodingSectionTitle}>Encoding</h3>

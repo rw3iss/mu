@@ -1,22 +1,29 @@
-import type { MovieListQuery } from '@mu/shared';
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import type { MovieListQuery, MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
 import {
+	BadRequestException,
+	Body,
 	Controller,
 	Get,
 	NotFoundException,
 	Param,
+	Post,
 	Query,
 	Req,
 	Res,
 	UseGuards,
 } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Public } from '../common/decorators/public.decorator.js';
 import { DatabaseService } from '../database/database.service.js';
-import { movieFiles } from '../database/schema/index.js';
+import { movieFiles, movies } from '../database/schema/index.js';
 import { MoviesService } from '../movies/movies.service.js';
 import { DirectPlayService } from '../stream/direct-play/direct-play.service.js';
 import { StreamService } from '../stream/stream.service.js';
+import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
+import { SubtitleSearchService } from '../stream/subtitles/subtitle-search.service.js';
 import { HlsGeneratorService } from '../stream/transcoder/hls-generator.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { SharingService } from './sharing.service.js';
@@ -32,6 +39,8 @@ export class SharingController {
 		private readonly hlsGenerator: HlsGeneratorService,
 		private readonly transcoderService: TranscoderService,
 		private readonly directPlayService: DirectPlayService,
+		private readonly subtitleService: SubtitleService,
+		private readonly subtitleSearch: SubtitleSearchService,
 		private readonly db: DatabaseService,
 	) {}
 
@@ -180,5 +189,186 @@ export class SharingController {
 	@UseGuards(SharingAuthGuard)
 	getGenres() {
 		return this.moviesService.getGenres();
+	}
+
+	// ── Shared subtitle endpoints ──
+
+	/**
+	 * GET /shared/subtitles/:movieId — List subtitle tracks for a shared movie.
+	 */
+	@Get('subtitles/:movieId')
+	@UseGuards(SharingAuthGuard)
+	async listSharedSubtitles(
+		@Param('movieId') movieId: string,
+	): Promise<{ subtitles: MovieSubtitleInfo[] }> {
+		const file = this.getMovieFile(movieId);
+		const tracks = file.subtitleTracks ? JSON.parse(file.subtitleTracks) : [];
+		return {
+			subtitles: (tracks as any[]).map((t: any) => ({
+				index: t.index,
+				language: t.language || 'und',
+				label: t.title || t.language || `Track ${t.index}`,
+				codec: t.codec,
+				forced: t.forced ?? false,
+				external: t.external ?? false,
+			})),
+		};
+	}
+
+	/**
+	 * POST /shared/subtitles/:movieId/search — Search for subtitles for a shared movie.
+	 */
+	@Post('subtitles/:movieId/search')
+	@UseGuards(SharingAuthGuard)
+	async searchSharedSubtitles(
+		@Param('movieId') movieId: string,
+		@Body() body: { language?: string },
+	): Promise<{ results: SubtitleSearchResult[] }> {
+		const movie = this.db.db.select().from(movies).where(eq(movies.id, movieId)).get();
+		if (!movie) throw new NotFoundException(`Movie ${movieId} not found`);
+		const file = this.getMovieFile(movieId);
+
+		const results = await this.subtitleSearch.search({
+			title: movie.title,
+			imdbId: movie.imdbId ?? undefined,
+			tmdbId: movie.tmdbId ?? undefined,
+			year: movie.year ?? undefined,
+			filePath: file.filePath,
+			language: body.language || 'en',
+		});
+		return { results };
+	}
+
+	/**
+	 * POST /shared/subtitles/:movieId/upload — Upload a subtitle to a shared movie.
+	 */
+	@Post('subtitles/:movieId/upload')
+	@UseGuards(SharingAuthGuard)
+	async uploadSharedSubtitle(
+		@Param('movieId') movieId: string,
+		@Req() req: FastifyRequest,
+	): Promise<{ subtitle: MovieSubtitleInfo }> {
+		const file = this.getMovieFile(movieId);
+
+		const data = await (req as any).file();
+		if (!data) throw new BadRequestException('No file uploaded');
+
+		const originalName = data.filename as string;
+		const ext = path.extname(originalName).toLowerCase();
+		const validExts = ['.srt', '.vtt', '.ass', '.ssa', '.sub'];
+		if (!validExts.includes(ext)) {
+			throw new BadRequestException(`Unsupported subtitle format "${ext}"`);
+		}
+
+		const chunks: Buffer[] = [];
+		for await (const chunk of data.file) {
+			chunks.push(chunk);
+		}
+		const fileBuffer = Buffer.concat(chunks);
+
+		const parsed = this.subtitleService.parseSubtitleFilename(originalName);
+		const lang = parsed.language !== 'und' ? parsed.language : 'en';
+
+		const movieDir = path.dirname(file.filePath);
+		const baseName = path.basename(file.filePath, path.extname(file.filePath));
+		const subFileName = `${baseName}.${lang}${ext}`;
+		const subFilePath = path.join(movieDir, subFileName);
+
+		await writeFile(subFilePath, fileBuffer);
+
+		await this.subtitleService.clearCache(file.id);
+		const tracks = await this.subtitleService.extractSubtitles(file.filePath, file.id);
+
+		// Update DB
+		this.db.db
+			.update(movieFiles)
+			.set({
+				subtitleTracks: JSON.stringify(
+					tracks.map((t) => ({
+						index: t.index,
+						language: t.language,
+						title: t.title,
+						external: t.external ?? false,
+					})),
+				),
+			})
+			.where(eq(movieFiles.id, file.id))
+			.run();
+
+		const newTrack = tracks[tracks.length - 1];
+		return {
+			subtitle: {
+				index: newTrack?.index ?? tracks.length - 1,
+				language: lang,
+				label: newTrack?.title || `${lang.toUpperCase()} (Uploaded)`,
+				external: true,
+			},
+		};
+	}
+
+	/**
+	 * POST /shared/subtitles/:movieId/download — Download a subtitle for a shared movie.
+	 */
+	@Post('subtitles/:movieId/download')
+	@UseGuards(SharingAuthGuard)
+	async downloadSharedSubtitle(
+		@Param('movieId') movieId: string,
+		@Body() body: { provider: string; fileId: string; language?: string },
+	): Promise<{ subtitle: MovieSubtitleInfo }> {
+		if (!body.provider || !body.fileId) {
+			throw new BadRequestException('provider and fileId are required');
+		}
+
+		const file = this.getMovieFile(movieId);
+		const { data, format } = await this.subtitleSearch.downloadFromProvider(
+			body.provider,
+			body.fileId,
+		);
+
+		const movieDir = path.dirname(file.filePath);
+		const baseName = path.basename(file.filePath, path.extname(file.filePath));
+		const lang = body.language || 'en';
+		const subFileName = `${baseName}.${lang}.${format}`;
+		const subFilePath = path.join(movieDir, subFileName);
+
+		await writeFile(subFilePath, data);
+
+		await this.subtitleService.clearCache(file.id);
+		const tracks = await this.subtitleService.extractSubtitles(file.filePath, file.id);
+
+		this.db.db
+			.update(movieFiles)
+			.set({
+				subtitleTracks: JSON.stringify(
+					tracks.map((t) => ({
+						index: t.index,
+						language: t.language,
+						title: t.title,
+						external: t.external ?? false,
+					})),
+				),
+			})
+			.where(eq(movieFiles.id, file.id))
+			.run();
+
+		const newTrack = tracks[tracks.length - 1];
+		return {
+			subtitle: {
+				index: newTrack?.index ?? tracks.length - 1,
+				language: lang,
+				label: newTrack?.title || `${lang.toUpperCase()} (Downloaded)`,
+				external: true,
+			},
+		};
+	}
+
+	private getMovieFile(movieId: string) {
+		const file = this.db.db
+			.select()
+			.from(movieFiles)
+			.where(and(eq(movieFiles.movieId, movieId), eq(movieFiles.available, true)))
+			.get();
+		if (!file) throw new NotFoundException(`No available file for movie ${movieId}`);
+		return file;
 	}
 }

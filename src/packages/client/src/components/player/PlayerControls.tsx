@@ -2,6 +2,7 @@ import type { VNode } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
+import { getUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import {
@@ -374,128 +375,148 @@ export function PlayerControls({
 					</div>
 
 					{/* Center: skip-back, play, skip-forward */}
-					<div class={styles.centerControls}>
-						{/* Skip Back — rollover reveals extended options */}
-						<div
-							class={styles.skipWrap}
-							onMouseEnter={() => setSkipBackOpen(true)}
-							onMouseLeave={() => setSkipBackOpen(false)}
-						>
-							<button
-								class={`${styles.controlBtn} ${styles.skipBtn} ${skipBackOpen ? styles.skipBtnHidden : ''}`}
-								onClick={() => skipBack(5)}
-								aria-label="Skip back"
-							>
-								<svg
-									width="20"
-									height="20"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="white"
-									stroke-width="2.5"
-									stroke-linecap="round"
-									stroke-linejoin="round"
+					{(() => {
+						const st = getUiSetting<number[]>('skip_times', [5, 10, 20]);
+						const t = [st[0] ?? 5, st[1] ?? 10, st[2] ?? 20];
+						return (
+							<div class={styles.centerControls}>
+								{/* Skip Back — rollover reveals extended options */}
+								<div
+									class={styles.skipWrap}
+									onMouseEnter={() => setSkipBackOpen(true)}
+									onMouseLeave={() => setSkipBackOpen(false)}
 								>
-									<polyline points="11 17 6 12 11 7" />
-									<polyline points="18 17 13 12 18 7" />
-								</svg>
-							</button>
-							{skipBackOpen && (
-								<div class={`${styles.skipExtended} ${styles.skipExtendedLeft}`}>
 									<button
-										class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-										onClick={() => skipBack(20)}
-										aria-label="Skip back 20 seconds"
+										class={`${styles.controlBtn} ${styles.skipBtn} ${skipBackOpen ? styles.skipBtnHidden : ''}`}
+										onClick={() => skipBack(t[0])}
+										aria-label="Skip back"
 									>
-										<span class={styles.skipExtText}>20s</span>
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="white"
+											stroke-width="2.5"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="11 17 6 12 11 7" />
+											<polyline points="18 17 13 12 18 7" />
+										</svg>
 									</button>
-									<button
-										class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-										onClick={() => skipBack(10)}
-										aria-label="Skip back 10 seconds"
-									>
-										<span class={styles.skipExtText}>10s</span>
-									</button>
-									<button
-										class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-										onClick={() => skipBack(5)}
-										aria-label="Skip back 5 seconds"
-									>
-										<span class={styles.skipExtText}>5s</span>
-									</button>
+									{skipBackOpen && (
+										<div
+											class={`${styles.skipExtended} ${styles.skipExtendedLeft}`}
+										>
+											<button
+												class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+												onClick={() => skipBack(t[2])}
+												aria-label={`Skip back ${t[2]}s`}
+											>
+												<span class={styles.skipExtText}>{t[2]}s</span>
+											</button>
+											<button
+												class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+												onClick={() => skipBack(t[1])}
+												aria-label={`Skip back ${t[1]}s`}
+											>
+												<span class={styles.skipExtText}>{t[1]}s</span>
+											</button>
+											<button
+												class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+												onClick={() => skipBack(t[0])}
+												aria-label={`Skip back ${t[0]}s`}
+											>
+												<span class={styles.skipExtText}>{t[0]}s</span>
+											</button>
+										</div>
+									)}
 								</div>
-							)}
-						</div>
 
-						<button
-							class={`${styles.controlBtn} ${styles.playBtn}`}
-							onClick={onTogglePlay}
-							aria-label={isPlaying.value ? 'Pause' : 'Play'}
-						>
-							{isPlaying.value ? (
-								<svg width="22" height="22" viewBox="0 0 24 24" fill="white">
-									<rect x="6" y="4" width="4" height="16" rx="1" />
-									<rect x="14" y="4" width="4" height="16" rx="1" />
-								</svg>
-							) : (
-								<svg width="22" height="22" viewBox="0 0 24 24" fill="white">
-									<path d="M8 5v14l11-7z" />
-								</svg>
-							)}
-						</button>
-
-						{/* Skip Forward — rollover reveals extended options */}
-						<div
-							class={styles.skipWrap}
-							onMouseEnter={() => setSkipFwdOpen(true)}
-							onMouseLeave={() => setSkipFwdOpen(false)}
-						>
-							<button
-								class={`${styles.controlBtn} ${styles.skipBtn} ${skipFwdOpen ? styles.skipBtnHidden : ''}`}
-								onClick={() => skipForward(5)}
-								aria-label="Skip forward"
-							>
-								<svg
-									width="20"
-									height="20"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="white"
-									stroke-width="2.5"
-									stroke-linecap="round"
-									stroke-linejoin="round"
+								<button
+									class={`${styles.controlBtn} ${styles.playBtn}`}
+									onClick={onTogglePlay}
+									aria-label={isPlaying.value ? 'Pause' : 'Play'}
 								>
-									<polyline points="13 17 18 12 13 7" />
-									<polyline points="6 17 11 12 6 7" />
-								</svg>
-							</button>
-							{skipFwdOpen && (
-								<div class={`${styles.skipExtended} ${styles.skipExtendedRight}`}>
+									{isPlaying.value ? (
+										<svg
+											width="22"
+											height="22"
+											viewBox="0 0 24 24"
+											fill="white"
+										>
+											<rect x="6" y="4" width="4" height="16" rx="1" />
+											<rect x="14" y="4" width="4" height="16" rx="1" />
+										</svg>
+									) : (
+										<svg
+											width="22"
+											height="22"
+											viewBox="0 0 24 24"
+											fill="white"
+										>
+											<path d="M8 5v14l11-7z" />
+										</svg>
+									)}
+								</button>
+
+								{/* Skip Forward — rollover reveals extended options */}
+								<div
+									class={styles.skipWrap}
+									onMouseEnter={() => setSkipFwdOpen(true)}
+									onMouseLeave={() => setSkipFwdOpen(false)}
+								>
 									<button
-										class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-										onClick={() => skipForward(5)}
-										aria-label="Skip forward 5 seconds"
+										class={`${styles.controlBtn} ${styles.skipBtn} ${skipFwdOpen ? styles.skipBtnHidden : ''}`}
+										onClick={() => skipForward(t[0])}
+										aria-label="Skip forward"
 									>
-										<span class={styles.skipExtText}>5s</span>
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="white"
+											stroke-width="2.5"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="13 17 18 12 13 7" />
+											<polyline points="6 17 11 12 6 7" />
+										</svg>
 									</button>
-									<button
-										class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-										onClick={() => skipForward(10)}
-										aria-label="Skip forward 10 seconds"
-									>
-										<span class={styles.skipExtText}>10s</span>
-									</button>
-									<button
-										class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-										onClick={() => skipForward(20)}
-										aria-label="Skip forward 20 seconds"
-									>
-										<span class={styles.skipExtText}>20s</span>
-									</button>
+									{skipFwdOpen && (
+										<div
+											class={`${styles.skipExtended} ${styles.skipExtendedRight}`}
+										>
+											<button
+												class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+												onClick={() => skipForward(t[0])}
+												aria-label={`Skip forward ${t[0]}s`}
+											>
+												<span class={styles.skipExtText}>{t[0]}s</span>
+											</button>
+											<button
+												class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+												onClick={() => skipForward(t[1])}
+												aria-label={`Skip forward ${t[1]}s`}
+											>
+												<span class={styles.skipExtText}>{t[1]}s</span>
+											</button>
+											<button
+												class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+												onClick={() => skipForward(t[2])}
+												aria-label={`Skip forward ${t[2]}s`}
+											>
+												<span class={styles.skipExtText}>{t[2]}s</span>
+											</button>
+										</div>
+									)}
 								</div>
-							)}
-						</div>
-					</div>
+							</div>
+						);
+					})()}
 
 					{/* Right: plugin buttons, info, volume, settings, fullscreen */}
 					<div class={styles.rightControls}>

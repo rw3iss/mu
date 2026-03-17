@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RemoteModule } from '../remote/remote.module.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { StreamController } from './stream.controller.js';
 import { StreamService } from './stream.service.js';
@@ -10,6 +11,7 @@ import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
 
 @Module({
+	imports: [RemoteModule],
 	controllers: [StreamController, SubtitleController, SubtitleManageController],
 	providers: [
 		StreamService,
