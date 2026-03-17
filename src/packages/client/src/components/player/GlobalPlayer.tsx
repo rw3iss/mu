@@ -144,6 +144,12 @@ export function GlobalPlayer() {
 			);
 			playbackInitRef.current = true;
 			restoredAutoplay.value = null;
+
+			// Restore subtitle for resumed session
+			const movieId = globalMovieId.value;
+			if (movieId && currentSession.value.subtitles.length > 0) {
+				restoreSubtitleChoice(movieId, currentSession.value.subtitles);
+			}
 		}
 	}, [globalMovieId.value, isPlayerActive.value]);
 

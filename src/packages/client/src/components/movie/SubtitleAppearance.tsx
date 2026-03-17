@@ -16,7 +16,7 @@ export interface SubtitleSettings {
 
 export const DEFAULT_SUBTITLE_SETTINGS: SubtitleSettings = {
 	fontSize: 100,
-	lineHeight: 120,
+	lineHeight: 100,
 	fontColor: '#ffffff',
 	backgroundColor: '#000000',
 	backgroundOpacity: 0.6,
@@ -84,8 +84,8 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 					<input
 						type="range"
 						class={styles.slider}
-						min={80}
-						max={300}
+						min={50}
+						max={200}
 						step={5}
 						value={settings.lineHeight}
 						onInput={(e) =>
@@ -211,6 +211,25 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						onClick={() => update('verticalOffset', settings.verticalOffset + 1)}
 					>
 						+
+					</button>
+					<button
+						class={styles.offsetBtn}
+						onClick={() => update('verticalOffset', 0)}
+						title="Reset vertical offset"
+					>
+						<svg
+							width="12"
+							height="12"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<polyline points="1 4 1 10 7 10" />
+							<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+						</svg>
 					</button>
 				</div>
 			</div>
