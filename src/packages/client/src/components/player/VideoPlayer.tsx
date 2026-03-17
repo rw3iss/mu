@@ -204,6 +204,9 @@ export function VideoPlayer({
 			{isBuffering.value && !engine.playbackError && (
 				<div class={styles.bufferingOverlay}>
 					<div class={styles.bufferingSpinner} />
+					{engine.hlsStatus && (
+						<span class={styles.bufferingText}>{engine.hlsStatus}</span>
+					)}
 				</div>
 			)}
 

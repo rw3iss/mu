@@ -27,9 +27,13 @@ const BUFFER_CONFIGS: Record<
 const MAX_RECOVERIES = 6;
 const RECOVERY_BASE_DELAY_MS = 2000;
 
+/** User-facing status message during HLS recovery (e.g. transcoding in progress) */
+type HlsStatus = string | null;
+
 export interface VideoEngine {
 	videoRef: { current: HTMLVideoElement | null };
 	playbackError: string | null;
+	hlsStatus: HlsStatus;
 	togglePlay: () => void;
 	seek: (time: number) => void;
 	initPlayback: (
@@ -76,6 +80,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	 */
 	const intendedPlayingRef = useRef(false);
 	const [playbackError, setPlaybackError] = useState<string | null>(null);
+	const [hlsStatus, setHlsStatus] = useState<HlsStatus>(null);
 
 	const bufferConfig = useMemo(() => {
 		const stored = getUiSetting('buffer_size', 'normal');
@@ -278,6 +283,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				hls.attachMedia(video);
 
 				hls.on(Hls.Events.MANIFEST_PARSED, () => {
+					setHlsStatus(null);
 					// Don't disrupt if user already started playing manually
 					if (!video.paused) return;
 					if (startPosition > 0) video.currentTime = startPosition;
@@ -287,7 +293,14 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				let networkRecoveries = 0;
 				let mediaRecoveries = 0;
 				hls.on(Hls.Events.ERROR, (_event, data) => {
-					if (!data.fatal) return;
+					// Non-fatal 503s mean transcoding is in progress — show status
+					if (!data.fatal) {
+						const resp = (data as any).response;
+						if (resp?.code === 503) {
+							setHlsStatus('Transcoding in progress...');
+						}
+						return;
+					}
 					const detail = data.details || 'unknown';
 					const response = (data as any).response;
 					const statusCode = response?.code ?? '';
@@ -297,6 +310,12 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 							if (networkRecoveries < MAX_RECOVERIES) {
 								networkRecoveries++;
 								const delay = RECOVERY_BASE_DELAY_MS * networkRecoveries;
+								const is503 = statusCode === 503;
+								setHlsStatus(
+									is503
+										? 'Transcoding in progress...'
+										: `Loading video... (retry ${networkRecoveries}/${MAX_RECOVERIES})`,
+								);
 								console.warn(
 									`[HLS] Network error, recovery ${networkRecoveries}/${MAX_RECOVERIES} in ${delay}ms`,
 								);
@@ -304,6 +323,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 									if (hlsRef.current) hls.startLoad();
 								}, delay);
 							} else {
+								setHlsStatus(null);
 								const msg = `Network error: unable to load video segments (${detail}${statusCode ? `, HTTP ${statusCode}` : ''})`;
 								console.error(`[HLS] ${msg}`);
 								setPlaybackError(msg);
@@ -412,6 +432,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	return {
 		videoRef,
 		playbackError,
+		hlsStatus,
 		togglePlay,
 		seek,
 		initPlayback,
