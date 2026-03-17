@@ -244,12 +244,29 @@ export class SubtitleService {
 	 */
 	async convertToVtt(inputPath: string, outputPath: string): Promise<void> {
 		const ext = path.extname(inputPath).toLowerCase();
+		const { copyFile, readFile: readF, writeFile: writeF } = await import('node:fs/promises');
+
 		if (ext === '.vtt') {
-			const { copyFile } = await import('node:fs/promises');
 			await copyFile(inputPath, outputPath);
 			return;
 		}
 
+		// Pure-JS SRT → VTT conversion (no ffmpeg needed for the most common case)
+		if (ext === '.srt') {
+			try {
+				let content = await readF(inputPath, 'utf-8');
+				// Remove BOM if present
+				if (content.charCodeAt(0) === 0xfeff) content = content.slice(1);
+				// Replace SRT timestamps (comma separator) with VTT (dot separator)
+				const vtt = content.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+				await writeF(outputPath, `WEBVTT\n\n${vtt}`, 'utf-8');
+				return;
+			} catch {
+				// Fall through to ffmpeg
+			}
+		}
+
+		// Fallback to ffmpeg for other formats (ASS, SSA, SUB, etc.)
 		return new Promise((resolve, reject) => {
 			ffmpeg(inputPath)
 				.outputOptions(['-c:s', 'webvtt'])

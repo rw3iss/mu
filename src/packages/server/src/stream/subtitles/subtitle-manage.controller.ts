@@ -138,13 +138,44 @@ export class SubtitleManageController {
 		const tracks = await this.subtitleService.extractSubtitles(file.filePath, file.id);
 
 		// Update the DB with the new tracks
-		await this.updateSubtitleTracks(file.id, tracks);
+		if (tracks.length > 0) {
+			await this.updateSubtitleTracks(file.id, tracks);
+		} else {
+			// extractSubtitles returned empty (ffprobe/ffmpeg unavailable) —
+			// manually register the downloaded file in the DB
+			const existing = this.parseSubtitleTracks(
+				this.database.db.select().from(movieFiles).where(eq(movieFiles.id, file.id)).get()
+					?.subtitleTracks ?? null,
+			);
+			const newIdx = existing.length;
+			existing.push({
+				index: newIdx,
+				language: lang,
+				title: `${lang.toUpperCase()} (Downloaded)`,
+				external: true,
+			});
+			await this.updateSubtitleTracks(file.id, existing);
+			tracks.push({
+				index: newIdx,
+				language: lang,
+				title: `${lang.toUpperCase()} (Downloaded)`,
+				external: true,
+			});
 
-		// Return info about the newly added subtitle
+			// Also convert to VTT manually so it's serveable
+			const outputDir = path.join('data', 'cache', 'subtitles', file.id);
+			const { mkdir: mkdirP } = await import('node:fs/promises');
+			await mkdirP(outputDir, { recursive: true });
+			await this.subtitleService.convertToVtt(
+				subFilePath,
+				path.join(outputDir, `${newIdx}.vtt`),
+			);
+		}
+
 		const newTrack = tracks[tracks.length - 1];
 		return {
 			subtitle: {
-				index: newTrack?.index ?? tracks.length - 1,
+				index: newTrack?.index ?? 0,
 				language: lang,
 				label: newTrack?.title || `${lang.toUpperCase()} (Downloaded)`,
 				external: true,
@@ -221,12 +252,43 @@ export class SubtitleManageController {
 		// Re-extract subtitles
 		await this.subtitleService.clearCache(file.id);
 		const tracks = await this.subtitleService.extractSubtitles(file.filePath, file.id);
-		await this.updateSubtitleTracks(file.id, tracks);
+
+		if (tracks.length > 0) {
+			await this.updateSubtitleTracks(file.id, tracks);
+		} else {
+			// Fallback: manually register the uploaded file
+			const existing = this.parseSubtitleTracks(
+				this.database.db.select().from(movieFiles).where(eq(movieFiles.id, file.id)).get()
+					?.subtitleTracks ?? null,
+			);
+			const newIdx = existing.length;
+			existing.push({
+				index: newIdx,
+				language: lang,
+				title: `${lang.toUpperCase()} (Uploaded)`,
+				external: true,
+			});
+			await this.updateSubtitleTracks(file.id, existing);
+			tracks.push({
+				index: newIdx,
+				language: lang,
+				title: `${lang.toUpperCase()} (Uploaded)`,
+				external: true,
+			});
+
+			const outputDir = path.join('data', 'cache', 'subtitles', file.id);
+			const { mkdir: mkdirP } = await import('node:fs/promises');
+			await mkdirP(outputDir, { recursive: true });
+			await this.subtitleService.convertToVtt(
+				subFilePath,
+				path.join(outputDir, `${newIdx}.vtt`),
+			);
+		}
 
 		const newTrack = tracks[tracks.length - 1];
 		return {
 			subtitle: {
-				index: newTrack?.index ?? tracks.length - 1,
+				index: newTrack?.index ?? 0,
 				language: lang,
 				label: newTrack?.title || `${lang.toUpperCase()} (Uploaded)`,
 				external: true,

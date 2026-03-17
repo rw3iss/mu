@@ -107,24 +107,38 @@ Located at `data/config/config.yml`. Auto-generated with random secrets on first
 ```yaml
 server:
   host: "0.0.0.0"
-  port: 4000
-  logLevel: info        # fatal | error | warn | info | debug | trace
+  port: 4000                    # server port
+  logLevel: info                # fatal | error | warn | info | debug | trace
 
 auth:
-  jwtSecret: "..."      # auto-generated, min 32 chars
-  cookieSecret: "..."   # auto-generated, min 32 chars
+  jwtSecret: "..."              # REQUIRED - auto-generated, min 32 chars
+  cookieSecret: "..."           # REQUIRED - auto-generated, min 32 chars
   allowRegistration: true
 
 media:
-  libraryPaths: []      # directories to scan for movies
+  libraryPaths: []              # configurable in Settings > Library after install
   scanIntervalMinutes: 60
   watchForChanges: true
 
 transcoding:
-  hwAccel: none         # none | vaapi | nvenc | qsv | videotoolbox
+  hwAccel: none                 # configurable in Settings > Playback (none | vaapi | nvenc | qsv | videotoolbox)
+
+thirdParty:
+  tmdb:
+    apiKey: ""                  # recommended - enables movie metadata, posters, cast info
+  omdb:
+    apiKey: ""                  # recommended - enables IMDb, Rotten Tomatoes, Metacritic ratings
+  opensubtitles:
+    apiKey: ""                  # optional - enables online subtitle search
 
 dataDir: "./data"
 ```
+
+**Required:** `auth.jwtSecret` and `auth.cookieSecret` are the only required settings -- both are auto-generated on first run. Everything else has sensible defaults.
+
+**Recommended:** TMDB and OMDB API keys enable automatic metadata fetching (posters, cast, ratings). Without them, movies will show only filename-derived info. Get free keys at [themoviedb.org](https://www.themoviedb.org/settings/api) and [omdbapi.com](https://www.omdbapi.com/apikey.aspx).
+
+**Configurable after install:** Media library paths, hardware acceleration, encoding settings, scan intervals, and most other options can be changed in the web UI under **Settings** after installation.
 
 ### Environment Variables
 
@@ -137,6 +151,7 @@ Override any config value with `MU_` prefixed env vars. Use double underscores f
 | `MU_TRANSCODING__HW_ACCEL` | `none` | Hardware acceleration |
 | `MU_THIRD_PARTY__TMDB__API_KEY` | -- | TMDB API key for metadata |
 | `MU_THIRD_PARTY__OMDB__API_KEY` | -- | OMDB API key for IMDb ratings |
+| `MU_THIRD_PARTY__OPENSUBTITLES__API_KEY` | -- | OpenSubtitles API key |
 | `MU_DATA_DIR` | `./data` | Data directory path |
 
 Single underscores also work for flat keys: `MU_SERVER_PORT=4000`.
