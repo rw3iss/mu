@@ -75,34 +75,44 @@ export const isPlayerActive = computed(() => playerMode.value !== 'hidden');
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+function writePersistState(): void {
+	if (!globalMovieId.value) {
+		localStorage.removeItem(STORAGE_KEY);
+		return;
+	}
+	const state: PersistedPlayerState = {
+		movieId: globalMovieId.value,
+		currentTime: currentTime.value,
+		volume: volume.value,
+		isMuted: isMuted.value,
+		playerMode: playerMode.value,
+		isPlaying: isPlaying.value,
+		session: currentSession.value,
+	};
+	try {
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+	} catch {
+		// Storage full or unavailable
+	}
+}
+
 function saveState(): void {
 	if (saveTimer) clearTimeout(saveTimer);
-	saveTimer = setTimeout(() => {
-		if (!globalMovieId.value) {
-			localStorage.removeItem(STORAGE_KEY);
-			return;
-		}
-		const state: PersistedPlayerState = {
-			movieId: globalMovieId.value,
-			currentTime: currentTime.value,
-			volume: volume.value,
-			isMuted: isMuted.value,
-			playerMode: playerMode.value,
-			isPlaying: isPlaying.value,
-			session: currentSession.value,
-		};
-		try {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-		} catch {
-			// Storage full or unavailable
-		}
-	}, 1000);
+	saveTimer = setTimeout(writePersistState, 1000);
+}
+
+/** Immediately persist current state (no debounce). Used during movie transitions. */
+function saveStateNow(): void {
+	if (saveTimer) clearTimeout(saveTimer);
+	writePersistState();
 }
 
 let disposeEffects: (() => void) | null = null;
 
 function setupPersistenceEffects(): void {
 	if (disposeEffects) return;
+	// Debounced save for frequently changing values (currentTime, volume, etc.)
+	// Play state is saved synchronously by video event handlers via mu_is_playing key.
 	const dispose1 = effect(() => {
 		void currentTime.value;
 		void volume.value;
@@ -112,6 +122,9 @@ function setupPersistenceEffects(): void {
 		saveState();
 	});
 	disposeEffects = dispose1;
+
+	// Save on page unload so hard refresh captures final state
+	window.addEventListener('beforeunload', saveStateNow);
 }
 
 // ============================================
@@ -129,6 +142,10 @@ export async function playMovie(
 ): Promise<void> {
 	initPlayerSettings();
 	closeEffectsPanel();
+	// User explicitly chose to play — persist this intent
+	try {
+		localStorage.setItem('mu_is_playing', '1');
+	} catch {}
 
 	if (opts?.fromBeginning) {
 		forceStartPosition.value = 0;
@@ -137,7 +154,7 @@ export async function playMovie(
 	const wasMini = playerMode.value === 'mini';
 
 	// Already loaded this movie - ensure it's playing
-	if (globalMovieId.value === movieId && currentSession.value) {
+	if (globalMovieId.value === movieId && currentSession.value && !opts?.fromBeginning) {
 		if (!wasMini) {
 			playerMode.value = 'full';
 			route(`/player/${movieId}`);
@@ -146,29 +163,32 @@ export async function playMovie(
 		if (engine) {
 			engine.setIntendedPlaying(true);
 			const video = engine.videoRef.current;
-			if (opts?.fromBeginning && video) {
-				video.currentTime = 0;
-			}
 			if (video?.paused) video.play().catch(() => {});
 		}
-		// Update history cache for the re-played movie
 		const movie = globalMovie.value;
-		if (movie) {
-			pushToHistory(movie);
-		}
+		if (movie) pushToHistory(movie);
 		return;
 	}
 
-	// Playing a different movie - stop old stream
-	if (globalMovieId.value && currentSession.value) {
+	// Stop old stream and destroy video engine before switching movies
+	const engine = sharedVideoEngine.value;
+	if (engine) engine.destroy();
+	if (currentSession.value) {
 		await endStream();
 	}
+	// Clear stale state synchronously before setting new movie
+	currentSession.value = null;
 
 	// Set up new movie — keep mini mode if already minimized
 	globalMovieId.value = movieId;
+	globalMovie.value = null;
 	if (!wasMini) {
 		playerMode.value = 'full';
 	}
+
+	// Force-save immediately with the new movieId and no session
+	// so a hard refresh during loading doesn't restore the old session
+	saveStateNow();
 
 	// Fetch movie data (non-blocking for UI)
 	moviesService
@@ -220,6 +240,7 @@ export async function closePlayer(): Promise<void> {
 
 	await endStream();
 	localStorage.removeItem(STORAGE_KEY);
+	localStorage.removeItem('mu_is_playing');
 
 	// If on player page, navigate away
 	if (movieId && window.location.pathname.startsWith('/player/')) {
@@ -315,8 +336,7 @@ export function initGlobalPlayer(): void {
 
 		// Restore movie and mode
 		globalMovieId.value = saved.movieId;
-		// Always restore to mini mode
-		playerMode.value = 'mini';
+		playerMode.value = saved.playerMode === 'hidden' ? 'mini' : saved.playerMode;
 
 		// Fetch movie metadata
 		moviesService
@@ -330,23 +350,18 @@ export function initGlobalPlayer(): void {
 				localStorage.removeItem(STORAGE_KEY);
 			});
 
-		// Tell GlobalPlayer whether to auto-play after restoring
-		restoredAutoplay.value = saved.isPlaying ?? false;
+		// Read the authoritative play state written synchronously by video event handlers.
+		// This is more reliable than the debounced `saved.isPlaying` which may be stale.
+		const wasPlaying = localStorage.getItem('mu_is_playing') === '1';
+		restoredAutoplay.value = wasPlaying;
 
-		// Restore session — verify it's still valid on the server
-		if (saved.session?.sessionId) {
-			const session = { ...saved.session, startPosition: saved.currentTime };
-			// Optimistically restore so GlobalPlayer doesn't create a new session
-			currentSession.value = session;
-
-			// Verify the session is still alive by pinging updateProgress.
-			// If the server returns 404, the session was ended — create a new one.
-			streamService.updateProgress(session.sessionId, saved.currentTime).catch(() => {
-				// Session no longer exists on server — clear it so GlobalPlayer
-				// creates a fresh one on its next effect cycle.
-				console.warn('[GlobalPlayer] Persisted session expired, will create new one');
-				currentSession.value = null;
-			});
+		// Restore session if it matches the movie.
+		// We set startPosition from the saved time so playback resumes at the right spot.
+		// If the session is stale, GlobalPlayer will create a fresh one.
+		if (saved.session?.sessionId && saved.session?.movieId === saved.movieId) {
+			currentSession.value = { ...saved.session, startPosition: saved.currentTime };
+		} else {
+			currentSession.value = null;
 		}
 	} catch {
 		localStorage.removeItem(STORAGE_KEY);

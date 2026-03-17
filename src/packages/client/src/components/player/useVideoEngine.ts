@@ -79,6 +79,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	 * This ref lets moveVideoTo know whether to resume after the move.
 	 */
 	const intendedPlayingRef = useRef(false);
+	/** For direct play with deferred loading: stores the URL until user plays */
+	const deferredSrcRef = useRef<{ url: string; position: number } | null>(null);
 	const [playbackError, setPlaybackError] = useState<string | null>(null);
 	const [hlsStatus, setHlsStatus] = useState<HlsStatus>(null);
 
@@ -244,20 +246,34 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			}
 
 			if (directPlay || !Hls.isSupported()) {
+				// Ensure video is fully stopped before setting new source
+				video.pause();
+				video.removeAttribute('src');
+				video.load();
+
 				const isAbsoluteUrl = streamUrl.startsWith('http');
-				// Only add local auth token for relative URLs (local server).
-				// Absolute URLs (remote servers) already have their own auth token.
+				let directUrl: string;
 				if (!isAbsoluteUrl) {
 					const token = localStorage.getItem('mu_token');
 					const sep = streamUrl.includes('?') ? '&' : '?';
-					video.src = token
+					directUrl = token
 						? `${streamUrl}${sep}token=${encodeURIComponent(token)}`
 						: streamUrl;
 				} else {
-					video.src = streamUrl;
+					directUrl = streamUrl;
 				}
-				if (startPosition > 0) video.currentTime = startPosition;
-				if (autoplay) video.play().catch(() => {});
+
+				if (autoplay) {
+					// Load and play immediately
+					deferredSrcRef.current = null;
+					video.src = directUrl;
+					if (startPosition > 0) video.currentTime = startPosition;
+					video.play().catch(() => {});
+				} else {
+					// Defer loading — don't set video.src until user presses play.
+					// This prevents the Web Audio API from picking up ghost audio.
+					deferredSrcRef.current = { url: directUrl, position: startPosition };
+				}
 			} else {
 				const token = localStorage.getItem('mu_token');
 				const hls = new Hls({
@@ -362,13 +378,35 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const togglePlay = useCallback(() => {
 		const video = videoRef.current;
 		if (!video) return;
+
+		// If we deferred loading a direct play source, load it now
+		if (deferredSrcRef.current) {
+			const { url, position } = deferredSrcRef.current;
+			deferredSrcRef.current = null;
+			video.src = url;
+			if (position > 0) video.currentTime = position;
+			intendedPlayingRef.current = true;
+			audioEngine.resume();
+			video.play().catch(() => {});
+			try {
+				localStorage.setItem('mu_is_playing', '1');
+			} catch {}
+			return;
+		}
+
 		if (video.paused) {
 			intendedPlayingRef.current = true;
 			audioEngine.resume();
 			video.play();
+			try {
+				localStorage.setItem('mu_is_playing', '1');
+			} catch {}
 		} else {
 			intendedPlayingRef.current = false;
 			video.pause();
+			try {
+				localStorage.setItem('mu_is_playing', '0');
+			} catch {}
 		}
 	}, []);
 
@@ -388,6 +426,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const destroy = useCallback(() => {
 		suppressPauseRef.current = true;
 		intendedPlayingRef.current = false;
+		deferredSrcRef.current = null;
 		if (hlsRef.current) {
 			hlsRef.current.destroy();
 			hlsRef.current = null;
@@ -397,8 +436,13 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			video.pause();
 			video.removeAttribute('src');
 			video.load();
+			// Mute to kill any lingering audio from buffered data
+			video.muted = true;
+			// Restore mute state after async cleanup
+			requestAnimationFrame(() => {
+				if (video) video.muted = isMuted.value;
+			});
 		}
-		// Re-enable after async pause events settle
 		requestAnimationFrame(() => {
 			suppressPauseRef.current = false;
 		});

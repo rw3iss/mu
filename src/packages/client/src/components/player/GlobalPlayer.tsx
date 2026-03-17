@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { audioEngine } from '@/audio/audio-engine';
 import { useSubtitleSettings } from '@/components/movie/SubtitleAppearance';
 import { streamService } from '@/services/stream.service';
 import { closeEffectsPanel, showEffectsPanel } from '@/state/audio-effects.state';
@@ -81,21 +82,53 @@ export function GlobalPlayer() {
 		};
 	}, [isPlayerActive.value, globalMovie.value]);
 
-	// When mode changes or a new movie starts, handle stream initialization
+	// When mode changes or a new movie starts, handle stream initialization.
+	// ALWAYS init paused, then restore play state from localStorage after.
 	useEffect(() => {
 		if (!isPlayerActive.value || !globalMovieId.value) return;
 
+		// Helper: after playback is initialized (paused), restore the saved play state.
+		const restorePlayState = (isDirectPlay: boolean) => {
+			// restoredAutoplay: true/false = restoring from refresh, null = user clicked play
+			const isRestore = restoredAutoplay.value !== null;
+			const shouldPlay = restoredAutoplay.value ?? true;
+			restoredAutoplay.value = null;
+
+			// For direct play on restore: never auto-resume (ghost audio bug with Web Audio API).
+			// The deferred src mechanism means the user must press play to load the video.
+			// For user-initiated play: initPlayback was called with autoplay=true via playMovie.
+			if (shouldPlay && !(isRestore && isDirectPlay)) {
+				const video = engine.videoRef.current;
+				if (video) {
+					engine.setIntendedPlaying(true);
+					audioEngine.resume();
+					video.play().catch(() => {});
+				}
+			}
+
+			// Restore subtitle
+			const movieId = globalMovieId.value;
+			const session = currentSession.value;
+			if (movieId && session && session.subtitles.length > 0) {
+				restoreSubtitleChoice(movieId, session.subtitles);
+			}
+		};
+
 		if (!currentSession.value) {
-			// Stop any old video before starting a new stream
+			// No session — create a new stream
 			engine.destroy();
 			setIsInitializing(true);
 			setPreparingMessage(null);
 			initPlayerSettings();
 			playbackInitRef.current = false;
-			engine.setIntendedPlaying(true);
+
+			const isRestore = restoredAutoplay.value !== null;
+			const shouldAutoplay = restoredAutoplay.value ?? true;
+			restoredAutoplay.value = null;
+			engine.setIntendedPlaying(shouldAutoplay);
+
 			startGlobalStream().then(async (session) => {
 				if (session) {
-					// If stream isn't ready yet (live transcode), poll until first segment is available
 					if (!session.ready && !session.directPlay) {
 						setPreparingMessage('Preparing video...');
 						const ready = await streamService.waitForReady(
@@ -119,22 +152,31 @@ export function GlobalPlayer() {
 					setPreparingMessage(null);
 					const pos = forceStartPosition.value ?? session.startPosition;
 					forceStartPosition.value = null;
-					engine.initPlayback(session.streamUrl, session.directPlay, pos);
+
+					// For direct play on restore: don't autoplay (defers src loading)
+					// For user-initiated or HLS: use shouldAutoplay
+					const autoplay = isRestore && session.directPlay ? false : shouldAutoplay;
+					engine.initPlayback(session.streamUrl, session.directPlay, pos, autoplay);
 					playbackInitRef.current = true;
 
-					// Restore previously selected subtitle for this movie
+					// Restore subtitle
 					const movieId = globalMovieId.value;
 					if (movieId && session.subtitles.length > 0) {
 						restoreSubtitleChoice(movieId, session.subtitles);
 					}
 				} else if (streamError.value) {
-					// Stream failed to start — show the error
 					setPreparingMessage(streamError.value);
 				}
 				setIsInitializing(false);
 			});
 		} else if (!playbackInitRef.current) {
-			const autoplay = restoredAutoplay.value ?? true;
+			// Session exists (restored from localStorage)
+			const isRestore = restoredAutoplay.value !== null;
+			const shouldAutoplay = restoredAutoplay.value ?? true;
+			restoredAutoplay.value = null;
+
+			// For direct play on restore: don't autoplay (defers src loading)
+			const autoplay = isRestore && currentSession.value.directPlay ? false : shouldAutoplay;
 			engine.setIntendedPlaying(autoplay);
 			engine.initPlayback(
 				currentSession.value.streamUrl,
@@ -143,9 +185,8 @@ export function GlobalPlayer() {
 				autoplay,
 			);
 			playbackInitRef.current = true;
-			restoredAutoplay.value = null;
 
-			// Restore subtitle for resumed session
+			// Restore subtitle
 			const movieId = globalMovieId.value;
 			if (movieId && currentSession.value.subtitles.length > 0) {
 				restoreSubtitleChoice(movieId, currentSession.value.subtitles);
@@ -189,15 +230,21 @@ export function GlobalPlayer() {
 		const fontColor = hexToRgba(s.fontColor, s.textOpacity);
 		const bgColor = hexToRgba(s.backgroundColor, s.backgroundOpacity);
 		const shadowColor = s.shadowColor;
-		const fontSize = `${(s.fontSize / 100) * 1.3}em`;
-		const lineHeight = (s.lineHeight ?? 120) / 100;
+		const fontSizeEm = (s.fontSize / 100) * 1.3;
+		// Base line-height scales with font size, then apply pixel offset
+		const baseLineHeight = fontSizeEm * 1.2;
+		const lineSpacingPx = s.lineSpacing ?? 0;
+		const lineHeight =
+			lineSpacingPx !== 0
+				? `calc(${baseLineHeight}em + ${lineSpacingPx}px)`
+				: `${baseLineHeight}em`;
 		const verticalOffset = s.verticalOffset;
 
 		styleEl.textContent = `
 			video::cue {
 				color: ${fontColor};
 				background-color: ${bgColor};
-				font-size: ${fontSize};
+				font-size: ${fontSizeEm}em;
 				line-height: ${lineHeight};
 				text-shadow: 1px 1px 2px ${shadowColor}, -1px -1px 2px ${shadowColor};
 			}

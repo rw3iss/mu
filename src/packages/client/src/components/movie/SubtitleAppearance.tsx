@@ -3,8 +3,8 @@ import styles from './SubtitleAppearance.module.scss';
 
 export interface SubtitleSettings {
 	fontSize: number;
-	/** Line height as a percentage (e.g. 120 = 1.2x). Auto-scales with fontSize changes. */
-	lineHeight: number;
+	/** Line spacing offset in pixels from the default for the current font size. */
+	lineSpacing: number;
 	fontColor: string;
 	backgroundColor: string;
 	backgroundOpacity: number;
@@ -16,7 +16,7 @@ export interface SubtitleSettings {
 
 export const DEFAULT_SUBTITLE_SETTINGS: SubtitleSettings = {
 	fontSize: 100,
-	lineHeight: 100,
+	lineSpacing: 0,
 	fontColor: '#ffffff',
 	backgroundColor: '#000000',
 	backgroundOpacity: 0.6,
@@ -40,12 +40,9 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 
 	const update = <K extends keyof SubtitleSettings>(key: K, value: SubtitleSettings[K]) => {
 		const next = { ...settings, [key]: value };
-		// Auto-scale lineHeight proportionally when fontSize changes
+		// Reset line spacing to default (0) when font size changes
 		if (key === 'fontSize') {
-			const oldSize = settings.fontSize || 100;
-			const newSize = value as number;
-			const ratio = newSize / oldSize;
-			next.lineHeight = Math.round(settings.lineHeight * ratio);
+			next.lineSpacing = 0;
 		}
 		setSettings(next);
 	};
@@ -82,20 +79,46 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 				<span class={styles.label}>Line Spacing</span>
 				<div class={styles.control}>
 					<input
-						type="range"
-						class={styles.slider}
-						min={50}
-						max={200}
-						step={5}
-						value={settings.lineHeight}
-						onInput={(e) =>
-							setSettings({
-								...settings,
-								lineHeight: parseInt((e.target as HTMLInputElement).value, 10),
-							})
-						}
+						type="number"
+						class={styles.numberInput}
+						value={settings.lineSpacing}
+						onChange={(e) => {
+							const val = parseInt((e.target as HTMLInputElement).value, 10);
+							if (!Number.isNaN(val)) update('lineSpacing', val);
+						}}
 					/>
-					<span class={styles.value}>{settings.lineHeight}%</span>
+					<span class={styles.unit}>px</span>
+					<button
+						class={styles.offsetBtn}
+						onClick={() => update('lineSpacing', (settings.lineSpacing || 0) - 1)}
+					>
+						-
+					</button>
+					<button
+						class={styles.offsetBtn}
+						onClick={() => update('lineSpacing', (settings.lineSpacing || 0) + 1)}
+					>
+						+
+					</button>
+					<button
+						class={styles.offsetBtn}
+						onClick={() => update('lineSpacing', 0)}
+						title="Reset line spacing"
+					>
+						<svg
+							width="12"
+							height="12"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<polyline points="1 4 1 10 7 10" />
+							<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+						</svg>
+					</button>
 				</div>
 			</div>
 
@@ -202,13 +225,13 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 					<span class={styles.unit}>px</span>
 					<button
 						class={styles.offsetBtn}
-						onClick={() => update('verticalOffset', settings.verticalOffset - 1)}
+						onClick={() => update('verticalOffset', (settings.verticalOffset || 0) - 1)}
 					>
 						-
 					</button>
 					<button
 						class={styles.offsetBtn}
-						onClick={() => update('verticalOffset', settings.verticalOffset + 1)}
+						onClick={() => update('verticalOffset', (settings.verticalOffset || 0) + 1)}
 					>
 						+
 					</button>
@@ -251,13 +274,17 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 					<span class={styles.unit}>ms</span>
 					<button
 						class={styles.offsetBtn}
-						onClick={() => update('timingOffsetMs', settings.timingOffsetMs - 100)}
+						onClick={() =>
+							update('timingOffsetMs', (settings.timingOffsetMs || 0) - 100)
+						}
 					>
 						-100
 					</button>
 					<button
 						class={styles.offsetBtn}
-						onClick={() => update('timingOffsetMs', settings.timingOffsetMs + 100)}
+						onClick={() =>
+							update('timingOffsetMs', (settings.timingOffsetMs || 0) + 100)
+						}
 					>
 						+100
 					</button>
