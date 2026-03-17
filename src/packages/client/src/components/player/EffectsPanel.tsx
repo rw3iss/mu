@@ -418,6 +418,34 @@ function CompressorTab() {
 					</div>
 				)}
 
+				<div class={styles.compParam}>
+					<div class={styles.compParamHeader}>
+						<span class={styles.compParamLabel}>Mix</span>
+						<span class={styles.compParamValue}>
+							{Math.round((settings.mix ?? 1) * 100)}%
+						</span>
+					</div>
+					<div class={styles.mixBar}>
+						<span class={styles.mixLabel}>Dry</span>
+						<input
+							type="range"
+							class={styles.compSlider}
+							min={0}
+							max={1}
+							step={0.01}
+							value={settings.mix ?? 1}
+							onInput={(e) =>
+								updateCompressorParam(
+									'mix',
+									parseFloat((e.target as HTMLInputElement).value),
+								)
+							}
+							disabled={!enabled}
+						/>
+						<span class={styles.mixLabel}>Wet</span>
+					</div>
+				</div>
+
 				<button class={styles.resetBtn} onClick={resetCompressor}>
 					Reset Compressor
 				</button>

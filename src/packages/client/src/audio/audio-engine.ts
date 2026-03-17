@@ -21,6 +21,8 @@ export interface CompressorSettings {
 	attack: number;
 	release: number;
 	makeupGain: number;
+	/** Dry/wet mix: 0 = fully dry (bypass), 1 = fully wet (compressed). Default 1. */
+	mix: number;
 }
 
 export const DEFAULT_EQ_BANDS: EqBand[] = [
@@ -43,6 +45,7 @@ export const DEFAULT_COMPRESSOR: CompressorSettings = {
 	attack: 0.003,
 	release: 0.25,
 	makeupGain: 0,
+	mix: 1,
 };
 
 export class AudioEngine {
@@ -52,6 +55,9 @@ export class AudioEngine {
 	private filters: BiquadFilterNode[] = [];
 	private compressor: DynamicsCompressorNode | null = null;
 	private makeupGainNode: GainNode | null = null;
+	private dryGainNode: GainNode | null = null;
+	private wetGainNode: GainNode | null = null;
+	private compMergeNode: GainNode | null = null;
 	private eqEnabled = false;
 	private compressorEnabled = false;
 	private inputGainDb = 0;
@@ -90,6 +96,12 @@ export class AudioEngine {
 		// Makeup gain after compressor
 		this.makeupGainNode = this.ctx.createGain();
 		this.makeupGainNode.gain.value = this.dbToLinear(this.currentCompressor.makeupGain);
+
+		// Dry/wet mix nodes for parallel compression
+		this.dryGainNode = this.ctx.createGain();
+		this.wetGainNode = this.ctx.createGain();
+		this.compMergeNode = this.ctx.createGain();
+		this.applyMix(this.currentCompressor.mix);
 
 		this.attached = true;
 		this.rebuildChain();
@@ -167,6 +179,7 @@ export class AudioEngine {
 		if (this.makeupGainNode) {
 			this.makeupGainNode.gain.value = this.dbToLinear(settings.makeupGain);
 		}
+		this.applyMix(settings.mix);
 	}
 
 	getCompressorSettings(): CompressorSettings {
@@ -206,6 +219,9 @@ export class AudioEngine {
 		this.filters = [];
 		this.compressor = null;
 		this.makeupGainNode = null;
+		this.dryGainNode = null;
+		this.wetGainNode = null;
+		this.compMergeNode = null;
 		this.attached = false;
 	}
 
@@ -220,8 +236,11 @@ export class AudioEngine {
 		for (const f of this.filters) f.disconnect();
 		this.compressor?.disconnect();
 		this.makeupGainNode?.disconnect();
+		this.dryGainNode?.disconnect();
+		this.wetGainNode?.disconnect();
+		this.compMergeNode?.disconnect();
 
-		// Build chain: source → inputGain → [EQ] → [Compressor] → destination
+		// Build chain: source → inputGain → [EQ] → [Compressor w/ dry/wet mix] → destination
 		let current: AudioNode = this.source;
 
 		if (this.inputGainNode) {
@@ -236,10 +255,25 @@ export class AudioEngine {
 			}
 		}
 
-		if (this.compressorEnabled && this.compressor && this.makeupGainNode) {
+		if (
+			this.compressorEnabled &&
+			this.compressor &&
+			this.makeupGainNode &&
+			this.dryGainNode &&
+			this.wetGainNode &&
+			this.compMergeNode
+		) {
+			// Parallel compression: split into dry + wet, merge at compMergeNode
+			// Dry path: current → dryGain → merge
+			current.connect(this.dryGainNode);
+			this.dryGainNode.connect(this.compMergeNode);
+			// Wet path: current → compressor → makeupGain → wetGain → merge
 			current.connect(this.compressor);
 			this.compressor.connect(this.makeupGainNode);
-			current = this.makeupGainNode;
+			this.makeupGainNode.connect(this.wetGainNode);
+			this.wetGainNode.connect(this.compMergeNode);
+
+			current = this.compMergeNode;
 		}
 
 		current.connect(this.ctx.destination);
@@ -252,6 +286,13 @@ export class AudioEngine {
 		this.compressor.ratio.value = s.ratio;
 		this.compressor.attack.value = s.attack;
 		this.compressor.release.value = s.release;
+	}
+
+	private applyMix(mix: number): void {
+		const wet = Math.max(0, Math.min(1, mix ?? 1));
+		const dry = 1 - wet;
+		if (this.dryGainNode) this.dryGainNode.gain.value = dry;
+		if (this.wetGainNode) this.wetGainNode.gain.value = wet;
 	}
 
 	private dbToLinear(db: number): number {

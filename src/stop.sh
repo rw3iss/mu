@@ -9,7 +9,7 @@ PID_FILE="$PROJECT_ROOT/data/mu-server.pid"
 
 # Detect Windows (Git Bash / MSYS2)
 IS_WINDOWS=false
-if [[ "$OSTYPE" == msys* ]] || [[ "$OSTYPE" == mingw* ]] || [[ "$OSTYPE" == cygwin* ]] || [ -d "/c/Windows" ]; then
+if [[ "$(uname -s)" == CYGWIN* ]] || [[ "$(uname -s)" == MINGW* ]] || [[ "$(uname -s)" == MSYS* ]]; then
     IS_WINDOWS=true
 fi
 
@@ -28,56 +28,73 @@ for config_path in \
     fi
 done
 
-kill_pid() {
-    local pid="$1"
+# ── Kill by port (most reliable) ──
+kill_port() {
+    local port="$1"
     if $IS_WINDOWS; then
-        taskkill.exe //PID "$pid" //F 2>/dev/null && echo "Killed PID $pid" || true
+        local pids
+        pids=$(netstat -ano 2>/dev/null | grep ":${port} " | grep LISTENING | awk '{print $NF}' | sort -u)
+        if [ -z "$pids" ]; then
+            return 1
+        fi
+        for pid in $pids; do
+            echo "Killing PID $pid on port $port..."
+            taskkill //F //PID "$pid" 2>&1
+        done
+        # Verify
+        local remaining
+        remaining=$(netstat -ano 2>/dev/null | grep ":${port} " | grep LISTENING)
+        if [ -n "$remaining" ]; then
+            echo "Warning: port $port still in use, retrying..."
+            sleep 1
+            pids=$(netstat -ano 2>/dev/null | grep ":${port} " | grep LISTENING | awk '{print $NF}' | sort -u)
+            for pid in $pids; do
+                taskkill //F //PID "$pid" 2>&1
+            done
+        fi
+        return 0
     else
-        kill "$pid" 2>/dev/null && echo "Killed PID $pid" || true
+        # Unix: try lsof, ss, fuser
+        local port_pid=""
+        if command -v lsof &>/dev/null; then
+            port_pid=$(lsof -ti ":${port}" 2>/dev/null | head -1)
+        elif command -v ss &>/dev/null; then
+            port_pid=$(ss -tlnp "sport = :${port}" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -1)
+        elif command -v fuser &>/dev/null; then
+            port_pid=$(fuser "${port}/tcp" 2>/dev/null | tr -d '[:space:]')
+        fi
+        if [ -n "$port_pid" ]; then
+            echo "Killing PID $port_pid on port $port..."
+            kill "$port_pid" 2>/dev/null
+            return 0
+        fi
+        return 1
     fi
 }
 
 killed=false
 
-# ── Method 1: PID file ──
+# ── Method 1: Kill by PID file ──
 if [ -f "$PID_FILE" ]; then
     OLD_PID=$(cat "$PID_FILE" 2>/dev/null | tr -d '[:space:]')
     if [ -n "$OLD_PID" ]; then
         echo "Found PID file: $OLD_PID"
-        kill_pid "$OLD_PID"
+        if $IS_WINDOWS; then
+            taskkill //F //PID "$OLD_PID" 2>/dev/null && echo "Killed PID $OLD_PID" || true
+        else
+            kill "$OLD_PID" 2>/dev/null && echo "Killed PID $OLD_PID" || true
+        fi
         killed=true
         rm -f "$PID_FILE"
     fi
 fi
 
-# ── Method 2: Kill by port (most reliable fallback) ──
-# Find PID listening on the configured port and kill it
-if $IS_WINDOWS; then
-    # Windows: use netstat to find PID on the port
-    PORT_PID=$(netstat -aon 2>/dev/null | grep ":${SERVER_PORT} " | grep "LISTENING" | awk '{print $NF}' | head -1 | tr -d '[:space:]')
-    if [ -n "$PORT_PID" ] && [ "$PORT_PID" != "0" ]; then
-        echo "Found process on port ${SERVER_PORT}: PID $PORT_PID"
-        kill_pid "$PORT_PID"
-        killed=true
-    fi
-else
-    # Unix: try lsof first, then ss, then fuser
-    PORT_PID=""
-    if command -v lsof &>/dev/null; then
-        PORT_PID=$(lsof -ti ":${SERVER_PORT}" 2>/dev/null | head -1)
-    elif command -v ss &>/dev/null; then
-        PORT_PID=$(ss -tlnp "sport = :${SERVER_PORT}" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -1)
-    elif command -v fuser &>/dev/null; then
-        PORT_PID=$(fuser "${SERVER_PORT}/tcp" 2>/dev/null | tr -d '[:space:]')
-    fi
-    if [ -n "$PORT_PID" ]; then
-        echo "Found process on port ${SERVER_PORT}: PID $PORT_PID"
-        kill_pid "$PORT_PID"
-        killed=true
-    fi
+# ── Method 2: Kill by port (always run to catch orphans) ──
+if kill_port "$SERVER_PORT"; then
+    killed=true
 fi
 
-# ── Method 3: pgrep / ps fallback (by process name) ──
+# ── Method 3: pgrep / ps fallback ──
 if ! $killed; then
     if ! $IS_WINDOWS && command -v pgrep &>/dev/null; then
         PIDS=$(pgrep -f "node.*dist/main" 2>/dev/null || true)
@@ -86,23 +103,19 @@ if ! $killed; then
     fi
     if [ -n "$PIDS" ]; then
         for pid in $PIDS; do
-            kill_pid "$pid"
+            if $IS_WINDOWS; then
+                taskkill //F //PID "$pid" 2>&1
+            else
+                kill "$pid" 2>/dev/null
+            fi
+            echo "Killed PID $pid"
             killed=true
         done
     fi
 fi
 
 if $killed; then
-    sleep 2
-    # Verify the port is actually free now
-    if $IS_WINDOWS; then
-        STILL=$(netstat -aon 2>/dev/null | grep ":${SERVER_PORT} " | grep "LISTENING" | awk '{print $NF}' | head -1 | tr -d '[:space:]')
-        if [ -n "$STILL" ] && [ "$STILL" != "0" ]; then
-            echo "Port ${SERVER_PORT} still in use (PID: $STILL), force killing..."
-            taskkill.exe //PID "$STILL" //F 2>/dev/null || true
-            sleep 1
-        fi
-    fi
+    sleep 1
     echo "Server stopped"
 else
     echo "No running server found"
