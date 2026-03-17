@@ -61,7 +61,9 @@ export function saveSubtitleChoice(movieId: string, trackId: string | null): voi
 		} else {
 			localStorage.removeItem(`mu_subtitle_${movieId}`);
 		}
-	} catch { /* ignore */ }
+	} catch {
+		/* ignore */
+	}
 }
 
 /** Restore the previously selected subtitle track for a movie. */

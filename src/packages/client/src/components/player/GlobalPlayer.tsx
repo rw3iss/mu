@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useSubtitleSettings } from '@/components/movie/SubtitleAppearance';
 import { streamService } from '@/services/stream.service';
+import { closeEffectsPanel, showEffectsPanel } from '@/state/audio-effects.state';
 import {
 	closePlayer,
 	forceStartPosition,
@@ -23,8 +25,6 @@ import {
 	streamError,
 	subtitleTrack,
 } from '@/state/player.state';
-import { useSubtitleSettings } from '@/components/movie/SubtitleAppearance';
-import { closeEffectsPanel, showEffectsPanel } from '@/state/audio-effects.state';
 import { setSharedVideoEngine } from '@/state/videoEngineRef';
 import { EffectsPanel } from './EffectsPanel';
 import styles from './GlobalPlayer.module.scss';
@@ -36,24 +36,21 @@ import { useVideoEngine } from './useVideoEngine';
 function offsetVttTimings(vtt: string, offsetMs: number): string {
 	if (offsetMs === 0) return vtt;
 	// Match VTT timestamps: HH:MM:SS.mmm or MM:SS.mmm
-	return vtt.replace(
-		/(\d{2}:)?(\d{2}):(\d{2})\.(\d{3})/g,
-		(_match, hours, mins, secs, ms) => {
-			const h = hours ? parseInt(hours, 10) : 0;
-			const totalMs =
-				h * 3600000 +
-				parseInt(mins, 10) * 60000 +
-				parseInt(secs, 10) * 1000 +
-				parseInt(ms, 10) +
-				offsetMs;
-			const clamped = Math.max(0, totalMs);
-			const hh = String(Math.floor(clamped / 3600000)).padStart(2, '0');
-			const mm = String(Math.floor((clamped % 3600000) / 60000)).padStart(2, '0');
-			const ss = String(Math.floor((clamped % 60000) / 1000)).padStart(2, '0');
-			const mmm = String(clamped % 1000).padStart(3, '0');
-			return `${hh}:${mm}:${ss}.${mmm}`;
-		},
-	);
+	return vtt.replace(/(\d{2}:)?(\d{2}):(\d{2})\.(\d{3})/g, (_match, hours, mins, secs, ms) => {
+		const h = hours ? parseInt(hours, 10) : 0;
+		const totalMs =
+			h * 3600000 +
+			parseInt(mins, 10) * 60000 +
+			parseInt(secs, 10) * 1000 +
+			parseInt(ms, 10) +
+			offsetMs;
+		const clamped = Math.max(0, totalMs);
+		const hh = String(Math.floor(clamped / 3600000)).padStart(2, '0');
+		const mm = String(Math.floor((clamped % 3600000) / 60000)).padStart(2, '0');
+		const ss = String(Math.floor((clamped % 60000) / 1000)).padStart(2, '0');
+		const mmm = String(clamped % 1000).padStart(3, '0');
+		return `${hh}:${mm}:${ss}.${mmm}`;
+	});
 }
 
 export function GlobalPlayer() {
@@ -230,9 +227,23 @@ export function GlobalPlayer() {
 
 		// Build the subtitle URL with auth
 		let subtitleUrl = track.url;
+		if (subtitleUrl.startsWith('http')) {
+			// Absolute URL — could be a remote server URL or our own origin.
+			// For our own origin, convert to relative. For remote, fetch with
+			// the token already in the URL (if present).
+			try {
+				const parsed = new URL(subtitleUrl);
+				if (parsed.origin === window.location.origin) {
+					subtitleUrl = parsed.pathname + parsed.search;
+				}
+				// For remote URLs, use as-is (token should be in query already)
+			} catch {
+				// Invalid URL, use as-is
+			}
+		}
 		if (!subtitleUrl.startsWith('http')) {
 			const token = localStorage.getItem('mu_token');
-			if (token) {
+			if (token && !subtitleUrl.includes('token=')) {
 				const sep = subtitleUrl.includes('?') ? '&' : '?';
 				subtitleUrl = `${subtitleUrl}${sep}token=${encodeURIComponent(token)}`;
 			}

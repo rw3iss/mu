@@ -58,7 +58,9 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						max={200}
 						step={5}
 						value={settings.fontSize}
-						onInput={(e) => update('fontSize', parseInt((e.target as HTMLInputElement).value, 10))}
+						onInput={(e) =>
+							update('fontSize', parseInt((e.target as HTMLInputElement).value, 10))
+						}
 					/>
 					<span class={styles.value}>{settings.fontSize}%</span>
 				</div>
@@ -89,7 +91,9 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						max={1}
 						step={0.05}
 						value={settings.textOpacity}
-						onInput={(e) => update('textOpacity', parseFloat((e.target as HTMLInputElement).value))}
+						onInput={(e) =>
+							update('textOpacity', parseFloat((e.target as HTMLInputElement).value))
+						}
 					/>
 					<span class={styles.value}>{Math.round(settings.textOpacity * 100)}%</span>
 				</div>
@@ -117,7 +121,9 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						type="color"
 						class={styles.colorPicker}
 						value={settings.backgroundColor}
-						onInput={(e) => update('backgroundColor', (e.target as HTMLInputElement).value)}
+						onInput={(e) =>
+							update('backgroundColor', (e.target as HTMLInputElement).value)
+						}
 					/>
 					<span class={styles.value}>{settings.backgroundColor}</span>
 				</div>
@@ -134,9 +140,16 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						max={1}
 						step={0.05}
 						value={settings.backgroundOpacity}
-						onInput={(e) => update('backgroundOpacity', parseFloat((e.target as HTMLInputElement).value))}
+						onInput={(e) =>
+							update(
+								'backgroundOpacity',
+								parseFloat((e.target as HTMLInputElement).value),
+							)
+						}
 					/>
-					<span class={styles.value}>{Math.round(settings.backgroundOpacity * 100)}%</span>
+					<span class={styles.value}>
+						{Math.round(settings.backgroundOpacity * 100)}%
+					</span>
 				</div>
 			</div>
 
@@ -148,7 +161,12 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						type="number"
 						class={styles.numberInput}
 						value={settings.verticalOffset}
-						onInput={(e) => update('verticalOffset', parseInt((e.target as HTMLInputElement).value, 10) || 0)}
+						onInput={(e) =>
+							update(
+								'verticalOffset',
+								parseInt((e.target as HTMLInputElement).value, 10) || 0,
+							)
+						}
 					/>
 					<span class={styles.unit}>px</span>
 				</div>
@@ -163,7 +181,12 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						class={styles.numberInput}
 						value={settings.timingOffsetMs}
 						step={100}
-						onInput={(e) => update('timingOffsetMs', parseInt((e.target as HTMLInputElement).value, 10) || 0)}
+						onInput={(e) =>
+							update(
+								'timingOffsetMs',
+								parseInt((e.target as HTMLInputElement).value, 10) || 0,
+							)
+						}
 					/>
 					<span class={styles.unit}>ms</span>
 					<button
@@ -177,6 +200,25 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						onClick={() => update('timingOffsetMs', settings.timingOffsetMs + 100)}
 					>
 						+100
+					</button>
+					<button
+						class={styles.offsetBtn}
+						onClick={() => update('timingOffsetMs', 0)}
+						title="Reset timing offset"
+					>
+						<svg
+							width="12"
+							height="12"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<polyline points="1 4 1 10 7 10" />
+							<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+						</svg>
 					</button>
 				</div>
 			</div>

@@ -290,9 +290,10 @@ export class RemoteService {
 
 		// Proxy subtitle URLs through local server (remote requires auth that browser can't provide).
 		// Extract the movie file ID from the stream URL for the subtitle proxy path.
-		const fileIdFromUrl = session.streamUrl?.match(/\/direct\/([^/?]+)/)?.[1]
-			?? session.streamUrl?.match(/\/([a-f0-9-]{36})\//)?.[1]
-			?? session.sessionId;
+		const fileIdFromUrl =
+			session.streamUrl?.match(/\/direct\/([^/?]+)/)?.[1] ??
+			session.streamUrl?.match(/\/([a-f0-9-]{36})\//)?.[1] ??
+			session.sessionId;
 
 		const subtitles = session.subtitles?.map((s: any) => ({
 			...s,

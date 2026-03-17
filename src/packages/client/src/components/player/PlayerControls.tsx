@@ -762,7 +762,9 @@ export function PlayerControls({
 												{globalMovieId.value && (
 													<SubtitlePanel
 														movieId={globalMovieId.value}
-														existingTracks={(session?.subtitles ?? []).map((t, i) => ({
+														existingTracks={(
+															session?.subtitles ?? []
+														).map((t, i) => ({
 															index: i,
 															language: t.language,
 															label: t.label,
@@ -786,7 +788,10 @@ export function PlayerControls({
 															};
 															const movieId = globalMovieId.value;
 															if (movieId) {
-																saveSubtitleChoice(movieId, trackId);
+																saveSubtitleChoice(
+																	movieId,
+																	trackId,
+																);
 															} else {
 																subtitleTrack.value = trackId;
 															}
