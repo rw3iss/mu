@@ -4,6 +4,7 @@ import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting } from '@/hooks/useUiSetting';
 import { initAudioEffects } from '@/state/audio-effects.state';
 import {
+	currentSession,
 	currentTime,
 	duration,
 	isBuffering,
@@ -139,14 +140,40 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		};
 		rafRef.current = requestAnimationFrame(tick);
 
-		// Progress reporting every 10s
+		// Progress reporting every 3s
 		progressIntervalRef.current = setInterval(() => {
 			if (isPlaying.value && videoRef.current) {
 				updateProgress(videoRef.current.currentTime);
 			}
-		}, 10000);
+		}, 3000);
+
+		// Send final position on page unload / tab hide so resume works after refresh
+		const sendFinalProgress = () => {
+			const video = videoRef.current;
+			const session = currentSession.value;
+			if (!video || video.currentTime <= 0 || !session) return;
+			if (session.sessionId.startsWith('remote:')) return;
+
+			// Use sendBeacon for reliability during page unload (fetch may be cancelled)
+			const url = `/api/v1/stream/${session.sessionId}/progress`;
+			const blob = new Blob([JSON.stringify({ positionSeconds: video.currentTime })], {
+				type: 'application/json',
+			});
+			if (!navigator.sendBeacon(url, blob)) {
+				// Fallback to regular update if sendBeacon fails
+				updateProgress(video.currentTime);
+			}
+		};
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === 'hidden') sendFinalProgress();
+		};
+		window.addEventListener('beforeunload', sendFinalProgress);
+		document.addEventListener('visibilitychange', handleVisibilityChange);
 
 		return () => {
+			sendFinalProgress();
+			window.removeEventListener('beforeunload', sendFinalProgress);
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
 			if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
 			if (seekLockTimerRef.current) clearTimeout(seekLockTimerRef.current);
 			if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);

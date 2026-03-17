@@ -1,3 +1,5 @@
+import { useState } from 'preact/hooks';
+import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import type { Movie } from '@/state/library.state';
@@ -10,6 +12,8 @@ interface InfoPanelProps {
 }
 
 export function InfoPanel({ movie, visible, onClose }: InfoPanelProps) {
+	const [showFileInfo, setShowFileInfo] = useState(false);
+
 	if (!movie) return null;
 
 	const hours = Math.floor((movie.runtime ?? 0) / 60);
@@ -98,6 +102,22 @@ export function InfoPanel({ movie, visible, onClose }: InfoPanelProps) {
 								</div>
 							))}
 						</div>
+					</div>
+				)}
+
+				{/* File Info */}
+				{movie.fileInfo && (
+					<div class={styles.section}>
+						<button
+							class={styles.fileInfoToggle}
+							onClick={() => setShowFileInfo(!showFileInfo)}
+						>
+							<h3 class={styles.sectionTitle}>File Info</h3>
+							<span class={styles.fileInfoArrow}>
+								{showFileInfo ? '\u25B2' : '\u25BC'}
+							</span>
+						</button>
+						{showFileInfo && <FileInfoGrid movie={movie} dark />}
 					</div>
 				)}
 

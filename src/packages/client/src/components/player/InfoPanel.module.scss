@@ -177,3 +177,24 @@
   text-align: right;
   flex-shrink: 0;
 }
+
+.fileInfoToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  width: 100%;
+  text-align: left;
+
+  .sectionTitle {
+    margin: 0;
+  }
+}
+
+.fileInfoArrow {
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.4);
+}
