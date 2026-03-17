@@ -184,6 +184,7 @@ export function GlobalPlayer() {
 		const bgColor = hexToRgba(s.backgroundColor, s.backgroundOpacity);
 		const shadowColor = s.shadowColor;
 		const fontSize = `${(s.fontSize / 100) * 1.3}em`;
+		const lineHeight = (s.lineHeight ?? 120) / 100;
 		const verticalOffset = s.verticalOffset;
 
 		styleEl.textContent = `
@@ -191,6 +192,7 @@ export function GlobalPlayer() {
 				color: ${fontColor};
 				background-color: ${bgColor};
 				font-size: ${fontSize};
+				line-height: ${lineHeight};
 				text-shadow: 1px 1px 2px ${shadowColor}, -1px -1px 2px ${shadowColor};
 			}
 			video::-webkit-media-text-track-display {

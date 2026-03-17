@@ -3,6 +3,8 @@ import styles from './SubtitleAppearance.module.scss';
 
 export interface SubtitleSettings {
 	fontSize: number;
+	/** Line height as a percentage (e.g. 120 = 1.2x). Auto-scales with fontSize changes. */
+	lineHeight: number;
 	fontColor: string;
 	backgroundColor: string;
 	backgroundOpacity: number;
@@ -14,6 +16,7 @@ export interface SubtitleSettings {
 
 export const DEFAULT_SUBTITLE_SETTINGS: SubtitleSettings = {
 	fontSize: 100,
+	lineHeight: 120,
 	fontColor: '#ffffff',
 	backgroundColor: '#000000',
 	backgroundOpacity: 0.6,
@@ -36,7 +39,15 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 	const [settings, setSettings] = useSubtitleSettings();
 
 	const update = <K extends keyof SubtitleSettings>(key: K, value: SubtitleSettings[K]) => {
-		setSettings({ ...settings, [key]: value });
+		const next = { ...settings, [key]: value };
+		// Auto-scale lineHeight proportionally when fontSize changes
+		if (key === 'fontSize') {
+			const oldSize = settings.fontSize || 100;
+			const newSize = value as number;
+			const ratio = newSize / oldSize;
+			next.lineHeight = Math.round(settings.lineHeight * ratio);
+		}
+		setSettings(next);
 	};
 
 	const reset = () => setSettings({ ...DEFAULT_SUBTITLE_SETTINGS });
@@ -63,6 +74,28 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						}
 					/>
 					<span class={styles.value}>{settings.fontSize}%</span>
+				</div>
+			</div>
+
+			{/* Line Height */}
+			<div class={styles.row}>
+				<span class={styles.label}>Line Spacing</span>
+				<div class={styles.control}>
+					<input
+						type="range"
+						class={styles.slider}
+						min={80}
+						max={300}
+						step={5}
+						value={settings.lineHeight}
+						onInput={(e) =>
+							setSettings({
+								...settings,
+								lineHeight: parseInt((e.target as HTMLInputElement).value, 10),
+							})
+						}
+					/>
+					<span class={styles.value}>{settings.lineHeight}%</span>
 				</div>
 			</div>
 
