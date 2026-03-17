@@ -11,6 +11,8 @@ interface SubtitlePanelProps {
 	onSelect?: (track: MovieSubtitleInfo) => void;
 	/** Called when subtitles change (download/upload) so parent can refresh */
 	onSubtitlesChanged?: () => void;
+	/** Called after a subtitle is downloaded/uploaded with the new track info */
+	onTrackAdded?: (track: MovieSubtitleInfo) => void;
 }
 
 export function SubtitlePanel({
@@ -18,6 +20,7 @@ export function SubtitlePanel({
 	existingTracks,
 	onSelect,
 	onSubtitlesChanged,
+	onTrackAdded,
 }: SubtitlePanelProps) {
 	const [tracks, setTracks] = useState<MovieSubtitleInfo[]>(existingTracks ?? []);
 	const [tracksOpen, setTracksOpen] = useState(true);
@@ -59,20 +62,21 @@ export function SubtitlePanel({
 			setDownloadingId(result.fileId);
 			setError(null);
 			try {
-				await subtitlesService.download(
+				const { subtitle } = await subtitlesService.download(
 					movieId,
 					result.provider,
 					result.fileId,
 					result.language,
 				);
 				await refreshTracks();
+				onTrackAdded?.(subtitle);
 			} catch (err: any) {
 				setError(err.message || 'Download failed');
 			} finally {
 				setDownloadingId(null);
 			}
 		},
-		[movieId, refreshTracks],
+		[movieId, refreshTracks, onTrackAdded],
 	);
 
 	const handleUpload = useCallback(
@@ -84,8 +88,9 @@ export function SubtitlePanel({
 			setIsUploading(true);
 			setError(null);
 			try {
-				await subtitlesService.upload(movieId, file);
+				const { subtitle } = await subtitlesService.upload(movieId, file);
 				await refreshTracks();
+				onTrackAdded?.(subtitle);
 			} catch (err: any) {
 				setError(err.message || 'Upload failed');
 			} finally {

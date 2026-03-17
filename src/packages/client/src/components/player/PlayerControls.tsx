@@ -14,6 +14,7 @@ import {
 import { globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import type { StreamSession } from '@/state/player.state';
 import {
+	currentSession,
 	currentTime,
 	duration,
 	isFullscreen,
@@ -749,7 +750,29 @@ export function PlayerControls({
 											</button>
 											<div class={styles.menuPanelContent}>
 												{globalMovieId.value && (
-													<SubtitlePanel movieId={globalMovieId.value} />
+													<SubtitlePanel
+														movieId={globalMovieId.value}
+														onTrackAdded={(track) => {
+															// Add the new subtitle to the session and auto-select it
+															const s = currentSession.value;
+															if (!s) return;
+															const trackId = `sub-${track.index}`;
+															const newTrack = {
+																id: trackId,
+																label: track.label,
+																language: track.language,
+																url: `/api/v1/stream/${s.sessionId}/subtitles/${track.index}.vtt`,
+															};
+															currentSession.value = {
+																...s,
+																subtitles: [
+																	...s.subtitles,
+																	newTrack,
+																],
+															};
+															subtitleTrack.value = trackId;
+														}}
+													/>
 												)}
 											</div>
 										</>
