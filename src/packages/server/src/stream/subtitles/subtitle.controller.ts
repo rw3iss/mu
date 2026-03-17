@@ -3,7 +3,7 @@ import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { FastifyReply } from 'fastify';
 import { DatabaseService } from '../../database/database.service.js';
-import { streamSessions } from '../../database/schema/index.js';
+import { movieFiles, streamSessions } from '../../database/schema/index.js';
 import { SubtitleService } from './subtitle.service.js';
 
 @Controller('stream')
@@ -22,32 +22,50 @@ export class SubtitleController {
 		@Param('trackIndex') trackIndex: string,
 		@Res() reply: FastifyReply,
 	) {
-		// Look up the session to find the associated file ID
-		const sessions = await this.db.db
-			.select()
-			.from(streamSessions)
-			.where(eq(streamSessions.id, sessionId));
-
-		if (sessions.length === 0) {
-			throw new NotFoundException(`Stream session ${sessionId} not found`);
-		}
-
-		const session = sessions[0]!;
 		const trackIdx = parseInt(trackIndex, 10);
-
 		if (Number.isNaN(trackIdx) || trackIdx < 0) {
 			throw new NotFoundException(`Invalid track index: ${trackIndex}`);
 		}
 
-		const subtitlePath = this.subtitleService.getSubtitleFile(session.movieFileId!, trackIdx);
+		// Try session lookup first (standard streams)
+		const session = this.db.db
+			.select()
+			.from(streamSessions)
+			.where(eq(streamSessions.id, sessionId))
+			.get();
 
-		// Verify the file exists
+		let fileId: string | undefined;
+
+		if (session?.movieFileId) {
+			fileId = session.movieFileId;
+		} else {
+			// Session not in DB (shared/anonymous streams skip DB insert).
+			// Fall back: check if the sessionId matches a movie file ID directly,
+			// or look up the most recent file for the movie.
+			const file = this.db.db
+				.select()
+				.from(movieFiles)
+				.where(eq(movieFiles.id, sessionId))
+				.get();
+			if (file) {
+				fileId = file.id;
+			}
+		}
+
+		if (!fileId) {
+			throw new NotFoundException(`Stream session ${sessionId} not found`);
+		}
+
+		return this.serveVtt(reply, fileId, trackIdx);
+	}
+
+	private async serveVtt(reply: FastifyReply, fileId: string, trackIdx: number) {
+		const subtitlePath = this.subtitleService.getSubtitleFile(fileId, trackIdx);
+
 		try {
 			await stat(subtitlePath);
 		} catch {
-			throw new NotFoundException(
-				`Subtitle track ${trackIdx} not found for session ${sessionId}`,
-			);
+			throw new NotFoundException(`Subtitle track ${trackIdx} not found`);
 		}
 
 		const content = await readFile(subtitlePath);

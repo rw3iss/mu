@@ -184,6 +184,53 @@ export class RemoteController {
 	}
 
 	/**
+	 * GET /remote/stream/:serverId/:sessionId/subtitles/:trackFile — Proxy subtitle VTT.
+	 * Must be defined before the segment catch-all to avoid route conflict.
+	 * Tries the shared subtitle serve endpoint first (works for shared streams),
+	 * then falls back to the standard stream subtitle endpoint.
+	 */
+	@Get('stream/:serverId/:sessionId/subtitles/:trackFile')
+	async proxySubtitleVtt(
+		@Param('serverId') serverId: string,
+		@Param('sessionId') sessionId: string,
+		@Param('trackFile') trackFile: string,
+		@Res() reply: FastifyReply,
+	) {
+		const auth = this.remoteService.getServerAuth(serverId);
+		if (!auth) throw new NotFoundException('Server not found');
+
+		// Extract track index from filename (e.g. "0.vtt" -> "0")
+		const trackMatch = trackFile.match(/^(\d+)\.vtt$/);
+		if (!trackMatch) {
+			return reply.status(404).send({ message: 'Invalid subtitle track path' });
+		}
+		const trackIndex = trackMatch[1];
+
+		// Try multiple endpoints — the session may be a session ID or a file ID.
+		// The shared subtitle endpoint uses file ID and sharing auth.
+		// The stream subtitle endpoint uses session ID and JWT auth.
+		const urls = [
+			// Shared subtitle serve (works with sharing auth, uses file ID)
+			`${auth.baseUrl}/api/v1/shared/subtitles/${sessionId}/${trackFile}`,
+			// Standard stream subtitle endpoint (fallback, works if session exists in DB)
+			`${auth.baseUrl}/api/v1/stream/${sessionId}/subtitles/${trackFile}`,
+		];
+
+		for (const url of urls) {
+			const response = await fetch(url, { headers: auth.headers });
+			if (response.ok) {
+				reply.status(200);
+				reply.header('Content-Type', 'text/vtt; charset=utf-8');
+				reply.header('Cache-Control', 'public, max-age=3600');
+				const body = Buffer.from(await response.arrayBuffer());
+				return reply.send(body);
+			}
+		}
+
+		return reply.status(404).send({ message: 'Subtitle not found on remote server' });
+	}
+
+	/**
 	 * GET /remote/stream/:serverId/:sessionId/:segmentFile — Proxy HLS segment.
 	 */
 	@Get('stream/:serverId/:sessionId/:segmentFile')

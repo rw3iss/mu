@@ -421,6 +421,36 @@ export class SharingController {
 		};
 	}
 
+	/**
+	 * GET /shared/subtitles/:movieFileId/:trackIndex.vtt — Serve a subtitle VTT file.
+	 */
+	@Get('subtitles/:movieFileId/:trackFile')
+	@UseGuards(SharingAuthGuard)
+	async serveSharedSubtitle(
+		@Param('movieFileId') movieFileId: string,
+		@Param('trackFile') trackFile: string,
+		@Res() reply: FastifyReply,
+	) {
+		const match = trackFile.match(/^(\d+)\.vtt$/);
+		if (!match) throw new NotFoundException('Invalid subtitle track path');
+
+		const trackIdx = parseInt(match[1]!, 10);
+		const subtitlePath = this.subtitleService.getSubtitleFile(movieFileId, trackIdx);
+
+		const { stat: statF, readFile: readF } = await import('node:fs/promises');
+		try {
+			await statF(subtitlePath);
+		} catch {
+			throw new NotFoundException(`Subtitle track ${trackIdx} not found`);
+		}
+
+		const content = await readF(subtitlePath);
+		return reply
+			.header('Content-Type', 'text/vtt; charset=utf-8')
+			.header('Cache-Control', 'public, max-age=3600')
+			.send(content);
+	}
+
 	private getMovieFile(movieId: string) {
 		const file = this.db.db
 			.select()
