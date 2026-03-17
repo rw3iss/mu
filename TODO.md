@@ -1,4 +1,16 @@
 
+- Ratings: when clicked, show breakout of 1-10 stars, with number entry on left and decimal up/down buttons. Allow half-stars in overlay. Close/cancel button on end.
+	- user clicks a main number, zooms in between that and next number, with mini decimal scale? Right click or click outside to stay at X.0.
+
+- Movie Info Flyout Panel:
+	- Add Move title, description, metadata, and Playlists.
+	- Button to fetch rating and reviews if they aren't loaded. (need "ratings and reviews" module).
+	- api for plugins to render to
+		- plugin hook: pluginInit: addInfoPanel(movie) => { registers function to render a component with data }
+	- when flyout renders, calls 'addInfoPanel' for any plugin, passes current movie, component renders custom
+
+- Play Queue: add item to queue, remove, move to front of queue, play playlist, clear queue, see queue
+
 - Enable better cache control:
 	- clear cache button in Settings > About - show modal to select cache items, option for older than?
 	- show breakdown of app data: thumbnails, metadata, db, transcode data
@@ -17,29 +29,11 @@
 		- after items are "grouped", it can set the group_id to the parent item or same group guid that was created for it (ie. the reference to the imdb or something).
 		- later, if new items are scanned that match the group, it can set them to 'possible', and when the user clicks 'group' on them, it can run the scan process again, and find all the new similar items, and then ask the user if it wants to add them all in a checklist.
 
-- Ratings: when clicked, show breakout of 1-10 stars, with number entry on left and decimal up/down buttons. Allow half-stars in overlay. Close/cancel button on end.
-	- user clicks a main number, zooms in between that and next number, with mini decimal scale? Right click or click outside to stay at X.0.
-
-- Movie Info Flyout Panel:
-	- Add Move title, description, metadata, and Playlists.
-	- Button to fetch rating and reviews if they aren't loaded. (need "ratings and reviews" module).
-	- api for plugins to render to
-		- plugin hook: pluginInit: addInfoPanel(movie) => { registers function to render a component with data }
-	- when flyout renders, calls 'addInfoPanel' for any plugin, passes current movie, component renders custom
-
-- Subtitle integration... works?
-
-- Movie Page:
-	- add mini features to grab extended data for a movie, like:
-		- fetch cast: compiles top cast members from third parties, stores in our backend for that movie (we begin to keep people DB).
-		- fetch reviews: load reviews, similarly.
-
-- add 'Pick a movie' for movie... open page user can page through movie options, set filters, "Movie Picker"
-
-- Play Queue: add item to queue, remove, move to front of queue, play playlist, clear queue, see queue
-
 - Discover: Trending: other movies cross joined with mine? filter by personalized vs not.
 
+
+
+--------------------------------------------------------------------------------
 
 # PLUGINS:
 

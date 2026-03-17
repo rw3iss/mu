@@ -161,14 +161,24 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						type="number"
 						class={styles.numberInput}
 						value={settings.verticalOffset}
-						onInput={(e) =>
-							update(
-								'verticalOffset',
-								parseInt((e.target as HTMLInputElement).value, 10) || 0,
-							)
-						}
+						onChange={(e) => {
+							const val = parseInt((e.target as HTMLInputElement).value, 10);
+							if (!Number.isNaN(val)) update('verticalOffset', val);
+						}}
 					/>
 					<span class={styles.unit}>px</span>
+					<button
+						class={styles.offsetBtn}
+						onClick={() => update('verticalOffset', settings.verticalOffset - 1)}
+					>
+						-
+					</button>
+					<button
+						class={styles.offsetBtn}
+						onClick={() => update('verticalOffset', settings.verticalOffset + 1)}
+					>
+						+
+					</button>
 				</div>
 			</div>
 
@@ -181,12 +191,10 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 						class={styles.numberInput}
 						value={settings.timingOffsetMs}
 						step={100}
-						onInput={(e) =>
-							update(
-								'timingOffsetMs',
-								parseInt((e.target as HTMLInputElement).value, 10) || 0,
-							)
-						}
+						onChange={(e) => {
+							const val = parseInt((e.target as HTMLInputElement).value, 10);
+							if (!Number.isNaN(val)) update('timingOffsetMs', val);
+						}}
 					/>
 					<span class={styles.unit}>ms</span>
 					<button

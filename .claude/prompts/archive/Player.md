@@ -34,5 +34,52 @@ When the global movie player is asked to play any new movie, the movie details t
 - load the movie's eq or compressor "saved" profile, if one is given in its play_settings (if the profile cannot be found, show a toast error that the profile no longer exists, and will be removed from the movie settings).
 
 ---------------------
-Subtitles:
 
+
+
+Back/Forward extended time operation changes:
+On the global movie player control bar, it currently has the -10s and +10s buttons.
+Can we change these to be special rollover buttons, so when they user hovers over one of those buttons, extended timing options extend to the right of left of that button, with other time options?
+First, change the default icons to a simple "back" and forward" icons, with no time indication.
+Then, when the user hovers over one, for example the left "back" button, animate open a new extended panel of buttons, over top of the current button, where the right-most button is a -5s time button, the button to the left of that is a -10s button, then a -20s button.
+So when a user hovers over the "back" button, it gets replaced with:
+[-20s] [-10s] [-5s]
+three buttons, in its place. The new button rollover bar should display directly over top of the existing back button, while the user is hovering over it. So if they clicked the 'back' button while hovering directly, it would be pressing the -5s button, but the user should also be able to select one of the other buttons to the left of it (-10s or -20s), and the extended options should not disappear, so ensure they are part of the hover detection. The buttons should go back to the normal "back" button when hovering off the entire st of buttons for the back operations.
+Do the same for the other side: the forward button. When hovering it, replace it with extended buttons: [+5s] [+10s] [+20s], to its right, while hovering
+
+Make the button overlays appear with a fast animation, like blurring and sliding outward from the direction they extend, over top of the existing button, as the existing button fades behind the extended button row.
+
+--------------------------------------------------------------------------------
+
+Let's extend the back/forward flyout button functionality, to enable the ability for users to set custom timings for the buttons (ie. a back/forward skip time different than 5s, 10s, or 20s).
+Enable this new setting in the Settings > Playback page, under the Buffer size setting.
+This setting should let the user define second values, as integers, for each of the three skip times.
+Show three number inputs in this setting, for each button space, starting at a default of 5s, then 10s, then 20s.
+Show the 'reset setting' button after the inputs to set the values back to those.
+The user should be able to enter any value from 1 to 300 (1 second to 5 minutes).
+
+This setting value should be requested and supplied to the app and global player during app initialization, and updated anytime the user might change the setting.
+When the global player loads, it should show the custom values in the buttons, and skip the movie forward or back according to those configured times in the setting.
+
+--------------------------------------------------------------------------------
+
+- fix subtitles
+Currently there seems to be an issue with subtitles.
+When I 'search' in the subtitles open panel, for a movie, it always comes back with 'No subtitles found online'
+I recently added the omdb and tmdb api keys. I don't know if that will help. Otherwise, can you check the backend subtitle search code to ensure it will search for subtitles, using the movie's current latest metadata (ie. it's real movie info), that it should have?
+If it doesn't have the metadata/real movie info, it can try to search by filename.
+
+Also, there is another bug: When I try to 'Upload' a subtitle file manually, it always shows this error: Internal server error
+(to ie. url: http://mu.ryanweiss.net/api/v1/subtitles/5e5b7ed4-67fb-4d43-8f97-3201c81f4bd0/upload)
+
+Can you login to the rw-win server, possibly, and diagnose the logs?
+
+Locally, the error is similar if it is a remotely played movie (from a remote library). It shows:
+No available file for movie remote:c9c69f1e-d145-4e44-8099-17cc9fde0a51:03c4e2cb-3a39-48c3-8dda-af69de5d31ae
+
+However, locally, if it's a local movie (not from a remote server), the subtitle upload seems to work okay.
+Can you fix it for the remote uploads, and the otherwise non-remote production environment?
+
+You can check the local logs here for more info.
+
+--------------------------------------------------------------------------------
