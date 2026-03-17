@@ -62,6 +62,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const lastDisplayTime = useRef<number>(0);
 	const seekLockRef = useRef(false);
 	const seekLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const latestTimeRef = useRef<number>(0);
 	/** Guards against DOM-move-induced pause events flipping isPlaying. */
 	const movingRef = useRef(false);
 	/** Suppresses async pause events during destroy/initPlayback so they
@@ -131,6 +132,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			const video = videoRef.current;
 			if (video && !seekLockRef.current) {
 				const time = video.currentTime;
+				latestTimeRef.current = time;
 				if (time >= lastDisplayTime.current || time < lastDisplayTime.current - 1) {
 					currentTime.value = time;
 					lastDisplayTime.current = time;
@@ -147,22 +149,20 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			}
 		}, 3000);
 
-		// Send final position on page unload / tab hide so resume works after refresh
+		// Send final position on page unload / tab hide so resume works after refresh.
+		// Uses latestTimeRef (updated every frame) since the video element may already
+		// be destroyed by the time beforeunload fires.
 		const sendFinalProgress = () => {
-			const video = videoRef.current;
+			const time = videoRef.current?.currentTime ?? latestTimeRef.current;
 			const session = currentSession.value;
-			if (!video || video.currentTime <= 0 || !session) return;
+			if (time <= 0 || !session) return;
 			if (session.sessionId.startsWith('remote:')) return;
 
-			// Use sendBeacon for reliability during page unload (fetch may be cancelled)
 			const url = `/api/v1/stream/${session.sessionId}/progress`;
-			const blob = new Blob([JSON.stringify({ positionSeconds: video.currentTime })], {
+			const blob = new Blob([JSON.stringify({ positionSeconds: time })], {
 				type: 'application/json',
 			});
-			if (!navigator.sendBeacon(url, blob)) {
-				// Fallback to regular update if sendBeacon fails
-				updateProgress(video.currentTime);
-			}
+			navigator.sendBeacon(url, blob);
 		};
 		const handleVisibilityChange = () => {
 			if (document.visibilityState === 'hidden') sendFinalProgress();
