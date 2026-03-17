@@ -29,32 +29,35 @@ export class SubtitleService {
 		const outputDir = this.getSubtitleDir(movieFileId);
 		await mkdir(outputDir, { recursive: true });
 
-		// Use ffprobe to discover subtitle streams
-		const probeData = await this.probe(filePath);
-		const subtitleStreams = (probeData.streams || []).filter(
-			(stream: any) => stream.codec_type === 'subtitle',
-		);
-
 		const tracks: SubtitleTrack[] = [];
 
-		// Extract embedded subtitles
-		for (let i = 0; i < subtitleStreams.length; i++) {
-			const stream = subtitleStreams[i];
-			const language = stream.tags?.language || 'und';
-			const title = stream.tags?.title || `Track ${i}`;
-			const outputPath = path.join(outputDir, `${i}.vtt`);
+		// Extract embedded subtitles (requires ffprobe + ffmpeg)
+		try {
+			const probeData = await this.probe(filePath);
+			const subtitleStreams = (probeData.streams || []).filter(
+				(stream: any) => stream.codec_type === 'subtitle',
+			);
 
-			try {
-				await this.extractTrack(filePath, stream.index, outputPath);
-				tracks.push({ index: i, language, title });
-				this.logger.debug(
-					`Extracted subtitle track ${i} (${language}) from ${path.basename(filePath)}`,
-				);
-			} catch (err) {
-				this.logger.warn(
-					`Failed to extract subtitle track ${i} from ${path.basename(filePath)}: ${err}`,
-				);
+			for (let i = 0; i < subtitleStreams.length; i++) {
+				const stream = subtitleStreams[i];
+				const language = stream.tags?.language || 'und';
+				const title = stream.tags?.title || `Track ${i}`;
+				const outputPath = path.join(outputDir, `${i}.vtt`);
+
+				try {
+					await this.extractTrack(filePath, stream.index, outputPath);
+					tracks.push({ index: i, language, title });
+					this.logger.debug(
+						`Extracted subtitle track ${i} (${language}) from ${path.basename(filePath)}`,
+					);
+				} catch (err) {
+					this.logger.warn(
+						`Failed to extract subtitle track ${i} from ${path.basename(filePath)}: ${err}`,
+					);
+				}
 			}
+		} catch (err) {
+			this.logger.warn(`ffprobe unavailable, skipping embedded subtitle extraction: ${err}`);
 		}
 
 		// Discover and convert external subtitle files

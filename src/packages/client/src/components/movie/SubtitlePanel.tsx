@@ -170,20 +170,29 @@ export function SubtitlePanel({
 						{searchResults.map((r) => (
 							<div key={r.fileId} class={styles.resultItem}>
 								<div class={styles.resultInfo}>
-									<span class={styles.resultLang}>
-										{r.language.toUpperCase()}
-									</span>
-									{r.hashMatch && (
-										<span class={styles.badgeAccent}>Hash Match</span>
-									)}
-									{r.hearingImpaired && <span class={styles.badgeMuted}>HI</span>}
-									<span class={styles.resultLabel}>
-										{r.releaseName || r.label}
-									</span>
-									{r.downloads != null && (
-										<span class={styles.resultDownloads}>
-											{r.downloads.toLocaleString()} DL
+									<div class={styles.resultTopRow}>
+										<span class={styles.resultLang}>
+											{r.language.toUpperCase()}
 										</span>
+										{r.hashMatch && (
+											<span class={styles.badgeAccent}>Hash Match</span>
+										)}
+										{r.hearingImpaired && (
+											<span class={styles.badgeMuted}>HI</span>
+										)}
+										{r.format && (
+											<span class={styles.badgeMuted}>
+												{r.format.toUpperCase()}
+											</span>
+										)}
+										{r.downloads != null && (
+											<span class={styles.resultDownloads}>
+												{r.downloads.toLocaleString()} DL
+											</span>
+										)}
+									</div>
+									{r.releaseName && (
+										<span class={styles.resultRelease}>{r.releaseName}</span>
 									)}
 								</div>
 								<button
