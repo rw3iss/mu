@@ -32,7 +32,7 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  max-height: 340px;
+  max-height: min(240px, 40vh);
   padding: 0 var(--space-xs) var(--space-xs);
 }
 

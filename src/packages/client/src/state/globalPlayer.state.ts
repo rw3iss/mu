@@ -7,6 +7,7 @@ import {
 	fetchProfiles,
 	loadCompProfile,
 	loadEqProfile,
+	loadVideoProfile,
 	profiles,
 } from '@/state/audio-effects.state';
 import { pushToHistory } from '@/state/history.state';
@@ -277,8 +278,8 @@ async function applyPlaySettings(movie: Movie): Promise<void> {
 	const settings = movie.playSettings;
 	if (!settings) return;
 
-	const { eqProfileId, compressorProfileId } = settings;
-	if (!eqProfileId && !compressorProfileId) return;
+	const { eqProfileId, compressorProfileId, videoProfileId } = settings as any;
+	if (!eqProfileId && !compressorProfileId && !videoProfileId) return;
 
 	// Ensure profiles are loaded
 	if (profiles.value.length === 0) {
@@ -310,6 +311,20 @@ async function applyPlaySettings(movie: Movie): Promise<void> {
 			moviesService
 				.update(movie.id, {
 					playSettings: JSON.stringify({ compressorProfileId: null }),
+				})
+				.catch(() => {});
+		}
+	}
+
+	if (videoProfileId) {
+		const found = profiles.value.find((p) => p.id === videoProfileId);
+		if (found) {
+			loadVideoProfile(videoProfileId);
+		} else {
+			notifyError(`Video profile no longer exists and will be removed from play settings.`);
+			moviesService
+				.update(movie.id, {
+					playSettings: JSON.stringify({ videoProfileId: null }),
 				})
 				.catch(() => {});
 		}

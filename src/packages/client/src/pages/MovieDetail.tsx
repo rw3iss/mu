@@ -129,6 +129,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	const [audioProfiles, setAudioProfiles] = useState<AudioProfile[]>([]);
 	const [selectedEqProfile, setSelectedEqProfile] = useState<string>('');
 	const [selectedCompProfile, setSelectedCompProfile] = useState<string>('');
+	const [selectedVideoProfile, setSelectedVideoProfile] = useState<string>('');
 	// Load audio profiles when play settings section is opened
 	useEffect(() => {
 		if (!showPlaySettings) return;
@@ -144,6 +145,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 		const ps = movie.playSettings;
 		setSelectedEqProfile(ps?.eqProfileId ?? '');
 		setSelectedCompProfile(ps?.compressorProfileId ?? '');
+		setSelectedVideoProfile((ps as any)?.videoProfileId ?? '');
 		if (ps && Object.keys(ps).length > 0) {
 			setShowPlaySettings(true);
 		}
@@ -630,6 +632,28 @@ export function MovieDetail({ id }: MovieDetailProps) {
 														p.type === 'compressor' ||
 														p.type === 'full',
 												)
+												.map((p) => (
+													<option key={p.id} value={p.id}>
+														{p.name}
+													</option>
+												))}
+										</select>
+
+										<label class={styles.playSettingsLabel}>
+											Video Profile
+										</label>
+										<select
+											class={styles.playSettingsSelect}
+											value={selectedVideoProfile}
+											onChange={(e) => {
+												const val = (e.target as HTMLSelectElement).value;
+												setSelectedVideoProfile(val);
+												updatePlaySetting('videoProfileId', val || null);
+											}}
+										>
+											<option value="">None (use default)</option>
+											{audioProfiles
+												.filter((p) => p.type === 'video')
 												.map((p) => (
 													<option key={p.id} value={p.id}>
 														{p.name}

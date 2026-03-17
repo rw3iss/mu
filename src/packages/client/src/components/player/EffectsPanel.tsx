@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { audioEngine } from '@/audio/audio-engine';
-import { useUiSetting } from '@/hooks/useUiSetting';
+import { setUiSetting, useUiSetting } from '@/hooks/useUiSetting';
 import type { AudioProfile } from '@/services/audio-profiles.service';
 import {
 	activeCompProfileId,
 	activeEqProfileId,
+	activeVideoProfileId,
 	compressorEnabled,
 	compressorSettings,
 	copyProfile,
@@ -16,21 +17,30 @@ import {
 	fetchProfiles,
 	loadCompProfile,
 	loadEqProfile,
+	loadVideoProfile,
 	profiles,
 	resetCompressor,
 	resetEq,
+	resetVideoEffects,
 	saveCompProfile,
 	saveEqProfile,
+	saveVideoProfile,
 	setEffectsTab,
 	showEffectsPanel,
 	toggleCompressor,
 	toggleEffectsPanel,
 	toggleEq,
+	toggleVideoEffects,
 	updateCompProfile,
 	updateCompressorParam,
 	updateEqBand,
 	updateEqProfile,
 	updateInputGain,
+	updateVideoParam,
+	updateVideoProfile,
+	type VideoEffectSettings,
+	videoEffects,
+	videoEnabled,
 } from '@/state/audio-effects.state';
 import styles from './EffectsPanel.module.scss';
 
@@ -47,13 +57,15 @@ function ProfileControls({
 	onSave,
 	onUpdate,
 }: {
-	type: 'eq' | 'compressor';
+	type: 'eq' | 'compressor' | 'video';
 	activeId: string | null;
 	onLoad: (id: string) => void;
 	onSave: (name: string) => Promise<AudioProfile>;
 	onUpdate: (id: string, name?: string) => Promise<void>;
 }) {
-	const allProfiles = profiles.value.filter((p) => p.type === type || p.type === 'full');
+	const allProfiles = profiles.value.filter(
+		(p) => p.type === type || (type !== 'video' && p.type === 'full'),
+	);
 	const [editName, setEditName] = useState('');
 	const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -96,8 +108,16 @@ function ProfileControls({
 						const val = (e.target as HTMLSelectElement).value;
 						if (val) onLoad(val);
 						else {
-							if (type === 'eq') activeEqProfileId.value = null;
-							else activeCompProfileId.value = null;
+							if (type === 'eq') {
+								activeEqProfileId.value = null;
+								setUiSetting('active_eq_profile_id', null);
+							} else if (type === 'compressor') {
+								activeCompProfileId.value = null;
+								setUiSetting('active_comp_profile_id', null);
+							} else if (type === 'video') {
+								activeVideoProfileId.value = null;
+								setUiSetting('active_video_profile_id', null);
+							}
 						}
 					}}
 				>
@@ -454,6 +474,93 @@ function CompressorTab() {
 	);
 }
 
+// ── Video Tab ──
+
+const VIDEO_PARAMS: {
+	key: keyof VideoEffectSettings;
+	label: string;
+	min: number;
+	max: number;
+	step: number;
+	unit: string;
+	default: number;
+}[] = [
+	{ key: 'brightness', label: 'Brightness', min: 0, max: 200, step: 1, unit: '%', default: 100 },
+	{ key: 'contrast', label: 'Contrast', min: 0, max: 200, step: 1, unit: '%', default: 100 },
+	{ key: 'saturation', label: 'Saturation', min: 0, max: 200, step: 1, unit: '%', default: 100 },
+	{
+		key: 'hueRotate',
+		label: 'Hue Rotate',
+		min: 0,
+		max: 360,
+		step: 1,
+		unit: '\u00B0',
+		default: 0,
+	},
+	{ key: 'sepia', label: 'Sepia', min: 0, max: 100, step: 1, unit: '%', default: 0 },
+	{ key: 'grayscale', label: 'Grayscale', min: 0, max: 100, step: 1, unit: '%', default: 0 },
+];
+
+function VideoTab() {
+	const enabled = videoEnabled.value;
+	const settings = videoEffects.value;
+	const activeId = activeVideoProfileId.value;
+
+	return (
+		<div>
+			<div class={styles.toggleRow}>
+				<span class={styles.toggleLabel}>Video Effects</span>
+				<button
+					class={`${styles.toggle} ${enabled ? styles.on : ''}`}
+					onClick={toggleVideoEffects}
+					aria-label="Toggle Video Effects"
+				/>
+			</div>
+
+			<ProfileControls
+				type="video"
+				activeId={activeId}
+				onLoad={loadVideoProfile}
+				onSave={saveVideoProfile}
+				onUpdate={updateVideoProfile}
+			/>
+
+			<CollapsibleSettings settingKey="effects_video_settings_open">
+				{VIDEO_PARAMS.map((param) => (
+					<div class={styles.compParam} key={param.key}>
+						<div class={styles.compParamHeader}>
+							<span class={styles.compParamLabel}>{param.label}</span>
+							<span class={styles.compParamValue}>
+								{settings[param.key]}
+								{param.unit}
+							</span>
+						</div>
+						<input
+							type="range"
+							class={styles.compSlider}
+							min={param.min}
+							max={param.max}
+							step={param.step}
+							value={settings[param.key]}
+							onInput={(e) =>
+								updateVideoParam(
+									param.key,
+									parseFloat((e.target as HTMLInputElement).value),
+								)
+							}
+							disabled={!enabled}
+						/>
+					</div>
+				))}
+
+				<button class={styles.resetBtn} onClick={resetVideoEffects}>
+					Reset Video Effects
+				</button>
+			</CollapsibleSettings>
+		</div>
+	);
+}
+
 // ── Main Panel ──
 
 function getActiveProfileName(allProfiles: AudioProfile[], activeId: string | null): string | null {
@@ -469,13 +576,15 @@ export function EffectsPanel() {
 	const allProfiles = profiles.value;
 	const isEqEnabled = eqEnabled.value;
 	const isCompEnabled = compressorEnabled.value;
+	const isVideoEnabled = videoEnabled.value;
 	const eqProfileName = getActiveProfileName(allProfiles, activeEqProfileId.value);
 	const compProfileName = getActiveProfileName(allProfiles, activeCompProfileId.value);
+	const videoProfileName = getActiveProfileName(allProfiles, activeVideoProfileId.value);
 
 	return (
 		<div class={styles.panel} data-player-panel onClick={(e) => e.stopPropagation()}>
 			<div class={styles.header}>
-				<span class={styles.headerTitle}>Audio Effects</span>
+				<span class={styles.headerTitle}>Effects</span>
 				<button class={styles.closeBtn} onClick={toggleEffectsPanel} aria-label="Close">
 					<svg
 						width="16"
@@ -496,21 +605,34 @@ export function EffectsPanel() {
 					class={`${styles.tab} ${tab === 'eq' ? styles.active : ''}`}
 					onClick={() => setEffectsTab('eq')}
 				>
-					<span>Equalizer{isEqEnabled && <span class={styles.onBadge}>ON</span>}</span>
+					<span>EQ{isEqEnabled && <span class={styles.onBadge}>ON</span>}</span>
 					{eqProfileName && <span class={styles.tabProfileName}>{eqProfileName}</span>}
 				</button>
 				<button
 					class={`${styles.tab} ${tab === 'compressor' ? styles.active : ''}`}
 					onClick={() => setEffectsTab('compressor')}
 				>
-					<span>Compressor{isCompEnabled && <span class={styles.onBadge}>ON</span>}</span>
+					<span>Comp{isCompEnabled && <span class={styles.onBadge}>ON</span>}</span>
 					{compProfileName && (
 						<span class={styles.tabProfileName}>{compProfileName}</span>
 					)}
 				</button>
+				<button
+					class={`${styles.tab} ${tab === 'video' ? styles.active : ''}`}
+					onClick={() => setEffectsTab('video')}
+				>
+					<span>Video{isVideoEnabled && <span class={styles.onBadge}>ON</span>}</span>
+					{videoProfileName && (
+						<span class={styles.tabProfileName}>{videoProfileName}</span>
+					)}
+				</button>
 			</div>
 
-			<div class={styles.body}>{tab === 'eq' ? <EqTab /> : <CompressorTab />}</div>
+			<div class={styles.body}>
+				{tab === 'eq' && <EqTab />}
+				{tab === 'compressor' && <CompressorTab />}
+				{tab === 'video' && <VideoTab />}
+			</div>
 		</div>
 	);
 }

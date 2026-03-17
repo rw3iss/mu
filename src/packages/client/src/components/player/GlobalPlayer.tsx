@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { audioEngine } from '@/audio/audio-engine';
 import { useSubtitleSettings } from '@/components/movie/SubtitleAppearance';
 import { streamService } from '@/services/stream.service';
-import { closeEffectsPanel, showEffectsPanel } from '@/state/audio-effects.state';
+import {
+	closeEffectsPanel,
+	showEffectsPanel,
+	videoEffects,
+	videoEnabled,
+} from '@/state/audio-effects.state';
 import {
 	closePlayer,
 	forceStartPosition,
@@ -257,6 +262,31 @@ export function GlobalPlayer() {
 			styleEl?.remove();
 		};
 	}, [subSettings]);
+
+	// Apply video effects (CSS filters) to the video element
+	useEffect(() => {
+		const video = engine.videoRef.current;
+		if (!video) return;
+
+		if (!videoEnabled.value) {
+			video.style.filter = '';
+			return;
+		}
+
+		const v = videoEffects.value;
+		const filters = [
+			`brightness(${v.brightness / 100})`,
+			`contrast(${v.contrast / 100})`,
+			`saturate(${v.saturation / 100})`,
+			v.hueRotate !== 0 ? `hue-rotate(${v.hueRotate}deg)` : '',
+			v.sepia > 0 ? `sepia(${v.sepia / 100})` : '',
+			v.grayscale > 0 ? `grayscale(${v.grayscale / 100})` : '',
+		]
+			.filter(Boolean)
+			.join(' ');
+
+		video.style.filter = filters;
+	}, [videoEnabled.value, videoEffects.value]);
 
 	// Apply selected subtitle track to the video element
 	useEffect(() => {

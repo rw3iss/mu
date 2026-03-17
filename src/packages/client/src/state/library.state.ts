@@ -54,6 +54,7 @@ export interface Movie {
 	playSettings?: {
 		eqProfileId?: string | null;
 		compressorProfileId?: string | null;
+		videoProfileId?: string | null;
 	} | null;
 	fileInfo?: {
 		containerFormat?: string;
