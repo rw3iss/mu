@@ -545,6 +545,15 @@ export function GlobalPlayer() {
 				</div>
 			)}
 
+			{/* Transcoding in-progress banner — auto-hides with controls */}
+			{!isMini && movie?.status === 'processing_playable' && (
+				<div
+					class={`${styles.transcodingBanner} ${showControls.value ? styles.transcodingBannerVisible : ''}`}
+				>
+					Transcoding in progress
+				</div>
+			)}
+
 			{/* Top header — full mode only, fades with controls */}
 			{!isMini && (
 				<div

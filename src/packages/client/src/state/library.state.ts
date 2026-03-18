@@ -49,7 +49,7 @@ export interface Movie {
 	watchPosition?: number;
 	durationSeconds?: number;
 	inWatchlist?: boolean;
-	status?: 'idle' | 'processing';
+	status?: 'idle' | 'processing' | 'processing_playable';
 	remoteOrigin?: RemoteOrigin;
 	playSettings?: {
 		eqProfileId?: string | null;

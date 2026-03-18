@@ -191,7 +191,7 @@ export class MoviesService {
 		};
 	}
 
-	findById(id: string, userId?: string) {
+	async findById(id: string, userId?: string) {
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 
 		if (!movie) {
@@ -282,7 +282,27 @@ export class MoviesService {
 			'pending',
 			'running',
 		]);
-		const status = activeJobs.length > 0 ? 'processing' : 'idle';
+		let status: 'idle' | 'processing' | 'processing_playable' = 'idle';
+		if (activeJobs.length > 0) {
+			// Check if partial cache is available for playback while still transcoding
+			if (firstFile) {
+				const enc = this.jobManager.findJobsByPayload('movieId', id, 'pre-transcode', [
+					'running',
+				]);
+				if (enc.length > 0) {
+					const quality = (enc[0]!.payload?.quality as string) || '1080p';
+					const hasPartial = await this.transcoderService.hasPlayablePartialCache(
+						firstFile.id,
+						quality,
+					);
+					status = hasPartial ? 'processing_playable' : 'processing';
+				} else {
+					status = 'processing';
+				}
+			} else {
+				status = 'processing';
+			}
+		}
 
 		// Parse play settings JSON
 		let playSettings = null;

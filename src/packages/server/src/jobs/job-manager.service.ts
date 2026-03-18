@@ -343,6 +343,7 @@ export class JobManagerService implements OnModuleDestroy {
 			status: job.status,
 			progress: job.progress,
 			error: job.error,
+			payload: job.payload,
 		});
 	}
 
@@ -351,6 +352,42 @@ export class JobManagerService implements OnModuleDestroy {
 	// ===========================================================
 
 	onModuleDestroy(): void {
+		// Mark all running jobs as interrupted
+		const runningCount = this.running.size;
+		for (const jobId of [...this.running]) {
+			const job = this.jobs.get(jobId);
+			if (!job) continue;
+			const callback = this.onCancelCallbacks.get(jobId);
+			if (callback) {
+				try {
+					callback();
+				} catch {}
+				this.onCancelCallbacks.delete(jobId);
+			}
+			job.status = 'failed';
+			job.error = 'Server shutdown';
+			job.completedAt = nowISO();
+		}
+		this.running.clear();
+
+		// Mark pending jobs
+		const pendingCount = this.queue.length;
+		for (const jobId of this.queue) {
+			const job = this.jobs.get(jobId);
+			if (job) {
+				job.status = 'failed';
+				job.error = 'Server shutdown';
+				job.completedAt = nowISO();
+			}
+		}
+		this.queue.length = 0;
+
+		if (runningCount > 0 || pendingCount > 0) {
+			this.logger.warn(
+				`Graceful shutdown: interrupted ${runningCount} running and ${pendingCount} pending jobs`,
+			);
+		}
+
 		this.scheduler.stop();
 		this.scheduledJobs.clear();
 		this.logger.log('Job manager stopped');

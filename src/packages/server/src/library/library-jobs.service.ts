@@ -51,6 +51,8 @@ export class LibraryJobsService implements OnModuleInit {
 		this.registerHandlers();
 		this.registerScheduledJobs();
 		this.listenForNewMovies();
+		// Resume incomplete pre-transcode jobs after a short delay to let other modules init
+		setTimeout(() => this.resumeIncompleteTranscodes(), 3000);
 	}
 
 	// ===========================================================
@@ -154,7 +156,13 @@ export class LibraryJobsService implements OnModuleInit {
 					this.transcoderService.stopTranscode(processKey);
 				});
 
-				await this.transcoderService.preTranscode(movieFileId, filePath, mode, quality);
+				await this.transcoderService.preTranscode(
+					movieFileId,
+					filePath,
+					mode,
+					quality,
+					(percent) => helpers.reportProgress(percent),
+				);
 
 				// Record the cached transcode with encoding settings used
 				this.recordTranscodeCache(movieFileId, quality);
@@ -295,6 +303,72 @@ export class LibraryJobsService implements OnModuleInit {
 		this.logger.log(
 			'Listening for new movies to schedule metadata + thumbnail + pre-transcode jobs',
 		);
+	}
+
+	/**
+	 * On startup, find movie files that need transcoding but don't have a completed cache,
+	 * and re-enqueue them as pre-transcode jobs.
+	 */
+	private async resumeIncompleteTranscodes(): Promise<void> {
+		const lib = this.settings.get<Record<string, unknown>>('library', {});
+		const persistEnabled = (lib as any)?.persistTranscodes !== false;
+		if (!persistEnabled) return;
+
+		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+		const defaultQuality = enc?.quality || '1080p';
+		const encodeHighest = enc?.encodeHighestAvailable === true;
+
+		const allFiles = this.database.db
+			.select({
+				file: movieFiles,
+				movieTitle: movies.title,
+			})
+			.from(movieFiles)
+			.leftJoin(movies, eq(movieFiles.movieId, movies.id))
+			.where(eq(movieFiles.available, true))
+			.all();
+
+		let resumed = 0;
+
+		for (const { file, movieTitle } of allFiles) {
+			const mode = this.streamService.determineStreamMode(file);
+			if (mode !== StreamMode.TRANSCODE && mode !== StreamMode.DIRECT_STREAM) continue;
+
+			const qualities = new Set<string>([defaultQuality]);
+			if (encodeHighest && file.resolution) {
+				const nativeQuality = this.resolutionToQuality(file.resolution);
+				if (
+					nativeQuality &&
+					this.qualityRank(nativeQuality) > this.qualityRank(defaultQuality)
+				) {
+					qualities.add(nativeQuality);
+				}
+			}
+
+			for (const quality of qualities) {
+				const hasCached = await this.transcoderService.hasCachedTranscode(file.id, quality);
+				if (hasCached) continue;
+
+				const title = movieTitle || file.id.slice(0, 8);
+				this.jobManager.enqueue({
+					type: JOB_TYPE.PRE_TRANSCODE,
+					label: `Resume transcode: ${title} (${quality})`,
+					payload: {
+						movieId: file.movieId,
+						movieFileId: file.id,
+						filePath: file.filePath,
+						mode,
+						quality,
+					},
+					priority: 45,
+				});
+				resumed++;
+			}
+		}
+
+		if (resumed > 0) {
+			this.logger.log(`Resumed ${resumed} incomplete pre-transcode jobs on startup`);
+		}
 	}
 
 	enqueuePreTranscodeIfNeeded(movieId: string, title: string): void {

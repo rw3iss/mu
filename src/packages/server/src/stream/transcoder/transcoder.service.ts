@@ -1,6 +1,6 @@
 import { ChildProcess, execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { access, mkdir, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
@@ -76,9 +76,12 @@ export class TranscoderService implements OnModuleDestroy {
 	}
 
 	async onModuleDestroy() {
-		// Kill all active transcode processes on shutdown
-		for (const [sessionId] of this.activeProcesses) {
-			this.stopTranscode(sessionId);
+		const count = this.activeProcesses.size;
+		if (count > 0) {
+			this.logger.warn(`Server shutting down — killing ${count} active FFmpeg processes`);
+			for (const [sessionId] of this.activeProcesses) {
+				this.stopTranscode(sessionId);
+			}
 		}
 	}
 
@@ -398,6 +401,7 @@ export class TranscoderService implements OnModuleDestroy {
 		filePath: string,
 		mode: string,
 		quality: string = '1080p',
+		onProgress?: (percent: number) => void,
 	): Promise<void> {
 		const persistDir = this.getPersistentDir(movieFileId, quality);
 
@@ -501,6 +505,10 @@ export class TranscoderService implements OnModuleDestroy {
 					this.logger.log(`Pre-transcode started for ${movieFileId}: ${commandLine}`);
 				})
 				.on('progress', (progress: any) => {
+					const pct = progress.percent;
+					if (typeof pct === 'number' && !Number.isNaN(pct)) {
+						onProgress?.(Math.min(100, Math.max(0, pct)));
+					}
 					this.logger.debug(
 						`Pre-transcode progress [${movieFileId}]: ${progress.percent?.toFixed(1)}%`,
 					);
@@ -519,7 +527,13 @@ export class TranscoderService implements OnModuleDestroy {
 						this.logger.warn(
 							`Hardware acceleration (${hwAccel}) failed for pre-transcode ${movieFileId}, retrying with software encoding...`,
 						);
-						this.preTranscodeWithSoftware(movieFileId, filePath, quality, persistDir)
+						this.preTranscodeWithSoftware(
+							movieFileId,
+							filePath,
+							quality,
+							persistDir,
+							onProgress,
+						)
 							.then(resolve)
 							.catch(reject);
 						return;
@@ -542,6 +556,32 @@ export class TranscoderService implements OnModuleDestroy {
 				this.activeProcesses.set(processKey, ffmpegProcess);
 			}
 		});
+	}
+
+	/**
+	 * Check whether a partially transcoded cache has enough segments to begin playback.
+	 */
+	async hasPlayablePartialCache(
+		movieFileId: string,
+		quality: string,
+		minSegments = 3,
+	): Promise<boolean> {
+		const dir = this.getPersistentDir(movieFileId, quality);
+		try {
+			await access(path.join(dir, 'stream.m3u8'));
+		} catch {
+			return false;
+		}
+		// Count segment files
+		try {
+			const files = await readdir(dir);
+			const segCount = files.filter(
+				(f) => f.startsWith('segment_') && f.endsWith('.ts'),
+			).length;
+			return segCount >= minSegments;
+		} catch {
+			return false;
+		}
 	}
 
 	getActiveTranscodeCount(): number {
@@ -734,6 +774,7 @@ export class TranscoderService implements OnModuleDestroy {
 		filePath: string,
 		quality: string,
 		persistDir: string,
+		onProgress?: (percent: number) => void,
 	): Promise<void> {
 		// Clean up the failed attempt
 		try {
@@ -796,6 +837,10 @@ export class TranscoderService implements OnModuleDestroy {
 					);
 				})
 				.on('progress', (progress: any) => {
+					const pct = progress.percent;
+					if (typeof pct === 'number' && !Number.isNaN(pct)) {
+						onProgress?.(Math.min(100, Math.max(0, pct)));
+					}
 					this.logger.debug(
 						`Pre-transcode SW fallback [${movieFileId}]: ${progress.percent?.toFixed(1)}%`,
 					);

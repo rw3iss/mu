@@ -240,6 +240,16 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				// Use the existing persistent cache — no FFmpeg needed
 				this.sessionDirs.set(sessionId, persistDir);
 				this.logger.log(`Using cached transcode for session=${sessionId}, file=${file.id}`);
+			} else if (
+				persistEnabled &&
+				(await this.transcoderService.hasPlayablePartialCache(file.id, quality))
+			) {
+				// Pre-transcode is still in progress but has enough segments to begin playback
+				this.sessionDirs.set(sessionId, persistDir);
+				hasCached = true;
+				this.logger.log(
+					`Using in-progress partial cache for session=${sessionId}, file=${file.id}`,
+				);
 			} else {
 				const outputDir = persistEnabled ? persistDir : undefined;
 				if (outputDir) {

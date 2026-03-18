@@ -76,6 +76,26 @@
   }
 }
 
+.transcodingBanner {
+  position: fixed;
+  top: var(--topbar-height);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: calc(var(--z-player-controls) + 1);
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--color-accent);
+  font-size: 12px;
+  padding: 4px 14px;
+  border-radius: 0 0 6px 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+
+  &.transcodingBannerVisible {
+    opacity: 1;
+  }
+}
+
 .topBtn {
   display: flex;
   align-items: center;

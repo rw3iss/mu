@@ -389,6 +389,34 @@
   gap: var(--space-sm);
   color: var(--color-text-secondary);
   font-size: var(--font-size-md);
+  flex-wrap: wrap;
+}
+
+.transcodeInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 180px;
+}
+
+.transcodeProgressBar {
+  width: 120px;
+  height: 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.transcodeProgressFill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.transcodeProgressText {
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
 }
 
 .sectionTitle {

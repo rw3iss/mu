@@ -29,6 +29,9 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [inWatchlist, setInWatchlist] = useState(false);
 
+	// Transcode progress tracking
+	const [transcodeProgress, setTranscodeProgress] = useState<number | null>(null);
+
 	// Inline title editing
 	const [editingTitle, setEditingTitle] = useState(false);
 	const [titleDraft, setTitleDraft] = useState('');
@@ -72,6 +75,38 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 		wsService.on('library:movie-updated', handler);
 		return () => wsService.off('library:movie-updated', handler);
+	}, [id]);
+
+	// Subscribe to transcode progress events
+	useEffect(() => {
+		if (!id) return;
+
+		const onProgress = (data: unknown) => {
+			const ev = data as { type?: string; progress?: number; payload?: { movieId?: string } };
+			if (ev.type === 'pre-transcode' && ev.payload?.movieId === id) {
+				setTranscodeProgress(ev.progress ?? null);
+			}
+		};
+		const onDone = (data: unknown) => {
+			const ev = data as { type?: string; payload?: { movieId?: string } };
+			if (ev.type === 'pre-transcode' && ev.payload?.movieId === id) {
+				setTranscodeProgress(null);
+				// Re-fetch movie to update status
+				moviesService
+					.get(id)
+					.then((updated) => setMovie(updated))
+					.catch(() => {});
+			}
+		};
+
+		wsService.on('job:progress', onProgress);
+		wsService.on('job:completed', onDone);
+		wsService.on('job:failed', onDone);
+		return () => {
+			wsService.off('job:progress', onProgress);
+			wsService.off('job:completed', onDone);
+			wsService.off('job:failed', onDone);
+		};
 	}, [id]);
 
 	const handlePlay = useCallback(() => {
@@ -396,10 +431,37 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 						{/* Actions */}
 						<div class={styles.actions}>
-							{movie.status === 'processing' && !isRemote ? (
+							{(movie.status === 'processing' ||
+								movie.status === 'processing_playable') &&
+							!isRemote ? (
 								<div class={styles.processingStatus}>
-									<Spinner size="sm" />
-									<span>Processing...</span>
+									{movie.status === 'processing_playable' && (
+										<Button variant="primary" size="lg" onClick={handlePlay}>
+											{'\u25B6'} Play
+										</Button>
+									)}
+									<div class={styles.transcodeInfo}>
+										{transcodeProgress != null ? (
+											<>
+												<div class={styles.transcodeProgressBar}>
+													<div
+														class={styles.transcodeProgressFill}
+														style={{
+															width: `${transcodeProgress.toFixed(0)}%`,
+														}}
+													/>
+												</div>
+												<span class={styles.transcodeProgressText}>
+													Transcoding: {transcodeProgress.toFixed(0)}%
+												</span>
+											</>
+										) : (
+											<>
+												<Spinner size="sm" />
+												<span>Processing...</span>
+											</>
+										)}
+									</div>
 									<Button
 										variant="ghost"
 										size="lg"
