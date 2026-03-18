@@ -1,4 +1,5 @@
-import { ChildProcess } from 'node:child_process';
+import { ChildProcess, execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { access, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
@@ -64,7 +65,6 @@ export class TranscoderService implements OnModuleDestroy {
 				  ];
 			for (const candidate of candidates) {
 				try {
-					const { existsSync } = require('node:fs');
 					if (existsSync(candidate)) {
 						ffmpeg.setFfmpegPath(candidate);
 						const probePath = candidate.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1');
@@ -574,7 +574,6 @@ export class TranscoderService implements OnModuleDestroy {
 		const proc = this.activeProcesses.get(sessionId);
 		if (!proc?.pid) return;
 		try {
-			const { execSync } = require('node:child_process');
 			if (process.platform === 'win32') {
 				execSync(
 					`wmic process where ProcessId=${proc.pid} CALL setpriority "above normal"`,
