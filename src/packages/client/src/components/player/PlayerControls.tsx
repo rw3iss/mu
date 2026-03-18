@@ -588,7 +588,9 @@ export function PlayerControls({
 								/>
 							</div>
 							<div class={styles.effectsDotsBottom}>
-								<span class={`${styles.effectsDot} ${videoEnabled.value ? styles.effectsDotActive : ''}`} />
+								<span
+									class={`${styles.effectsDot} ${videoEnabled.value ? styles.effectsDotActive : ''}`}
+								/>
 							</div>
 							<button
 								class={`${styles.controlBtn} ${showEffectsPanel.value ? styles.active : ''}`}
@@ -796,6 +798,29 @@ export function PlayerControls({
 															language: t.language,
 															label: t.label,
 														}))}
+														onSelect={(track) => {
+															// Select this subtitle track for playback
+															const s = currentSession.value;
+															if (!s) return;
+															const sub =
+																s.subtitles.find(
+																	(st) =>
+																		st.label === track.label &&
+																		st.language ===
+																			track.language,
+																) ?? s.subtitles[track.index];
+															if (sub) {
+																const movieId = globalMovieId.value;
+																if (movieId) {
+																	saveSubtitleChoice(
+																		movieId,
+																		sub.id,
+																	);
+																} else {
+																	subtitleTrack.value = sub.id;
+																}
+															}
+														}}
 														onTrackAdded={(track) => {
 															const s = currentSession.value;
 															if (!s) return;

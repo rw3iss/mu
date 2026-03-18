@@ -100,11 +100,12 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 110px;
+  height: var(--player-bar-height);
   //background: rgba(12, 12, 12, 0.97);
   display: flex;
   align-items: stretch;
   transition: opacity 300ms ease;
+  backdrop-filter: blur(16px);
 
   &.hidden {
     opacity: 0;
@@ -157,8 +158,8 @@
   // Lower-left corner, above the player bar
   bottom: 0;
   left: 0;
-  width: 160px;
-  height: 90px;
+  width: var(--player-mini-width);
+  height: var(--player-mini-height);
   cursor: pointer;
   // Above bar in mini mode
   z-index: calc(var(--z-player-controls) + 1);
@@ -189,7 +190,7 @@
 
 // Spacer in the control bar to make room for the mini video
 .miniSpacer {
-  width: 160px;
-  height: 90px;
+  width: var(--player-mini-width);
+  height: var(--player-mini-height);
   flex-shrink: 0;
 }

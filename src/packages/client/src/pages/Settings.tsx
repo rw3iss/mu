@@ -40,6 +40,60 @@ import { AdminDashboard } from './AdminDashboard';
 import { Plugins } from './Plugins';
 import styles from './Settings.module.scss';
 
+function OverlayTimeoutSetting() {
+	const [val, setVal] = useUiSetting('overlay_hide_timeout', 2000);
+	return (
+		<div class={styles.settingRow}>
+			<div class={styles.settingInfo}>
+				<span class={styles.settingLabel}>Overlay Hide Timeout</span>
+				<span class={styles.settingDescription}>
+					Time before player controls fade out (0 = never hide)
+				</span>
+			</div>
+			<div class={styles.skipTimesRow}>
+				<input
+					type="number"
+					class={styles.skipTimeInput}
+					min={0}
+					max={10000}
+					step={100}
+					value={val}
+					onInput={(e) => {
+						const n = parseInt((e.target as HTMLInputElement).value, 10);
+						if (!Number.isNaN(n)) setVal(Math.max(0, Math.min(10000, n)));
+					}}
+				/>
+				<span class={styles.settingDescription}>ms</span>
+				<button class={styles.resetBtn} onClick={() => setVal((val || 0) - 100)}>
+					-100
+				</button>
+				<button class={styles.resetBtn} onClick={() => setVal((val || 0) + 100)}>
+					+100
+				</button>
+				<button
+					class={styles.resetBtn}
+					onClick={() => setVal(2000)}
+					title="Reset to default (2000ms)"
+				>
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<polyline points="1 4 1 10 7 10" />
+						<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+					</svg>
+				</button>
+			</div>
+		</div>
+	);
+}
+
 interface ServerStats {
 	system: {
 		cpuCount: number;
@@ -1020,6 +1074,9 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.toggleTrack} />
 								</label>
 							</div>
+
+							{/* Overlay Hide Timeout */}
+							<OverlayTimeoutSetting />
 
 							{/* Subtitles Appearance */}
 							<div class={styles.settingGroup}>

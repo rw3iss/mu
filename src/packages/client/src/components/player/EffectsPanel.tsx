@@ -111,12 +111,15 @@ function ProfileControls({
 							if (type === 'eq') {
 								activeEqProfileId.value = null;
 								setUiSetting('active_eq_profile_id', null);
+								resetEq();
 							} else if (type === 'compressor') {
 								activeCompProfileId.value = null;
 								setUiSetting('active_comp_profile_id', null);
+								resetCompressor();
 							} else if (type === 'video') {
 								activeVideoProfileId.value = null;
 								setUiSetting('active_video_profile_id', null);
+								resetVideoEffects();
 							}
 						}
 					}}
@@ -297,7 +300,6 @@ function EqTab() {
 							onInput={(e) =>
 								updateInputGain(parseFloat((e.target as HTMLInputElement).value))
 							}
-							disabled={!enabled}
 						/>
 						<span class={`${styles.eqLabel} ${styles.eqLabelAmp}`}>Amp</span>
 					</div>
@@ -320,7 +322,6 @@ function EqTab() {
 										parseFloat((e.target as HTMLInputElement).value),
 									)
 								}
-								disabled={!enabled}
 							/>
 							<span class={styles.eqLabel}>{formatFreq(band.frequency)}</span>
 						</div>
@@ -417,7 +418,6 @@ function CompressorTab() {
 									parseFloat((e.target as HTMLInputElement).value),
 								)
 							}
-							disabled={!enabled}
 						/>
 					</div>
 				))}
@@ -460,7 +460,6 @@ function CompressorTab() {
 									parseFloat((e.target as HTMLInputElement).value),
 								)
 							}
-							disabled={!enabled}
 						/>
 						<span class={styles.mixLabel}>Wet</span>
 					</div>
@@ -530,6 +529,27 @@ function VideoTab() {
 					<div class={styles.compParam} key={param.key}>
 						<div class={styles.compParamHeader}>
 							<span class={styles.compParamLabel}>{param.label}</span>
+							{settings[param.key] !== param.default && (
+								<button
+									class={styles.paramResetBtn}
+									onClick={() => updateVideoParam(param.key, param.default)}
+									title={`Reset to ${param.default}${param.unit}`}
+								>
+									<svg
+										width="10"
+										height="10"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2.5"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<polyline points="1 4 1 10 7 10" />
+										<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+									</svg>
+								</button>
+							)}
 							<span class={styles.compParamValue}>
 								{settings[param.key]}
 								{param.unit}
@@ -542,13 +562,13 @@ function VideoTab() {
 							max={param.max}
 							step={param.step}
 							value={settings[param.key]}
+							onDblClick={() => updateVideoParam(param.key, param.default)}
 							onInput={(e) =>
 								updateVideoParam(
 									param.key,
 									parseFloat((e.target as HTMLInputElement).value),
 								)
 							}
-							disabled={!enabled}
 						/>
 					</div>
 				))}

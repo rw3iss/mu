@@ -47,7 +47,7 @@
   z-index: 1;
 
   .withMiniPlayer & {
-    padding-bottom: calc(100px + var(--space-lg));
+    padding-bottom: calc(var(--player-bar-height) + var(--space-lg));
   }
 
   @include mobile {

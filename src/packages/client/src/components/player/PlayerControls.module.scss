@@ -24,7 +24,7 @@
 
 .seekRow {
 	position: relative;
-	top: 8px;
+	top: -10px;
 	z-index: 3;
 	display: flex;
 	align-items: center;
@@ -51,7 +51,7 @@
 	bottom: 0;
 	width: 100%;
 	height: 3px;
-	background: rgba(255, 255, 255, 0.18);
+	background: rgba(50,50,50,1);
 	border-radius: 0;
 	transition: height 120ms ease;
 
@@ -110,7 +110,7 @@
 	flex: 1;
 	min-height: 0;
 	align-items: stretch;
-  	backdrop-filter: blur(16px);
+	z-index: 10;
 }
 
 .mainRow {
@@ -127,9 +127,9 @@
 .leftSection {
 	display: flex;
 	flex-direction: column;
-	justify-content: space-around;
+	justify-content: flex-start;
 	min-width: 0;
-	padding: 16px 10px 0 15px;
+	padding: 5px 10px 0 15px;
 	gap: 1px;
 }
 
@@ -144,6 +144,7 @@
 	line-height: 1.3;
 	text-decoration: none;
 	transition: color 120ms ease;
+	margin-bottom: 5px;
 
 	&:hover {
 		color: #ffffff;
@@ -157,16 +158,16 @@
 	font-variant-numeric: tabular-nums;
 	white-space: nowrap;
 	line-height: 1.3;
-	margin-bottom: 22px;
 }
 
 // ── Center: playback controls ──
 .centerControls {
-	position: fixed;
+	position: absolute;
 	left: 50%;
 	top: 0;
 	bottom: 0;
-	margin-top: 0px;
+	margin-top: -10px;
+	margin-bottom: 10px;
 	transform: translateX(-50%);
 	display: flex;
 	align-items: stretch;
@@ -181,6 +182,8 @@
 
 // ── Right: info, volume, settings, fullscreen, minimize, close ──
 .rightControls {
+	margin-top: -10px;
+	margin-bottom: 10px;
 	margin-left: auto;
 	display: flex;
 	align-items: stretch;
@@ -225,7 +228,7 @@
 
 .effectsDots {
 	position: absolute;
-	top: 18px;
+	top: 20px;
 	left: 0;
 	right: 0;
 	display: flex;
@@ -237,7 +240,7 @@
 
 .effectsDotsBottom {
 	position: absolute;
-	bottom: 18px;
+	bottom: 20px;
 	left: 0;
 	right: 0;
 	display: flex;
@@ -542,7 +545,7 @@
 
 .menuPanelContent {
 	padding: 4px 0;
-	max-height: 520px;
+	max-height: 600px;
 	overflow-y: auto;
 	min-width: 320px;
 }

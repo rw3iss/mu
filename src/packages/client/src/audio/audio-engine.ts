@@ -118,6 +118,12 @@ export class AudioEngine {
 
 	setCompressorEnabled(enabled: boolean): void {
 		this.compressorEnabled = enabled;
+		// When disabling, reset dry/wet gains to safe values so they don't
+		// carry stale state if the chain somehow leaks a connection
+		if (!enabled) {
+			if (this.dryGainNode) this.dryGainNode.gain.value = 1;
+			if (this.wetGainNode) this.wetGainNode.gain.value = 0;
+		}
 		this.rebuildChain();
 	}
 

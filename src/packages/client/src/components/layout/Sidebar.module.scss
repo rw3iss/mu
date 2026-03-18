@@ -19,7 +19,7 @@
 	}
 
 	&.withMiniPlayer {
-		height: calc(100vh - 90px);
+		height: calc(100vh - var(--player-bar-height));
 	}
 
 	@include mobile {

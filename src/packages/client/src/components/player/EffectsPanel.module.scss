@@ -360,6 +360,22 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
+.paramResetBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: color 120ms ease;
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.8);
+  }
+}
+
 .compParamValue {
   font-size: var(--font-size-xs);
   color: rgba(255, 255, 255, 0.8);

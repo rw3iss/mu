@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { audioEngine } from '@/audio/audio-engine';
 import { useSubtitleSettings } from '@/components/movie/SubtitleAppearance';
+import { getUiSetting } from '@/hooks/useUiSetting';
 import { streamService } from '@/services/stream.service';
 import {
 	closeEffectsPanel,
@@ -72,11 +73,14 @@ export function GlobalPlayer() {
 		showControls.value = true;
 		if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
 		if (isPlaying.value) {
-			controlsTimerRef.current = setTimeout(() => {
-				if (!isHoveringControls.value) {
-					showControls.value = false;
-				}
-			}, 3000);
+			const timeout = getUiSetting('overlay_hide_timeout', 2000);
+			if (timeout > 0) {
+				controlsTimerRef.current = setTimeout(() => {
+					if (!isHoveringControls.value) {
+						showControls.value = false;
+					}
+				}, timeout);
+			}
 		}
 	}, []);
 
@@ -299,7 +303,10 @@ export function GlobalPlayer() {
 			lineSpacingPx !== 0
 				? `calc(${baseLineHeight}em + ${lineSpacingPx}px)`
 				: `${baseLineHeight}em`;
-		const verticalOffset = s.verticalOffset;
+		const userOffset = s.verticalOffset;
+		// Push subtitles up when player controls are visible in full mode
+		const controlsUp = showControls.value && playerMode.value !== 'mini' ? -90 : 0;
+		const totalOffset = userOffset + controlsUp;
 
 		styleEl.textContent = `
 			video::cue {
@@ -310,14 +317,15 @@ export function GlobalPlayer() {
 				text-shadow: 1px 1px 2px ${shadowColor}, -1px -1px 2px ${shadowColor};
 			}
 			video::-webkit-media-text-track-display {
-				transform: translateY(${verticalOffset}px);
+				transform: translateY(${totalOffset}px);
+				transition: transform 200ms ease;
 			}
 		`;
 
 		return () => {
 			styleEl?.remove();
 		};
-	}, [subSettings]);
+	}, [subSettings, showControls.value, playerMode.value]);
 
 	// Apply video effects (CSS filters) to the video element
 	useEffect(() => {
