@@ -121,11 +121,20 @@ function Install-FFmpeg {
             }
         }
         $env:PATH = "$dest;$env:PATH"
-        # Add to system PATH permanently
-        $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-        if ($currentPath -notlike "*$dest*") {
-            [Environment]::SetEnvironmentVariable("PATH", "$dest;$currentPath", "User")
-            Write-Ok "Added $dest to user PATH permanently"
+        # Add to Windows system PATH (Machine level) — required for Node.js child processes
+        $machinePath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
+        if ($machinePath -notlike "*$dest*") {
+            try {
+                [Environment]::SetEnvironmentVariable("PATH", "$dest;$machinePath", "Machine")
+                Write-Ok "Added $dest to system PATH (Machine level)"
+            } catch {
+                # Machine level requires admin — fall back to User level
+                $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+                if ($userPath -notlike "*$dest*") {
+                    [Environment]::SetEnvironmentVariable("PATH", "$dest;$userPath", "User")
+                    Write-Ok "Added $dest to user PATH (run as admin for system-wide access)"
+                }
+            }
         }
     }
     $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")

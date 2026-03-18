@@ -45,6 +45,28 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 - **FFmpeg** 5+ (for transcoding and media probing)
 - **OS**: Linux, macOS, or Windows
 
+### FFmpeg on Windows
+
+Windows installations via WinGet (`winget install Gyan.FFmpeg`) create symlinks that can have permission issues when called from Node.js. If transcoding fails with "Cannot find ffmpeg", copy the binaries to a stable location and add to the system PATH:
+
+```powershell
+# Copy FFmpeg binaries to C:\ffmpeg
+$src = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Recurse -Filter "ffmpeg.exe" |
+  Where-Object { $_.DirectoryName -match 'bin$' } | Select-Object -First 1
+Copy-Item "$($src.DirectoryName)\*.exe" "C:\ffmpeg\" -Force
+
+# Add to system PATH permanently
+[Environment]::SetEnvironmentVariable("PATH", "C:\ffmpeg;" + [Environment]::GetEnvironmentVariable("PATH", "Machine"), "Machine")
+```
+
+Or in Git Bash:
+```bash
+cp /c/Users/*/AppData/Local/Microsoft/WinGet/Packages/*/ffmpeg-*/bin/*.exe /c/ffmpeg/
+powershell.exe -Command '[Environment]::SetEnvironmentVariable("PATH","C:\ffmpeg;"+[Environment]::GetEnvironmentVariable("PATH","Machine"),"Machine")'
+```
+
+Restart the server after updating the PATH. The install script handles this automatically.
+
 ---
 
 ## Installation

@@ -254,14 +254,30 @@ install_ffmpeg() {
             fi
 
             export PATH="$ff_dir:$PATH"
-            # Add to .bash_profile for permanent access
+            # Add to .bash_profile for Git Bash sessions
             if [ -f "$HOME/.bash_profile" ] && ! grep -q "/c/ffmpeg" "$HOME/.bash_profile" 2>/dev/null; then
                 echo 'export PATH="/c/ffmpeg:$PATH"' >> "$HOME/.bash_profile"
-                log "Added C:\\ffmpeg to PATH in .bash_profile"
+                log "Added C:\\ffmpeg to Git Bash PATH"
             elif [ -f "$HOME/.bashrc" ] && ! grep -q "/c/ffmpeg" "$HOME/.bashrc" 2>/dev/null; then
                 echo 'export PATH="/c/ffmpeg:$PATH"' >> "$HOME/.bashrc"
-                log "Added C:\\ffmpeg to PATH in .bashrc"
+                log "Added C:\\ffmpeg to Git Bash PATH"
             fi
+
+            # Add to Windows system PATH (required for Node.js child processes)
+            echo -en "  ${CYAN}Add C:\\ffmpeg to Windows system PATH? (required for transcoding) (Y/n):${NC} "
+            read -r add_sys_path
+            if [ "${add_sys_path,,}" != "n" ]; then
+                powershell.exe -NoProfile -Command "
+                    \$p = [Environment]::GetEnvironmentVariable('PATH','Machine');
+                    if (\$p -notlike '*C:\\ffmpeg*') {
+                        [Environment]::SetEnvironmentVariable('PATH','C:\\ffmpeg;'+\$p,'Machine');
+                        Write-Host 'Added C:\\ffmpeg to Windows system PATH'
+                    } else {
+                        Write-Host 'C:\\ffmpeg already in system PATH'
+                    }
+                " 2>/dev/null && log "Windows system PATH updated" || warn "Failed to update system PATH (may need admin privileges)"
+            fi
+
             info "FFmpeg installed to $ff_dir"
             ;;
     esac
