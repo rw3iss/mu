@@ -36,6 +36,38 @@ export class TranscoderService implements OnModuleDestroy {
 		this.cacheDir = path.resolve(
 			this.config.get<string>('cache.streamDir') || './data/cache/streams',
 		);
+
+		// Set explicit ffmpeg/ffprobe paths from config
+		// This avoids PATH issues on Windows (WinGet symlink permissions, Git Bash vs system PATH)
+		const ffmpegPath = this.config.get<string>('transcoding.ffmpegPath', 'ffmpeg');
+		const ffprobePath = this.config.get<string>('transcoding.ffprobePath', 'ffprobe');
+		if (ffmpegPath !== 'ffmpeg') {
+			ffmpeg.setFfmpegPath(ffmpegPath);
+			this.logger.log(`Using ffmpeg at: ${ffmpegPath}`);
+		}
+		if (ffprobePath !== 'ffprobe') {
+			ffmpeg.setFfprobePath(ffprobePath);
+			this.logger.log(`Using ffprobe at: ${ffprobePath}`);
+		}
+
+		// Auto-detect: if default 'ffmpeg' fails, try common Windows locations
+		if (ffmpegPath === 'ffmpeg' && process.platform === 'win32') {
+			const candidates = [
+				'C:\\ffmpeg\\ffmpeg.exe',
+				'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+			];
+			for (const candidate of candidates) {
+				try {
+					const { existsSync } = require('node:fs');
+					if (existsSync(candidate)) {
+						ffmpeg.setFfmpegPath(candidate);
+						ffmpeg.setFfprobePath(candidate.replace('ffmpeg.exe', 'ffprobe.exe'));
+						this.logger.log(`Auto-detected ffmpeg at: ${candidate}`);
+						break;
+					}
+				} catch {}
+			}
+		}
 	}
 
 	async onModuleDestroy() {
