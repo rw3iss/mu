@@ -54,9 +54,9 @@ export class TranscoderService implements OnModuleDestroy {
 		if (ffmpegPath === 'ffmpeg') {
 			const candidates = process.platform === 'win32'
 				? [
+					'C:/ffmpeg/ffmpeg.exe',
 					'C:\\ffmpeg\\ffmpeg.exe',
-					'/c/ffmpeg/ffmpeg.exe',
-					'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+					'C:/Program Files/ffmpeg/bin/ffmpeg.exe',
 				  ]
 				: [
 					'/usr/bin/ffmpeg',
