@@ -42,7 +42,10 @@ export function RatingWidget({
 		[max],
 	);
 
+	const submittedRef = { current: false };
 	const handleSubmit = useCallback(() => {
+		if (submittedRef.current) return;
+		submittedRef.current = true;
 		onChange?.(editValue);
 		setIsEditing(false);
 	}, [editValue, onChange]);

@@ -91,6 +91,12 @@ export function InfoPanel({ movie, visible, onClose }: InfoPanelProps) {
 
 				{/* Ratings */}
 				<div class={styles.ratings}>
+					{movie.rating != null && movie.rating > 0 && (
+						<div class={styles.ratingItem}>
+							<span class={styles.ratingSource}>You</span>
+							<span class={styles.ratingValue}>{movie.rating.toFixed(1)}</span>
+						</div>
+					)}
 					{movie.imdbRating != null && movie.imdbRating > 0 && (
 						<div class={styles.ratingItem}>
 							<span class={styles.ratingSource}>IMDb</span>

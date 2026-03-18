@@ -358,6 +358,9 @@
 .compParamLabel {
   font-size: var(--font-size-xs);
   color: rgba(255, 255, 255, 0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .paramResetBtn {

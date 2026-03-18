@@ -1,5 +1,4 @@
 import { computed, effect, signal } from '@preact/signals';
-import { route } from 'preact-router';
 import { moviesService } from '@/services/movies.service';
 import { streamService } from '@/services/stream.service';
 import {
@@ -160,10 +159,7 @@ export async function playMovie(
 
 	// Already loaded this movie - ensure it's playing
 	if (globalMovieId.value === movieId && currentSession.value) {
-		if (!wasMini) {
-			playerMode.value = 'full';
-			route(`/player/${movieId}`);
-		}
+		playerMode.value = 'full';
 		const engine = sharedVideoEngine.value;
 		if (engine) {
 			engine.setIntendedPlaying(true);
@@ -189,12 +185,10 @@ export async function playMovie(
 	currentSession.value = null;
 	subtitleTrack.value = null;
 
-	// Set up new movie — keep mini mode if already minimized
+	// Set up new movie
 	globalMovieId.value = movieId;
 	globalMovie.value = null;
-	if (!wasMini) {
-		playerMode.value = 'full';
-	}
+	playerMode.value = 'full';
 
 	// Force-save immediately with the new movieId and no session
 	// so a hard refresh during loading doesn't restore the old session
@@ -205,45 +199,34 @@ export async function playMovie(
 		.get(movieId)
 		.then((m) => {
 			globalMovie.value = m;
-			// Push to history cache as soon as we have the movie metadata
 			pushToHistory(m);
-			// Apply movie-specific play settings (EQ/compressor profiles, volume)
 			applyPlaySettings(m);
 		})
 		.catch(() => {
 			globalMovie.value = null;
 		});
-
-	// Only navigate to player page if not in mini mode
-	if (!wasMini) {
-		route(`/player/${movieId}`);
-	}
 }
 
 /**
- * Minimize: shrink to mini-player bar, navigate away from player page.
+ * Minimize: shrink to mini-player bar.
  */
 export function minimizePlayer(): void {
 	if (!globalMovieId.value) return;
 	playerMode.value = 'mini';
-	const movieId = globalMovieId.value;
-	route(`/movie/${movieId}`);
 }
 
 /**
- * Maximize: go back to full player page.
+ * Maximize: expand to full player overlay.
  */
 export function maximizePlayer(): void {
 	if (!globalMovieId.value) return;
 	playerMode.value = 'full';
-	route(`/player/${globalMovieId.value}`, true);
 }
 
 /**
  * Close: end stream, hide player entirely.
  */
 export async function closePlayer(): Promise<void> {
-	const movieId = globalMovieId.value;
 	playerMode.value = 'hidden';
 	globalMovieId.value = null;
 	globalMovie.value = null;
@@ -251,11 +234,6 @@ export async function closePlayer(): Promise<void> {
 	await endStream();
 	localStorage.removeItem(STORAGE_KEY);
 	localStorage.removeItem('mu_is_playing');
-
-	// If on player page, navigate away
-	if (movieId && window.location.pathname.startsWith('/player/')) {
-		route(`/movie/${movieId}`);
-	}
 }
 
 /**

@@ -528,28 +528,30 @@ function VideoTab() {
 				{VIDEO_PARAMS.map((param) => (
 					<div class={styles.compParam} key={param.key}>
 						<div class={styles.compParamHeader}>
-							<span class={styles.compParamLabel}>{param.label}</span>
-							{settings[param.key] !== param.default && (
-								<button
-									class={styles.paramResetBtn}
-									onClick={() => updateVideoParam(param.key, param.default)}
-									title={`Reset to ${param.default}${param.unit}`}
-								>
-									<svg
-										width="10"
-										height="10"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2.5"
-										stroke-linecap="round"
-										stroke-linejoin="round"
+							<span class={styles.compParamLabel}>
+								{param.label}
+								{settings[param.key] !== param.default && (
+									<button
+										class={styles.paramResetBtn}
+										onClick={() => updateVideoParam(param.key, param.default)}
+										title={`Reset to ${param.default}${param.unit}`}
 									>
-										<polyline points="1 4 1 10 7 10" />
-										<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-									</svg>
-								</button>
-							)}
+										<svg
+											width="10"
+											height="10"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2.5"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="1 4 1 10 7 10" />
+											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+										</svg>
+									</button>
+								)}
+							</span>
 							<span class={styles.compParamValue}>
 								{settings[param.key]}
 								{param.unit}

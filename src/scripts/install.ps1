@@ -102,16 +102,31 @@ function Install-FFmpeg {
         $dest = "C:\ffmpeg"
         Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
         Expand-Archive -Path $zip -DestinationPath $dest -Force
-        # Move binaries from nested dir
         $inner = Get-ChildItem $dest -Directory | Where-Object { $_.Name -like "ffmpeg-*" } | Select-Object -First 1
         if ($inner) {
             Copy-Item "$($inner.FullName)\bin\*" $dest -Force
         }
         Remove-Item $zip -Force -ErrorAction SilentlyContinue
-        # Add to PATH for this session
+    }
+    # Ensure C:\ffmpeg is on PATH (WinGet symlinks can have permission issues)
+    $dest = "C:\ffmpeg"
+    if (Test-Path $dest) {
+        # Copy WinGet binaries to stable location if not already there
+        if (-not (Test-Path "$dest\ffmpeg.exe")) {
+            $wingetBin = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Recurse -Filter "ffmpeg.exe" -ErrorAction SilentlyContinue |
+                Where-Object { $_.DirectoryName -match 'bin$' } | Select-Object -First 1
+            if ($wingetBin) {
+                Copy-Item "$($wingetBin.DirectoryName)\*.exe" $dest -Force
+                Write-Ok "Copied FFmpeg binaries to $dest"
+            }
+        }
         $env:PATH = "$dest;$env:PATH"
-        Write-Info "FFmpeg installed to $dest"
-        Write-Info "Add C:\ffmpeg to your system PATH for permanent access."
+        # Add to system PATH permanently
+        $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+        if ($currentPath -notlike "*$dest*") {
+            [Environment]::SetEnvironmentVariable("PATH", "$dest;$currentPath", "User")
+            Write-Ok "Added $dest to user PATH permanently"
+        }
     }
     $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [Environment]::GetEnvironmentVariable("PATH", "User")
 }

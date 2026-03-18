@@ -12,7 +12,7 @@ import { Login } from '@/pages/Login';
 import { MovieDetail } from '@/pages/MovieDetail';
 import { NotFound } from '@/pages/NotFound';
 import { PersonDetail } from '@/pages/PersonDetail';
-import { Player } from '@/pages/Player';
+// Player is now handled entirely by GlobalPlayer (no dedicated route)
 import { PlaylistDetail } from '@/pages/PlaylistDetail';
 import { Playlists } from '@/pages/Playlists';
 import { Search } from '@/pages/Search';
@@ -33,7 +33,7 @@ import { GlobalPlayer } from '@/components/player/GlobalPlayer';
 import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { wsService } from '@/services/websocket.service';
-import { initGlobalPlayer, isPlayerActive, playerMode } from '@/state/globalPlayer.state';
+import { initGlobalPlayer } from '@/state/globalPlayer.state';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
 
@@ -68,13 +68,6 @@ function handleRouteChange(e: { url: string }) {
 	currentPath.value = url;
 
 	if (enforceAuth(url)) return;
-
-	// Auto-minimize player when navigating away from the player page
-	// (e.g. browser back button). closePlayer/minimizePlayer set the mode
-	// before routing, so this only catches external navigation (popstate).
-	if (!url.startsWith('/player/') && playerMode.value === 'full' && isPlayerActive.value) {
-		playerMode.value = 'mini';
-	}
 }
 
 export function App() {
@@ -121,18 +114,16 @@ export function App() {
 	}
 
 	const path = currentPath.value;
-	const isPlayerRoute = path.startsWith('/player/');
 	const isAuthRoute = path === '/login' || path === '/setup';
 
 	return (
 		<div>
 			<Toast />
 			{!isAuthRoute && <GlobalPlayer />}
-			{isAuthRoute || isPlayerRoute ? (
+			{isAuthRoute ? (
 				<Router onChange={handleRouteChange}>
 					<Login path="/login" />
 					<Setup path="/setup" />
-					<Player path="/player/:id" />
 					<NotFound default />
 				</Router>
 			) : (
@@ -141,7 +132,6 @@ export function App() {
 						<Dashboard path="/" />
 						<Library path="/library" />
 						<MovieDetail path="/movie/:id" />
-						<Player path="/player/:id" />
 						<Playlists path="/playlists" />
 						<PlaylistDetail path="/playlists/:id" />
 						<Watchlist path="/watchlist" />

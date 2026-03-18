@@ -224,23 +224,45 @@ install_ffmpeg() {
             fi
             ;;
         windows)
-            info "Downloading FFmpeg for Windows..."
-            local ff_url="https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
-            local ff_zip="/tmp/ffmpeg.zip"
-            curl -fSL -o "$ff_zip" "$ff_url"
             local ff_dir="/c/ffmpeg"
             mkdir -p "$ff_dir"
-            unzip -o -q "$ff_zip" -d "$ff_dir"
-            # Move binaries to a consistent path
-            local inner_dir
-            inner_dir=$(find "$ff_dir" -maxdepth 1 -type d -name 'ffmpeg-*' | head -1)
-            if [ -n "$inner_dir" ]; then
-                cp "$inner_dir/bin/"* "$ff_dir/" 2>/dev/null || true
+
+            # Check if WinGet installed FFmpeg (symlinks may have permission issues)
+            local winget_ffmpeg
+            winget_ffmpeg=$(find "/c/Users/$(whoami)/AppData/Local/Microsoft/WinGet/Packages" \
+                -name 'ffmpeg.exe' -path '*/bin/*' 2>/dev/null | head -1)
+
+            if [ -n "$winget_ffmpeg" ]; then
+                info "Found WinGet FFmpeg, copying binaries to $ff_dir..."
+                local bin_dir
+                bin_dir=$(dirname "$winget_ffmpeg")
+                cp "$bin_dir/ffmpeg.exe" "$ff_dir/" 2>/dev/null || true
+                cp "$bin_dir/ffprobe.exe" "$ff_dir/" 2>/dev/null || true
+                cp "$bin_dir/ffplay.exe" "$ff_dir/" 2>/dev/null || true
+            else
+                info "Downloading FFmpeg for Windows..."
+                local ff_url="https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+                local ff_zip="/tmp/ffmpeg.zip"
+                curl -fSL -o "$ff_zip" "$ff_url"
+                unzip -o -q "$ff_zip" -d "$ff_dir"
+                local inner_dir
+                inner_dir=$(find "$ff_dir" -maxdepth 1 -type d -name 'ffmpeg-*' | head -1)
+                if [ -n "$inner_dir" ]; then
+                    cp "$inner_dir/bin/"* "$ff_dir/" 2>/dev/null || true
+                fi
+                rm -f "$ff_zip"
             fi
+
             export PATH="$ff_dir:$PATH"
-            rm -f "$ff_zip"
+            # Add to .bash_profile for permanent access
+            if [ -f "$HOME/.bash_profile" ] && ! grep -q "/c/ffmpeg" "$HOME/.bash_profile" 2>/dev/null; then
+                echo 'export PATH="/c/ffmpeg:$PATH"' >> "$HOME/.bash_profile"
+                log "Added C:\\ffmpeg to PATH in .bash_profile"
+            elif [ -f "$HOME/.bashrc" ] && ! grep -q "/c/ffmpeg" "$HOME/.bashrc" 2>/dev/null; then
+                echo 'export PATH="/c/ffmpeg:$PATH"' >> "$HOME/.bashrc"
+                log "Added C:\\ffmpeg to PATH in .bashrc"
+            fi
             info "FFmpeg installed to $ff_dir"
-            info "Add C:\\ffmpeg to your system PATH for permanent access."
             ;;
     esac
 }
