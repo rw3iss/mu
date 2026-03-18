@@ -47,27 +47,33 @@ function OverlayTimeoutSetting() {
 			<div class={styles.settingInfo}>
 				<span class={styles.settingLabel}>Overlay Hide Timeout</span>
 				<span class={styles.settingDescription}>
-					Time before player controls fade out (0 = never hide)
+					Time before player controls fade out (min 100ms)
 				</span>
 			</div>
 			<div class={styles.skipTimesRow}>
 				<input
 					type="number"
 					class={styles.skipTimeInput}
-					min={0}
+					min={100}
 					max={10000}
 					step={100}
 					value={val}
 					onInput={(e) => {
 						const n = parseInt((e.target as HTMLInputElement).value, 10);
-						if (!Number.isNaN(n)) setVal(Math.max(0, Math.min(10000, n)));
+						if (!Number.isNaN(n)) setVal(Math.max(100, Math.min(10000, n)));
 					}}
 				/>
 				<span class={styles.settingDescription}>ms</span>
-				<button class={styles.resetBtn} onClick={() => setVal((val || 0) - 100)}>
+				<button
+					class={styles.resetBtn}
+					onClick={() => setVal(Math.max(100, (val || 0) - 100))}
+				>
 					-100
 				</button>
-				<button class={styles.resetBtn} onClick={() => setVal((val || 0) + 100)}>
+				<button
+					class={styles.resetBtn}
+					onClick={() => setVal(Math.min(10000, (val || 0) + 100))}
+				>
 					+100
 				</button>
 				<button
