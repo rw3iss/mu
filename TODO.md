@@ -1,3 +1,19 @@
+
+- group, see related movies in library or set (ie. series):
+	- be smart... metadata if exists, otherwise strategies for filename/folder association.
+
+- add 'Server' section to Settings.:
+	- see each job, progress, cancel
+	- see server stats
+	- control server: restart, etc.
+	- user access...
+
+- show indicator on library page if movie is processing.
+
+- "Clean files" admin feature: rename all movie files to something standardized (enter a formatter), option to put movies in enclosing folder if they are not, put subtitles in subfolder, option to group series, etc.
+
+- when updating metadata, set the title.
+
 - set default subtitle language (to help subtitles, etc).
 - set interface language: to translations.
 
@@ -45,7 +61,6 @@
 --------------------------------------------------------------------------------
 
 # PLUGINS:
-
 
 - Actor/Movie lookup:
 	- on movie page, see extended movie info: actors, director, etc
