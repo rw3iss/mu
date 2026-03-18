@@ -26,6 +26,7 @@ import {
 	initPlayerSettings,
 	isFullscreen,
 	isHoveringControls,
+	isPlaying,
 	restoreSubtitleChoice,
 	showControls,
 	showInfoPanel,
@@ -65,6 +66,26 @@ export function GlobalPlayer() {
 	const [_isInitializing, setIsInitializing] = useState(false);
 	const [preparingMessage, setPreparingMessage] = useState<string | null>(null);
 	const playbackInitRef = useRef(false);
+	const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const resetControlsTimer = useCallback(() => {
+		showControls.value = true;
+		if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+		if (isPlaying.value) {
+			controlsTimerRef.current = setTimeout(() => {
+				if (!isHoveringControls.value) {
+					showControls.value = false;
+				}
+			}, 3000);
+		}
+	}, []);
+
+	// Auto-hide controls when playing starts
+	useEffect(() => {
+		if (isPlaying.value && playerMode.value !== 'mini') {
+			resetControlsTimer();
+		}
+	}, [isPlaying.value]);
 
 	// Expose the video engine via module-level ref so Player page can access it
 	useEffect(() => {
@@ -477,15 +498,9 @@ export function GlobalPlayer() {
 			{/* Persistent video wrapper — stays in DOM, CSS transitions between full/mini */}
 			<div
 				ref={videoWrapperRef}
-				class={`${styles.videoWrapper} ${isMini ? styles.videoWrapperMini : styles.videoWrapperFull}`}
+				class={`${styles.videoWrapper} ${isMini ? styles.videoWrapperMini : styles.videoWrapperFull} ${!isMini && !showControls.value ? styles.hideCursor : ''}`}
 				onClick={isMini ? maximizePlayer : undefined}
-				onMouseMove={
-					!isMini
-						? () => {
-								showControls.value = true;
-							}
-						: undefined
-				}
+				onMouseMove={!isMini ? resetControlsTimer : undefined}
 			>
 				{isMini && (
 					<div class={styles.miniVideoOverlay}>

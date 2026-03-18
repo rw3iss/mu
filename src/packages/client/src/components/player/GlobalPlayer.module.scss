@@ -102,7 +102,6 @@
   right: 0;
   height: 110px;
   //background: rgba(12, 12, 12, 0.97);
-  backdrop-filter: blur(16px);
   display: flex;
   align-items: stretch;
   transition: opacity 300ms ease;
@@ -140,6 +139,10 @@
   }
 }
 
+.hideCursor {
+  cursor: none;
+}
+
 .videoWrapperFull {
   inset: 0;
   // Above page content, below the player bar
@@ -154,8 +157,8 @@
   // Lower-left corner, above the player bar
   bottom: 0;
   left: 0;
-  width: 178px;
-  height: 100px;
+  width: 160px;
+  height: 90px;
   cursor: pointer;
   // Above bar in mini mode
   z-index: calc(var(--z-player-controls) + 1);
@@ -186,6 +189,7 @@
 
 // Spacer in the control bar to make room for the mini video
 .miniSpacer {
-  width: 178px;
+  width: 160px;
+  height: 90px;
   flex-shrink: 0;
 }

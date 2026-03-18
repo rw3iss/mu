@@ -159,7 +159,7 @@ export async function playMovie(
 	const wasMini = playerMode.value === 'mini';
 
 	// Already loaded this movie - ensure it's playing
-	if (globalMovieId.value === movieId && currentSession.value && !opts?.fromBeginning) {
+	if (globalMovieId.value === movieId && currentSession.value) {
 		if (!wasMini) {
 			playerMode.value = 'full';
 			route(`/player/${movieId}`);
@@ -168,6 +168,10 @@ export async function playMovie(
 		if (engine) {
 			engine.setIntendedPlaying(true);
 			const video = engine.videoRef.current;
+			if (opts?.fromBeginning && video) {
+				video.currentTime = 0;
+				currentTime.value = 0;
+			}
 			if (video?.paused) video.play().catch(() => {});
 		}
 		const movie = globalMovie.value;
