@@ -29,6 +29,8 @@ const MAX_RECOVERIES = 12;
 const RECOVERY_BASE_DELAY_MS = 1500;
 /** Max recoveries specifically for 503 (transcoding in progress) — more patient */
 const MAX_503_RECOVERIES = 30;
+/** Max full stream reloads before giving up entirely */
+const MAX_FULL_RELOADS = 3;
 
 /** User-facing status message during HLS recovery (e.g. transcoding in progress) */
 type HlsStatus = string | null;
@@ -84,6 +86,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const intendedPlayingRef = useRef(false);
 	/** For direct play with deferred loading: stores the URL until user plays */
 	const deferredSrcRef = useRef<{ url: string; position: number } | null>(null);
+	/** Tracks pending HLS recovery timeout so it can be cleared on destroy */
+	const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [playbackError, setPlaybackError] = useState<string | null>(null);
 	const [hlsStatus, setHlsStatus] = useState<HlsStatus>(null);
 
@@ -201,6 +205,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
 			if (seekLockTimerRef.current) clearTimeout(seekLockTimerRef.current);
 			if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+			if (recoveryTimerRef.current) {
+				clearTimeout(recoveryTimerRef.current);
+				recoveryTimerRef.current = null;
+			}
 			if (hlsRef.current) {
 				hlsRef.current.destroy();
 				hlsRef.current = null;
@@ -330,12 +338,15 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				let networkRecoveries = 0;
 				let transcodingRecoveries = 0;
 				let mediaRecoveries = 0;
+				let fullReloads = 0;
 				let lastSuccessTime = Date.now();
+				recoveryTimerRef.current = null;
 
 				// Reset recovery counters on successful fragment load
 				hls.on(Hls.Events.FRAG_LOADED, () => {
 					networkRecoveries = 0;
 					transcodingRecoveries = 0;
+					fullReloads = 0;
 					lastSuccessTime = Date.now();
 					if (hlsStatus) setHlsStatus(null);
 				});
@@ -365,16 +376,20 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 									setHlsStatus(
 										`Transcoding in progress... (${transcodingRecoveries})`,
 									);
-									setTimeout(() => {
+									if (recoveryTimerRef.current)
+										clearTimeout(recoveryTimerRef.current);
+									recoveryTimerRef.current = setTimeout(() => {
+										recoveryTimerRef.current = null;
 										if (hlsRef.current) hls.startLoad();
 									}, delay);
 								} else {
-									// Last resort: try reloading the stream entirely
-									setHlsStatus('Reloading stream...');
-									const pos = video.currentTime;
-									hls.stopLoad();
-									hls.startLoad(pos);
-									transcodingRecoveries = 0;
+									// All 503 retries exhausted — give up
+									const msg =
+										'Stream unavailable: transcoding failed or took too long';
+									console.error('[HLS] Max 503 recoveries exhausted');
+									setPlaybackError(msg);
+									hls.destroy();
+									hlsRef.current = null;
 								}
 							} else if (networkRecoveries < MAX_RECOVERIES) {
 								networkRecoveries++;
@@ -386,21 +401,25 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 								console.warn(
 									`[HLS] Network error, recovery ${networkRecoveries}/${MAX_RECOVERIES} in ${delay}ms`,
 								);
-								setTimeout(() => {
+								if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
+								recoveryTimerRef.current = setTimeout(() => {
+									recoveryTimerRef.current = null;
 									if (hlsRef.current) hls.startLoad();
 								}, delay);
-							} else {
-								// All recoveries exhausted — last resort: full reload from current position
+							} else if (fullReloads < MAX_FULL_RELOADS) {
+								// Recoveries exhausted — try full reload from current position
+								fullReloads++;
 								const pos = video.currentTime;
-								setHlsStatus('Reloading stream...');
+								setHlsStatus(
+									`Reloading stream... (${fullReloads}/${MAX_FULL_RELOADS})`,
+								);
 								console.warn(
-									'[HLS] All recoveries exhausted, reloading stream from',
+									`[HLS] Full reload ${fullReloads}/${MAX_FULL_RELOADS} from`,
 									pos,
 								);
 								hls.destroy();
 								hlsRef.current = null;
 
-								// Recreate HLS and reload
 								const newHls = new Hls({
 									startPosition: pos,
 									enableWorker: true,
@@ -421,7 +440,13 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 								hlsRef.current = newHls;
 								networkRecoveries = 0;
 								transcodingRecoveries = 0;
-								setHlsStatus(null);
+							} else {
+								// All reloads exhausted — give up
+								const msg = `Stream failed: unable to load video after ${MAX_FULL_RELOADS} attempts`;
+								console.error('[HLS] All full reloads exhausted');
+								setPlaybackError(msg);
+								hls.destroy();
+								hlsRef.current = null;
 							}
 							break;
 						}
@@ -519,6 +544,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		suppressPauseRef.current = true;
 		intendedPlayingRef.current = false;
 		deferredSrcRef.current = null;
+		if (recoveryTimerRef.current) {
+			clearTimeout(recoveryTimerRef.current);
+			recoveryTimerRef.current = null;
+		}
 		if (hlsRef.current) {
 			hlsRef.current.destroy();
 			hlsRef.current = null;
