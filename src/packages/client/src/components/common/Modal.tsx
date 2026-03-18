@@ -1,4 +1,4 @@
-import { ComponentChildren } from 'preact';
+import { ComponentChildren, createPortal } from 'preact/compat';
 import { useCallback, useEffect, useRef } from 'preact/hooks';
 import styles from './Modal.module.scss';
 
@@ -42,7 +42,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
 	if (!isOpen) return null;
 
-	return (
+	return createPortal(
 		<div
 			ref={overlayRef}
 			class={styles.overlay}
@@ -62,6 +62,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 				)}
 				<div class={styles.body}>{children}</div>
 			</div>
-		</div>
+		</div>,
+		document.body,
 	);
 }

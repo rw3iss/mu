@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
-import { getUiSetting } from '@/hooks/useUiSetting';
+import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import {
@@ -42,6 +42,29 @@ interface PlayerControlsProps {
 	hasMiniThumbnail?: boolean;
 	/** Element rendered to the left of the controls row, below the seek bar */
 	leftSlot?: VNode | null;
+}
+
+function SubtitleSettingsCollapsible() {
+	const [open, setOpen] = useUiSetting('subtitle_settings_panel_open', false);
+	return (
+		<div>
+			<button
+				class={styles.menuItem}
+				onClick={() => setOpen(!open)}
+				style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+			>
+				<span>Settings</span>
+				<span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
+					{open ? '\u25B2' : '\u25BC'}
+				</span>
+			</button>
+			{open && (
+				<div style={{ padding: '8px 12px' }}>
+					<SubtitleAppearance compact />
+				</div>
+			)}
+		</div>
+	);
 }
 
 function formatTime(seconds: number): string {
@@ -757,7 +780,7 @@ export function PlayerControls({
 												{'\u2039'} Manage Subtitles
 											</button>
 											<div class={styles.menuPanelContent}>
-												<SubtitleAppearance compact />
+												<SubtitleSettingsCollapsible />
 												<div class={styles.menuDivider} />
 												{globalMovieId.value && (
 													<SubtitlePanel

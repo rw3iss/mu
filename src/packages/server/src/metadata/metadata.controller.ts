@@ -58,6 +58,42 @@ export class MetadataController {
 		return metadata ?? { message: 'No metadata found' };
 	}
 
+	@Post('movies/:id/clear-metadata')
+	@Roles('admin')
+	async clearMetadata(@Param('id') movieId: string) {
+		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
+		if (!movie) return { message: 'Movie not found' };
+
+		// Clear third-party metadata from the movies table (keep title, file-derived data)
+		this.database.db
+			.update(movies)
+			.set({
+				overview: null,
+				tagline: null,
+				originalTitle: null,
+				posterUrl: null,
+				backdropUrl: null,
+				trailerUrl: null,
+				imdbId: null,
+				tmdbId: null,
+				releaseDate: null,
+				language: null,
+				country: null,
+				contentRating: null,
+				updatedAt: nowISO(),
+			})
+			.where(eq(movies.id, movieId))
+			.run();
+
+		// Delete the movie_metadata record entirely
+		this.database.db.delete(movieMetadata).where(eq(movieMetadata.movieId, movieId)).run();
+
+		this.logger.log(`Cleared metadata for movie ${movieId} (${movie.title})`);
+		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'clear-metadata' });
+
+		return { message: 'Metadata cleared' };
+	}
+
 	@Post('movies/:id/rescan')
 	@Roles('admin')
 	async rescan(@Param('id') movieId: string) {

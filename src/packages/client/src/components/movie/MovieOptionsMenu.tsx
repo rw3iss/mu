@@ -20,6 +20,7 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 	const [rescanState, setRescanState] = useState<'idle' | 'loading' | 'complete'>('idle');
 	const [refreshState, setRefreshState] = useState<'idle' | 'loading' | 'complete'>('idle');
 	const [confirmingRemove, setConfirmingRemove] = useState(false);
+	const [confirmingClearMeta, setConfirmingClearMeta] = useState(false);
 	const [showDeleteModal, setShowDeleteModal] = useState(false);
 	const [deleteFolder, setDeleteFolder] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
@@ -115,6 +116,22 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 		[movie.id, refreshMovie],
 	);
 
+	const handleClearMetadata = useCallback(
+		async (e: Event) => {
+			e.stopPropagation();
+			setConfirmingClearMeta(false);
+			setOpen(false);
+			try {
+				await moviesService.clearMetadata(movie.id);
+				await refreshMovie();
+				notifySuccess('Metadata cleared');
+			} catch {
+				notifyError('Failed to clear metadata');
+			}
+		},
+		[movie.id, refreshMovie],
+	);
+
 	const handleRemove = useCallback(
 		async (e: Event) => {
 			e.stopPropagation();
@@ -203,6 +220,34 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 								? 'Complete'
 								: 'Refresh Metadata'}
 					</button>
+					{confirmingClearMeta ? (
+						<div class={styles.confirmRow}>
+							<span>Clear all metadata?</span>
+							<button class={styles.confirmYes} onClick={handleClearMetadata}>
+								Yes
+							</button>
+							<button
+								class={styles.confirmNo}
+								onClick={(e: Event) => {
+									e.stopPropagation();
+									setConfirmingClearMeta(false);
+								}}
+							>
+								Cancel
+							</button>
+						</div>
+					) : (
+						<button
+							class={styles.menuItem}
+							onClick={(e: Event) => {
+								e.stopPropagation();
+								setConfirmingClearMeta(true);
+							}}
+						>
+							<span class={styles.menuIcon}>{'\u2715'}</span>
+							Clear Metadata
+						</button>
+					)}
 					<div class={styles.menuDivider} />
 					<button class={styles.menuItem} onClick={handleHideToggle}>
 						<span class={styles.menuIcon}>

@@ -188,7 +188,6 @@ export function Settings(props: SettingsProps) {
 	const [editingServer, setEditingServer] = useState<string | null>(null);
 
 	// Rating settings
-	const [ratingScale, setRatingScale] = useState('10');
 	const [showExternalRatings, setShowExternalRatings] = useState(true);
 
 	// Notification settings
@@ -302,7 +301,6 @@ export function Settings(props: SettingsProps) {
 
 				const rating = data.rating as Record<string, unknown> | undefined;
 				if (rating) {
-					if (typeof rating.ratingScale === 'string') setRatingScale(rating.ratingScale);
 					if (typeof rating.showExternalRatings === 'boolean')
 						setShowExternalRatings(rating.showExternalRatings);
 				}
@@ -423,7 +421,7 @@ export function Settings(props: SettingsProps) {
 		setIsSaving(true);
 		try {
 			await api.put('/settings/rating', {
-				value: { ratingScale, showExternalRatings },
+				value: { showExternalRatings },
 			});
 			notifySuccess('Rating settings saved');
 		} catch {
@@ -431,7 +429,7 @@ export function Settings(props: SettingsProps) {
 		} finally {
 			setIsSaving(false);
 		}
-	}, [ratingScale, showExternalRatings]);
+	}, [showExternalRatings]);
 
 	// Scan state
 	const [isScanning, setIsScanning] = useState(false);
@@ -556,26 +554,6 @@ export function Settings(props: SettingsProps) {
 							</div>
 
 							<h3 class={styles.sectionTitle}>Rating</h3>
-
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Rating Scale</span>
-									<span class={styles.settingDescription}>
-										Scale used for your personal ratings
-									</span>
-								</div>
-								<select
-									class={styles.select}
-									value={ratingScale}
-									onChange={(e) =>
-										setRatingScale((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="10">0 - 10</option>
-									<option value="5">0 - 5</option>
-									<option value="100">0 - 100</option>
-								</select>
-							</div>
 
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
@@ -1373,6 +1351,60 @@ export function Settings(props: SettingsProps) {
 								/>
 							</div>
 
+							<div class={styles.scanRow}>
+								<Button
+									variant="secondary"
+									loading={isScanning}
+									onClick={handleScanNow}
+								>
+									{isScanning ? 'Scanning...' : 'Scan Now'}
+								</Button>
+								<label
+									class={styles.toggle}
+									title="Re-encode existing movies whose cached transcode doesn't match the encoding settings above"
+								>
+									<input
+										type="checkbox"
+										checked={reEncodeOnScan}
+										onChange={(e) =>
+											setReEncodeOnScan(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+								<span class={styles.settingDescription}>Re-encode on scan</span>
+								{scanResult && (
+									<div class={styles.scanResult}>
+										<span class={styles.scanStat}>
+											{scanResult.filesFound} file
+											{scanResult.filesFound === 1 ? '' : 's'} found
+										</span>
+										{scanResult.filesAdded > 0 && (
+											<span class={styles.scanStatHighlight}>
+												{scanResult.filesAdded} new
+											</span>
+										)}
+										{scanResult.filesUpdated > 0 && (
+											<span class={styles.scanStat}>
+												{scanResult.filesUpdated} updated
+											</span>
+										)}
+										{scanResult.filesRemoved > 0 && (
+											<span class={styles.scanStat}>
+												{scanResult.filesRemoved} removed
+											</span>
+										)}
+										{scanResult.filesAdded === 0 &&
+											scanResult.filesUpdated === 0 &&
+											scanResult.filesRemoved === 0 && (
+												<span class={styles.scanStat}>Up to date</span>
+											)}
+									</div>
+								)}
+							</div>
+
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Automatic Scanning</span>
@@ -1881,65 +1913,6 @@ export function Settings(props: SettingsProps) {
 												Cancel
 											</button>
 										</div>
-									</div>
-								)}
-							</div>
-
-							<div class={styles.scanSection}>
-								<Button
-									variant="secondary"
-									loading={isScanning}
-									onClick={handleScanNow}
-								>
-									{isScanning ? 'Scanning...' : 'Scan Now'}
-								</Button>
-								<label
-									class={styles.toggle}
-									title="Re-encode existing movies whose cached transcode doesn't match the encoding settings above"
-								>
-									<input
-										type="checkbox"
-										checked={reEncodeOnScan}
-										onChange={(e) =>
-											setReEncodeOnScan(
-												(e.target as HTMLInputElement).checked,
-											)
-										}
-									/>
-									<span class={styles.toggleTrack} />
-								</label>
-								<span class={styles.settingDescription}>
-									Re-encode movies that don't match current encoding settings
-								</span>
-								{scanResult && (
-									<div class={styles.scanResult}>
-										<span class={styles.scanStat}>
-											{scanResult.filesFound} file
-											{scanResult.filesFound === 1 ? '' : 's'} found
-										</span>
-										{scanResult.filesAdded > 0 && (
-											<span class={styles.scanStatHighlight}>
-												{scanResult.filesAdded} new movie
-												{scanResult.filesAdded === 1 ? '' : 's'} imported
-											</span>
-										)}
-										{scanResult.filesUpdated > 0 && (
-											<span class={styles.scanStat}>
-												{scanResult.filesUpdated} updated
-											</span>
-										)}
-										{scanResult.filesRemoved > 0 && (
-											<span class={styles.scanStat}>
-												{scanResult.filesRemoved} removed
-											</span>
-										)}
-										{scanResult.filesAdded === 0 &&
-											scanResult.filesUpdated === 0 &&
-											scanResult.filesRemoved === 0 && (
-												<span class={styles.scanStat}>
-													Library is up to date
-												</span>
-											)}
 									</div>
 								)}
 							</div>

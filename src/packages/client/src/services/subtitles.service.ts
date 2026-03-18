@@ -28,6 +28,11 @@ export const subtitlesService = {
 		});
 	},
 
+	/** Delete a subtitle track */
+	remove(movieId: string, trackIndex: number): Promise<{ success: boolean }> {
+		return api.delete<{ success: boolean }>(`/subtitles/${movieId}/${trackIndex}`);
+	},
+
 	/** Upload a subtitle file manually */
 	async upload(movieId: string, file: File): Promise<{ subtitle: MovieSubtitleInfo }> {
 		const formData = new FormData();

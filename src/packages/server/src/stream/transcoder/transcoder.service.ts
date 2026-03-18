@@ -267,6 +267,7 @@ export class TranscoderService implements OnModuleDestroy {
 			const ffmpegProcess = (command as any).ffmpegProc;
 			if (ffmpegProcess) {
 				this.activeProcesses.set(sessionId, ffmpegProcess);
+				this.boostProcessPriority(sessionId);
 			}
 		});
 	}
@@ -522,6 +523,30 @@ export class TranscoderService implements OnModuleDestroy {
 				this.logger.warn(`Failed to kill FFmpeg process for session ${sessionId}: ${err}`);
 			}
 			this.activeProcesses.delete(sessionId);
+		}
+	}
+
+	/**
+	 * Attempt to raise the priority of an FFmpeg process for active streaming.
+	 * On Unix: renice to -5 (higher priority). On Windows: wmic to AboveNormal.
+	 * Failures are silently ignored (may require elevated privileges).
+	 */
+	boostProcessPriority(sessionId: string): void {
+		const proc = this.activeProcesses.get(sessionId);
+		if (!proc?.pid) return;
+		try {
+			const { execSync } = require('node:child_process');
+			if (process.platform === 'win32') {
+				execSync(
+					`wmic process where ProcessId=${proc.pid} CALL setpriority "above normal"`,
+					{ stdio: 'ignore' },
+				);
+			} else {
+				execSync(`renice -n -5 -p ${proc.pid}`, { stdio: 'ignore' });
+			}
+			this.logger.debug(`Boosted FFmpeg priority for session ${sessionId} (PID ${proc.pid})`);
+		} catch {
+			// Requires elevated privileges — silently ignore
 		}
 	}
 

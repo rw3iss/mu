@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting } from '@/hooks/useUiSetting';
 import { initAudioEffects } from '@/state/audio-effects.state';
+import { globalMovieId } from '@/state/globalPlayer.state';
 import {
 	currentSession,
 	currentTime,
@@ -24,8 +25,10 @@ const BUFFER_CONFIGS: Record<
 	max: { maxBufferLength: 120, maxMaxBufferLength: 240, maxBufferSize: 250 * 1024 * 1024 },
 };
 
-const MAX_RECOVERIES = 6;
-const RECOVERY_BASE_DELAY_MS = 2000;
+const MAX_RECOVERIES = 12;
+const RECOVERY_BASE_DELAY_MS = 1500;
+/** Max recoveries specifically for 503 (transcoding in progress) — more patient */
+const MAX_503_RECOVERIES = 30;
 
 /** User-facing status message during HLS recovery (e.g. transcoding in progress) */
 type HlsStatus = string | null;
@@ -149,10 +152,22 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		};
 		rafRef.current = requestAnimationFrame(tick);
 
+		// Save position to localStorage for reliable restore
+		const savePositionLocally = (time: number) => {
+			const movieId = globalMovieId.value;
+			if (movieId && time > 0) {
+				try {
+					localStorage.setItem(`mu_position_${movieId}`, String(time));
+				} catch {}
+			}
+		};
+
 		// Progress reporting every 3s
 		progressIntervalRef.current = setInterval(() => {
 			if (isPlaying.value && videoRef.current) {
-				updateProgress(videoRef.current.currentTime);
+				const t = videoRef.current.currentTime;
+				updateProgress(t);
+				savePositionLocally(t);
 			}
 		}, 3000);
 
@@ -161,6 +176,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		// be destroyed by the time beforeunload fires.
 		const sendFinalProgress = () => {
 			const time = videoRef.current?.currentTime ?? latestTimeRef.current;
+			savePositionLocally(time);
+
 			const session = currentSession.value;
 			if (time <= 0 || !session) return;
 			if (session.sessionId.startsWith('remote:')) return;
@@ -307,30 +324,60 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				});
 
 				let networkRecoveries = 0;
+				let transcodingRecoveries = 0;
 				let mediaRecoveries = 0;
+				let lastSuccessTime = Date.now();
+
+				// Reset recovery counters on successful fragment load
+				hls.on(Hls.Events.FRAG_LOADED, () => {
+					networkRecoveries = 0;
+					transcodingRecoveries = 0;
+					lastSuccessTime = Date.now();
+					if (hlsStatus) setHlsStatus(null);
+				});
+
 				hls.on(Hls.Events.ERROR, (_event, data) => {
+					const resp = (data as any).response;
+					const statusCode = resp?.code ?? 0;
+
 					// Non-fatal 503s mean transcoding is in progress — show status
 					if (!data.fatal) {
-						const resp = (data as any).response;
-						if (resp?.code === 503) {
+						if (statusCode === 503) {
 							setHlsStatus('Transcoding in progress...');
 						}
 						return;
 					}
 					const detail = data.details || 'unknown';
-					const response = (data as any).response;
-					const statusCode = response?.code ?? '';
 
 					switch (data.type) {
-						case Hls.ErrorTypes.NETWORK_ERROR:
-							if (networkRecoveries < MAX_RECOVERIES) {
+						case Hls.ErrorTypes.NETWORK_ERROR: {
+							const is503 = statusCode === 503;
+
+							if (is503) {
+								// Transcoding in progress — be very patient
+								transcodingRecoveries++;
+								if (transcodingRecoveries < MAX_503_RECOVERIES) {
+									const delay = Math.min(2000, 500 + transcodingRecoveries * 100);
+									setHlsStatus(
+										`Transcoding in progress... (${transcodingRecoveries})`,
+									);
+									setTimeout(() => {
+										if (hlsRef.current) hls.startLoad();
+									}, delay);
+								} else {
+									// Last resort: try reloading the stream entirely
+									setHlsStatus('Reloading stream...');
+									const pos = video.currentTime;
+									hls.stopLoad();
+									hls.startLoad(pos);
+									transcodingRecoveries = 0;
+								}
+							} else if (networkRecoveries < MAX_RECOVERIES) {
 								networkRecoveries++;
-								const delay = RECOVERY_BASE_DELAY_MS * networkRecoveries;
-								const is503 = statusCode === 503;
+								const delay =
+									RECOVERY_BASE_DELAY_MS * Math.min(networkRecoveries, 4);
 								setHlsStatus(
-									is503
-										? 'Transcoding in progress...'
-										: `Loading video... (retry ${networkRecoveries}/${MAX_RECOVERIES})`,
+									`Loading video... (retry ${networkRecoveries}/${MAX_RECOVERIES})`,
 								);
 								console.warn(
 									`[HLS] Network error, recovery ${networkRecoveries}/${MAX_RECOVERIES} in ${delay}ms`,
@@ -339,14 +386,41 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 									if (hlsRef.current) hls.startLoad();
 								}, delay);
 							} else {
-								setHlsStatus(null);
-								const msg = `Network error: unable to load video segments (${detail}${statusCode ? `, HTTP ${statusCode}` : ''})`;
-								console.error(`[HLS] ${msg}`);
-								setPlaybackError(msg);
+								// All recoveries exhausted — last resort: full reload from current position
+								const pos = video.currentTime;
+								setHlsStatus('Reloading stream...');
+								console.warn(
+									'[HLS] All recoveries exhausted, reloading stream from',
+									pos,
+								);
 								hls.destroy();
 								hlsRef.current = null;
+
+								// Recreate HLS and reload
+								const newHls = new Hls({
+									startPosition: pos,
+									enableWorker: true,
+									lowLatencyMode: false,
+									maxBufferLength: bufferConfig.maxBufferLength,
+									maxMaxBufferLength: bufferConfig.maxMaxBufferLength,
+									maxBufferSize: bufferConfig.maxBufferSize,
+									xhrSetup(xhr) {
+										if (token)
+											xhr.setRequestHeader(
+												'Authorization',
+												`Bearer ${token}`,
+											);
+									},
+								});
+								newHls.loadSource(streamUrl);
+								newHls.attachMedia(video);
+								hlsRef.current = newHls;
+								networkRecoveries = 0;
+								transcodingRecoveries = 0;
+								setHlsStatus(null);
 							}
 							break;
+						}
 						case Hls.ErrorTypes.MEDIA_ERROR:
 							if (mediaRecoveries < MAX_RECOVERIES) {
 								mediaRecoveries++;
@@ -413,14 +487,36 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const seek = useCallback((time: number) => {
 		const video = videoRef.current;
 		if (!video) return;
+
+		// If src is deferred (direct play, paused on restore), load it first
+		if (deferredSrcRef.current) {
+			const { url } = deferredSrcRef.current;
+			deferredSrcRef.current = null;
+			video.src = url;
+		}
+
 		seekLockRef.current = true;
-		video.currentTime = time;
+		// Use fastSeek for smoother scrubbing (snaps to nearest keyframe)
+		if (typeof video.fastSeek === 'function') {
+			video.fastSeek(time);
+		} else {
+			video.currentTime = time;
+		}
 		currentTime.value = time;
 		lastDisplayTime.current = time;
+		latestTimeRef.current = time;
 		if (seekLockTimerRef.current) clearTimeout(seekLockTimerRef.current);
 		seekLockTimerRef.current = setTimeout(() => {
 			seekLockRef.current = false;
-		}, 150);
+		}, 100);
+
+		// Save position locally so it persists
+		const movieId = globalMovieId.value;
+		if (movieId && time > 0) {
+			try {
+				localStorage.setItem(`mu_position_${movieId}`, String(time));
+			} catch {}
+		}
 	}, []);
 
 	const destroy = useCallback(() => {

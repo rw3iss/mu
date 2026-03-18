@@ -23,6 +23,7 @@ import {
 	isPlaying,
 	startStream,
 	streamError,
+	subtitleTrack,
 	volume,
 } from '@/state/player.state';
 import { sharedVideoEngine } from '@/state/videoEngineRef';
@@ -179,6 +180,7 @@ export async function playMovie(
 	}
 	// Clear stale state synchronously before setting new movie
 	currentSession.value = null;
+	subtitleTrack.value = null;
 
 	// Set up new movie — keep mini mode if already minimized
 	globalMovieId.value = movieId;
@@ -377,6 +379,19 @@ export function initGlobalPlayer(): void {
 			currentSession.value = { ...saved.session, startPosition: saved.currentTime };
 		} else {
 			currentSession.value = null;
+		}
+
+		// Use the best available position: compare saved state vs per-movie localStorage
+		let bestPosition = saved.currentTime || 0;
+		try {
+			const localPos = parseFloat(
+				localStorage.getItem(`mu_position_${saved.movieId}`) || '0',
+			);
+			if (localPos > bestPosition) bestPosition = localPos;
+		} catch {}
+
+		if (bestPosition > 0) {
+			forceStartPosition.value = bestPosition;
 		}
 	} catch {
 		localStorage.removeItem(STORAGE_KEY);

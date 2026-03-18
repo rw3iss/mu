@@ -7,6 +7,7 @@ import {
 	BadRequestException,
 	Body,
 	Controller,
+	Delete,
 	Get,
 	Logger,
 	NotFoundException,
@@ -296,6 +297,83 @@ export class SubtitleManageController {
 		};
 	}
 
+	/**
+	 * DELETE /subtitles/:movieId/:trackIndex — Delete a subtitle track
+	 */
+	@Delete(':movieId/:trackIndex')
+	async deleteSubtitle(
+		@Param('movieId') movieId: string,
+		@Param('trackIndex') trackIndex: string,
+	): Promise<{ success: boolean }> {
+		const idx = parseInt(trackIndex, 10);
+		if (Number.isNaN(idx) || idx < 0) {
+			throw new BadRequestException('Invalid track index');
+		}
+
+		const remote = this.parseRemoteId(movieId);
+		if (remote) {
+			return this.proxyRemoteDelete(
+				remote.serverId,
+				`/shared/subtitles/${remote.remoteMovieId}/${trackIndex}`,
+			);
+		}
+
+		// Use any file for this movie (even unavailable ones) since we're just deleting subtitles
+		const file = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, movieId))
+			.get();
+		if (!file) throw new NotFoundException(`No file found for movie ${movieId}`);
+
+		const tracks = this.parseSubtitleTracks(file.subtitleTracks);
+		const track = tracks.find((t: any) => t.index === idx);
+		if (!track) throw new NotFoundException(`Track ${idx} not found`);
+
+		// Delete the cached VTT file
+		const vttPath = this.subtitleService.getSubtitleFile(file.id, idx);
+		try {
+			const { unlink } = await import('node:fs/promises');
+			await unlink(vttPath);
+		} catch {
+			/* file may not exist */
+		}
+
+		// If it's an external subtitle, also delete the source file
+		if (track.external) {
+			const movieDir = path.dirname(file.filePath);
+			const baseName = path.basename(file.filePath, path.extname(file.filePath));
+			const lang = track.language || 'en';
+			const exts = ['.srt', '.vtt', '.ass', '.ssa', '.sub'];
+			for (const ext of exts) {
+				for (const pattern of [`${baseName}.${lang}${ext}`, `${baseName}.${lang}.${ext}`]) {
+					try {
+						const { unlink } = await import('node:fs/promises');
+						await unlink(path.join(movieDir, pattern));
+						this.logger.log(`Deleted subtitle file: ${pattern}`);
+					} catch {
+						/* file doesn't match this pattern */
+					}
+				}
+			}
+		}
+
+		// Remove from DB tracks and re-index
+		const remaining = tracks.filter((t: any) => t.index !== idx);
+		remaining.forEach((t: any, i: number) => {
+			t.index = i;
+		});
+		await this.updateSubtitleTracks(file.id, remaining);
+
+		// Re-extract to rebuild VTT cache with correct indices
+		await this.subtitleService.clearCache(file.id);
+		await this.subtitleService.extractSubtitles(file.filePath, file.id).catch(() => {
+			// If ffprobe unavailable, just keep the DB state we already set
+		});
+
+		return { success: true };
+	}
+
 	// ── Remote helpers ──
 
 	private parseRemoteId(movieId: string): { serverId: string; remoteMovieId: string } | null {
@@ -367,6 +445,20 @@ export class SubtitleManageController {
 		if (!response.ok) {
 			const text = await response.text().catch(() => '');
 			throw new BadGatewayException(`Remote server error ${response.status}: ${text}`);
+		}
+		return (await response.json()) as T;
+	}
+
+	private async proxyRemoteDelete<T>(serverId: string, remotePath: string): Promise<T> {
+		const { baseUrl, headers } = this.getRemoteAuth(serverId);
+		const response = await fetch(`${baseUrl}/api/v1${remotePath}`, {
+			method: 'DELETE',
+			headers,
+			signal: AbortSignal.timeout(15000),
+		});
+		if (!response.ok) {
+			const body = await response.text().catch(() => '');
+			throw new BadGatewayException(`Remote server error ${response.status}: ${body}`);
 		}
 		return (await response.json()) as T;
 	}

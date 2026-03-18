@@ -127,7 +127,7 @@ export function App() {
 	return (
 		<div>
 			<Toast />
-			<GlobalPlayer />
+			{!isAuthRoute && <GlobalPlayer />}
 			{isAuthRoute || isPlayerRoute ? (
 				<Router onChange={handleRouteChange}>
 					<Login path="/login" />

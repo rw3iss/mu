@@ -65,8 +65,13 @@
   );
 }
 
-.content {
+.innerWrap {
   position: relative;
+  max-width: 1920px;
+  margin: 0 auto;
+}
+
+.content {
   display: flex;
   gap: var(--space-2xl);
   padding-top: var(--space-2xl);
@@ -110,7 +115,7 @@
 .infoColumn {
   flex: 1;
   min-width: 0;
-  padding-bottom: var(--space-4xl);
+  padding-bottom: calc(var(--space-4xl) + 30px);
 }
 
 .playlistsColumn {

@@ -75,6 +75,10 @@ export const moviesService = {
 		return api.post<void>(`/movies/${movieId}/refresh`);
 	},
 
+	clearMetadata(movieId: string): Promise<void> {
+		return api.post<void>(`/movies/${movieId}/clear-metadata`);
+	},
+
 	/**
 	 * Get recently added movies
 	 */

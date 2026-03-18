@@ -38,11 +38,9 @@ export function VideoPlayer({
 	const internalEngine = useVideoEngine(!externalEngine);
 	const engine = externalEngine ?? internalEngine;
 
-	// Move video element into our container (preserving play state)
+	// Add click/dblclick handlers to the video element
 	useEffect(() => {
-		if (containerRef.current && engine.videoRef.current) {
-			engine.moveVideoTo(containerRef.current);
-
+		if (engine.videoRef.current) {
 			// Add click/dblclick handlers to the video element.
 			// Delay single-click (toggle play) so a double-click (fullscreen)
 			// can cancel it, preventing the pause/unpause flicker.

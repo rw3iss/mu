@@ -116,7 +116,10 @@ export const searchQuery = signal('');
 export const viewMode = signal<ViewMode>('grid');
 export const showHidden = signal(false);
 export const localOnly = signal(localStorage.getItem('mu_local_only') === 'true');
+/** Server filter: 'all' | 'local' | serverId */
+export const serverFilter = signal(localStorage.getItem('mu_server_filter') || 'all');
 export const hasRemoteServers = signal(false);
+export const remoteServerList = signal<{ id: string; name: string }[]>([]);
 
 export const filters = signal<LibraryFilters>({
 	genres: [],
@@ -166,8 +169,9 @@ export async function fetchMovies(page = 1): Promise<void> {
 			params.showHidden = 'true';
 		}
 
-		if (localOnly.value) {
-			params.server = 'local';
+		const sf = serverFilter.value;
+		if (sf && sf !== 'all') {
+			params.server = sf;
 		}
 
 		const response = await moviesService.list(params);
@@ -175,9 +179,11 @@ export async function fetchMovies(page = 1): Promise<void> {
 		totalMovies.value = response.total;
 		hiddenCount.value = response.hiddenCount ?? 0;
 
-		// Track whether remote servers exist
-		if ((response as any).remoteServers?.length > 0) {
+		// Track remote servers
+		const rs = (response as any).remoteServers;
+		if (rs?.length > 0) {
 			hasRemoteServers.value = true;
+			remoteServerList.value = rs.map((s: any) => ({ id: s.id, name: s.name }));
 		}
 	} catch (error) {
 		console.error('Failed to fetch movies:', error);
@@ -225,6 +231,32 @@ export function toggleLocalOnly(): void {
 	localOnly.value = !localOnly.value;
 	localStorage.setItem('mu_local_only', String(localOnly.value));
 	fetchMovies(1);
+}
+
+export function setServerFilter(value: string): void {
+	serverFilter.value = value;
+	localStorage.setItem('mu_server_filter', value);
+	// Sync legacy localOnly for compatibility
+	localOnly.value = value === 'local';
+	localStorage.setItem('mu_local_only', String(value === 'local'));
+	fetchMovies(1);
+}
+
+export async function initRemoteServers(): Promise<void> {
+	try {
+		const { api } = await import('@/services/api');
+		const servers =
+			await api.get<{ id: string; name: string; url: string; enabled: boolean }[]>(
+				'/remote/servers',
+			);
+		const enabled = servers.filter((s) => s.enabled);
+		if (enabled.length > 0) {
+			hasRemoteServers.value = true;
+			remoteServerList.value = enabled.map((s) => ({ id: s.id, name: s.name }));
+		}
+	} catch {
+		// Remote servers not available
+	}
 }
 
 export function initSortPrefs(): void {

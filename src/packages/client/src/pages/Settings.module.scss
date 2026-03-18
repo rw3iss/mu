@@ -454,6 +454,14 @@
   flex-wrap: wrap;
 }
 
+.scanRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg) 0;
+  flex-wrap: wrap;
+}
+
 .scanResult {
   display: flex;
   align-items: center;

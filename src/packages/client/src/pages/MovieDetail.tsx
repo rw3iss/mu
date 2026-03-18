@@ -275,476 +275,506 @@ export function MovieDetail({ id }: MovieDetailProps) {
 				</div>
 			)}
 
-			{/* Back button */}
-			<button
-				class={styles.backButton}
-				onClick={() => route('/library')}
-				aria-label="Back to Library"
-			>
-				{'\u2190'} Library
-			</button>
+			{/* Inner content — max-width constrained */}
+			<div class={styles.innerWrap}>
+				{/* Back button */}
+				<button
+					class={styles.backButton}
+					onClick={() => route('/library')}
+					aria-label="Back to Library"
+				>
+					{'\u2190'} Library
+				</button>
 
-			{/* Content */}
-			<div class={styles.content}>
-				{/* Poster */}
-				<div class={styles.posterColumn}>
-					{movie.posterUrl ? (
-						<img
-							src={movie.posterUrl}
-							alt={`${movie.title} poster`}
-							class={styles.poster}
-						/>
-					) : (
-						<div class={styles.posterPlaceholder}>{(movie.title ?? '?').charAt(0)}</div>
-					)}
-				</div>
-
-				{/* Info */}
-				<div class={styles.infoColumn}>
-					{/* Title */}
-					{!isRemote && editingTitle ? (
-						<div class={styles.titleEditRow}>
-							<input
-								ref={titleInputRef}
-								type="text"
-								class={styles.titleInput}
-								value={titleDraft}
-								onInput={(e) => setTitleDraft((e.target as HTMLInputElement).value)}
-								onKeyDown={handleTitleKeyDown}
-								disabled={isSavingTitle}
+				{/* Content */}
+				<div class={styles.content}>
+					{/* Poster */}
+					<div class={styles.posterColumn}>
+						{movie.posterUrl ? (
+							<img
+								src={movie.posterUrl}
+								alt={`${movie.title} poster`}
+								class={styles.poster}
 							/>
-							<button
-								class={styles.titleSaveBtn}
-								onClick={saveTitle}
-								disabled={isSavingTitle}
-								aria-label="Save title"
-							>
-								{isSavingTitle ? '\u2026' : '\u2713'}
-							</button>
-							<button
-								class={styles.titleCancelBtn}
-								onClick={cancelEditingTitle}
-								disabled={isSavingTitle}
-								aria-label="Cancel editing"
-							>
-								{'\u2715'}
-							</button>
-						</div>
-					) : isRemote ? (
-						<h1 class={styles.title}>{movie.title}</h1>
-					) : (
-						<div class={styles.titleRow} onClick={startEditingTitle}>
-							<h1 class={styles.title}>{movie.title}</h1>
-							<span class={styles.titleEditIcon}>{'\u270E'}</span>
-						</div>
-					)}
-
-					{movie.tagline && <p class={styles.tagline}>{movie.tagline}</p>}
-
-					<div class={styles.meta}>
-						{movie.contentRating && (
-							<span class={styles.contentRatingBadge}>{movie.contentRating}</span>
-						)}
-						{movie.year > 0 && <span>{movie.year}</span>}
-						{movie.hidden && <span class={styles.hiddenBadge}>Hidden</span>}
-						{isRemote && movie.remoteOrigin && (
-							<span class={styles.remoteBadge}>{movie.remoteOrigin.serverName}</span>
-						)}
-						{runtimeText && <span>{runtimeText}</span>}
-						{movie.director && <span>Dir. {movie.director}</span>}
-					</div>
-
-					{/* Genres */}
-					{movie.genres && movie.genres.length > 0 && (
-						<div class={styles.genres}>
-							{movie.genres.map((genre) => (
-								<span key={genre} class={styles.genreTag}>
-									{genre}
-								</span>
-							))}
-						</div>
-					)}
-
-					{/* Ratings */}
-					<div class={styles.ratings}>
-						{!isRemote && (
-							<div class={styles.userRating}>
-								<span class={styles.ratingLabel}>Your Rating</span>
-								<RatingWidget
-									value={movie.rating}
-									editable
-									onChange={handleRate}
-									size="lg"
-								/>
-							</div>
-						)}
-						<ExternalRatings
-							imdbRating={movie.imdbRating}
-							rtRating={movie.rtRating}
-							metacriticRating={movie.metacriticRating}
-						/>
-						<PluginSlot name={UI.MOVIE_PAGE_RATING} context={{ movie }} />
-					</div>
-
-					{/* Actions */}
-					<div class={styles.actions}>
-						{movie.status === 'processing' && !isRemote ? (
-							<div class={styles.processingStatus}>
-								<Spinner size="sm" />
-								<span>Processing...</span>
-								<Button variant="ghost" size="lg" onClick={handleCancelProcessing}>
-									{'\u2715'} Cancel
-								</Button>
-							</div>
-						) : hasWatchProgress(movie) ? (
-							<div class={styles.playGroup}>
-								<div class={styles.hybridBtn}>
-									<button
-										class={styles.hybridPlay}
-										onClick={handlePlay}
-										aria-label="Play from beginning"
-									>
-										{'\u25B6'}
-									</button>
-									<button class={styles.hybridResume} onClick={handleResume}>
-										Resume
-									</button>
-								</div>
-								<div class={styles.playProgressBar}>
-									<div
-										class={styles.playProgressFill}
-										style={{ width: `${getWatchPercent(movie)}%` }}
-									/>
-								</div>
-							</div>
 						) : (
-							<Button variant="primary" size="lg" onClick={handlePlay}>
-								{'\u25B6'} Play
-							</Button>
-						)}
-						{!isRemote && (
-							<Button
-								variant={inWatchlist ? 'secondary' : 'ghost'}
-								size="lg"
-								onClick={handleWatchlistToggle}
-							>
-								{inWatchlist ? '\u2713 In Watchlist' : '\u2606 Watchlist'}
-							</Button>
-						)}
-						{!isRemote && (
-							<MovieOptionsMenu movie={movie} onMovieUpdate={handleMovieUpdate} />
+							<div class={styles.posterPlaceholder}>
+								{(movie.title ?? '?').charAt(0)}
+							</div>
 						)}
 					</div>
 
-					{/* Overview */}
-					{movie.overview && (
-						<div class={styles.overviewSection}>
-							<h2 class={styles.sectionTitle}>Overview</h2>
-							<p class={styles.overview}>{movie.overview}</p>
-						</div>
-					)}
-
-					{/* Details */}
-					{(movie.writers?.length ||
-						movie.productionCompanies?.length ||
-						movie.budget ||
-						movie.revenue ||
-						movie.language ||
-						movie.releaseDate ||
-						movie.trailerUrl) && (
-						<div class={styles.detailsSection}>
-							<h2 class={styles.sectionTitle}>Details</h2>
-							<div class={styles.detailsGrid}>
-								{movie.writers && movie.writers.length > 0 && (
-									<>
-										<span class={styles.detailLabel}>Writers</span>
-										<span class={styles.detailValue}>
-											{movie.writers.join(', ')}
-										</span>
-									</>
-								)}
-								{movie.releaseDate && (
-									<>
-										<span class={styles.detailLabel}>Release Date</span>
-										<span class={styles.detailValue}>
-											{new Date(movie.releaseDate).toLocaleDateString(
-												undefined,
-												{ year: 'numeric', month: 'long', day: 'numeric' },
-											)}
-										</span>
-									</>
-								)}
-								{movie.language && (
-									<>
-										<span class={styles.detailLabel}>Language</span>
-										<span class={styles.detailValue}>
-											{movie.language.toUpperCase()}
-										</span>
-									</>
-								)}
-								{movie.country && (
-									<>
-										<span class={styles.detailLabel}>Country</span>
-										<span class={styles.detailValue}>{movie.country}</span>
-									</>
-								)}
-								{movie.productionCompanies &&
-									movie.productionCompanies.length > 0 && (
-										<>
-											<span class={styles.detailLabel}>Production</span>
-											<span class={styles.detailValue}>
-												{movie.productionCompanies.join(', ')}
-											</span>
-										</>
-									)}
-								{movie.budget != null && movie.budget > 0 && (
-									<>
-										<span class={styles.detailLabel}>Budget</span>
-										<span class={styles.detailValue}>
-											${(movie.budget / 1_000_000).toFixed(0)}M
-										</span>
-									</>
-								)}
-								{movie.revenue != null && movie.revenue > 0 && (
-									<>
-										<span class={styles.detailLabel}>Box Office</span>
-										<span class={styles.detailValue}>
-											${(movie.revenue / 1_000_000).toFixed(1)}M
-										</span>
-									</>
-								)}
-								{movie.trailerUrl && (
-									<>
-										<span class={styles.detailLabel}>Trailer</span>
-										<span class={styles.detailValue}>
-											<a
-												href={movie.trailerUrl}
-												target="_blank"
-												rel="noopener noreferrer"
-												class={styles.trailerLink}
-											>
-												Watch on YouTube
-											</a>
-										</span>
-									</>
-								)}
+					{/* Info */}
+					<div class={styles.infoColumn}>
+						{/* Title */}
+						{!isRemote && editingTitle ? (
+							<div class={styles.titleEditRow}>
+								<input
+									ref={titleInputRef}
+									type="text"
+									class={styles.titleInput}
+									value={titleDraft}
+									onInput={(e) =>
+										setTitleDraft((e.target as HTMLInputElement).value)
+									}
+									onKeyDown={handleTitleKeyDown}
+									disabled={isSavingTitle}
+								/>
+								<button
+									class={styles.titleSaveBtn}
+									onClick={saveTitle}
+									disabled={isSavingTitle}
+									aria-label="Save title"
+								>
+									{isSavingTitle ? '\u2026' : '\u2713'}
+								</button>
+								<button
+									class={styles.titleCancelBtn}
+									onClick={cancelEditingTitle}
+									disabled={isSavingTitle}
+									aria-label="Cancel editing"
+								>
+									{'\u2715'}
+								</button>
 							</div>
-						</div>
-					)}
+						) : isRemote ? (
+							<h1 class={styles.title}>{movie.title}</h1>
+						) : (
+							<div class={styles.titleRow} onClick={startEditingTitle}>
+								<h1 class={styles.title}>{movie.title}</h1>
+								<span class={styles.titleEditIcon}>{'\u270E'}</span>
+							</div>
+						)}
 
-					{/* Keywords */}
-					{movie.keywords && movie.keywords.length > 0 && (
-						<div class={styles.keywordsSection}>
+						{movie.tagline && <p class={styles.tagline}>{movie.tagline}</p>}
+
+						<div class={styles.meta}>
+							{movie.contentRating && (
+								<span class={styles.contentRatingBadge}>{movie.contentRating}</span>
+							)}
+							{movie.year > 0 && <span>{movie.year}</span>}
+							{movie.hidden && <span class={styles.hiddenBadge}>Hidden</span>}
+							{isRemote && movie.remoteOrigin && (
+								<span class={styles.remoteBadge}>
+									{movie.remoteOrigin.serverName}
+								</span>
+							)}
+							{runtimeText && <span>{runtimeText}</span>}
+							{movie.director && <span>Dir. {movie.director}</span>}
+						</div>
+
+						{/* Genres */}
+						{movie.genres && movie.genres.length > 0 && (
 							<div class={styles.genres}>
-								{movie.keywords.map((kw) => (
-									<span key={kw} class={styles.keywordTag}>
-										{kw}
+								{movie.genres.map((genre) => (
+									<span key={genre} class={styles.genreTag}>
+										{genre}
 									</span>
 								))}
 							</div>
-						</div>
-					)}
+						)}
 
-					{/* Cast */}
-					{movie.cast && movie.cast.length > 0 && (
-						<div class={styles.castSection}>
-							<h2 class={styles.sectionTitle}>Cast</h2>
-							<div class={styles.castGrid}>
-								{movie.cast.slice(0, 12).map((member) => (
-									<div key={member.name} class={styles.castMember}>
-										<div class={styles.castAvatar}>
-											{member.profileUrl ? (
-												<img src={member.profileUrl} alt={member.name} />
-											) : (
-												<span>{member.name.charAt(0)}</span>
+						{/* Ratings */}
+						<div class={styles.ratings}>
+							{!isRemote && (
+								<div class={styles.userRating}>
+									<span class={styles.ratingLabel}>Your Rating</span>
+									<RatingWidget
+										value={movie.rating}
+										editable
+										onChange={handleRate}
+										size="lg"
+									/>
+								</div>
+							)}
+							<ExternalRatings
+								imdbRating={movie.imdbRating}
+								rtRating={movie.rtRating}
+								metacriticRating={movie.metacriticRating}
+							/>
+							<PluginSlot name={UI.MOVIE_PAGE_RATING} context={{ movie }} />
+						</div>
+
+						{/* Actions */}
+						<div class={styles.actions}>
+							{movie.status === 'processing' && !isRemote ? (
+								<div class={styles.processingStatus}>
+									<Spinner size="sm" />
+									<span>Processing...</span>
+									<Button
+										variant="ghost"
+										size="lg"
+										onClick={handleCancelProcessing}
+									>
+										{'\u2715'} Cancel
+									</Button>
+								</div>
+							) : hasWatchProgress(movie) ? (
+								<div class={styles.playGroup}>
+									<div class={styles.hybridBtn}>
+										<button
+											class={styles.hybridPlay}
+											onClick={handlePlay}
+											aria-label="Play from beginning"
+										>
+											{'\u25B6'}
+										</button>
+										<button class={styles.hybridResume} onClick={handleResume}>
+											Resume
+										</button>
+									</div>
+									<div class={styles.playProgressBar}>
+										<div
+											class={styles.playProgressFill}
+											style={{ width: `${getWatchPercent(movie)}%` }}
+										/>
+									</div>
+								</div>
+							) : (
+								<Button variant="primary" size="lg" onClick={handlePlay}>
+									{'\u25B6'} Play
+								</Button>
+							)}
+							{!isRemote && (
+								<Button
+									variant={inWatchlist ? 'secondary' : 'ghost'}
+									size="lg"
+									onClick={handleWatchlistToggle}
+								>
+									{inWatchlist ? '\u2713 In Watchlist' : '\u2606 Watchlist'}
+								</Button>
+							)}
+							{!isRemote && (
+								<MovieOptionsMenu movie={movie} onMovieUpdate={handleMovieUpdate} />
+							)}
+						</div>
+
+						{/* Overview */}
+						{movie.overview && (
+							<div class={styles.overviewSection}>
+								<h2 class={styles.sectionTitle}>Overview</h2>
+								<p class={styles.overview}>{movie.overview}</p>
+							</div>
+						)}
+
+						{/* Details */}
+						{(movie.writers?.length ||
+							movie.productionCompanies?.length ||
+							movie.budget ||
+							movie.revenue ||
+							movie.language ||
+							movie.releaseDate ||
+							movie.trailerUrl) && (
+							<div class={styles.detailsSection}>
+								<h2 class={styles.sectionTitle}>Details</h2>
+								<div class={styles.detailsGrid}>
+									{movie.writers && movie.writers.length > 0 && (
+										<>
+											<span class={styles.detailLabel}>Writers</span>
+											<span class={styles.detailValue}>
+												{movie.writers.join(', ')}
+											</span>
+										</>
+									)}
+									{movie.releaseDate && (
+										<>
+											<span class={styles.detailLabel}>Release Date</span>
+											<span class={styles.detailValue}>
+												{new Date(movie.releaseDate).toLocaleDateString(
+													undefined,
+													{
+														year: 'numeric',
+														month: 'long',
+														day: 'numeric',
+													},
+												)}
+											</span>
+										</>
+									)}
+									{movie.language && (
+										<>
+											<span class={styles.detailLabel}>Language</span>
+											<span class={styles.detailValue}>
+												{movie.language.toUpperCase()}
+											</span>
+										</>
+									)}
+									{movie.country && (
+										<>
+											<span class={styles.detailLabel}>Country</span>
+											<span class={styles.detailValue}>{movie.country}</span>
+										</>
+									)}
+									{movie.productionCompanies &&
+										movie.productionCompanies.length > 0 && (
+											<>
+												<span class={styles.detailLabel}>Production</span>
+												<span class={styles.detailValue}>
+													{movie.productionCompanies.join(', ')}
+												</span>
+											</>
+										)}
+									{movie.budget != null && movie.budget > 0 && (
+										<>
+											<span class={styles.detailLabel}>Budget</span>
+											<span class={styles.detailValue}>
+												${(movie.budget / 1_000_000).toFixed(0)}M
+											</span>
+										</>
+									)}
+									{movie.revenue != null && movie.revenue > 0 && (
+										<>
+											<span class={styles.detailLabel}>Box Office</span>
+											<span class={styles.detailValue}>
+												${(movie.revenue / 1_000_000).toFixed(1)}M
+											</span>
+										</>
+									)}
+									{movie.trailerUrl && (
+										<>
+											<span class={styles.detailLabel}>Trailer</span>
+											<span class={styles.detailValue}>
+												<a
+													href={movie.trailerUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													class={styles.trailerLink}
+												>
+													Watch on YouTube
+												</a>
+											</span>
+										</>
+									)}
+								</div>
+							</div>
+						)}
+
+						{/* Keywords */}
+						{movie.keywords && movie.keywords.length > 0 && (
+							<div class={styles.keywordsSection}>
+								<div class={styles.genres}>
+									{movie.keywords.map((kw) => (
+										<span key={kw} class={styles.keywordTag}>
+											{kw}
+										</span>
+									))}
+								</div>
+							</div>
+						)}
+
+						{/* Cast */}
+						{movie.cast && movie.cast.length > 0 && (
+							<div class={styles.castSection}>
+								<h2 class={styles.sectionTitle}>Cast</h2>
+								<div class={styles.castGrid}>
+									{movie.cast.slice(0, 12).map((member) => (
+										<div key={member.name} class={styles.castMember}>
+											<div class={styles.castAvatar}>
+												{member.profileUrl ? (
+													<img
+														src={member.profileUrl}
+														alt={member.name}
+													/>
+												) : (
+													<span>{member.name.charAt(0)}</span>
+												)}
+											</div>
+											<div class={styles.castInfo}>
+												<span class={styles.castName}>{member.name}</span>
+												<span class={styles.castCharacter}>
+													{member.character}
+												</span>
+											</div>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+
+						{/* Play Settings (local only) */}
+						{!isRemote && (
+							<div class={styles.fileInfoSection}>
+								<button
+									class={styles.fileInfoToggle}
+									onClick={() => setShowPlaySettings(!showPlaySettings)}
+								>
+									<h2 class={styles.sectionTitle}>Play Settings</h2>
+									<span class={styles.fileInfoArrow}>
+										{showPlaySettings ? '\u25B2' : '\u25BC'}
+									</span>
+								</button>
+
+								{showPlaySettings && (
+									<div class={styles.fileInfoContent}>
+										<p class={styles.playSettingsDescription}>
+											Override default audio settings when playing this movie.
+										</p>
+										<div class={styles.playSettingsGrid}>
+											<label class={styles.playSettingsLabel}>
+												EQ Profile
+											</label>
+											<select
+												class={styles.playSettingsSelect}
+												value={selectedEqProfile}
+												onChange={(e) => {
+													const val = (e.target as HTMLSelectElement)
+														.value;
+													setSelectedEqProfile(val);
+													updatePlaySetting('eqProfileId', val || null);
+												}}
+											>
+												<option value="">None (use default)</option>
+												{audioProfiles
+													.filter(
+														(p) => p.type === 'eq' || p.type === 'full',
+													)
+													.map((p) => (
+														<option key={p.id} value={p.id}>
+															{p.name}
+														</option>
+													))}
+											</select>
+
+											<label class={styles.playSettingsLabel}>
+												Compressor Profile
+											</label>
+											<select
+												class={styles.playSettingsSelect}
+												value={selectedCompProfile}
+												onChange={(e) => {
+													const val = (e.target as HTMLSelectElement)
+														.value;
+													setSelectedCompProfile(val);
+													updatePlaySetting(
+														'compressorProfileId',
+														val || null,
+													);
+												}}
+											>
+												<option value="">None (use default)</option>
+												{audioProfiles
+													.filter(
+														(p) =>
+															p.type === 'compressor' ||
+															p.type === 'full',
+													)
+													.map((p) => (
+														<option key={p.id} value={p.id}>
+															{p.name}
+														</option>
+													))}
+											</select>
+
+											<label class={styles.playSettingsLabel}>
+												Video Profile
+											</label>
+											<select
+												class={styles.playSettingsSelect}
+												value={selectedVideoProfile}
+												onChange={(e) => {
+													const val = (e.target as HTMLSelectElement)
+														.value;
+													setSelectedVideoProfile(val);
+													updatePlaySetting(
+														'videoProfileId',
+														val || null,
+													);
+												}}
+											>
+												<option value="">None (use default)</option>
+												{audioProfiles
+													.filter((p) => p.type === 'video')
+													.map((p) => (
+														<option key={p.id} value={p.id}>
+															{p.name}
+														</option>
+													))}
+											</select>
+										</div>
+									</div>
+								)}
+							</div>
+						)}
+
+						{/* File Info (local only) */}
+						{!isRemote && movie.fileInfo && (
+							<div class={styles.fileInfoSection}>
+								<button
+									class={styles.fileInfoToggle}
+									onClick={() => setShowFileInfo(!showFileInfo)}
+								>
+									<h2 class={styles.sectionTitle}>File Info</h2>
+									<span class={styles.fileInfoArrow}>
+										{showFileInfo ? '\u25B2' : '\u25BC'}
+									</span>
+								</button>
+
+								{showFileInfo && (
+									<div class={styles.fileInfoContent}>
+										<FileInfoGrid movie={movie} />
+
+										{/* Subtitles */}
+										<div class={styles.trackSection}>
+											<button
+												class={styles.subtitleToggle}
+												onClick={() => setShowSubtitles(!showSubtitles)}
+											>
+												{movie.fileInfo.subtitleTracks.length > 0
+													? `${movie.fileInfo.subtitleTracks.length} subtitle${movie.fileInfo.subtitleTracks.length === 1 ? '' : 's'} found`
+													: 'No subtitles found'}
+												<span class={styles.fileInfoArrow}>
+													{showSubtitles ? '\u25B2' : '\u25BC'}
+												</span>
+											</button>
+											{showSubtitles && (
+												<div class={styles.subtitlePanelWrap}>
+													<SubtitlePanel
+														movieId={movie.id}
+														existingTracks={(
+															movie.fileInfo?.subtitleTracks ?? []
+														).map((t) => ({
+															index: t.index,
+															language: t.language || 'und',
+															label:
+																t.title ||
+																t.language ||
+																`Track ${t.index}`,
+															codec: t.codec,
+															forced: t.forced,
+															external: t.external,
+														}))}
+														onSubtitlesChanged={async () => {
+															const data = await moviesService.get(
+																movie.id,
+															);
+															setMovie(data);
+														}}
+													/>
+												</div>
 											)}
 										</div>
-										<div class={styles.castInfo}>
-											<span class={styles.castName}>{member.name}</span>
-											<span class={styles.castCharacter}>
-												{member.character}
-											</span>
-										</div>
 									</div>
-								))}
+								)}
 							</div>
-						</div>
-					)}
+						)}
 
-					{/* Play Settings (local only) */}
-					{!isRemote && (
-						<div class={styles.fileInfoSection}>
-							<button
-								class={styles.fileInfoToggle}
-								onClick={() => setShowPlaySettings(!showPlaySettings)}
-							>
-								<h2 class={styles.sectionTitle}>Play Settings</h2>
-								<span class={styles.fileInfoArrow}>
-									{showPlaySettings ? '\u25B2' : '\u25BC'}
-								</span>
-							</button>
+						<PluginSlot name={UI.MOVIE_PAGE_CONTENT} context={{ movie }} />
+					</div>
 
-							{showPlaySettings && (
-								<div class={styles.fileInfoContent}>
-									<p class={styles.playSettingsDescription}>
-										Override default audio settings when playing this movie.
-									</p>
-									<div class={styles.playSettingsGrid}>
-										<label class={styles.playSettingsLabel}>EQ Profile</label>
-										<select
-											class={styles.playSettingsSelect}
-											value={selectedEqProfile}
-											onChange={(e) => {
-												const val = (e.target as HTMLSelectElement).value;
-												setSelectedEqProfile(val);
-												updatePlaySetting('eqProfileId', val || null);
-											}}
-										>
-											<option value="">None (use default)</option>
-											{audioProfiles
-												.filter((p) => p.type === 'eq' || p.type === 'full')
-												.map((p) => (
-													<option key={p.id} value={p.id}>
-														{p.name}
-													</option>
-												))}
-										</select>
-
-										<label class={styles.playSettingsLabel}>
-											Compressor Profile
-										</label>
-										<select
-											class={styles.playSettingsSelect}
-											value={selectedCompProfile}
-											onChange={(e) => {
-												const val = (e.target as HTMLSelectElement).value;
-												setSelectedCompProfile(val);
-												updatePlaySetting(
-													'compressorProfileId',
-													val || null,
-												);
-											}}
-										>
-											<option value="">None (use default)</option>
-											{audioProfiles
-												.filter(
-													(p) =>
-														p.type === 'compressor' ||
-														p.type === 'full',
-												)
-												.map((p) => (
-													<option key={p.id} value={p.id}>
-														{p.name}
-													</option>
-												))}
-										</select>
-
-										<label class={styles.playSettingsLabel}>
-											Video Profile
-										</label>
-										<select
-											class={styles.playSettingsSelect}
-											value={selectedVideoProfile}
-											onChange={(e) => {
-												const val = (e.target as HTMLSelectElement).value;
-												setSelectedVideoProfile(val);
-												updatePlaySetting('videoProfileId', val || null);
-											}}
-										>
-											<option value="">None (use default)</option>
-											{audioProfiles
-												.filter((p) => p.type === 'video')
-												.map((p) => (
-													<option key={p.id} value={p.id}>
-														{p.name}
-													</option>
-												))}
-										</select>
-									</div>
-								</div>
-							)}
-						</div>
-					)}
-
-					{/* File Info (local only) */}
-					{!isRemote && movie.fileInfo && (
-						<div class={styles.fileInfoSection}>
-							<button
-								class={styles.fileInfoToggle}
-								onClick={() => setShowFileInfo(!showFileInfo)}
-							>
-								<h2 class={styles.sectionTitle}>File Info</h2>
-								<span class={styles.fileInfoArrow}>
-									{showFileInfo ? '\u25B2' : '\u25BC'}
-								</span>
-							</button>
-
-							{showFileInfo && (
-								<div class={styles.fileInfoContent}>
-									<FileInfoGrid movie={movie} />
-
-									{/* Subtitles */}
-									<div class={styles.trackSection}>
-										<button
-											class={styles.subtitleToggle}
-											onClick={() => setShowSubtitles(!showSubtitles)}
-										>
-											{movie.fileInfo.subtitleTracks.length > 0
-												? `${movie.fileInfo.subtitleTracks.length} subtitle${movie.fileInfo.subtitleTracks.length === 1 ? '' : 's'} found`
-												: 'No subtitles found'}
-											<span class={styles.fileInfoArrow}>
-												{showSubtitles ? '\u25B2' : '\u25BC'}
-											</span>
-										</button>
-										{showSubtitles && (
-											<div class={styles.subtitlePanelWrap}>
-												<SubtitlePanel
-													movieId={movie.id}
-													existingTracks={(
-														movie.fileInfo?.subtitleTracks ?? []
-													).map((t) => ({
-														index: t.index,
-														language: t.language || 'und',
-														label:
-															t.title ||
-															t.language ||
-															`Track ${t.index}`,
-														codec: t.codec,
-														forced: t.forced,
-														external: t.external,
-													}))}
-													onSubtitlesChanged={async () => {
-														const data = await moviesService.get(
-															movie.id,
-														);
-														setMovie(data);
-													}}
-												/>
-											</div>
-										)}
-									</div>
-								</div>
-							)}
-						</div>
-					)}
-
-					<PluginSlot name={UI.MOVIE_PAGE_CONTENT} context={{ movie }} />
-				</div>
-
-				{/* Playlists (right column) */}
-				<div class={styles.playlistsColumn}>
-					<MoviePlaylists
-						movieId={movie.id}
-						remoteInfo={
-							isRemote && movie.remoteOrigin
-								? {
-										title: movie.title,
-										posterUrl: movie.posterUrl,
-										serverId: movie.remoteOrigin.serverId,
-									}
-								: undefined
-						}
-					/>
+					{/* Playlists (right column) */}
+					<div class={styles.playlistsColumn}>
+						<MoviePlaylists
+							movieId={movie.id}
+							remoteInfo={
+								isRemote && movie.remoteOrigin
+									? {
+											title: movie.title,
+											posterUrl: movie.posterUrl,
+											serverId: movie.remoteOrigin.serverId,
+										}
+									: undefined
+							}
+						/>
+					</div>
 				</div>
 			</div>
 		</div>

@@ -54,6 +54,7 @@ export default defineConfig({
 	css: {
 		preprocessorOptions: {
 			scss: {
+				api: 'modern-compiler',
 				additionalData: `@use "${resolve(clientSrc, 'styles/_variables.scss').replace(/\\/g, '/')}" as *; @use "${resolve(clientSrc, 'styles/_mixins.scss').replace(/\\/g, '/')}" as *;`,
 			},
 		},

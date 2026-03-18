@@ -46,6 +46,8 @@ export async function logout(): Promise<void> {
 		// Ignore logout errors
 	} finally {
 		localStorage.removeItem('mu_token');
+		localStorage.removeItem('mu_player_state');
+		localStorage.removeItem('mu_is_playing');
 		currentUser.value = null;
 		route('/login');
 	}

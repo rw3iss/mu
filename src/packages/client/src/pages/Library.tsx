@@ -14,17 +14,19 @@ import {
 	filters,
 	hasRemoteServers,
 	hiddenCount,
+	initRemoteServers,
 	initSortPrefs,
 	initViewMode,
 	isLoading,
-	localOnly,
 	movies,
+	remoteServerList,
 	searchMovies,
 	searchQuery,
+	serverFilter,
 	setFilters,
+	setServerFilter,
 	setViewMode,
 	showHidden,
-	toggleLocalOnly,
 	toggleShowHidden,
 	totalMovies,
 	totalPages,
@@ -46,6 +48,7 @@ export function Library(_props: LibraryProps) {
 	useEffect(() => {
 		initViewMode();
 		initSortPrefs();
+		initRemoteServers();
 		fetchMovies(1);
 		loadGenres();
 
@@ -135,14 +138,20 @@ export function Library(_props: LibraryProps) {
 					/>
 				</div>
 
-				{hasRemoteServers.value && (
-					<button
-						class={`${styles.showHiddenBtn} ${localOnly.value ? styles.active : ''}`}
-						onClick={toggleLocalOnly}
-						title={localOnly.value ? 'Showing local movies only' : 'Show all movies'}
+				{(hasRemoteServers.value || remoteServerList.value.length > 0) && (
+					<select
+						class={styles.librarySelect}
+						value={serverFilter.value}
+						onChange={(e) => setServerFilter((e.target as HTMLSelectElement).value)}
 					>
-						{localOnly.value ? 'Local Only' : 'All Servers'}
-					</button>
+						<option value="all">All Libraries</option>
+						<option value="local">My Library</option>
+						{remoteServerList.value.map((s) => (
+							<option key={s.id} value={s.id}>
+								{s.name}
+							</option>
+						))}
+					</select>
 				)}
 
 				<button

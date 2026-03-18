@@ -1,8 +1,11 @@
 .player {
   position: fixed;
   inset: 0;
-  background: #000000;
+  // Transparent — the actual video is in GlobalPlayer's videoWrapper
+  // This container only hosts the VideoPlayer's click handlers and overlays
+  background: transparent;
   z-index: var(--z-player-controls);
+  pointer-events: none;
 }
 
 .loading,

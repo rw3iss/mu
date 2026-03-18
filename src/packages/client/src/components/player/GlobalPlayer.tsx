@@ -61,7 +61,6 @@ function offsetVttTimings(vtt: string, offsetMs: number): string {
 
 export function GlobalPlayer() {
 	const engine = useVideoEngine();
-	const miniVideoContainerRef = useRef<HTMLDivElement>(null);
 	const [_isInitializing, setIsInitializing] = useState(false);
 	const [preparingMessage, setPreparingMessage] = useState<string | null>(null);
 	const playbackInitRef = useRef(false);
@@ -180,13 +179,16 @@ export function GlobalPlayer() {
 			const shouldAutoplay = restoredAutoplay.value ?? true;
 			restoredAutoplay.value = null;
 
+			const pos = forceStartPosition.value ?? currentSession.value.startPosition;
+			forceStartPosition.value = null;
+
 			// For direct play on restore: don't autoplay (defers src loading)
 			const autoplay = isRestore && currentSession.value.directPlay ? false : shouldAutoplay;
 			engine.setIntendedPlaying(autoplay);
 			engine.initPlayback(
 				currentSession.value.streamUrl,
 				currentSession.value.directPlay,
-				currentSession.value.startPosition,
+				pos,
 				autoplay,
 			);
 			playbackInitRef.current = true;
@@ -199,16 +201,17 @@ export function GlobalPlayer() {
 		}
 	}, [globalMovieId.value, isPlayerActive.value]);
 
-	// Move video element to mini container when in mini mode
+	// Mount video element into the persistent wrapper (once)
+	const videoWrapperRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
-		if (
-			playerMode.value === 'mini' &&
-			miniVideoContainerRef.current &&
-			engine.videoRef.current
-		) {
-			engine.moveVideoTo(miniVideoContainerRef.current);
+		if (videoWrapperRef.current && engine.videoRef.current) {
+			const wrapper = videoWrapperRef.current;
+			const video = engine.videoRef.current;
+			if (!wrapper.contains(video)) {
+				wrapper.insertBefore(video, wrapper.firstChild);
+			}
 		}
-	}, [playerMode.value]);
+	}, [engine.videoRef.current, isPlayerActive.value]);
 
 	// Subtitle appearance settings
 	const [subSettings] = useSubtitleSettings();
@@ -372,11 +375,15 @@ export function GlobalPlayer() {
 			});
 
 		return () => {
-			// Clean up blob URLs
+			// Clean up blob URLs and remove track elements
 			for (const t of video.querySelectorAll('track')) {
 				if (t.src.startsWith('blob:')) {
 					URL.revokeObjectURL(t.src);
 				}
+				video.removeChild(t);
+			}
+			for (let i = 0; i < video.textTracks.length; i++) {
+				video.textTracks[i]!.mode = 'hidden';
 			}
 		};
 	}, [subtitleTrack.value, currentSession.value?.sessionId, subSettings.timingOffsetMs]);
@@ -435,6 +442,37 @@ export function GlobalPlayer() {
 
 	return (
 		<>
+			{/* Persistent video wrapper — stays in DOM, CSS transitions between full/mini */}
+			<div
+				ref={videoWrapperRef}
+				class={`${styles.videoWrapper} ${isMini ? styles.videoWrapperMini : styles.videoWrapperFull}`}
+				onClick={isMini ? maximizePlayer : undefined}
+				onMouseMove={
+					!isMini
+						? () => {
+								showControls.value = true;
+							}
+						: undefined
+				}
+			>
+				{isMini && (
+					<div class={styles.miniVideoOverlay}>
+						<svg
+							width="24"
+							height="24"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="white"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<polyline points="18 15 12 9 6 15" />
+						</svg>
+					</div>
+				)}
+			</div>
+
 			{/* Preparing / error overlay */}
 			{preparingMessage && !isMini && (
 				<div class={styles.preparingOverlay}>
@@ -517,7 +555,7 @@ export function GlobalPlayer() {
 
 			{/* Bottom bar — same layout in both modes */}
 			<div
-				class={`${styles.playerBar} ${barVisible ? '' : styles.hidden}`}
+				class={`${styles.playerBar} ${isMini ? styles.playerBarMini : styles.playerBarFull} ${barVisible ? '' : styles.hidden}`}
 				onMouseEnter={() => {
 					isHoveringControls.value = true;
 				}}
@@ -534,30 +572,7 @@ export function GlobalPlayer() {
 					session={currentSession.value}
 					title={movie?.title}
 					hasMiniThumbnail={isMini}
-					leftSlot={
-						isMini ? (
-							<div
-								class={styles.miniVideo}
-								ref={miniVideoContainerRef}
-								onClick={maximizePlayer}
-							>
-								<div class={styles.miniVideoOverlay}>
-									<svg
-										width="24"
-										height="24"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="white"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<polyline points="18 15 12 9 6 15" />
-									</svg>
-								</div>
-							</div>
-						) : null
-					}
+					leftSlot={isMini ? <div class={styles.miniSpacer} /> : null}
 				/>
 			</div>
 		</>

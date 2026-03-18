@@ -30,6 +30,8 @@ export function SubtitlePanel({
 	const [downloadingId, setDownloadingId] = useState<string | null>(null);
 	const [isUploading, setIsUploading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [confirmDeleteTrack, setConfirmDeleteTrack] = useState<MovieSubtitleInfo | null>(null);
+	const [isDeleting, setIsDeleting] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const refreshTracks = useCallback(async () => {
@@ -42,6 +44,23 @@ export function SubtitlePanel({
 		}
 	}, [movieId, onSubtitlesChanged]);
 
+	const handleDelete = useCallback(
+		async (track: MovieSubtitleInfo) => {
+			setIsDeleting(true);
+			setError(null);
+			try {
+				await subtitlesService.remove(movieId, track.index);
+				setConfirmDeleteTrack(null);
+				await refreshTracks();
+			} catch (err: any) {
+				setError(err.message || 'Delete failed');
+			} finally {
+				setIsDeleting(false);
+			}
+		},
+		[movieId, refreshTracks],
+	);
+
 	const handleSearch = useCallback(async () => {
 		setIsSearching(true);
 		setError(null);
@@ -50,8 +69,10 @@ export function SubtitlePanel({
 			const { results } = await subtitlesService.search(movieId);
 			setSearchResults(results);
 			setSearchDone(true);
-		} catch (err: any) {
-			setError(err.message || 'Search failed');
+		} catch {
+			// Show a friendly message instead of raw API errors (e.g. 404 when no file available)
+			setSearchDone(true);
+			setSearchResults([]);
 		} finally {
 			setIsSearching(false);
 		}
@@ -132,6 +153,30 @@ export function SubtitlePanel({
 								{t.codec && (
 									<span class={styles.badgeMuted}>{t.codec.toUpperCase()}</span>
 								)}
+								<button
+									class={styles.deleteTrackBtn}
+									onClick={(e) => {
+										e.stopPropagation();
+										setConfirmDeleteTrack(t);
+									}}
+									title="Delete subtitle"
+								>
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<polyline points="3 6 5 6 21 6" />
+										<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+										<path d="M10 11v6" />
+										<path d="M14 11v6" />
+									</svg>
+								</button>
 							</div>
 						))
 					)}
@@ -273,6 +318,46 @@ export function SubtitlePanel({
 			</div>
 
 			{error && <div class={styles.error}>{error}</div>}
+
+			{/* Delete confirmation modal */}
+			{confirmDeleteTrack && (
+				<div class={styles.confirmOverlay}>
+					<div class={styles.confirmModal}>
+						<p class={styles.confirmTitle}>Delete Subtitle?</p>
+						<p class={styles.confirmDetail}>
+							{confirmDeleteTrack.label}
+							{confirmDeleteTrack.language && confirmDeleteTrack.language !== 'und'
+								? ` (${confirmDeleteTrack.language.toUpperCase()})`
+								: ''}
+							{confirmDeleteTrack.external ? ' — External' : ' — Embedded'}
+							{confirmDeleteTrack.codec
+								? ` — ${confirmDeleteTrack.codec.toUpperCase()}`
+								: ''}
+						</p>
+						<p class={styles.confirmWarning}>
+							{confirmDeleteTrack.external
+								? 'This will delete the subtitle file from disk.'
+								: 'This will remove the embedded track from the cache.'}
+						</p>
+						<div class={styles.confirmActions}>
+							<button
+								class={styles.confirmCancel}
+								onClick={() => setConfirmDeleteTrack(null)}
+								disabled={isDeleting}
+							>
+								Cancel
+							</button>
+							<button
+								class={styles.confirmDelete}
+								onClick={() => handleDelete(confirmDeleteTrack)}
+								disabled={isDeleting}
+							>
+								{isDeleting ? 'Deleting...' : 'Delete'}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }
