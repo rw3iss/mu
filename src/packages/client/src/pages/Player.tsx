@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Spinner } from '@/components/common/Spinner';
-import { VideoPlayer } from '@/components/player/VideoPlayer';
-import { globalMovie, globalMovieId, playerMode, playMovie } from '@/state/globalPlayer.state';
+import { globalMovieId, playerMode, playMovie } from '@/state/globalPlayer.state';
 import { notifyError } from '@/state/notifications.state';
 import { currentSession } from '@/state/player.state';
-import { sharedVideoEngine } from '@/state/videoEngineRef';
 import styles from './Player.module.scss';
 
 interface PlayerProps {
@@ -62,18 +60,7 @@ export function Player({ id }: PlayerProps) {
 		);
 	}
 
-	const movie = globalMovie.value;
-	const engine = sharedVideoEngine.value;
-
-	return (
-		<div class={styles.player} data-player-container>
-			<VideoPlayer
-				streamUrl={currentSession.value.streamUrl}
-				directPlay={currentSession.value.directPlay}
-				startPosition={currentSession.value.startPosition}
-				movie={movie}
-				externalEngine={engine}
-			/>
-		</div>
-	);
+	// Video is rendered by GlobalPlayer's persistent wrapper — Player page only
+	// needs to handle loading/error states and route management.
+	return <div class={styles.player} data-player-container />;
 }

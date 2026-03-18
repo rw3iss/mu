@@ -17,6 +17,7 @@ import type { StreamSession } from '@/state/player.state';
 import {
 	currentSession,
 	currentTime,
+	duration,
 	endStream,
 	initPlayerSettings,
 	isMuted,
@@ -37,6 +38,7 @@ export type PlayerMode = 'hidden' | 'full' | 'mini';
 interface PersistedPlayerState {
 	movieId: string;
 	currentTime: number;
+	duration: number;
 	volume: number;
 	isMuted: boolean;
 	playerMode: PlayerMode;
@@ -85,6 +87,7 @@ function writePersistState(): void {
 	const state: PersistedPlayerState = {
 		movieId: globalMovieId.value,
 		currentTime: currentTime.value,
+		duration: duration.value,
 		volume: volume.value,
 		isMuted: isMuted.value,
 		playerMode: playerMode.value,
@@ -347,9 +350,10 @@ export function initGlobalPlayer(): void {
 		const saved: PersistedPlayerState = JSON.parse(raw);
 		if (!saved.movieId) return;
 
-		// Restore volume/mute
+		// Restore volume/mute/duration
 		volume.value = saved.volume;
 		isMuted.value = saved.isMuted;
+		if (saved.duration > 0) duration.value = saved.duration;
 
 		// Restore movie and mode
 		globalMovieId.value = saved.movieId;

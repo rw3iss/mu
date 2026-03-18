@@ -22,6 +22,7 @@ import {
 } from '@/state/globalPlayer.state';
 import {
 	currentSession,
+	currentTime,
 	initPlayerSettings,
 	isFullscreen,
 	isHoveringControls,
@@ -162,6 +163,7 @@ export function GlobalPlayer() {
 					const autoplay = isRestore && session.directPlay ? false : shouldAutoplay;
 					engine.initPlayback(session.streamUrl, session.directPlay, pos, autoplay);
 					playbackInitRef.current = true;
+					if (pos > 0) currentTime.value = pos;
 
 					// Restore subtitle
 					const movieId = globalMovieId.value;
@@ -192,6 +194,8 @@ export function GlobalPlayer() {
 				autoplay,
 			);
 			playbackInitRef.current = true;
+			// Set currentTime so seek bar shows correct position immediately
+			if (pos > 0) currentTime.value = pos;
 
 			// Restore subtitle
 			const movieId = globalMovieId.value;
@@ -201,8 +205,9 @@ export function GlobalPlayer() {
 		}
 	}, [globalMovieId.value, isPlayerActive.value]);
 
-	// Mount video element into the persistent wrapper (once)
+	// Mount video element into the persistent wrapper and attach click handlers
 	const videoWrapperRef = useRef<HTMLDivElement>(null);
+	const videoClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	useEffect(() => {
 		if (videoWrapperRef.current && engine.videoRef.current) {
 			const wrapper = videoWrapperRef.current;
@@ -210,6 +215,33 @@ export function GlobalPlayer() {
 			if (!wrapper.contains(video)) {
 				wrapper.insertBefore(video, wrapper.firstChild);
 			}
+
+			// Click to toggle play, double-click for fullscreen
+			const handleClick = (e: MouseEvent) => {
+				if (playerMode.value === 'mini') return;
+				if (e.detail === 1) {
+					videoClickTimerRef.current = setTimeout(() => {
+						videoClickTimerRef.current = null;
+						engine.togglePlay();
+					}, 200);
+				}
+			};
+			const handleDblClick = () => {
+				if (playerMode.value === 'mini') return;
+				if (videoClickTimerRef.current) {
+					clearTimeout(videoClickTimerRef.current);
+					videoClickTimerRef.current = null;
+				}
+				handleToggleFullscreen();
+			};
+
+			video.addEventListener('click', handleClick);
+			video.addEventListener('dblclick', handleDblClick);
+			return () => {
+				if (videoClickTimerRef.current) clearTimeout(videoClickTimerRef.current);
+				video.removeEventListener('click', handleClick);
+				video.removeEventListener('dblclick', handleDblClick);
+			};
 		}
 	}, [engine.videoRef.current, isPlayerActive.value]);
 

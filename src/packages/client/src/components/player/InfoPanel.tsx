@@ -1,7 +1,10 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { moviesService } from '@/services/movies.service';
+import { wsService } from '@/services/websocket.service';
+import { globalMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import styles from './InfoPanel.module.scss';
 
@@ -13,6 +16,34 @@ interface InfoPanelProps {
 
 export function InfoPanel({ movie, visible, onClose }: InfoPanelProps) {
 	const [showFileInfo, setShowFileInfo] = useState(false);
+
+	// Refresh movie data when panel opens or when movie is updated via WebSocket
+	useEffect(() => {
+		if (!visible || !movie?.id) return;
+
+		// Fetch latest data when panel becomes visible
+		moviesService
+			.get(movie.id)
+			.then((updated) => {
+				globalMovie.value = updated;
+			})
+			.catch(() => {});
+
+		// Listen for updates (metadata refresh, rescan, etc.)
+		const handler = (data: unknown) => {
+			const event = data as { movieId?: string };
+			if (event.movieId === movie.id) {
+				moviesService
+					.get(movie.id)
+					.then((updated) => {
+						globalMovie.value = updated;
+					})
+					.catch(() => {});
+			}
+		};
+		wsService.on('library:movie-updated', handler);
+		return () => wsService.off('library:movie-updated', handler);
+	}, [visible, movie?.id]);
 
 	if (!movie) return null;
 

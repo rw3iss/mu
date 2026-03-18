@@ -100,8 +100,8 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 90px;
-  background: rgba(12, 12, 12, 0.97);
+  height: 110px;
+  //background: rgba(12, 12, 12, 0.97);
   backdrop-filter: blur(16px);
   display: flex;
   align-items: stretch;
@@ -154,8 +154,8 @@
   // Lower-left corner, above the player bar
   bottom: 0;
   left: 0;
-  width: 160px;
-  height: 90px;
+  width: 178px;
+  height: 100px;
   cursor: pointer;
   // Above bar in mini mode
   z-index: calc(var(--z-player-controls) + 1);
@@ -186,6 +186,6 @@
 
 // Spacer in the control bar to make room for the mini video
 .miniSpacer {
-  width: 160px;
+  width: 178px;
   flex-shrink: 0;
 }

@@ -287,9 +287,13 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 					if (startPosition > 0) video.currentTime = startPosition;
 					video.play().catch(() => {});
 				} else {
-					// Defer loading — don't set video.src until user presses play.
-					// This prevents the Web Audio API from picking up ghost audio.
+					// Load the source muted to show a frame, but don't play.
+					// Muting prevents the Web Audio API ghost audio issue.
 					deferredSrcRef.current = { url: directUrl, position: startPosition };
+					video.muted = true;
+					video.src = directUrl;
+					if (startPosition > 0) video.currentTime = startPosition;
+					// Video stays paused — frame will render once loaded
 				}
 			} else {
 				const token = localStorage.getItem('mu_token');
@@ -453,12 +457,11 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		const video = videoRef.current;
 		if (!video) return;
 
-		// If we deferred loading a direct play source, load it now
+		// If we deferred a direct play source (loaded muted for preview frame), unmute and play
 		if (deferredSrcRef.current) {
-			const { url, position } = deferredSrcRef.current;
 			deferredSrcRef.current = null;
-			video.src = url;
-			if (position > 0) video.currentTime = position;
+			// Src is already loaded (muted for frame preview) — just unmute and play
+			video.muted = isMuted.value;
 			intendedPlayingRef.current = true;
 			audioEngine.resume();
 			video.play().catch(() => {});
@@ -487,13 +490,6 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const seek = useCallback((time: number) => {
 		const video = videoRef.current;
 		if (!video) return;
-
-		// If src is deferred (direct play, paused on restore), load it first
-		if (deferredSrcRef.current) {
-			const { url } = deferredSrcRef.current;
-			deferredSrcRef.current = null;
-			video.src = url;
-		}
 
 		seekLockRef.current = true;
 		// Use fastSeek for smoother scrubbing (snaps to nearest keyframe)
