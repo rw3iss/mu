@@ -1,3 +1,12 @@
+- set default subtitle language (to help subtitles, etc).
+- set interface language: to translations.
+
+- Timer/stop playing feature: player settings
+
+- Export/backup feature
+	- restore and index so user can just 'restore backup' for metadata, reviews, etc. (just clone .db?)
+
+- build external web client PWA that can connect to any server (ie. Mu client).
 
 - Ratings: when clicked, show breakout of 1-10 stars, with number entry on left and decimal up/down buttons. Allow half-stars in overlay. Close/cancel button on end.
 	- user clicks a main number, zooms in between that and next number, with mini decimal scale? Right click or click outside to stay at X.0.

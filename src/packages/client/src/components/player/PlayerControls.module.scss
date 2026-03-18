@@ -230,7 +230,18 @@
 	right: 0;
 	display: flex;
 	justify-content: center;
-	gap: 8px;
+	gap: 12px;
+	z-index: 1;
+	pointer-events: none;
+}
+
+.effectsDotsBottom {
+	position: absolute;
+	bottom: 18px;
+	left: 0;
+	right: 0;
+	display: flex;
+	justify-content: center;
 	z-index: 1;
 	pointer-events: none;
 }

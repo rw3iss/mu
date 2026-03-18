@@ -83,3 +83,15 @@ Can you fix it for the remote uploads, and the otherwise non-remote production e
 You can check the local logs here for more info.
 
 --------------------------------------------------------------------------------
+There is some playback bug going on:
+Sometimes movies seem to stop streaming, and then say 'transcoding in progress'. The network requests show 'segment not available'. Then, if I refresh the page, that movie still doesn't load and won't play, no matter what I try. If I change the movie entirely, and starting playing a different movie, it works, and works if I go back to the previous movie.
+We need to make the streaming sort of smarter so that if it detects that it is failing, or a transcoding error, it should try to unload and reload the video, possibly, or do what it does at the 'new play' sequence, because the transcoding should be ready (it works if i start playing it after switching to another video), but for some reason if it's already being played, the transcoding gets "off track", and thinks its not ready ever...
+
+Before we improve that stage, we also need to make sure that any currently streaming movies maintain a 'priority' as far as their transcoding and background jobs go. Is there anyway we can do that?
+There should be a sort of "priority queue" for each movie session, and the first session that is playing should have the highest priority, so that its jobs and streaming requests will always try to be fulfilled first, so any playing videos will never pause or skip.
+Is it possible to gain any benefit there, ie. to introduce prioritization in the jobs or transcoding, or does it not matter (maybe they aren't job based)? Otherwise, maybe we can give their threads a higher priority, somehow?
+Is it possible to make a setting that tells the server what priority to run its background processes in, that can work on all platforms?
+
+Research and implement the best way to ensure streams are prioritized and will have the least chance of skipping or missing requests for currently playing movies.
+Then also ensure if a pause does happen that it will be able to smoothyl resume playback as fast as possibly, and not get stuck on "Segment not available" (when it shows), and if it encounters a state it cannot recover from, it should try to reload the movie at the currently playing position, as a last resort, if that would help.
+

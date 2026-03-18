@@ -11,6 +11,7 @@ import {
 	eqEnabled,
 	showEffectsPanel,
 	toggleEffectsPanel,
+	videoEnabled,
 } from '@/state/audio-effects.state';
 import { globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import type { StreamSession } from '@/state/player.state';
@@ -585,6 +586,9 @@ export function PlayerControls({
 								<span
 									class={`${styles.effectsDot} ${compressorEnabled.value ? styles.effectsDotActive : ''}`}
 								/>
+							</div>
+							<div class={styles.effectsDotsBottom}>
+								<span class={`${styles.effectsDot} ${videoEnabled.value ? styles.effectsDotActive : ''}`} />
 							</div>
 							<button
 								class={`${styles.controlBtn} ${showEffectsPanel.value ? styles.active : ''}`}
