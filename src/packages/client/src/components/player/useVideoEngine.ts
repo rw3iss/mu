@@ -401,7 +401,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 								console.warn(
 									`[HLS] Network error, recovery ${networkRecoveries}/${MAX_RECOVERIES} in ${delay}ms`,
 								);
-								if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
+								if (recoveryTimerRef.current)
+									clearTimeout(recoveryTimerRef.current);
 								recoveryTimerRef.current = setTimeout(() => {
 									recoveryTimerRef.current = null;
 									if (hlsRef.current) hls.startLoad();
