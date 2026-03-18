@@ -1,3 +1,6 @@
+INFO:
+ssh rw3iss@192.168.50.211
+
 
 - group, see related movies in library or set (ie. series):
 	- be smart... metadata if exists, otherwise strategies for filename/folder association.
