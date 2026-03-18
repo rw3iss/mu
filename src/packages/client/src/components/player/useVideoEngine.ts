@@ -528,6 +528,14 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			video.pause();
 			video.removeAttribute('src');
 			video.load();
+			// Remove all subtitle track elements and revoke blob URLs
+			for (const t of video.querySelectorAll('track')) {
+				if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
+				video.removeChild(t);
+			}
+			for (let i = 0; i < video.textTracks.length; i++) {
+				video.textTracks[i]!.mode = 'hidden';
+			}
 			// Mute to kill any lingering audio from buffered data
 			video.muted = true;
 			// Restore mute state after async cleanup

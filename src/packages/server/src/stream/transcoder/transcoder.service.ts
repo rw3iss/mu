@@ -53,16 +53,14 @@ export class TranscoderService implements OnModuleDestroy {
 
 		// Auto-detect: if default 'ffmpeg' fails, try common locations
 		if (ffmpegPath === 'ffmpeg') {
-			const candidates = process.platform === 'win32'
-				? [
-					'C:/ffmpeg/ffmpeg.exe',
-					'C:\\ffmpeg\\ffmpeg.exe',
-					'C:/Program Files/ffmpeg/bin/ffmpeg.exe',
-				  ]
-				: [
-					'/usr/bin/ffmpeg',
-					'/usr/local/bin/ffmpeg',
-				  ];
+			const candidates =
+				process.platform === 'win32'
+					? [
+							'C:/ffmpeg/ffmpeg.exe',
+							'C:\\ffmpeg\\ffmpeg.exe',
+							'C:/Program Files/ffmpeg/bin/ffmpeg.exe',
+						]
+					: ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg'];
 			for (const candidate of candidates) {
 				try {
 					if (existsSync(candidate)) {

@@ -296,13 +296,7 @@ export function GlobalPlayer() {
 		const bgColor = hexToRgba(s.backgroundColor, s.backgroundOpacity);
 		const shadowColor = s.shadowColor;
 		const fontSizeEm = (s.fontSize / 100) * 1.3;
-		// Base line-height scales with font size, then apply pixel offset
-		const baseLineHeight = fontSizeEm * 1.2;
-		const lineSpacingPx = s.lineSpacing ?? 0;
-		const lineHeight =
-			lineSpacingPx !== 0
-				? `calc(${baseLineHeight}em + ${lineSpacingPx}px)`
-				: `${baseLineHeight}em`;
+		const lineHeight = s.lineSpacing ?? 1.0;
 		const userOffset = s.verticalOffset;
 		// Push subtitles up when player controls are visible in full mode
 		const controlsUp = showControls.value && playerMode.value !== 'mini' ? -90 : 0;
@@ -356,20 +350,23 @@ export function GlobalPlayer() {
 	useEffect(() => {
 		const video = engine.videoRef.current;
 		const session = currentSession.value;
-		if (!video) return;
+		let cancelled = false;
 
-		// Remove existing track elements
-		for (const t of video.querySelectorAll('track')) {
-			video.removeChild(t);
+		// Always clean up existing tracks first
+		if (video) {
+			for (const t of video.querySelectorAll('track')) {
+				if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
+				video.removeChild(t);
+			}
+			for (let i = 0; i < video.textTracks.length; i++) {
+				video.textTracks[i]!.mode = 'hidden';
+			}
 		}
 
-		// Also hide any active text tracks
-		for (let i = 0; i < video.textTracks.length; i++) {
-			video.textTracks[i]!.mode = 'hidden';
-		}
+		if (!video || !session) return;
 
 		const selectedId = subtitleTrack.value;
-		if (!selectedId || !session) return;
+		if (!selectedId) return;
 
 		const track = session.subtitles.find((t) => t.id === selectedId);
 		if (!track) return;
@@ -377,18 +374,12 @@ export function GlobalPlayer() {
 		// Build the subtitle URL with auth
 		let subtitleUrl = track.url;
 		if (subtitleUrl.startsWith('http')) {
-			// Absolute URL — could be a remote server URL or our own origin.
-			// For our own origin, convert to relative. For remote, fetch with
-			// the token already in the URL (if present).
 			try {
 				const parsed = new URL(subtitleUrl);
 				if (parsed.origin === window.location.origin) {
 					subtitleUrl = parsed.pathname + parsed.search;
 				}
-				// For remote URLs, use as-is (token should be in query already)
-			} catch {
-				// Invalid URL, use as-is
-			}
+			} catch {}
 		}
 		if (!subtitleUrl.startsWith('http')) {
 			const token = localStorage.getItem('mu_token');
@@ -398,15 +389,15 @@ export function GlobalPlayer() {
 			}
 		}
 
-		// Fetch the VTT content and create a blob URL to avoid CORS issues
-		// with crossOrigin='anonymous' on the video element
+		// Fetch VTT and create blob URL
 		fetch(subtitleUrl)
 			.then((res) => {
 				if (!res.ok) throw new Error(`Subtitle fetch failed: ${res.status}`);
 				return res.text();
 			})
 			.then((vttText) => {
-				// Apply timing offset to the VTT content
+				if (cancelled) return;
+
 				const timingOffset = subSettings.timingOffsetMs;
 				let processedVtt = vttText;
 				if (timingOffset !== 0) {
@@ -416,10 +407,15 @@ export function GlobalPlayer() {
 				const blob = new Blob([processedVtt], { type: 'text/vtt' });
 				const blobUrl = URL.createObjectURL(blob);
 
-				// Check video is still current
-				if (engine.videoRef.current !== video) {
+				if (cancelled) {
 					URL.revokeObjectURL(blobUrl);
 					return;
+				}
+
+				// Remove any tracks that snuck in while we were fetching
+				for (const t of video.querySelectorAll('track')) {
+					if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
+					video.removeChild(t);
 				}
 
 				const trackEl = document.createElement('track');
@@ -432,19 +428,19 @@ export function GlobalPlayer() {
 				trackEl.track.mode = 'showing';
 			})
 			.catch((err) => {
-				console.error('[Subtitles] Failed to load subtitle track:', err);
+				if (!cancelled) console.error('[Subtitles] Failed to load subtitle track:', err);
 			});
 
 		return () => {
-			// Clean up blob URLs and remove track elements
-			for (const t of video.querySelectorAll('track')) {
-				if (t.src.startsWith('blob:')) {
-					URL.revokeObjectURL(t.src);
+			cancelled = true;
+			if (video) {
+				for (const t of video.querySelectorAll('track')) {
+					if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
+					video.removeChild(t);
 				}
-				video.removeChild(t);
-			}
-			for (let i = 0; i < video.textTracks.length; i++) {
-				video.textTracks[i]!.mode = 'hidden';
+				for (let i = 0; i < video.textTracks.length; i++) {
+					video.textTracks[i]!.mode = 'hidden';
+				}
 			}
 		};
 	}, [subtitleTrack.value, currentSession.value?.sessionId, subSettings.timingOffsetMs]);

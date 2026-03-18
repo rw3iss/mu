@@ -272,6 +272,7 @@ export class MoviesService {
 					bitrate: firstFile.bitrate,
 					fileSize: firstFile.fileSize,
 					fileName: firstFile.fileName,
+					filePath: firstFile.filePath,
 					audioTracks: parseJson(firstFile.audioTracks),
 					subtitleTracks: parseJson(firstFile.subtitleTracks),
 				}

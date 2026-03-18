@@ -3,7 +3,7 @@ import styles from './SubtitleAppearance.module.scss';
 
 export interface SubtitleSettings {
 	fontSize: number;
-	/** Line spacing offset in pixels from the default for the current font size. */
+	/** Line height multiplier (e.g. 1.4 = 140%). Adjustable in 0.05 increments. */
 	lineSpacing: number;
 	fontColor: string;
 	backgroundColor: string;
@@ -16,7 +16,7 @@ export interface SubtitleSettings {
 
 export const DEFAULT_SUBTITLE_SETTINGS: SubtitleSettings = {
 	fontSize: 100,
-	lineSpacing: 0,
+	lineSpacing: 1.0,
 	fontColor: '#ffffff',
 	backgroundColor: '#000000',
 	backgroundOpacity: 0.6,
@@ -40,9 +40,9 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 
 	const update = <K extends keyof SubtitleSettings>(key: K, value: SubtitleSettings[K]) => {
 		const next = { ...settings, [key]: value };
-		// Reset line spacing to default (0) when font size changes
+		// Reset line spacing to default when font size changes
 		if (key === 'fontSize') {
-			next.lineSpacing = 0;
+			next.lineSpacing = DEFAULT_SUBTITLE_SETTINGS.lineSpacing;
 		}
 		setSettings(next);
 	};
@@ -62,13 +62,14 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 					<input
 						type="range"
 						class={styles.slider}
-						min={50}
+						min={25}
 						max={200}
 						step={5}
 						value={settings.fontSize}
 						onInput={(e) =>
 							update('fontSize', parseInt((e.target as HTMLInputElement).value, 10))
 						}
+						onDblClick={() => update('fontSize', 100)}
 					/>
 					<span class={styles.value}>{settings.fontSize}%</span>
 				</div>
@@ -79,46 +80,21 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 				<span class={styles.label}>Line Spacing</span>
 				<div class={styles.control}>
 					<input
-						type="number"
-						class={styles.numberInput}
+						type="range"
+						class={styles.slider}
+						min={1.0}
+						max={2.5}
+						step={0.05}
 						value={settings.lineSpacing}
-						onChange={(e) => {
-							const val = parseInt((e.target as HTMLInputElement).value, 10);
-							if (!Number.isNaN(val)) update('lineSpacing', val);
-						}}
+						onInput={(e) =>
+							setSettings({
+								...settings,
+								lineSpacing: parseFloat((e.target as HTMLInputElement).value),
+							})
+						}
+						onDblClick={() => setSettings({ ...settings, lineSpacing: 1.0 })}
 					/>
-					<span class={styles.unit}>px</span>
-					<button
-						class={styles.offsetBtn}
-						onClick={() => update('lineSpacing', (settings.lineSpacing || 0) - 1)}
-					>
-						-
-					</button>
-					<button
-						class={styles.offsetBtn}
-						onClick={() => update('lineSpacing', (settings.lineSpacing || 0) + 1)}
-					>
-						+
-					</button>
-					<button
-						class={styles.offsetBtn}
-						onClick={() => update('lineSpacing', 0)}
-						title="Reset line spacing"
-					>
-						<svg
-							width="12"
-							height="12"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<polyline points="1 4 1 10 7 10" />
-							<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-						</svg>
-					</button>
+					<span class={styles.value}>{(settings.lineSpacing ?? 1.0).toFixed(2)}x</span>
 				</div>
 			</div>
 

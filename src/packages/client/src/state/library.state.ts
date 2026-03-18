@@ -71,6 +71,7 @@ export interface Movie {
 		bitrate?: number;
 		fileSize?: number;
 		fileName?: string;
+		filePath?: string;
 		audioTracks: {
 			index: number;
 			codec: string;

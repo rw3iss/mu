@@ -17,6 +17,13 @@ export function FileInfoGrid({ movie, dark }: FileInfoGridProps) {
 	return (
 		<div class={wrapClass}>
 			<div class={styles.grid}>
+				{fi.filePath && (
+					<>
+						<span class={styles.label}>Location</span>
+						<span class={styles.value}>{fi.filePath.replace(/[\\/][^\\/]*$/, '')}</span>
+					</>
+				)}
+
 				<span class={styles.label}>Playback</span>
 				<span class={styles.value}>
 					<span
