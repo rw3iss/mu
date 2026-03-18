@@ -50,18 +50,25 @@ export class TranscoderService implements OnModuleDestroy {
 			this.logger.log(`Using ffprobe at: ${ffprobePath}`);
 		}
 
-		// Auto-detect: if default 'ffmpeg' fails, try common Windows locations
-		if (ffmpegPath === 'ffmpeg' && process.platform === 'win32') {
-			const candidates = [
-				'C:\\ffmpeg\\ffmpeg.exe',
-				'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
-			];
+		// Auto-detect: if default 'ffmpeg' fails, try common locations
+		if (ffmpegPath === 'ffmpeg') {
+			const candidates = process.platform === 'win32'
+				? [
+					'C:\\ffmpeg\\ffmpeg.exe',
+					'/c/ffmpeg/ffmpeg.exe',
+					'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+				  ]
+				: [
+					'/usr/bin/ffmpeg',
+					'/usr/local/bin/ffmpeg',
+				  ];
 			for (const candidate of candidates) {
 				try {
 					const { existsSync } = require('node:fs');
 					if (existsSync(candidate)) {
 						ffmpeg.setFfmpegPath(candidate);
-						ffmpeg.setFfprobePath(candidate.replace('ffmpeg.exe', 'ffprobe.exe'));
+						const probePath = candidate.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1');
+						ffmpeg.setFfprobePath(probePath);
 						this.logger.log(`Auto-detected ffmpeg at: ${candidate}`);
 						break;
 					}
