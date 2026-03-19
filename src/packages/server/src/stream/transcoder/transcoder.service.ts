@@ -582,67 +582,55 @@ export class TranscoderService implements OnModuleDestroy {
 	): Promise<'complete' | 'partial' | 'invalid' | 'empty'> {
 		const dir = this.getPersistentDir(movieFileId, quality);
 
-		// Check .complete marker
+		// Fast path: .complete marker exists — trust it
 		try {
 			await access(path.join(dir, '.complete'));
-		} catch {
-			// No .complete marker — check if there's any content at all
-		}
-
-		// Check manifest
-		let manifestContent: string;
-		try {
-			manifestContent = await readFile(path.join(dir, 'stream.m3u8'), 'utf-8');
-		} catch {
-			// No manifest — check if there are loose segments
+			// Quick sanity check: manifest exists
 			try {
-				const files = await readdir(dir);
-				const segs = files.filter((f) => f.startsWith('segment_') && f.endsWith('.ts'));
-				return segs.length > 0 ? 'partial' : 'empty';
+				await access(path.join(dir, 'stream.m3u8'));
+				return 'complete';
 			} catch {
-				return 'empty';
+				// .complete but no manifest — invalid
+				return 'invalid';
 			}
-		}
-
-		// Parse manifest — count referenced segments and verify they exist
-		const segmentRefs = manifestContent
-			.split('\n')
-			.filter((line) => line.startsWith('segment_') && line.endsWith('.ts'));
-
-		if (segmentRefs.length === 0) return 'invalid';
-
-		// Check if segments actually exist
-		let existCount = 0;
-		for (const seg of segmentRefs) {
-			try {
-				const s = await stat(path.join(dir, seg));
-				if (s.size > 0) existCount++;
-			} catch {
-				// Missing segment
-			}
-		}
-
-		if (existCount === 0) return 'invalid';
-
-		// Check for .complete marker
-		try {
-			await access(path.join(dir, '.complete'));
-			if (existCount === segmentRefs.length) return 'complete';
-			// .complete exists but segments are missing — invalid
-			return 'invalid';
 		} catch {
-			// No .complete — it's partial
+			// No .complete marker
 		}
 
-		// Has manifest with ENDLIST? That means FFmpeg finished but .complete wasn't written
-		if (manifestContent.includes('#EXT-X-ENDLIST') && existCount === segmentRefs.length) {
-			// Write the missing .complete marker
-			await writeFile(path.join(dir, '.complete'), '');
-			this.logger.log(`Repaired missing .complete marker for ${movieFileId}/${quality}`);
-			return 'complete';
+		// Check if directory has any content
+		let files: string[];
+		try {
+			files = await readdir(dir);
+		} catch {
+			return 'empty';
 		}
 
-		return existCount >= 3 ? 'partial' : 'invalid';
+		const segments = files.filter((f) => f.startsWith('segment_') && f.endsWith('.ts'));
+		if (segments.length === 0) {
+			return files.includes('stream.m3u8') ? 'invalid' : 'empty';
+		}
+
+		// Has manifest with ENDLIST? Means FFmpeg finished but .complete wasn't written
+		if (files.includes('stream.m3u8')) {
+			try {
+				const manifest = await readFile(path.join(dir, 'stream.m3u8'), 'utf-8');
+				if (manifest.includes('#EXT-X-ENDLIST')) {
+					await writeFile(path.join(dir, '.complete'), '');
+					this.logger.log(
+						`Repaired missing .complete marker for ${movieFileId}/${quality}`,
+					);
+					return 'complete';
+				}
+			} catch {}
+		}
+
+		// Has chunk-meta.json? Then the chunk system manages it
+		if (files.includes('chunk-meta.json')) {
+			return 'partial';
+		}
+
+		// Old-format partial cache — check if it has enough segments to be useful
+		return segments.length >= 3 ? 'partial' : 'invalid';
 	}
 
 	/**
