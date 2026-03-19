@@ -1,5 +1,14 @@
+// - keep manifest cache on client for recently played X movies. Don't let it refetch/load on next 'play', if the movie was unloaded.
+// - pre-empt manifest loading if user hovers over play button, or clicks it? fire off manifest request first, for fastest load.
+
+- make movie info overlay when hovering cards: show more details, trailer...
+
 INFO:
 ssh rw3iss@192.168.50.211
+
+When selecting 'Re-scan file' on a specific movie, can you make it so that it does NOT replace any metadata that it found for the file (ie. the title and description), if they are already set?
+Re-scanning a movie should only update it's file info, and other file properties, and fill in the title and anything other metadata it finds in the scan... only if those properties or metadata are already empty.
+When I click 'Clear metadata', it should then delete all metadata, and set the movie title and description back to its basic file info/file name, at that point. Then I can rescan metadata again after that to pull the real info again.
 
 
 - group, see related movies in library or set (ie. series):

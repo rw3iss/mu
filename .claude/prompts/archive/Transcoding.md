@@ -104,3 +104,16 @@ architecturally supported. The main change needed is:
 
 This is feasible but adds complexity to the gap-detection logic. I'd suggest we start with the current sequential approach and add variable-duration support as a follow-up — for now, if
 the chunk size changes mid-transcode, we can keep existing chunks and just use the new size for remaining gaps, since the manifest already supports per-segment durations.
+
+
+--------------------------------------------------------------------------------
+
+We need to show some indication on the movie details page, and the movie cards, for movies that are not completely transcoded. Do we have a flag that is set on the
+movies if the transcoding is complete? If so, then on the movie details or card page, show a special label that the movie is not fully transcoded, just so the user
+knows that their may be issues playing. This can also just be the same 'Processing...' label that is already there... However it should show if the movies are not
+fully transcoded, and it should also ensure those movies transcoding operations (that are missing) are resumed, when the server starts, or at any point it detects
+them. It should try to be smart, in that case, and move the movies from the top of the 'recently played' list as the highest priority transcoding operations, if they
+need to be transcoded still. Basically the server should check all movies in the database on startup, and if any are not marked as 'transcoding complete', and need
+transcoding, an operation should be started for each movie (with the recently played movies at the highest transcoding priority, and started first). It should be able
+to detect which chunks are missing from those movies, and begin transcoding and filling them in, when that movie transcoding job starts to finish it. When it is
+finished, the transcoding should mark the movie as complete in the database, and the UI should update
