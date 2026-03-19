@@ -18,7 +18,7 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 - **Library sharing** -- share your library with other Mu instances over the network
 - **Custom player** -- keyboard shortcuts, PiP, speed control, movie info flyout, EQ and audio compressor
 - **Playlists** -- manual and smart playlists with filter rules (genre, year, rating, etc.)
-- **Ratings** -- rate movies on a 0--10 scale, import IMDb ratings, view aggregated scores
+- **Ratings** -- rate movies on a 0.0-10.0 scale (decimal precision), import IMDb ratings, view aggregated scores
 - **Discovery** -- related movies, personalized recommendations, browse by person/genre/decade
 - **PWA** -- installable on mobile, responsive design, swipe gestures
 - **Admin dashboard** -- server stats, user management, media sources, log viewer, cache and device management

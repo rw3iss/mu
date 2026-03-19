@@ -11,6 +11,7 @@ ssh rw3iss@192.168.50.211
 	- control server: restart, etc.
 	- user access...
 	- show current server configuration: ie. hardware encoding configuration, defaults: make an endpoint for server configuration.
+	I'd like to add a separate 'Server' section to the Settings page. This will be a location the user can manage everything about the server, and see the statistics, and see and manage running jobs, as well manage remote access to it.
 
 
 - show indicator on library page if movie is processing.
