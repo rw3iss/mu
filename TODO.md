@@ -5,11 +5,13 @@ ssh rw3iss@192.168.50.211
 - group, see related movies in library or set (ie. series):
 	- be smart... metadata if exists, otherwise strategies for filename/folder association.
 
-- add 'Server' section to Settings.:
+- add 'Server' section to Settings:
 	- see each job, progress, cancel
 	- see server stats
 	- control server: restart, etc.
 	- user access...
+	- show current server configuration: ie. hardware encoding configuration, defaults: make an endpoint for server configuration.
+
 
 - show indicator on library page if movie is processing.
 

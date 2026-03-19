@@ -1,4 +1,4 @@
-# CineHost
+# Mu
 
 **A lightweight, self-hosted movie streaming and management platform.**
 
@@ -8,14 +8,14 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 
 ## Features
 
-- **Library scanning** -- point at directories of movie files and CineHost indexes them automatically with real-time file watching
+- **Library scanning** -- point at directories of movie files and Mu indexes them automatically with real-time file watching
 - **Automatic metadata** -- posters, cast, ratings, and genres pulled from TMDB, OMDB/IMDb, and Rotten Tomatoes
 - **Streaming** -- HLS adaptive streaming with FFmpeg transcoding, or zero-overhead direct play for compatible formats
 - **Hardware acceleration** -- NVENC, QSV, VAAPI, and VideoToolbox for fast transcoding
 - **Multiple quality levels** -- 480p through 4K, selectable per-stream
 - **Subtitles & audio** -- embedded and external subtitle support (SRT, VTT, ASS), multiple audio track selection
 - **Resume playback** -- pick up where you left off, across devices
-- **Library sharing** -- share your library with other CineHost instances over the network
+- **Library sharing** -- share your library with other Mu instances over the network
 - **Custom player** -- keyboard shortcuts, PiP, speed control, movie info flyout, EQ and audio compressor
 - **Playlists** -- manual and smart playlists with filter rules (genre, year, rating, etc.)
 - **Ratings** -- rate movies on a 0--10 scale, import IMDb ratings, view aggregated scores
@@ -76,7 +76,7 @@ Restart the server after updating the PATH. The install script handles this auto
 Download and run the install script. It checks prerequisites, lets you pick a release, and walks you through configuration:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rw3iss/cinehost/main/src/scripts/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/rw3iss/mu/main/src/scripts/install.sh -o install.sh
 bash install.sh
 ```
 
@@ -90,15 +90,15 @@ The installer will:
 ### Interactive Installer (Windows PowerShell)
 
 ```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/rw3iss/cinehost/main/src/scripts/install.ps1" -OutFile install.ps1
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/rw3iss/mu/main/src/scripts/install.ps1" -OutFile install.ps1
 .\install.ps1
 ```
 
 ### Manual Install
 
 ```bash
-git clone https://github.com/rw3iss/cinehost.git
-cd cinehost/src
+git clone https://github.com/rw3iss/mu.git
+cd mu/src
 pnpm install
 pnpm build
 pnpm start
@@ -116,7 +116,7 @@ docker compose -f docker/docker-compose.yml up -d
 
 ## Configuration
 
-CineHost is configured through (in priority order):
+Mu is configured through (in priority order):
 
 1. **Environment variables** (prefixed with `MU_`)
 2. **Config file** (`data/config/config.yml`, auto-generated on first run)
@@ -183,7 +183,7 @@ Single underscores also work for flat keys: `MU_SERVER_PORT=4000`.
 ## Project Structure
 
 ```
-cinehost/
+mu/
   src/
   ├── packages/
   │   ├── server/        # NestJS + Fastify backend
@@ -210,8 +210,8 @@ Same as production: Node.js 20+, pnpm 9+, FFmpeg 5+.
 ### Getting Started
 
 ```bash
-git clone https://github.com/rw3iss/cinehost.git
-cd cinehost/src
+git clone https://github.com/rw3iss/mu.git
+cd mu/src
 
 # Install dependencies
 pnpm install
@@ -257,9 +257,9 @@ The server writes a PID file to `data/mu-server.pid`. The deploy/restart/stop sc
 For production deployments, the install script can set up a **systemd service** (Linux) that starts automatically on boot:
 
 ```bash
-sudo systemctl status cinehost
-sudo systemctl restart cinehost
-sudo journalctl -u cinehost -f
+sudo systemctl status mu
+sudo systemctl restart mu
+sudo journalctl -u mu -f
 ```
 
 ---
