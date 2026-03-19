@@ -967,9 +967,13 @@ export class TranscoderService implements OnModuleDestroy {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const configuredHwAccel = enc?.hwAccel || 'none';
 		const hwAccel = this.hwAccelBroken ? 'none' : configuredHwAccel;
+		const configuredPreset = enc?.preset || 'veryfast';
+		// NVENC uses different preset names: map libx264 presets to NVENC equivalents
+		const preset =
+			hwAccel === 'nvenc' ? this.mapNvencPreset(configuredPreset) : configuredPreset;
 		return {
 			hwAccel,
-			preset: enc?.preset || 'veryfast',
+			preset,
 			rateControl: enc?.rateControl || 'cbr',
 			crf: enc?.crf ?? 23,
 			segmentDuration: enc?.segmentDuration ?? 4,
@@ -1112,6 +1116,25 @@ export class TranscoderService implements OnModuleDestroy {
 			rateControl: enc.rateControl,
 			crf: enc.crf,
 		});
+	}
+
+	/**
+	 * Map libx264 preset names to NVENC equivalents.
+	 * NVENC uses p1-p7 or slow/medium/fast, not ultrafast/veryfast/etc.
+	 */
+	private mapNvencPreset(preset: string): string {
+		const map: Record<string, string> = {
+			ultrafast: 'p1',
+			superfast: 'p1',
+			veryfast: 'p2',
+			faster: 'p3',
+			fast: 'p4',
+			medium: 'p5',
+			slow: 'p6',
+			slower: 'p7',
+			veryslow: 'p7',
+		};
+		return map[preset] ?? 'p2';
 	}
 
 	private getVideoCodec(hwAccel: string): string {
