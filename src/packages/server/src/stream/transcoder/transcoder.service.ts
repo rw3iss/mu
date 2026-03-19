@@ -29,6 +29,8 @@ export class TranscoderService implements OnModuleDestroy {
 	private readonly sessionStates = new Map<string, { state: TranscodeState; error?: string }>();
 	/** Sessions that have already retried with software encoding (prevents infinite loops) */
 	private readonly swFallbackAttempted = new Set<string>();
+	/** If true, hardware encoding has failed and all encodes should use software */
+	private hwAccelBroken = false;
 	private readonly cacheDir: string;
 
 	constructor(
@@ -982,8 +984,9 @@ export class TranscoderService implements OnModuleDestroy {
 		if (!profile) throw new Error(`No transcoding profile for quality "${quality}"`);
 
 		const enc = this.getEncodingSettings();
-		const hwAccel = useSoftware ? 'none' : enc.hwAccel;
-		const videoCodec = useSoftware ? 'libx264' : this.getVideoCodec(hwAccel);
+		const forceSoftware = useSoftware || this.hwAccelBroken;
+		const hwAccel = forceSoftware ? 'none' : enc.hwAccel;
+		const videoCodec = forceSoftware ? 'libx264' : this.getVideoCodec(hwAccel);
 		const videoRateOpts =
 			enc.rateControl === 'crf' ? ['-crf', String(enc.crf)] : ['-b:v', profile.videoBitrate];
 		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
@@ -1051,9 +1054,10 @@ export class TranscoderService implements OnModuleDestroy {
 					this.activeProcesses.delete(processKey);
 
 					// If hardware encoding failed, retry with software
-					if (hwAccel !== 'none' && !useSoftware) {
+					if (hwAccel !== 'none' && !forceSoftware) {
+						this.hwAccelBroken = true;
 						this.logger.warn(
-							`HW accel failed for chunk ${path.basename(outputPath)}, retrying with software`,
+							`HW accel failed for chunk ${path.basename(outputPath)}, switching to software for all future chunks`,
 						);
 						this.transcodeChunk(
 							filePath,
