@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, rm } from 'node:fs/promises';
+import { access, mkdir, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import ffmpeg from 'fluent-ffmpeg';
@@ -25,39 +25,87 @@ export class SubtitleService {
 	 * then extract each subtitle stream to WebVTT format.
 	 * Returns metadata about the discovered subtitle tracks.
 	 */
-	async extractSubtitles(filePath: string, movieFileId: string): Promise<SubtitleTrack[]> {
+	async extractSubtitles(
+		filePath: string,
+		movieFileId: string,
+		/** Pre-loaded subtitle track info from DB (skips FFprobe if provided) */
+		storedTracks?: { index: number; language?: string; title?: string; codec?: string }[],
+	): Promise<SubtitleTrack[]> {
 		const outputDir = this.getSubtitleDir(movieFileId);
 		await mkdir(outputDir, { recursive: true });
 
 		const tracks: SubtitleTrack[] = [];
 
-		// Extract embedded subtitles (requires ffprobe + ffmpeg)
-		try {
-			const probeData = await this.probe(filePath);
-			const subtitleStreams = (probeData.streams || []).filter(
-				(stream: any) => stream.codec_type === 'subtitle',
-			);
-
-			for (let i = 0; i < subtitleStreams.length; i++) {
-				const stream = subtitleStreams[i];
-				const language = stream.tags?.language || 'und';
-				const title = stream.tags?.title || `Track ${i}`;
+		// Use stored track info if available (avoids FFprobe)
+		if (storedTracks && storedTracks.length > 0) {
+			for (let i = 0; i < storedTracks.length; i++) {
+				const track = storedTracks[i]!;
 				const outputPath = path.join(outputDir, `${i}.vtt`);
 
+				// Skip extraction if VTT already exists from a previous session
 				try {
-					await this.extractTrack(filePath, stream.index, outputPath);
-					tracks.push({ index: i, language, title });
-					this.logger.debug(
-						`Extracted subtitle track ${i} (${language}) from ${path.basename(filePath)}`,
-					);
+					await access(outputPath);
+					tracks.push({
+						index: i,
+						language: track.language || 'und',
+						title: track.title || `Track ${i}`,
+					});
+					continue;
+				} catch {
+					// Not yet extracted
+				}
+
+				try {
+					await this.extractTrack(filePath, track.index, outputPath);
+					tracks.push({
+						index: i,
+						language: track.language || 'und',
+						title: track.title || `Track ${i}`,
+					});
 				} catch (err) {
 					this.logger.warn(
 						`Failed to extract subtitle track ${i} from ${path.basename(filePath)}: ${err}`,
 					);
 				}
 			}
-		} catch (err) {
-			this.logger.warn(`ffprobe unavailable, skipping embedded subtitle extraction: ${err}`);
+		} else {
+			// Fallback: probe the file for embedded subtitles
+			try {
+				const probeData = await this.probe(filePath);
+				const subtitleStreams = (probeData.streams || []).filter(
+					(stream: any) => stream.codec_type === 'subtitle',
+				);
+
+				for (let i = 0; i < subtitleStreams.length; i++) {
+					const stream = subtitleStreams[i];
+					const language = stream.tags?.language || 'und';
+					const title = stream.tags?.title || `Track ${i}`;
+					const outputPath = path.join(outputDir, `${i}.vtt`);
+
+					// Skip if already extracted
+					try {
+						await access(outputPath);
+						tracks.push({ index: i, language, title });
+						continue;
+					} catch {}
+
+					try {
+						await this.extractTrack(filePath, stream.index, outputPath);
+						tracks.push({ index: i, language, title });
+						this.logger.debug(
+							`Extracted subtitle track ${i} (${language}) from ${path.basename(filePath)}`,
+						);
+					} catch (err) {
+						this.logger.warn(
+							`Failed to extract subtitle track ${i} from ${path.basename(filePath)}: ${err}`,
+						);
+					}
+				}
+			} catch (err) {
+				this.logger.warn(
+					`ffprobe unavailable, skipping embedded subtitle extraction: ${err}`,
+				);
+			}
 		}
 
 		// Discover and convert external subtitle files

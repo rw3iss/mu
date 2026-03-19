@@ -221,10 +221,22 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			});
 		}
 
-		// Extract subtitles from the file
+		// Extract subtitles — use stored track info from DB to skip FFprobe
 		let subtitleTracks: { index: number; language: string; title: string }[] = [];
 		try {
-			subtitleTracks = await this.subtitleService.extractSubtitles(file.filePath, file.id);
+			let storedTracks:
+				| { index: number; language?: string; title?: string; codec?: string }[]
+				| undefined;
+			if (file.subtitleTracks) {
+				try {
+					storedTracks = JSON.parse(file.subtitleTracks as string);
+				} catch {}
+			}
+			subtitleTracks = await this.subtitleService.extractSubtitles(
+				file.filePath,
+				file.id,
+				storedTracks,
+			);
 		} catch (err) {
 			this.logger.warn(`Failed to extract subtitles for file ${file.id}: ${err}`);
 		}
