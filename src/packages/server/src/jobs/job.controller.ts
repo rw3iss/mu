@@ -1,10 +1,24 @@
-import { Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
+import {
+	Controller,
+	forwardRef,
+	Get,
+	Inject,
+	NotFoundException,
+	Param,
+	Post,
+	Query,
+} from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { LibraryJobsService } from '../library/library-jobs.service.js';
 import { JobManagerService } from './job-manager.service.js';
 
 @Controller('jobs')
 export class JobController {
-	constructor(private readonly jobManager: JobManagerService) {}
+	constructor(
+		private readonly jobManager: JobManagerService,
+		@Inject(forwardRef(() => LibraryJobsService))
+		private readonly libraryJobs: LibraryJobsService,
+	) {}
 
 	@Get()
 	@Roles('admin')
@@ -30,22 +44,22 @@ export class JobController {
 	}
 
 	/**
-	 * Get movie IDs that currently have active pre-transcode jobs.
-	 * Available to all authenticated users (not admin-only).
+	 * Get movie IDs that are currently processing or need transcoding.
+	 * Includes active jobs AND movies that haven't finished transcoding.
 	 */
 	@Get('processing-movies')
 	getProcessingMovies() {
-		const jobs = this.jobManager.findJobsByPayload('movieId', undefined, 'pre-transcode', [
-			'pending',
-			'running',
-		]);
-		// findJobsByPayload with undefined value won't match — use listJobs instead
+		// Active job-based processing
 		const allJobs = this.jobManager.listJobs({ type: 'pre-transcode', status: 'pending' });
 		const runningJobs = this.jobManager.listJobs({ type: 'pre-transcode', status: 'running' });
 		const movieIds = new Set<string>();
 		for (const job of [...allJobs, ...runningJobs]) {
 			const mid = job.payload?.movieId as string | undefined;
 			if (mid) movieIds.add(mid);
+		}
+		// Also include movies that need transcoding but aren't being processed yet
+		for (const mid of this.libraryJobs.getUntranscodedMovieIds()) {
+			movieIds.add(mid);
 		}
 		return { movieIds: [...movieIds] };
 	}

@@ -1,9 +1,9 @@
 import crypto from 'node:crypto';
 import { nowISO, StreamMode, WsEvent } from '@mu/shared';
 import { forwardRef, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movieFiles, movies, transcodeCache } from '../database/schema/index.js';
+import { movieFiles, movies, transcodeCache, userWatchHistory } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import type { JobHelpers, JobRecord } from '../jobs/job.interface.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
@@ -369,10 +369,11 @@ export class LibraryJobsService implements OnModuleInit {
 	 * On startup, find movie files that need transcoding but don't have a completed cache,
 	 * and re-enqueue them as pre-transcode jobs.
 	 */
+	/**
+	 * On startup, find movie files that need transcoding but don't have a completed cache,
+	 * and enqueue them. Recently watched movies get higher priority.
+	 */
 	private async resumeIncompleteTranscodes(): Promise<void> {
-		// If chunked transcoding is enabled, the ChunkManagerService handles resume on its own
-		if (this.chunkManager.isEnabled()) return;
-
 		const lib = this.settings.get<Record<string, unknown>>('library', {});
 		const persistEnabled = (lib as any)?.persistTranscodes !== false;
 		if (!persistEnabled) return;
@@ -380,6 +381,16 @@ export class LibraryJobsService implements OnModuleInit {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const defaultQuality = enc?.quality || '1080p';
 		const encodeHighest = enc?.encodeHighestAvailable === true;
+		const useChunked = this.chunkManager.isEnabled();
+
+		// Get recently watched movie IDs for priority ordering
+		const recentlyWatched = this.database.db
+			.select({ movieId: userWatchHistory.movieId, watchedAt: userWatchHistory.watchedAt })
+			.from(userWatchHistory)
+			.orderBy(sql`${userWatchHistory.watchedAt} DESC`)
+			.limit(50)
+			.all();
+		const recentMovieIds = new Set(recentlyWatched.map((r) => r.movieId));
 
 		const allFiles = this.database.db
 			.select({
@@ -412,26 +423,85 @@ export class LibraryJobsService implements OnModuleInit {
 				const hasCached = await this.transcoderService.hasCachedTranscode(file.id, quality);
 				if (hasCached) continue;
 
+				// Recently watched movies get higher priority
+				const isRecent = recentMovieIds.has(file.movieId);
+				const priority = isRecent ? 30 : 45;
 				const title = movieTitle || file.id.slice(0, 8);
-				this.jobManager.enqueue({
-					type: JOB_TYPE.PRE_TRANSCODE,
-					label: `Resume transcode: ${title} (${quality})`,
-					payload: {
-						movieId: file.movieId,
-						movieFileId: file.id,
-						filePath: file.filePath,
-						mode,
+
+				if (
+					useChunked &&
+					mode === StreamMode.TRANSCODE &&
+					file.durationSeconds &&
+					file.durationSeconds > 0
+				) {
+					// Chunked transcoding: initialize chunk map and enqueue chunks
+					await this.chunkManager.initializeChunkMap(
+						file.id,
 						quality,
-					},
-					priority: 45,
-				});
+						file.filePath,
+						file.durationSeconds,
+					);
+					this.chunkManager.enqueueAllPending(file.id, quality, priority);
+				} else {
+					// Monolithic transcoding
+					this.jobManager.enqueue({
+						type: JOB_TYPE.PRE_TRANSCODE,
+						label: `Resume transcode: ${title} (${quality})`,
+						payload: {
+							movieId: file.movieId,
+							movieFileId: file.id,
+							filePath: file.filePath,
+							mode,
+							quality,
+						},
+						priority,
+					});
+				}
 				resumed++;
 			}
 		}
 
 		if (resumed > 0) {
-			this.logger.log(`Resumed ${resumed} incomplete pre-transcode jobs on startup`);
+			this.logger.log(
+				`Resumed ${resumed} incomplete transcode jobs on startup (${recentMovieIds.size} recently watched prioritized)`,
+			);
 		}
+	}
+
+	/**
+	 * Get movie IDs that need transcoding but don't have a completed cache.
+	 */
+	getUntranscodedMovieIds(): string[] {
+		const lib = this.settings.get<Record<string, unknown>>('library', {});
+		const persistEnabled = (lib as any)?.persistTranscodes !== false;
+		if (!persistEnabled) return [];
+
+		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+		const defaultQuality = enc?.quality || '1080p';
+
+		const allFiles = this.database.db
+			.select({ file: movieFiles })
+			.from(movieFiles)
+			.where(eq(movieFiles.available, true))
+			.all();
+
+		// Get all cached transcode file IDs
+		const cachedFileIds = new Set(
+			this.database.db
+				.select({ movieFileId: transcodeCache.movieFileId })
+				.from(transcodeCache)
+				.all()
+				.map((c) => c.movieFileId),
+		);
+
+		const movieIds = new Set<string>();
+		for (const { file } of allFiles) {
+			const mode = this.streamService.determineStreamMode(file);
+			if (mode !== StreamMode.TRANSCODE && mode !== StreamMode.DIRECT_STREAM) continue;
+			if (cachedFileIds.has(file.id)) continue;
+			movieIds.add(file.movieId);
+		}
+		return [...movieIds];
 	}
 
 	enqueuePreTranscodeIfNeeded(movieId: string, title: string): void {
