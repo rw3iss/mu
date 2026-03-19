@@ -1,0 +1,15 @@
+diff --git a/lib/processor.js b/lib/processor.js
+index 36d980ad0cbf60cf55d2b2664460cad7b475584b..754e92bec6e85d7caf140cb4441d4d17562dccba 100644
+--- a/lib/processor.js
++++ b/lib/processor.js
+@@ -438,8 +438,8 @@ module.exports = function(proto) {
+           captureStdout: !outputStream,
+           niceness: self.options.niceness,
+           cwd: self.options.cwd,
+-          windowsHide: true
+-        }, 
++          windowsHide: false
++        },
+ 
+         function processCB(ffmpegProc, stdoutRing, stderrRing) {
+           self.ffmpegProc = ffmpegProc;
