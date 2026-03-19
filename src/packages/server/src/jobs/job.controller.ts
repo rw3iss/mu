@@ -1,24 +1,10 @@
-import {
-	Controller,
-	forwardRef,
-	Get,
-	Inject,
-	NotFoundException,
-	Param,
-	Post,
-	Query,
-} from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator.js';
-import { LibraryJobsService } from '../library/library-jobs.service.js';
 import { JobManagerService } from './job-manager.service.js';
 
 @Controller('jobs')
 export class JobController {
-	constructor(
-		private readonly jobManager: JobManagerService,
-		@Inject(forwardRef(() => LibraryJobsService))
-		private readonly libraryJobs: LibraryJobsService,
-	) {}
+	constructor(private readonly jobManager: JobManagerService) {}
 
 	@Get()
 	@Roles('admin')
@@ -58,7 +44,7 @@ export class JobController {
 			if (mid) movieIds.add(mid);
 		}
 		// Also include movies that need transcoding but aren't being processed yet
-		for (const mid of this.libraryJobs.getUntranscodedMovieIds()) {
+		for (const mid of this.jobManager.getUntranscodedMovieIds()) {
 			movieIds.add(mid);
 		}
 		return { movieIds: [...movieIds] };

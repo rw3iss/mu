@@ -33,6 +33,9 @@ export class JobManagerService implements OnModuleDestroy {
 	/** Max concurrent jobs */
 	private maxConcurrency = 4;
 
+	/** Callback to get untranscoded movie IDs (registered by LibraryJobsService) */
+	private untranscodedMovieIdsFn: (() => string[]) | null = null;
+
 	/** Scheduled recurring jobs */
 	private readonly scheduler = new ToadScheduler();
 	private readonly scheduledJobs = new Map<string, SimpleIntervalJob>();
@@ -49,6 +52,20 @@ export class JobManagerService implements OnModuleDestroy {
 	/**
 	 * Register a handler for a job type. Only one handler per type.
 	 */
+	/**
+	 * Register a callback that returns untranscoded movie IDs.
+	 */
+	registerUntranscodedMovieIdsFn(fn: () => string[]): void {
+		this.untranscodedMovieIdsFn = fn;
+	}
+
+	/**
+	 * Get movie IDs that need transcoding (via registered callback).
+	 */
+	getUntranscodedMovieIds(): string[] {
+		return this.untranscodedMovieIdsFn?.() ?? [];
+	}
+
 	registerHandler(type: string, handler: JobHandler): void {
 		if (this.handlers.has(type)) {
 			this.logger.warn(`Overwriting handler for job type "${type}"`);

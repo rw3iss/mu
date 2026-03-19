@@ -53,6 +53,8 @@ export class LibraryJobsService implements OnModuleInit {
 		this.registerHandlers();
 		this.registerScheduledJobs();
 		this.listenForNewMovies();
+		// Register callback so JobController can query untranscoded movie IDs
+		this.jobManager.registerUntranscodedMovieIdsFn(() => this.getUntranscodedMovieIds());
 		// Resume incomplete pre-transcode jobs after a short delay to let other modules init
 		setTimeout(() => this.resumeIncompleteTranscodes(), 3000);
 	}
