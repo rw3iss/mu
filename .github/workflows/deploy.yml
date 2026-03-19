@@ -2,7 +2,7 @@ name: Deploy to Server
 
 on:
   push:
-    branches: [main]
+    branches: [feature/transcode-chunk-resume]
 
 jobs:
   deploy:
