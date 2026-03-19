@@ -974,6 +974,7 @@ export class TranscoderService implements OnModuleDestroy {
 		startTime: number,
 		chunkDuration: number,
 		quality: string = '1080p',
+		useSoftware = false,
 	): Promise<void> {
 		const profile =
 			TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES] ??
@@ -981,8 +982,8 @@ export class TranscoderService implements OnModuleDestroy {
 		if (!profile) throw new Error(`No transcoding profile for quality "${quality}"`);
 
 		const enc = this.getEncodingSettings();
-		const hwAccel = enc.hwAccel;
-		const videoCodec = this.getVideoCodec(hwAccel);
+		const hwAccel = useSoftware ? 'none' : enc.hwAccel;
+		const videoCodec = useSoftware ? 'libx264' : this.getVideoCodec(hwAccel);
 		const videoRateOpts =
 			enc.rateControl === 'crf' ? ['-crf', String(enc.crf)] : ['-b:v', profile.videoBitrate];
 		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
@@ -1048,6 +1049,24 @@ export class TranscoderService implements OnModuleDestroy {
 						`Chunk encode failed ${path.basename(outputPath)}: ${err.message}`,
 					);
 					this.activeProcesses.delete(processKey);
+
+					// If hardware encoding failed, retry with software
+					if (hwAccel !== 'none' && !useSoftware) {
+						this.logger.warn(
+							`HW accel failed for chunk ${path.basename(outputPath)}, retrying with software`,
+						);
+						this.transcodeChunk(
+							filePath,
+							outputPath,
+							startTime,
+							chunkDuration,
+							quality,
+							true,
+						)
+							.then(resolve)
+							.catch(reject);
+						return;
+					}
 					reject(err);
 				})
 				.on('end', () => {
