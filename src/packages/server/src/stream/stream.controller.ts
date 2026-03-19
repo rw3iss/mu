@@ -77,7 +77,29 @@ export class StreamController {
 			return reply.send({ state: 'failed', ready: false, error: state.error });
 		}
 
-		// Check if the manifest and first segment exist
+		// Check chunk-based transcoding first
+		const sessionInfo = this.streamService.getSessionInfo(sessionId);
+		if (sessionInfo?.movieFileId) {
+			const chunkMap = this.chunkManager.getChunkMap(
+				sessionInfo.movieFileId,
+				sessionInfo.quality || '1080p',
+			);
+			if (chunkMap) {
+				// Chunked mode: ready when the first chunk is complete
+				const firstChunkReady = chunkMap.chunks[0]?.status === 'complete';
+				const progress = this.chunkManager.getProgress(
+					sessionInfo.movieFileId,
+					sessionInfo.quality || '1080p',
+				);
+				return reply.send({
+					state: firstChunkReady ? 'running' : 'preparing',
+					ready: firstChunkReady,
+					progress: progress.percent,
+				});
+			}
+		}
+
+		// Fallback: check if the manifest and first segment exist on disk
 		const dir = this.streamService.getSessionCacheDir(sessionId);
 		const manifest = await this.hlsGenerator.getManifest(sessionId, dir);
 		const firstSeg = await this.hlsGenerator.getSegment(sessionId, 0, dir);
