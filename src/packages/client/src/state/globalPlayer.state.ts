@@ -162,17 +162,29 @@ export async function playMovie(
 		playerMode.value = 'full';
 		const engine = sharedVideoEngine.value;
 		if (engine) {
-			engine.setIntendedPlaying(true);
 			const video = engine.videoRef.current;
-			if (opts?.fromBeginning && video) {
-				video.currentTime = 0;
-				currentTime.value = 0;
+			// If the video has no source or is stuck (duration=0, no buffered data),
+			// force a fresh stream instead of trying to resume stale state
+			const isStuck =
+				video &&
+				(!video.src ||
+					(video.duration === 0 &&
+						video.buffered.length === 0 &&
+						!currentSession.value.directPlay));
+			if (isStuck) {
+				// Fall through to create a new stream
+			} else {
+				engine.setIntendedPlaying(true);
+				if (opts?.fromBeginning && video) {
+					video.currentTime = 0;
+					currentTime.value = 0;
+				}
+				if (video?.paused) video.play().catch(() => {});
+				const movie = globalMovie.value;
+				if (movie) pushToHistory(movie);
+				return;
 			}
-			if (video?.paused) video.play().catch(() => {});
 		}
-		const movie = globalMovie.value;
-		if (movie) pushToHistory(movie);
-		return;
 	}
 
 	// Stop old stream and destroy video engine before switching movies
@@ -358,14 +370,9 @@ export function initGlobalPlayer(): void {
 		const wasPlaying = localStorage.getItem('mu_is_playing') === '1';
 		restoredAutoplay.value = wasPlaying;
 
-		// Restore session if it matches the movie.
-		// We set startPosition from the saved time so playback resumes at the right spot.
-		// If the session is stale, GlobalPlayer will create a fresh one.
-		if (saved.session?.sessionId && saved.session?.movieId === saved.movieId) {
-			currentSession.value = { ...saved.session, startPosition: saved.currentTime };
-		} else {
-			currentSession.value = null;
-		}
+		// Don't restore the old session — it's stale after a refresh.
+		// GlobalPlayer will create a fresh stream using forceStartPosition.
+		currentSession.value = null;
 
 		// Use the best available position: compare saved state vs per-movie localStorage
 		let bestPosition = saved.currentTime || 0;
