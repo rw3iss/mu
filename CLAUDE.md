@@ -202,3 +202,40 @@ echo 'cd /c/Users/rw3is/Documents/Sites/other/mu/src && bash deploy.sh' | ssh rw
 - Client uses Preact Signals for state management, not React useState patterns
 - SCSS Modules for component styling (`*.module.scss`)
 - UI settings persisted to localStorage via `useUiSetting` hook
+
+## Gotchas & Patterns
+
+### Windows Production Server
+- SSH commands must be piped via stdin: `echo 'cmd' | ssh rw3iss@192.168.50.211`
+- NVENC hardware encoding fails with exit code 0xC0000142 (DLL init failure) — server auto-detects and falls back to software globally via `hwAccelBroken` flag
+- FFmpeg paths must use forward slashes (`C:/ffmpeg/`) — backslashes fail with `existsSync`
+- `stop.sh` grep pipelines need `|| true` to prevent `set -e` from killing deploy when port is already freed
+- File paths with special characters (brackets `[`, multiple spaces) can cause FFmpeg failures
+
+### Transcoding System
+- Two modes: monolithic (legacy, single FFmpeg per movie) and chunked (new, independent chunks per movie)
+- Chunked mode controlled by `useChunkedTranscoding` encoding setting (default: off)
+- Chunk manager has its own priority queue separate from JobManagerService
+- `validateCache()` must be fast — avoid per-segment `stat()` calls (use `.complete` marker trust)
+- Pre-transcode jobs resume on startup; recently watched movies get priority 30 vs 45
+- `getEncodingSettings()` is the single source of truth for codec settings — `hwAccelBroken` flag is checked there
+
+### Client Player
+- Player is a persistent overlay (no route) — `globalPlayer.state.ts` manages lifecycle
+- On refresh, always create a fresh stream session — never restore stale session from localStorage
+- HLS.js recovery: MAX_FULL_RELOADS=3 prevents infinite retry loops; recovery timers tracked via ref for cleanup on destroy
+- `durationSeconds` from server response overrides HLS-reported duration (which grows during live transcoding)
+
+### NestJS Dependency Injection
+- Cross-module service injection requires the service to be exported from its module AND imported in the consuming module
+- Use callback registration pattern (not `forwardRef`) when modules have circular dependencies (e.g., JobController needing LibraryJobsService)
+- `forwardRef` only works within the same module's providers
+
+### Edit Tool & Deep Indentation
+- The Edit tool can fail to match strings with deep tab nesting (13+ levels) — use Python string replacement via Bash as fallback
+- Always verify edits applied correctly with Read or Grep after deeply-nested changes
+
+### Deploy
+- Use `echo 'cd /c/Users/rw3is/Documents/Sites/other/mu/src && bash deploy.sh' | ssh rw3iss@192.168.50.211` (canonical deploy)
+- Git remote uses SSH URL: `git@github.com:rw3iss/cinehost.git` (repo was renamed to `mu` but SSH URL still works)
+- `pnpm logs` tails local server log; `pnpm logs:prod` tails production via SSH
