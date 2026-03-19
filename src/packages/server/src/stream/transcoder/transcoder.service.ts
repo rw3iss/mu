@@ -15,6 +15,8 @@ interface TranscodeOptions {
 	quality?: string;
 	audioTrack?: number;
 	subtitleTrack?: number;
+	/** Start transcoding from this position (seconds). Used for seek-restart. */
+	seekSeconds?: number;
 }
 
 type TranscodeState = 'running' | 'completed' | 'failed';
@@ -192,7 +194,14 @@ export class TranscoderService implements OnModuleDestroy {
 			// Use scale filter instead of .size() to preserve aspect ratio
 			const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
 
-			let command = ffmpeg(filePath)
+			let command = ffmpeg(filePath);
+
+			// Seek to start position if specified (input-level -ss for fast seek)
+			if (options.seekSeconds && options.seekSeconds > 0) {
+				command = command.inputOptions(['-ss', String(options.seekSeconds)]);
+			}
+
+			command = command
 				.outputOptions([
 					'-f',
 					'hls',

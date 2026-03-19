@@ -16,6 +16,7 @@ export interface StreamSession {
 	audioTracks: AudioTrack[];
 	qualities: QualityOption[];
 	startPosition: number;
+	durationSeconds?: number | null;
 }
 
 export interface SubtitleTrack {

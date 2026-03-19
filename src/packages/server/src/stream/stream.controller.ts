@@ -168,6 +168,19 @@ export class StreamController {
 	}
 
 	/**
+	 * Restart transcoding from a new position (seek).
+	 * Stops the current FFmpeg process and starts a new one from the given time.
+	 */
+	@Post(':sessionId/seek')
+	async seekStream(
+		@Param('sessionId') sessionId: string,
+		@Body() body: { positionSeconds: number },
+	) {
+		await this.streamService.seekStream(sessionId, body.positionSeconds);
+		return { success: true };
+	}
+
+	/**
 	 * End a streaming session, stopping any active transcode and cleaning up resources.
 	 */
 	@Delete(':sessionId')

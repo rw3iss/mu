@@ -356,7 +356,81 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			audioTracks,
 			qualities,
 			startPosition: resumePosition,
+			durationSeconds: file.durationSeconds ?? null,
 		};
+	}
+
+	/**
+	 * Restart transcoding from a new seek position.
+	 * Stops the current FFmpeg, cleans up ephemeral segments, and restarts from the given time.
+	 */
+	async seekStream(sessionId: string, positionSeconds: number): Promise<void> {
+		const session = await this.database.db
+			.select()
+			.from(streamSessions)
+			.where(eq(streamSessions.id, sessionId));
+
+		if (session.length === 0) {
+			throw new NotFoundException(`Stream session ${sessionId} not found`);
+		}
+
+		const sess = session[0]!;
+		const fileId = sess.movieFileId;
+		if (!fileId) {
+			throw new NotFoundException('Session has no associated file');
+		}
+
+		const file = await this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.id, fileId));
+
+		if (file.length === 0) {
+			throw new NotFoundException(`File ${fileId} not found`);
+		}
+
+		const movieFile = file[0]!;
+		const mode = this.determineStreamMode(movieFile);
+
+		// Only applicable to transcoded streams
+		if (mode !== StreamMode.TRANSCODE && mode !== StreamMode.DIRECT_STREAM) {
+			return;
+		}
+
+		// Stop current transcode
+		this.transcoderService.stopTranscode(sessionId);
+
+		// Clean up ephemeral session dir (not persistent cache)
+		const sessionDir = this.transcoderService.getSessionDir(sessionId);
+		const currentDir = this.sessionDirs.get(sessionId);
+		const persistDir = this.transcoderService.getPersistentDir(
+			movieFile.id,
+			sess.quality || '1080p',
+		);
+
+		// Only clean ephemeral dirs, not persistent cache
+		if (currentDir !== persistDir) {
+			await this.transcoderService.cleanup(sessionId);
+		}
+
+		// Create new ephemeral dir for this seek
+		const newDir = this.transcoderService.getSessionDir(sessionId);
+		this.sessionDirs.set(sessionId, newDir);
+
+		// Restart transcode from seek position
+		const quality = sess.quality || '1080p';
+		if (mode === StreamMode.TRANSCODE) {
+			await this.transcoderService.startTranscode(
+				sessionId,
+				movieFile.filePath,
+				{ quality, seekSeconds: positionSeconds },
+				newDir,
+			);
+		} else {
+			await this.transcoderService.startRemux(sessionId, movieFile.filePath, newDir);
+		}
+
+		this.logger.log(`Seek-restart session ${sessionId} from ${positionSeconds}s`);
 	}
 
 	async updateProgress(sessionId: string, positionSeconds: number) {

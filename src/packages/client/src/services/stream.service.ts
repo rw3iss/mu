@@ -117,6 +117,14 @@ export const streamService = {
 	},
 
 	/**
+	 * Restart transcoding from a new seek position.
+	 */
+	seekStream(sessionId: string, positionSeconds: number): Promise<void> {
+		if (sessionId.startsWith('remote:')) return Promise.resolve();
+		return api.post<void>(`/stream/${sessionId}/seek`, { positionSeconds });
+	},
+
+	/**
 	 * End a stream session.
 	 * No-op for remote sessions.
 	 */

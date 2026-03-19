@@ -2,6 +2,7 @@ import Hls from 'hls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting } from '@/hooks/useUiSetting';
+import { streamService } from '@/services/stream.service';
 import { initAudioEffects } from '@/state/audio-effects.state';
 import { globalMovieId } from '@/state/globalPlayer.state';
 import {
@@ -111,7 +112,14 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 
 			video.addEventListener('durationchange', () => {
 				if (video.duration && Number.isFinite(video.duration)) {
-					duration.value = video.duration;
+					// Prefer the known movie duration from session (full length)
+					// over HLS-reported duration (which grows during transcoding)
+					const knownDuration = currentSession.value?.durationSeconds;
+					if (knownDuration && knownDuration > video.duration) {
+						duration.value = knownDuration;
+					} else {
+						duration.value = video.duration;
+					}
 				}
 			});
 			video.addEventListener('play', () => {
@@ -329,6 +337,11 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 
 				hls.on(Hls.Events.MANIFEST_PARSED, () => {
 					setHlsStatus(null);
+					// Set full movie duration if known (for in-progress transcodes)
+					const knownDuration = currentSession.value?.durationSeconds;
+					if (knownDuration && knownDuration > 0) {
+						duration.value = knownDuration;
+					}
 					// Don't disrupt if user already started playing manually
 					if (!video.paused) return;
 					if (startPosition > 0) video.currentTime = startPosition;
@@ -516,6 +529,65 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const seek = useCallback((time: number) => {
 		const video = videoRef.current;
 		if (!video) return;
+
+		// Check if seeking past what's buffered/available in the HLS stream
+		const session = currentSession.value;
+		const hls = hlsRef.current;
+		if (hls && session && !session.directPlay) {
+			// Get the end of the last buffered range
+			let bufferedEnd = 0;
+			if (video.buffered.length > 0) {
+				bufferedEnd = video.buffered.end(video.buffered.length - 1);
+			}
+			// Also check the HLS-reported duration (transcoded length so far)
+			const hlsDuration =
+				video.duration && Number.isFinite(video.duration) ? video.duration : 0;
+			const availableEnd = Math.max(bufferedEnd, hlsDuration);
+
+			// If seeking past available content, restart transcode from that position
+			if (time > availableEnd + 5) {
+				setHlsStatus('Seeking...');
+				hls.destroy();
+				hlsRef.current = null;
+
+				streamService
+					.seekStream(session.sessionId, time)
+					.then(() => {
+						// Wait briefly for FFmpeg to start generating segments
+						setTimeout(() => {
+							const token = localStorage.getItem('mu_token');
+							const newHls = new Hls({
+								startPosition: 0, // FFmpeg starts from 0 in new output
+								enableWorker: true,
+								lowLatencyMode: false,
+								maxBufferLength: bufferConfig.maxBufferLength,
+								maxMaxBufferLength: bufferConfig.maxMaxBufferLength,
+								maxBufferSize: bufferConfig.maxBufferSize,
+								fragLoadingMaxRetry: 15,
+								fragLoadingRetryDelay: 2000,
+								manifestLoadingMaxRetry: 15,
+								manifestLoadingRetryDelay: 2000,
+								xhrSetup(xhr) {
+									if (token)
+										xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+								},
+							});
+							newHls.loadSource(session.streamUrl);
+							newHls.attachMedia(video);
+							hlsRef.current = newHls;
+							setHlsStatus(null);
+						}, 1500);
+					})
+					.catch(() => {
+						setHlsStatus(null);
+					});
+
+				currentTime.value = time;
+				lastDisplayTime.current = time;
+				latestTimeRef.current = time;
+				return;
+			}
+		}
 
 		seekLockRef.current = true;
 		// Use fastSeek for smoother scrubbing (snaps to nearest keyframe)
