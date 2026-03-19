@@ -791,6 +791,9 @@ export function MovieDetail({ id }: MovieDetailProps) {
 												<div class={styles.subtitlePanelWrap}>
 													<SubtitlePanel
 														movieId={movie.id}
+														fileName={
+															movie.fileInfo?.fileName ?? undefined
+														}
 														existingTracks={(
 															movie.fileInfo?.subtitleTracks ?? []
 														).map((t) => ({

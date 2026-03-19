@@ -181,6 +181,18 @@
   overflow-y: auto;
 }
 
+.fileNameLabel {
+  padding: 4px 8px;
+  margin: 0 0 4px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .resultItem {
   display: flex;
   align-items: center;

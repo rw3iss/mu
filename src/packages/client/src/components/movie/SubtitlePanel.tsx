@@ -15,6 +15,8 @@ interface SubtitlePanelProps {
 	onTrackAdded?: (track: MovieSubtitleInfo) => void;
 	/** Called after a subtitle is deleted with the deleted track info */
 	onTrackDeleted?: (track: MovieSubtitleInfo) => void;
+	/** Movie file name to display above search results for reference */
+	fileName?: string;
 }
 
 export function SubtitlePanel({
@@ -24,6 +26,7 @@ export function SubtitlePanel({
 	onSubtitlesChanged,
 	onTrackAdded,
 	onTrackDeleted,
+	fileName,
 }: SubtitlePanelProps) {
 	const [tracks, setTracks] = useState<MovieSubtitleInfo[]>(existingTracks ?? []);
 	const [tracksOpen, setTracksOpen] = useState(true);
@@ -36,6 +39,7 @@ export function SubtitlePanel({
 	const [confirmDeleteTrack, setConfirmDeleteTrack] = useState<MovieSubtitleInfo | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const resultsRef = useRef<HTMLDivElement>(null);
 
 	const refreshTracks = useCallback(async () => {
 		try {
@@ -73,6 +77,17 @@ export function SubtitlePanel({
 			const { results } = await subtitlesService.search(movieId);
 			setSearchResults(results);
 			setSearchDone(true);
+			// Scroll results into view after render
+			if (results.length > 0) {
+				setTimeout(
+					() =>
+						resultsRef.current?.scrollIntoView({
+							behavior: 'smooth',
+							block: 'nearest',
+						}),
+					50,
+				);
+			}
 		} catch {
 			// Show a friendly message instead of raw API errors (e.g. 404 when no file available)
 			setSearchDone(true);
@@ -220,7 +235,8 @@ export function SubtitlePanel({
 				)}
 
 				{searchResults.length > 0 && (
-					<div class={styles.resultsList}>
+					<div class={styles.resultsList} ref={resultsRef}>
+						{fileName && <div class={styles.fileNameLabel}>File: {fileName}</div>}
 						{searchResults.map((r) => (
 							<div key={r.fileId} class={styles.resultItem}>
 								<div class={styles.resultInfo}>

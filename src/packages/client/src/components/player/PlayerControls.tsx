@@ -14,7 +14,7 @@ import {
 	toggleEffectsPanel,
 	videoEnabled,
 } from '@/state/audio-effects.state';
-import { globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
+import { globalMovie, globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import type { StreamSession } from '@/state/player.state';
 import {
 	currentSession,
@@ -792,6 +792,10 @@ export function PlayerControls({
 												{globalMovieId.value && (
 													<SubtitlePanel
 														movieId={globalMovieId.value}
+														fileName={
+															globalMovie.value?.fileInfo?.fileName ??
+															undefined
+														}
 														existingTracks={(
 															session?.subtitles ?? []
 														).map((t, i) => ({
