@@ -233,7 +233,11 @@ export class TranscoderService implements OnModuleDestroy {
 					profile.audioBitrate,
 					...videoRateOpts,
 				])
-				.outputOptions(['-preset', enc.preset]);
+				.outputOptions([
+					'-preset',
+					enc.preset,
+					...(enc.pixFmt ? ['-pix_fmt', enc.pixFmt] : []),
+				]);
 
 			// Apply hardware acceleration input options
 			if (hwAccel === 'nvenc') {
@@ -488,7 +492,11 @@ export class TranscoderService implements OnModuleDestroy {
 						profile.audioBitrate,
 						...videoRateOpts,
 					])
-					.outputOptions(['-preset', enc.preset]);
+					.outputOptions([
+						'-preset',
+						enc.preset,
+						...(enc.pixFmt ? ['-pix_fmt', enc.pixFmt] : []),
+					]);
 
 				if (hwAccel === 'nvenc') {
 					command = command.inputOptions(['-hwaccel', 'cuda']);
@@ -794,7 +802,11 @@ export class TranscoderService implements OnModuleDestroy {
 					profile.audioBitrate,
 					...videoRateOpts,
 				])
-				.outputOptions(['-preset', enc.preset])
+				.outputOptions([
+					'-preset',
+					enc.preset,
+					...(enc.pixFmt ? ['-pix_fmt', enc.pixFmt] : []),
+				])
 				.outputOptions(['-map', '0:v:0']);
 
 			if (options.audioTrack !== undefined) {
@@ -903,7 +915,11 @@ export class TranscoderService implements OnModuleDestroy {
 					profile.audioBitrate,
 					...videoRateOpts,
 				])
-				.outputOptions(['-preset', enc.preset])
+				.outputOptions([
+					'-preset',
+					enc.preset,
+					...(enc.pixFmt ? ['-pix_fmt', enc.pixFmt] : []),
+				])
 				.outputOptions(['-map', '0:v:0', '-map', '0:a:0?'])
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
@@ -948,12 +964,15 @@ export class TranscoderService implements OnModuleDestroy {
 	private getEncodingSettings() {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const configuredHwAccel = enc?.hwAccel || 'none';
+		const hwAccel = this.hwAccelBroken ? 'none' : configuredHwAccel;
 		return {
-			hwAccel: this.hwAccelBroken ? 'none' : configuredHwAccel,
+			hwAccel,
 			preset: enc?.preset || 'veryfast',
 			rateControl: enc?.rateControl || 'cbr',
 			crf: enc?.crf ?? 23,
 			segmentDuration: enc?.segmentDuration ?? 4,
+			// Force 8-bit output for hardware encoders (NVENC doesn't support 10-bit H.264)
+			pixFmt: hwAccel !== 'none' ? 'yuv420p' : undefined,
 		};
 	}
 
@@ -1011,6 +1030,7 @@ export class TranscoderService implements OnModuleDestroy {
 					...videoRateOpts,
 					'-preset',
 					enc.preset,
+					...(enc.pixFmt ? ['-pix_fmt', enc.pixFmt] : []),
 					'-map',
 					'0:v:0',
 					'-map',
