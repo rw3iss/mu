@@ -326,11 +326,35 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 							outputDir,
 						);
 					} else {
-						await this.transcoderService.startRemux(
-							sessionId,
-							file.filePath,
-							outputDir,
-						);
+						// DIRECT_STREAM (remux) — if remux fails, fall back to full transcode
+						try {
+							await this.transcoderService.startRemux(
+								sessionId,
+								file.filePath,
+								outputDir,
+							);
+						} catch (remuxErr: any) {
+							this.logger.warn(
+								`Remux failed for session ${sessionId}, falling back to transcode: ${remuxErr.message}`,
+							);
+							// Clean up failed remux output
+							if (outputDir) {
+								await this.transcoderService.cleanup(sessionId);
+								await this.transcoderService.getSessionDir(sessionId);
+								const newOutputDir = outputDir;
+								this.sessionDirs.set(sessionId, newOutputDir);
+							}
+							await this.transcoderService.startTranscode(
+								sessionId,
+								file.filePath,
+								{
+									quality,
+									audioTrack: options.audioTrack,
+									subtitleTrack: options.subtitleTrack,
+								},
+								outputDir,
+							);
+						}
 					}
 				}
 			}
