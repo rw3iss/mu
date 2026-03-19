@@ -6,6 +6,7 @@ import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { subtitlesService } from '@/services/subtitles.service';
 import {
 	compressorEnabled,
 	eqEnabled,
@@ -798,6 +799,52 @@ export function PlayerControls({
 															language: t.language,
 															label: t.label,
 														}))}
+														onTrackDeleted={(track) => {
+															const s = currentSession.value;
+															if (!s) return;
+															const activeId = subtitleTrack.value;
+															if (activeId) {
+																const activeSub = s.subtitles.find(
+																	(st) => st.id === activeId,
+																);
+																if (
+																	activeSub &&
+																	activeSub.label ===
+																		track.label &&
+																	activeSub.language ===
+																		track.language
+																) {
+																	subtitleTrack.value = null;
+																	const mid = globalMovieId.value;
+																	if (mid)
+																		saveSubtitleChoice(
+																			mid,
+																			null,
+																		);
+																}
+															}
+														}}
+														onSubtitlesChanged={async () => {
+															const mid = globalMovieId.value;
+															if (!mid) return;
+															try {
+																const { subtitles: subs } =
+																	await subtitlesService.list(
+																		mid,
+																	);
+																const s = currentSession.value;
+																if (!s) return;
+																currentSession.value = {
+																	...s,
+																	subtitles: subs.map((t, i) => ({
+																		id: `sub-${i}`,
+																		label: t.label,
+																		language: t.language,
+																		url: `/api/v1/stream/${s.sessionId}/subtitles/${i}.vtt`,
+																	})),
+																};
+															} catch {}
+														}}
 														onSelect={(track) => {
 															// Select this subtitle track for playback
 															const s = currentSession.value;

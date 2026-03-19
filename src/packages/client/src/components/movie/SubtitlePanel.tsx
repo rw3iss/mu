@@ -9,10 +9,12 @@ interface SubtitlePanelProps {
 	existingTracks?: MovieSubtitleInfo[];
 	/** Called when a subtitle is selected for playback */
 	onSelect?: (track: MovieSubtitleInfo) => void;
-	/** Called when subtitles change (download/upload) so parent can refresh */
+	/** Called when subtitles change (download/upload/delete) so parent can refresh */
 	onSubtitlesChanged?: () => void;
 	/** Called after a subtitle is downloaded/uploaded with the new track info */
 	onTrackAdded?: (track: MovieSubtitleInfo) => void;
+	/** Called after a subtitle is deleted with the deleted track info */
+	onTrackDeleted?: (track: MovieSubtitleInfo) => void;
 }
 
 export function SubtitlePanel({
@@ -21,6 +23,7 @@ export function SubtitlePanel({
 	onSelect,
 	onSubtitlesChanged,
 	onTrackAdded,
+	onTrackDeleted,
 }: SubtitlePanelProps) {
 	const [tracks, setTracks] = useState<MovieSubtitleInfo[]>(existingTracks ?? []);
 	const [tracksOpen, setTracksOpen] = useState(true);
@@ -51,6 +54,7 @@ export function SubtitlePanel({
 			try {
 				await subtitlesService.remove(movieId, track.index);
 				setConfirmDeleteTrack(null);
+				onTrackDeleted?.(track);
 				await refreshTracks();
 			} catch (err: any) {
 				setError(err.message || 'Delete failed');
@@ -58,7 +62,7 @@ export function SubtitlePanel({
 				setIsDeleting(false);
 			}
 		},
-		[movieId, refreshTracks],
+		[movieId, refreshTracks, onTrackDeleted],
 	);
 
 	const handleSearch = useCallback(async () => {

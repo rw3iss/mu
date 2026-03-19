@@ -217,7 +217,7 @@
 }
 
 .resultRelease {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -225,7 +225,7 @@
 }
 
 .resultDownloads {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: 11px;
   flex-shrink: 0;
 }
@@ -237,7 +237,7 @@
   width: 28px;
   height: 28px;
   flex-shrink: 0;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   border-radius: var(--radius-sm);
   transition: color 120ms ease, background 120ms ease;
   cursor: pointer;
