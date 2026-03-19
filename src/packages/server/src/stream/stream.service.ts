@@ -236,74 +236,102 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 		if (mode === StreamMode.TRANSCODE || mode === StreamMode.DIRECT_STREAM) {
 			const persistDir = this.transcoderService.getPersistentDir(file.id, quality);
-			hasCached =
-				persistEnabled &&
-				(await this.transcoderService.hasCachedTranscode(file.id, quality));
 
-			if (hasCached) {
-				// Use the existing persistent cache — no FFmpeg needed
+			// Validate existing cache before using it
+			let cacheState: 'complete' | 'partial' | 'invalid' | 'empty' = 'empty';
+			if (persistEnabled) {
+				cacheState = await this.transcoderService.validateCache(file.id, quality);
+			}
+
+			if (cacheState === 'invalid') {
+				// Old or broken cache — clear it so we can start fresh
+				this.logger.warn(
+					`Invalid cache detected for ${file.id}/${quality}, clearing and re-transcoding`,
+				);
+				await this.transcoderService.clearCache(file.id);
+				cacheState = 'empty';
+			}
+
+			if (cacheState === 'complete') {
+				hasCached = true;
 				this.sessionDirs.set(sessionId, persistDir);
 				this.logger.log(`Using cached transcode for session=${sessionId}, file=${file.id}`);
-			} else if (
-				persistEnabled &&
-				(await this.transcoderService.hasPlayablePartialCache(file.id, quality))
-			) {
-				// Pre-transcode is still in progress but has enough segments to begin playback
-				this.sessionDirs.set(sessionId, persistDir);
-				hasCached = true;
-				this.logger.log(
-					`Using in-progress partial cache for session=${sessionId}, file=${file.id}`,
-				);
-			} else if (
-				this.chunkManager.isEnabled() &&
-				mode === StreamMode.TRANSCODE &&
-				persistEnabled &&
-				file.durationSeconds &&
-				file.durationSeconds > 0
-			) {
-				// Chunked transcoding: initialize chunk map and start encoding
-				this.sessionDirs.set(sessionId, persistDir);
-				const chunkMap = await this.chunkManager.initializeChunkMap(
-					file.id,
-					quality,
-					file.filePath,
-					file.durationSeconds,
-				);
-				// Enqueue first chunks at seek priority for fast startup
-				const lookahead = 10;
-				for (let i = 0; i < Math.min(lookahead, chunkMap.totalChunks); i++) {
-					if (chunkMap.chunks[i]?.status === 'pending') {
-						this.chunkManager.reprioritizeForSeek(file.id, quality, 0);
-						break;
+			} else if (cacheState === 'partial') {
+				// Partial cache exists — check if chunk manager or monolithic is handling it
+				const hasChunkMeta = this.chunkManager.getChunkMap(file.id, quality);
+				if (hasChunkMeta || this.chunkManager.isEnabled()) {
+					// Chunk system will handle it
+				} else {
+					// Legacy partial — playable if enough segments
+					const playable = await this.transcoderService.hasPlayablePartialCache(
+						file.id,
+						quality,
+					);
+					if (playable) {
+						this.sessionDirs.set(sessionId, persistDir);
+						hasCached = true;
+						this.logger.log(
+							`Using in-progress partial cache for session=${sessionId}, file=${file.id}`,
+						);
 					}
 				}
-				// Enqueue remaining chunks at background priority
-				this.chunkManager.enqueueAllPending(file.id, quality);
-				// Mark as having cache if any chunks are already done
-				const progress = this.chunkManager.getProgress(file.id, quality);
-				if (progress.completed > 0) hasCached = true;
-				this.logger.log(
-					`Chunked transcode started for session=${sessionId}, file=${file.id}: ${progress.completed}/${progress.total} chunks ready`,
-				);
-			} else {
-				const outputDir = persistEnabled ? persistDir : undefined;
-				if (outputDir) {
-					this.sessionDirs.set(sessionId, persistDir);
-				}
+			}
 
-				if (mode === StreamMode.TRANSCODE) {
-					await this.transcoderService.startTranscode(
-						sessionId,
+			if (!hasCached) {
+				// No usable cache — need to start transcoding
+				if (
+					this.chunkManager.isEnabled() &&
+					mode === StreamMode.TRANSCODE &&
+					persistEnabled &&
+					file.durationSeconds &&
+					file.durationSeconds > 0
+				) {
+					// Chunked transcoding
+					this.sessionDirs.set(sessionId, persistDir);
+					const chunkMap = await this.chunkManager.initializeChunkMap(
+						file.id,
+						quality,
 						file.filePath,
-						{
-							quality,
-							audioTrack: options.audioTrack,
-							subtitleTrack: options.subtitleTrack,
-						},
-						outputDir,
+						file.durationSeconds,
+					);
+					// Enqueue first chunks at seek priority for fast startup
+					for (let i = 0; i < Math.min(10, chunkMap.totalChunks); i++) {
+						if (chunkMap.chunks[i]?.status === 'pending') {
+							this.chunkManager.reprioritizeForSeek(file.id, quality, 0);
+							break;
+						}
+					}
+					this.chunkManager.enqueueAllPending(file.id, quality);
+					const progress = this.chunkManager.getProgress(file.id, quality);
+					if (progress.completed > 0) hasCached = true;
+					this.logger.log(
+						`Chunked transcode started for session=${sessionId}, file=${file.id}: ${progress.completed}/${progress.total} chunks ready`,
 					);
 				} else {
-					await this.transcoderService.startRemux(sessionId, file.filePath, outputDir);
+					// Monolithic transcoding (legacy or remux)
+					const outputDir = persistEnabled ? persistDir : undefined;
+					if (outputDir) {
+						this.sessionDirs.set(sessionId, persistDir);
+					}
+
+					if (mode === StreamMode.TRANSCODE) {
+						await this.transcoderService.startTranscode(
+							sessionId,
+							file.filePath,
+							{
+								quality,
+								audioTrack: options.audioTrack,
+								subtitleTrack: options.subtitleTrack,
+							},
+							outputDir,
+						);
+					} else {
+						await this.transcoderService.startRemux(
+							sessionId,
+							file.filePath,
+							outputDir,
+						);
+					}
 				}
 			}
 		}

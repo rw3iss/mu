@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { nowISO, WsEvent } from '@mu/shared';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
@@ -108,6 +108,20 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 		// Scan disk for existing segments
 		const cacheDir = this.transcoder.getPersistentDir(movieFileId, quality);
 		await mkdir(cacheDir, { recursive: true });
+
+		// Check for old-format cache (has segments but no chunk-meta.json)
+		// Old monolithic transcodes use different segment durations, so they're incompatible
+		const chunkMetaPath = path.join(cacheDir, 'chunk-meta.json');
+		const hasOldManifest = existsSync(path.join(cacheDir, 'stream.m3u8'));
+		const hasChunkMeta = existsSync(chunkMetaPath);
+		if (hasOldManifest && !hasChunkMeta) {
+			this.logger.warn(
+				`Old-format cache detected for ${movieFileId}/${quality}, clearing for chunked transcode`,
+			);
+			await rm(cacheDir, { recursive: true, force: true });
+			await mkdir(cacheDir, { recursive: true });
+		}
+
 		await this.scanExistingChunks(chunkMap, cacheDir);
 
 		// Persist metadata
