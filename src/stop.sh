@@ -115,7 +115,24 @@ if ! $killed; then
 fi
 
 if $killed; then
-    sleep 1
+    # Wait for the port to actually be freed (Windows can take a few seconds)
+    for i in 1 2 3 4 5; do
+        if $IS_WINDOWS; then
+            still_listening=$(netstat -ano 2>/dev/null | grep ":${SERVER_PORT} " | grep LISTENING)
+        else
+            still_listening=""
+            if command -v lsof &>/dev/null; then
+                still_listening=$(lsof -ti ":${SERVER_PORT}" 2>/dev/null)
+            elif command -v ss &>/dev/null; then
+                still_listening=$(ss -tlnp "sport = :${SERVER_PORT}" 2>/dev/null | grep LISTEN)
+            fi
+        fi
+        if [ -z "$still_listening" ]; then
+            break
+        fi
+        echo "Waiting for port $SERVER_PORT to be freed... ($i)"
+        sleep 1
+    done
     echo "Server stopped"
 else
     echo "No running server found"
