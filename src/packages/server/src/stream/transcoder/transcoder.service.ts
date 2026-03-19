@@ -284,8 +284,9 @@ export class TranscoderService implements OnModuleDestroy {
 					// If hardware acceleration was used, retry with software encoding
 					if (hwAccel !== 'none' && !this.swFallbackAttempted.has(sessionId)) {
 						this.swFallbackAttempted.add(sessionId);
+						this.hwAccelBroken = true;
 						this.logger.warn(
-							`Hardware acceleration (${hwAccel}) failed for session ${sessionId}, retrying with software encoding...`,
+							`Hardware acceleration (${hwAccel}) failed for session ${sessionId}, switching to software encoding globally`,
 						);
 						this.retryWithSoftware(sessionId, filePath, options, outputDir).catch(
 							(retryErr) => {
@@ -535,8 +536,9 @@ export class TranscoderService implements OnModuleDestroy {
 						!this.swFallbackAttempted.has(processKey)
 					) {
 						this.swFallbackAttempted.add(processKey);
+						this.hwAccelBroken = true;
 						this.logger.warn(
-							`Hardware acceleration (${hwAccel}) failed for pre-transcode ${movieFileId}, retrying with software encoding...`,
+							`Hardware acceleration (${hwAccel}) failed for pre-transcode ${movieFileId}, switching to software encoding globally`,
 						);
 						this.preTranscodeWithSoftware(
 							movieFileId,
@@ -957,8 +959,9 @@ export class TranscoderService implements OnModuleDestroy {
 
 	private getEncodingSettings() {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+		const configuredHwAccel = enc?.hwAccel || 'none';
 		return {
-			hwAccel: enc?.hwAccel || 'none',
+			hwAccel: this.hwAccelBroken ? 'none' : configuredHwAccel,
 			preset: enc?.preset || 'veryfast',
 			rateControl: enc?.rateControl || 'cbr',
 			crf: enc?.crf ?? 23,
