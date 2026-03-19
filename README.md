@@ -8,21 +8,43 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 
 ## Features
 
+### Library & Metadata
 - **Library scanning** -- point at directories of movie files and Mu indexes them automatically with real-time file watching
-- **Automatic metadata** -- posters, cast, ratings, and genres pulled from TMDB, OMDB/IMDb, and Rotten Tomatoes
-- **Streaming** -- HLS adaptive streaming with FFmpeg transcoding, or zero-overhead direct play for compatible formats
-- **Hardware acceleration** -- NVENC, QSV, VAAPI, and VideoToolbox for fast transcoding
-- **Multiple quality levels** -- 480p through 4K, selectable per-stream
-- **Subtitles & audio** -- embedded and external subtitle support (SRT, VTT, ASS), multiple audio track selection
-- **Resume playback** -- pick up where you left off, across devices
-- **Library sharing** -- share your library with other Mu instances over the network
-- **Custom player** -- keyboard shortcuts, PiP, speed control, movie info flyout, EQ and audio compressor
-- **Playlists** -- manual and smart playlists with filter rules (genre, year, rating, etc.)
-- **Ratings** -- rate movies on a 0.0-10.0 scale (decimal precision), import IMDb ratings, view aggregated scores
+- **Automatic metadata** -- posters, cast, ratings, genres, keywords, and content ratings from TMDB, OMDB/IMDb, and Rotten Tomatoes
 - **Discovery** -- related movies, personalized recommendations, browse by person/genre/decade
-- **PWA** -- installable on mobile, responsive design, swipe gestures
-- **Admin dashboard** -- server stats, user management, media sources, log viewer, cache and device management
-- **Plugin system** -- extensible architecture for custom metadata sources, routes, and scheduled tasks
+- **Playlists** -- manual and smart playlists with filter rules (genre, year, rating, etc.)
+- **Ratings** -- rate movies on a 0.0-10.0 scale, view aggregated scores from IMDb, Rotten Tomatoes, Metacritic
+- **Library sharing** -- share your library with other Mu instances over the network
+
+### Streaming & Transcoding
+- **HLS adaptive streaming** -- FFmpeg transcoding with automatic format detection, or zero-overhead direct play for compatible formats
+- **Chunked transcoding** -- movies are transcoded in independent chunks for fast startup, seek support, and crash recovery (configurable chunk size)
+- **Smart seek** -- seeking to an untranscoded position reprioritizes encoding chunks so playback resumes quickly without wasting completed work
+- **Resumable transcoding** -- interrupted transcodes resume automatically on server restart, prioritizing recently watched movies
+- **Hardware acceleration** -- NVENC, QSV, VAAPI support with automatic software fallback when hardware encoding fails
+- **Multiple quality levels** -- 480p through 4K, selectable per-stream, capped at source resolution
+- **Pre-transcoding** -- movies are transcoded in the background ahead of playback for instant streaming
+- **Cache validation** -- detects and repairs broken or incomplete transcode caches on startup
+- **Graceful shutdown** -- running transcode jobs are cleanly interrupted and resumed on next start
+
+### Player
+- **Persistent overlay player** -- video stays playing during navigation, with mini and full modes
+- **Resume playback** -- pick up where you left off, persisted across refreshes and restarts
+- **Subtitles** -- embedded and external subtitle support (SRT, VTT, ASS), online search via OpenSubtitles, upload, appearance customization (font size, color, shadow, background, line spacing, timing offset, vertical position)
+- **Audio engine** -- parametric EQ with saveable profiles, dynamic range compressor with dry/wet mix, per-movie audio settings
+- **Video effects** -- brightness, contrast, saturation, hue, sepia, grayscale with saveable presets
+- **Skip controls** -- configurable skip forward/backward times
+- **Keyboard shortcuts** -- full keyboard control for playback, seeking, volume, fullscreen
+
+### Interface
+- **Customizable appearance** -- theme (dark/light/auto), accent color, page/panel backgrounds, card spacing/radius/borders, font scaling (5 levels)
+- **Responsive design** -- works on desktop, tablet, and mobile
+- **PWA** -- installable on mobile devices
+- **Processing indicators** -- movies being transcoded show status on cards and detail pages with real-time progress via WebSocket
+
+### Administration
+- **Admin dashboard** -- server stats, user management, media sources, log viewer, cache management
+- **Plugin system** -- extensible architecture with API endpoint registration, client-side UI slots, settings management, and scaffolding tools
 
 ---
 
@@ -34,7 +56,9 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 | **Database** | SQLite via Drizzle ORM (zero-config) |
 | **Frontend** | Preact + Signals, Vite, SASS modules |
 | **Streaming** | FFmpeg, HLS via hls.js |
+| **Audio** | Web Audio API (EQ, compressor, parallel compression) |
 | **Monorepo** | Turborepo + pnpm workspaces |
+| **Linting** | Biome (tabs, single quotes, trailing commas) |
 
 ---
 
@@ -47,7 +71,7 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 
 ### FFmpeg on Windows
 
-Windows installations via WinGet (`winget install Gyan.FFmpeg`) create symlinks that can have permission issues when called from Node.js. If transcoding fails with "Cannot find ffmpeg", copy the binaries to a stable location and add to the system PATH:
+Windows installations via WinGet (`winget install Gyan.FFmpeg`) create symlinks that can have permission issues when called from Node.js. The install script handles this automatically, but if transcoding fails with "Cannot find ffmpeg", copy the binaries manually:
 
 ```powershell
 # Copy FFmpeg binaries to C:\ffmpeg
@@ -59,13 +83,7 @@ Copy-Item "$($src.DirectoryName)\*.exe" "C:\ffmpeg\" -Force
 [Environment]::SetEnvironmentVariable("PATH", "C:\ffmpeg;" + [Environment]::GetEnvironmentVariable("PATH", "Machine"), "Machine")
 ```
 
-Or in Git Bash:
-```bash
-cp /c/Users/*/AppData/Local/Microsoft/WinGet/Packages/*/ffmpeg-*/bin/*.exe /c/ffmpeg/
-powershell.exe -Command '[Environment]::SetEnvironmentVariable("PATH","C:\ffmpeg;"+[Environment]::GetEnvironmentVariable("PATH","Machine"),"Machine")'
-```
-
-Restart the server after updating the PATH. The install script handles this automatically.
+The server auto-detects FFmpeg at `C:/ffmpeg/ffmpeg.exe` on Windows. Restart after updating the PATH.
 
 ---
 
@@ -73,19 +91,12 @@ Restart the server after updating the PATH. The install script handles this auto
 
 ### Interactive Installer (Linux / macOS / Windows Git Bash)
 
-Download and run the install script. It checks prerequisites, lets you pick a release, and walks you through configuration:
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rw3iss/mu/main/src/scripts/install.sh -o install.sh
 bash install.sh
 ```
 
-The installer will:
-1. Check and optionally install Node.js, pnpm, and FFmpeg
-2. Show available releases and let you choose one
-3. Ask for install directory, data directory, and server port
-4. Download, build, and generate a config with random secrets
-5. Optionally open the firewall port and install a systemd service (Linux)
+The installer checks prerequisites, lets you pick a release, configures API keys, and optionally sets up a systemd service (Linux).
 
 ### Interactive Installer (Windows PowerShell)
 
@@ -129,38 +140,29 @@ Located at `data/config/config.yml`. Auto-generated with random secrets on first
 ```yaml
 server:
   host: "0.0.0.0"
-  port: 4000                    # server port
-  logLevel: info                # fatal | error | warn | info | debug | trace
+  port: 4000
+  logLevel: info
 
 auth:
-  jwtSecret: "..."              # REQUIRED - auto-generated, min 32 chars
-  cookieSecret: "..."           # REQUIRED - auto-generated, min 32 chars
+  jwtSecret: "..."              # auto-generated
+  cookieSecret: "..."           # auto-generated
   allowRegistration: true
 
-media:
-  libraryPaths: []              # configurable in Settings > Library after install
-  scanIntervalMinutes: 60
-  watchForChanges: true
-
 transcoding:
-  hwAccel: none                 # configurable in Settings > Playback (none | vaapi | nvenc | qsv | videotoolbox)
+  hwAccel: none                 # none | vaapi | nvenc | qsv
 
 thirdParty:
   tmdb:
-    apiKey: ""                  # recommended - enables movie metadata, posters, cast info
+    apiKey: ""                  # recommended - movie metadata, posters, cast
   omdb:
-    apiKey: ""                  # recommended - enables IMDb, Rotten Tomatoes, Metacritic ratings
+    apiKey: ""                  # recommended - IMDb, RT, Metacritic ratings
   opensubtitles:
-    apiKey: ""                  # optional - enables online subtitle search
-
-dataDir: "./data"
+    apiKey: ""                  # optional - online subtitle search
 ```
 
-**Required:** `auth.jwtSecret` and `auth.cookieSecret` are the only required settings -- both are auto-generated on first run. Everything else has sensible defaults.
+**Required:** `auth.jwtSecret` and `auth.cookieSecret` are the only required settings -- both are auto-generated on first run.
 
-**Recommended:** TMDB and OMDB API keys enable automatic metadata fetching (posters, cast, ratings). Without them, movies will show only filename-derived info. Get free keys at [themoviedb.org](https://www.themoviedb.org/settings/api) and [omdbapi.com](https://www.omdbapi.com/apikey.aspx).
-
-**Configurable after install:** Media library paths, hardware acceleration, encoding settings, scan intervals, and most other options can be changed in the web UI under **Settings** after installation.
+**Recommended:** TMDB and OMDB API keys enable automatic metadata fetching. Get free keys at [themoviedb.org](https://www.themoviedb.org/settings/api) and [omdbapi.com](https://www.omdbapi.com/apikey.aspx).
 
 ### Environment Variables
 
@@ -171,16 +173,63 @@ Override any config value with `MU_` prefixed env vars. Use double underscores f
 | `MU_SERVER__PORT` | `4000` | Server port |
 | `MU_SERVER__LOG_LEVEL` | `info` | Log verbosity |
 | `MU_TRANSCODING__HW_ACCEL` | `none` | Hardware acceleration |
-| `MU_THIRD_PARTY__TMDB__API_KEY` | -- | TMDB API key for metadata |
-| `MU_THIRD_PARTY__OMDB__API_KEY` | -- | OMDB API key for IMDb ratings |
+| `MU_THIRD_PARTY__TMDB__API_KEY` | -- | TMDB API key |
+| `MU_THIRD_PARTY__OMDB__API_KEY` | -- | OMDB API key |
 | `MU_THIRD_PARTY__OPENSUBTITLES__API_KEY` | -- | OpenSubtitles API key |
 | `MU_DATA_DIR` | `./data` | Data directory path |
 
-Single underscores also work for flat keys: `MU_SERVER_PORT=4000`.
-
 ---
 
-## Project Structure
+## Development
+
+### Getting Started
+
+```bash
+git clone https://github.com/rw3iss/mu.git
+cd mu/src
+
+pnpm install
+pnpm dev          # server + client with hot reload
+```
+
+The dev server runs at `http://localhost:4000`.
+
+### Commands
+
+```bash
+# Build & run
+pnpm build                    # build all packages
+pnpm start                    # start production server
+pnpm dev                      # dev mode with hot reload
+pnpm dev:server               # server only
+pnpm dev:client               # client only
+
+# Database
+pnpm db:migrate               # apply schema changes
+pnpm db:studio                # open Drizzle Studio (DB browser)
+pnpm db:seed                  # seed initial data
+pnpm db:reset                 # clear database
+
+# Code quality
+pnpm check                    # lint + format (Biome)
+pnpm lint:fix                 # fix lint issues
+pnpm format                   # format code
+
+# Logs
+pnpm logs                     # tail local server log
+pnpm logs:prod                # tail production server log via SSH
+
+# Plugins
+pnpm plugin:generate <id>     # scaffold a new plugin
+pnpm plugin:generate-client-api <id>  # generate client API from plugin schema
+
+# Server management (from src/)
+bash deploy.sh                # git pull, install, build, restart
+bash restart.sh               # stop + start (no rebuild)
+bash stop.sh                  # stop the running server
+```
+
+### Project Structure
 
 ```
 mu/
@@ -189,77 +238,14 @@ mu/
   │   ├── server/        # NestJS + Fastify backend
   │   ├── client/        # Preact frontend (PWA)
   │   └── shared/        # Shared types and utilities
-  ├── plugins/           # Built-in plugins (TMDB, OMDB, etc.)
-  ├── scripts/           # Install and utility scripts
+  ├── plugins/           # Plugin directory (server + client code per plugin)
+  ├── scripts/           # Install, log, and utility scripts
   ├── docker/            # Dockerfile + docker-compose
   └── data/              # Runtime data (gitignored)
       ├── config/        #   config.yml
       ├── db/            #   SQLite database
-      ├── cache/         #   image and stream cache
-      └── thumbnails/    #   extracted video thumbnails
-```
-
----
-
-## Development
-
-### Prerequisites
-
-Same as production: Node.js 20+, pnpm 9+, FFmpeg 5+.
-
-### Getting Started
-
-```bash
-git clone https://github.com/rw3iss/mu.git
-cd mu/src
-
-# Install dependencies
-pnpm install
-
-# Start in development mode (server + client with hot reload)
-pnpm dev
-```
-
-The dev server runs at `http://localhost:4000`. The Vite dev server proxies API requests to the NestJS backend.
-
-### Build & Run (Production)
-
-```bash
-# Build all packages
-pnpm build
-
-# Start the server
-NODE_ENV=production node packages/server/dist/main.js
-```
-
-Or use the helper scripts from the repo root:
-
-```bash
-bash deploy.sh     # git pull, install, build, restart
-bash restart.sh    # stop + start (no rebuild)
-bash stop.sh       # stop the running server
-```
-
-### Other Commands
-
-```bash
-pnpm test          # run tests
-pnpm lint          # lint with Biome
-pnpm db:generate   # generate DB migration after schema change
-pnpm db:migrate    # apply migrations
-pnpm db:studio     # open Drizzle Studio (DB browser)
-```
-
-### Server Management
-
-The server writes a PID file to `data/mu-server.pid`. The deploy/restart/stop scripts use this to manage the process. Logs go to `data/logs/server.log` when started via the scripts.
-
-For production deployments, the install script can set up a **systemd service** (Linux) that starts automatically on boot:
-
-```bash
-sudo systemctl status mu
-sudo systemctl restart mu
-sudo journalctl -u mu -f
+      ├── cache/         #   transcode and image cache
+      └── logs/          #   server logs
 ```
 
 ---
