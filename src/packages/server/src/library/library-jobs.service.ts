@@ -11,6 +11,7 @@ import { ThumbnailService } from '../media/thumbnail.service.js';
 import { MetadataService } from '../metadata/metadata.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { StreamService } from '../stream/stream.service.js';
+import { ChunkManagerService } from '../stream/transcoder/chunk-manager.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { LibraryService } from './library.service.js';
 import { ScannerService } from './scanner.service.js';
@@ -45,6 +46,7 @@ export class LibraryJobsService implements OnModuleInit {
 		private readonly transcoderService: TranscoderService,
 		private readonly streamService: StreamService,
 		private readonly database: DatabaseService,
+		private readonly chunkManager: ChunkManagerService,
 	) {}
 
 	onModuleInit() {
@@ -150,22 +152,80 @@ export class LibraryJobsService implements OnModuleInit {
 				};
 				helpers.log(`Pre-transcoding file ${movieFileId} (${mode}, ${quality})`);
 
-				// Register cancel callback to kill the FFmpeg process
-				const processKey = `pre-${movieFileId}-${quality}`;
-				this.jobManager.setOnCancel(job.id, () => {
-					this.transcoderService.stopTranscode(processKey);
-				});
+				// Use chunked transcoding if enabled
+				if (this.chunkManager.isEnabled() && mode === 'transcode') {
+					// Get movie file duration
+					const file = this.database.db
+						.select()
+						.from(movieFiles)
+						.where(eq(movieFiles.id, movieFileId))
+						.get();
 
-				await this.transcoderService.preTranscode(
-					movieFileId,
-					filePath,
-					mode,
-					quality,
-					(percent) => helpers.reportProgress(percent),
-				);
+					if (file?.durationSeconds && file.durationSeconds > 0) {
+						this.jobManager.setOnCancel(job.id, () => {
+							this.chunkManager.cancelAllChunks(movieFileId, quality);
+						});
 
-				// Record the cached transcode with encoding settings used
-				this.recordTranscodeCache(movieFileId, quality);
+						const chunkMap = await this.chunkManager.initializeChunkMap(
+							movieFileId,
+							quality,
+							filePath,
+							file.durationSeconds,
+						);
+						this.chunkManager.enqueueAllPending(movieFileId, quality);
+
+						// Poll for completion
+						await new Promise<void>((resolve, reject) => {
+							const check = setInterval(() => {
+								const progress = this.chunkManager.getProgress(
+									movieFileId,
+									quality,
+								);
+								helpers.reportProgress(progress.percent);
+								if (progress.completed === progress.total) {
+									clearInterval(check);
+									resolve();
+								}
+								// Check if cancelled
+								if (job.status === 'failed') {
+									clearInterval(check);
+									reject(new Error('Cancelled'));
+								}
+							}, 2000);
+						});
+
+						this.recordTranscodeCache(movieFileId, quality);
+					} else {
+						// Fallback: no duration info, use monolithic transcode
+						helpers.log('No duration info, falling back to monolithic transcode');
+						const processKey = `pre-${movieFileId}-${quality}`;
+						this.jobManager.setOnCancel(job.id, () => {
+							this.transcoderService.stopTranscode(processKey);
+						});
+						await this.transcoderService.preTranscode(
+							movieFileId,
+							filePath,
+							mode,
+							quality,
+							(percent) => helpers.reportProgress(percent),
+						);
+						this.recordTranscodeCache(movieFileId, quality);
+					}
+				} else {
+					// Monolithic transcode (legacy or remux)
+					const processKey = `pre-${movieFileId}-${quality}`;
+					this.jobManager.setOnCancel(job.id, () => {
+						this.transcoderService.stopTranscode(processKey);
+					});
+					await this.transcoderService.preTranscode(
+						movieFileId,
+						filePath,
+						mode,
+						quality,
+						(percent) => helpers.reportProgress(percent),
+					);
+					this.recordTranscodeCache(movieFileId, quality);
+				}
 
 				// Notify clients so movie detail pages can refresh their file info
 				if (movieId) {
@@ -310,6 +370,9 @@ export class LibraryJobsService implements OnModuleInit {
 	 * and re-enqueue them as pre-transcode jobs.
 	 */
 	private async resumeIncompleteTranscodes(): Promise<void> {
+		// If chunked transcoding is enabled, the ChunkManagerService handles resume on its own
+		if (this.chunkManager.isEnabled()) return;
+
 		const lib = this.settings.get<Record<string, unknown>>('library', {});
 		const persistEnabled = (lib as any)?.persistTranscodes !== false;
 		if (!persistEnabled) return;

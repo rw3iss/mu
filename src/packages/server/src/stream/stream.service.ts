@@ -254,6 +254,37 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				this.logger.log(
 					`Using in-progress partial cache for session=${sessionId}, file=${file.id}`,
 				);
+			} else if (
+				this.chunkManager.isEnabled() &&
+				mode === StreamMode.TRANSCODE &&
+				persistEnabled &&
+				file.durationSeconds &&
+				file.durationSeconds > 0
+			) {
+				// Chunked transcoding: initialize chunk map and start encoding
+				this.sessionDirs.set(sessionId, persistDir);
+				const chunkMap = await this.chunkManager.initializeChunkMap(
+					file.id,
+					quality,
+					file.filePath,
+					file.durationSeconds,
+				);
+				// Enqueue first chunks at seek priority for fast startup
+				const lookahead = 10;
+				for (let i = 0; i < Math.min(lookahead, chunkMap.totalChunks); i++) {
+					if (chunkMap.chunks[i]?.status === 'pending') {
+						this.chunkManager.reprioritizeForSeek(file.id, quality, 0);
+						break;
+					}
+				}
+				// Enqueue remaining chunks at background priority
+				this.chunkManager.enqueueAllPending(file.id, quality);
+				// Mark as having cache if any chunks are already done
+				const progress = this.chunkManager.getProgress(file.id, quality);
+				if (progress.completed > 0) hasCached = true;
+				this.logger.log(
+					`Chunked transcode started for session=${sessionId}, file=${file.id}: ${progress.completed}/${progress.total} chunks ready`,
+				);
 			} else {
 				const outputDir = persistEnabled ? persistDir : undefined;
 				if (outputDir) {

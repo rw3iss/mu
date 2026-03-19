@@ -221,6 +221,7 @@ export function Settings(props: SettingsProps) {
 	const [crfValue, setCrfValue] = useState('23');
 	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState('2');
 	const [segmentDuration, setSegmentDuration] = useState('4');
+	const [useChunkedTranscoding, setUseChunkedTranscoding] = useState(false);
 	const [reEncodeOnScan, setReEncodeOnScan] = useState(false);
 
 	// Sharing settings
@@ -312,6 +313,8 @@ export function Settings(props: SettingsProps) {
 						setMaxConcurrentJobs(String(encoding.maxConcurrentJobs));
 					if (encoding.segmentDuration != null)
 						setSegmentDuration(String(encoding.segmentDuration));
+					if (encoding.useChunkedTranscoding != null)
+						setUseChunkedTranscoding(!!encoding.useChunkedTranscoding);
 				}
 
 				// Load sources from the API
@@ -399,6 +402,7 @@ export function Settings(props: SettingsProps) {
 					crf: parseInt(crfValue, 10),
 					maxConcurrentJobs: parseInt(maxConcurrentJobs, 10),
 					segmentDuration: parseInt(segmentDuration, 10),
+					useChunkedTranscoding,
 				},
 			});
 
@@ -421,6 +425,7 @@ export function Settings(props: SettingsProps) {
 		crfValue,
 		maxConcurrentJobs,
 		segmentDuration,
+		useChunkedTranscoding,
 	]);
 
 	const handleSaveLibrary = useCallback(async () => {
@@ -1414,6 +1419,31 @@ export function Settings(props: SettingsProps) {
 									<option value="6">6s (Efficient)</option>
 									<option value="10">10s (Maximum efficiency)</option>
 								</select>
+							</div>
+
+							{/* Chunked Transcoding */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Chunked Transcoding</span>
+									<span class={styles.settingDescription}>
+										Transcode movies in independent chunks for seek support and
+										resumability. When enabled, you can seek to any point in a
+										transcoding movie and transcoding resumes after server
+										restarts.
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={useChunkedTranscoding}
+										onChange={(e) =>
+											setUseChunkedTranscoding(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
 							</div>
 
 							<div class={styles.actions}>

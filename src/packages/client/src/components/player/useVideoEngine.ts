@@ -544,39 +544,26 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				video.duration && Number.isFinite(video.duration) ? video.duration : 0;
 			const availableEnd = Math.max(bufferedEnd, hlsDuration);
 
-			// If seeking past available content, restart transcode from that position
+			// If seeking past available content, tell server to prioritize that region
 			if (time > availableEnd + 5) {
 				setHlsStatus('Seeking...');
-				hls.destroy();
-				hlsRef.current = null;
 
 				streamService
 					.seekStream(session.sessionId, time)
 					.then(() => {
-						// Wait briefly for FFmpeg to start generating segments
-						setTimeout(() => {
-							const token = localStorage.getItem('mu_token');
-							const newHls = new Hls({
-								startPosition: 0, // FFmpeg starts from 0 in new output
-								enableWorker: true,
-								lowLatencyMode: false,
-								maxBufferLength: bufferConfig.maxBufferLength,
-								maxMaxBufferLength: bufferConfig.maxMaxBufferLength,
-								maxBufferSize: bufferConfig.maxBufferSize,
-								fragLoadingMaxRetry: 15,
-								fragLoadingRetryDelay: 2000,
-								manifestLoadingMaxRetry: 15,
-								manifestLoadingRetryDelay: 2000,
-								xhrSetup(xhr) {
-									if (token)
-										xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-								},
-							});
-							newHls.loadSource(session.streamUrl);
-							newHls.attachMedia(video);
-							hlsRef.current = newHls;
-							setHlsStatus(null);
-						}, 1500);
+						// Reload manifest to pick up newly available/gap-marked chunks
+						// HLS.js handles #EXT-X-GAP markers natively, skipping unavailable segments
+						if (hlsRef.current) {
+							// Stop and reload to force manifest refresh
+							hlsRef.current.stopLoad();
+							setTimeout(() => {
+								if (hlsRef.current) {
+									hlsRef.current.loadSource(session.streamUrl);
+									hlsRef.current.attachMedia(video);
+									setHlsStatus(null);
+								}
+							}, 1000);
+						}
 					})
 					.catch(() => {
 						setHlsStatus(null);
