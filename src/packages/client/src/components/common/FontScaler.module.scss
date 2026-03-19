@@ -1,0 +1,86 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 200px;
+}
+
+.track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+
+  // Background line
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 6px;
+    right: 6px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-50%);
+    border-radius: 1px;
+  }
+}
+
+.trackFill {
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  height: 2px;
+  background: var(--color-accent);
+  transform: translateY(-50%);
+  border-radius: 1px;
+  transition: width 0.15s ease;
+}
+
+.dot {
+  position: relative;
+  z-index: 1;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  padding: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  &.dotActive {
+    width: 14px;
+    height: 14px;
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+}
+
+.handle {
+  display: none;
+}
+
+.labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 1px;
+}
+
+.label {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  width: 20px;
+  text-align: center;
+  transition: color 0.15s ease;
+
+  &.labelActive {
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+}

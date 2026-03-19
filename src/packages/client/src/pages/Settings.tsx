@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
+import { FontScaler, resetTextScale } from '@/components/common/FontScaler';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
@@ -1083,6 +1084,38 @@ export function Settings(props: SettingsProps) {
 
 							{/* Overlay Hide Timeout */}
 							<OverlayTimeoutSetting />
+
+							{/* Font Scale */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Font Scale</span>
+									<span class={styles.settingDescription}>
+										Adjust the text size across the app
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<FontScaler />
+									<button
+										class={styles.resetBtn}
+										onClick={resetTextScale}
+										title="Reset to default"
+									>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="1 4 1 10 7 10" />
+											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+										</svg>
+									</button>
+								</div>
+							</div>
 
 							{/* Subtitles Appearance */}
 							<div class={styles.settingGroup}>

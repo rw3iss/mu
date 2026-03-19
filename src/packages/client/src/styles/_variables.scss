@@ -54,14 +54,15 @@
   --font-family-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Consolas,
     monospace;
 
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.8125rem;
-  --font-size-md: 0.9375rem;
-  --font-size-lg: 1.0625rem;
-  --font-size-xl: 1.25rem;
-  --font-size-2xl: 1.5rem;
-  --font-size-3xl: 2rem;
-  --font-size-4xl: 2.5rem;
+  --text-scale: 1;
+  --font-size-xs: calc(0.75rem * var(--text-scale));
+  --font-size-sm: calc(0.8125rem * var(--text-scale));
+  --font-size-md: calc(0.9375rem * var(--text-scale));
+  --font-size-lg: calc(1.0625rem * var(--text-scale));
+  --font-size-xl: calc(1.25rem * var(--text-scale));
+  --font-size-2xl: calc(1.5rem * var(--text-scale));
+  --font-size-3xl: calc(2rem * var(--text-scale));
+  --font-size-4xl: calc(2.5rem * var(--text-scale));
 
   --font-weight-light: 300;
   --font-weight-normal: 400;

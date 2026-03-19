@@ -13,6 +13,10 @@ export interface CardBorder {
 
 export type ItemSpacing = 'none' | 'minimal' | 'compact' | 'normal' | 'comfortable' | 'spaced';
 
+/** Available font scale levels */
+export const TEXT_SCALE_VALUES = [0.5, 0.75, 1.0, 1.25, 1.5] as const;
+export type TextScale = (typeof TEXT_SCALE_VALUES)[number];
+
 // ============================================
 // Defaults
 // ============================================
@@ -23,6 +27,7 @@ const DEFAULT_CARD_BORDER: CardBorder = { width: 1, color: '#788cb4', opacity: 0
 const DEFAULT_PAGE_BG = '';
 const DEFAULT_PANEL_BG = '';
 const DEFAULT_DISABLE_HOVER = false;
+const DEFAULT_TEXT_SCALE: TextScale = 1.0;
 
 // ============================================
 // Signals
@@ -39,6 +44,9 @@ export const pageBg = signal<string>(getUiSetting<string>('page_bg', DEFAULT_PAG
 export const panelBg = signal<string>(getUiSetting<string>('panel_bg', DEFAULT_PANEL_BG));
 export const disableHover = signal<boolean>(
 	getUiSetting<boolean>('disable_hover', DEFAULT_DISABLE_HOVER),
+);
+export const textScale = signal<TextScale>(
+	getUiSetting<TextScale>('text_scale', DEFAULT_TEXT_SCALE),
 );
 
 // ============================================
@@ -115,6 +123,16 @@ effect(() => {
 
 effect(() => {
 	const root = document.documentElement;
+	const scale = textScale.value;
+	if (scale !== 1.0) {
+		root.style.setProperty('--text-scale', String(scale));
+	} else {
+		root.style.removeProperty('--text-scale');
+	}
+});
+
+effect(() => {
+	const root = document.documentElement;
 	if (disableHover.value) {
 		root.dataset.noHover = '';
 	} else {
@@ -151,6 +169,11 @@ export function setPanelBg(v: string): void {
 	setUiSetting('panel_bg', v);
 }
 
+export function setTextScale(v: TextScale): void {
+	textScale.value = v;
+	setUiSetting('text_scale', v);
+}
+
 export function setDisableHover(v: boolean): void {
 	disableHover.value = v;
 	setUiSetting('disable_hover', v);
@@ -178,6 +201,10 @@ export function resetPageBg(): void {
 
 export function resetPanelBg(): void {
 	setPanelBg('');
+}
+
+export function resetTextScale(): void {
+	setTextScale(DEFAULT_TEXT_SCALE);
 }
 
 export function resetDisableHover(): void {
