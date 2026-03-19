@@ -507,20 +507,27 @@ export function GlobalPlayer() {
 				onMouseMove={!isMini ? resetControlsTimer : undefined}
 			>
 				{isMini && (
-					<div class={styles.miniVideoOverlay}>
-						<svg
-							width="24"
-							height="24"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="white"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<polyline points="18 15 12 9 6 15" />
-						</svg>
-					</div>
+					<>
+						{preparingMessage && (
+							<div class={styles.miniSpinnerOverlay}>
+								<div class={styles.miniSpinner} />
+							</div>
+						)}
+						<div class={styles.miniVideoOverlay}>
+							<svg
+								width="24"
+								height="24"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="white"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<polyline points="18 15 12 9 6 15" />
+							</svg>
+						</div>
+					</>
 				)}
 			</div>
 
