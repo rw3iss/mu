@@ -16,6 +16,7 @@ import { wsService } from '@/services/websocket.service';
 import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { processingMovieIds } from '@/state/processing.state';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieDetail.module.scss';
 
@@ -432,7 +433,8 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						{/* Actions */}
 						<div class={styles.actions}>
 							{(movie.status === 'processing' ||
-								movie.status === 'processing_playable') &&
+								movie.status === 'processing_playable' ||
+								processingMovieIds.value.has(movie.id)) &&
 							!isRemote ? (
 								<div class={styles.processingStatus}>
 									{movie.status === 'processing_playable' && (

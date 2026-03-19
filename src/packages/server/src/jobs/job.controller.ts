@@ -29,6 +29,27 @@ export class JobController {
 		return { cancelled: results.length };
 	}
 
+	/**
+	 * Get movie IDs that currently have active pre-transcode jobs.
+	 * Available to all authenticated users (not admin-only).
+	 */
+	@Get('processing-movies')
+	getProcessingMovies() {
+		const jobs = this.jobManager.findJobsByPayload('movieId', undefined, 'pre-transcode', [
+			'pending',
+			'running',
+		]);
+		// findJobsByPayload with undefined value won't match — use listJobs instead
+		const allJobs = this.jobManager.listJobs({ type: 'pre-transcode', status: 'pending' });
+		const runningJobs = this.jobManager.listJobs({ type: 'pre-transcode', status: 'running' });
+		const movieIds = new Set<string>();
+		for (const job of [...allJobs, ...runningJobs]) {
+			const mid = job.payload?.movieId as string | undefined;
+			if (mid) movieIds.add(mid);
+		}
+		return { movieIds: [...movieIds] };
+	}
+
 	@Get(':id')
 	@Roles('admin')
 	getJob(@Param('id') id: string) {

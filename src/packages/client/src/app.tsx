@@ -34,6 +34,7 @@ import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { wsService } from '@/services/websocket.service';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
+import { initProcessingState } from '@/state/processing.state';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
 
@@ -76,6 +77,7 @@ export function App() {
 		checkAuth();
 		wsService.connect();
 		initGlobalPlayer();
+		initProcessingState();
 		return () => wsService.disconnect();
 	}, []);
 

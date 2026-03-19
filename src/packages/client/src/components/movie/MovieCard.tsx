@@ -4,6 +4,7 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
+import { processingMovieIds } from '@/state/processing.state';
 import { getRatingColor } from '@/utils/rating-color';
 import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
@@ -40,10 +41,11 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 	const ratingColor = getRatingColor(rating);
 	const transcodeNeeded = needsTranscode(movie);
 	const streamLabel = getStreamModeLabel(movie);
+	const isProcessing = processingMovieIds.value.has(movie.id);
 
 	return (
 		<div
-			class={`${styles.card} ${movie.hidden ? styles.hidden : ''}`}
+			class={`${styles.card} ${movie.hidden ? styles.hidden : ''} ${isProcessing ? styles.processing : ''}`}
 			onClick={handleClick}
 			role="button"
 			tabIndex={0}
@@ -96,6 +98,8 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 					)}
 				</div>
 			</div>
+
+			{isProcessing && <div class={styles.processingOverlay}>Processing...</div>}
 
 			{hasWatchProgress(movie) && (
 				<div class={styles.progressBar}>
