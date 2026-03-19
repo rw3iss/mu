@@ -253,7 +253,7 @@ export class AudioEngine {
 		// Build chain: source → inputGain → [EQ] → [Compressor w/ dry/wet mix] → destination
 		let current: AudioNode = this.source;
 
-		if (this.inputGainNode) {
+		if (this.eqEnabled && this.inputGainNode) {
 			current.connect(this.inputGainNode);
 			current = this.inputGainNode;
 		}
