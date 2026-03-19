@@ -50,6 +50,7 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 			role="button"
 			tabIndex={0}
 		>
+			{isProcessing && <div class={styles.processingOverlay}>Processing...</div>}
 			{movie.hidden && <span class={styles.hiddenLabel}>Hidden</span>}
 			{movie.remoteOrigin && (
 				<span class={styles.remoteBadge} title={`From: ${movie.remoteOrigin.serverName}`}>
@@ -99,8 +100,6 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 				</div>
 			</div>
 
-			{isProcessing && <div class={styles.processingOverlay}>Processing...</div>}
-
 			{hasWatchProgress(movie) && (
 				<div class={styles.progressBar}>
 					<div
@@ -113,24 +112,11 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 			<div class={styles.info}>
 				<h3 class={styles.title}>{movie.title}</h3>
 				<div class={styles.details}>
-					<span class={styles.year}>{movie.year}</span>
+					{movie.year && <span class={styles.year}>{movie.year}</span>}
+					{movie.year && movie.runtime > 0 && <span class={styles.dot}>{'\u00B7'}</span>}
 					{movie.runtime > 0 && (
 						<span class={styles.runtime}>
 							{Math.floor(movie.runtime / 60)}h {movie.runtime % 60}m
-						</span>
-					)}
-					{movie.addedAt && (
-						<span class={styles.addedAt}>
-							{new Date(movie.addedAt).toLocaleDateString('en-US', {
-								month: 'short',
-								day: 'numeric',
-								year: 'numeric',
-							})}
-						</span>
-					)}
-					{rating > 0 && (
-						<span class={styles.userRating} style={{ color: ratingColor }}>
-							{'\u2605'} {rating.toFixed(1)}
 						</span>
 					)}
 					<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />

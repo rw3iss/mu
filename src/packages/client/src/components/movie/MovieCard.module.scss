@@ -43,7 +43,7 @@
 
 .processingOverlay {
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: 0;
   right: 0;
   text-align: center;
@@ -52,6 +52,7 @@
   font-weight: 500;
   color: var(--color-text-secondary);
   background: rgba(0, 0, 0, 0.75);
+  border-radius: var(--item-radius) var(--item-radius) 0 0;
   z-index: 3;
 }
 
@@ -216,27 +217,11 @@
 .runtime {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
-
-  &::before {
-    content: '\00b7';
-    margin-right: var(--space-xs);
-  }
 }
 
-.addedAt {
+.dot {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
-}
-
-.userRating {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-
-  &::before {
-    content: '\00b7';
-    margin-right: var(--space-xs);
-    color: var(--color-text-muted);
-  }
 }
 
 .optionsWrap {
