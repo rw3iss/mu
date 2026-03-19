@@ -22,15 +22,18 @@ export class ChunkManifestService {
 			'#EXT-X-INDEPENDENT-SEGMENTS',
 		];
 
+		// Only include consecutive completed chunks from the start.
+		// This mimics a growing EVENT playlist that HLS.js handles naturally.
+		// Gaps confuse many HLS players; a growing playlist works universally.
 		let allComplete = true;
-
 		for (const chunk of chunkMap.chunks) {
-			if (chunk.status !== 'complete') {
-				lines.push('#EXT-X-GAP');
+			if (chunk.status === 'complete') {
+				lines.push(`#EXTINF:${chunk.duration.toFixed(3)},`);
+				lines.push(chunk.segmentFile);
+			} else {
 				allComplete = false;
+				break; // Stop at first incomplete chunk
 			}
-			lines.push(`#EXTINF:${chunk.duration.toFixed(3)},`);
-			lines.push(chunk.segmentFile);
 		}
 
 		if (allComplete) {
