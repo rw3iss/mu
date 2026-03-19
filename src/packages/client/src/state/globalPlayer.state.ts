@@ -172,7 +172,13 @@ export async function playMovie(
 						video.buffered.length === 0 &&
 						!currentSession.value.directPlay));
 			if (isStuck) {
-				// Fall through to create a new stream
+				// Video is stuck — destroy engine and create fresh stream
+				// Don't call endStream() — the old session is already dead,
+				// and sending DELETE could kill the new session due to race condition
+				engine.destroy();
+				currentSession.value = null;
+				subtitleTrack.value = null;
+				// Fall through to startGlobalStream below
 			} else {
 				engine.setIntendedPlaying(true);
 				if (opts?.fromBeginning && video) {
@@ -188,14 +194,13 @@ export async function playMovie(
 	}
 
 	// Stop old stream and destroy video engine before switching movies
-	const engine = sharedVideoEngine.value;
-	if (engine) engine.destroy();
 	if (currentSession.value) {
+		const engine = sharedVideoEngine.value;
+		if (engine) engine.destroy();
 		await endStream();
+		currentSession.value = null;
+		subtitleTrack.value = null;
 	}
-	// Clear stale state synchronously before setting new movie
-	currentSession.value = null;
-	subtitleTrack.value = null;
 
 	// Set up new movie
 	globalMovieId.value = movieId;
