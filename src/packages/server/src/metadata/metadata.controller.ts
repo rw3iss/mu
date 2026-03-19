@@ -64,10 +64,27 @@ export class MetadataController {
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
 		if (!movie) return { message: 'Movie not found' };
 
-		// Clear third-party metadata from the movies table (keep title, file-derived data)
+		// Derive a basic title from the movie's file name
+		const file = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, movieId))
+			.get();
+		let baseTitle = movie.title;
+		if (file?.fileName) {
+			// Strip extension and clean up filename for display
+			baseTitle = file.fileName
+				.replace(/\.[^.]+$/, '')
+				.replace(/[._]/g, ' ')
+				.replace(/\s+/g, ' ')
+				.trim();
+		}
+
+		// Clear all metadata and reset title to filename-derived name
 		this.database.db
 			.update(movies)
 			.set({
+				title: baseTitle,
 				year: null,
 				overview: null,
 				tagline: null,
@@ -222,46 +239,54 @@ export class MetadataController {
 				.where(eq(movieFiles.id, file.id))
 				.run();
 
-			// Update movie record from file metadata tags
+			// Update movie record from file metadata tags — only fill empty fields
 			if (movie) {
 				const tags = fileMetadata.formatTags ?? {};
 				const movieUpdate: Record<string, unknown> = { updatedAt: nowISO() };
 
-				// Title: prefer file tag over filename-parsed title
-				const tagTitle = tags.title || tags.TITLE;
-				if (tagTitle && typeof tagTitle === 'string' && tagTitle.trim()) {
-					movieUpdate.title = tagTitle.trim();
-				}
-
-				// Year: from date/DATE_RELEASED/year tags
-				const tagDate =
-					tags.date || tags.DATE || tags.DATE_RELEASED || tags.year || tags.YEAR;
-				if (tagDate) {
-					const yearMatch = String(tagDate).match(/(\d{4})/);
-					if (yearMatch) {
-						movieUpdate.year = parseInt(yearMatch[1]!, 10);
+				// Title: only if currently empty or matches a bare filename pattern
+				if (!movie.title) {
+					const tagTitle = tags.title || tags.TITLE;
+					if (tagTitle && typeof tagTitle === 'string' && tagTitle.trim()) {
+						movieUpdate.title = tagTitle.trim();
 					}
 				}
 
-				// Overview/description
-				const tagDesc =
-					tags.description ||
-					tags.DESCRIPTION ||
-					tags.synopsis ||
-					tags.SYNOPSIS ||
-					tags.comment ||
-					tags.COMMENT;
-				if (tagDesc && typeof tagDesc === 'string' && tagDesc.trim()) {
-					movieUpdate.overview = tagDesc.trim();
+				// Year: only if not already set
+				if (!movie.year) {
+					const tagDate =
+						tags.date || tags.DATE || tags.DATE_RELEASED || tags.year || tags.YEAR;
+					if (tagDate) {
+						const yearMatch = String(tagDate).match(/(\d{4})/);
+						if (yearMatch) {
+							movieUpdate.year = parseInt(yearMatch[1]!, 10);
+						}
+					}
 				}
 
-				// Content rating
-				const tagRating = tags.rating || tags.RATING || tags.content_rating;
-				if (tagRating && typeof tagRating === 'string' && tagRating.trim()) {
-					movieUpdate.contentRating = tagRating.trim();
+				// Overview/description: only if not already set
+				if (!movie.overview) {
+					const tagDesc =
+						tags.description ||
+						tags.DESCRIPTION ||
+						tags.synopsis ||
+						tags.SYNOPSIS ||
+						tags.comment ||
+						tags.COMMENT;
+					if (tagDesc && typeof tagDesc === 'string' && tagDesc.trim()) {
+						movieUpdate.overview = tagDesc.trim();
+					}
 				}
 
-				// Runtime from probe duration (more reliable than tags)
+				// Content rating: only if not already set
+				if (!movie.contentRating) {
+					const tagRating = tags.rating || tags.RATING || tags.content_rating;
+					if (tagRating && typeof tagRating === 'string' && tagRating.trim()) {
+						movieUpdate.contentRating = tagRating.trim();
+					}
+				}
+
+				// Runtime from probe duration — always update (file-derived, not metadata)
 				if (codecInfo.durationSeconds && codecInfo.durationSeconds > 0) {
 					movieUpdate.runtimeMinutes = Math.round(codecInfo.durationSeconds / 60);
 				}
