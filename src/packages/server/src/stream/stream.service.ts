@@ -352,20 +352,27 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 							// Clean up failed remux output
 							if (outputDir) {
 								await this.transcoderService.cleanup(sessionId);
-								await this.transcoderService.getSessionDir(sessionId);
-								const newOutputDir = outputDir;
-								this.sessionDirs.set(sessionId, newOutputDir);
+								this.sessionDirs.set(sessionId, outputDir);
 							}
-							await this.transcoderService.startTranscode(
-								sessionId,
-								file.filePath,
-								{
-									quality,
-									audioTrack: options.audioTrack,
-									subtitleTrack: options.subtitleTrack,
-								},
-								outputDir,
-							);
+							try {
+								await this.transcoderService.startTranscode(
+									sessionId,
+									file.filePath,
+									{
+										quality,
+										audioTrack: options.audioTrack,
+										subtitleTrack: options.subtitleTrack,
+									},
+									outputDir,
+								);
+							} catch (transcodeErr: any) {
+								this.logger.error(
+									`Both remux and transcode failed for ${file.filePath}: ${transcodeErr.message}`,
+								);
+								throw new BadRequestException(
+									`Unable to play this file. FFmpeg cannot process it — the file path may contain special characters, or the file may be corrupt.`,
+								);
+							}
 						}
 					}
 				}
