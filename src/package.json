@@ -24,7 +24,9 @@
     "cache:clean": "node scripts/cache-clean.js",
     "clean": "turbo run clean && node -e \"const fs=require('fs');try{fs.rmSync('node_modules',{recursive:true,force:true})}catch{}\"",
     "plugin:generate": "npx tsx scripts/plugin-generate.ts",
-    "plugin:generate-client-api": "npx tsx scripts/plugin-generate-client-api.ts"
+    "plugin:generate-client-api": "npx tsx scripts/plugin-generate-client-api.ts",
+    "logs": "bash scripts/logs.sh",
+    "logs:prod": "bash scripts/logs-prod.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",
