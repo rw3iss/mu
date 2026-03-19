@@ -14,7 +14,7 @@ export interface CardBorder {
 export type ItemSpacing = 'none' | 'minimal' | 'compact' | 'normal' | 'comfortable' | 'spaced';
 
 /** Available font scale levels */
-export const TEXT_SCALE_VALUES = [0.5, 0.75, 1.0, 1.25, 1.5] as const;
+export const TEXT_SCALE_VALUES = [0.9, 1.0, 1.1, 1.2, 1.3] as const;
 export type TextScale = (typeof TEXT_SCALE_VALUES)[number];
 
 // ============================================

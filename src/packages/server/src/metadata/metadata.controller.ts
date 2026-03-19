@@ -68,6 +68,7 @@ export class MetadataController {
 		this.database.db
 			.update(movies)
 			.set({
+				year: null,
 				overview: null,
 				tagline: null,
 				originalTitle: null,
@@ -80,6 +81,7 @@ export class MetadataController {
 				language: null,
 				country: null,
 				contentRating: null,
+				runtimeMinutes: null,
 				updatedAt: nowISO(),
 			})
 			.where(eq(movies.id, movieId))
