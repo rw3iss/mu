@@ -890,6 +890,119 @@ export class TranscoderService implements OnModuleDestroy {
 		};
 	}
 
+	/**
+	 * Transcode a single chunk (time range) of a movie into an MPEG-TS segment.
+	 * Returns a promise that resolves when the chunk is fully encoded.
+	 */
+	async transcodeChunk(
+		filePath: string,
+		outputPath: string,
+		startTime: number,
+		chunkDuration: number,
+		quality: string = '1080p',
+	): Promise<void> {
+		const profile =
+			TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES] ??
+			TRANSCODING_PROFILES['1080p'];
+		if (!profile) throw new Error(`No transcoding profile for quality "${quality}"`);
+
+		const enc = this.getEncodingSettings();
+		const hwAccel = enc.hwAccel;
+		const videoCodec = this.getVideoCodec(hwAccel);
+		const videoRateOpts =
+			enc.rateControl === 'crf' ? ['-crf', String(enc.crf)] : ['-b:v', profile.videoBitrate];
+		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+		const gopSize = String(Math.round((chunkDuration * 24) / 2) * 2);
+		const processKey = `chunk-${path.basename(outputPath, '.ts')}`;
+
+		return new Promise<void>((resolve, reject) => {
+			let command = ffmpeg(filePath)
+				.inputOptions(['-ss', String(startTime)])
+				.outputOptions([
+					'-t',
+					String(chunkDuration),
+					'-f',
+					'mpegts',
+					'-force_key_frames',
+					'expr:eq(t,0)',
+				])
+				.videoCodec(videoCodec)
+				.audioCodec('aac')
+				.outputOptions([
+					'-vf',
+					scaleFilter,
+					'-threads',
+					'0',
+					'-g',
+					gopSize,
+					'-sc_threshold',
+					'0',
+					'-b:a',
+					profile.audioBitrate,
+					...videoRateOpts,
+					'-preset',
+					enc.preset,
+					'-map',
+					'0:v:0',
+					'-map',
+					'0:a:0?',
+				]);
+
+			// Hardware acceleration input options
+			if (hwAccel === 'nvenc') {
+				command = command.inputOptions(['-hwaccel', 'cuda']);
+			} else if (hwAccel === 'vaapi') {
+				command = command.inputOptions([
+					'-hwaccel',
+					'vaapi',
+					'-hwaccel_output_format',
+					'vaapi',
+					'-vaapi_device',
+					'/dev/dri/renderD128',
+				]);
+			} else if (hwAccel === 'qsv') {
+				command = command.inputOptions(['-hwaccel', 'qsv']);
+			}
+
+			command
+				.output(outputPath)
+				.on('start', () => {
+					this.logger.debug(`Chunk encode started: ${path.basename(outputPath)}`);
+				})
+				.on('error', (err: Error) => {
+					this.logger.error(
+						`Chunk encode failed ${path.basename(outputPath)}: ${err.message}`,
+					);
+					this.activeProcesses.delete(processKey);
+					reject(err);
+				})
+				.on('end', () => {
+					this.logger.debug(`Chunk encode complete: ${path.basename(outputPath)}`);
+					this.activeProcesses.delete(processKey);
+					resolve();
+				});
+
+			command.run();
+			const ffmpegProcess = (command as any).ffmpegProc;
+			if (ffmpegProcess) {
+				this.activeProcesses.set(processKey, ffmpegProcess);
+			}
+		});
+	}
+
+	/**
+	 * Get a hash of the current encoding settings for cache invalidation.
+	 */
+	getEncodingSettingsHash(): string {
+		const enc = this.getEncodingSettings();
+		return JSON.stringify({
+			hwAccel: enc.hwAccel,
+			preset: enc.preset,
+			rateControl: enc.rateControl,
+			crf: enc.crf,
+		});
+	}
+
 	private getVideoCodec(hwAccel: string): string {
 		switch (hwAccel) {
 			case 'nvenc':

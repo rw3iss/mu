@@ -24,6 +24,7 @@ import { EventsService } from '../events/events.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { SubtitleService } from './subtitles/subtitle.service.js';
+import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
 
 interface StartStreamOptions {
@@ -43,6 +44,8 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 	/** Maps sessionId → the directory where HLS segments live (persistent or ephemeral) */
 	private readonly sessionDirs = new Map<string, string>();
+	/** Track movieFileId and quality per session for chunk manager lookups */
+	private readonly sessionInfo = new Map<string, { movieFileId: string; quality: string }>();
 
 	/** Interval timer for reaping stale sessions */
 	private reapInterval: ReturnType<typeof setInterval> | null = null;
@@ -55,6 +58,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		readonly _directPlayService: DirectPlayService,
 		private readonly subtitleService: SubtitleService,
 		private readonly settings: SettingsService,
+		private readonly chunkManager: ChunkManagerService,
 	) {}
 
 	onModuleInit(): void {
@@ -315,6 +319,9 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			streamUrl = `/api/v1/stream/${sessionId}/manifest.m3u8`;
 		}
 
+		// Store session info for chunk manager lookups
+		this.sessionInfo.set(sessionId, { movieFileId: file.id, quality });
+
 		this.events.emit(WsEvent.STREAM_STARTED, {
 			sessionId,
 			movieId,
@@ -397,16 +404,27 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			return;
 		}
 
+		// If chunked transcoding is active for this file, just reprioritize chunks
+		const quality = sess.quality || '1080p';
+		if (this.chunkManager.isEnabled()) {
+			const chunkMap = this.chunkManager.getChunkMap(movieFile.id, quality);
+			if (chunkMap) {
+				this.chunkManager.reprioritizeForSeek(movieFile.id, quality, positionSeconds);
+				// Point session at persistent dir (chunks are written there)
+				const persistDir = this.transcoderService.getPersistentDir(movieFile.id, quality);
+				this.sessionDirs.set(sessionId, persistDir);
+				this.logger.log(`Chunk-based seek for session ${sessionId} to ${positionSeconds}s`);
+				return;
+			}
+		}
+
 		// Stop current transcode
 		this.transcoderService.stopTranscode(sessionId);
 
 		// Clean up ephemeral session dir (not persistent cache)
 		const sessionDir = this.transcoderService.getSessionDir(sessionId);
 		const currentDir = this.sessionDirs.get(sessionId);
-		const persistDir = this.transcoderService.getPersistentDir(
-			movieFile.id,
-			sess.quality || '1080p',
-		);
+		const persistDir = this.transcoderService.getPersistentDir(movieFile.id, quality);
 
 		// Only clean ephemeral dirs, not persistent cache
 		if (currentDir !== persistDir) {
@@ -416,9 +434,6 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// Create new ephemeral dir for this seek
 		const newDir = this.transcoderService.getSessionDir(sessionId);
 		this.sessionDirs.set(sessionId, newDir);
-
-		// Restart transcode from seek position
-		const quality = sess.quality || '1080p';
 		if (mode === StreamMode.TRANSCODE) {
 			await this.transcoderService.startTranscode(
 				sessionId,
@@ -505,6 +520,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				await this.transcoderService.cleanup(sessionId);
 			}
 			this.sessionDirs.delete(sessionId);
+			this.sessionInfo.delete(sessionId);
 		}
 
 		// Mark session as ended by clearing lastActiveAt
@@ -588,6 +604,13 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	 */
 	getSessionCacheDir(sessionId: string): string | undefined {
 		return this.sessionDirs.get(sessionId);
+	}
+
+	/**
+	 * Get the movieFileId and quality for a session.
+	 */
+	getSessionInfo(sessionId: string): { movieFileId: string; quality: string } | undefined {
+		return this.sessionInfo.get(sessionId);
 	}
 
 	/**

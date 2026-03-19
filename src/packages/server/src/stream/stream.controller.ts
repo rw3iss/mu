@@ -18,6 +18,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { movieFiles } from '../database/schema/index.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { StreamService } from './stream.service.js';
+import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
 
@@ -29,6 +30,7 @@ export class StreamController {
 		private readonly streamService: StreamService,
 		private readonly hlsGenerator: HlsGeneratorService,
 		private readonly transcoderService: TranscoderService,
+		private readonly chunkManager: ChunkManagerService,
 		private readonly directPlayService: DirectPlayService,
 		private readonly db: DatabaseService,
 	) {}
@@ -99,12 +101,25 @@ export class StreamController {
 			return reply.status(500).send({ message: `Transcoding failed: ${state.error}` });
 		}
 
+		// Check for chunk-based virtual manifest first
+		const sessionInfo = this.streamService.getSessionInfo(sessionId);
+		if (sessionInfo?.movieFileId) {
+			const virtualManifest = this.chunkManager.getVirtualManifest(
+				sessionInfo.movieFileId,
+				sessionInfo.quality || '1080p',
+			);
+			if (virtualManifest) {
+				return reply
+					.header('Content-Type', 'application/vnd.apple.mpegurl')
+					.header('Cache-Control', 'no-cache')
+					.send(Buffer.from(virtualManifest));
+			}
+		}
+
 		const dir = this.streamService.getSessionCacheDir(sessionId);
 		const manifest = await this.hlsGenerator.getManifest(sessionId, dir);
 
 		if (!manifest) {
-			// Manifest not ready yet — transcoder is still generating.
-			// Return 503 with Retry-After so HLS.js will retry.
 			return reply
 				.status(503)
 				.header('Retry-After', '1')
