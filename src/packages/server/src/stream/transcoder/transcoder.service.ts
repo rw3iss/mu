@@ -241,7 +241,8 @@ export class TranscoderService implements OnModuleDestroy {
 
 			// Apply hardware acceleration input options
 			if (hwAccel === 'nvenc') {
-				command = command.inputOptions(['-hwaccel', 'cuda']);
+				// Don't add -hwaccel cuda — it conflicts with CPU-based scale filters.
+				// NVENC still uses GPU for encoding; only decoding stays on CPU.
 			} else if (hwAccel === 'vaapi') {
 				command = command.inputOptions([
 					'-hwaccel',
@@ -499,7 +500,8 @@ export class TranscoderService implements OnModuleDestroy {
 					]);
 
 				if (hwAccel === 'nvenc') {
-					command = command.inputOptions(['-hwaccel', 'cuda']);
+					// Don't add -hwaccel cuda — it conflicts with CPU-based scale filters.
+					// NVENC still uses GPU for encoding; only decoding stays on CPU.
 				} else if (hwAccel === 'vaapi') {
 					command = command.inputOptions([
 						'-hwaccel',
@@ -1039,7 +1041,8 @@ export class TranscoderService implements OnModuleDestroy {
 
 			// Hardware acceleration input options
 			if (hwAccel === 'nvenc') {
-				command = command.inputOptions(['-hwaccel', 'cuda']);
+				// Don't add -hwaccel cuda — it conflicts with CPU-based scale filters.
+				// NVENC still uses GPU for encoding; only decoding stays on CPU.
 			} else if (hwAccel === 'vaapi') {
 				command = command.inputOptions([
 					'-hwaccel',
