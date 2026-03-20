@@ -329,7 +329,10 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 
 	private async drain(): Promise<void> {
 		const max = this.getMaxConcurrency();
-		while (this.activeCount < max && this.queue.length > 0) {
+		while (this.queue.length > 0) {
+			// Check total FFmpeg load: chunk processes + transcoder's monolithic/live processes
+			const totalFfmpeg = this.activeCount + this.transcoder.getActiveTranscodeCount();
+			if (totalFfmpeg >= max) break;
 			const task = this.queue.shift();
 			if (!task) break;
 
