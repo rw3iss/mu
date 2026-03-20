@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import { statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
+import path from 'node:path';
 import { nowISO, StreamMode, WsEvent } from '@mu/shared';
 import {
 	BadRequestException,
@@ -773,9 +774,21 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			if (defaultRank <= sourceMaxRank) {
 				maxQuality = defaultQuality;
 			} else {
-				this.logger.debug(
-					`Capping quality from ${defaultQuality} to ${maxQuality} (source height: ${sourceHeight}px)`,
+				// Before capping, check if a cache at the default quality already exists
+				// (pre-transcode may have encoded at the default without capping)
+				const hasDefaultCache = existsSync(
+					path.join(this.transcoderService.getPersistentDir(movieFileId, defaultQuality), '.complete'),
 				);
+				if (hasDefaultCache) {
+					this.logger.debug(
+						`Source is ${sourceHeight}px but using existing ${defaultQuality} cache`,
+					);
+					maxQuality = defaultQuality;
+				} else {
+					this.logger.debug(
+						`Capping quality from ${defaultQuality} to ${maxQuality} (source height: ${sourceHeight}px)`,
+					);
+				}
 			}
 		}
 
