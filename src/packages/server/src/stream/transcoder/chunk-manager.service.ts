@@ -388,6 +388,17 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 				`Chunk ${chunk.index} failed for ${map.movieFileId}/${map.quality}: ${err.message}`,
 			);
 
+			// Detect systemic failure: if many recent chunks failed, abort the whole movie
+			const recentChunks = map.chunks.slice(Math.max(0, chunk.index - 10), chunk.index + 1);
+			const recentFailures = recentChunks.filter((c) => c.status === 'failed').length;
+			if (recentFailures >= 5) {
+				this.logger.error(
+					`Systemic failure for ${map.movieFileId}/${map.quality}: ${recentFailures} consecutive failures, aborting`,
+				);
+				this.cancelAllChunks(map.movieFileId, map.quality);
+				return;
+			}
+
 			// Retry if under max attempts
 			if (chunk.attempts < MAX_CHUNK_RETRIES) {
 				chunk.status = 'pending';
