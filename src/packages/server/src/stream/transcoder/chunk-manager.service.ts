@@ -327,27 +327,41 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 		return enc?.chunkLookahead ?? 10;
 	}
 
+	private drainScheduled = false;
+
+	/** Schedule drain with delay to avoid tight spawn loops on failure */
+	private scheduleDrain(): void {
+		if (this.drainScheduled) return;
+		this.drainScheduled = true;
+		setTimeout(() => {
+			this.drainScheduled = false;
+			this.drain();
+		}, 200);
+	}
+
 	private async drain(): Promise<void> {
 		const max = this.getMaxConcurrency();
-		while (this.queue.length > 0) {
-			// Check total FFmpeg load: chunk processes + transcoder's monolithic/live processes
-			const totalFfmpeg = this.activeCount + this.transcoder.getActiveTranscodeCount();
-			if (totalFfmpeg >= max) break;
-			const task = this.queue.shift();
-			if (!task) break;
+		// Check total FFmpeg load: chunk + monolithic/live processes
+		const totalFfmpeg = this.activeCount + this.transcoder.getActiveTranscodeCount();
+		if (totalFfmpeg >= max || this.queue.length === 0) return;
 
-			const map = this.chunkMaps.get(this.mapKey(task.movieFileId, task.quality));
-			if (!map) continue;
+		const task = this.queue.shift();
+		if (!task) return;
 
-			const chunk = map.chunks[task.chunkIndex];
-			if (!chunk || chunk.status === 'complete' || chunk.status === 'encoding') continue;
+		const map = this.chunkMaps.get(this.mapKey(task.movieFileId, task.quality));
+		if (!map) { this.scheduleDrain(); return; }
 
-			this.activeCount++;
-			this.executeChunk(map, chunk).finally(() => {
-				this.activeCount--;
-				this.drain();
-			});
+		const chunk = map.chunks[task.chunkIndex];
+		if (!chunk || chunk.status === 'complete' || chunk.status === 'encoding') {
+			this.scheduleDrain();
+			return;
 		}
+
+		this.activeCount++;
+		this.executeChunk(map, chunk).finally(() => {
+			this.activeCount--;
+			this.scheduleDrain();
+		});
 	}
 
 	private async executeChunk(map: ChunkMap, chunk: ChunkInfo): Promise<void> {
