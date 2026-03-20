@@ -291,43 +291,53 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			if (!hasCached) {
-				// No usable cache — need to start transcoding
-				if (
-					this.chunkManager.isEnabled() &&
-					mode === StreamMode.TRANSCODE &&
-					persistEnabled &&
-					file.durationSeconds &&
-					file.durationSeconds > 0
-				) {
-					// Chunked transcoding
-					this.sessionDirs.set(sessionId, persistDir);
-					const chunkMap = await this.chunkManager.initializeChunkMap(
-						file.id,
-						quality,
-						file.filePath,
-						file.durationSeconds,
-					);
-					// Enqueue first chunks at seek priority for fast startup
-					for (let i = 0; i < Math.min(10, chunkMap.totalChunks); i++) {
-						if (chunkMap.chunks[i]?.status === 'pending') {
-							this.chunkManager.reprioritizeForSeek(file.id, quality, 0);
-							break;
-						}
-					}
-					this.chunkManager.enqueueAllPending(file.id, quality);
-					const progress = this.chunkManager.getProgress(file.id, quality);
-					if (progress.completed > 0) hasCached = true;
-					this.logger.log(
-						`Chunked transcode started for session=${sessionId}, file=${file.id}: ${progress.completed}/${progress.total} chunks ready`,
-					);
-				} else {
-					// Monolithic transcoding (legacy or remux)
-					const outputDir = persistEnabled ? persistDir : undefined;
-					if (outputDir) {
-						this.sessionDirs.set(sessionId, persistDir);
-					}
+				// Pause background encoding — live playback gets full priority
+				this.chunkManager.pauseBackground();
 
-					if (mode === StreamMode.TRANSCODE) {
+				// Use monolithic transcode for live playback (fastest startup: 1-2s to first segment)
+				// Write to ephemeral session dir so we don't overwrite background chunk cache
+				const outputDir = persistEnabled ? persistDir : undefined;
+				if (outputDir) {
+					this.sessionDirs.set(sessionId, persistDir);
+				}
+
+				if (mode === StreamMode.TRANSCODE) {
+					try {
+						await this.transcoderService.startTranscode(
+							sessionId,
+							file.filePath,
+							{
+								quality,
+								audioTrack: options.audioTrack,
+								subtitleTrack: options.subtitleTrack,
+							},
+							outputDir,
+						);
+					} catch (transcodeErr: any) {
+						this.logger.error(
+							`Transcode failed for ${file.filePath}: ${transcodeErr.message}`,
+						);
+						this.chunkManager.resumeBackground();
+						throw new BadRequestException(
+							'Unable to play this file. It may need to be rescanned, or the file path contains unsupported characters.',
+						);
+					}
+				} else {
+					// DIRECT_STREAM (remux) — if remux fails, fall back to full transcode
+					try {
+						await this.transcoderService.startRemux(
+							sessionId,
+							file.filePath,
+							outputDir,
+						);
+					} catch (remuxErr: any) {
+						this.logger.warn(
+							`Remux failed for session ${sessionId}, falling back to transcode: ${remuxErr.message}`,
+						);
+						if (outputDir) {
+							await this.transcoderService.cleanup(sessionId);
+							this.sessionDirs.set(sessionId, outputDir);
+						}
 						try {
 							await this.transcoderService.startTranscode(
 								sessionId,
@@ -341,48 +351,12 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 							);
 						} catch (transcodeErr: any) {
 							this.logger.error(
-								`Transcode failed for ${file.filePath}: ${transcodeErr.message}`,
+								`Both remux and transcode failed for ${file.filePath}: ${transcodeErr.message}`,
 							);
+							this.chunkManager.resumeBackground();
 							throw new BadRequestException(
-								'Unable to play this file. It may need to be rescanned, or the file path contains unsupported characters.',
+								'Unable to play this file. FFmpeg cannot process it — the file path may contain special characters, or the file may be corrupt.',
 							);
-						}
-					} else {
-						// DIRECT_STREAM (remux) — if remux fails, fall back to full transcode
-						try {
-							await this.transcoderService.startRemux(
-								sessionId,
-								file.filePath,
-								outputDir,
-							);
-						} catch (remuxErr: any) {
-							this.logger.warn(
-								`Remux failed for session ${sessionId}, falling back to transcode: ${remuxErr.message}`,
-							);
-							// Clean up failed remux output
-							if (outputDir) {
-								await this.transcoderService.cleanup(sessionId);
-								this.sessionDirs.set(sessionId, outputDir);
-							}
-							try {
-								await this.transcoderService.startTranscode(
-									sessionId,
-									file.filePath,
-									{
-										quality,
-										audioTrack: options.audioTrack,
-										subtitleTrack: options.subtitleTrack,
-									},
-									outputDir,
-								);
-							} catch (transcodeErr: any) {
-								this.logger.error(
-									`Both remux and transcode failed for ${file.filePath}: ${transcodeErr.message}`,
-								);
-								throw new BadRequestException(
-									`Unable to play this file. FFmpeg cannot process it — the file path may contain special characters, or the file may be corrupt.`,
-								);
-							}
 						}
 					}
 				}
@@ -642,6 +616,9 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			this.sessionDirs.delete(sessionId);
 			this.sessionInfo.delete(sessionId);
 		}
+
+		// Resume background chunk encoding (was paused for live stream priority)
+		this.chunkManager.resumeBackground();
 
 		// Mark session as ended by clearing lastActiveAt
 		await this.database.db.delete(streamSessions).where(eq(streamSessions.id, sessionId));

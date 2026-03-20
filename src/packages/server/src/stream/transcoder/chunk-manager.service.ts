@@ -36,6 +36,8 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 	/** Set when FFmpeg consistently fails to spawn (Windows handle exhaustion) */
 	private ffmpegBroken = false;
 	private consecutiveSpawnFailures = 0;
+	/** When true, background chunk encoding is paused (live stream has priority) */
+	private paused = false;
 
 	constructor(
 		private readonly transcoder: TranscoderService,
@@ -281,6 +283,28 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 		return enc?.useChunkedTranscoding === true;
 	}
 
+	/**
+	 * Pause background chunk encoding (for live stream priority).
+	 * Active chunks finish but no new ones start.
+	 */
+	pauseBackground(): void {
+		if (!this.paused) {
+			this.paused = true;
+			this.logger.log('Background chunk encoding paused (live stream priority)');
+		}
+	}
+
+	/**
+	 * Resume background chunk encoding.
+	 */
+	resumeBackground(): void {
+		if (this.paused) {
+			this.paused = false;
+			this.logger.log('Background chunk encoding resumed');
+			this.drain();
+		}
+	}
+
 	// ============================================
 	// Internal scheduling
 	// ============================================
@@ -343,6 +367,7 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private async drain(): Promise<void> {
+		if (this.paused || this.ffmpegBroken) return;
 		const max = this.getMaxConcurrency();
 		// Check total FFmpeg load: chunk + monolithic/live processes
 		const totalFfmpeg = this.activeCount + this.transcoder.getActiveTranscodeCount();

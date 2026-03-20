@@ -1,3 +1,6 @@
+Names; viro
+
+
 // - keep manifest cache on client for recently played X movies. Don't let it refetch/load on next 'play', if the movie was unloaded.
 // - pre-empt manifest loading if user hovers over play button, or clicks it? fire off manifest request first, for fastest load.
 
