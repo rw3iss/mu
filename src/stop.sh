@@ -114,6 +114,24 @@ if ! $killed; then
     fi
 fi
 
+# ── Kill orphaned FFmpeg processes ──
+if $IS_WINDOWS; then
+    ffmpeg_pids=$(tasklist 2>/dev/null | grep -i "ffmpeg" | awk '{print $2}' || true)
+else
+    ffmpeg_pids=$(pgrep -f "ffmpeg" 2>/dev/null || true)
+fi
+if [ -n "$ffmpeg_pids" ]; then
+    for pid in $ffmpeg_pids; do
+        if $IS_WINDOWS; then
+            taskkill //F //PID "$pid" 2>/dev/null || true
+        else
+            kill "$pid" 2>/dev/null || true
+        fi
+    done
+    echo "Killed orphaned FFmpeg processes"
+    killed=true
+fi
+
 if $killed; then
     # Wait for the port to actually be freed (Windows can take a few seconds)
     for i in 1 2 3 4 5; do
