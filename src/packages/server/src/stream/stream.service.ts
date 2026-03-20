@@ -753,73 +753,80 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	 * Considers: source file resolution, cached transcodes, and configured default.
 	 * Never upscales — caps quality at source resolution.
 	 */
+	/**
+	 * Resolve which quality to stream for a movie file.
+	 *
+	 * Priority:
+	 * 1. If "streamHighestAvailable" → use highest completed cache
+	 * 2. Otherwise → prefer default encoding quality cache
+	 * 3. Fall back to any completed cache (highest first)
+	 * 4. If no cache → return the quality that should be encoded
+	 *    (default quality, or file's native if "encodeHighestAvailable" is on)
+	 */
 	private resolveDefaultQuality(movieFileId: string, sourceHeight?: number | null): string {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const defaultQuality = enc?.quality || '1080p';
 		const encodeHighest = enc?.encodeHighestAvailable === true;
+		const streamHighest = enc?.streamHighestAvailable === true;
 
+		const QUALITIES = ['480p', '720p', '1080p', '4k'] as const;
 		const ranks: Record<string, number> = { '480p': 1, '720p': 2, '1080p': 3, '4k': 4 };
 
-		// Cap quality at source resolution to avoid upscaling
-		let maxQuality = defaultQuality;
-		if (sourceHeight && sourceHeight > 0) {
-			if (sourceHeight < 720) maxQuality = '480p';
-			else if (sourceHeight < 1080) maxQuality = '720p';
-			else if (sourceHeight < 2160) maxQuality = '1080p';
-			else maxQuality = '4k';
+		// Find all completed caches for this file
+		const completedQualities: string[] = [];
+		for (const q of QUALITIES) {
+			const dir = this.transcoderService.getPersistentDir(movieFileId, q);
+			if (existsSync(path.join(dir, '.complete'))) {
+				completedQualities.push(q);
+			}
+		}
 
-			// Don't exceed source-capped quality
-			const defaultRank = ranks[defaultQuality] ?? 3;
-			const sourceMaxRank = ranks[maxQuality] ?? 3;
-			if (defaultRank <= sourceMaxRank) {
-				maxQuality = defaultQuality;
-			} else {
-				// Before capping, check if a cache at the default quality already exists
-				// (pre-transcode may have encoded at the default without capping)
-				const hasDefaultCache = existsSync(
-					path.join(this.transcoderService.getPersistentDir(movieFileId, defaultQuality), '.complete'),
+		// Sort by rank descending (highest first)
+		completedQualities.sort((a, b) => (ranks[b] ?? 0) - (ranks[a] ?? 0));
+
+		if (completedQualities.length > 0) {
+			if (streamHighest) {
+				// Stream at highest available completed quality
+				this.logger.debug(
+					`Streaming highest available: ${completedQualities[0]} for ${movieFileId}`,
 				);
-				if (hasDefaultCache) {
-					this.logger.debug(
-						`Source is ${sourceHeight}px but using existing ${defaultQuality} cache`,
-					);
-					maxQuality = defaultQuality;
-				} else {
-					this.logger.debug(
-						`Capping quality from ${defaultQuality} to ${maxQuality} (source height: ${sourceHeight}px)`,
-					);
-				}
-			}
-		}
-
-		if (!encodeHighest) return maxQuality;
-
-		try {
-			const cached = this.database.db
-				.select({ quality: transcodeCache.quality })
-				.from(transcodeCache)
-				.where(eq(transcodeCache.movieFileId, movieFileId))
-				.all();
-
-			if (cached.length === 0) return maxQuality;
-
-			const maxRank = ranks[maxQuality] ?? 3;
-			let best = maxQuality;
-			let bestRank = ranks[maxQuality] ?? 0;
-
-			for (const { quality } of cached) {
-				const rank = ranks[quality] ?? 0;
-				// Don't exceed source resolution
-				if (rank > bestRank && rank <= maxRank) {
-					best = quality;
-					bestRank = rank;
-				}
+				return completedQualities[0]!;
 			}
 
-			return best;
-		} catch {
-			return maxQuality;
+			// Prefer default encoding quality if it exists
+			if (completedQualities.includes(defaultQuality)) {
+				return defaultQuality;
+			}
+
+			// Default quality not cached — use highest available
+			this.logger.debug(
+				`Default ${defaultQuality} not cached, using ${completedQualities[0]} for ${movieFileId}`,
+			);
+			return completedQualities[0]!;
 		}
+
+		// No completed cache — determine what quality to encode
+		// Determine source-native quality
+		let sourceQuality = defaultQuality;
+		if (sourceHeight && sourceHeight > 0) {
+			if (sourceHeight >= 2160) sourceQuality = '4k';
+			else if (sourceHeight >= 1080) sourceQuality = '1080p';
+			else if (sourceHeight >= 720) sourceQuality = '720p';
+			else sourceQuality = '480p';
+		}
+
+		if (encodeHighest && sourceHeight && sourceHeight > 0) {
+			// Encode at the file's native quality (or default, whichever is higher)
+			const sourceRank = ranks[sourceQuality] ?? 0;
+			const defaultRank = ranks[defaultQuality] ?? 0;
+			const chosen = sourceRank > defaultRank ? sourceQuality : defaultQuality;
+			this.logger.debug(`No cache, will encode at ${chosen} (encodeHighest, source=${sourceHeight}px)`);
+			return chosen;
+		}
+
+		// Encode at default quality (don't cap — let FFmpeg handle scaling)
+		this.logger.debug(`No cache, will encode at ${defaultQuality}`);
+		return defaultQuality;
 	}
 
 	/**

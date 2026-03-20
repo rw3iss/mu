@@ -217,6 +217,7 @@ export function Settings(props: SettingsProps) {
 	const [encodingPreset, setEncodingPreset] = useState('veryfast');
 	const [encodeQuality, setEncodeQuality] = useState('1080p');
 	const [encodeHighestAvailable, setEncodeHighestAvailable] = useState(false);
+	const [streamHighestAvailable, setStreamHighestAvailable] = useState(false);
 	const [rateControl, setRateControl] = useState('cbr');
 	const [crfValue, setCrfValue] = useState('23');
 	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState('2');
@@ -306,6 +307,8 @@ export function Settings(props: SettingsProps) {
 					if (typeof encoding.quality === 'string') setEncodeQuality(encoding.quality);
 					if (typeof encoding.encodeHighestAvailable === 'boolean')
 						setEncodeHighestAvailable(encoding.encodeHighestAvailable);
+					if (typeof encoding.streamHighestAvailable === 'boolean')
+						setStreamHighestAvailable(encoding.streamHighestAvailable);
 					if (typeof encoding.rateControl === 'string')
 						setRateControl(encoding.rateControl);
 					if (encoding.crf != null) setCrfValue(String(encoding.crf));
@@ -398,6 +401,7 @@ export function Settings(props: SettingsProps) {
 					preset: encodingPreset,
 					quality: encodeQuality,
 					encodeHighestAvailable,
+					streamHighestAvailable,
 					rateControl,
 					crf: parseInt(crfValue, 10),
 					maxConcurrentJobs: parseInt(maxConcurrentJobs, 10),
@@ -421,6 +425,7 @@ export function Settings(props: SettingsProps) {
 		encodingPreset,
 		encodeQuality,
 		encodeHighestAvailable,
+		streamHighestAvailable,
 		rateControl,
 		crfValue,
 		maxConcurrentJobs,
@@ -1325,6 +1330,31 @@ export function Settings(props: SettingsProps) {
 										checked={encodeHighestAvailable}
 										onChange={(e) =>
 											setEncodeHighestAvailable(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							{/* Stream Highest Available */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Stream Highest Available
+									</span>
+									<span class={styles.settingDescription}>
+										Always stream the highest quality cached version, even if
+										it exceeds the default encoding quality
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={streamHighestAvailable}
+										onChange={(e) =>
+											setStreamHighestAvailable(
 												(e.target as HTMLInputElement).checked,
 											)
 										}
