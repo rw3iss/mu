@@ -456,12 +456,20 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			ready,
 			format: directPlay ? 'native' : 'hls',
 			quality,
-			subtitles: subtitleTracks.map((t) => ({
-				id: String(t.index),
-				label: t.title || t.language,
-				language: t.language,
-				url: `/api/v1/stream/${sessionId}/subtitles/${t.index}.vtt`,
-			})),
+			subtitles: subtitleTracks.map((t, i) => {
+				const lang = (t.language || 'und').toUpperCase();
+				const title =
+					t.title && t.title !== `Track ${t.index}` && t.title !== t.language
+						? t.title
+						: null;
+				const label = title ? `${lang} — ${title}` : `${lang} (Track ${i + 1})`;
+				return {
+					id: String(t.index),
+					label,
+					language: t.language,
+					url: `/api/v1/stream/${sessionId}/subtitles/${t.index}.vtt`,
+				};
+			}),
 			audioTracks,
 			qualities,
 			startPosition: resumePosition,
