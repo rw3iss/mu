@@ -147,6 +147,12 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			// Attach Web Audio API processing chain
 			audioEngine.attach(video);
 			initAudioEffects();
+
+			// Safety: ensure AudioContext resumes when video plays
+			// (handles case where attach() captures audio before user gesture)
+			video.addEventListener('play', () => {
+				audioEngine.resume();
+			});
 		}
 
 		// 60fps time tracking via requestAnimationFrame

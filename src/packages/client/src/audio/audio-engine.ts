@@ -212,7 +212,11 @@ export class AudioEngine {
 	/** Resume AudioContext if suspended (browser autoplay policy). */
 	async resume(): Promise<void> {
 		if (this.ctx?.state === 'suspended') {
-			await this.ctx.resume();
+			try {
+				await this.ctx.resume();
+			} catch {
+				// Browser blocked resume (no user gesture yet) — will retry on next play event
+			}
 		}
 	}
 
