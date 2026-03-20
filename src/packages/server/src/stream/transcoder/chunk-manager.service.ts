@@ -33,6 +33,9 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 
 	/** Track active chunk process keys for cancellation */
 	private readonly activeChunkKeys = new Set<string>();
+	/** Set when FFmpeg consistently fails to spawn (Windows handle exhaustion) */
+	private ffmpegBroken = false;
+	private consecutiveSpawnFailures = 0;
 
 	constructor(
 		private readonly transcoder: TranscoderService,
@@ -365,6 +368,11 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private async executeChunk(map: ChunkMap, chunk: ChunkInfo): Promise<void> {
+		// Quick check: can FFmpeg actually spawn? If previous failures exhausted handles, bail early.
+		if (this.ffmpegBroken) {
+			chunk.status = 'failed';
+			return;
+		}
 		const cacheDir = this.transcoder.getPersistentDir(map.movieFileId, map.quality);
 		const outputPath = path.join(cacheDir, chunk.segmentFile);
 		const processKey = `chunk-${map.movieFileId}-${map.quality}-${chunk.index}`;
@@ -404,6 +412,20 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 			this.logger.error(
 				`Chunk ${chunk.index} failed for ${map.movieFileId}/${map.quality}: ${err.message}`,
 			);
+
+			// Track consecutive spawn failures globally
+			const isDllError = err.message?.includes('3221225794') || err.message?.includes('C0000142');
+			if (isDllError) {
+				this.consecutiveSpawnFailures++;
+				if (this.consecutiveSpawnFailures >= 3) {
+					this.ffmpegBroken = true;
+					this.logger.error('FFmpeg spawn broken (Windows handle exhaustion) — halting all chunk encoding');
+					this.queue.length = 0;
+					return;
+				}
+			} else {
+				this.consecutiveSpawnFailures = 0;
+			}
 
 			// Detect systemic failure: if many recent chunks failed, abort the whole movie
 			const recentChunks = map.chunks.slice(Math.max(0, chunk.index - 10), chunk.index + 1);
