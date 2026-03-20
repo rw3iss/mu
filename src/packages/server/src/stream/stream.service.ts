@@ -327,16 +327,25 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 					}
 
 					if (mode === StreamMode.TRANSCODE) {
-						await this.transcoderService.startTranscode(
-							sessionId,
-							file.filePath,
-							{
-								quality,
-								audioTrack: options.audioTrack,
-								subtitleTrack: options.subtitleTrack,
-							},
-							outputDir,
-						);
+						try {
+							await this.transcoderService.startTranscode(
+								sessionId,
+								file.filePath,
+								{
+									quality,
+									audioTrack: options.audioTrack,
+									subtitleTrack: options.subtitleTrack,
+								},
+								outputDir,
+							);
+						} catch (transcodeErr: any) {
+							this.logger.error(
+								`Transcode failed for ${file.filePath}: ${transcodeErr.message}`,
+							);
+							throw new BadRequestException(
+								'Unable to play this file. It may need to be rescanned, or the file path contains unsupported characters.',
+							);
+						}
 					} else {
 						// DIRECT_STREAM (remux) — if remux fails, fall back to full transcode
 						try {
@@ -814,6 +823,11 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		const filePath = (file.filePath || '').toLowerCase();
 		const videoCodec = (file.codecVideo || '').toLowerCase();
 		const audioCodec = (file.codecAudio || '').toLowerCase();
+
+		// If codec info is missing (file wasn't probed yet), default to transcode
+		if (!videoCodec) {
+			return StreamMode.TRANSCODE;
+		}
 		const ext = filePath.slice(filePath.lastIndexOf('.'));
 
 		const isH264 = videoCodec === 'h264' || videoCodec === 'avc' || videoCodec === 'h.264';
