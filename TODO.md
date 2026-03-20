@@ -3,6 +3,7 @@
 
 - seeking to future un-transcoded area fails for Dungeons&Dragons.
 
+- show a debug/stream info popup during playback: show bitrate, stream rate, etc.
 
 - make movie info overlay when hovering cards: show more details, trailer...
 

@@ -1,4 +1,31 @@
 // ============================================
+// Loading Spinner — shown while video is loading
+// ============================================
+
+.loadingSpinner {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-player-controls);
+  pointer-events: none;
+}
+
+.loadingSpinnerIcon {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  animation: loadingSpin 0.8s linear infinite;
+}
+
+@keyframes loadingSpin {
+  to { transform: rotate(360deg); }
+}
+
+// ============================================
 // Preparing Overlay — shown while transcoding
 // ============================================
 

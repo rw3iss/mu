@@ -531,6 +531,17 @@ export function GlobalPlayer() {
 				)}
 			</div>
 
+			{/* Loading spinner — shown while video is loading (no other message visible) */}
+			{!isMini &&
+				!preparingMessage &&
+				!isPlaying.value &&
+				!streamError.value &&
+				isPlayerActive.value && (
+					<div class={styles.loadingSpinner}>
+						<div class={styles.loadingSpinnerIcon} />
+					</div>
+				)}
+
 			{/* Preparing / error overlay */}
 			{preparingMessage && !isMini && (
 				<div class={styles.preparingOverlay}>
