@@ -413,6 +413,8 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 					`Systemic failure for ${map.movieFileId}/${map.quality}: ${recentFailures} consecutive failures, aborting`,
 				);
 				this.cancelAllChunks(map.movieFileId, map.quality);
+				// Write .failed marker to prevent re-queuing on restart
+				writeFile(path.join(cacheDir, '.failed'), `Systemic failure: ${err.message}`).catch(() => {});
 				return;
 			}
 
@@ -516,8 +518,9 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 						const completePath = path.join(qualityPath, '.complete');
 						const metaPath = path.join(qualityPath, CHUNK_META_FILE);
 
-						// Skip completed transcodes
+						// Skip completed or permanently failed transcodes
 						if (existsSync(completePath)) continue;
+						if (existsSync(path.join(qualityPath, '.failed'))) continue;
 
 						// Only resume if we have chunk metadata
 						if (!existsSync(metaPath)) continue;

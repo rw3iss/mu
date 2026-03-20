@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { nowISO, StreamMode, WsEvent } from '@mu/shared';
 import { forwardRef, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
@@ -424,6 +426,10 @@ export class LibraryJobsService implements OnModuleInit {
 			for (const quality of qualities) {
 				const hasCached = await this.transcoderService.hasCachedTranscode(file.id, quality);
 				if (hasCached) continue;
+
+				// Skip if previously failed permanently (.failed marker)
+				const persistDir = this.transcoderService.getPersistentDir(file.id, quality);
+				if (existsSync(path.join(persistDir, '.failed'))) continue;
 
 				// Recently watched movies get higher priority
 				const isRecent = recentMovieIds.has(file.movieId);
