@@ -25,6 +25,7 @@ import {
 	currentSession,
 	currentTime,
 	initPlayerSettings,
+	isBuffering,
 	isFullscreen,
 	isHoveringControls,
 	isPlaying,
@@ -531,12 +532,12 @@ export function GlobalPlayer() {
 				)}
 			</div>
 
-			{/* Loading spinner — shown while video is loading (no other message visible) */}
+			{/* Loading spinner — shown while video is buffering (not when paused with content) */}
 			{!isMini &&
 				!preparingMessage &&
-				!isPlaying.value &&
 				!streamError.value &&
-				isPlayerActive.value && (
+				isPlayerActive.value &&
+				isBuffering.value && (
 					<div class={styles.loadingSpinner}>
 						<div class={styles.loadingSpinnerIcon} />
 					</div>
