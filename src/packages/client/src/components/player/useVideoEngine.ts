@@ -144,19 +144,16 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				isBuffering.value = false;
 			});
 
-			// Audio engine: defer attachment until user explicitly enables effects.
-			// createMediaElementSource permanently captures video audio through
-			// Web Audio API — if anything goes wrong, audio is lost.
-			// So we only attach when effects are actually needed.
-			const attachAudioOnDemand = () => {
-				if (!audioEngine.isAttached()) {
-					audioEngine.attach(video);
-					audioEngine.resume();
-				}
-			};
-			// Store the attach function so effects can trigger it
-			(window as any).__muAttachAudio = attachAudioOnDemand;
+			// Attach audio engine EAGERLY (before HLS loads) — calling
+			// createMediaElementSource on an empty video is fine, but calling
+			// it AFTER HLS sets MediaSource causes Chrome to taint the audio.
+			audioEngine.attach(video);
 			initAudioEffects();
+
+			// Resume AudioContext when video plays
+			video.addEventListener('play', () => {
+				audioEngine.resume();
+			});
 		}
 
 		// 60fps time tracking via requestAnimationFrame

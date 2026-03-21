@@ -90,17 +90,7 @@ export class AudioEngine {
 		this.source = this.ctx.createMediaElementSource(element);
 		console.log('[AudioEngine] attach: via createMediaElementSource, ctx.state=', this.ctx.state);
 
-		// DEBUG: test tone on a SEPARATE AudioContext to verify CMES taints the main one
-		const testCtx = new AudioContext();
-		const osc = testCtx.createOscillator();
-		const testGain = testCtx.createGain();
-		testGain.gain.value = 0.1;
-		osc.frequency.value = 440;
-		osc.connect(testGain);
-		testGain.connect(testCtx.destination);
-		osc.start();
-		setTimeout(() => { osc.stop(); testCtx.close(); }, 300);
-		console.log('[AudioEngine] DEBUG: test tone on SEPARATE AudioContext');
+		console.log('[AudioEngine] attach complete: ctx.state=', this.ctx.state);
 
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
@@ -140,19 +130,11 @@ export class AudioEngine {
 
 	setEqEnabled(enabled: boolean): void {
 		this.eqEnabled = enabled;
-		// Attach on demand when effects are first enabled
-		if (enabled && !this.attached && (window as any).__muAttachAudio) {
-			(window as any).__muAttachAudio();
-		}
 		this.rebuildChain();
 	}
 
 	setCompressorEnabled(enabled: boolean): void {
 		this.compressorEnabled = enabled;
-		// Attach on demand when effects are first enabled
-		if (enabled && !this.attached && (window as any).__muAttachAudio) {
-			(window as any).__muAttachAudio();
-		}
 		if (!enabled) {
 			// When disabling, reset dry/wet gains to safe values
 			if (this.dryGainNode) this.dryGainNode.gain.value = 1;
