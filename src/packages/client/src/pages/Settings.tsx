@@ -2242,44 +2242,7 @@ export function Settings(props: SettingsProps) {
 								browse, and stream your personal movie collection from anywhere.
 							</p>
 
-							{serverStats && (
-								<>
-									<h3 class={styles.aboutSectionTitle}>Server Statistics</h3>
 
-									{/* ── Uptime banner ── */}
-									<div class={styles.statBanner}>
-										<div class={styles.statBannerIcon}>
-											<svg
-												width="20"
-												height="20"
-												viewBox="0 0 24 24"
-												fill="none"
-												stroke="currentColor"
-												stroke-width="2"
-												stroke-linecap="round"
-												stroke-linejoin="round"
-											>
-												<circle cx="12" cy="12" r="10" />
-												<polyline points="12 6 12 12 16 14" />
-											</svg>
-										</div>
-										<div class={styles.statBannerContent}>
-											<span class={styles.statBannerLabel}>
-												Server Uptime
-											</span>
-											<span class={styles.statBannerValue}>
-												{formatUptime(serverStats.system.uptime)}
-											</span>
-										</div>
-										<span class={styles.statTooltip}>
-											How long the server process has been running since last
-											restart
-										</span>
-									</div>
-
-									{/* Resources moved to Server tab */}
-								</>
-							)}
 						</div>
 					)}
 				</div>

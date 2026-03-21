@@ -1,29 +1,16 @@
 Names: viro? mu?
-
-
+INFO: ssh rw3iss@192.168.50.211
+--------------------------------------------------------------------------------
 
 // - keep manifest cache on client for recently played X movies. Don't let it refetch/load on next 'play', if the movie was unloaded.
 // - pre-empt manifest loading if user hovers over play button, or clicks it? fire off manifest request first, for fastest load.
-
-- seeking to future un-transcoded area fails for Dungeons&Dragons.
 
 - show a debug/stream info popup during playback: show bitrate, stream rate, etc.
 
 - make movie info overlay when hovering cards: show more details, trailer...
 
-INFO:
-ssh rw3iss@192.168.50.211
-
-When selecting 'Re-scan file' on a specific movie, can you make it so that it does NOT replace any metadata that it found for the file (ie. the title and description), if they are already set?
-Re-scanning a movie should only update it's file info, and other file properties, and fill in the title and anything other metadata it finds in the scan... only if those properties or metadata are already empty.
-When I click 'Clear metadata', it should then delete all metadata, and set the movie title and description back to its basic file info/file name, at that point. Then I can rescan metadata again after that to pull the real info again.
-
-
 - group, see related movies in library or set (ie. series):
 	- be smart... metadata if exists, otherwise strategies for filename/folder association.
-
-
-- show indicator on library page if movie is processing.
 
 - "Clean files" admin feature: rename all movie files to something standardized (enter a formatter), option to put movies in enclosing folder if they are not, put subtitles in subfolder, option to group series, etc.
 

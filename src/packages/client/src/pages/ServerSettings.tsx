@@ -103,9 +103,17 @@ function ServerInfoSection() {
 
 	return (
 		<div class={styles.infoGrid}>
-			<div class={styles.infoRow}>
-				<span class={styles.infoLabel}>Uptime</span>
-				<span class={styles.infoValue}>{formatUptime(info.uptime)}</span>
+			<div class={styles.uptimeBanner}>
+				<div class={styles.uptimeIcon}>
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<circle cx="12" cy="12" r="10" />
+						<polyline points="12 6 12 12 16 14" />
+					</svg>
+				</div>
+				<div class={styles.uptimeContent}>
+					<span class={styles.uptimeLabel}>Server Uptime</span>
+					<span class={styles.uptimeValue}>{formatUptime(info.uptime)}</span>
+				</div>
 			</div>
 			<div class={styles.infoRow}>
 				<span class={styles.infoLabel}>Platform</span>
