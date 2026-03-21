@@ -42,6 +42,9 @@ export class TranscoderService implements OnModuleDestroy {
 			this.config.get<string>('cache.streamDir') || './data/cache/streams',
 		);
 
+		// Restore hwAccelBroken from persisted settings
+		this.hwAccelBroken = this.settings.get<boolean>('hwAccelBroken', false);
+
 		// Set explicit ffmpeg/ffprobe paths from config
 		// This avoids PATH issues on Windows (WinGet symlink permissions, Git Bash vs system PATH)
 		const ffmpegPath = this.config.get<string>('transcoding.ffmpegPath', 'ffmpeg');
@@ -290,6 +293,7 @@ export class TranscoderService implements OnModuleDestroy {
 					if (hwAccel !== 'none' && !this.swFallbackAttempted.has(sessionId)) {
 						this.swFallbackAttempted.add(sessionId);
 						this.hwAccelBroken = true;
+						this.settings.set("hwAccelBroken", true);
 						this.logger.warn(
 							`Hardware acceleration (${hwAccel}) failed for session ${sessionId}, switching to software encoding globally`,
 						);
@@ -547,6 +551,7 @@ export class TranscoderService implements OnModuleDestroy {
 					) {
 						this.swFallbackAttempted.add(processKey);
 						this.hwAccelBroken = true;
+						this.settings.set("hwAccelBroken", true);
 						this.logger.warn(
 							`Hardware acceleration (${hwAccel}) failed for pre-transcode ${movieFileId}, switching to software encoding globally`,
 						);
@@ -1074,6 +1079,7 @@ export class TranscoderService implements OnModuleDestroy {
 					// If hardware encoding failed, retry with software
 					if (hwAccel !== 'none' && !forceSoftware) {
 						this.hwAccelBroken = true;
+						this.settings.set("hwAccelBroken", true);
 						this.logger.warn(
 							`HW accel failed for chunk ${path.basename(outputPath)}, switching to software for all future chunks`,
 						);

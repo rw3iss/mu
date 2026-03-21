@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { TranscoderService } from './transcoder.service.js';
@@ -32,7 +32,8 @@ export class HlsGeneratorService {
 
 	/**
 	 * Read and return a specific HLS transport stream segment (.ts) for a given session.
-	 * Returns null if the segment file does not exist.
+	 * Verifies the segment is fully written before serving (checks file size stability).
+	 * Returns null if the segment file does not exist after retries.
 	 */
 	async getSegment(
 		sessionId: string,
@@ -43,16 +44,38 @@ export class HlsGeneratorService {
 		const segmentFileName = `segment_${segmentNumber.toString().padStart(4, '0')}.ts`;
 		const segmentPath = path.join(sessionDir, segmentFileName);
 
-		// Try reading immediately, then wait briefly and retry if not found
-		// This avoids returning 503 for segments that are being written right now
-		for (let attempt = 0; attempt < 3; attempt++) {
+		// Retry up to 5 times with 1s delay (total 5s wait for live transcoding)
+		for (let attempt = 0; attempt < 5; attempt++) {
 			try {
+				const fileStat = await stat(segmentPath);
+
+				// Verify segment is complete: check size stability
+				// A segment being written will have a changing size
+				if (fileStat.size === 0) {
+					if (attempt < 4) {
+						await new Promise((r) => setTimeout(r, 1000));
+						continue;
+					}
+					return null;
+				}
+
+				// Wait briefly and check size again to ensure FFmpeg finished writing
+				if (attempt === 0) {
+					await new Promise((r) => setTimeout(r, 100));
+					const recheck = await stat(segmentPath);
+					if (recheck.size !== fileStat.size) {
+						// Still being written — wait and retry
+						await new Promise((r) => setTimeout(r, 500));
+						continue;
+					}
+				}
+
 				const data = await readFile(segmentPath);
 				return data;
 			} catch (err: any) {
 				if (err.code === 'ENOENT') {
-					if (attempt < 2) {
-						await new Promise((r) => setTimeout(r, 500));
+					if (attempt < 4) {
+						await new Promise((r) => setTimeout(r, 1000));
 						continue;
 					}
 					this.logger.debug(

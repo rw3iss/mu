@@ -12,34 +12,29 @@ export class ChunkManifestService {
 	 * Completed chunks get normal entries; pending/encoding chunks get #EXT-X-GAP markers.
 	 * This allows HLS.js to show full duration and skip unavailable segments.
 	 */
+	/**
+	 * Generate a VOD-style manifest listing ALL segments.
+	 * Segments that aren't cached yet will return 503 when requested,
+	 * triggering HLS.js's built-in fragment retry mechanism.
+	 * This shows the full movie duration in the seek bar immediately.
+	 */
 	generateVirtualManifest(chunkMap: ChunkMap): string {
 		const lines: string[] = [
 			'#EXTM3U',
 			'#EXT-X-VERSION:6',
 			`#EXT-X-TARGETDURATION:${Math.ceil(chunkMap.chunkDuration)}`,
 			'#EXT-X-MEDIA-SEQUENCE:0',
-			'#EXT-X-PLAYLIST-TYPE:EVENT',
+			'#EXT-X-PLAYLIST-TYPE:VOD',
 			'#EXT-X-INDEPENDENT-SEGMENTS',
 		];
 
-		// Only include consecutive completed chunks from the start.
-		// This mimics a growing EVENT playlist that HLS.js handles naturally.
-		// Gaps confuse many HLS players; a growing playlist works universally.
-		let allComplete = true;
+		// List ALL segments — uncached ones return 503 on request
 		for (const chunk of chunkMap.chunks) {
-			if (chunk.status === 'complete') {
-				lines.push(`#EXTINF:${chunk.duration.toFixed(3)},`);
-				lines.push(chunk.segmentFile);
-			} else {
-				allComplete = false;
-				break; // Stop at first incomplete chunk
-			}
+			lines.push(`#EXTINF:${chunk.duration.toFixed(3)},`);
+			lines.push(chunk.segmentFile);
 		}
 
-		if (allComplete) {
-			lines.push('#EXT-X-ENDLIST');
-		}
-
+		lines.push('#EXT-X-ENDLIST');
 		return lines.join('\n') + '\n';
 	}
 

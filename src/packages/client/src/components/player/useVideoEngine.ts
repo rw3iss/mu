@@ -327,12 +327,13 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 					maxBufferLength: bufferConfig.maxBufferLength,
 					maxMaxBufferLength: bufferConfig.maxMaxBufferLength,
 					maxBufferSize: bufferConfig.maxBufferSize,
-					manifestLoadingMaxRetry: 15,
-					manifestLoadingRetryDelay: 2000,
-					levelLoadingMaxRetry: 15,
-					levelLoadingRetryDelay: 2000,
-					fragLoadingMaxRetry: 15,
+					manifestLoadingMaxRetry: 10,
+					manifestLoadingRetryDelay: 1000,
+					levelLoadingMaxRetry: 10,
+					levelLoadingRetryDelay: 1000,
+					fragLoadingMaxRetry: 30,
 					fragLoadingRetryDelay: 2000,
+					fragLoadingMaxRetryTimeout: 30000,
 					xhrSetup(xhr) {
 						if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 					},
@@ -550,26 +551,17 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				video.duration && Number.isFinite(video.duration) ? video.duration : 0;
 			const availableEnd = Math.max(bufferedEnd, hlsDuration);
 
-			// If seeking past available content, tell server to prioritize that region
+			// If seeking past buffered content, tell server to prioritize those chunks
 			if (time > availableEnd + 5) {
 				setHlsStatus('Seeking...');
 
+				// Tell server to prioritize chunks at the seek position
 				streamService
 					.seekStream(session.sessionId, time)
 					.then(() => {
-						// Reload manifest to pick up newly available/gap-marked chunks
-						// HLS.js handles #EXT-X-GAP markers natively, skipping unavailable segments
-						if (hlsRef.current) {
-							// Stop and reload to force manifest refresh
-							hlsRef.current.stopLoad();
-							setTimeout(() => {
-								if (hlsRef.current) {
-									hlsRef.current.loadSource(session.streamUrl);
-									hlsRef.current.attachMedia(video);
-									setHlsStatus(null);
-								}
-							}, 1000);
-						}
+						setHlsStatus(null);
+						// With VOD manifest, HLS.js can seek directly — uncached segments
+						// return 503 which HLS.js retries automatically
 					})
 					.catch(() => {
 						setHlsStatus(null);

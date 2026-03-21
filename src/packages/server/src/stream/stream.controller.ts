@@ -175,15 +175,33 @@ export class StreamController {
 			return reply.status(500).send({ message: `Transcoding failed: ${state.error}` });
 		}
 
+		const segmentNumber = parseInt(match[1]!, 10);
 		const dir = this.streamService.getSessionCacheDir(sessionId);
-		const segment = await this.hlsGenerator.getSegment(sessionId, parseInt(match[1]!, 10), dir);
+		const segment = await this.hlsGenerator.getSegment(sessionId, segmentNumber, dir);
 
 		if (!segment) {
-			// Segment not yet transcoded — tell the client to retry
+			// Segment not cached — trigger on-demand chunk encoding if chunk system is active
+			const sessionInfo = this.streamService.getSessionInfo(sessionId);
+			if (sessionInfo?.movieFileId) {
+				const chunkMap = this.chunkManager.getChunkMap(
+					sessionInfo.movieFileId,
+					sessionInfo.quality || '1080p',
+				);
+				if (chunkMap) {
+					// Reprioritize this segment and lookahead for immediate encoding
+					const seekTime = segmentNumber * chunkMap.chunkDuration;
+					this.chunkManager.reprioritizeForSeek(
+						sessionInfo.movieFileId,
+						sessionInfo.quality || '1080p',
+						seekTime,
+					);
+				}
+			}
+
 			return reply
 				.status(503)
-				.header('Retry-After', '1')
-				.send({ message: 'Segment not yet available' });
+				.header('Retry-After', '2')
+				.send({ message: 'Segment not yet available, encoding triggered' });
 		}
 
 		return reply
