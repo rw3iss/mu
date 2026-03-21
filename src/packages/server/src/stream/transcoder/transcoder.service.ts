@@ -1,13 +1,14 @@
+import crypto from 'node:crypto';
 import { ChildProcess, execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { ConfigService } from '../../config/config.service.js';
 import { DatabaseService } from '../../database/database.service.js';
-import { transcodeCache } from '../../database/schema/index.js';
+import { movieFiles, transcodeCache } from '../../database/schema/index.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import { TranscodeDebuggerService } from './transcode-debugger.service.js';
 import { TRANSCODING_PROFILES } from './transcoder.profiles.js';
@@ -89,6 +90,82 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					}
 				} catch {}
 			}
+		}
+
+		// Reconcile disk caches with transcode_cache DB on startup
+		setTimeout(() => this.reconcileCaches(), 5000);
+	}
+
+	/**
+	 * Scan persistent cache directories and add any completed caches
+	 * that aren't tracked in the transcode_cache DB table.
+	 */
+	private async reconcileCaches(): Promise<void> {
+		const persistBase = path.join(this.cacheDir, 'persistent');
+		if (!existsSync(persistBase)) return;
+
+		try {
+			const dirs = readdirSync(persistBase);
+			let added = 0;
+
+			for (const fileId of dirs) {
+				const filePath = path.join(persistBase, fileId);
+				try { if (!statSync(filePath).isDirectory()) continue; } catch { continue; }
+
+				// Check file exists in DB
+				const dbFile = this.database.db
+					.select({ id: transcodeCache.movieFileId })
+					.from(transcodeCache)
+					.where(eq(transcodeCache.movieFileId, fileId))
+					.get();
+
+				// Check movie_files table for this ID
+				const movieFile = this.database.db.select().from(movieFiles).where(eq(movieFiles.id, fileId)).get();
+				if (!movieFile) continue;
+
+				const qualities = readdirSync(filePath);
+				for (const quality of qualities) {
+					const qPath = path.join(filePath, quality);
+					try { if (!statSync(qPath).isDirectory()) continue; } catch { continue; }
+
+					if (!existsSync(path.join(qPath, '.complete'))) continue;
+
+					// Check if already in DB
+					const existing = this.database.db
+						.select()
+						.from(transcodeCache)
+						.where(
+							and(
+								eq(transcodeCache.movieFileId, fileId),
+								eq(transcodeCache.quality, quality),
+							),
+						)
+						.get();
+					if (existing) continue;
+
+					// Add to DB
+					const enc = this.getEncodingSettings();
+					this.database.db.insert(transcodeCache).values({
+						id: crypto.randomUUID(),
+						movieFileId: fileId,
+						quality,
+						encodingSettings: JSON.stringify({
+							hwAccel: enc.hwAccel,
+							preset: enc.preset,
+							rateControl: enc.rateControl,
+							crf: enc.crf,
+						}),
+						completedAt: new Date().toISOString(),
+					}).run();
+					added++;
+				}
+			}
+
+			if (added > 0) {
+				this.logger.log(`Reconciled ${added} completed caches from disk to database`);
+			}
+		} catch (err: any) {
+			this.logger.warn(`Cache reconciliation failed: ${err.message}`);
 		}
 	}
 
