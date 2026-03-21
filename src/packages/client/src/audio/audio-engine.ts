@@ -63,9 +63,16 @@ export class AudioEngine {
 	ensureContext(): void {
 		if (!this.ctx) {
 			this.ctx = new AudioContext();
+			console.log('[AudioEngine] Created AudioContext, state:', this.ctx.state);
 		}
 		if (this.ctx.state === 'suspended') {
-			this.ctx.resume().catch(() => {});
+			this.ctx.resume().then(() => {
+				console.log('[AudioEngine] AudioContext resumed, state:', this.ctx?.state);
+			}).catch((err) => {
+				console.warn('[AudioEngine] Failed to resume AudioContext:', err);
+			});
+		} else {
+			console.log('[AudioEngine] AudioContext already running, state:', this.ctx.state);
 		}
 	}
 
@@ -75,24 +82,41 @@ export class AudioEngine {
 	 */
 	attach(element: HTMLMediaElement): void {
 		// Same element — nothing to do
-		if (this.attached && this.currentElement === element) return;
+		if (this.attached && this.currentElement === element) {
+			console.log('[AudioEngine] attach: same element, skipping');
+			return;
+		}
 
 		// Create context if not exists (fallback — may start suspended)
 		if (!this.ctx) {
 			this.ctx = new AudioContext();
+			console.log('[AudioEngine] attach: created fallback AudioContext, state:', this.ctx.state);
 		}
 
 		if (this.attached && this.source) {
 			// Re-attaching to a new video element — swap source only
+			console.log('[AudioEngine] attach: re-attaching to new element');
 			this.source.disconnect();
-			this.source = this.ctx.createMediaElementSource(element);
+			try {
+				this.source = this.ctx.createMediaElementSource(element);
+			} catch (err) {
+				console.error('[AudioEngine] attach: createMediaElementSource failed:', err);
+				return;
+			}
 			this.currentElement = element;
 			this.rebuildChain();
+			console.log('[AudioEngine] attach: re-attached, ctx state:', this.ctx.state);
 			return;
 		}
 
 		// First attach — create everything
-		this.source = this.ctx.createMediaElementSource(element);
+		console.log('[AudioEngine] attach: first attach');
+		try {
+			this.source = this.ctx.createMediaElementSource(element);
+		} catch (err) {
+			console.error('[AudioEngine] attach: createMediaElementSource failed:', err);
+			return;
+		}
 		this.currentElement = element;
 
 		// Create input gain (Amp) node
@@ -279,6 +303,8 @@ export class AudioEngine {
 		}
 
 		current.connect(this.ctx.destination);
+		console.log('[AudioEngine] rebuildChain: eq=%s, comp=%s, ctx.state=%s',
+			this.eqEnabled, this.compressorEnabled, this.ctx.state);
 	}
 
 	private applyCompressorSettings(s: CompressorSettings): void {
