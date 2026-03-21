@@ -490,6 +490,19 @@ export function GlobalPlayer() {
 		return () => document.removeEventListener('mousedown', handleGlobalClick);
 	}, []);
 
+	// Lock body scroll when player is in full mode (prevent scrollbar over video)
+	useEffect(() => {
+		const isFull = isPlayerActive.value && playerMode.value !== 'mini';
+		if (isFull) {
+			document.body.style.overflow = 'hidden';
+		} else {
+			document.body.style.overflow = '';
+		}
+		return () => {
+			document.body.style.overflow = '';
+		};
+	}, [isPlayerActive.value, playerMode.value]);
+
 	// Don't render anything if player is hidden
 	if (!isPlayerActive.value) return null;
 
