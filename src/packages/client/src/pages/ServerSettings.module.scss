@@ -219,6 +219,14 @@
   font-weight: var(--font-weight-semibold);
 }
 
+.jobTime {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .jobProgressBar {
   height: 3px;
   background: var(--color-bg-tertiary);

@@ -409,6 +409,14 @@ function JobsSection() {
 								{job.progress > 0 && job.progress < 100 && (
 									<span class={styles.jobProgress}>{job.progress.toFixed(0)}%</span>
 								)}
+								{(job.startedAt || job.createdAt) && (
+									<span class={styles.jobTime}>
+										{new Date(job.startedAt || job.createdAt).toLocaleString(undefined, {
+											month: 'short', day: 'numeric',
+											hour: '2-digit', minute: '2-digit',
+										})}
+									</span>
+								)}
 							</div>
 							{job.progress > 0 && job.status === 'running' && (
 								<div class={styles.jobProgressBar}>
