@@ -84,6 +84,17 @@ export class AudioEngine {
 		this.source = this.ctx.createMediaElementSource(element);
 		console.log('[AudioEngine] attach: via createMediaElementSource, ctx.state=', this.ctx.state);
 
+		// DEBUG: play a short test tone to verify AudioContext output works
+		const osc = this.ctx.createOscillator();
+		const testGain = this.ctx.createGain();
+		testGain.gain.value = 0.1; // quiet
+		osc.frequency.value = 440; // A4
+		osc.connect(testGain);
+		testGain.connect(this.ctx.destination);
+		osc.start();
+		setTimeout(() => osc.stop(), 300); // 300ms beep
+		console.log('[AudioEngine] DEBUG: playing 300ms test tone at 440Hz');
+
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
 		this.inputGainNode.gain.value = this.dbToLinear(this.inputGainDb);
