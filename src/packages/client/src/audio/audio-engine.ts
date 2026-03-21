@@ -64,16 +64,31 @@ export class AudioEngine {
 	private currentBands: EqBand[] = [...DEFAULT_EQ_BANDS];
 	private currentCompressor: CompressorSettings = { ...DEFAULT_COMPRESSOR };
 	private attached = false;
+	private currentElement: HTMLMediaElement | null = null;
 
 	/**
-	 * Attach to a video/audio element. Call once — the source node is
-	 * permanently bound to the element (Web Audio API limitation).
+	 * Attach to a video/audio element.
+	 * If already attached to a different element, re-creates the source node
+	 * on the existing AudioContext (preserves "running" state from user gesture).
 	 */
 	attach(element: HTMLMediaElement): void {
-		if (this.attached) return;
+		if (this.attached && this.currentElement === element) return;
+
+		if (this.attached && this.ctx) {
+			// Re-attaching to a new video element — disconnect old source,
+			// create new source on the SAME AudioContext (keeps it running)
+			if (this.source) {
+				this.source.disconnect();
+			}
+			this.source = this.ctx.createMediaElementSource(element);
+			this.currentElement = element;
+			this.rebuildChain();
+			return;
+		}
 
 		this.ctx = new AudioContext();
 		this.source = this.ctx.createMediaElementSource(element);
+		this.currentElement = element;
 
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
@@ -236,6 +251,7 @@ export class AudioEngine {
 		this.dryGainNode = null;
 		this.wetGainNode = null;
 		this.compMergeNode = null;
+		this.currentElement = null;
 		this.attached = false;
 	}
 
