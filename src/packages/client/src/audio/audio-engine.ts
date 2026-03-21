@@ -38,6 +38,17 @@ export const DEFAULT_COMPRESSOR: CompressorSettings = {
 	mix: 1,
 };
 
+/**
+ * Audio engine using Web Audio API for EQ and compression.
+ *
+ * KEY DESIGN: Audio is NOT captured by Web Audio until effects are enabled.
+ * This avoids the CORS/crossOrigin issues that cause silence when
+ * createMediaElementSource is used with HLS.js MediaSource.
+ *
+ * When no effects are enabled, the video plays audio natively (no Web Audio).
+ * When EQ or compressor is enabled, we capture audio via createMediaElementSource
+ * and route it through the effects chain.
+ */
 export class AudioEngine {
 	private ctx: AudioContext | null = null;
 	private source: MediaElementAudioSourceNode | null = null;
@@ -53,125 +64,67 @@ export class AudioEngine {
 	private inputGainDb = 0;
 	private currentBands: EqBand[] = [...DEFAULT_EQ_BANDS];
 	private currentCompressor: CompressorSettings = { ...DEFAULT_COMPRESSOR };
-	private attached = false;
 	private currentElement: HTMLMediaElement | null = null;
+	private captured = false;
 
 	/**
-	 * Ensure the AudioContext exists. Call this from a user gesture (click handler)
-	 * so Chrome allows the context to run. Safe to call multiple times.
+	 * Register the video element. Does NOT capture audio yet.
+	 * Audio plays natively until effects are enabled.
+	 */
+	attach(element: HTMLMediaElement): void {
+		this.currentElement = element;
+		// If effects are already enabled (restored from settings), capture now
+		if (this.eqEnabled || this.compressorEnabled) {
+			this.captureAudio();
+		}
+	}
+
+	isAttached(): boolean {
+		return this.currentElement !== null;
+	}
+
+	/**
+	 * Ensure AudioContext exists and is running.
+	 * Call from user gesture handlers.
 	 */
 	ensureContext(): void {
 		if (!this.ctx) {
 			this.ctx = new AudioContext();
-			console.log('[AudioEngine] Created AudioContext, state:', this.ctx.state);
 		}
 		if (this.ctx.state === 'suspended') {
-			this.ctx.resume().then(() => {
-				console.log('[AudioEngine] AudioContext resumed, state:', this.ctx?.state);
-			}).catch((err) => {
-				console.warn('[AudioEngine] Failed to resume AudioContext:', err);
-			});
-		} else {
-			console.log('[AudioEngine] AudioContext already running, state:', this.ctx.state);
+			this.ctx.resume().catch(() => {});
 		}
-	}
-
-	/**
-	 * Attach to a video/audio element. Creates the source node and audio chain.
-	 * Call ensureContext() first (from a user gesture) to avoid suspended state.
-	 */
-	attach(element: HTMLMediaElement): void {
-		// Same element — nothing to do
-		if (this.attached && this.currentElement === element) {
-			console.log('[AudioEngine] attach: same element, skipping');
-			return;
-		}
-
-		// Create context if not exists (fallback — may start suspended)
-		if (!this.ctx) {
-			this.ctx = new AudioContext();
-			console.log('[AudioEngine] attach: created fallback AudioContext, state:', this.ctx.state);
-		}
-
-		if (this.attached && this.source) {
-			// Re-attaching to a new video element — swap source only
-			console.log('[AudioEngine] attach: re-attaching to new element');
-			this.source.disconnect();
-			try {
-				this.source = this.ctx.createMediaElementSource(element);
-			} catch (err) {
-				console.error('[AudioEngine] attach: createMediaElementSource failed:', err);
-				return;
-			}
-			this.currentElement = element;
-			this.rebuildChain();
-			console.log('[AudioEngine] attach: re-attached, ctx state:', this.ctx.state);
-			return;
-		}
-
-		// First attach — create everything
-		console.log('[AudioEngine] attach: first attach');
-		try {
-			this.source = this.ctx.createMediaElementSource(element);
-		} catch (err) {
-			console.error('[AudioEngine] attach: createMediaElementSource failed:', err);
-			return;
-		}
-		this.currentElement = element;
-
-		// Create input gain (Amp) node
-		this.inputGainNode = this.ctx.createGain();
-		this.inputGainNode.gain.value = this.dbToLinear(this.inputGainDb);
-
-		// Create EQ filter chain
-		this.filters = this.currentBands.map((band) => {
-			const filter = this.ctx!.createBiquadFilter();
-			filter.type = band.type;
-			filter.frequency.value = band.frequency;
-			filter.gain.value = band.gain;
-			filter.Q.value = band.q;
-			return filter;
-		});
-
-		// Create compressor
-		this.compressor = this.ctx.createDynamicsCompressor();
-		this.applyCompressorSettings(this.currentCompressor);
-
-		// Makeup gain after compressor
-		this.makeupGainNode = this.ctx.createGain();
-		this.makeupGainNode.gain.value = this.dbToLinear(this.currentCompressor.makeupGain);
-
-		// Dry/wet mix nodes for parallel compression
-		this.dryGainNode = this.ctx.createGain();
-		this.wetGainNode = this.ctx.createGain();
-		this.compMergeNode = this.ctx.createGain();
-		this.applyMix(this.currentCompressor.mix);
-
-		this.attached = true;
-		this.rebuildChain();
-	}
-
-	isAttached(): boolean {
-		return this.attached;
 	}
 
 	setEqEnabled(enabled: boolean): void {
 		this.eqEnabled = enabled;
-		this.rebuildChain();
+		if (enabled && !this.captured) {
+			this.captureAudio();
+		} else if (!enabled && !this.compressorEnabled && this.captured) {
+			// Both effects off — release audio back to native playback
+			this.releaseAudio();
+		} else {
+			this.rebuildChain();
+		}
 	}
 
 	setCompressorEnabled(enabled: boolean): void {
 		this.compressorEnabled = enabled;
-		if (!enabled) {
-			// When disabling, reset dry/wet gains to safe values
-			if (this.dryGainNode) this.dryGainNode.gain.value = 1;
-			if (this.wetGainNode) this.wetGainNode.gain.value = 0;
-		}
-		this.rebuildChain();
-		if (enabled) {
-			// Re-apply current mix and compressor settings after chain rebuild
-			this.applyMix(this.currentCompressor.mix);
-			this.applyCompressorSettings(this.currentCompressor);
+		if (enabled && !this.captured) {
+			this.captureAudio();
+		} else if (!enabled && !this.eqEnabled && this.captured) {
+			// Both effects off — release audio back to native playback
+			this.releaseAudio();
+		} else {
+			if (!enabled) {
+				if (this.dryGainNode) this.dryGainNode.gain.value = 1;
+				if (this.wetGainNode) this.wetGainNode.gain.value = 0;
+			}
+			this.rebuildChain();
+			if (enabled) {
+				this.applyMix(this.currentCompressor.mix);
+				this.applyCompressorSettings(this.currentCompressor);
+			}
 		}
 	}
 
@@ -227,33 +180,99 @@ export class AudioEngine {
 		if (this.ctx?.state === 'suspended') {
 			try {
 				await this.ctx.resume();
-			} catch {
-				// Browser blocked resume — will retry on next user interaction
-			}
+			} catch {}
 		}
 	}
 
 	destroy(): void {
-		if (this.source) {
-			this.source.disconnect();
-			this.source = null;
-		}
+		this.releaseAudio();
 		if (this.ctx) {
 			this.ctx.close().catch(() => {});
 			this.ctx = null;
 		}
-		this.inputGainNode = null;
-		this.filters = [];
-		this.compressor = null;
-		this.makeupGainNode = null;
-		this.dryGainNode = null;
-		this.wetGainNode = null;
-		this.compMergeNode = null;
 		this.currentElement = null;
-		this.attached = false;
 	}
 
-	// ── Private ──
+	// ── Private: Capture/Release ──
+
+	/**
+	 * Capture audio from the video element via Web Audio API.
+	 * Once captured, audio MUST go through the AudioContext to be heard.
+	 */
+	private captureAudio(): void {
+		if (this.captured || !this.currentElement) return;
+
+		if (!this.ctx) {
+			this.ctx = new AudioContext();
+		}
+
+		try {
+			this.source = this.ctx.createMediaElementSource(this.currentElement);
+		} catch (err) {
+			console.warn('[AudioEngine] createMediaElementSource failed:', err);
+			return;
+		}
+
+		// Create nodes
+		this.inputGainNode = this.ctx.createGain();
+		this.inputGainNode.gain.value = this.dbToLinear(this.inputGainDb);
+
+		this.filters = this.currentBands.map((band) => {
+			const filter = this.ctx!.createBiquadFilter();
+			filter.type = band.type;
+			filter.frequency.value = band.frequency;
+			filter.gain.value = band.gain;
+			filter.Q.value = band.q;
+			return filter;
+		});
+
+		this.compressor = this.ctx.createDynamicsCompressor();
+		this.applyCompressorSettings(this.currentCompressor);
+
+		this.makeupGainNode = this.ctx.createGain();
+		this.makeupGainNode.gain.value = this.dbToLinear(this.currentCompressor.makeupGain);
+
+		this.dryGainNode = this.ctx.createGain();
+		this.wetGainNode = this.ctx.createGain();
+		this.compMergeNode = this.ctx.createGain();
+		this.applyMix(this.currentCompressor.mix);
+
+		this.captured = true;
+		this.rebuildChain();
+
+		// Resume context if needed
+		if (this.ctx.state === 'suspended') {
+			this.ctx.resume().catch(() => {});
+		}
+
+		console.log('[AudioEngine] Audio captured via Web Audio API');
+	}
+
+	/**
+	 * Release audio back to native video playback.
+	 * Note: createMediaElementSource is permanent — once called, audio
+	 * always goes through Web Audio. So we just route source → destination
+	 * (pass-through) when no effects are active.
+	 */
+	private releaseAudio(): void {
+		if (!this.captured || !this.source || !this.ctx) return;
+
+		// Disconnect everything and connect source directly to destination
+		this.source.disconnect();
+		this.inputGainNode?.disconnect();
+		for (const f of this.filters) f.disconnect();
+		this.compressor?.disconnect();
+		this.makeupGainNode?.disconnect();
+		this.dryGainNode?.disconnect();
+		this.wetGainNode?.disconnect();
+		this.compMergeNode?.disconnect();
+
+		// Pass-through: source → destination (no effects)
+		this.source.connect(this.ctx.destination);
+		console.log('[AudioEngine] Effects bypassed, pass-through mode');
+	}
+
+	// ── Private: Chain ──
 
 	private rebuildChain(): void {
 		if (!this.ctx || !this.source) return;
@@ -268,7 +287,6 @@ export class AudioEngine {
 		this.wetGainNode?.disconnect();
 		this.compMergeNode?.disconnect();
 
-		// Build chain: source → [inputGain] → [EQ] → [Compressor w/ dry/wet mix] → destination
 		let current: AudioNode = this.source;
 
 		if (this.eqEnabled && this.inputGainNode) {
@@ -291,20 +309,16 @@ export class AudioEngine {
 			this.wetGainNode &&
 			this.compMergeNode
 		) {
-			// Parallel compression: split into dry + wet, merge at compMergeNode
 			current.connect(this.dryGainNode);
 			this.dryGainNode.connect(this.compMergeNode);
 			current.connect(this.compressor);
 			this.compressor.connect(this.makeupGainNode);
 			this.makeupGainNode.connect(this.wetGainNode);
 			this.wetGainNode.connect(this.compMergeNode);
-
 			current = this.compMergeNode;
 		}
 
 		current.connect(this.ctx.destination);
-		console.log('[AudioEngine] rebuildChain: eq=%s, comp=%s, ctx.state=%s',
-			this.eqEnabled, this.compressorEnabled, this.ctx.state);
 	}
 
 	private applyCompressorSettings(s: CompressorSettings): void {

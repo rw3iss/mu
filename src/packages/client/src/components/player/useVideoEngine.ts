@@ -104,7 +104,6 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		if (!videoRef.current) {
 			const video = document.createElement('video');
 			video.playsInline = true;
-			video.crossOrigin = 'anonymous';
 			video.style.width = '100%';
 			video.style.height = '100%';
 			video.style.objectFit = 'contain';
