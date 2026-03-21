@@ -223,6 +223,7 @@ export function Settings(props: SettingsProps) {
 	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState('2');
 	const [segmentDuration, setSegmentDuration] = useState('4');
 	const [useChunkedTranscoding, setUseChunkedTranscoding] = useState(false);
+	const [debugTranscoding, setDebugTranscoding] = useState(false);
 	const [reEncodeOnScan, setReEncodeOnScan] = useState(false);
 
 	// Sharing settings
@@ -318,6 +319,8 @@ export function Settings(props: SettingsProps) {
 						setSegmentDuration(String(encoding.segmentDuration));
 					if (encoding.useChunkedTranscoding != null)
 						setUseChunkedTranscoding(!!encoding.useChunkedTranscoding);
+					if (encoding.debugTranscoding != null)
+						setDebugTranscoding(!!encoding.debugTranscoding);
 				}
 
 				// Load sources from the API
@@ -407,6 +410,7 @@ export function Settings(props: SettingsProps) {
 					maxConcurrentJobs: parseInt(maxConcurrentJobs, 10),
 					segmentDuration: parseInt(segmentDuration, 10),
 					useChunkedTranscoding,
+					debugTranscoding,
 				},
 			});
 
@@ -431,6 +435,7 @@ export function Settings(props: SettingsProps) {
 		maxConcurrentJobs,
 		segmentDuration,
 		useChunkedTranscoding,
+		debugTranscoding,
 	]);
 
 	const handleSaveLibrary = useCallback(async () => {
@@ -1468,6 +1473,32 @@ export function Settings(props: SettingsProps) {
 										checked={useChunkedTranscoding}
 										onChange={(e) =>
 											setUseChunkedTranscoding(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							{/* Debug Transcoding */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Debug Transcoding
+									</span>
+									<span class={styles.settingDescription}>
+										Log detailed transcoding diagnostics (FFmpeg commands,
+										timing, segment production, errors) to a dedicated debug log.
+										View via Settings or API.
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={debugTranscoding}
+										onChange={(e) =>
+											setDebugTranscoding(
 												(e.target as HTMLInputElement).checked,
 											)
 										}

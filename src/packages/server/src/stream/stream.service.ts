@@ -26,6 +26,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { SubtitleService } from './subtitles/subtitle.service.js';
 import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
+import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
 
 interface StartStreamOptions {
@@ -60,6 +61,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		private readonly subtitleService: SubtitleService,
 		private readonly settings: SettingsService,
 		private readonly chunkManager: ChunkManagerService,
+		private readonly transcodeDebugger: TranscodeDebuggerService,
 	) {}
 
 	onModuleInit(): void {
@@ -222,6 +224,26 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			});
 		}
 
+		// Start debug session
+		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+		this.transcodeDebugger.startSession(sessionId, file.id, {
+			filePath: file.filePath,
+			codecVideo: file.codecVideo ?? undefined,
+			codecAudio: file.codecAudio ?? undefined,
+			resolution: `${file.videoWidth ?? '?'}x${file.videoHeight ?? '?'}`,
+			durationSeconds: file.durationSeconds ?? undefined,
+			fileSizeBytes: file.fileSize ?? undefined,
+		}, {
+			quality,
+			preset: enc?.preset,
+			hwAccel: enc?.hwAccel,
+			videoCodec: enc?.videoCodec,
+			rateControl: enc?.rateControl,
+			crf: enc?.crf,
+			mode,
+		});
+		this.transcodeDebugger.recordMilestone(sessionId, 'requestReceived');
+
 		// Extract subtitles — use stored track info from DB to skip FFprobe
 		let subtitleTracks: { index: number; language: string; title: string }[] = [];
 		try {
@@ -255,6 +277,8 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			if (persistEnabled) {
 				cacheState = await this.transcoderService.validateCache(file.id, quality);
 			}
+
+			this.transcodeDebugger.recordEvent(sessionId, 'cache_state', `Cache state: ${cacheState}`);
 
 			if (cacheState === 'invalid') {
 				// Old or broken cache — clear it so we can start fresh
@@ -640,6 +664,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			movieId: session.movieId,
 		});
 
+		this.transcodeDebugger.endSession(sessionId, 'completed');
 		this.logger.log(`Stream ended: session=${sessionId}`);
 	}
 

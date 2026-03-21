@@ -9,6 +9,7 @@ import { ConfigService } from '../../config/config.service.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { transcodeCache } from '../../database/schema/index.js';
 import { SettingsService } from '../../settings/settings.service.js';
+import { TranscodeDebuggerService } from './transcode-debugger.service.js';
 import { TRANSCODING_PROFILES } from './transcoder.profiles.js';
 
 interface TranscodeOptions {
@@ -39,6 +40,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		private readonly config: ConfigService,
 		private readonly settings: SettingsService,
 		private readonly database: DatabaseService,
+		private readonly transcodeDebugger: TranscodeDebuggerService,
 	) {
 		this.cacheDir = path.resolve(
 			this.config.get<string>('cache.streamDir') || './data/cache/streams',
@@ -293,6 +295,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					);
 					this.logger.debug(`FFmpeg command: ${commandLine}`);
 					this.sessionStates.set(sessionId, { state: 'running' });
+					this.transcodeDebugger.recordFFmpegCommand(sessionId, commandLine);
+					this.transcodeDebugger.recordMilestone(sessionId, 'ffmpegSpawned');
 					// Resolve immediately once FFmpeg starts; segments will be generated progressively
 					resolve();
 				})
@@ -300,9 +304,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.logger.debug(
 						`Transcode progress [${sessionId}]: ${progress.percent?.toFixed(1)}%`,
 					);
+					this.transcodeDebugger.recordFFmpegProgress(sessionId, progress);
 				})
 				.on('error', (err: Error) => {
 					this.logger.error(`FFmpeg error for session ${sessionId}: ${err.message}`);
+					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(sessionId);
 
 					// If hardware acceleration was used, retry with software encoding
@@ -331,6 +337,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.logger.log(`Transcode complete for session ${sessionId}`);
 					this.activeProcesses.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'completed' });
+					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_complete', 'Transcode finished');
 					// Write .complete marker for persistent cache
 					if (outputDir) {
 						writeFile(path.join(targetDir, '.complete'), '').catch(() => {});
@@ -345,6 +352,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			if (ffmpegProcess) {
 				this.activeProcesses.set(sessionId, ffmpegProcess);
 				this.boostProcessPriority(sessionId);
+				this.transcodeDebugger.attachStderr(sessionId, ffmpegProcess);
 			}
 		});
 	}
@@ -396,17 +404,21 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					);
 					this.logger.debug(`FFmpeg command: ${commandLine}`);
 					this.sessionStates.set(sessionId, { state: 'running' });
+					this.transcodeDebugger.recordFFmpegCommand(sessionId, commandLine);
+					this.transcodeDebugger.recordMilestone(sessionId, 'ffmpegSpawned');
 					resolve();
 				})
 				.on('progress', (progress: any) => {
 					this.logger.debug(
 						`Remux progress [${sessionId}]: ${progress.percent?.toFixed(1)}%`,
 					);
+					this.transcodeDebugger.recordFFmpegProgress(sessionId, progress);
 				})
 				.on('error', (err: Error) => {
 					this.logger.error(
 						`FFmpeg remux error for session ${sessionId}: ${err.message}`,
 					);
+					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'failed', error: err.message });
 					reject(err);
@@ -415,6 +427,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.logger.log(`Remux complete for session ${sessionId}`);
 					this.activeProcesses.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'completed' });
+					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_complete', 'Remux finished');
 					if (outputDir) {
 						writeFile(path.join(targetDir, '.complete'), '').catch(() => {});
 					}
@@ -425,6 +438,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			const ffmpegProcess = (command as any).ffmpegProc;
 			if (ffmpegProcess) {
 				this.activeProcesses.set(sessionId, ffmpegProcess);
+				this.transcodeDebugger.attachStderr(sessionId, ffmpegProcess);
 			}
 		});
 	}
@@ -545,6 +559,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
 					this.logger.log(`Pre-transcode started for ${movieFileId}: ${commandLine}`);
+					this.transcodeDebugger.recordFFmpegCommand(processKey, commandLine);
+					this.transcodeDebugger.recordMilestone(processKey, 'ffmpegSpawned');
 				})
 				.on('progress', (progress: any) => {
 					const pct = progress.percent;
@@ -554,9 +570,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.logger.debug(
 						`Pre-transcode progress [${movieFileId}]: ${progress.percent?.toFixed(1)}%`,
 					);
+					this.transcodeDebugger.recordFFmpegProgress(processKey, progress);
 				})
 				.on('error', (err: Error) => {
 					this.logger.error(`Pre-transcode error for ${movieFileId}: ${err.message}`);
+					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(processKey);
 
 					// If hardware acceleration was used, retry with software encoding
@@ -588,6 +606,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.on('end', () => {
 					this.logger.log(`Pre-transcode complete for ${movieFileId}/${quality}`);
 					this.activeProcesses.delete(processKey);
+					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_complete', 'Pre-transcode finished');
 					writeFile(path.join(persistDir, '.complete'), '')
 						.then(() => resolve())
 						.catch(() => resolve());
@@ -598,6 +617,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			const ffmpegProcess = (command as any).ffmpegProc;
 			if (ffmpegProcess) {
 				this.activeProcesses.set(processKey, ffmpegProcess);
+				this.transcodeDebugger.attachStderr(processKey, ffmpegProcess);
 			}
 		});
 	}
@@ -1083,13 +1103,15 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 
 			command
 				.output(outputPath)
-				.on('start', () => {
+				.on('start', (commandLine: string) => {
 					this.logger.debug(`Chunk encode started: ${path.basename(outputPath)}`);
+					this.transcodeDebugger.recordFFmpegCommand(processKey, commandLine);
 				})
 				.on('error', (err: Error) => {
 					this.logger.error(
 						`Chunk encode failed ${path.basename(outputPath)}: ${err.message}`,
 					);
+					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(processKey);
 
 					// If hardware encoding failed, retry with software
@@ -1116,6 +1138,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.on('end', () => {
 					this.logger.debug(`Chunk encode complete: ${path.basename(outputPath)}`);
 					this.activeProcesses.delete(processKey);
+					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_complete', 'Chunk encode finished');
 					resolve();
 				});
 
@@ -1123,6 +1146,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			const ffmpegProcess = (command as any).ffmpegProc;
 			if (ffmpegProcess) {
 				this.activeProcesses.set(processKey, ffmpegProcess);
+				this.transcodeDebugger.attachStderr(processKey, ffmpegProcess);
 			}
 		});
 	}

@@ -20,6 +20,7 @@ import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { StreamService } from './stream.service.js';
 import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
+import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
 
 @Controller('stream')
@@ -33,6 +34,7 @@ export class StreamController {
 		private readonly chunkManager: ChunkManagerService,
 		private readonly directPlayService: DirectPlayService,
 		private readonly db: DatabaseService,
+		private readonly transcodeDebugger: TranscodeDebuggerService,
 	) {}
 
 	/**
@@ -116,6 +118,8 @@ export class StreamController {
 	 */
 	@Get(':sessionId/manifest.m3u8')
 	async getManifest(@Param('sessionId') sessionId: string, @Res() reply: FastifyReply) {
+		const requestStart = Date.now();
+
 		// Check if FFmpeg has crashed for this session
 		const state = this.transcoderService.getTranscodeState(sessionId);
 		if (state?.state === 'failed') {
@@ -142,12 +146,14 @@ export class StreamController {
 		const manifest = await this.hlsGenerator.getManifest(sessionId, dir);
 
 		if (!manifest) {
+			this.transcodeDebugger.recordClientRequest(sessionId, 'manifest', undefined, 503, Date.now() - requestStart);
 			return reply
 				.status(503)
 				.header('Retry-After', '1')
 				.send({ message: 'Manifest not yet available, transcoding in progress' });
 		}
 
+		this.transcodeDebugger.recordClientRequest(sessionId, 'manifest', undefined, 200, Date.now() - requestStart);
 		return reply
 			.header('Content-Type', 'application/vnd.apple.mpegurl')
 			.header('Cache-Control', 'no-cache')
@@ -163,6 +169,8 @@ export class StreamController {
 		@Param('segmentFile') segmentFile: string,
 		@Res() reply: FastifyReply,
 	) {
+		const requestStart = Date.now();
+
 		// segmentFile is e.g. "segment_0000.ts"
 		const match = segmentFile.match(/^segment_(\d+)\.ts$/);
 		if (!match) {
@@ -198,12 +206,18 @@ export class StreamController {
 				}
 			}
 
+			this.transcodeDebugger.recordClientRequest(sessionId, 'segment', segmentNumber, 503, Date.now() - requestStart);
 			return reply
 				.status(503)
 				.header('Retry-After', '2')
 				.send({ message: 'Segment not yet available, encoding triggered' });
 		}
 
+		this.transcodeDebugger.recordClientRequest(sessionId, 'segment', segmentNumber, 200, Date.now() - requestStart);
+		this.transcodeDebugger.recordSegmentReady(sessionId, segmentNumber, segment.length);
+		if (segmentNumber === 0) {
+			this.transcodeDebugger.recordMilestone(sessionId, 'firstSegmentServed');
+		}
 		return reply
 			.header('Content-Type', 'video/mp2t')
 			.header('Cache-Control', 'public, max-age=86400')

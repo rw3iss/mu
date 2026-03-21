@@ -10,11 +10,13 @@ import { SubtitleSearchService } from './subtitles/subtitle-search.service.js';
 import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { ChunkManifestService } from './transcoder/chunk-manifest.service.js';
 import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
+import { TranscodeDebugController } from './transcoder/transcode-debug.controller.js';
+import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
 
 @Module({
 	imports: [RemoteModule],
-	controllers: [StreamController, SubtitleController, SubtitleManageController],
+	controllers: [StreamController, SubtitleController, SubtitleManageController, TranscodeDebugController],
 	providers: [
 		StreamService,
 		TranscoderService,
@@ -24,6 +26,7 @@ import { TranscoderService } from './transcoder/transcoder.service.js';
 		DirectPlayService,
 		SubtitleService,
 		SubtitleSearchService,
+		TranscodeDebuggerService,
 	],
 	exports: [
 		StreamService,
@@ -34,6 +37,7 @@ import { TranscoderService } from './transcoder/transcoder.service.js';
 		ChunkManifestService,
 		SubtitleService,
 		SubtitleSearchService,
+		TranscodeDebuggerService,
 	],
 })
 export class StreamModule {}
