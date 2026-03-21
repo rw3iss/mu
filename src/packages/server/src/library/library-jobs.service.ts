@@ -408,6 +408,22 @@ export class LibraryJobsService implements OnModuleInit {
 
 		let resumed = 0;
 
+		// Collect all work first, then enqueue after initialization.
+		// This prevents monolithic jobs from starting FFmpeg processes
+		// while chunk maps are still being initialized (which also does disk I/O),
+		// avoiding Windows handle exhaustion (0xC0000142).
+		const pendingMonolithic: Array<{
+			type: string;
+			label: string;
+			payload: Record<string, unknown>;
+			priority: number;
+		}> = [];
+		const pendingChunked: Array<{
+			fileId: string;
+			quality: string;
+			priority: number;
+		}> = [];
+
 		for (const { file, movieTitle } of allFiles) {
 			const mode = this.streamService.determineStreamMode(file);
 			if (mode !== StreamMode.TRANSCODE && mode !== StreamMode.DIRECT_STREAM) continue;
@@ -442,17 +458,16 @@ export class LibraryJobsService implements OnModuleInit {
 					file.durationSeconds &&
 					file.durationSeconds > 0
 				) {
-					// Chunked transcoding: initialize chunk map and enqueue chunks
+					// Chunked transcoding: initialize chunk map first (sequential, does disk I/O)
 					await this.chunkManager.initializeChunkMap(
 						file.id,
 						quality,
 						file.filePath,
 						file.durationSeconds,
 					);
-					this.chunkManager.enqueueAllPending(file.id, quality, priority);
+					pendingChunked.push({ fileId: file.id, quality, priority });
 				} else {
-					// Monolithic transcoding
-					this.jobManager.enqueue({
+					pendingMonolithic.push({
 						type: JOB_TYPE.PRE_TRANSCODE,
 						label: `Resume transcode: ${title} (${quality})`,
 						payload: {
@@ -467,6 +482,15 @@ export class LibraryJobsService implements OnModuleInit {
 				}
 				resumed++;
 			}
+		}
+
+		// Now that all chunk maps are initialized, enqueue everything.
+		// Jobs won't compete with chunk initialization for FFmpeg handles.
+		for (const job of pendingMonolithic) {
+			this.jobManager.enqueue(job);
+		}
+		for (const { fileId, quality, priority } of pendingChunked) {
+			this.chunkManager.enqueueAllPending(fileId, quality, priority);
 		}
 
 		if (resumed > 0) {
