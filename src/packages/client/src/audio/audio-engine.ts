@@ -80,7 +80,7 @@ export class AudioEngine {
 		// If no AudioContext yet (no user gesture), defer attachment
 		if (!this.ctx) {
 			this.pendingElement = element;
-			console.log('[AudioEngine] attach: deferred (waiting for user gesture)');
+			
 			return;
 		}
 
@@ -101,17 +101,8 @@ export class AudioEngine {
 			// this.nativeVolume = element.volume;
 			// element.volume = 0;
 			this.capturedElement = element;
-			console.log('[AudioEngine] attached via captureStream, ctx.state=', this.ctx.state);
-			// DEBUG: test tone on SAME context to verify destination works
-			const osc = this.ctx.createOscillator();
-			const g = this.ctx.createGain();
-			g.gain.value = 0.15;
-			osc.frequency.value = 880;
-			osc.connect(g);
-			g.connect(this.ctx.destination);
-			osc.start();
-			setTimeout(() => osc.stop(), 500);
-			console.log('[AudioEngine] DEBUG: 500ms test tone at 880Hz on same ctx');
+			
+
 		} catch (err) {
 			console.error('[AudioEngine] captureStream failed:', err);
 			return;
@@ -263,25 +254,25 @@ export class AudioEngine {
 	ensureContext(): void {
 		if (!this.ctx) {
 			this.ctx = new AudioContext();
-			console.log('[AudioEngine] ensureContext: CREATED ctx, state=', this.ctx.state);
+			
 		}
 		if (this.ctx.state === 'suspended') {
 			this.ctx.resume().catch(() => {});
 		}
 		// Complete deferred attachment if element was stored before ctx existed
 		if (this.pendingElement && !this.attached) {
-			console.log('[AudioEngine] ensureContext: completing deferred attach');
+			
 			this.doAttach(this.pendingElement);
 		}
 	}
 
 	/** Resume AudioContext if suspended (browser autoplay policy). */
 	async resume(): Promise<void> {
-		console.log('[AudioEngine] resume called, ctx.state=', this.ctx?.state);
+		
 		if (this.ctx?.state === 'suspended') {
 			try {
 				await this.ctx.resume();
-				console.log('[AudioEngine] resumed successfully, ctx.state=', this.ctx?.state);
+				
 			} catch (err) {
 				console.warn('[AudioEngine] resume failed:', err);
 			}
