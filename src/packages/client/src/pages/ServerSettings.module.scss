@@ -100,12 +100,32 @@
   color: var(--color-text-primary);
 }
 
+.statCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-xs);
+}
+
+.statSegments {
+  display: flex;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.statSegment {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
 .statBar {
   height: 6px;
   background: var(--color-bg-tertiary);
   border-radius: 3px;
   margin-bottom: var(--space-xs);
   overflow: hidden;
+  position: relative;
 }
 
 .statBarFill {
@@ -113,6 +133,14 @@
   background: var(--color-accent);
   border-radius: 3px;
   transition: width 0.5s ease;
+}
+
+.statBarOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--color-accent);
+  opacity: 0.6;
 }
 
 // ── Jobs ──

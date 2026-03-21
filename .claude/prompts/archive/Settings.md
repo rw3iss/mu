@@ -1,0 +1,25 @@
+
+- add 'Server' section to Settings:
+	- see each job, progress, cancel
+	- see server stats
+	- control server: restart, etc.
+	- user access...
+	- show current server configuration: ie. hardware encoding configuration, defaults: make an endpoint for server configuration.
+
+I'd like to add a separate 'Server' section to the Settings page. This section should only show for the 'admin' roles, or original user. This will be a location the user can manage everything about the server, and see the statistics, and see and manage running jobs, as well manage remote access to it.
+This will be a lot of changes, in parts, so write out a plan to follow for all of these steps.
+
+Each of these features or sections in the new Settings > Server page should be a collapsable section.
+
+- SERVER INFO: Design an endpoint to retrieve all of the current server's information (ie. including the uptime, the current operating system, the hardware configuration (ie. if nvidia is ACTUALLY being used, or if it's falling back to software rendering), and other server information). I'd also like the ability to relaunch the server from this section. Add a button to 'Restart Server', which when clicked shows an in-app modal confirmation to restart the server. Make a backend api endpoint to handle the restart request, and call the restart.sh script, or be able to stop itself and then call it (or the best way to restart the server and all processes, like restart.sh does).
+
+- STATISTICS: I'd also like to add back the "Statistics" section to this new Settings > Server section. That used to exist (in the Settings > About section). See if it's commented out, and move it to the Settings > Server, new Statistics section. Ensure it shows all live statistics for the backend server (including cpu use, memory usage, and disk usage, broken down by app/system/total). We will think of other stats to display later, but if you have any good ones in mind here, you can add them.
+
+- JOBS: I'd like a way to see all current jobs running on the backend, including transcoding, and all of their details (including when it started, how much data it's processing, ie. job details, the target file or movie it's processing for, and an estimated time until it's finished processing). This should show background jobs, primarily (ie. background transcoding), but it can also show the current streaming movie jobs too. Each job should be listed in a list as an item with minimal/basic job details, and clicking the items should expand them to show more information about it, including the transcoding quality. They should also include the ability to stop a job, or even pause it. If a job is paused, the backend should understand to allow other jobs to continue while that one is paused. Ensure the backend job registration system can keep track of the "input" data for each job, ie. the movie file, so this can be referenced and looked up for that job's details. Then ensure their is a jobs api endpoint to retrieve all of that information, for the current jobs. Past jobs can also be stored up to some time. I think the job system might already be using redis, which we can continue to use, but if we're going to create historical job records, in this case, then we can also consider moving it to postgres itself (or the DB), but if we're already using redis, consider mixing the two, and storing the historical records in postgres once they complete from redis. If the jobs are removed from redis as soon as they begin, then ensure a record is also inserted into the job history table when that happens, for the job, with the input/job details. Ensure the jobs system can maintain 'statuses' for each job (ie. started/running, errored, completed, paused, cancelled, etc), so we can see that in the Jobs history list, and also ensure the api can support querying or differentiating between jobs based on their statuses, so we can obtain the historical jobs (ie. by status: completed, cancelled, failed). We just need to ensure we're storing more information on the Job details in the redis job, and the postgres history record after, if you can do that. When the job is completed, also update these entries with the historical data, ie. how long the job took, and the result of the operation (ie. what was produced, etc).
+Ensure there is a "Jobs" section in this new admin server section. In this section of the Server Setting pane, create two tabs for "Current Jobs" and "History". Show the currently running jobs in the Current Jobs tab, as well as any pending jobs, if they haven't started yet, and then show past jobs in the History tab (completed, cancelled, and failed jobs).
+
+- LOGS: I'd also like the ability to see the server log. Make an endpoint to read the server.log file, and show it here in a textarea read only output, with a refresh button, and copy to clipboard button in the upper right corner.
+
+... that's it for now. If you think there should be other useful 'Settings > Server' sections, add them if you think it's worthwhile. Later we might be able to add and modify new users here, but maybe that will go in the Admin section.
+
+

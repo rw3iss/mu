@@ -203,13 +203,19 @@ function ServerInfoSection() {
 // Statistics Section
 // ============================================
 
+function meterColor(ratio: number): string {
+	if (ratio < 0.6) return 'var(--color-accent, #4caf50)';
+	if (ratio < 0.85) return '#ff9800';
+	return '#f44336';
+}
+
 function StatsSection() {
 	const [stats, setStats] = useState<any>(null);
 
 	useEffect(() => {
 		const load = async () => {
 			try {
-				const data = await api.get('/admin/server/stats');
+				const data = await api.get('/health/stats');
 				setStats(data);
 			} catch {}
 		};
@@ -220,37 +226,86 @@ function StatsSection() {
 
 	if (!stats) return <Spinner size="sm" />;
 
-	const memPercent = stats.memory.system.usedPercent.toFixed(0);
+	const sys = stats.system;
+	const svc = stats.services;
+	const cpuRatio = Math.min(sys.loadAvg[0] / sys.cpuCount, 1);
+	const memTotal = sys.memoryTotal || 1;
+	const memUsed = sys.memoryTotal - sys.memoryFree;
+	const memRatio = memUsed / memTotal;
+	const appMem = sys.appMemory?.total ?? 0;
+	const appMemRatio = appMem / memTotal;
 
 	return (
 		<div class={styles.statsGrid}>
+			{/* CPU */}
 			<div class={styles.statCard}>
-				<div class={styles.statLabel}>System Memory</div>
+				<div class={styles.statCardHeader}>
+					<span class={styles.statLabel}>CPU Load</span>
+					<span class={styles.statValue}>{sys.loadAvg[0].toFixed(2)} / {sys.cpuCount}</span>
+				</div>
 				<div class={styles.statBar}>
-					<div class={styles.statBarFill} style={{ width: `${memPercent}%` }} />
-				</div>
-				<div class={styles.statValue}>
-					{formatBytes(stats.memory.system.used)} / {formatBytes(stats.memory.system.total)} ({memPercent}%)
+					<div class={styles.statBarFill} style={{ width: `${cpuRatio * 100}%`, background: meterColor(cpuRatio) }} />
 				</div>
 			</div>
+
+			{/* Memory */}
 			<div class={styles.statCard}>
-				<div class={styles.statLabel}>App Memory</div>
-				<div class={styles.statValue}>
-					Heap: {formatBytes(stats.memory.app.heapUsed)} / {formatBytes(stats.memory.app.heapTotal)}
-					{' | '}RSS: {formatBytes(stats.memory.app.rss)}
+				<div class={styles.statCardHeader}>
+					<span class={styles.statLabel}>Memory</span>
+				</div>
+				<div class={styles.statSegments}>
+					<span class={styles.statSegment}>App: {formatBytes(appMem)}</span>
+					<span class={styles.statSegment}>System: {formatBytes(memUsed)}</span>
+					<span class={styles.statSegment}>Total: {formatBytes(memTotal)}</span>
+				</div>
+				<div class={styles.statBar}>
+					<div class={styles.statBarFill} style={{ width: `${memRatio * 100}%`, background: meterColor(memRatio) }} />
+					<div class={`${styles.statBarFill} ${styles.statBarOverlay}`} style={{ width: `${Math.max(appMemRatio * 100, 0.5)}%` }} />
 				</div>
 			</div>
+
+			{/* Disk */}
+			{sys.diskTotal > 0 && (() => {
+				const diskTotal = sys.diskTotal || 1;
+				const diskUsed = diskTotal - sys.diskFree;
+				const diskRatio = diskUsed / diskTotal;
+				const appSize = sys.dataDirSize || 0;
+				const appDiskRatio = appSize / diskTotal;
+				return (
+					<div class={styles.statCard}>
+						<div class={styles.statCardHeader}>
+							<span class={styles.statLabel}>Disk</span>
+						</div>
+						<div class={styles.statSegments}>
+							<span class={styles.statSegment}>App: {formatBytes(appSize)}</span>
+							<span class={styles.statSegment}>Used: {formatBytes(diskUsed)}</span>
+							<span class={styles.statSegment}>Total: {formatBytes(diskTotal)}</span>
+						</div>
+						<div class={styles.statBar}>
+							<div class={styles.statBarFill} style={{ width: `${diskRatio * 100}%`, background: meterColor(diskRatio) }} />
+							<div class={`${styles.statBarFill} ${styles.statBarOverlay}`} style={{ width: `${Math.max(appDiskRatio * 100, 0.5)}%` }} />
+						</div>
+					</div>
+				);
+			})()}
+
+			{/* Library */}
 			<div class={styles.statCard}>
 				<div class={styles.statLabel}>Library</div>
 				<div class={styles.statValue}>
-					{stats.library.movieCount} movies, {stats.library.fileCount} files
-					{stats.library.totalFileSize > 0 && ` (${formatBytes(stats.library.totalFileSize)})`}
+					{stats.library?.movieCount ?? 0} movies, {stats.library?.fileCount ?? 0} files
 				</div>
 			</div>
-			<div class={styles.statCard}>
-				<div class={styles.statLabel}>Active Transcodes</div>
-				<div class={styles.statValue}>{stats.streaming.activeTranscodes}</div>
-			</div>
+
+			{/* Services */}
+			{svc && (
+				<div class={styles.statCard}>
+					<div class={styles.statLabel}>Activity</div>
+					<div class={styles.statValue}>
+						{svc.activeStreams ?? 0} streams, {svc.activeTranscodes ?? 0} transcodes, {svc.runningJobs ?? 0} running / {svc.pendingJobs ?? 0} pending jobs
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

@@ -1,4 +1,5 @@
-Names; viro
+Names: viro? mu?
+
 
 
 // - keep manifest cache on client for recently played X movies. Don't let it refetch/load on next 'play', if the movie was unloaded.
@@ -20,14 +21,6 @@ When I click 'Clear metadata', it should then delete all metadata, and set the m
 
 - group, see related movies in library or set (ie. series):
 	- be smart... metadata if exists, otherwise strategies for filename/folder association.
-
-- add 'Server' section to Settings:
-	- see each job, progress, cancel
-	- see server stats
-	- control server: restart, etc.
-	- user access...
-	- show current server configuration: ie. hardware encoding configuration, defaults: make an endpoint for server configuration.
-	I'd like to add a separate 'Server' section to the Settings page. This will be a location the user can manage everything about the server, and see the statistics, and see and manage running jobs, as well manage remote access to it.
 
 
 - show indicator on library page if movie is processing.
