@@ -3,6 +3,7 @@ import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
 import { FontScaler, resetTextScale } from '@/components/common/FontScaler';
+import { ServerSettings } from '@/pages/ServerSettings';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
@@ -161,6 +162,7 @@ type SettingsTab =
 	| 'notifications'
 	| 'plugins'
 	| 'admin'
+	| 'server'
 	| 'about';
 
 const VALID_TABS: SettingsTab[] = [
@@ -171,6 +173,7 @@ const VALID_TABS: SettingsTab[] = [
 	'notifications',
 	'plugins',
 	'admin',
+	'server',
 	'about',
 ];
 
@@ -587,6 +590,7 @@ export function Settings(props: SettingsProps) {
 			? [
 					{ id: 'plugins' as SettingsTab, label: 'Plugins' },
 					{ id: 'admin' as SettingsTab, label: 'Admin' },
+					{ id: 'server' as SettingsTab, label: 'Server' },
 				]
 			: []),
 		{ id: 'about', label: 'About' },
@@ -2183,6 +2187,14 @@ export function Settings(props: SettingsProps) {
 					{activeTab === 'admin' && isAdmin && (
 						<div class={styles.panel}>
 							<AdminDashboard />
+						</div>
+					)}
+
+					{/* Server Tab (admin only) */}
+					{activeTab === 'server' && (
+						<div class={styles.panel}>
+							<h2 class={styles.panelTitle}>Server</h2>
+							<ServerSettings />
 						</div>
 					)}
 

@@ -20,6 +20,8 @@ export type { NewPlugin, Plugin } from './plugins.ts';
 export { plugins } from './plugins.ts';
 export type { NewScanLogEntry, ScanLogEntry } from './scan-log.ts';
 export { scanLog } from './scan-log.ts';
+export type { JobHistoryEntry, NewJobHistoryEntry } from './job-history.ts';
+export { jobHistory } from './job-history.ts';
 export type { NewSetting, Setting } from './settings.ts';
 export { settings } from './settings.ts';
 export type { NewStreamSession, StreamSession } from './stream-sessions.ts';

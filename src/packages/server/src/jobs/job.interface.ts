@@ -1,4 +1,4 @@
-export type JobStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'paused';
 
 export interface JobDescriptor {
 	/** Unique job type identifier, e.g. 'scan', 'metadata', 'thumbnail', 'cleanup' */
