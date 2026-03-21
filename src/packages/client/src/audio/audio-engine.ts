@@ -69,28 +69,28 @@ export class AudioEngine {
 	 * Attach to a video/audio element. Call once — the source node is
 	 * permanently bound to the element (Web Audio API limitation).
 	 */
+	/** Store element for deferred attachment */
+	private pendingElement: HTMLMediaElement | null = null;
+
 	attach(element: HTMLMediaElement): void {
-		if (this.attached) {
-			console.log('[AudioEngine] attach: already attached, ctx.state=', this.ctx?.state);
+		if (this.attached) return;
+
+		// If no AudioContext yet (no user gesture), defer attachment
+		if (!this.ctx) {
+			this.pendingElement = element;
+			console.log('[AudioEngine] attach: deferred (waiting for user gesture)');
 			return;
 		}
 
-		// Reuse context created by ensureContext (from user gesture) if available
-		if (!this.ctx) {
-			this.ctx = new AudioContext();
-			console.log('[AudioEngine] attach: created NEW ctx (WARNING: not from gesture!)');
-		} else {
-			console.log('[AudioEngine] attach: reusing ctx from ensureContext, state=', this.ctx.state);
-		}
+		this.doAttach(element);
+	}
 
-		// Log crossOrigin state — if set, createMediaElementSource will taint audio
-		console.log('[AudioEngine] video.crossOrigin=', element.crossOrigin,
-			'readyState=', element.readyState, 'src=', element.src?.substring(0, 50));
+	private doAttach(element: HTMLMediaElement): void {
+		if (this.attached || !this.ctx) return;
 
 		this.source = this.ctx.createMediaElementSource(element);
-		console.log('[AudioEngine] attach: via createMediaElementSource, ctx.state=', this.ctx.state);
-
-		console.log('[AudioEngine] attach complete: ctx.state=', this.ctx.state);
+		this.pendingElement = null;
+		console.log('[AudioEngine] attached: ctx.state=', this.ctx.state);
 
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
@@ -241,6 +241,11 @@ export class AudioEngine {
 		}
 		if (this.ctx.state === 'suspended') {
 			this.ctx.resume().catch(() => {});
+		}
+		// Complete deferred attachment if element was stored before ctx existed
+		if (this.pendingElement && !this.attached) {
+			console.log('[AudioEngine] ensureContext: completing deferred attach');
+			this.doAttach(this.pendingElement);
 		}
 	}
 
