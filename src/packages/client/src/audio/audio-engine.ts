@@ -70,10 +70,14 @@ export class AudioEngine {
 	 * permanently bound to the element (Web Audio API limitation).
 	 */
 	attach(element: HTMLMediaElement): void {
-		if (this.attached) return;
+		if (this.attached) {
+			console.log('[AudioEngine] attach: already attached, ctx.state=', this.ctx?.state);
+			return;
+		}
 
 		this.ctx = new AudioContext();
 		this.source = this.ctx.createMediaElementSource(element);
+		console.log('[AudioEngine] attach: created ctx.state=', this.ctx.state, 'source=', !!this.source);
 
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
@@ -221,11 +225,13 @@ export class AudioEngine {
 
 	/** Resume AudioContext if suspended (browser autoplay policy). */
 	async resume(): Promise<void> {
+		console.log('[AudioEngine] resume called, ctx.state=', this.ctx?.state);
 		if (this.ctx?.state === 'suspended') {
 			try {
 				await this.ctx.resume();
-			} catch {
-				// Browser blocked resume (no user gesture yet) — will retry on next play event
+				console.log('[AudioEngine] resumed successfully, ctx.state=', this.ctx?.state);
+			} catch (err) {
+				console.warn('[AudioEngine] resume failed:', err);
 			}
 		}
 	}
