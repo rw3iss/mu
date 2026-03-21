@@ -75,7 +75,13 @@ export class AudioEngine {
 			return;
 		}
 
-		this.ctx = new AudioContext();
+		// Reuse context created by ensureContext (from user gesture) if available
+		if (!this.ctx) {
+			this.ctx = new AudioContext();
+			console.log('[AudioEngine] attach: created NEW ctx (WARNING: not from gesture!)');
+		} else {
+			console.log('[AudioEngine] attach: reusing ctx from ensureContext, state=', this.ctx.state);
+		}
 
 		// Log crossOrigin state — if set, createMediaElementSource will taint audio
 		console.log('[AudioEngine] video.crossOrigin=', element.crossOrigin,
@@ -241,8 +247,16 @@ export class AudioEngine {
 	 * Ensure AudioContext exists and is running.
 	 * Call from user gesture handlers (click/touch).
 	 */
+	/**
+	 * Create/resume AudioContext. MUST be called from a user gesture (click).
+	 * Chrome only allows audio output from contexts created during user activation.
+	 */
 	ensureContext(): void {
-		if (this.ctx && this.ctx.state === 'suspended') {
+		if (!this.ctx) {
+			this.ctx = new AudioContext();
+			console.log('[AudioEngine] ensureContext: CREATED ctx, state=', this.ctx.state);
+		}
+		if (this.ctx.state === 'suspended') {
 			this.ctx.resume().catch(() => {});
 		}
 	}
