@@ -377,7 +377,10 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 		if (!task) return;
 
 		const map = this.chunkMaps.get(this.mapKey(task.movieFileId, task.quality));
-		if (!map) { this.scheduleDrain(); return; }
+		if (!map) {
+			this.scheduleDrain();
+			return;
+		}
 
 		const chunk = map.chunks[task.chunkIndex];
 		if (!chunk || chunk.status === 'complete' || chunk.status === 'encoding') {
@@ -439,12 +442,15 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 			);
 
 			// Track consecutive spawn failures globally
-			const isDllError = err.message?.includes('3221225794') || err.message?.includes('C0000142');
+			const isDllError =
+				err.message?.includes('3221225794') || err.message?.includes('C0000142');
 			if (isDllError) {
 				this.consecutiveSpawnFailures++;
 				if (this.consecutiveSpawnFailures >= 3) {
 					this.ffmpegBroken = true;
-					this.logger.error('FFmpeg spawn broken (Windows handle exhaustion) — halting all chunk encoding');
+					this.logger.error(
+						'FFmpeg spawn broken (Windows handle exhaustion) — halting all chunk encoding',
+					);
 					this.queue.length = 0;
 					return;
 				}
@@ -461,7 +467,9 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 				);
 				this.cancelAllChunks(map.movieFileId, map.quality);
 				// Write .failed marker to prevent re-queuing on restart
-				writeFile(path.join(cacheDir, '.failed'), `Systemic failure: ${err.message}`).catch(() => {});
+				writeFile(path.join(cacheDir, '.failed'), `Systemic failure: ${err.message}`).catch(
+					() => {},
+				);
 				return;
 			}
 

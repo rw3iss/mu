@@ -301,7 +301,10 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				) {
 					this.sessionDirs.set(sessionId, persistDir);
 					const chunkMap = await this.chunkManager.initializeChunkMap(
-						file.id, quality, file.filePath, file.durationSeconds,
+						file.id,
+						quality,
+						file.filePath,
+						file.durationSeconds,
 					);
 					// Prioritize first chunks for immediate playback
 					this.chunkManager.reprioritizeForSeek(file.id, quality, 0);
@@ -321,8 +324,13 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 					if (mode === StreamMode.TRANSCODE) {
 						try {
 							await this.transcoderService.startTranscode(
-								sessionId, file.filePath,
-								{ quality, audioTrack: options.audioTrack, subtitleTrack: options.subtitleTrack },
+								sessionId,
+								file.filePath,
+								{
+									quality,
+									audioTrack: options.audioTrack,
+									subtitleTrack: options.subtitleTrack,
+								},
 								outputDir,
 							);
 						} catch (transcodeErr: any) {
@@ -331,21 +339,34 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 						}
 					} else {
 						try {
-							await this.transcoderService.startRemux(sessionId, file.filePath, outputDir);
+							await this.transcoderService.startRemux(
+								sessionId,
+								file.filePath,
+								outputDir,
+							);
 						} catch (remuxErr: any) {
-							this.logger.warn(`Remux failed, falling back to transcode: ${remuxErr.message}`);
+							this.logger.warn(
+								`Remux failed, falling back to transcode: ${remuxErr.message}`,
+							);
 							if (outputDir) {
 								await this.transcoderService.cleanup(sessionId);
 								this.sessionDirs.set(sessionId, outputDir);
 							}
 							try {
 								await this.transcoderService.startTranscode(
-									sessionId, file.filePath,
-									{ quality, audioTrack: options.audioTrack, subtitleTrack: options.subtitleTrack },
+									sessionId,
+									file.filePath,
+									{
+										quality,
+										audioTrack: options.audioTrack,
+										subtitleTrack: options.subtitleTrack,
+									},
 									outputDir,
 								);
 							} catch (transcodeErr: any) {
-								this.logger.error(`Both remux and transcode failed: ${transcodeErr.message}`);
+								this.logger.error(
+									`Both remux and transcode failed: ${transcodeErr.message}`,
+								);
 								throw new BadRequestException('Unable to play this file.');
 							}
 						}
@@ -788,7 +809,9 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			const sourceRank = ranks[sourceQuality] ?? 0;
 			const defaultRank = ranks[defaultQuality] ?? 0;
 			const chosen = sourceRank > defaultRank ? sourceQuality : defaultQuality;
-			this.logger.debug(`No cache, will encode at ${chosen} (encodeHighest, source=${sourceHeight}px)`);
+			this.logger.debug(
+				`No cache, will encode at ${chosen} (encodeHighest, source=${sourceHeight}px)`,
+			);
 			return chosen;
 		}
 

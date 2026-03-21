@@ -1345,8 +1345,8 @@ export function Settings(props: SettingsProps) {
 										Stream Highest Available
 									</span>
 									<span class={styles.settingDescription}>
-										Always stream the highest quality cached version, even if
-										it exceeds the default encoding quality
+										Always stream the highest quality cached version, even if it
+										exceeds the default encoding quality
 									</span>
 								</div>
 								<label class={styles.toggle}>
