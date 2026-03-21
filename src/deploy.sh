@@ -64,6 +64,10 @@ const alters = [
   'ALTER TABLE movie_files ADD COLUMN hdr INTEGER DEFAULT 0',
   'ALTER TABLE movie_files ADD COLUMN container_format TEXT',
   'ALTER TABLE plugins ADD COLUMN status TEXT DEFAULT \\'not_installed\\'',
+  'ALTER TABLE transcode_cache ADD COLUMN file_path TEXT',
+  'ALTER TABLE transcode_cache ADD COLUMN cache_path TEXT',
+  'ALTER TABLE transcode_cache ADD COLUMN size_bytes INTEGER',
+  'ALTER TABLE transcode_cache ADD COLUMN segment_count INTEGER',
 ];
 for (const sql of alters) { try { db.exec(sql); } catch {} }
 console.log('Database migrations applied');

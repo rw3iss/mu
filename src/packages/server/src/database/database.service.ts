@@ -253,7 +253,11 @@ export class DatabaseService implements OnModuleDestroy {
         movie_file_id TEXT NOT NULL REFERENCES movie_files(id) ON DELETE CASCADE,
         quality TEXT NOT NULL,
         encoding_settings TEXT NOT NULL,
-        completed_at TEXT NOT NULL
+        completed_at TEXT NOT NULL,
+        file_path TEXT,
+        cache_path TEXT,
+        size_bytes INTEGER,
+        segment_count INTEGER
       );
       CREATE TABLE IF NOT EXISTS audio_profiles (
         id TEXT PRIMARY KEY,

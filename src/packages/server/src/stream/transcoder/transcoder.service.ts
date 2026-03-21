@@ -143,6 +143,13 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						.get();
 					if (existing) continue;
 
+					// Count segments and size
+					const segFiles = readdirSync(qPath).filter((f: string) => f.startsWith('segment_') && f.endsWith('.ts'));
+					let sizeBytes = 0;
+					for (const seg of segFiles) {
+						try { sizeBytes += statSync(path.join(qPath, seg)).size; } catch {}
+					}
+
 					// Add to DB
 					const enc = this.getEncodingSettings();
 					this.database.db.insert(transcodeCache).values({
@@ -156,6 +163,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 							crf: enc.crf,
 						}),
 						completedAt: new Date().toISOString(),
+						filePath: movieFile.filePath ?? null,
+						cachePath: qPath,
+						sizeBytes,
+						segmentCount: segFiles.length,
 					}).run();
 					added++;
 				}

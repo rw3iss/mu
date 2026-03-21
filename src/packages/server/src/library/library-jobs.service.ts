@@ -726,6 +726,10 @@ export class LibraryJobsService implements OnModuleInit {
 			)
 			.run();
 
+		// Look up source file path for reference
+		const file = this.database.db.select().from(movieFiles).where(eq(movieFiles.id, movieFileId)).get();
+		const cachePath = this.transcoderService.getPersistentDir(movieFileId, quality);
+
 		this.database.db
 			.insert(transcodeCache)
 			.values({
@@ -734,6 +738,8 @@ export class LibraryJobsService implements OnModuleInit {
 				quality,
 				encodingSettings: settingsJson,
 				completedAt: nowISO(),
+				filePath: file?.filePath ?? null,
+				cachePath,
 			})
 			.run();
 	}
