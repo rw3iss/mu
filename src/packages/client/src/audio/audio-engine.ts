@@ -102,6 +102,16 @@ export class AudioEngine {
 			// element.volume = 0;
 			this.capturedElement = element;
 			console.log('[AudioEngine] attached via captureStream, ctx.state=', this.ctx.state);
+			// DEBUG: test tone on SAME context to verify destination works
+			const osc = this.ctx.createOscillator();
+			const g = this.ctx.createGain();
+			g.gain.value = 0.15;
+			osc.frequency.value = 880;
+			osc.connect(g);
+			g.connect(this.ctx.destination);
+			osc.start();
+			setTimeout(() => osc.stop(), 500);
+			console.log('[AudioEngine] DEBUG: 500ms test tone at 880Hz on same ctx');
 		} catch (err) {
 			console.error('[AudioEngine] captureStream failed:', err);
 			return;
