@@ -117,11 +117,19 @@ export class AudioEngine {
 
 	setEqEnabled(enabled: boolean): void {
 		this.eqEnabled = enabled;
+		// Attach on demand when effects are first enabled
+		if (enabled && !this.attached && (window as any).__muAttachAudio) {
+			(window as any).__muAttachAudio();
+		}
 		this.rebuildChain();
 	}
 
 	setCompressorEnabled(enabled: boolean): void {
 		this.compressorEnabled = enabled;
+		// Attach on demand when effects are first enabled
+		if (enabled && !this.attached && (window as any).__muAttachAudio) {
+			(window as any).__muAttachAudio();
+		}
 		if (!enabled) {
 			// When disabling, reset dry/wet gains to safe values
 			if (this.dryGainNode) this.dryGainNode.gain.value = 1;

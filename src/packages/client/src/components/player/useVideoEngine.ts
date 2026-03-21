@@ -104,9 +104,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		if (!videoRef.current) {
 			const video = document.createElement('video');
 			video.playsInline = true;
-			// NOTE: crossOrigin = 'anonymous' removed — it causes
-			// createMediaElementSource to taint audio output (silence)
-			// Subtitles use blob URLs so don't need crossOrigin
+			// NOTE: crossOrigin removed to avoid createMediaElementSource audio tainting
 			video.style.width = '100%';
 			video.style.height = '100%';
 			video.style.objectFit = 'contain';
@@ -146,17 +144,19 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				isBuffering.value = false;
 			});
 
-			// Attach Web Audio API processing chain
-			// If already attached (e.g. after refresh), re-attaches source to new video
-			// on the same AudioContext (preserves "running" state)
-			audioEngine.attach(video);
+			// Audio engine: defer attachment until user explicitly enables effects.
+			// createMediaElementSource permanently captures video audio through
+			// Web Audio API — if anything goes wrong, audio is lost.
+			// So we only attach when effects are actually needed.
+			const attachAudioOnDemand = () => {
+				if (!audioEngine.isAttached()) {
+					audioEngine.attach(video);
+					audioEngine.resume();
+				}
+			};
+			// Store the attach function so effects can trigger it
+			(window as any).__muAttachAudio = attachAudioOnDemand;
 			initAudioEffects();
-
-			// Safety: ensure AudioContext resumes when video plays
-			// (handles case where attach() captures audio before user gesture)
-			video.addEventListener('play', () => {
-				audioEngine.resume();
-			});
 		}
 
 		// 60fps time tracking via requestAnimationFrame
