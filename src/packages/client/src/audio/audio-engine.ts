@@ -21,11 +21,16 @@ export interface CompressorSettings {
 }
 
 export const DEFAULT_EQ_BANDS: EqBand[] = [
-	{ frequency: 60, gain: 0, q: 1, type: 'lowshelf' },
-	{ frequency: 230, gain: 0, q: 1, type: 'peaking' },
-	{ frequency: 910, gain: 0, q: 1, type: 'peaking' },
-	{ frequency: 3600, gain: 0, q: 1, type: 'peaking' },
-	{ frequency: 14000, gain: 0, q: 1, type: 'highshelf' },
+	{ frequency: 32, gain: 0, q: 1.0, type: 'lowshelf' },
+	{ frequency: 64, gain: 0, q: 1.0, type: 'peaking' },
+	{ frequency: 125, gain: 0, q: 1.0, type: 'peaking' },
+	{ frequency: 250, gain: 0, q: 1.0, type: 'peaking' },
+	{ frequency: 500, gain: 0, q: 1.0, type: 'peaking' },
+	{ frequency: 1000, gain: 0, q: 1.0, type: 'peaking' },
+	{ frequency: 2000, gain: 0, q: 1.0, type: 'peaking' },
+	{ frequency: 4000, gain: 0, q: 1.0, type: 'peaking' },
+	{ frequency: 8000, gain: 0, q: 1.0, type: 'peaking' },
+	{ frequency: 16000, gain: 0, q: 1.0, type: 'highshelf' },
 ];
 
 export const DEFAULT_COMPRESSOR: CompressorSettings = {
@@ -176,6 +181,19 @@ export class AudioEngine {
 		return { ...this.currentCompressor };
 	}
 
+	resetEq(): void {
+		this.setBands(DEFAULT_EQ_BANDS.map((b) => ({ ...b })));
+	}
+
+	resetCompressor(): void {
+		this.setCompressorSettings({ ...DEFAULT_COMPRESSOR });
+	}
+
+	getCompressorReduction(): number {
+		if (!this.compressor) return 0;
+		return this.compressor.reduction;
+	}
+
 	async resume(): Promise<void> {
 		if (this.ctx?.state === 'suspended') {
 			try {
@@ -204,12 +222,19 @@ export class AudioEngine {
 
 		if (!this.ctx) {
 			this.ctx = new AudioContext();
+			console.log('[AudioEngine] captureAudio: created AudioContext, state:', this.ctx.state);
+		}
+
+		// Resume context if suspended
+		if (this.ctx.state === 'suspended') {
+			this.ctx.resume().catch(() => {});
 		}
 
 		try {
 			this.source = this.ctx.createMediaElementSource(this.currentElement);
+			console.log('[AudioEngine] captureAudio: source created successfully');
 		} catch (err) {
-			console.warn('[AudioEngine] createMediaElementSource failed:', err);
+			console.error('[AudioEngine] captureAudio: createMediaElementSource FAILED:', err);
 			return;
 		}
 
@@ -319,6 +344,8 @@ export class AudioEngine {
 		}
 
 		current.connect(this.ctx.destination);
+		console.log('[AudioEngine] rebuildChain: eq=%s, comp=%s, ctx.state=%s, source=%s',
+			this.eqEnabled, this.compressorEnabled, this.ctx.state, !!this.source);
 	}
 
 	private applyCompressorSettings(s: CompressorSettings): void {
