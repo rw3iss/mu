@@ -104,7 +104,9 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		if (!videoRef.current) {
 			const video = document.createElement('video');
 			video.playsInline = true;
-			video.crossOrigin = 'anonymous';
+			// NOTE: crossOrigin = 'anonymous' removed — it causes
+			// createMediaElementSource to taint audio output (silence)
+			// Subtitles use blob URLs so don't need crossOrigin
 			video.style.width = '100%';
 			video.style.height = '100%';
 			video.style.objectFit = 'contain';
