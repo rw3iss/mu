@@ -24,8 +24,21 @@ class WebSocketService {
 	private url: string;
 
 	constructor() {
-		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-		this.url = `${protocol}//${window.location.host}/ws`;
+		// Support standalone client pointing to a remote server
+		const apiUrl =
+			(typeof import.meta.env?.VITE_API_URL === 'string' && import.meta.env.VITE_API_URL) ||
+			localStorage.getItem('mu_api_url') ||
+			'';
+
+		if (apiUrl) {
+			// Derive WebSocket URL from API URL (https://host/api/v1 → wss://host/ws)
+			const url = new URL(apiUrl);
+			const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+			this.url = `${wsProtocol}//${url.host}/ws`;
+		} else {
+			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+			this.url = `${protocol}//${window.location.host}/ws`;
+		}
 	}
 
 	/**

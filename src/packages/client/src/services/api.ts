@@ -25,7 +25,17 @@ interface RequestOptions {
 // Base API Client
 // ============================================
 
-const BASE_URL = '/api/v1';
+/**
+ * API base URL — configurable for standalone client builds.
+ * Priority: VITE_API_URL env var > localStorage override > relative path (same-origin)
+ *
+ * For standalone builds: VITE_API_URL=https://your-server.com/api/v1 pnpm build
+ * For runtime override: localStorage.setItem('mu_api_url', 'https://...')
+ */
+const BASE_URL =
+	(typeof import.meta.env?.VITE_API_URL === 'string' && import.meta.env.VITE_API_URL) ||
+	localStorage.getItem('mu_api_url') ||
+	'/api/v1';
 
 function getAuthHeaders(): Record<string, string> {
 	const token = localStorage.getItem('mu_token');

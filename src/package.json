@@ -8,6 +8,7 @@
     "dev:server": "turbo run dev --filter=@mu/server",
     "dev:client": "turbo run dev --filter=@mu/client",
     "build": "turbo run build",
+    "build:standalone": "cd packages/client && pnpm build:standalone",
     "start": "node packages/server/dist/main.js",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
