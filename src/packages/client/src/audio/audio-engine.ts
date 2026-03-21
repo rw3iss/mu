@@ -64,50 +64,16 @@ export class AudioEngine {
 	private currentBands: EqBand[] = [...DEFAULT_EQ_BANDS];
 	private currentCompressor: CompressorSettings = { ...DEFAULT_COMPRESSOR };
 	private attached = false;
-	private nativeVolume = 1;
-	private capturedElement: HTMLMediaElement | null = null;
 
 	/**
 	 * Attach to a video/audio element. Call once — the source node is
 	 * permanently bound to the element (Web Audio API limitation).
 	 */
-	/** Store element for deferred attachment */
-	private pendingElement: HTMLMediaElement | null = null;
-
 	attach(element: HTMLMediaElement): void {
 		if (this.attached) return;
 
-		// If no AudioContext yet (no user gesture), defer attachment
-		if (!this.ctx) {
-			this.pendingElement = element;
-			
-			return;
-		}
-
-		this.doAttach(element);
-	}
-
-	private doAttach(element: HTMLMediaElement): void {
-		if (this.attached || !this.ctx) return;
-
-		// Use captureStream instead of createMediaElementSource.
-		// createMediaElementSource taints audio when HLS.js MediaSource is active.
-		// captureStream captures a copy of the rendered audio without CORS issues.
-		try {
-			const stream = (element as any).captureStream() as MediaStream;
-			this.source = this.ctx.createMediaStreamSource(stream) as any;
-			// Mute native audio to prevent double playback
-			// DON'T mute - captureStream captures after volume adjustment
-			// this.nativeVolume = element.volume;
-			// element.volume = 0;
-			this.capturedElement = element;
-			
-
-		} catch (err) {
-			console.error('[AudioEngine] captureStream failed:', err);
-			return;
-		}
-		this.pendingElement = null;
+		this.ctx = new AudioContext();
+		this.source = this.ctx.createMediaElementSource(element);
 
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
@@ -243,48 +209,25 @@ export class AudioEngine {
 		return this.compressor.reduction;
 	}
 
-	/**
-	 * Ensure AudioContext exists and is running.
-	 * Call from user gesture handlers (click/touch).
-	 */
-	/**
-	 * Create/resume AudioContext. MUST be called from a user gesture (click).
-	 * Chrome only allows audio output from contexts created during user activation.
-	 */
+	/** Create/resume AudioContext. Call from user gesture (click). */
 	ensureContext(): void {
-		if (!this.ctx) {
-			this.ctx = new AudioContext();
-			
-		}
-		if (this.ctx.state === 'suspended') {
+		if (this.ctx && this.ctx.state === 'suspended') {
 			this.ctx.resume().catch(() => {});
-		}
-		// Complete deferred attachment if element was stored before ctx existed
-		if (this.pendingElement && !this.attached) {
-			
-			this.doAttach(this.pendingElement);
 		}
 	}
 
 	/** Resume AudioContext if suspended (browser autoplay policy). */
 	async resume(): Promise<void> {
-		
 		if (this.ctx?.state === 'suspended') {
 			try {
 				await this.ctx.resume();
-				
-			} catch (err) {
-				console.warn('[AudioEngine] resume failed:', err);
+			} catch {
+				// Browser blocked resume (no user gesture yet) — will retry on next play event
 			}
 		}
 	}
 
 	destroy(): void {
-		// Restore native audio volume
-		if (this.capturedElement) {
-			this.capturedElement.volume = this.nativeVolume;
-			this.capturedElement = null;
-		}
 		if (this.source) {
 			this.source.disconnect();
 			this.source = null;

@@ -104,7 +104,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		if (!videoRef.current) {
 			const video = document.createElement('video');
 			video.playsInline = true;
-			// NOTE: crossOrigin removed to avoid createMediaElementSource audio tainting
+			video.crossOrigin = 'anonymous';
 			video.style.width = '100%';
 			video.style.height = '100%';
 			video.style.objectFit = 'contain';
@@ -144,13 +144,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				isBuffering.value = false;
 			});
 
-			// Attach audio engine EAGERLY (before HLS loads) — calling
-			// createMediaElementSource on an empty video is fine, but calling
-			// it AFTER HLS sets MediaSource causes Chrome to taint the audio.
+			// Attach Web Audio API processing chain
 			audioEngine.attach(video);
 			initAudioEffects();
 
-			// Resume AudioContext when video plays
 			video.addEventListener('play', () => {
 				audioEngine.resume();
 			});
