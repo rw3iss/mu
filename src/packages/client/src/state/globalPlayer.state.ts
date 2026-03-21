@@ -1,4 +1,5 @@
 import { computed, effect, signal } from '@preact/signals';
+import { audioEngine } from '@/audio/audio-engine';
 import { moviesService } from '@/services/movies.service';
 import { streamService } from '@/services/stream.service';
 import {
@@ -146,6 +147,8 @@ export async function playMovie(
 ): Promise<void> {
 	initPlayerSettings();
 	closeEffectsPanel();
+	// Resume AudioContext within the user gesture (click) — Chrome requires this
+	audioEngine.resume();
 	// User explicitly chose to play — persist this intent
 	try {
 		localStorage.setItem('mu_is_playing', '1');
