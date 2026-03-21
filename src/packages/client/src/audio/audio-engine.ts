@@ -209,6 +209,16 @@ export class AudioEngine {
 		return this.compressor.reduction;
 	}
 
+	/**
+	 * Ensure AudioContext exists and is running.
+	 * Call from user gesture handlers (click/touch).
+	 */
+	ensureContext(): void {
+		if (this.ctx && this.ctx.state === 'suspended') {
+			this.ctx.resume().catch(() => {});
+		}
+	}
+
 	/** Resume AudioContext if suspended (browser autoplay policy). */
 	async resume(): Promise<void> {
 		if (this.ctx?.state === 'suspended') {
