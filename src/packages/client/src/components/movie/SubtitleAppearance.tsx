@@ -53,8 +53,6 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 
 	return (
 		<div class={wrapClass}>
-			{!compact && <h3 class={styles.sectionTitle}>Subtitles</h3>}
-
 			{/* Font Size */}
 			<div class={styles.row}>
 				<span class={styles.label}>Font Size</span>
