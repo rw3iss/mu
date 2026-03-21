@@ -256,9 +256,6 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		options: TranscodeOptions = {},
 		outputDir?: string,
 	): Promise<void> {
-		if (this.isFfmpegSpawnBroken()) {
-			throw new Error('FFmpeg spawn temporarily disabled (Windows DLL error cooldown)');
-		}
 		const targetDir = outputDir || this.getSessionDir(sessionId);
 
 		// Clean out stale partial files from a previously failed transcode
@@ -405,8 +402,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(sessionId);
 
-					// Windows DLL init failure — don't retry, it'll just fail again
-					if (this.isWindowsSpawnFailure(err)) {
+					// Windows DLL init failure with NVENC — likely NVIDIA DLLs can't load
+					// in non-interactive session. Fall through to software retry first.
+					if (this.isWindowsSpawnFailure(err) && hwAccel === 'none') {
+						// Software encoding also failed — FFmpeg itself is broken
 						this.markFfmpegSpawnBroken();
 						this.sessionStates.set(sessionId, { state: 'failed', error: 'FFmpeg cannot start (Windows DLL error) — try again in 60s' });
 						reject(err);
@@ -556,9 +555,6 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		quality: string = '1080p',
 		onProgress?: (percent: number) => void,
 	): Promise<void> {
-		if (this.isFfmpegSpawnBroken()) {
-			throw new Error('FFmpeg spawn temporarily disabled (Windows DLL error cooldown)');
-		}
 		const persistDir = this.getPersistentDir(movieFileId, quality);
 
 		// Already cached
@@ -682,8 +678,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(processKey);
 
-					// Windows DLL init failure — don't retry
-					if (this.isWindowsSpawnFailure(err)) {
+					// Windows DLL init failure with software encoding — FFmpeg itself is broken
+					if (this.isWindowsSpawnFailure(err) && hwAccel === 'none') {
 						this.markFfmpegSpawnBroken();
 						reject(err);
 						return;
@@ -1260,8 +1256,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(processKey);
 
-					// Windows DLL init failure — don't retry
-					if (this.isWindowsSpawnFailure(err)) {
+					// Windows DLL init failure with software — FFmpeg itself is broken
+					if (this.isWindowsSpawnFailure(err) && hwAccel === 'none') {
 						this.markFfmpegSpawnBroken();
 						reject(err);
 						return;
