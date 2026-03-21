@@ -149,6 +149,30 @@ function meterColor(ratio: number): string {
 	return '#f44336';
 }
 
+function CollapsibleSubtitleSettings() {
+	const [open, setOpen] = useState(false);
+	return (
+		<div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-md)', marginTop: 'var(--space-md)' }}>
+			<button
+				onClick={() => setOpen(!open)}
+				style={{
+					display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+					width: '100%', padding: '0', background: 'none', border: 'none',
+					cursor: 'pointer', color: 'var(--color-text-primary)',
+				}}
+			>
+				<span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>Subtitles</span>
+				<span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{open ? '\u25B2' : '\u25BC'}</span>
+			</button>
+			{open && (
+				<div style={{ paddingTop: 'var(--space-md)' }}>
+					<SubtitleAppearance />
+				</div>
+			)}
+		</div>
+	);
+}
+
 interface SettingsProps {
 	path?: string;
 	tab?: string;
@@ -1136,10 +1160,8 @@ export function Settings(props: SettingsProps) {
 								</div>
 							</div>
 
-							{/* Subtitles Appearance */}
-							<div class={styles.settingGroup}>
-								<SubtitleAppearance />
-							</div>
+							{/* Subtitles Appearance (collapsible) */}
+							<CollapsibleSubtitleSettings />
 						</div>
 					)}
 

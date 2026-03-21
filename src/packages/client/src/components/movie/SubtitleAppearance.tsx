@@ -201,15 +201,15 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 					<span class={styles.unit}>px</span>
 					<button
 						class={styles.offsetBtn}
-						onClick={() => update('verticalOffset', (settings.verticalOffset || 0) - 1)}
+						onClick={() => update('verticalOffset', (settings.verticalOffset || 0) - 5)}
 					>
-						-
+						-5
 					</button>
 					<button
 						class={styles.offsetBtn}
-						onClick={() => update('verticalOffset', (settings.verticalOffset || 0) + 1)}
+						onClick={() => update('verticalOffset', (settings.verticalOffset || 0) + 5)}
 					>
-						+
+						+5
 					</button>
 					<button
 						class={styles.offsetBtn}
