@@ -265,6 +265,25 @@ export class DatabaseService implements OnModuleDestroy {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS job_history (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        label TEXT NOT NULL,
+        status TEXT NOT NULL,
+        payload TEXT,
+        priority INTEGER DEFAULT 10,
+        progress REAL DEFAULT 0,
+        result TEXT,
+        error TEXT,
+        created_at TEXT NOT NULL,
+        started_at TEXT,
+        completed_at TEXT,
+        duration_ms INTEGER,
+        movie_id TEXT,
+        movie_title TEXT,
+        file_path TEXT,
+        quality TEXT
+      );
     `);
 		// Add columns that may not exist in older databases
 		try {
