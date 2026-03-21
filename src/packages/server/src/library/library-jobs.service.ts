@@ -68,8 +68,8 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 
 	onApplicationBootstrap() {
 		// Resume after HTTP is fully listening so the site is immediately accessible.
-		// The 10s delay gives the app breathing room before heavy disk I/O starts.
-		setTimeout(() => this.resumeIncompleteTranscodes(), 10000);
+		// Long delay to let the HTTP server be fully accessible before heavy disk I/O.
+		setTimeout(() => this.resumeIncompleteTranscodes(), 60000);
 	}
 
 	// ===========================================================
