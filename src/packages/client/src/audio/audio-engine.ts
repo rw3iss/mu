@@ -64,6 +64,8 @@ export class AudioEngine {
 	private currentBands: EqBand[] = [...DEFAULT_EQ_BANDS];
 	private currentCompressor: CompressorSettings = { ...DEFAULT_COMPRESSOR };
 	private attached = false;
+	private nativeVolume = 1;
+	private capturedElement: HTMLMediaElement | null = null;
 
 	/**
 	 * Attach to a video/audio element. Call once — the source node is
@@ -88,9 +90,22 @@ export class AudioEngine {
 	private doAttach(element: HTMLMediaElement): void {
 		if (this.attached || !this.ctx) return;
 
-		this.source = this.ctx.createMediaElementSource(element);
+		// Use captureStream instead of createMediaElementSource.
+		// createMediaElementSource taints audio when HLS.js MediaSource is active.
+		// captureStream captures a copy of the rendered audio without CORS issues.
+		try {
+			const stream = (element as any).captureStream() as MediaStream;
+			this.source = this.ctx.createMediaStreamSource(stream) as any;
+			// Mute native audio to prevent double playback
+			this.nativeVolume = element.volume;
+			element.volume = 0;
+			this.capturedElement = element;
+			console.log('[AudioEngine] attached via captureStream, ctx.state=', this.ctx.state);
+		} catch (err) {
+			console.error('[AudioEngine] captureStream failed:', err);
+			return;
+		}
 		this.pendingElement = null;
-		console.log('[AudioEngine] attached: ctx.state=', this.ctx.state);
 
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
@@ -263,6 +278,11 @@ export class AudioEngine {
 	}
 
 	destroy(): void {
+		// Restore native audio volume
+		if (this.capturedElement) {
+			this.capturedElement.volume = this.nativeVolume;
+			this.capturedElement = null;
+		}
 		if (this.source) {
 			this.source.disconnect();
 			this.source = null;
