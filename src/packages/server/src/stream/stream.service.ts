@@ -291,84 +291,52 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			if (!hasCached) {
-				// Use on-demand chunk transcoding for live playback
-				if (
-					this.chunkManager.isEnabled() &&
-					mode === StreamMode.TRANSCODE &&
-					persistEnabled &&
-					file.durationSeconds &&
-					file.durationSeconds > 0
-				) {
-					this.sessionDirs.set(sessionId, persistDir);
-					const chunkMap = await this.chunkManager.initializeChunkMap(
-						file.id,
-						quality,
-						file.filePath,
-						file.durationSeconds,
-					);
-					// Prioritize first chunks for immediate playback
-					this.chunkManager.reprioritizeForSeek(file.id, quality, 0);
-					this.chunkManager.enqueueAllPending(file.id, quality);
-					const progress = this.chunkManager.getProgress(file.id, quality);
-					if (progress.completed > 0) hasCached = true;
-					this.logger.log(
-						`On-demand chunked transcode for session=${sessionId}: ${progress.completed}/${progress.total} ready`,
-					);
-				} else {
-					// Fallback: monolithic transcode (remux or non-chunked)
-					const outputDir = persistEnabled ? persistDir : undefined;
-					if (outputDir) {
-						this.sessionDirs.set(sessionId, persistDir);
-					}
+				// Pause background encoding — live stream gets all FFmpeg capacity
+				this.chunkManager.pauseBackground();
 
-					if (mode === StreamMode.TRANSCODE) {
+				// Use monolithic FFmpeg for live playback (fastest startup: 1-2s)
+				// Uses 'ultrafast' preset for real-time encoding speed
+				const outputDir = persistEnabled ? persistDir : undefined;
+				if (outputDir) {
+					this.sessionDirs.set(sessionId, persistDir);
+				}
+
+				if (mode === StreamMode.TRANSCODE) {
+					try {
+						await this.transcoderService.startTranscode(
+							sessionId,
+							file.filePath,
+							{
+								quality,
+								audioTrack: options.audioTrack,
+								subtitleTrack: options.subtitleTrack,
+								livePlayback: true,
+							},
+							outputDir,
+						);
+					} catch (transcodeErr: any) {
+						this.logger.error(`Transcode failed: ${transcodeErr.message}`);
+						this.chunkManager.resumeBackground();
+						throw new BadRequestException('Unable to play this file.');
+					}
+				} else {
+					try {
+						await this.transcoderService.startRemux(sessionId, file.filePath, outputDir);
+					} catch (remuxErr: any) {
+						this.logger.warn(`Remux failed, falling back: ${remuxErr.message}`);
+						if (outputDir) {
+							await this.transcoderService.cleanup(sessionId);
+							this.sessionDirs.set(sessionId, outputDir);
+						}
 						try {
 							await this.transcoderService.startTranscode(
-								sessionId,
-								file.filePath,
-								{
-									quality,
-									audioTrack: options.audioTrack,
-									subtitleTrack: options.subtitleTrack,
-								},
+								sessionId, file.filePath,
+								{ quality, audioTrack: options.audioTrack, subtitleTrack: options.subtitleTrack, livePlayback: true },
 								outputDir,
 							);
-						} catch (transcodeErr: any) {
-							this.logger.error(`Transcode failed: ${transcodeErr.message}`);
+						} catch (e2: any) {
+							this.chunkManager.resumeBackground();
 							throw new BadRequestException('Unable to play this file.');
-						}
-					} else {
-						try {
-							await this.transcoderService.startRemux(
-								sessionId,
-								file.filePath,
-								outputDir,
-							);
-						} catch (remuxErr: any) {
-							this.logger.warn(
-								`Remux failed, falling back to transcode: ${remuxErr.message}`,
-							);
-							if (outputDir) {
-								await this.transcoderService.cleanup(sessionId);
-								this.sessionDirs.set(sessionId, outputDir);
-							}
-							try {
-								await this.transcoderService.startTranscode(
-									sessionId,
-									file.filePath,
-									{
-										quality,
-										audioTrack: options.audioTrack,
-										subtitleTrack: options.subtitleTrack,
-									},
-									outputDir,
-								);
-							} catch (transcodeErr: any) {
-								this.logger.error(
-									`Both remux and transcode failed: ${transcodeErr.message}`,
-								);
-								throw new BadRequestException('Unable to play this file.');
-							}
 						}
 					}
 				}

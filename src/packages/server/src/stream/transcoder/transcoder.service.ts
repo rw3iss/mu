@@ -17,6 +17,8 @@ interface TranscodeOptions {
 	subtitleTrack?: number;
 	/** Start transcoding from this position (seconds). Used for seek-restart. */
 	seekSeconds?: number;
+	/** Use ultrafast preset for live playback (faster startup, lower quality) */
+	livePlayback?: boolean;
 }
 
 type TranscodeState = 'running' | 'completed' | 'failed';
@@ -190,11 +192,19 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const segmentPattern = path.join(targetDir, 'segment_%04d.ts');
 
 		const enc = this.getEncodingSettings();
+		// For live playback, use ultrafast preset for fastest startup (3-5x realtime)
+		// Background pre-transcoding uses the configured preset (better quality)
+		if (options.livePlayback && enc.hwAccel === 'none') {
+			enc.preset = 'ultrafast';
+		} else if (options.livePlayback && enc.hwAccel === 'nvenc') {
+			enc.preset = 'p1'; // fastest NVENC preset
+		}
 		const hwAccel = enc.hwAccel;
 		const videoCodec = this.getVideoCodec(hwAccel);
-		const segDuration = String(enc.segmentDuration);
+		// Use smaller segments for live playback (faster first segment)
+		const segDuration = options.livePlayback ? '2' : String(enc.segmentDuration);
 		// GOP size = segment_duration × assumed_fps (round to nearest even)
-		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
+		const gopSize = String(Math.round((Number(segDuration) * 24) / 2) * 2);
 
 		return new Promise<void>((resolve, reject) => {
 			const videoRateOpts =
