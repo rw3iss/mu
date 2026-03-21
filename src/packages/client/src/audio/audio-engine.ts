@@ -71,6 +71,7 @@ export class AudioEngine {
 	private currentCompressor: CompressorSettings = { ...DEFAULT_COMPRESSOR };
 	private currentElement: HTMLMediaElement | null = null;
 	private captured = false;
+	private savedVolume: number | null = null;
 
 	/**
 	 * Register the video element. Does NOT capture audio yet.
@@ -231,11 +232,25 @@ export class AudioEngine {
 		}
 
 		try {
-			this.source = this.ctx.createMediaElementSource(this.currentElement);
-			console.log('[AudioEngine] captureAudio: source created successfully');
+			// Use captureStream + createMediaStreamSource instead of createMediaElementSource.
+			// createMediaElementSource taints audio with HLS.js MediaSource, producing silence.
+			// captureStream() avoids this by capturing the rendered audio output.
+			const stream = (this.currentElement as any).captureStream();
+			this.source = this.ctx.createMediaStreamSource(stream) as any;
+			// Mute the video element's native audio to prevent double playback
+			// (audio now goes through Web Audio only)
+			this.savedVolume = this.currentElement.volume;
+			this.currentElement.volume = 0;
+			console.log('[AudioEngine] captureAudio: captured via captureStream');
 		} catch (err) {
-			console.error('[AudioEngine] captureAudio: createMediaElementSource FAILED:', err);
-			return;
+			// Fallback: try createMediaElementSource (works for direct play)
+			try {
+				this.source = this.ctx.createMediaElementSource(this.currentElement);
+				console.log('[AudioEngine] captureAudio: captured via createMediaElementSource');
+			} catch (err2) {
+				console.error('[AudioEngine] captureAudio: both capture methods FAILED:', err, err2);
+				return;
+			}
 		}
 
 		// Create nodes
@@ -282,7 +297,7 @@ export class AudioEngine {
 	private releaseAudio(): void {
 		if (!this.captured || !this.source || !this.ctx) return;
 
-		// Disconnect everything and connect source directly to destination
+		// Disconnect the Web Audio chain
 		this.source.disconnect();
 		this.inputGainNode?.disconnect();
 		for (const f of this.filters) f.disconnect();
@@ -292,9 +307,24 @@ export class AudioEngine {
 		this.wetGainNode?.disconnect();
 		this.compMergeNode?.disconnect();
 
-		// Pass-through: source → destination (no effects)
-		this.source.connect(this.ctx.destination);
-		console.log('[AudioEngine] Effects bypassed, pass-through mode');
+		// Restore native video audio (un-mute the element)
+		// The actual volume will be set by useVideoEngine's volume sync effect
+		if (this.currentElement) {
+			this.currentElement.volume = this.savedVolume ?? 1;
+		}
+
+		// Clean up capture state
+		this.source = null;
+		this.inputGainNode = null;
+		this.filters = [];
+		this.compressor = null;
+		this.makeupGainNode = null;
+		this.dryGainNode = null;
+		this.wetGainNode = null;
+		this.compMergeNode = null;
+		this.captured = false;
+
+		console.log('[AudioEngine] Effects released, native audio restored');
 	}
 
 	// ── Private: Chain ──
