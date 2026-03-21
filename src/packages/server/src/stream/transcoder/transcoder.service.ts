@@ -35,6 +35,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	private readonly swFallbackAttempted = new Set<string>();
 	/** If true, hardware encoding has failed and all encodes should use software */
 	private hwAccelBroken = false;
+	/** If true, FFmpeg itself cannot spawn (Windows DLL init failure) — skip all encodes */
+	private ffmpegSpawnBroken = false;
+	private ffmpegSpawnBrokenUntil = 0;
 	private readonly cacheDir: string;
 
 	constructor(
@@ -253,6 +256,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		options: TranscodeOptions = {},
 		outputDir?: string,
 	): Promise<void> {
+		if (this.isFfmpegSpawnBroken()) {
+			throw new Error('FFmpeg spawn temporarily disabled (Windows DLL error cooldown)');
+		}
 		const targetDir = outputDir || this.getSessionDir(sessionId);
 
 		// Clean out stale partial files from a previously failed transcode
@@ -399,6 +405,14 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(sessionId);
 
+					// Windows DLL init failure — don't retry, it'll just fail again
+					if (this.isWindowsSpawnFailure(err)) {
+						this.markFfmpegSpawnBroken();
+						this.sessionStates.set(sessionId, { state: 'failed', error: 'FFmpeg cannot start (Windows DLL error) — try again in 60s' });
+						reject(err);
+						return;
+					}
+
 					// If hardware acceleration was used, retry with software encoding
 					if (hwAccel !== 'none' && !this.swFallbackAttempted.has(sessionId)) {
 						this.swFallbackAttempted.add(sessionId);
@@ -542,6 +556,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		quality: string = '1080p',
 		onProgress?: (percent: number) => void,
 	): Promise<void> {
+		if (this.isFfmpegSpawnBroken()) {
+			throw new Error('FFmpeg spawn temporarily disabled (Windows DLL error cooldown)');
+		}
 		const persistDir = this.getPersistentDir(movieFileId, quality);
 
 		// Already cached
@@ -664,6 +681,13 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.logger.error(`Pre-transcode error for ${movieFileId}: ${err.message}`);
 					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(processKey);
+
+					// Windows DLL init failure — don't retry
+					if (this.isWindowsSpawnFailure(err)) {
+						this.markFfmpegSpawnBroken();
+						reject(err);
+						return;
+					}
 
 					// If hardware acceleration was used, retry with software encoding
 					if (
@@ -1092,6 +1116,37 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		});
 	}
 
+	/**
+	 * Windows exit code 0xC0000142 (3221225794) = STATUS_DLL_INIT_FAILED.
+	 * This means FFmpeg itself can't start — retrying immediately will fail and
+	 * leak handles, making the problem worse. Back off for 60s.
+	 */
+	private isWindowsSpawnFailure(err: Error): boolean {
+		return err.message.includes('3221225794');
+	}
+
+	private markFfmpegSpawnBroken(): void {
+		if (this.ffmpegSpawnBroken) return;
+		this.ffmpegSpawnBroken = true;
+		// Auto-recover after 60 seconds — the handle table may have freed up
+		this.ffmpegSpawnBrokenUntil = Date.now() + 60_000;
+		this.logger.warn(
+			'FFmpeg spawn failure (Windows DLL init) — pausing all encoding for 60s',
+		);
+		setTimeout(() => {
+			this.ffmpegSpawnBroken = false;
+			this.logger.log('FFmpeg spawn cooldown expired — encoding re-enabled');
+		}, 60_000);
+	}
+
+	/** Returns true if FFmpeg spawns are temporarily disabled */
+	isFfmpegSpawnBroken(): boolean {
+		if (this.ffmpegSpawnBroken && Date.now() > this.ffmpegSpawnBrokenUntil) {
+			this.ffmpegSpawnBroken = false;
+		}
+		return this.ffmpegSpawnBroken;
+	}
+
 	private getEncodingSettings() {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const configuredHwAccel = enc?.hwAccel || 'none';
@@ -1123,6 +1178,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		quality: string = '1080p',
 		useSoftware = false,
 	): Promise<void> {
+		if (this.isFfmpegSpawnBroken()) {
+			throw new Error('FFmpeg spawn temporarily disabled (Windows DLL error cooldown)');
+		}
 		const profile =
 			TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES] ??
 			TRANSCODING_PROFILES['1080p'];
@@ -1201,6 +1259,13 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					);
 					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(processKey);
+
+					// Windows DLL init failure — don't retry
+					if (this.isWindowsSpawnFailure(err)) {
+						this.markFfmpegSpawnBroken();
+						reject(err);
+						return;
+					}
 
 					// If hardware encoding failed, retry with software
 					if (hwAccel !== 'none' && !forceSoftware) {
