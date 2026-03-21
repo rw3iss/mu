@@ -56,6 +56,15 @@ if (!cacheDir) {
 
 console.log(`Scanning cache directory: ${cacheDir}`);
 
+// Ensure transcode_cache table exists
+db.exec(`CREATE TABLE IF NOT EXISTS transcode_cache (
+	id TEXT PRIMARY KEY,
+	movie_file_id TEXT NOT NULL REFERENCES movie_files(id) ON DELETE CASCADE,
+	quality TEXT NOT NULL,
+	encoding_settings TEXT NOT NULL,
+	completed_at TEXT NOT NULL
+)`);
+
 // Get all movie file IDs from DB
 const dbFileIds = new Set(
 	db.prepare('SELECT id FROM movie_files').all().map((r: any) => r.id),
@@ -63,7 +72,7 @@ const dbFileIds = new Set(
 
 // Get existing cache entries
 const existingCache = new Set(
-	db.prepare('SELECT movie_file_id || \':\' || quality FROM transcode_cache').all().map((r: any) => Object.values(r)[0]),
+	db.prepare("SELECT movie_file_id || ':' || quality as k FROM transcode_cache").all().map((r: any) => r.k),
 );
 
 const dirs = readdirSync(cacheDir);
@@ -104,7 +113,6 @@ for (const fileId of dirs) {
 		}
 
 		if (!existsSync(completePath)) {
-			// Check if there are segments (partial cache)
 			const files = readdirSync(qualityPath);
 			const segments = files.filter((f) => f.startsWith('segment_') && f.endsWith('.ts'));
 			if (segments.length > 0) {
