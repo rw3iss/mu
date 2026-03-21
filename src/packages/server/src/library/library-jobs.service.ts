@@ -2,7 +2,14 @@ import crypto from 'node:crypto';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { nowISO, StreamMode, WsEvent } from '@mu/shared';
-import { forwardRef, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+	forwardRef,
+	Inject,
+	Injectable,
+	Logger,
+	OnModuleInit,
+	OnApplicationBootstrap,
+} from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movies, transcodeCache, userWatchHistory } from '../database/schema/index.js';
@@ -29,7 +36,7 @@ export const JOB_TYPE = {
 } as const;
 
 @Injectable()
-export class LibraryJobsService implements OnModuleInit {
+export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap {
 	private readonly logger = new Logger('LibraryJobs');
 
 	/** Track when the auto-scan was last scheduled so we can compute next run */
@@ -57,8 +64,12 @@ export class LibraryJobsService implements OnModuleInit {
 		this.listenForNewMovies();
 		// Register callback so JobController can query untranscoded movie IDs
 		this.jobManager.registerUntranscodedMovieIdsFn(() => this.getUntranscodedMovieIds());
-		// Resume incomplete pre-transcode jobs after a short delay to let other modules init
-		setTimeout(() => this.resumeIncompleteTranscodes(), 3000);
+	}
+
+	onApplicationBootstrap() {
+		// Resume after HTTP is fully listening so the site is immediately accessible.
+		// The 5s delay gives the app breathing room before heavy disk I/O starts.
+		setTimeout(() => this.resumeIncompleteTranscodes(), 5000);
 	}
 
 	// ===========================================================
@@ -465,6 +476,8 @@ export class LibraryJobsService implements OnModuleInit {
 						file.filePath,
 						file.durationSeconds,
 					);
+					// Yield to event loop so HTTP requests can be served during startup
+					await new Promise((r) => setTimeout(r, 0));
 					pendingChunked.push({ fileId: file.id, quality, priority });
 				} else {
 					pendingMonolithic.push({
