@@ -2,7 +2,7 @@ import { ChildProcess, execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { ConfigService } from '../../config/config.service.js';
@@ -22,7 +22,7 @@ interface TranscodeOptions {
 type TranscodeState = 'running' | 'completed' | 'failed';
 
 @Injectable()
-export class TranscoderService implements OnModuleDestroy {
+export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger(TranscoderService.name);
 	private readonly activeProcesses = new Map<string, ChildProcess>();
 	/** Tracks the state of each transcode session (running / completed / failed) */
@@ -42,8 +42,14 @@ export class TranscoderService implements OnModuleDestroy {
 			this.config.get<string>('cache.streamDir') || './data/cache/streams',
 		);
 
+	}
+
+	onModuleInit() {
 		// Restore hwAccelBroken from persisted settings
 		this.hwAccelBroken = this.settings.get<boolean>('hwAccelBroken', false);
+		if (this.hwAccelBroken) {
+			this.logger.warn('Hardware acceleration marked as broken from previous session');
+		}
 
 		// Set explicit ffmpeg/ffprobe paths from config
 		// This avoids PATH issues on Windows (WinGet symlink permissions, Git Bash vs system PATH)
