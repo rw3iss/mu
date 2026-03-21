@@ -164,7 +164,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						}),
 						completedAt: new Date().toISOString(),
 						filePath: movieFile.filePath ?? null,
-						cachePath: qPath,
+						cachePath: `persistent/${fileId}/${quality}`,
 						sizeBytes,
 						segmentCount: segFiles.length,
 					}).run();

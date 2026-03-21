@@ -10,9 +10,9 @@ export const transcodeCache = sqliteTable('transcode_cache', {
 	/** JSON-encoded encoding settings used for this transcode */
 	encodingSettings: text('encoding_settings').notNull(),
 	completedAt: text('completed_at').notNull(),
-	/** Original file path — for re-matching if movie_file ID changes */
+	/** Original source file path — for re-matching if movie_file ID changes */
 	filePath: text('file_path'),
-	/** Cache directory path on disk */
+	/** Relative cache path from cache root (e.g. "persistent/{fileId}/{quality}") */
 	cachePath: text('cache_path'),
 	/** Total size of cached segments in bytes */
 	sizeBytes: integer('size_bytes'),

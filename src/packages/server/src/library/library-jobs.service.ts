@@ -728,7 +728,8 @@ export class LibraryJobsService implements OnModuleInit {
 
 		// Look up source file path for reference
 		const file = this.database.db.select().from(movieFiles).where(eq(movieFiles.id, movieFileId)).get();
-		const cachePath = this.transcoderService.getPersistentDir(movieFileId, quality);
+		// Store relative cache path (movieFileId/quality) so it works if cache root moves
+		const cachePath = `persistent/${movieFileId}/${quality}`;
 
 		this.database.db
 			.insert(transcodeCache)
