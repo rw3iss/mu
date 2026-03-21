@@ -9,6 +9,7 @@ import {
 	movieFiles,
 	movieMetadata,
 	movies,
+	transcodeCache,
 	userRatings,
 	userWatchHistory,
 	userWatchlist,
@@ -314,6 +315,22 @@ export class MoviesService {
 			}
 		}
 
+		// Get cached transcode versions for this movie's files
+		const cachedVersions: { quality: string; completedAt: string }[] = [];
+		if (firstFile) {
+			const caches = this.database.db
+				.select({
+					quality: transcodeCache.quality,
+					completedAt: transcodeCache.completedAt,
+				})
+				.from(transcodeCache)
+				.where(eq(transcodeCache.movieFileId, firstFile.id))
+				.all();
+			for (const c of caches) {
+				cachedVersions.push({ quality: c.quality, completedAt: c.completedAt });
+			}
+		}
+
 		return {
 			...this.flattenMovie(movie, metadata, inWatchlist, userRating),
 			status,
@@ -321,6 +338,7 @@ export class MoviesService {
 			durationSeconds,
 			fileInfo,
 			playSettings,
+			cachedVersions,
 		};
 	}
 
