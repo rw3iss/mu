@@ -34,46 +34,9 @@ pnpm build
 
 # ── 2.5. Run database migrations ──
 echo "--- database migrations ---"
-cd "$SRC_DIR/packages/server"
-node -e "
-const fs = require('fs');
-const path = require('path');
-const Database = require('better-sqlite3');
-const dbPath = path.resolve('../../data/db/mu.db');
-if (!fs.existsSync(dbPath)) { console.log('No database yet, skipping migrations'); process.exit(0); }
-const db = new Database(dbPath);
-const tables = [
-  'CREATE TABLE IF NOT EXISTS transcode_cache (id TEXT PRIMARY KEY, movie_file_id TEXT NOT NULL REFERENCES movie_files(id) ON DELETE CASCADE, quality TEXT NOT NULL, encoding_settings TEXT NOT NULL, completed_at TEXT NOT NULL)',
-  'CREATE TABLE IF NOT EXISTS audio_profiles (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, name TEXT NOT NULL, type TEXT NOT NULL, config TEXT NOT NULL DEFAULT \\'{}\\', is_default INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)',
-  'CREATE TABLE IF NOT EXISTS job_history (id TEXT PRIMARY KEY, type TEXT NOT NULL, label TEXT NOT NULL, status TEXT NOT NULL, payload TEXT, priority INTEGER DEFAULT 10, progress REAL DEFAULT 0, result TEXT, error TEXT, created_at TEXT NOT NULL, started_at TEXT, completed_at TEXT, duration_ms INTEGER, movie_id TEXT, movie_title TEXT, file_path TEXT, quality TEXT)',
-];
-for (const sql of tables) { db.exec(sql); }
-// Add columns that may not exist
-const alters = [
-  'ALTER TABLE movies ADD COLUMN thumbnail_url TEXT',
-  'ALTER TABLE movies ADD COLUMN thumbnail_aspect_ratio REAL',
-  'ALTER TABLE movies ADD COLUMN hidden INTEGER DEFAULT 0',
-  'ALTER TABLE movies ADD COLUMN play_settings TEXT',
-  'ALTER TABLE movie_files ADD COLUMN file_metadata TEXT',
-  'ALTER TABLE movie_files ADD COLUMN video_width INTEGER',
-  'ALTER TABLE movie_files ADD COLUMN video_height INTEGER',
-  'ALTER TABLE movie_files ADD COLUMN video_bit_depth INTEGER',
-  'ALTER TABLE movie_files ADD COLUMN video_frame_rate TEXT',
-  'ALTER TABLE movie_files ADD COLUMN video_profile TEXT',
-  'ALTER TABLE movie_files ADD COLUMN video_color_space TEXT',
-  'ALTER TABLE movie_files ADD COLUMN hdr INTEGER DEFAULT 0',
-  'ALTER TABLE movie_files ADD COLUMN container_format TEXT',
-  'ALTER TABLE plugins ADD COLUMN status TEXT DEFAULT \\'not_installed\\'',
-  'ALTER TABLE transcode_cache ADD COLUMN file_path TEXT',
-  'ALTER TABLE transcode_cache ADD COLUMN cache_path TEXT',
-  'ALTER TABLE transcode_cache ADD COLUMN size_bytes INTEGER',
-  'ALTER TABLE transcode_cache ADD COLUMN segment_count INTEGER',
-];
-for (const sql of alters) { try { db.exec(sql); } catch {} }
-console.log('Database migrations applied');
-db.close();
-" 2>/dev/null || echo "Migration script skipped (dependencies not ready)"
 cd "$SRC_DIR"
+node scripts/migrate.js 2>/dev/null || echo "Migration script skipped"
+
 
 # ── 3. Stop existing server ──
 echo "--- stopping server ---"
