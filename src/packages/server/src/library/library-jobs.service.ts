@@ -68,8 +68,8 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 
 	onApplicationBootstrap() {
 		// Resume after HTTP is fully listening so the site is immediately accessible.
-		// The 5s delay gives the app breathing room before heavy disk I/O starts.
-		setTimeout(() => this.resumeIncompleteTranscodes(), 5000);
+		// The 10s delay gives the app breathing room before heavy disk I/O starts.
+		setTimeout(() => this.resumeIncompleteTranscodes(), 10000);
 	}
 
 	// ===========================================================
@@ -469,15 +469,16 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					file.durationSeconds &&
 					file.durationSeconds > 0
 				) {
-					// Chunked transcoding: initialize chunk map first (sequential, does disk I/O)
+					// Chunked transcoding: initialize chunk map first (sequential, does disk I/O).
+					// Use a real delay (not just setTimeout(0)) to prevent event loop starvation
+					// on Windows where NTFS stat() calls saturate the I/O threadpool.
 					await this.chunkManager.initializeChunkMap(
 						file.id,
 						quality,
 						file.filePath,
 						file.durationSeconds,
 					);
-					// Yield to event loop so HTTP requests can be served during startup
-					await new Promise((r) => setTimeout(r, 0));
+					await new Promise((r) => setTimeout(r, 50));
 					pendingChunked.push({ fileId: file.id, quality, priority });
 				} else {
 					pendingMonolithic.push({
