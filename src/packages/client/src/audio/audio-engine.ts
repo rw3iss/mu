@@ -77,25 +77,12 @@ export class AudioEngine {
 
 		this.ctx = new AudioContext();
 
-		// Use captureStream to avoid createMediaElementSource which taints HLS audio
-		try {
-			const stream = (element as any).captureStream() as MediaStream;
-			const audioTracks = stream.getAudioTracks();
-			console.log('[AudioEngine] captureStream: tracks=', audioTracks.length,
-				audioTracks.map((t: any) => `${t.label}(${t.readyState})`));
-			if (audioTracks.length > 0) {
-				this.source = this.ctx.createMediaStreamSource(stream) as any;
-				// NOTE: NOT muting video.volume — if we hear double audio (echo),
-				// it confirms captureStream works and we can then mute
-				console.log('[AudioEngine] attach: via captureStream, ctx.state=', this.ctx.state);
-			} else {
-				throw new Error('No audio tracks in captureStream');
-			}
-		} catch (err) {
-			console.warn('[AudioEngine] captureStream failed, trying createMediaElementSource:', err);
-			this.source = this.ctx.createMediaElementSource(element);
-			console.log('[AudioEngine] attach: via createMediaElementSource, ctx.state=', this.ctx.state);
-		}
+		// Log crossOrigin state — if set, createMediaElementSource will taint audio
+		console.log('[AudioEngine] video.crossOrigin=', element.crossOrigin,
+			'readyState=', element.readyState, 'src=', element.src?.substring(0, 50));
+
+		this.source = this.ctx.createMediaElementSource(element);
+		console.log('[AudioEngine] attach: via createMediaElementSource, ctx.state=', this.ctx.state);
 
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
