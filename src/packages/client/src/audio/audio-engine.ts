@@ -97,8 +97,9 @@ export class AudioEngine {
 			const stream = (element as any).captureStream() as MediaStream;
 			this.source = this.ctx.createMediaStreamSource(stream) as any;
 			// Mute native audio to prevent double playback
-			this.nativeVolume = element.volume;
-			element.volume = 0;
+			// DON'T mute - captureStream captures after volume adjustment
+			// this.nativeVolume = element.volume;
+			// element.volume = 0;
 			this.capturedElement = element;
 			console.log('[AudioEngine] attached via captureStream, ctx.state=', this.ctx.state);
 		} catch (err) {
