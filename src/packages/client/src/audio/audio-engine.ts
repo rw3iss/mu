@@ -79,9 +79,32 @@ export class AudioEngine {
 	 */
 	attach(element: HTMLMediaElement): void {
 		this.currentElement = element;
-		// If effects are already enabled (restored from settings), capture now
+		// If effects are already enabled (restored from settings),
+		// wait for the video to have a source before capturing
 		if (this.eqEnabled || this.compressorEnabled) {
-			this.captureAudio();
+			this.deferCapture();
+		}
+	}
+
+	/**
+	 * Defer audio capture until the video is actually playing.
+	 * captureStream() requires the video to have a source.
+	 */
+	private deferCapture(): void {
+		if (!this.currentElement || this.captured) return;
+		const el = this.currentElement;
+		const onCanPlay = () => {
+			el.removeEventListener('canplay', onCanPlay);
+			el.removeEventListener('playing', onCanPlay);
+			if (!this.captured && (this.eqEnabled || this.compressorEnabled)) {
+				this.captureAudio();
+			}
+		};
+		el.addEventListener('canplay', onCanPlay);
+		el.addEventListener('playing', onCanPlay);
+		// If already playing, capture now
+		if (el.readyState >= 3) {
+			onCanPlay();
 		}
 	}
 
@@ -105,7 +128,11 @@ export class AudioEngine {
 	setEqEnabled(enabled: boolean): void {
 		this.eqEnabled = enabled;
 		if (enabled && !this.captured) {
-			this.captureAudio();
+			if (this.currentElement && this.currentElement.readyState >= 3) {
+				this.captureAudio();
+			} else {
+				this.deferCapture();
+			}
 		} else if (!enabled && !this.compressorEnabled && this.captured) {
 			// Both effects off — release audio back to native playback
 			this.releaseAudio();
@@ -117,7 +144,11 @@ export class AudioEngine {
 	setCompressorEnabled(enabled: boolean): void {
 		this.compressorEnabled = enabled;
 		if (enabled && !this.captured) {
-			this.captureAudio();
+			if (this.currentElement && this.currentElement.readyState >= 3) {
+				this.captureAudio();
+			} else {
+				this.deferCapture();
+			}
 		} else if (!enabled && !this.eqEnabled && this.captured) {
 			// Both effects off — release audio back to native playback
 			this.releaseAudio();
