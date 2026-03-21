@@ -1,5 +1,6 @@
 Names: viro? mu?
 INFO: ssh rw3iss@192.168.50.211
+
 --------------------------------------------------------------------------------
 
 // - keep manifest cache on client for recently played X movies. Don't let it refetch/load on next 'play', if the movie was unloaded.
@@ -13,6 +14,7 @@ INFO: ssh rw3iss@192.168.50.211
 	- be smart... metadata if exists, otherwise strategies for filename/folder association.
 
 - "Clean files" admin feature: rename all movie files to something standardized (enter a formatter), option to put movies in enclosing folder if they are not, put subtitles in subfolder, option to group series, etc.
+"Cleanup Files"
 
 - when updating metadata, set the title.
 
@@ -25,6 +27,7 @@ INFO: ssh rw3iss@192.168.50.211
 	- restore and index so user can just 'restore backup' for metadata, reviews, etc. (just clone .db?)
 
 - build external web client PWA that can connect to any server (ie. Mu client).
+		Can you see if we can somehow ensure that the built client (the PWA) can run completely independently, and just be pointed to any backend server? I'd like to eventually "compile" the client to a standalone client, that can just connect to any backend server (ie. someone else's), so users can still use the app without installing or setting up the entire backend. How do you suggest we do that? For now, we can just ensure it bundles to a standalone bundle, with an index.html page, that should all be compiled using the configured settings (ie. an ENV file pointing to the backend server). Then I can just open the index.html, and it should work as is with whatever backend I point it to. Is it setup to work that way currently? Then after that is ensured, we need to find the easiest or most efficient/lightweight way to bundle the web client to a standalone "App" for each operating system (it can install as a PWA, but it needs to ensure it includes all the necessary script and style files). Can you figure out the best way to make a process for that? It can be a separate build process, or it can just be part of the current one, with flags if needed.
 
 - Ratings: when clicked, show breakout of 1-10 stars, with number entry on left and decimal up/down buttons. Allow half-stars in overlay. Close/cancel button on end.
 	- user clicks a main number, zooms in between that and next number, with mini decimal scale? Right click or click outside to stay at X.0.
