@@ -8,3 +8,5 @@ dist/
 **/*.tsbuildinfo
 *.swp
 *.log
+
+_*.md
