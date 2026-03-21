@@ -27,6 +27,7 @@
     "plugin:generate": "npx tsx scripts/plugin-generate.ts",
     "plugin:generate-client-api": "npx tsx scripts/plugin-generate-client-api.ts",
     "cache:reconcile": "npx tsx scripts/reconcile-cache.ts",
+    "cache:probe-match": "npx tsx scripts/probe-and-match-cache.ts",
     "logs": "bash scripts/logs.sh",
     "logs:prod": "bash scripts/logs-prod.sh"
   },

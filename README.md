@@ -248,6 +248,14 @@ mu/
       └── logs/          #   server logs
 ```
 
+
+# How-To Extended:
+
+### If you want to move the cache:
+1. Copy data/cache/streams/ to the new location
+2. Update cache.streamDir in data/config/config.yml (or env var MU_CACHE__STREAM_DIR)
+3. Restart server — everything works because DB only stores relative path
+
 ---
 
 ## License
