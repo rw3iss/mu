@@ -145,6 +145,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			});
 
 			// Attach Web Audio API processing chain
+			// Destroy previous audio context if it exists (stale from previous video element)
+			if (audioEngine.isAttached()) {
+				audioEngine.destroy();
+			}
 			audioEngine.attach(video);
 			initAudioEffects();
 
@@ -227,6 +231,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				hlsRef.current.destroy();
 				hlsRef.current = null;
 			}
+			// Destroy audio engine so it can re-attach to a new video element
+			audioEngine.destroy();
 			if (videoRef.current?.parentNode) {
 				videoRef.current.parentNode.removeChild(videoRef.current);
 			}
