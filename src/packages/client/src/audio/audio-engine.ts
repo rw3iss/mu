@@ -1,11 +1,6 @@
-/**
- * Audio processing engine using Web Audio API.
- *
- * Chain: MediaElementSource → EQ Filters → Compressor → Gain → Destination
- *
- * When both EQ and compressor are disabled, the source connects directly
- * to the destination (zero-overhead pass-through).
- */
+// ============================================
+// Web Audio API Engine
+// ============================================
 
 export interface EqBand {
 	frequency: number;
@@ -26,22 +21,17 @@ export interface CompressorSettings {
 }
 
 export const DEFAULT_EQ_BANDS: EqBand[] = [
-	{ frequency: 32, gain: 0, q: 1.0, type: 'lowshelf' },
-	{ frequency: 64, gain: 0, q: 1.0, type: 'peaking' },
-	{ frequency: 125, gain: 0, q: 1.0, type: 'peaking' },
-	{ frequency: 250, gain: 0, q: 1.0, type: 'peaking' },
-	{ frequency: 500, gain: 0, q: 1.0, type: 'peaking' },
-	{ frequency: 1000, gain: 0, q: 1.0, type: 'peaking' },
-	{ frequency: 2000, gain: 0, q: 1.0, type: 'peaking' },
-	{ frequency: 4000, gain: 0, q: 1.0, type: 'peaking' },
-	{ frequency: 8000, gain: 0, q: 1.0, type: 'peaking' },
-	{ frequency: 16000, gain: 0, q: 1.0, type: 'highshelf' },
+	{ frequency: 60, gain: 0, q: 1, type: 'lowshelf' },
+	{ frequency: 230, gain: 0, q: 1, type: 'peaking' },
+	{ frequency: 910, gain: 0, q: 1, type: 'peaking' },
+	{ frequency: 3600, gain: 0, q: 1, type: 'peaking' },
+	{ frequency: 14000, gain: 0, q: 1, type: 'highshelf' },
 ];
 
 export const DEFAULT_COMPRESSOR: CompressorSettings = {
 	threshold: -24,
 	knee: 30,
-	ratio: 12,
+	ratio: 4,
 	attack: 0.003,
 	release: 0.25,
 	makeupGain: 0,
@@ -67,26 +57,41 @@ export class AudioEngine {
 	private currentElement: HTMLMediaElement | null = null;
 
 	/**
-	 * Attach to a video/audio element.
-	 * If already attached to a different element, re-creates the source node
-	 * on the existing AudioContext (preserves "running" state from user gesture).
+	 * Ensure the AudioContext exists. Call this from a user gesture (click handler)
+	 * so Chrome allows the context to run. Safe to call multiple times.
+	 */
+	ensureContext(): void {
+		if (!this.ctx) {
+			this.ctx = new AudioContext();
+		}
+		if (this.ctx.state === 'suspended') {
+			this.ctx.resume().catch(() => {});
+		}
+	}
+
+	/**
+	 * Attach to a video/audio element. Creates the source node and audio chain.
+	 * Call ensureContext() first (from a user gesture) to avoid suspended state.
 	 */
 	attach(element: HTMLMediaElement): void {
+		// Same element — nothing to do
 		if (this.attached && this.currentElement === element) return;
 
-		if (this.attached && this.ctx) {
-			// Re-attaching to a new video element — disconnect old source,
-			// create new source on the SAME AudioContext (keeps it running)
-			if (this.source) {
-				this.source.disconnect();
-			}
+		// Create context if not exists (fallback — may start suspended)
+		if (!this.ctx) {
+			this.ctx = new AudioContext();
+		}
+
+		if (this.attached && this.source) {
+			// Re-attaching to a new video element — swap source only
+			this.source.disconnect();
 			this.source = this.ctx.createMediaElementSource(element);
 			this.currentElement = element;
 			this.rebuildChain();
 			return;
 		}
 
-		this.ctx = new AudioContext();
+		// First attach — create everything
 		this.source = this.ctx.createMediaElementSource(element);
 		this.currentElement = element;
 
@@ -165,72 +170,41 @@ export class AudioEngine {
 		return this.inputGainDb;
 	}
 
-	updateBand(index: number, gain: number): void {
-		if (index < 0 || index >= this.currentBands.length) return;
-		this.currentBands[index]!.gain = gain;
-		if (this.filters[index]) {
-			this.filters[index]!.gain.value = gain;
-		}
-	}
-
-	updateBandQ(index: number, q: number): void {
-		if (index < 0 || index >= this.currentBands.length) return;
-		this.currentBands[index]!.q = q;
-		if (this.filters[index]) {
-			this.filters[index]!.Q.value = q;
-		}
-	}
-
 	setBands(bands: EqBand[]): void {
-		this.currentBands = bands.map((b) => ({ ...b }));
-		this.filters.forEach((filter, i) => {
-			const band = bands[i];
-			if (band) {
-				filter.type = band.type;
-				filter.frequency.value = band.frequency;
-				filter.gain.value = band.gain;
-				filter.Q.value = band.q;
-			}
-		});
+		this.currentBands = bands;
+		for (let i = 0; i < bands.length && i < this.filters.length; i++) {
+			const filter = this.filters[i]!;
+			const band = bands[i]!;
+			filter.type = band.type;
+			filter.frequency.value = band.frequency;
+			filter.gain.value = band.gain;
+			filter.Q.value = band.q;
+		}
 	}
 
 	getBands(): EqBand[] {
-		return this.currentBands.map((b) => ({ ...b }));
+		return [...this.currentBands];
 	}
 
-	setCompressorSettings(settings: CompressorSettings): void {
-		this.currentCompressor = { ...settings };
-		this.applyCompressorSettings(settings);
+	setCompressorSettings(s: CompressorSettings): void {
+		this.currentCompressor = { ...s };
+		this.applyCompressorSettings(s);
 		if (this.makeupGainNode) {
-			this.makeupGainNode.gain.value = this.dbToLinear(settings.makeupGain);
+			this.makeupGainNode.gain.value = this.dbToLinear(s.makeupGain);
 		}
-		this.applyMix(settings.mix);
+		this.applyMix(s.mix);
 	}
 
 	getCompressorSettings(): CompressorSettings {
 		return { ...this.currentCompressor };
 	}
 
-	resetEq(): void {
-		this.setBands(DEFAULT_EQ_BANDS.map((b) => ({ ...b })));
-	}
-
-	resetCompressor(): void {
-		this.setCompressorSettings({ ...DEFAULT_COMPRESSOR });
-	}
-
-	getCompressorReduction(): number {
-		if (!this.compressor) return 0;
-		return this.compressor.reduction;
-	}
-
-	/** Resume AudioContext if suspended (browser autoplay policy). */
 	async resume(): Promise<void> {
 		if (this.ctx?.state === 'suspended') {
 			try {
 				await this.ctx.resume();
 			} catch {
-				// Browser blocked resume (no user gesture yet) — will retry on next play event
+				// Browser blocked resume — will retry on next user interaction
 			}
 		}
 	}
@@ -270,7 +244,7 @@ export class AudioEngine {
 		this.wetGainNode?.disconnect();
 		this.compMergeNode?.disconnect();
 
-		// Build chain: source → inputGain → [EQ] → [Compressor w/ dry/wet mix] → destination
+		// Build chain: source → [inputGain] → [EQ] → [Compressor w/ dry/wet mix] → destination
 		let current: AudioNode = this.source;
 
 		if (this.eqEnabled && this.inputGainNode) {
@@ -294,10 +268,8 @@ export class AudioEngine {
 			this.compMergeNode
 		) {
 			// Parallel compression: split into dry + wet, merge at compMergeNode
-			// Dry path: current → dryGain → merge
 			current.connect(this.dryGainNode);
 			this.dryGainNode.connect(this.compMergeNode);
-			// Wet path: current → compressor → makeupGain → wetGain → merge
 			current.connect(this.compressor);
 			this.compressor.connect(this.makeupGainNode);
 			this.makeupGainNode.connect(this.wetGainNode);
@@ -319,10 +291,9 @@ export class AudioEngine {
 	}
 
 	private applyMix(mix: number): void {
-		const wet = Math.max(0, Math.min(1, mix ?? 1));
-		const dry = 1 - wet;
-		if (this.dryGainNode) this.dryGainNode.gain.value = dry;
-		if (this.wetGainNode) this.wetGainNode.gain.value = wet;
+		if (!this.dryGainNode || !this.wetGainNode) return;
+		this.dryGainNode.gain.value = 1 - mix;
+		this.wetGainNode.gain.value = mix;
 	}
 
 	private dbToLinear(db: number): number {
@@ -330,5 +301,4 @@ export class AudioEngine {
 	}
 }
 
-/** Singleton audio engine instance shared across the app. */
 export const audioEngine = new AudioEngine();

@@ -33,6 +33,7 @@ import { GlobalPlayer } from '@/components/player/GlobalPlayer';
 import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { wsService } from '@/services/websocket.service';
+import { audioEngine } from '@/audio/audio-engine';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
 import { initProcessingState } from '@/state/processing.state';
 
@@ -78,7 +79,24 @@ export function App() {
 		wsService.connect();
 		initGlobalPlayer();
 		initProcessingState();
-		return () => wsService.disconnect();
+
+		// Ensure AudioContext is created on first user interaction (Chrome requirement)
+		const unlockAudio = () => {
+			audioEngine.ensureContext();
+			document.removeEventListener('click', unlockAudio);
+			document.removeEventListener('touchstart', unlockAudio);
+			document.removeEventListener('keydown', unlockAudio);
+		};
+		document.addEventListener('click', unlockAudio);
+		document.addEventListener('touchstart', unlockAudio);
+		document.addEventListener('keydown', unlockAudio);
+
+		return () => {
+			wsService.disconnect();
+			document.removeEventListener('click', unlockAudio);
+			document.removeEventListener('touchstart', unlockAudio);
+			document.removeEventListener('keydown', unlockAudio);
+		};
 	}, []);
 
 	// Enforce auth redirect on initial load once checkAuth() completes

@@ -147,8 +147,8 @@ export async function playMovie(
 ): Promise<void> {
 	initPlayerSettings();
 	closeEffectsPanel();
-	// Resume AudioContext within the user gesture (click) — Chrome requires this
-	audioEngine.resume();
+	// Create/resume AudioContext within the user gesture (click) — Chrome requires this
+	audioEngine.ensureContext();
 	// User explicitly chose to play — persist this intent
 	try {
 		localStorage.setItem('mu_is_playing', '1');
