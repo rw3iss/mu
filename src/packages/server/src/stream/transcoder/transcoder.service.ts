@@ -335,6 +335,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.videoCodec(videoCodec)
 				.audioCodec('aac')
 				.outputOptions([
+					'-ac',
+					'2',
 					'-vf',
 					scaleFilter,
 					'-threads',
@@ -618,6 +620,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					.videoCodec(videoCodec)
 					.audioCodec('aac')
 					.outputOptions([
+						'-ac',
+						'2',
 						'-vf',
 						scaleFilter,
 						'-threads',
@@ -943,6 +947,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.videoCodec('libx264')
 				.audioCodec('aac')
 				.outputOptions([
+					'-ac',
+					'2',
 					'-vf',
 					scaleFilter,
 					'-threads',
@@ -1056,6 +1062,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.videoCodec('libx264')
 				.audioCodec('aac')
 				.outputOptions([
+					'-ac',
+					'2',
 					'-vf',
 					scaleFilter,
 					'-threads',
@@ -1221,6 +1229,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.videoCodec(videoCodec)
 				.audioCodec('aac')
 				.outputOptions([
+					'-ac',
+					'2',
 					'-vf',
 					scaleFilter,
 					'-threads',

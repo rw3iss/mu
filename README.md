@@ -256,6 +256,12 @@ mu/
 2. Update cache.streamDir in data/config/config.yml (or env var MU_CACHE__STREAM_DIR)
 3. Restart server — everything works because DB only stores relative path
 
+### Restart Windows service/server:
+nssm stop mu-server      # stop the service
+nssm start mu-server     # start the service
+nssm restart mu-server   # restart the service
+
+
 ---
 
 ## License
