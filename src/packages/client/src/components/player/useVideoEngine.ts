@@ -318,6 +318,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			} else {
 				const token = localStorage.getItem('mu_token');
 				const hls = new Hls({
+					debug: localStorage.getItem('mu_hls_debug') === '1',
 					startPosition,
 					enableWorker: true,
 					lowLatencyMode: false,
@@ -339,6 +340,14 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 
 				hls.loadSource(streamUrl);
 				hls.attachMedia(video);
+
+				// Debug: log key lifecycle events
+				hls.on(Hls.Events.MANIFEST_LOADED, () => console.log('[HLS] Manifest loaded'));
+				hls.on(Hls.Events.FRAG_LOADING, (_e, d) => console.log('[HLS] Loading fragment', d.frag.sn));
+				hls.on(Hls.Events.FRAG_BUFFERED, (_e, d) => console.log('[HLS] Fragment buffered', d.frag.sn));
+				hls.on(Hls.Events.BUFFER_APPENDING, () => console.log('[HLS] Buffer appending'));
+				hls.on(Hls.Events.BUFFER_APPENDED, () => console.log('[HLS] Buffer appended'));
+				hls.on(Hls.Events.BUFFER_EOS, () => console.log('[HLS] Buffer EOS'));
 
 				hls.on(Hls.Events.MANIFEST_PARSED, () => {
 					setHlsStatus(null);
