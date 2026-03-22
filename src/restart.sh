@@ -48,21 +48,11 @@ LOG_FILE="$LOG_DIR/server.log"
 mkdir -p "$(dirname "$PID_FILE")"
 
 cd "$SRC_DIR/packages/server"
-if $IS_WINDOWS; then
-    # On Windows, nohup breaks child process spawning (FFmpeg gets 0xC0000142).
-    # Use PowerShell Start-Process to launch in a proper Windows process context.
-    WIN_NODE="$(cygpath -w "$(which node)")"
-    WIN_DIST="$(cygpath -w "$SERVER_DIST")"
-    WIN_LOG="$(cygpath -w "$LOG_FILE")"
-    powershell.exe -Command "Start-Process -FilePath '$WIN_NODE' -ArgumentList '$WIN_DIST' -RedirectStandardOutput '$WIN_LOG' -RedirectStandardError '$WIN_LOG' -WindowStyle Hidden -PassThru | Select-Object -ExpandProperty Id" > /tmp/mu-server-pid.txt 2>/dev/null
-    SERVER_PID=$(cat /tmp/mu-server-pid.txt 2>/dev/null | tr -d '[:space:]')
-    rm -f /tmp/mu-server-pid.txt
-    # Set NODE_ENV in the registry for the process (or just accept it won't be set — NestJS defaults to production when not 'development')
-else
-    NODE_ENV=production nohup node "$SERVER_DIST" >> "$LOG_FILE" 2>&1 &
-    SERVER_PID=$!
-    disown "$SERVER_PID" 2>/dev/null || true
-fi
+# Prevent NVIDIA DLL loading in FFmpeg child processes (fixes 0xC0000142 on Windows SSH)
+export CUDA_VISIBLE_DEVICES=""
+NODE_ENV=production nohup node "$SERVER_DIST" >> "$LOG_FILE" 2>&1 &
+SERVER_PID=$!
+disown "$SERVER_PID" 2>/dev/null || true
 echo "$SERVER_PID" > "$PID_FILE"
 
 echo "Server started (PID: $SERVER_PID)"
