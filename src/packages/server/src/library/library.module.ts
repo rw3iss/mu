@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MediaModule } from '../media/media.module.js';
 import { MetadataModule } from '../metadata/metadata.module.js';
+import { MoviesModule } from '../movies/movies.module.js';
 import { StreamModule } from '../stream/stream.module.js';
 import { LibraryController } from './library.controller.js';
 import { LibraryService } from './library.service.js';
@@ -9,7 +10,7 @@ import { ScannerService } from './scanner.service.js';
 import { WatcherService } from './watcher.service.js';
 
 @Module({
-	imports: [MetadataModule, MediaModule, StreamModule],
+	imports: [MetadataModule, MediaModule, StreamModule, forwardRef(() => MoviesModule)],
 	controllers: [LibraryController],
 	providers: [LibraryService, ScannerService, WatcherService, LibraryJobsService],
 	exports: [LibraryService, ScannerService, WatcherService, LibraryJobsService],

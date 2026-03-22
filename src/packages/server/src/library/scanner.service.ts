@@ -1,8 +1,8 @@
 import { opendir, stat } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
-import { Injectable, Logger } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { and, eq, isNull } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
@@ -10,6 +10,7 @@ import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { mediaSources, movieFiles, movies, scanLog } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
+import { MoviesService } from '../movies/movies.service.js';
 
 interface ParsedFilename {
 	title: string;
@@ -61,6 +62,8 @@ export class ScannerService {
 		private readonly events: EventsService,
 		readonly _cache: CacheService,
 		private readonly guidResolver: GuidResolverService,
+		@Inject(forwardRef(() => MoviesService))
+		private readonly moviesService: MoviesService,
 	) {}
 
 	async scanSource(sourceId: string) {
@@ -230,6 +233,27 @@ export class ScannerService {
 						.run();
 					filesRemoved++;
 				}
+			}
+
+			// Clean up movies with no remaining available files
+			let moviesRemoved = 0;
+			const orphanedMovies = this.database.db
+				.select({ id: movies.id, title: movies.title })
+				.from(movies)
+				.leftJoin(
+					movieFiles,
+					and(eq(movieFiles.movieId, movies.id), eq(movieFiles.available, true)),
+				)
+				.where(isNull(movieFiles.id))
+				.all();
+
+			for (const orphan of orphanedMovies) {
+				await this.moviesService.purgeMovie(orphan.id);
+				moviesRemoved++;
+			}
+
+			if (moviesRemoved > 0) {
+				this.logger.log(`Purged ${moviesRemoved} orphaned movie(s) with no available files`);
 			}
 
 			// Update source stats

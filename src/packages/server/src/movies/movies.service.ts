@@ -6,9 +6,11 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { and, asc, count, desc, eq, like, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import {
+	jobHistory,
 	movieFiles,
 	movieMetadata,
 	movies,
+	playlistMovies,
 	transcodeCache,
 	userRatings,
 	userWatchHistory,
@@ -502,6 +504,35 @@ export class MoviesService {
 			.run();
 
 		return this.findById(id);
+	}
+
+	/**
+	 * Complete cleanup: remove all caches, related data, and the movie itself.
+	 * Idempotent — returns silently if the movie does not exist.
+	 */
+	async purgeMovie(id: string) {
+		const movie = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
+		if (!movie) return;
+
+		const files = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, id))
+			.all();
+
+		for (const file of files) {
+			await this.transcoderService.clearCache(file.id);
+			await this.subtitleService.clearCache(file.id);
+		}
+
+		this.thumbnailService.clearForMovie(id);
+		await this.imageService.clearForMovie(id);
+
+		this.database.db.delete(playlistMovies).where(eq(playlistMovies.movieId, id)).run();
+		this.database.db.delete(jobHistory).where(eq(jobHistory.movieId, id)).run();
+		this.database.db.delete(movies).where(eq(movies.id, id)).run();
+
+		this.logger.log(`Purged movie: ${movie.title}`);
 	}
 
 	remove(id: string) {

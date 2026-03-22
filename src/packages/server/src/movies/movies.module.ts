@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { LibraryModule } from '../library/library.module.js';
 import { MediaModule } from '../media/media.module.js';
 import { MetadataModule } from '../metadata/metadata.module.js';
@@ -16,7 +16,7 @@ import { WatchlistController } from './watchlist.controller.js';
 import { WatchlistService } from './watchlist.service.js';
 
 @Module({
-	imports: [LibraryModule, MediaModule, MetadataModule, RemoteModule, StreamModule],
+	imports: [forwardRef(() => LibraryModule), MediaModule, MetadataModule, RemoteModule, StreamModule],
 	controllers: [
 		MoviesController,
 		RatingsController,
