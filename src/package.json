@@ -30,6 +30,7 @@
     "cache:reconcile": "npx tsx scripts/reconcile-cache.ts",
     "cache:probe-match": "npx tsx scripts/probe-and-match-cache.ts",
     "settings": "node scripts/settings.js",
+    "fix:ffmpeg": "bash scripts/fix-ffmpeg.sh",
     "logs": "bash scripts/logs.sh",
     "logs:prod": "bash scripts/logs-prod.sh"
   },
