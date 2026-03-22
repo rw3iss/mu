@@ -5,6 +5,7 @@ import { Controller, Logger, Param, Post } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -22,6 +23,7 @@ export class MetadataController {
 		private readonly thumbnailService: ThumbnailService,
 		private readonly events: EventsService,
 		private readonly libraryJobs: LibraryJobsService,
+		private readonly guidResolver: GuidResolverService,
 	) {}
 
 	@Post('movies/refresh-all')
@@ -107,7 +109,7 @@ export class MetadataController {
 		// Delete the movie_metadata record entirely
 		this.database.db.delete(movieMetadata).where(eq(movieMetadata.movieId, movieId)).run();
 
-		this.logger.log(`Cleared metadata for movie ${movieId} (${movie.title})`);
+		this.logger.log(`Cleared metadata for movie ${this.guidResolver.resolve(movieId)} (${movie.title})`);
 		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'clear-metadata' });
 
 		return { message: 'Metadata cleared' };
@@ -330,7 +332,7 @@ export class MetadataController {
 			this.logger.warn(`Failed to enqueue pre-transcode during rescan: ${err.message}`);
 		}
 
-		this.logger.log(`Rescanned ${results.length} file(s) for movie ${movieId}`);
+		this.logger.log(`Rescanned ${results.length} file(s) for movie ${this.guidResolver.resolve(movieId)}`);
 
 		// Emit WebSocket event
 		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'rescan' });

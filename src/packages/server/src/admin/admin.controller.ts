@@ -1,6 +1,7 @@
 import { Controller, Delete, Logger, Param, Post } from '@nestjs/common';
 import { isNull } from 'drizzle-orm';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movies } from '../database/schema/index.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
@@ -14,6 +15,7 @@ export class AdminController {
 		private readonly database: DatabaseService,
 		private readonly streamService: StreamService,
 		private readonly thumbnailService: ThumbnailService,
+		private readonly guidResolver: GuidResolverService,
 	) {}
 
 	/**
@@ -73,7 +75,7 @@ export class AdminController {
 				}
 			} catch (err: any) {
 				failed++;
-				this.logger.warn(`Thumbnail failed for movie ${movieId}: ${err.message}`);
+				this.logger.warn(`Thumbnail failed for movie ${this.guidResolver.resolve(movieId)}: ${err.message}`);
 			}
 		}
 

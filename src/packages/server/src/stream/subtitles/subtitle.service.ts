@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { access, mkdir, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
+import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import ffmpeg from 'fluent-ffmpeg';
 
 interface SubtitleTrack {
@@ -16,7 +17,7 @@ export class SubtitleService {
 	private readonly logger = new Logger(SubtitleService.name);
 	private readonly cacheDir: string;
 
-	constructor() {
+	constructor(private readonly guidResolver: GuidResolverService) {
 		this.cacheDir = path.resolve('data/cache/subtitles');
 	}
 
@@ -332,7 +333,7 @@ export class SubtitleService {
 		const dir = this.getSubtitleDir(movieFileId);
 		if (existsSync(dir)) {
 			await rm(dir, { recursive: true, force: true });
-			this.logger.debug(`Cleared subtitle cache for file ${movieFileId}`);
+			this.logger.debug(`Cleared subtitle cache for file ${this.guidResolver.resolve(movieFileId)}`);
 		}
 	}
 

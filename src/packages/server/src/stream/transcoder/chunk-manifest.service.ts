@@ -1,11 +1,14 @@
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
+import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import type { ChunkMap } from './chunk-meta.js';
 
 @Injectable()
 export class ChunkManifestService {
 	private readonly logger = new Logger(ChunkManifestService.name);
+
+	constructor(private readonly guidResolver: GuidResolverService) {}
 
 	/**
 	 * Generate a virtual HLS manifest from chunk state.
@@ -60,6 +63,6 @@ export class ChunkManifestService {
 
 		const manifest = lines.join('\n') + '\n';
 		await writeFile(path.join(cacheDir, 'stream.m3u8'), manifest);
-		this.logger.log(`Final manifest written for ${chunkMap.movieFileId}/${chunkMap.quality}`);
+		this.logger.log(`Final manifest written for ${this.guidResolver.resolve(chunkMap.movieFileId)}/${chunkMap.quality}`);
 	}
 }

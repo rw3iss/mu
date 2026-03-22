@@ -2,6 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
+import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { ConfigService } from '../config/config.service.js';
 
 @Injectable()
@@ -9,7 +10,10 @@ export class ImageService {
 	private readonly logger = new Logger('ImageService');
 	private readonly cacheDir: string;
 
-	constructor(private readonly config: ConfigService) {
+	constructor(
+		private readonly config: ConfigService,
+		private readonly guidResolver: GuidResolverService,
+	) {
 		this.cacheDir = resolve(this.config.get<string>('paths.imageCache', './data/cache/images'));
 		if (!existsSync(this.cacheDir)) {
 			mkdirSync(this.cacheDir, { recursive: true });
@@ -64,7 +68,7 @@ export class ImageService {
 		const movieDir = join(this.cacheDir, movieId);
 		if (existsSync(movieDir)) {
 			await rm(movieDir, { recursive: true, force: true });
-			this.logger.debug(`Cleared image cache for movie ${movieId}`);
+			this.logger.debug(`Cleared image cache for movie ${this.guidResolver.resolve(movieId)}`);
 		}
 	}
 

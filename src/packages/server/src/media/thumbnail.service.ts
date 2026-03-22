@@ -4,6 +4,7 @@ import { nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
+import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movies } from '../database/schema/index.js';
@@ -30,6 +31,7 @@ export class ThumbnailService {
 	constructor(
 		private readonly database: DatabaseService,
 		private readonly config: ConfigService,
+		private readonly guidResolver: GuidResolverService,
 	) {
 		this.thumbnailDir = resolve(
 			this.config.get<string>('media.thumbnailDir', './data/thumbnails'),
@@ -53,7 +55,7 @@ export class ThumbnailService {
 			.get();
 
 		if (!file || !file.filePath) {
-			this.logger.warn(`No file found for movie ${movieId}`);
+			this.logger.warn(`No file found for movie ${this.guidResolver.resolve(movieId)}`);
 			return null;
 		}
 
@@ -94,11 +96,11 @@ export class ThumbnailService {
 				.run();
 
 			this.logger.debug(
-				`Thumbnail generated for movie ${movieId} at ${seekTime}s (AR: ${aspectRatio})`,
+				`Thumbnail generated for movie ${this.guidResolver.resolve(movieId)} at ${seekTime}s (AR: ${aspectRatio})`,
 			);
 			return thumbnailUrl;
 		} catch (err: any) {
-			this.logger.warn(`Failed to generate thumbnail for movie ${movieId}: ${err.message}`);
+			this.logger.warn(`Failed to generate thumbnail for movie ${this.guidResolver.resolve(movieId)}: ${err.message}`);
 			return null;
 		}
 	}
@@ -237,7 +239,7 @@ export class ThumbnailService {
 		const thumbPath = join(this.thumbnailDir, `${movieId}.jpg`);
 		if (existsSync(thumbPath)) {
 			unlinkSync(thumbPath);
-			this.logger.debug(`Cleared thumbnail for movie ${movieId}`);
+			this.logger.debug(`Cleared thumbnail for movie ${this.guidResolver.resolve(movieId)}`);
 		}
 	}
 

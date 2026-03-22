@@ -1,13 +1,17 @@
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
+import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import { TranscoderService } from './transcoder.service.js';
 
 @Injectable()
 export class HlsGeneratorService {
 	private readonly logger = new Logger(HlsGeneratorService.name);
 
-	constructor(private readonly transcoderService: TranscoderService) {}
+	constructor(
+		private readonly transcoderService: TranscoderService,
+		private readonly guidResolver: GuidResolverService,
+	) {}
 
 	/**
 	 * Read and return the HLS master manifest (.m3u8) for a given session.
@@ -22,10 +26,10 @@ export class HlsGeneratorService {
 			return data;
 		} catch (err: any) {
 			if (err.code === 'ENOENT') {
-				this.logger.debug(`Manifest not yet available for session ${sessionId}`);
+				this.logger.debug(`Manifest not yet available for session ${this.guidResolver.resolve(sessionId)}`);
 				return null;
 			}
-			this.logger.error(`Error reading manifest for session ${sessionId}: ${err.message}`);
+			this.logger.error(`Error reading manifest for session ${this.guidResolver.resolve(sessionId)}: ${err.message}`);
 			throw err;
 		}
 	}
@@ -79,12 +83,12 @@ export class HlsGeneratorService {
 						continue;
 					}
 					this.logger.debug(
-						`Segment ${segmentNumber} not yet available for session ${sessionId}`,
+						`Segment ${segmentNumber} not yet available for session ${this.guidResolver.resolve(sessionId)}`,
 					);
 					return null;
 				}
 				this.logger.error(
-					`Error reading segment ${segmentNumber} for session ${sessionId}: ${err.message}`,
+					`Error reading segment ${segmentNumber} for session ${this.guidResolver.resolve(sessionId)}: ${err.message}`,
 				);
 				throw err;
 			}

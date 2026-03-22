@@ -14,6 +14,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles } from '../database/schema/index.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
@@ -35,6 +36,7 @@ export class StreamController {
 		private readonly directPlayService: DirectPlayService,
 		private readonly db: DatabaseService,
 		private readonly transcodeDebugger: TranscodeDebuggerService,
+		private readonly guidResolver: GuidResolverService,
 	) {}
 
 	/**
@@ -123,7 +125,7 @@ export class StreamController {
 		// Check if FFmpeg has crashed for this session
 		const state = this.transcoderService.getTranscodeState(sessionId);
 		if (state?.state === 'failed') {
-			this.logger.error(`Manifest requested for failed session ${sessionId}: ${state.error}`);
+			this.logger.error(`Manifest requested for failed session ${this.guidResolver.resolve(sessionId)}: ${state.error}`);
 			return reply.status(500).send({ message: `Transcoding failed: ${state.error}` });
 		}
 

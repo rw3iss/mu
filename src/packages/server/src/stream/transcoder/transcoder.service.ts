@@ -6,6 +6,7 @@ import path from 'node:path';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
+import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import { ConfigService } from '../../config/config.service.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, transcodeCache } from '../../database/schema/index.js';
@@ -45,6 +46,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		private readonly settings: SettingsService,
 		private readonly database: DatabaseService,
 		private readonly transcodeDebugger: TranscodeDebuggerService,
+		private readonly guidResolver: GuidResolverService,
 	) {
 		this.cacheDir = path.resolve(
 			this.config.get<string>('cache.streamDir') || './data/cache/streams',
@@ -382,7 +384,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
 					this.logger.log(
-						`FFmpeg started for session ${sessionId}, outputDir=${targetDir}`,
+						`FFmpeg started for session ${this.guidResolver.resolve(sessionId)}, outputDir=${targetDir}`,
 					);
 					this.logger.debug(`FFmpeg command: ${commandLine}`);
 					this.sessionStates.set(sessionId, { state: 'running' });
@@ -393,12 +395,12 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				})
 				.on('progress', (progress: any) => {
 					this.logger.debug(
-						`Transcode progress [${sessionId}]: ${progress.percent?.toFixed(1)}%`,
+						`Transcode progress [${this.guidResolver.resolve(sessionId)}]: ${progress.percent?.toFixed(1)}%`,
 					);
 					this.transcodeDebugger.recordFFmpegProgress(sessionId, progress);
 				})
 				.on('error', (err: Error) => {
-					this.logger.error(`FFmpeg error for session ${sessionId}: ${err.message}`);
+					this.logger.error(`FFmpeg error for session ${this.guidResolver.resolve(sessionId)}: ${err.message}`);
 					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(sessionId);
 
@@ -418,12 +420,12 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						this.hwAccelBroken = true;
 						this.settings.set('hwAccelBroken', true);
 						this.logger.warn(
-							`Hardware acceleration (${hwAccel}) failed for session ${sessionId}, switching to software encoding globally`,
+							`Hardware acceleration (${hwAccel}) failed for session ${this.guidResolver.resolve(sessionId)}, switching to software encoding globally`,
 						);
 						this.retryWithSoftware(sessionId, filePath, options, outputDir).catch(
 							(retryErr) => {
 								this.logger.error(
-									`Software fallback also failed for session ${sessionId}: ${retryErr.message}`,
+									`Software fallback also failed for session ${this.guidResolver.resolve(sessionId)}: ${retryErr.message}`,
 								);
 							},
 						);
@@ -435,7 +437,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					reject(err);
 				})
 				.on('end', () => {
-					this.logger.log(`Transcode complete for session ${sessionId}`);
+					this.logger.log(`Transcode complete for session ${this.guidResolver.resolve(sessionId)}`);
 					this.activeProcesses.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'completed' });
 					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_complete', 'Transcode finished');
@@ -501,7 +503,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
 					this.logger.log(
-						`FFmpeg remux started for session ${sessionId}, outputDir=${targetDir}`,
+						`FFmpeg remux started for session ${this.guidResolver.resolve(sessionId)}, outputDir=${targetDir}`,
 					);
 					this.logger.debug(`FFmpeg command: ${commandLine}`);
 					this.sessionStates.set(sessionId, { state: 'running' });
@@ -511,13 +513,13 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				})
 				.on('progress', (progress: any) => {
 					this.logger.debug(
-						`Remux progress [${sessionId}]: ${progress.percent?.toFixed(1)}%`,
+						`Remux progress [${this.guidResolver.resolve(sessionId)}]: ${progress.percent?.toFixed(1)}%`,
 					);
 					this.transcodeDebugger.recordFFmpegProgress(sessionId, progress);
 				})
 				.on('error', (err: Error) => {
 					this.logger.error(
-						`FFmpeg remux error for session ${sessionId}: ${err.message}`,
+						`FFmpeg remux error for session ${this.guidResolver.resolve(sessionId)}: ${err.message}`,
 					);
 					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(sessionId);
@@ -525,7 +527,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					reject(err);
 				})
 				.on('end', () => {
-					this.logger.log(`Remux complete for session ${sessionId}`);
+					this.logger.log(`Remux complete for session ${this.guidResolver.resolve(sessionId)}`);
 					this.activeProcesses.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'completed' });
 					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_complete', 'Remux finished');
@@ -559,7 +561,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 
 		// Already cached
 		if (await this.hasCachedTranscode(movieFileId, quality)) {
-			this.logger.log(`Pre-transcode skipped — cache exists for ${movieFileId}/${quality}`);
+			this.logger.log(`Pre-transcode skipped — cache exists for ${this.guidResolver.resolve(movieFileId)}/${quality}`);
 			return;
 		}
 
@@ -659,7 +661,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			command
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
-					this.logger.log(`Pre-transcode started for ${movieFileId}: ${commandLine}`);
+					this.logger.log(`Pre-transcode started for ${this.guidResolver.resolve(movieFileId)}: ${commandLine}`);
 					this.transcodeDebugger.recordFFmpegCommand(processKey, commandLine);
 					this.transcodeDebugger.recordMilestone(processKey, 'ffmpegSpawned');
 				})
@@ -669,12 +671,12 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						onProgress?.(Math.min(100, Math.max(0, pct)));
 					}
 					this.logger.debug(
-						`Pre-transcode progress [${movieFileId}]: ${progress.percent?.toFixed(1)}%`,
+						`Pre-transcode progress [${this.guidResolver.resolve(movieFileId)}]: ${progress.percent?.toFixed(1)}%`,
 					);
 					this.transcodeDebugger.recordFFmpegProgress(processKey, progress);
 				})
 				.on('error', (err: Error) => {
-					this.logger.error(`Pre-transcode error for ${movieFileId}: ${err.message}`);
+					this.logger.error(`Pre-transcode error for ${this.guidResolver.resolve(movieFileId)}: ${err.message}`);
 					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(processKey);
 
@@ -695,7 +697,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						this.hwAccelBroken = true;
 						this.settings.set('hwAccelBroken', true);
 						this.logger.warn(
-							`Hardware acceleration (${hwAccel}) failed for pre-transcode ${movieFileId}, switching to software encoding globally`,
+							`Hardware acceleration (${hwAccel}) failed for pre-transcode ${this.guidResolver.resolve(movieFileId)}, switching to software encoding globally`,
 						);
 						this.preTranscodeWithSoftware(
 							movieFileId,
@@ -712,7 +714,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					reject(err);
 				})
 				.on('end', () => {
-					this.logger.log(`Pre-transcode complete for ${movieFileId}/${quality}`);
+					this.logger.log(`Pre-transcode complete for ${this.guidResolver.resolve(movieFileId)}/${quality}`);
 					this.activeProcesses.delete(processKey);
 					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_complete', 'Pre-transcode finished');
 					writeFile(path.join(persistDir, '.complete'), '')
@@ -776,7 +778,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				if (manifest.includes('#EXT-X-ENDLIST')) {
 					await writeFile(path.join(dir, '.complete'), '');
 					this.logger.log(
-						`Repaired missing .complete marker for ${movieFileId}/${quality}`,
+						`Repaired missing .complete marker for ${this.guidResolver.resolve(movieFileId)}/${quality}`,
 					);
 					return 'complete';
 				}
@@ -825,13 +827,13 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	stopTranscode(sessionId: string): void {
 		const proc = this.activeProcesses.get(sessionId);
 		if (proc) {
-			this.logger.log(`Stopping transcode for session ${sessionId}`);
+			this.logger.log(`Stopping transcode for session ${this.guidResolver.resolve(sessionId)}`);
 			try {
 				// On Windows, SIGKILL is not available; use SIGTERM which works cross-platform.
 				// fluent-ffmpeg processes respond to SIGTERM gracefully.
 				proc.kill();
 			} catch (err) {
-				this.logger.warn(`Failed to kill FFmpeg process for session ${sessionId}: ${err}`);
+				this.logger.warn(`Failed to kill FFmpeg process for session ${this.guidResolver.resolve(sessionId)}: ${err}`);
 			}
 			this.activeProcesses.delete(sessionId);
 		}
@@ -854,7 +856,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			} else {
 				execSync(`renice -n -5 -p ${proc.pid}`, { stdio: 'ignore' });
 			}
-			this.logger.debug(`Boosted FFmpeg priority for session ${sessionId} (PID ${proc.pid})`);
+			this.logger.debug(`Boosted FFmpeg priority for session ${this.guidResolver.resolve(sessionId)} (PID ${proc.pid})`);
 		} catch {
 			// Requires elevated privileges — silently ignore
 		}
@@ -868,9 +870,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const sessionDir = this.getSessionDir(sessionId);
 		try {
 			await rm(sessionDir, { recursive: true, force: true });
-			this.logger.log(`Cleaned up transcode files for session ${sessionId}`);
+			this.logger.log(`Cleaned up transcode files for session ${this.guidResolver.resolve(sessionId)}`);
 		} catch (err) {
-			this.logger.warn(`Failed to clean up session ${sessionId}: ${err}`);
+			this.logger.warn(`Failed to clean up session ${this.guidResolver.resolve(sessionId)}: ${err}`);
 		}
 	}
 
@@ -969,26 +971,26 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			command
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
-					this.logger.log(`FFmpeg SW fallback started for session ${sessionId}`);
+					this.logger.log(`FFmpeg SW fallback started for session ${this.guidResolver.resolve(sessionId)}`);
 					this.logger.debug(`FFmpeg command: ${commandLine}`);
 					this.sessionStates.set(sessionId, { state: 'running' });
 					resolve();
 				})
 				.on('progress', (progress: any) => {
 					this.logger.debug(
-						`SW fallback progress [${sessionId}]: ${progress.percent?.toFixed(1)}%`,
+						`SW fallback progress [${this.guidResolver.resolve(sessionId)}]: ${progress.percent?.toFixed(1)}%`,
 					);
 				})
 				.on('error', (err: Error) => {
 					this.logger.error(
-						`FFmpeg SW fallback error for session ${sessionId}: ${err.message}`,
+						`FFmpeg SW fallback error for session ${this.guidResolver.resolve(sessionId)}: ${err.message}`,
 					);
 					this.activeProcesses.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'failed', error: err.message });
 					reject(err);
 				})
 				.on('end', () => {
-					this.logger.log(`SW fallback transcode complete for session ${sessionId}`);
+					this.logger.log(`SW fallback transcode complete for session ${this.guidResolver.resolve(sessionId)}`);
 					this.activeProcesses.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'completed' });
 					if (outputDir) {
@@ -1075,7 +1077,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
 					this.logger.log(
-						`Pre-transcode SW fallback started for ${movieFileId}: ${commandLine}`,
+						`Pre-transcode SW fallback started for ${this.guidResolver.resolve(movieFileId)}: ${commandLine}`,
 					);
 				})
 				.on('progress', (progress: any) => {
@@ -1084,19 +1086,19 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						onProgress?.(Math.min(100, Math.max(0, pct)));
 					}
 					this.logger.debug(
-						`Pre-transcode SW fallback [${movieFileId}]: ${progress.percent?.toFixed(1)}%`,
+						`Pre-transcode SW fallback [${this.guidResolver.resolve(movieFileId)}]: ${progress.percent?.toFixed(1)}%`,
 					);
 				})
 				.on('error', (err: Error) => {
 					this.logger.error(
-						`Pre-transcode SW fallback error for ${movieFileId}: ${err.message}`,
+						`Pre-transcode SW fallback error for ${this.guidResolver.resolve(movieFileId)}: ${err.message}`,
 					);
 					this.activeProcesses.delete(processKey);
 					reject(err);
 				})
 				.on('end', () => {
 					this.logger.log(
-						`Pre-transcode SW fallback complete for ${movieFileId}/${quality}`,
+						`Pre-transcode SW fallback complete for ${this.guidResolver.resolve(movieFileId)}/${quality}`,
 					);
 					this.activeProcesses.delete(processKey);
 					writeFile(path.join(persistDir, '.complete'), '')

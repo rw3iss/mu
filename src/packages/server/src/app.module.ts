@@ -4,6 +4,7 @@ import { AdminModule } from './admin/admin.module.js';
 import { AudioProfilesModule } from './audio-profiles/audio-profiles.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CacheModule } from './cache/cache.module.js';
+import { CommonModule } from './common/common.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { ConfigModule } from './config/config.module.js';
@@ -29,6 +30,7 @@ import { UsersModule } from './users/users.module.js';
 	imports: [
 		ConfigModule,
 		DatabaseModule,
+		CommonModule,
 		CacheModule,
 		AuthModule,
 		UsersModule,

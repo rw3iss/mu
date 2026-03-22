@@ -2,6 +2,7 @@ import type { ChildProcess } from 'node:child_process';
 import { appendFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import type {
 	ClientRequestLog,
@@ -22,7 +23,10 @@ export class TranscodeDebuggerService implements OnModuleInit {
 	private enabled = false;
 	private readonly logPath: string;
 
-	constructor(private readonly settings: SettingsService) {
+	constructor(
+		private readonly settings: SettingsService,
+		private readonly guidResolver: GuidResolverService,
+	) {
 		this.logPath = path.resolve('./data/logs/transcode-debug.log');
 	}
 
@@ -93,7 +97,7 @@ export class TranscodeDebuggerService implements OnModuleInit {
 		this.sessionOrder.push(sessionId);
 
 		this.recordEvent(sessionId, 'session_start', `Debug session started for ${movieFileId}`);
-		this.logger.log(`Transcode debug session started: ${sessionId}`);
+		this.logger.log(`Transcode debug session started: ${this.guidResolver.resolve(sessionId)}`);
 	}
 
 	endSession(sessionId: string, status: 'completed' | 'failed' | 'cancelled'): void {

@@ -5,6 +5,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
+import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { mediaSources, movieFiles, movies, scanLog } from '../database/schema/index.js';
@@ -59,6 +60,7 @@ export class ScannerService {
 		readonly _config: ConfigService,
 		private readonly events: EventsService,
 		readonly _cache: CacheService,
+		private readonly guidResolver: GuidResolverService,
 	) {}
 
 	async scanSource(sourceId: string) {
@@ -394,7 +396,7 @@ export class ScannerService {
 			}
 		}
 
-		this.logger.log(`Rescanned ${results.length} file(s) for movie ${movieId}`);
+		this.logger.log(`Rescanned ${results.length} file(s) for movie ${this.guidResolver.resolve(movieId)}`);
 		return { files: results };
 	}
 

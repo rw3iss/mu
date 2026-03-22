@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path';
 import { nowISO, WsEvent } from '@mu/shared';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import { EventsService } from '../../events/events.service.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import { ChunkManifestService } from './chunk-manifest.service.js';
@@ -44,6 +45,7 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 		private readonly manifestService: ChunkManifestService,
 		private readonly settings: SettingsService,
 		private readonly events: EventsService,
+		private readonly guidResolver: GuidResolverService,
 	) {}
 
 	onModuleInit() {
@@ -121,7 +123,7 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 		const hasChunkMeta = existsSync(chunkMetaPath);
 		if (hasOldManifest && !hasChunkMeta) {
 			this.logger.warn(
-				`Old-format cache detected for ${movieFileId}/${quality}, clearing for chunked transcode`,
+				`Old-format cache detected for ${this.guidResolver.resolve(movieFileId)}/${quality}, clearing for chunked transcode`,
 			);
 			await rm(cacheDir, { recursive: true, force: true });
 			await mkdir(cacheDir, { recursive: true });
@@ -134,7 +136,7 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 
 		this.chunkMaps.set(key, chunkMap);
 		this.logger.log(
-			`Chunk map initialized: ${movieFileId}/${quality} — ${totalChunks} chunks (${chunkDuration}s each), ${chunkMap.chunks.filter((c) => c.status === 'complete').length} already cached`,
+			`Chunk map initialized: ${this.guidResolver.resolve(movieFileId)}/${quality} — ${totalChunks} chunks (${chunkDuration}s each), ${chunkMap.chunks.filter((c) => c.status === 'complete').length} already cached`,
 		);
 
 		return chunkMap;
@@ -211,7 +213,7 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 		this.drain();
 
 		this.logger.log(
-			`Reprioritized for seek: ${movieFileId}/${quality} target chunk ${targetIndex} (${seekTimeSeconds}s)`,
+			`Reprioritized for seek: ${this.guidResolver.resolve(movieFileId)}/${quality} target chunk ${targetIndex} (${seekTimeSeconds}s)`,
 		);
 	}
 
@@ -438,7 +440,7 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 			chunk.status = 'failed';
 			this.activeChunkKeys.delete(processKey);
 			this.logger.error(
-				`Chunk ${chunk.index} failed for ${map.movieFileId}/${map.quality}: ${err.message}`,
+				`Chunk ${chunk.index} failed for ${this.guidResolver.resolve(map.movieFileId)}/${map.quality}: ${err.message}`,
 			);
 
 			// Track consecutive spawn failures globally
@@ -463,7 +465,7 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 			const recentFailures = recentChunks.filter((c) => c.status === 'failed').length;
 			if (recentFailures >= 5) {
 				this.logger.error(
-					`Systemic failure for ${map.movieFileId}/${map.quality}: ${recentFailures} consecutive failures, aborting`,
+					`Systemic failure for ${this.guidResolver.resolve(map.movieFileId)}/${map.quality}: ${recentFailures} consecutive failures, aborting`,
 				);
 				this.cancelAllChunks(map.movieFileId, map.quality);
 				// Write .failed marker to prevent re-queuing on restart
@@ -487,7 +489,7 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private async finalize(map: ChunkMap, cacheDir: string): Promise<void> {
-		this.logger.log(`All chunks complete for ${map.movieFileId}/${map.quality} — finalizing`);
+		this.logger.log(`All chunks complete for ${this.guidResolver.resolve(map.movieFileId)}/${map.quality} — finalizing`);
 
 		// Write final manifest
 		await this.manifestService.writeFinalManifest(map, cacheDir);
@@ -588,7 +590,7 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 							const currentHash = this.transcoder.getEncodingSettingsHash();
 							if (meta.encodingSettingsHash !== currentHash) {
 								this.logger.warn(
-									`Skipping resume for ${movieFileId}/${quality}: encoding settings changed`,
+									`Skipping resume for ${this.guidResolver.resolve(movieFileId)}/${quality}: encoding settings changed`,
 								);
 								continue;
 							}
@@ -596,7 +598,7 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 							// Check source file still exists
 							if (!existsSync(meta.filePath)) {
 								this.logger.warn(
-									`Skipping resume for ${movieFileId}/${quality}: source file missing`,
+									`Skipping resume for ${this.guidResolver.resolve(movieFileId)}/${quality}: source file missing`,
 								);
 								continue;
 							}
@@ -620,12 +622,12 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 								);
 								resumed++;
 								this.logger.log(
-									`Resumed chunked transcode: ${movieFileId}/${quality} — ${pending} chunks remaining`,
+									`Resumed chunked transcode: ${this.guidResolver.resolve(movieFileId)}/${quality} — ${pending} chunks remaining`,
 								);
 							}
 						} catch (err: any) {
 							this.logger.warn(
-								`Failed to resume ${movieFileId}/${quality}: ${err.message}`,
+								`Failed to resume ${this.guidResolver.resolve(movieFileId)}/${quality}: ${err.message}`,
 							);
 						}
 					}

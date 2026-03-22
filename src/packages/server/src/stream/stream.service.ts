@@ -11,6 +11,7 @@ import {
 	OnModuleInit,
 } from '@nestjs/common';
 import { and, eq, lt } from 'drizzle-orm';
+import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
@@ -62,6 +63,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		private readonly settings: SettingsService,
 		private readonly chunkManager: ChunkManagerService,
 		private readonly transcodeDebugger: TranscodeDebuggerService,
+		private readonly guidResolver: GuidResolverService,
 	) {}
 
 	onModuleInit(): void {
@@ -107,9 +109,9 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			try {
 				await this.endStream(session.id);
 				reaped++;
-				this.logger.log(`Reaped stale session ${session.id} (movie: ${session.movieId})`);
+				this.logger.log(`Reaped stale session ${this.guidResolver.resolve(session.id)} (movie: ${this.guidResolver.resolve(session.movieId)})`);
 			} catch (err: any) {
-				this.logger.warn(`Failed to reap session ${session.id}: ${err.message}`);
+				this.logger.warn(`Failed to reap session ${this.guidResolver.resolve(session.id)}: ${err.message}`);
 			}
 		}
 
@@ -169,7 +171,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 			if (allFiles.length > 0) {
 				this.logger.warn(
-					`Movie ${movieId} has ${allFiles.length} file(s) but none are available. ` +
+					`Movie ${this.guidResolver.resolve(movieId)} has ${allFiles.length} file(s) but none are available. ` +
 						`Paths: ${allFiles.map((f) => f.filePath).join(', ')}`,
 				);
 				throw new NotFoundException(
@@ -178,11 +180,21 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				);
 			}
 
-			throw new NotFoundException(`No file found for movie ${movieId}`);
+			throw new NotFoundException(`No file found for movie ${this.guidResolver.resolve(movieId)}`);
 		}
 
 		// Pick the best available file (prefer highest resolution)
 		const file = this.selectBestFile(movieFileList);
+
+		// Warm up GUID resolver with movie and file names
+		const movieRow = this.database.db
+			.select({ title: movies.title })
+			.from(movies)
+			.where(eq(movies.id, movieId))
+			.get();
+		const movieTitle = movieRow?.title ?? file.fileName ?? 'Unknown';
+		this.guidResolver.warmup(movieId, movieTitle);
+		this.guidResolver.warmup(file.id, movieTitle);
 
 		// Verify the file has actual content (not empty/corrupt)
 		try {
@@ -207,6 +219,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		const mode = this.determineStreamMode(file);
 
 		const sessionId = crypto.randomUUID();
+		this.guidResolver.warmup(sessionId, movieTitle);
 		const quality = options.quality || this.resolveDefaultQuality(file.id, file.videoHeight);
 
 		// Skip session tracking for shared/anonymous streams (__shared__ has no DB user record)
@@ -261,7 +274,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				storedTracks,
 			);
 		} catch (err) {
-			this.logger.warn(`Failed to extract subtitles for file ${file.id}: ${err}`);
+			this.logger.warn(`Failed to extract subtitles for file ${this.guidResolver.resolve(file.id)}: ${err}`);
 		}
 
 		// Start transcode or remux pipeline as needed
@@ -283,7 +296,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			if (cacheState === 'invalid') {
 				// Old or broken cache — clear it so we can start fresh
 				this.logger.warn(
-					`Invalid cache detected for ${file.id}/${quality}, clearing and re-transcoding`,
+					`Invalid cache detected for ${this.guidResolver.resolve(file.id)}/${quality}, clearing and re-transcoding`,
 				);
 				await this.transcoderService.clearCache(file.id);
 				cacheState = 'empty';
@@ -292,7 +305,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			if (cacheState === 'complete') {
 				hasCached = true;
 				this.sessionDirs.set(sessionId, persistDir);
-				this.logger.log(`Using cached transcode for session=${sessionId}, file=${file.id}`);
+				this.logger.log(`Using cached transcode for session=${this.guidResolver.resolve(sessionId)}, file=${this.guidResolver.resolve(file.id)}`);
 			} else if (cacheState === 'partial') {
 				// Partial cache exists — check if chunk manager or monolithic is handling it
 				const hasChunkMeta = this.chunkManager.getChunkMap(file.id, quality);
@@ -308,7 +321,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 						this.sessionDirs.set(sessionId, persistDir);
 						hasCached = true;
 						this.logger.log(
-							`Using in-progress partial cache for session=${sessionId}, file=${file.id}`,
+							`Using in-progress partial cache for session=${this.guidResolver.resolve(sessionId)}, file=${this.guidResolver.resolve(file.id)}`,
 						);
 					}
 				}
@@ -422,7 +435,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		const resolvedDir =
 			this.sessionDirs.get(sessionId) || this.transcoderService.getSessionDir(sessionId);
 		this.logger.log(
-			`Stream started: session=${sessionId}, movie=${movieId}, file=${file.id}, mode=${mode}, quality=${quality}, segmentDir=${resolvedDir}`,
+			`Stream started: session=${this.guidResolver.resolve(sessionId)}, movie=${this.guidResolver.resolve(movieId)}, file=${this.guidResolver.resolve(file.id)}, mode=${mode}, quality=${quality}, segmentDir=${resolvedDir}`,
 		);
 
 		// Direct play and cached transcodes are ready immediately;
@@ -511,7 +524,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				// Point session at persistent dir (chunks are written there)
 				const persistDir = this.transcoderService.getPersistentDir(movieFile.id, quality);
 				this.sessionDirs.set(sessionId, persistDir);
-				this.logger.log(`Chunk-based seek for session ${sessionId} to ${positionSeconds}s`);
+				this.logger.log(`Chunk-based seek for session ${this.guidResolver.resolve(sessionId)} to ${positionSeconds}s`);
 				return;
 			}
 		}
@@ -543,7 +556,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			await this.transcoderService.startRemux(sessionId, movieFile.filePath, newDir);
 		}
 
-		this.logger.log(`Seek-restart session ${sessionId} from ${positionSeconds}s`);
+		this.logger.log(`Seek-restart session ${this.guidResolver.resolve(sessionId)} from ${positionSeconds}s`);
 	}
 
 	async updateProgress(sessionId: string, positionSeconds: number) {
@@ -665,7 +678,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		});
 
 		this.transcodeDebugger.endSession(sessionId, 'completed');
-		this.logger.log(`Stream ended: session=${sessionId}`);
+		this.logger.log(`Stream ended: session=${this.guidResolver.resolve(sessionId)}`);
 	}
 
 	async getActiveSessions() {
@@ -693,7 +706,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			try {
 				await this.endStream(session.id);
 			} catch (err: any) {
-				this.logger.warn(`Failed to end session ${session.id}: ${err.message}`);
+				this.logger.warn(`Failed to end session ${this.guidResolver.resolve(session.id)}: ${err.message}`);
 			}
 		}
 

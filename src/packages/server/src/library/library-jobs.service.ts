@@ -23,6 +23,7 @@ import { StreamService } from '../stream/stream.service.js';
 import { ChunkManagerService } from '../stream/transcoder/chunk-manager.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { LibraryService } from './library.service.js';
+import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { ScannerService } from './scanner.service.js';
 
 /** Well-known job types */
@@ -56,6 +57,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		private readonly streamService: StreamService,
 		private readonly database: DatabaseService,
 		private readonly chunkManager: ChunkManagerService,
+		private readonly guidResolver: GuidResolverService,
 	) {}
 
 	onModuleInit() {
@@ -462,6 +464,12 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				const isRecent = recentMovieIds.has(file.movieId);
 				const priority = isRecent ? 30 : 45;
 				const title = movieTitle || file.id.slice(0, 8);
+
+				// Warm the GUID resolver cache so downstream log lines show movie titles
+				if (movieTitle) {
+					this.guidResolver.warmup(file.movieId, movieTitle);
+					this.guidResolver.warmup(file.id, movieTitle);
+				}
 
 				if (
 					useChunked &&
