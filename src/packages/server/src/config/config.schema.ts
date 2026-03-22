@@ -10,16 +10,16 @@ export const configSchema = z.object({
 					origin: z.union([z.string(), z.array(z.string()), z.boolean()]).default(true),
 					credentials: z.boolean().default(true),
 				})
-				.default({}),
+				.default(() => ({}) as any),
 			rateLimit: z
 				.object({
 					max: z.coerce.number().int().positive().default(100),
 					windowMs: z.coerce.number().int().positive().default(60_000),
 				})
-				.default({}),
+				.default(() => ({}) as any),
 			logLevel: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 		})
-		.default({}),
+		.default(() => ({}) as any),
 
 	database: z
 		.object({
@@ -27,7 +27,7 @@ export const configSchema = z.object({
 			walMode: z.boolean().default(true),
 			busyTimeout: z.coerce.number().int().nonnegative().default(5000),
 		})
-		.default({}),
+		.default(() => ({}) as any),
 
 	cache: z
 		.object({
@@ -37,7 +37,7 @@ export const configSchema = z.object({
 			streamDir: z.string().default('./data/cache/streams'),
 			persistTranscodes: z.boolean().default(true),
 		})
-		.default({}),
+		.default(() => ({}) as any),
 
 	auth: z.object({
 		jwtSecret: z.string().min(32),
@@ -64,7 +64,7 @@ export const configSchema = z.object({
 				.default(['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.ts']),
 			watchForChanges: z.boolean().default(true),
 		})
-		.default({}),
+		.default(() => ({}) as any),
 
 	transcoding: z
 		.object({
@@ -95,7 +95,7 @@ export const configSchema = z.object({
 					},
 				}),
 		})
-		.default({}),
+		.default(() => ({}) as any),
 
 	thirdParty: z
 		.object({
@@ -105,20 +105,20 @@ export const configSchema = z.object({
 					baseUrl: z.string().url().default('https://api.themoviedb.org/3'),
 					language: z.string().default('en-US'),
 				})
-				.default({}),
+				.default(() => ({}) as any),
 			omdb: z
 				.object({
 					apiKey: z.string().default(''),
 					baseUrl: z.string().url().default('https://www.omdbapi.com'),
 				})
-				.default({}),
+				.default(() => ({}) as any),
 			opensubtitles: z
 				.object({
 					apiKey: z.string().default(''),
 				})
-				.default({}),
+				.default(() => ({}) as any),
 		})
-		.default({}),
+		.default(() => ({}) as any),
 
 	ratings: z
 		.object({
@@ -126,7 +126,7 @@ export const configSchema = z.object({
 			allowPublicAccess: z.boolean().default(false),
 			maxRating: z.coerce.number().int().positive().default(10),
 		})
-		.default({}),
+		.default(() => ({}) as any),
 
 	plugins: z
 		.object({
@@ -134,7 +134,7 @@ export const configSchema = z.object({
 			directory: z.string().default('./plugins'),
 			allowedPlugins: z.array(z.string()).default([]),
 		})
-		.default({}),
+		.default(() => ({}) as any),
 
 	dataDir: z.string().default('../../data'),
 });
