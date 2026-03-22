@@ -219,6 +219,15 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	 * Remove persistent cache for one file (all qualities) or all files.
 	 */
 	async clearCache(movieFileId?: string): Promise<void> {
+		// Clear health check cache for affected directories
+		if (movieFileId) {
+			for (const key of this.healthCache.keys()) {
+				if (key.includes(movieFileId)) this.healthCache.delete(key);
+			}
+		} else {
+			this.healthCache.clear();
+		}
+
 		const target = movieFileId
 			? path.join(this.cacheDir, 'persistent', movieFileId)
 			: path.join(this.cacheDir, 'persistent');
@@ -747,17 +756,25 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	): Promise<'complete' | 'partial' | 'invalid' | 'empty'> {
 		const dir = this.getPersistentDir(movieFileId, quality);
 
-		// Fast path: .complete marker exists — trust it
+		// Fast path: .complete marker exists — trust it (with codec health check)
 		try {
 			await access(path.join(dir, '.complete'));
 			// Quick sanity check: manifest exists
 			try {
 				await access(path.join(dir, 'stream.m3u8'));
-				return 'complete';
 			} catch {
 				// .complete but no manifest — invalid
 				return 'invalid';
 			}
+			// Verify first segment has valid codecs for browser playback
+			const healthy = await this.probeSegmentHealth(dir);
+			if (!healthy) {
+				this.logger.warn(
+					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} has codec issues — marking invalid for re-encode`,
+				);
+				return 'invalid';
+			}
+			return 'complete';
 		} catch {
 			// No .complete marker
 		}
@@ -796,6 +813,76 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 
 		// Old-format partial cache — check if it has enough segments to be useful
 		return segments.length >= 3 ? 'partial' : 'invalid';
+	}
+
+	/**
+	 * Probe the first segment in a cache directory to verify codecs are valid
+	 * for browser playback. Catches issues like 5.1 AAC (channels detection
+	 * fails in HLS.js), wrong video codec, or corrupt segments.
+	 * Results are cached in-memory to avoid repeated FFprobe calls.
+	 */
+	private readonly healthCache = new Map<string, boolean>();
+
+	private async probeSegmentHealth(cacheDir: string): Promise<boolean> {
+		// Check in-memory cache first
+		const cached = this.healthCache.get(cacheDir);
+		if (cached !== undefined) return cached;
+
+		const segmentPath = path.join(cacheDir, 'segment_0000.ts');
+		try {
+			await access(segmentPath);
+		} catch {
+			// No first segment — can't validate, assume OK (will fail elsewhere)
+			return true;
+		}
+
+		try {
+			const { execSync } = await import('node:child_process');
+			const cmd = `ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,channels -of json "${segmentPath}"`;
+			const out = JSON.parse(execSync(cmd, { encoding: 'utf-8', timeout: 10000 }));
+			const audioStream = (out.streams || [])[0];
+
+			if (audioStream) {
+				// Check for zero channels (causes HLS.js SourceBuffer errors)
+				if (audioStream.channels === 0) {
+					this.logger.warn(
+						`Segment health check failed: audio has 0 channels in ${cacheDir}`,
+					);
+					this.healthCache.set(cacheDir, false);
+					return false;
+				}
+				// Check for non-stereo AAC that browsers may not handle in HLS
+				if (
+					audioStream.codec_name === 'aac' &&
+					audioStream.channels > 2
+				) {
+					this.logger.warn(
+						`Segment health check: ${audioStream.channels}-channel AAC detected in ${cacheDir} — re-encode to stereo`,
+					);
+					this.healthCache.set(cacheDir, false);
+					return false;
+				}
+			}
+
+			// Check video codec
+			const vidCmd = `ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "${segmentPath}"`;
+			const videoCodec = execSync(vidCmd, { encoding: 'utf-8', timeout: 10000 }).trim();
+			if (videoCodec && videoCodec !== 'h264') {
+				this.logger.warn(
+					`Segment health check: unexpected video codec "${videoCodec}" in ${cacheDir}`,
+				);
+				this.healthCache.set(cacheDir, false);
+				return false;
+			}
+
+			this.healthCache.set(cacheDir, true);
+			return true;
+		} catch (err: any) {
+			this.logger.warn(`Segment health probe failed for ${cacheDir}: ${err.message}`);
+			// Probe failure — don't block playback, assume OK
+			this.healthCache.set(cacheDir, true);
+			return true;
+		}
 	}
 
 	/**
