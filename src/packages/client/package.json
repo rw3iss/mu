@@ -12,16 +12,16 @@
     "clean": "node -e \"const fs=require('fs');try{fs.rmSync('dist',{recursive:true,force:true})}catch{}\""
   },
   "dependencies": {
-    "preact": "^10.25.0",
-    "@preact/signals": "^2.0.0",
-    "preact-router": "^4.1.0",
+    "@mu/shared": "workspace:*",
+    "@preact/signals": "^2.8.2",
     "hls.js": "^1.5.0",
-    "@mu/shared": "workspace:*"
+    "preact": "^10.29.0",
+    "preact-router": "^4.1.0"
   },
   "devDependencies": {
-    "@preact/preset-vite": "^2.9.0",
-    "vite": "^6.0.0",
-    "sass": "^1.80.0",
-    "typescript": "^5.7.0"
+    "@preact/preset-vite": "^2.10.5",
+    "sass": "^1.98.0",
+    "typescript": "^5.7.0",
+    "vite": "^8.0.1"
   }
 }
