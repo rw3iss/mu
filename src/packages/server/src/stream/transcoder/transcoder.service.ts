@@ -1151,7 +1151,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	 * NVIDIA DLL loading failures (0xC0000142) in non-interactive sessions.
 	 */
 	private createFfmpegCommand(filePath: string): ReturnType<typeof ffmpeg> {
-		const command = this.createFfmpegCommand(filePath);
+		const command = ffmpeg(filePath);
 		if (process.platform === 'win32') {
 			command.inputOptions(['-hwaccel', 'none']);
 		}
