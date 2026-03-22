@@ -317,7 +317,11 @@ export class SubtitleService {
 
 		// Fallback to ffmpeg for other formats (ASS, SSA, SUB, etc.)
 		return new Promise((resolve, reject) => {
-			ffmpeg(inputPath)
+			const command = ffmpeg(inputPath);
+			if (process.platform === 'win32') {
+				command.inputOptions(['-hwaccel', 'none']);
+			}
+			command
 				.outputOptions(['-c:s', 'webvtt'])
 				.output(outputPath)
 				.on('error', (err: Error) => reject(err))
@@ -365,7 +369,11 @@ export class SubtitleService {
 		outputPath: string,
 	): Promise<void> {
 		return new Promise((resolve, reject) => {
-			ffmpeg(inputPath)
+			const command = ffmpeg(inputPath);
+			if (process.platform === 'win32') {
+				command.inputOptions(['-hwaccel', 'none']);
+			}
+			command
 				.outputOptions(['-map', `0:${streamIndex}`, '-c:s', 'webvtt'])
 				.output(outputPath)
 				.on('error', (err: Error) => reject(err))

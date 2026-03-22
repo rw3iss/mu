@@ -310,7 +310,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			// Use scale filter instead of .size() to preserve aspect ratio
 			const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
 
-			let command = ffmpeg(filePath);
+			let command = this.createFfmpegCommand(filePath);
 
 			// Seek to start position if specified (input-level -ss for fast seek)
 			if (options.seekSeconds && options.seekSeconds > 0) {
@@ -482,7 +482,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const segDuration = String(enc.segmentDuration);
 
 		return new Promise<void>((resolve, reject) => {
-			const command = ffmpeg(filePath)
+			const command = this.createFfmpegCommand(filePath)
 				.outputOptions([
 					'-f',
 					'hls',
@@ -587,7 +587,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const segDuration = String(enc.segmentDuration);
 
 		return new Promise<void>((resolve, reject) => {
-			let command = ffmpeg(filePath).outputOptions([
+			let command = this.createFfmpegCommand(filePath).outputOptions([
 				'-f',
 				'hls',
 				'-hls_time',
@@ -925,7 +925,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					? ['-crf', String(enc.crf)]
 					: ['-b:v', profile.videoBitrate];
 
-			let command = ffmpeg(filePath)
+			let command = this.createFfmpegCommand(filePath)
 				.outputOptions([
 					'-f',
 					'hls',
@@ -1038,7 +1038,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const processKey = `pre-${movieFileId}-${quality}`;
 
 		return new Promise<void>((resolve, reject) => {
-			const command = ffmpeg(filePath)
+			const command = this.createFfmpegCommand(filePath)
 				.outputOptions([
 					'-f',
 					'hls',
@@ -1145,6 +1145,19 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		return this.ffmpegSpawnBroken;
 	}
 
+	/**
+	 * Create an FFmpeg command with base input options.
+	 * On Windows, explicitly disables hardware decoding to prevent
+	 * NVIDIA DLL loading failures (0xC0000142) in non-interactive sessions.
+	 */
+	private createFfmpegCommand(filePath: string): ReturnType<typeof ffmpeg> {
+		const command = this.createFfmpegCommand(filePath);
+		if (process.platform === 'win32') {
+			command.inputOptions(['-hwaccel', 'none']);
+		}
+		return command;
+	}
+
 	private getEncodingSettings() {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const configuredHwAccel = enc?.hwAccel || 'none';
@@ -1195,7 +1208,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const processKey = `chunk-${path.basename(outputPath, '.ts')}`;
 
 		return new Promise<void>((resolve, reject) => {
-			let command = ffmpeg(filePath)
+			let command = this.createFfmpegCommand(filePath)
 				.inputOptions(['-ss', String(startTime)])
 				.outputOptions([
 					'-t',

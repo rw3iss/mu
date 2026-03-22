@@ -221,7 +221,11 @@ export class ThumbnailService {
 		seekSeconds: number,
 	): Promise<void> {
 		return new Promise((resolve, reject) => {
-			ffmpeg(inputPath)
+			const command = ffmpeg(inputPath);
+			if (process.platform === 'win32') {
+				command.inputOptions(['-hwaccel', 'none']);
+			}
+			command
 				.seekInput(seekSeconds)
 				.frames(1)
 				.outputOptions(['-vf', `scale=${this.maxWidth}:-2`, '-q:v', '2'])
