@@ -281,18 +281,7 @@ export function GlobalPlayer() {
 			const wrapper = videoWrapperRef.current;
 			const video = engine.videoRef.current;
 			if (!wrapper.contains(video)) {
-				// Moving the video element between DOM parents pauses it —
-				// preserve and restore the play state after the browser processes the move
-				const wasPlaying = !video.paused;
 				wrapper.insertBefore(video, wrapper.firstChild);
-				if (wasPlaying) {
-					// Browser pauses asynchronously after DOM move — wait a frame then restore
-					requestAnimationFrame(() => {
-						if (video.paused) {
-							video.play().catch(() => {});
-						}
-					});
-				}
 			}
 
 			// Click to toggle play, double-click for fullscreen.
@@ -606,43 +595,48 @@ export function GlobalPlayer() {
 	// In full mode, the bar fades with controls; in mini/split mode, always visible
 	const barVisible = isMini || isSplit || showControls.value;
 
-	if (isSplit) {
-		return (
-			<div class={styles.splitPanel} style={{ width: `${splitWidth.value}vw` }}>
-				{/* Drag handle on left edge */}
-				<div
-					class={styles.splitDragHandle}
-					onMouseDown={(e: MouseEvent) => {
-						e.preventDefault();
-						const startX = e.clientX;
-						const startWidth = splitWidth.value;
-						const onMove = (ev: MouseEvent) => {
-							const delta = startX - ev.clientX;
-							const newWidth = Math.min(
-								75,
-								Math.max(
-									25,
-									startWidth + (delta / window.innerWidth) * 100,
-								),
-							);
-							setSplitWidth(Math.round(newWidth));
-						};
-						const onUp = () => {
-							document.removeEventListener('mousemove', onMove);
-							document.removeEventListener('mouseup', onUp);
-						};
-						document.addEventListener('mousemove', onMove);
-						document.addEventListener('mouseup', onUp);
-					}}
-				/>
+	// Calculate split video height for positioning content below it
+	const splitVideoHeight = isSplit
+		? `calc(${splitWidth.value}vw * 9 / 16)`
+		: '0px';
 
-				{/* Video area with overlaid top bar */}
-				<div class={styles.splitVideoArea}>
+	return (
+		<>
+			{/* Split mode panel — everything except the video (which stays in the shared wrapper) */}
+			{isSplit && (
+				<div class={styles.splitPanel} style={{ width: `${splitWidth.value}vw` }}>
+					{/* Drag handle on left edge */}
+					<div
+						class={styles.splitDragHandle}
+						onMouseDown={(e: MouseEvent) => {
+							e.preventDefault();
+							const startX = e.clientX;
+							const startWidth = splitWidth.value;
+							const onMove = (ev: MouseEvent) => {
+								const delta = startX - ev.clientX;
+								const newWidth = Math.min(
+									75,
+									Math.max(
+										25,
+										startWidth + (delta / window.innerWidth) * 100,
+									),
+								);
+								setSplitWidth(Math.round(newWidth));
+							};
+							const onUp = () => {
+								document.removeEventListener('mousemove', onMove);
+								document.removeEventListener('mouseup', onUp);
+							};
+							document.addEventListener('mousemove', onMove);
+							document.addEventListener('mouseup', onUp);
+						}}
+					/>
+
+					{/* Top bar — overlays the video area */}
 					<div class={styles.splitTopBar}>
 						<button
 							class={styles.splitTopBtn}
-							onMouseDown={(e: Event) => e.stopPropagation()}
-							onClick={(e: Event) => { e.stopPropagation(); minimizePlayer(); }}
+							onClick={() => minimizePlayer()}
 							title="Minimize"
 						>
 							<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -651,8 +645,7 @@ export function GlobalPlayer() {
 						</button>
 						<button
 							class={styles.splitTopBtn}
-							onMouseDown={(e: Event) => e.stopPropagation()}
-							onClick={(e: Event) => { e.stopPropagation(); maximizePlayer(); }}
+							onClick={() => maximizePlayer()}
 							title="Full screen"
 						>
 							<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -665,8 +658,7 @@ export function GlobalPlayer() {
 						<div style={{ flex: 1 }} />
 						<button
 							class={styles.splitTopBtn}
-							onMouseDown={(e: Event) => e.stopPropagation()}
-							onClick={(e: Event) => { e.stopPropagation(); closePlayer(); }}
+							onClick={() => closePlayer()}
 							title="Close"
 						>
 							<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -675,58 +667,57 @@ export function GlobalPlayer() {
 							</svg>
 						</button>
 					</div>
-					<div ref={videoWrapperRef} class={styles.splitVideoInner} />
-				</div>
 
-				{/* Title + time row */}
-				<div class={styles.splitTitleRow}>
-					<span class={styles.splitTitle}>{movie?.title ?? ''}</span>
-					<span class={styles.splitTime}>
-						{formatTimeSplit(currentTime.value)} /{' '}
-						{formatTimeSplit(duration.value)}
-					</span>
-				</div>
+					{/* Spacer for video area (video is positioned fixed via the shared wrapper) */}
+					<div style={{ height: splitVideoHeight, flexShrink: 0 }} />
 
-				{/* Seek bar + controls */}
-				<div class={styles.splitSeekArea}>
-					<PlayerControls
-						visible
-						isSplit
-						onTogglePlay={engine.togglePlay}
-						onSeek={engine.seek}
-						onToggleFullscreen={handleToggleFullscreen}
-						onToggleInfo={handleToggleInfo}
-						session={currentSession.value}
-						title={movie?.title}
-					/>
-				</div>
+					{/* Title + time row */}
+					<div class={styles.splitTitleRow}>
+						<span class={styles.splitTitle}>{movie?.title ?? ''}</span>
+						<span class={styles.splitTime}>
+							{formatTimeSplit(currentTime.value)} /{' '}
+							{formatTimeSplit(duration.value)}
+						</span>
+					</div>
 
-				{/* Movie info — inline, no flyout */}
-				<div class={styles.splitInfoArea}>
-					{movie && (
-						<InfoPanel
-							movie={movie}
+					{/* Seek bar + controls */}
+					<div class={styles.splitSeekArea}>
+						<PlayerControls
 							visible
-							onClose={() => {}}
-							inline
+							isSplit
+							onTogglePlay={engine.togglePlay}
+							onSeek={engine.seek}
+							onToggleFullscreen={handleToggleFullscreen}
+							onToggleInfo={handleToggleInfo}
+							session={currentSession.value}
+							title={movie?.title}
 						/>
-					)}
+					</div>
+
+					{/* Movie info — inline, no flyout */}
+					<div class={styles.splitInfoArea}>
+						{movie && (
+							<InfoPanel
+								movie={movie}
+								visible
+								onClose={() => {}}
+								inline
+							/>
+						)}
+					</div>
+
+					{/* Effects panel */}
+					<EffectsPanel />
 				</div>
+			)}
 
-				{/* Effects panel */}
-				<EffectsPanel />
-			</div>
-		);
-	}
-
-	return (
-		<>
-			{/* Persistent video wrapper — stays in DOM, CSS transitions between full/mini */}
+			{/* Persistent video wrapper — stays in DOM, CSS repositions between full/mini/split */}
 			<div
 				ref={videoWrapperRef}
-				class={`${styles.videoWrapper} ${isMini ? styles.videoWrapperMini : styles.videoWrapperFull} ${!isMini && !showControls.value ? styles.hideCursor : ''}`}
+				class={`${styles.videoWrapper} ${isSplit ? styles.videoWrapperSplit : isMini ? styles.videoWrapperMini : styles.videoWrapperFull} ${!isMini && !isSplit && !showControls.value ? styles.hideCursor : ''}`}
+				style={isSplit ? { width: `${splitWidth.value}vw` } : undefined}
 				onClick={isMini ? maximizePlayer : undefined}
-				onMouseMove={!isMini ? resetControlsTimer : undefined}
+				onMouseMove={!isMini && !isSplit ? resetControlsTimer : undefined}
 			>
 				{isMini && (
 					<>
