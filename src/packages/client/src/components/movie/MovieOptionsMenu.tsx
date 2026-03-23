@@ -25,6 +25,7 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 	const [deleteFolder, setDeleteFolder] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [deleteSuccess, setDeleteSuccess] = useState(false);
+	const [filePath, setFilePath] = useState<string | null>(movie.fileInfo?.filePath ?? null);
 	const menuRef = useRef<HTMLDivElement>(null);
 
 	// Close on outside click + raise parent card z-index while open
@@ -293,6 +294,14 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 							e.stopPropagation();
 							setDeleteFolder(false);
 							setShowDeleteModal(true);
+							// Fetch file info if not available (e.g. from movie cards)
+							if (!filePath) {
+								moviesService.get(movie.id).then((full) => {
+									if (full?.fileInfo?.filePath) {
+										setFilePath(full.fileInfo.filePath);
+									}
+								}).catch(() => {});
+							}
 						}}
 					>
 						<span class={styles.menuIcon}>{'\u{1F5D1}'}</span>
@@ -341,7 +350,7 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 								/>
 								Delete file and enclosing folder
 								{(() => {
-									const fp = movie.fileInfo?.filePath;
+									const fp = filePath;
 									if (!fp) return null;
 									// Extract parent folder name from path (handle both / and \)
 									const parts = fp.replace(/\\/g, '/').split('/');
