@@ -613,11 +613,20 @@ export function GlobalPlayer() {
 
 				{/* Video area with overlaid top bar */}
 				<div class={styles.splitVideoArea}>
-					<div ref={videoWrapperRef} class={styles.splitVideoInner} />
 					<div
 						class={styles.splitTopBar}
-						onMouseDown={(e: Event) => e.stopPropagation()}
-						onClick={(e: Event) => e.stopPropagation()}
+						ref={(el: HTMLDivElement | null) => {
+							if (!el) return;
+							// Use native capture-phase listeners to intercept clicks
+							// BEFORE they reach the video element's native handlers
+							const stop = (e: Event) => { e.stopPropagation(); };
+							el.removeEventListener('click', stop, true);
+							el.removeEventListener('mousedown', stop, true);
+							el.removeEventListener('dblclick', stop, true);
+							el.addEventListener('click', stop, true);
+							el.addEventListener('mousedown', stop, true);
+							el.addEventListener('dblclick', stop, true);
+						}}
 					>
 						<button
 							class={styles.splitTopBtn}
@@ -652,6 +661,7 @@ export function GlobalPlayer() {
 							</svg>
 						</button>
 					</div>
+					<div ref={videoWrapperRef} class={styles.splitVideoInner} />
 				</div>
 
 				{/* Title + time row */}

@@ -302,7 +302,7 @@
 	height: 36px;
 	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
 	z-index: 3;
-	pointer-events: none; // let clicks pass through to video EXCEPT on buttons
+	pointer-events: auto;
 	padding: 0;
 	gap: 0;
 }
@@ -322,7 +322,6 @@
 	justify-content: center;
 	opacity: 0.7;
 	transition: opacity 0.15s, background 0.15s;
-	pointer-events: auto; // re-enable clicks on buttons
 
 	&:hover {
 		opacity: 1;
