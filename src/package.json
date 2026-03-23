@@ -32,7 +32,10 @@
     "settings": "node scripts/settings.js",
     "fix:ffmpeg": "bash scripts/fix-ffmpeg.sh",
     "logs": "bash scripts/logs.sh",
-    "logs:prod": "bash scripts/logs-prod.sh"
+    "logs:prod": "bash scripts/logs-prod.sh",
+    "setup:service": "bash scripts/setup-service.sh",
+    "uninstall": "bash scripts/uninstall.sh",
+    "update": "bash scripts/update.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.8",
