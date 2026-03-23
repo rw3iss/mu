@@ -36,9 +36,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	private readonly swFallbackAttempted = new Set<string>();
 	/** If true, hardware encoding has failed and all encodes should use software */
 	private hwAccelBroken = false;
-	/** If true, FFmpeg itself cannot spawn (Windows DLL init failure) — skip all encodes */
+	/** If true, FFmpeg itself cannot spawn (Windows DLL init failure) — skip background encodes */
 	private ffmpegSpawnBroken = false;
 	private ffmpegSpawnBrokenUntil = 0;
+	private ffmpegSpawnFailCount = 0;
 	private readonly cacheDir: string;
 
 	constructor(
@@ -394,6 +395,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			command
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
+					this.resetFfmpegSpawnFailCount();
 					this.logger.log(
 						`FFmpeg started for session ${this.guidResolver.resolve(sessionId)}, outputDir=${targetDir}`,
 					);
@@ -674,6 +676,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			command
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
+					this.resetFfmpegSpawnFailCount();
 					this.logger.log(`Pre-transcode started for ${this.guidResolver.resolve(movieFileId)}: ${commandLine}`);
 					this.transcodeDebugger.recordFFmpegCommand(processKey, commandLine);
 					this.transcodeDebugger.recordMilestone(processKey, 'ffmpegSpawned');
@@ -1223,23 +1226,37 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private markFfmpegSpawnBroken(): void {
+		this.ffmpegSpawnFailCount++;
+		// Only pause after 3+ consecutive failures (transient issues are common)
+		if (this.ffmpegSpawnFailCount < 3) {
+			this.logger.warn(
+				`FFmpeg spawn failure (${this.ffmpegSpawnFailCount}/3) — will retry on next request`,
+			);
+			return;
+		}
 		if (this.ffmpegSpawnBroken) return;
 		this.ffmpegSpawnBroken = true;
-		// Auto-recover after 60 seconds — the handle table may have freed up
-		this.ffmpegSpawnBrokenUntil = Date.now() + 60_000;
+		this.ffmpegSpawnBrokenUntil = Date.now() + 15_000;
 		this.logger.warn(
-			'FFmpeg spawn failure (Windows DLL init) — pausing all encoding for 60s',
+			'FFmpeg spawn failed 3+ times — pausing background encoding for 15s',
 		);
 		setTimeout(() => {
 			this.ffmpegSpawnBroken = false;
+			this.ffmpegSpawnFailCount = 0;
 			this.logger.log('FFmpeg spawn cooldown expired — encoding re-enabled');
-		}, 60_000);
+		}, 15_000);
 	}
 
-	/** Returns true if FFmpeg spawns are temporarily disabled */
+	/** Reset spawn failure counter on successful FFmpeg start */
+	private resetFfmpegSpawnFailCount(): void {
+		this.ffmpegSpawnFailCount = 0;
+	}
+
+	/** Returns true if FFmpeg spawns are temporarily disabled (background only) */
 	isFfmpegSpawnBroken(): boolean {
 		if (this.ffmpegSpawnBroken && Date.now() > this.ffmpegSpawnBrokenUntil) {
 			this.ffmpegSpawnBroken = false;
+			this.ffmpegSpawnFailCount = 0;
 		}
 		return this.ffmpegSpawnBroken;
 	}
@@ -1362,6 +1379,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			command
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
+					this.resetFfmpegSpawnFailCount();
 					this.logger.debug(`Chunk encode started: ${path.basename(outputPath)}`);
 					this.transcodeDebugger.recordFFmpegCommand(processKey, commandLine);
 				})
