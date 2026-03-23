@@ -13,15 +13,13 @@ INFO: ssh rw3iss@192.168.50.211
 - group, see related movies in library or set (ie. series):
 	- be smart... metadata if exists, otherwise strategies for filename/folder association.
 
-- "Clean files" admin feature: rename all movie files to something standardized (enter a formatter), option to put movies in enclosing folder if they are not, put subtitles in subfolder, option to group series, etc.
-"Cleanup Files"
-
-- when updating metadata, set the title.
+- Admin cleanup utilites:
+	- Rename Folders and Files: rename all movie files to something standardized (enter a formatter), option to put movies in enclosing folder if they are not, put subtitles in subfolder, option to group series, etc.
+	- Delete movie containing folders with no files > XMB.
+	- "Trim Cache": scale back cache: delete cached movies that haven't been played in X days (or delete X% of the space, starting with the oldest items).
 
 - set default subtitle language (to help subtitles, etc).
 - set interface language: to translations.
-
-- Timer/stop playing feature: player settings
 
 - Export/backup feature
 	- restore and index so user can just 'restore backup' for metadata, reviews, etc. (just clone .db?)

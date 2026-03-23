@@ -1389,6 +1389,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					'mpegts',
 					'-force_key_frames',
 					'expr:eq(t,0)',
+					'-output_ts_offset',
+					String(startTime),
 				])
 				.videoCodec(videoCodec)
 				.audioCodec('aac')
