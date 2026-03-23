@@ -203,10 +203,10 @@
 }
 
 .videoWrapperSplit {
-  // Top-right corner, offset below the split top bar
+  // Top-right corner, below site header + split top bar
   // Must explicitly reset inset from videoWrapperFull
   inset: auto;
-  top: var(--split-top-bar-height, 24px);
+  top: calc(var(--topbar-height, 56px) + var(--split-top-bar-height, 32px));
   right: 0;
   bottom: auto;
   left: auto;
@@ -283,10 +283,12 @@
 // ============================================
 
 .splitPanel {
+	--split-top-bar-height: 32px;
+
 	position: fixed;
-	top: 0;
+	top: var(--topbar-height, 56px);
 	right: 0;
-	height: 100vh;
+	height: calc(100vh - var(--topbar-height, 56px));
 	background: var(--color-bg, #0a0a0a);
 	// Below the video wrapper so video renders on top
 	z-index: var(--z-player-controls, 900);
@@ -315,7 +317,7 @@
 .splitTopBar {
 	display: flex;
 	align-items: stretch;
-	height: var(--split-top-bar-height, 24px);
+	height: var(--split-top-bar-height, 32px);
 	background: rgba(0, 0, 0, 0.7);
 	flex-shrink: 0;
 	padding: 0;
@@ -327,8 +329,8 @@
 	border: none;
 	color: white;
 	cursor: pointer;
-	width: var(--split-top-bar-height, 24px);
-	height: var(--split-top-bar-height, 24px);
+	width: var(--split-top-bar-height, 32px);
+	height: var(--split-top-bar-height, 32px);
 	padding: 0;
 	margin: 0;
 	border-radius: 0;

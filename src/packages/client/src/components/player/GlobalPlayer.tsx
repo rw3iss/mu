@@ -595,8 +595,9 @@ export function GlobalPlayer() {
 	// In full mode, the bar fades with controls; in mini/split mode, always visible
 	const barVisible = isMini || isSplit || showControls.value;
 
-	// Calculate split content offset: top bar (24px) + video (aspect ratio)
-	const SPLIT_TOP_BAR_HEIGHT = 24;
+	// Calculate split content offset: top bar (32px) + video (aspect ratio)
+	// The site header offset is handled by CSS (panel top: var(--topbar-height))
+	const SPLIT_TOP_BAR_HEIGHT = 32;
 	const splitVideoHeight = isSplit
 		? `calc(${SPLIT_TOP_BAR_HEIGHT}px + ${splitWidth.value}vw * 9 / 16)`
 		: '0px';
@@ -640,7 +641,7 @@ export function GlobalPlayer() {
 							onClick={() => minimizePlayer()}
 							title="Minimize"
 						>
-							<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+							<svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
 								<polyline points="6 9 12 15 18 9" />
 							</svg>
 						</button>
@@ -649,7 +650,7 @@ export function GlobalPlayer() {
 							onClick={() => maximizePlayer()}
 							title="Full screen"
 						>
-							<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+							<svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
 								<polyline points="15 3 21 3 21 9" />
 								<polyline points="9 21 3 21 3 15" />
 								<line x1="21" y1="3" x2="14" y2="10" />
@@ -662,7 +663,7 @@ export function GlobalPlayer() {
 							onClick={() => closePlayer()}
 							title="Close"
 						>
-							<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+							<svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
 								<line x1="18" y1="6" x2="6" y2="18" />
 								<line x1="6" y1="6" x2="18" y2="18" />
 							</svg>
