@@ -340,6 +340,28 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 									onChange={() => setDeleteFolder(true)}
 								/>
 								Delete file and enclosing folder
+								{(() => {
+									const fp = movie.fileInfo?.filePath;
+									if (!fp) return null;
+									// Extract parent folder name from path (handle both / and \)
+									const parts = fp.replace(/\\/g, '/').split('/');
+									const folderName = parts.length >= 2 ? parts[parts.length - 2] : null;
+									if (!folderName) return null;
+									return (
+										<span
+											style={{
+												display: 'block',
+												fontSize: '0.8em',
+												opacity: 0.6,
+												marginTop: '0.2rem',
+												marginLeft: '1.5rem',
+												wordBreak: 'break-all',
+											}}
+										>
+											({folderName})
+										</span>
+									);
+								})()}
 							</label>
 							<div class={styles.deleteActions}>
 								<Button
