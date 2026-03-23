@@ -203,17 +203,18 @@
 }
 
 .videoWrapperSplit {
-  // Top-right corner, sized to the split panel width
+  // Top-right corner, offset below the split top bar
   // Must explicitly reset inset from videoWrapperFull
   inset: auto;
-  top: 0;
+  top: var(--split-top-bar-height, 24px);
   right: 0;
   bottom: auto;
   left: auto;
   // width set via inline style (splitWidth vw)
   aspect-ratio: 16 / 9;
   height: auto;
-  z-index: calc(var(--z-player-controls) + 1);
+  // Above the split panel so video renders on top
+  z-index: calc(var(--z-player-controls, 900) + 2);
 
   video {
     object-fit: contain;
@@ -287,8 +288,8 @@
 	right: 0;
 	height: 100vh;
 	background: var(--color-bg, #0a0a0a);
-	// Must be above the video wrapper (z-player-controls + 1)
-	z-index: calc(var(--z-player-controls, 900) + 2);
+	// Below the video wrapper so video renders on top
+	z-index: var(--z-player-controls, 900);
 	display: flex;
 	flex-direction: column;
 	border-left: 1px solid rgba(255, 255, 255, 0.1);
@@ -312,15 +313,11 @@
 }
 
 .splitTopBar {
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
 	display: flex;
 	align-items: stretch;
-	height: 36px;
-	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
-	z-index: 5;
+	height: var(--split-top-bar-height, 24px);
+	background: rgba(0, 0, 0, 0.7);
+	flex-shrink: 0;
 	padding: 0;
 	gap: 0;
 }
@@ -330,8 +327,8 @@
 	border: none;
 	color: white;
 	cursor: pointer;
-	width: 36px;
-	height: 36px;
+	width: var(--split-top-bar-height, 24px);
+	height: var(--split-top-bar-height, 24px);
 	padding: 0;
 	margin: 0;
 	border-radius: 0;
