@@ -281,7 +281,13 @@ export function GlobalPlayer() {
 			const wrapper = videoWrapperRef.current;
 			const video = engine.videoRef.current;
 			if (!wrapper.contains(video)) {
+				// Moving the video element between DOM parents pauses it —
+				// preserve and restore the play state
+				const wasPlaying = !video.paused;
 				wrapper.insertBefore(video, wrapper.firstChild);
+				if (wasPlaying && video.paused) {
+					video.play().catch(() => {});
+				}
 			}
 
 			// Click to toggle play, double-click for fullscreen.
@@ -499,25 +505,31 @@ export function GlobalPlayer() {
 				await document.exitFullscreen();
 				// Restore previous mode (handled by fullscreenchange listener below)
 			} else {
-				// Remember current mode before switching to full
+				// Remember current mode and play state before switching to full
 				preFullscreenModeRef.current = playerMode.value;
+				const wasPlaying = !engine.videoRef.current?.paused;
 				// Switch to full mode so the full-screen overlay renders correctly
 				if (playerMode.value !== 'full') {
 					maximizePlayer();
 				}
 				await document.documentElement.requestFullscreen();
 				isFullscreen.value = true;
+				// Restore play state after mode switch (moving video element can pause it)
+				if (wasPlaying && engine.videoRef.current?.paused) {
+					engine.videoRef.current.play().catch(() => {});
+				}
 			}
 		} catch (error) {
 			console.error('Fullscreen error:', error);
 		}
-	}, []);
+	}, [engine]);
 
-	// Restore previous mode when exiting fullscreen
+	// Restore previous mode when exiting fullscreen, preserving play state
 	useEffect(() => {
 		const handleFullscreenChange = () => {
 			if (!document.fullscreenElement) {
 				isFullscreen.value = false;
+				const wasPlaying = !engine.videoRef.current?.paused;
 				// Restore the mode the user was in before entering fullscreen
 				const prev = preFullscreenModeRef.current;
 				if (prev && prev !== 'full' && prev !== 'hidden') {
@@ -525,13 +537,21 @@ export function GlobalPlayer() {
 					else if (prev === 'mini') minimizePlayer();
 				}
 				preFullscreenModeRef.current = null;
+				// Restore play state after mode switch
+				if (wasPlaying) {
+					requestAnimationFrame(() => {
+						if (engine.videoRef.current?.paused) {
+							engine.videoRef.current.play().catch(() => {});
+						}
+					});
+				}
 			} else {
 				isFullscreen.value = true;
 			}
 		};
 		document.addEventListener('fullscreenchange', handleFullscreenChange);
 		return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-	}, []);
+	}, [engine]);
 
 	// Info panel toggle
 	const handleToggleInfo = useCallback(() => {
@@ -613,24 +633,11 @@ export function GlobalPlayer() {
 
 				{/* Video area with overlaid top bar */}
 				<div class={styles.splitVideoArea}>
-					<div
-						class={styles.splitTopBar}
-						ref={(el: HTMLDivElement | null) => {
-							if (!el) return;
-							// Use native capture-phase listeners to intercept clicks
-							// BEFORE they reach the video element's native handlers
-							const stop = (e: Event) => { e.stopPropagation(); };
-							el.removeEventListener('click', stop, true);
-							el.removeEventListener('mousedown', stop, true);
-							el.removeEventListener('dblclick', stop, true);
-							el.addEventListener('click', stop, true);
-							el.addEventListener('mousedown', stop, true);
-							el.addEventListener('dblclick', stop, true);
-						}}
-					>
+					<div class={styles.splitTopBar}>
 						<button
 							class={styles.splitTopBtn}
-							onClick={() => minimizePlayer()}
+							onMouseDown={(e: Event) => e.stopPropagation()}
+							onClick={(e: Event) => { e.stopPropagation(); minimizePlayer(); }}
 							title="Minimize"
 						>
 							<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -639,7 +646,8 @@ export function GlobalPlayer() {
 						</button>
 						<button
 							class={styles.splitTopBtn}
-							onClick={() => maximizePlayer()}
+							onMouseDown={(e: Event) => e.stopPropagation()}
+							onClick={(e: Event) => { e.stopPropagation(); maximizePlayer(); }}
 							title="Full screen"
 						>
 							<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -652,7 +660,8 @@ export function GlobalPlayer() {
 						<div style={{ flex: 1 }} />
 						<button
 							class={styles.splitTopBtn}
-							onClick={() => closePlayer()}
+							onMouseDown={(e: Event) => e.stopPropagation()}
+							onClick={(e: Event) => { e.stopPropagation(); closePlayer(); }}
 							title="Close"
 						>
 							<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
