@@ -67,6 +67,11 @@
   }
 }
 
+.withSplitPlayer {
+	transition: max-width 0.05s ease-out;
+	overflow-x: hidden;
+}
+
 // Light theme adjustments for the radial effect
 :global([data-theme='light']) {
   .main::before {

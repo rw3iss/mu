@@ -44,6 +44,8 @@ interface PlayerControlsProps {
 	hasMiniThumbnail?: boolean;
 	/** Element rendered to the left of the controls row, below the seek bar */
 	leftSlot?: VNode | null;
+	/** When true, renders in compact split-panel layout */
+	isSplit?: boolean;
 }
 
 function SubtitleSettingsCollapsible() {
@@ -94,6 +96,7 @@ export function PlayerControls({
 	title,
 	hasMiniThumbnail,
 	leftSlot,
+	isSplit,
 }: PlayerControlsProps) {
 	const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 	const [settingsPanel, setSettingsPanel] = useState<
@@ -386,34 +389,36 @@ export function PlayerControls({
 			<div class={styles.contentRow}>
 				{leftSlot}
 				<div class={styles.mainRow}>
-					{/* Left: title + timing */}
-					<div class={styles.leftSection}>
-						{title && globalMovieId.value && (
-							<a
-								href={`/movie/${globalMovieId.value}`}
-								class={styles.titleText}
-								onClick={(e) => {
-									e.preventDefault();
-									if (playerMode.value !== 'mini') {
-										minimizePlayer();
-									}
-									route(`/movie/${globalMovieId.value}`);
-								}}
-							>
-								{title}
-							</a>
-						)}
-						<span class={styles.timingLabel}>
-							{formatTime(currentTime.value)} / {formatTime(duration.value)}
-						</span>
-					</div>
+					{/* Left: title + timing (hidden in split mode — shown above) */}
+					{!isSplit && (
+						<div class={styles.leftSection}>
+							{title && globalMovieId.value && (
+								<a
+									href={`/movie/${globalMovieId.value}`}
+									class={styles.titleText}
+									onClick={(e) => {
+										e.preventDefault();
+										if (playerMode.value !== 'mini') {
+											minimizePlayer();
+										}
+										route(`/movie/${globalMovieId.value}`);
+									}}
+								>
+									{title}
+								</a>
+							)}
+							<span class={styles.timingLabel}>
+								{formatTime(currentTime.value)} / {formatTime(duration.value)}
+							</span>
+						</div>
+					)}
 
 					{/* Center: skip-back, play, skip-forward */}
 					{(() => {
 						const st = getUiSetting<number[]>('skip_times', [5, 10, 20]);
 						const t = [st[0] ?? 5, st[1] ?? 10, st[2] ?? 20];
 						return (
-							<div class={styles.centerControls}>
+							<div class={`${styles.centerControls} ${isSplit ? styles.centerControlsSplit : ''}`}>
 								{/* Skip Back — rollover reveals extended options */}
 								<div
 									class={styles.skipWrap}

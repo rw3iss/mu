@@ -180,6 +180,13 @@
 	// }
 }
 
+.centerControlsSplit {
+	position: static;
+	transform: none;
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
 // ── Right: info, volume, settings, fullscreen, minimize, close ──
 .rightControls {
 	margin-top: -10px;

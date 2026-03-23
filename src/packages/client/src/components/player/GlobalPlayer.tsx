@@ -19,11 +19,14 @@ import {
 	minimizePlayer,
 	playerMode,
 	restoredAutoplay,
+	splitPlayer,
+	splitWidth,
 	startGlobalStream,
 } from '@/state/globalPlayer.state';
 import {
 	currentSession,
 	currentTime,
+	duration,
 	initPlayerSettings,
 	isBuffering,
 	isFullscreen,
@@ -63,6 +66,22 @@ function offsetVttTimings(vtt: string, offsetMs: number): string {
 	});
 }
 
+function setSplitWidth(w: number) {
+	splitWidth.value = w;
+	localStorage.setItem('mu_ui_split_width', String(w));
+}
+
+function formatTimeSplit(seconds: number): string {
+	if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+	const h = Math.floor(seconds / 3600);
+	const m = Math.floor((seconds % 3600) / 60);
+	const s = Math.floor(seconds % 60);
+	if (h > 0) {
+		return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+	}
+	return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export function GlobalPlayer() {
 	const engine = useVideoEngine();
 	const [_isInitializing, setIsInitializing] = useState(false);
@@ -87,7 +106,7 @@ export function GlobalPlayer() {
 
 	// Auto-hide controls when playing starts
 	useEffect(() => {
-		if (isPlaying.value && playerMode.value !== 'mini') {
+		if (isPlaying.value && playerMode.value !== 'mini' && playerMode.value !== 'split') {
 			resetControlsTimer();
 		}
 	}, [isPlaying.value]);
@@ -512,7 +531,8 @@ export function GlobalPlayer() {
 
 	// Lock body scroll when player is in full mode (prevent scrollbar over video)
 	useEffect(() => {
-		const isFull = isPlayerActive.value && playerMode.value !== 'mini';
+		const isFull =
+			isPlayerActive.value && playerMode.value !== 'mini' && playerMode.value !== 'split';
 		if (isFull) {
 			document.body.style.overflow = 'hidden';
 		} else {
@@ -528,8 +548,139 @@ export function GlobalPlayer() {
 
 	const movie = globalMovie.value;
 	const isMini = playerMode.value === 'mini';
-	// In full mode, the bar fades with controls; in mini mode, always visible
-	const barVisible = isMini || showControls.value;
+	const isSplit = playerMode.value === 'split';
+	// In full mode, the bar fades with controls; in mini/split mode, always visible
+	const barVisible = isMini || isSplit || showControls.value;
+
+	if (isSplit) {
+		return (
+			<div class={styles.splitPanel} style={{ width: `${splitWidth.value}vw` }}>
+				{/* Drag handle on left edge */}
+				<div
+					class={styles.splitDragHandle}
+					onMouseDown={(e: MouseEvent) => {
+						e.preventDefault();
+						const startX = e.clientX;
+						const startWidth = splitWidth.value;
+						const onMove = (ev: MouseEvent) => {
+							const delta = startX - ev.clientX;
+							const newWidth = Math.min(
+								75,
+								Math.max(
+									25,
+									startWidth + (delta / window.innerWidth) * 100,
+								),
+							);
+							setSplitWidth(Math.round(newWidth));
+						};
+						const onUp = () => {
+							document.removeEventListener('mousemove', onMove);
+							document.removeEventListener('mouseup', onUp);
+						};
+						document.addEventListener('mousemove', onMove);
+						document.addEventListener('mouseup', onUp);
+					}}
+				/>
+
+				{/* Top bar */}
+				<div class={styles.splitTopBar}>
+					<button
+						class={styles.splitTopBtn}
+						onClick={() => minimizePlayer()}
+						title="Minimize"
+					>
+						<svg
+							width={18}
+							height={18}
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth={2}
+						>
+							<polyline points="6 9 12 15 18 9" />
+						</svg>
+					</button>
+					<button
+						class={styles.splitTopBtn}
+						onClick={() => maximizePlayer()}
+						title="Full screen"
+					>
+						<svg
+							width={18}
+							height={18}
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth={2}
+						>
+							<polyline points="15 3 21 3 21 9" />
+							<polyline points="9 21 3 21 3 15" />
+							<line x1="21" y1="3" x2="14" y2="10" />
+							<line x1="3" y1="21" x2="10" y2="14" />
+						</svg>
+					</button>
+					<div style={{ flex: 1 }} />
+					<button
+						class={styles.splitTopBtn}
+						onClick={() => closePlayer()}
+						title="Close"
+					>
+						<svg
+							width={18}
+							height={18}
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth={2}
+						>
+							<line x1="18" y1="6" x2="6" y2="18" />
+							<line x1="6" y1="6" x2="18" y2="18" />
+						</svg>
+					</button>
+				</div>
+
+				{/* Video area */}
+				<div class={styles.splitVideoArea} ref={videoWrapperRef} />
+
+				{/* Title + time row */}
+				<div class={styles.splitTitleRow}>
+					<span class={styles.splitTitle}>{movie?.title ?? ''}</span>
+					<span class={styles.splitTime}>
+						{formatTimeSplit(currentTime.value)} /{' '}
+						{formatTimeSplit(duration.value)}
+					</span>
+				</div>
+
+				{/* Seek bar + controls */}
+				<div class={styles.splitSeekArea}>
+					<PlayerControls
+						visible
+						isSplit
+						onTogglePlay={engine.togglePlay}
+						onSeek={engine.seek}
+						onToggleFullscreen={handleToggleFullscreen}
+						onToggleInfo={handleToggleInfo}
+						session={currentSession.value}
+						title={movie?.title}
+					/>
+				</div>
+
+				{/* Movie info scroll area */}
+				<div class={styles.splitInfoArea}>
+					{movie && (
+						<InfoPanel
+							movie={movie}
+							visible
+							onClose={() => {}}
+						/>
+					)}
+				</div>
+
+				{/* Effects panel */}
+				<EffectsPanel />
+			</div>
+		);
+	}
 
 	return (
 		<>
@@ -633,6 +784,26 @@ export function GlobalPlayer() {
 							stroke-linejoin="round"
 						>
 							<polyline points="6 9 12 15 18 9" />
+						</svg>
+					</button>
+					<button
+						class={styles.topBtn}
+						onClick={splitPlayer}
+						aria-label="Split view"
+						title="Split view"
+					>
+						<svg
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="white"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<rect x="3" y="3" width="18" height="18" rx="2" />
+							<line x1="12" y1="3" x2="12" y2="21" />
 						</svg>
 					</button>
 					<button class={styles.topBtn} onClick={closePlayer} aria-label="Close player">

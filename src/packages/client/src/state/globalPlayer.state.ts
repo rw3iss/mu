@@ -33,7 +33,7 @@ import { sharedVideoEngine } from '@/state/videoEngineRef';
 // Types
 // ============================================
 
-export type PlayerMode = 'hidden' | 'full' | 'mini';
+export type PlayerMode = 'hidden' | 'full' | 'mini' | 'split';
 
 interface PersistedPlayerState {
 	movieId: string;
@@ -69,6 +69,10 @@ export const restoredAutoplay = signal<boolean | null>(null);
  * Consumed (reset to null) by GlobalPlayer after applying.
  */
 export const forceStartPosition = signal<number | null>(null);
+
+export const splitWidth = signal<number>(
+	parseInt(localStorage.getItem('mu_ui_split_width') || '50', 10),
+);
 
 // Computed
 export const isPlayerActive = computed(() => playerMode.value !== 'hidden');
@@ -162,7 +166,9 @@ export async function playMovie(
 
 	// Already loaded this movie - ensure it's playing
 	if (globalMovieId.value === movieId && currentSession.value) {
-		playerMode.value = 'full';
+		if (playerMode.value !== 'split') {
+			playerMode.value = 'full';
+		}
 		const engine = sharedVideoEngine.value;
 		if (engine) {
 			const video = engine.videoRef.current;
@@ -241,6 +247,14 @@ export function minimizePlayer(): void {
 export function maximizePlayer(): void {
 	if (!globalMovieId.value) return;
 	playerMode.value = 'full';
+}
+
+/**
+ * Split: show player as a resizable right-side panel.
+ */
+export function splitPlayer(): void {
+	if (!globalMovieId.value) return;
+	playerMode.value = 'split';
 }
 
 /**
