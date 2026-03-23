@@ -24,6 +24,7 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 	const [showDeleteModal, setShowDeleteModal] = useState(false);
 	const [deleteFolder, setDeleteFolder] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [deleteSuccess, setDeleteSuccess] = useState(false);
 	const menuRef = useRef<HTMLDivElement>(null);
 
 	// Close on outside click + raise parent card z-index while open
@@ -154,10 +155,13 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 				await closePlayer();
 			}
 			await moviesService.deleteFromDisk(movie.id, deleteFolder);
-			notifySuccess(`'${movie.title}' deleted from disk`);
-			setShowDeleteModal(false);
-			setOpen(false);
-			route('/library');
+			setDeleteSuccess(true);
+			setTimeout(() => {
+				setShowDeleteModal(false);
+				setDeleteSuccess(false);
+				setOpen(false);
+				route('/library');
+			}, 1200);
 		} catch (err: any) {
 			notifyError(err?.message || 'Failed to delete movie from disk');
 		} finally {
@@ -299,48 +303,56 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 
 			<Modal
 				isOpen={showDeleteModal}
-				onClose={() => setShowDeleteModal(false)}
-				title="Delete from Disk"
+				onClose={() => !deleteSuccess && setShowDeleteModal(false)}
+				title={deleteSuccess ? 'Deleted' : 'Delete from Disk'}
 			>
 				<div class={styles.deleteModalBody}>
-					<p>
-						This will permanently delete the movie file(s) from disk and remove all
-						cached data. This action cannot be undone.
-					</p>
-					<label class={styles.deleteOption}>
-						<input
-							type="radio"
-							name="deleteMode"
-							checked={!deleteFolder}
-							onChange={() => setDeleteFolder(false)}
-						/>
-						Delete movie file only
-					</label>
-					<label class={styles.deleteOption}>
-						<input
-							type="radio"
-							name="deleteMode"
-							checked={deleteFolder}
-							onChange={() => setDeleteFolder(true)}
-						/>
-						Delete file and enclosing folder
-					</label>
-					<div class={styles.deleteActions}>
-						<Button
-							variant="secondary"
-							onClick={() => setShowDeleteModal(false)}
-							disabled={isDeleting}
-						>
-							Cancel
-						</Button>
-						<Button
-							variant="danger"
-							onClick={handleDeleteFromDisk}
-							loading={isDeleting}
-						>
-							Delete Permanently
-						</Button>
-					</div>
+					{deleteSuccess ? (
+						<p style={{ textAlign: 'center', padding: '1rem 0', color: 'var(--color-success, #4caf50)' }}>
+							'{movie.title}' has been deleted.
+						</p>
+					) : (
+						<>
+							<p>
+								This will permanently delete the movie file(s) from disk and remove all
+								cached data. This action cannot be undone.
+							</p>
+							<label class={styles.deleteOption}>
+								<input
+									type="radio"
+									name="deleteMode"
+									checked={!deleteFolder}
+									onChange={() => setDeleteFolder(false)}
+								/>
+								Delete movie file only
+							</label>
+							<label class={styles.deleteOption}>
+								<input
+									type="radio"
+									name="deleteMode"
+									checked={deleteFolder}
+									onChange={() => setDeleteFolder(true)}
+								/>
+								Delete file and enclosing folder
+							</label>
+							<div class={styles.deleteActions}>
+								<Button
+									variant="secondary"
+									onClick={() => setShowDeleteModal(false)}
+									disabled={isDeleting}
+								>
+									Cancel
+								</Button>
+								<Button
+									variant="danger"
+									onClick={handleDeleteFromDisk}
+									loading={isDeleting}
+								>
+									Delete Permanently
+								</Button>
+							</div>
+						</>
+					)}
 				</div>
 			</Modal>
 		</div>
