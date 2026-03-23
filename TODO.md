@@ -18,6 +18,8 @@ INFO: ssh rw3iss@192.168.50.211
 	- Delete movie containing folders with no files > XMB.
 	- "Trim Cache": scale back cache: delete cached movies that haven't been played in X days (or delete X% of the space, starting with the oldest items).
 
+- job management, move background transcodes to highest priority.
+
 - set default subtitle language (to help subtitles, etc).
 - set interface language: to translations.
 

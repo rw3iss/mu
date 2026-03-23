@@ -4,7 +4,7 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
-import { processingMovieIds } from '@/state/processing.state';
+import { getMovieProgress, processingMovieIds } from '@/state/processing.state';
 import { getRatingColor } from '@/utils/rating-color';
 import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
@@ -42,6 +42,7 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 	const transcodeNeeded = needsTranscode(movie);
 	const streamLabel = getStreamModeLabel(movie);
 	const isProcessing = processingMovieIds.value.has(movie.id);
+	const progress = isProcessing ? getMovieProgress(movie.id) : undefined;
 
 	return (
 		<div
@@ -50,7 +51,11 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 			role="button"
 			tabIndex={0}
 		>
-			{isProcessing && <div class={styles.processingOverlay}>Processing...</div>}
+			{isProcessing && (
+				<div class={styles.processingOverlay}>
+					{progress != null ? `${progress}%` : 'Processing...'}
+				</div>
+			)}
 			{movie.hidden && <span class={styles.hiddenLabel}>Hidden</span>}
 			{movie.remoteOrigin && (
 				<span class={styles.remoteBadge} title={`From: ${movie.remoteOrigin.serverName}`}>

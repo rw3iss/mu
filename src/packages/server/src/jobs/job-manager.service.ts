@@ -141,6 +141,28 @@ export class JobManagerService implements OnModuleDestroy {
 	}
 
 	/**
+	 * Move a pending job to the front of the queue (highest priority).
+	 * If another job is running, it continues — this just ensures the
+	 * prioritized job runs next.
+	 */
+	prioritize(id: string): boolean {
+		const job = this.jobs.get(id);
+		if (!job || job.status !== 'pending') return false;
+
+		// Remove from current queue position
+		const idx = this.queue.indexOf(id);
+		if (idx !== -1) this.queue.splice(idx, 1);
+
+		// Set priority to 1 (highest) and insert at front
+		job.priority = 1;
+		this.queue.unshift(id);
+
+		this.logger.log(`Job prioritized: [${job.type}] ${job.label}`);
+		this.emitJobEvent(WsEvent.JOB_PROGRESS, job);
+		return true;
+	}
+
+	/**
 	 * Register a cleanup callback for a running job (e.g. to kill an FFmpeg process).
 	 */
 	setOnCancel(jobId: string, callback: () => void): void {

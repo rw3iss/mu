@@ -527,6 +527,18 @@ function JobsSection() {
 									)}
 									{tab === 'current' && (
 										<div class={styles.jobActions}>
+											{job.status === 'pending' && (
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={(e: Event) => {
+														e.stopPropagation();
+														handleAction(job.id, 'prioritize');
+													}}
+												>
+													Prioritize
+												</Button>
+											)}
 											{job.status === 'running' && (
 												<Button
 													variant="ghost"

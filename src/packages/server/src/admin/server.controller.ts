@@ -145,4 +145,11 @@ export class ServerController {
 		const result = this.jobManager.cancel(id);
 		return { success: result };
 	}
+
+	@Post('jobs/:id/prioritize')
+	@Roles('admin')
+	prioritizeJob(@Param('id') id: string) {
+		const result = this.jobManager.prioritize(id);
+		return { success: result };
+	}
 }
