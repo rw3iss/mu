@@ -12,9 +12,11 @@ interface InfoPanelProps {
 	movie: Movie | null;
 	visible: boolean;
 	onClose: () => void;
+	/** When true, renders content inline (no backdrop, no close button, no slide animation) */
+	inline?: boolean;
 }
 
-export function InfoPanel({ movie, visible, onClose }: InfoPanelProps) {
+export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 	const [showFileInfo, setShowFileInfo] = useState(false);
 
 	// Refresh movie data when panel opens or when movie is updated via WebSocket
@@ -53,13 +55,18 @@ export function InfoPanel({ movie, visible, onClose }: InfoPanelProps) {
 
 	return (
 		<>
-			{/* Backdrop overlay */}
-			{visible && <div class={styles.backdrop} onClick={onClose} />}
+			{/* Backdrop overlay — not shown in inline mode */}
+			{!inline && visible && <div class={styles.backdrop} onClick={onClose} />}
 
-			<div class={`${styles.panel} ${visible ? styles.open : ''}`} data-player-panel>
-				<button class={styles.closeBtn} onClick={onClose} aria-label="Close info">
-					{'\u2715'}
-				</button>
+			<div
+				class={`${inline ? styles.inlinePanel : styles.panel} ${!inline && visible ? styles.open : ''}`}
+				data-player-panel
+			>
+				{!inline && (
+					<button class={styles.closeBtn} onClick={onClose} aria-label="Close info">
+						{'\u2715'}
+					</button>
+				)}
 
 				{/* Poster */}
 				{movie.posterUrl && (

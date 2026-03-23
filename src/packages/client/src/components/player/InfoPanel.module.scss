@@ -5,6 +5,23 @@
   z-index: calc(var(--z-player-controls) + 4);
 }
 
+// Inline mode — no positioning, no animation, just content
+.inlinePanel {
+  padding: var(--space-md);
+  color: rgba(255, 255, 255, 0.9);
+
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+  }
+}
+
 .panel {
   position: fixed;
   top: 0;

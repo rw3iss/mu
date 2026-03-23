@@ -562,8 +562,8 @@ export function PlayerControls({
 						{/* Plugin buttons — rendered before system buttons */}
 						<PluginSlot name={UI.PLAYER_BUTTON} context={{}} />
 
-						{/* Info */}
-						<button
+						{/* Info — hidden in split mode (info shown inline) */}
+						{!isSplit && <button
 							class={styles.controlBtn}
 							onClick={onToggleInfo}
 							aria-label="Movie info"
@@ -581,7 +581,7 @@ export function PlayerControls({
 								<line x1="12" y1="16" x2="12" y2="12" />
 								<line x1="12" y1="8" x2="12.01" y2="8" />
 							</svg>
-						</button>
+						</button>}
 
 						{/* Effects */}
 						<div class={styles.effectsBtnWrap}>

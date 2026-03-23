@@ -665,13 +665,14 @@ export function GlobalPlayer() {
 					/>
 				</div>
 
-				{/* Movie info scroll area */}
+				{/* Movie info — inline, no flyout */}
 				<div class={styles.splitInfoArea}>
 					{movie && (
 						<InfoPanel
 							movie={movie}
 							visible
 							onClose={() => {}}
+							inline
 						/>
 					)}
 				</div>
