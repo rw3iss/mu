@@ -282,11 +282,16 @@ export function GlobalPlayer() {
 			const video = engine.videoRef.current;
 			if (!wrapper.contains(video)) {
 				// Moving the video element between DOM parents pauses it —
-				// preserve and restore the play state
+				// preserve and restore the play state after the browser processes the move
 				const wasPlaying = !video.paused;
 				wrapper.insertBefore(video, wrapper.firstChild);
-				if (wasPlaying && video.paused) {
-					video.play().catch(() => {});
+				if (wasPlaying) {
+					// Browser pauses asynchronously after DOM move — wait a frame then restore
+					requestAnimationFrame(() => {
+						if (video.paused) {
+							video.play().catch(() => {});
+						}
+					});
 				}
 			}
 
