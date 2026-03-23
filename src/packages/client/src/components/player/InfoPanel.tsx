@@ -68,22 +68,45 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 					</button>
 				)}
 
-				{/* Poster */}
-				{movie.posterUrl && (
-					<img
-						src={movie.posterUrl}
-						alt={`${movie.title} poster`}
-						class={styles.poster}
-					/>
+				{/* Inline: two-column layout with poster left, details right */}
+				{inline ? (
+					<div class={styles.inlineHeader}>
+						{movie.posterUrl && (
+							<img
+								src={movie.posterUrl}
+								alt={`${movie.title} poster`}
+								class={styles.inlinePoster}
+							/>
+						)}
+						<div class={styles.inlineHeaderDetails}>
+							<h2 class={styles.title}>{movie.title}</h2>
+							<div class={styles.meta}>
+								{movie.year > 0 && <span>{movie.year}</span>}
+								{runtimeText && <span>{runtimeText}</span>}
+								{movie.director && <span>Dir. {movie.director}</span>}
+							</div>
+						</div>
+					</div>
+				) : (
+					<>
+						{/* Poster */}
+						{movie.posterUrl && (
+							<img
+								src={movie.posterUrl}
+								alt={`${movie.title} poster`}
+								class={styles.poster}
+							/>
+						)}
+
+						<h2 class={styles.title}>{movie.title}</h2>
+
+						<div class={styles.meta}>
+							{movie.year > 0 && <span>{movie.year}</span>}
+							{runtimeText && <span>{runtimeText}</span>}
+							{movie.director && <span>Dir. {movie.director}</span>}
+						</div>
+					</>
 				)}
-
-				<h2 class={styles.title}>{movie.title}</h2>
-
-				<div class={styles.meta}>
-					{movie.year > 0 && <span>{movie.year}</span>}
-					{runtimeText && <span>{runtimeText}</span>}
-					{movie.director && <span>Dir. {movie.director}</span>}
-				</div>
 
 				{/* Genres */}
 				{movie.genres && movie.genres.length > 0 && (

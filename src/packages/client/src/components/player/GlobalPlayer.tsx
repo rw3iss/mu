@@ -284,10 +284,11 @@ export function GlobalPlayer() {
 				wrapper.insertBefore(video, wrapper.firstChild);
 			}
 
-			// Click to toggle play, double-click for fullscreen
+			// Click to toggle play, double-click for fullscreen.
+			// Only respond to clicks directly on the video element — ignore
+			// clicks on overlay buttons that might bubble through.
 			const handleClick = (e: MouseEvent) => {
 				if (playerMode.value === 'mini') return;
-				// Only toggle play when clicking the video element itself
 				if (e.target !== video) return;
 				if (e.detail === 1) {
 					videoClickTimerRef.current = setTimeout(() => {
@@ -296,8 +297,9 @@ export function GlobalPlayer() {
 					}, 200);
 				}
 			};
-			const handleDblClick = () => {
+			const handleDblClick = (e: MouseEvent) => {
 				if (playerMode.value === 'mini') return;
+				if (e.target !== video) return;
 				if (videoClickTimerRef.current) {
 					clearTimeout(videoClickTimerRef.current);
 					videoClickTimerRef.current = null;
