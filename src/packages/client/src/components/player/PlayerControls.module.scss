@@ -197,6 +197,38 @@
 	align-self: center;
 }
 
+// Compact overrides when controls are inside the split panel
+.splitControls {
+	flex: none;
+	flex-shrink: 0;
+
+	.seekRow {
+		top: 0;
+		margin: 0;
+		padding: 0 0.5rem;
+	}
+
+	.contentRow {
+		flex: none;
+		min-height: auto;
+	}
+
+	.mainRow {
+		height: 36px;
+		padding: 0 0.25rem;
+	}
+
+	.controlBtn {
+		width: 32px;
+		height: 32px;
+	}
+
+	.playBtn svg {
+		width: 22px;
+		height: 22px;
+	}
+}
+
 // ── Right: info, volume, settings, fullscreen, minimize, close ──
 .rightControls {
 	margin-top: -10px;

@@ -351,7 +351,7 @@ export function PlayerControls({
 	return (
 		<div
 			data-player-panel
-			class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''}`}
+			class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''} ${isSplit ? styles.splitControls : ''}`}
 		>
 			{/* ── Row 1: Seek bar — flush to top, full width ── */}
 			<div class={styles.seekRow}>

@@ -585,11 +585,11 @@ export function GlobalPlayer() {
 	// In full mode, the bar fades with controls; in mini/split mode, always visible
 	const barVisible = isMini || isSplit || showControls.value;
 
-	// Calculate split content offset: top bar (32px) + video (aspect ratio)
-	// The site header offset is handled by CSS (panel top: var(--topbar-height))
-	const SPLIT_TOP_BAR_HEIGHT = 32;
+	// Spacer height = just the video (aspect ratio based on split width).
+	// The top bar (32px) is a flex child above the spacer so it pushes naturally.
+	// The site header offset is handled by CSS (panel top: var(--topbar-height)).
 	const splitVideoHeight = isSplit
-		? `calc(${SPLIT_TOP_BAR_HEIGHT}px + ${splitWidth.value}vw * 9 / 16)`
+		? `calc(${splitWidth.value}vw * 9 / 16)`
 		: '0px';
 
 	return (
