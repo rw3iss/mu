@@ -100,6 +100,26 @@ export function GlobalPlayer() {
 		};
 	}, [engine]);
 
+	// Global spacebar: toggle play/pause when player is open (full or mini)
+	useEffect(() => {
+		function handleGlobalKeyDown(e: KeyboardEvent) {
+			// Don't intercept when typing in inputs
+			if (
+				e.target instanceof HTMLInputElement ||
+				e.target instanceof HTMLTextAreaElement ||
+				e.target instanceof HTMLSelectElement
+			) {
+				return;
+			}
+			if (e.key === ' ' && playerMode.value !== 'hidden') {
+				e.preventDefault();
+				engine.togglePlay();
+			}
+		}
+		document.addEventListener('keydown', handleGlobalKeyDown);
+		return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+	}, [engine]);
+
 	// Set browser tab title to movie name while playing
 	useEffect(() => {
 		const movie = globalMovie.value;
