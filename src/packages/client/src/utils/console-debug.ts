@@ -135,7 +135,7 @@ const mu = {
 		return '';
 	},
 
-	version: __MU_VERSION__ ?? '0.1.0',
+	version: '0.1.0',
 
 	config: Object.assign(
 		(key?: string) => {
@@ -231,8 +231,6 @@ const proxy = new Proxy(mu, {
 		return Reflect.get(target, prop);
 	},
 });
-
-declare const __MU_VERSION__: string | undefined;
 
 export function initConsoleDebug() {
 	(window as any).mu = proxy;

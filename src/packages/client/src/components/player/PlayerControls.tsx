@@ -557,6 +557,13 @@ export function PlayerControls({
 						);
 					})()}
 
+					{/* Center: time display (split mode only) */}
+					{isSplit && (
+						<div class={styles.splitTimeCenter}>
+							{formatTime(currentTime.value)} / {formatTime(duration.value)}
+						</div>
+					)}
+
 					{/* Right: plugin buttons, info, volume, settings, fullscreen */}
 					<div class={styles.rightControls}>
 						{/* Plugin buttons — rendered before system buttons */}

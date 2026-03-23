@@ -72,16 +72,6 @@ function setSplitWidth(w: number) {
 	localStorage.setItem('mu_ui_split_width', String(w));
 }
 
-function formatTimeSplit(seconds: number): string {
-	if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
-	const h = Math.floor(seconds / 3600);
-	const m = Math.floor((seconds % 3600) / 60);
-	const s = Math.floor(seconds % 60);
-	if (h > 0) {
-		return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-	}
-	return `${m}:${s.toString().padStart(2, '0')}`;
-}
 
 export function GlobalPlayer() {
 	const engine = useVideoEngine();
@@ -673,28 +663,17 @@ export function GlobalPlayer() {
 					{/* Spacer for video area (video is positioned fixed via the shared wrapper) */}
 					<div style={{ height: splitVideoHeight, flexShrink: 0 }} />
 
-					{/* Title + time row */}
-					<div class={styles.splitTitleRow}>
-						<span class={styles.splitTitle}>{movie?.title ?? ''}</span>
-						<span class={styles.splitTime}>
-							{formatTimeSplit(currentTime.value)} /{' '}
-							{formatTimeSplit(duration.value)}
-						</span>
-					</div>
-
-					{/* Seek bar + controls */}
-					<div class={styles.splitSeekArea}>
-						<PlayerControls
-							visible
-							isSplit
-							onTogglePlay={engine.togglePlay}
-							onSeek={engine.seek}
-							onToggleFullscreen={handleToggleFullscreen}
-							onToggleInfo={handleToggleInfo}
-							session={currentSession.value}
-							title={movie?.title}
-						/>
-					</div>
+					{/* Seek bar + controls — directly below video, full width */}
+					<PlayerControls
+						visible
+						isSplit
+						onTogglePlay={engine.togglePlay}
+						onSeek={engine.seek}
+						onToggleFullscreen={handleToggleFullscreen}
+						onToggleInfo={handleToggleInfo}
+						session={currentSession.value}
+						title={movie?.title}
+					/>
 
 					{/* Movie info — inline, no flyout */}
 					<div class={styles.splitInfoArea}>
