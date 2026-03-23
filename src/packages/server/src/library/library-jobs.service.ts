@@ -169,86 +169,49 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				};
 				helpers.log(`Pre-transcoding file ${movieFileId} (${mode}, ${quality})`);
 
-				// Use chunked transcoding if enabled
-				if (this.chunkManager.isEnabled() && mode === 'transcode') {
-					// Get movie file duration
-					const file = this.database.db
-						.select()
-						.from(movieFiles)
-						.where(eq(movieFiles.id, movieFileId))
-						.get();
+				// Always use monolithic transcode for background pre-encoding.
+				// Chunked encoding creates audio discontinuities at chunk boundaries
+				// and has per-chunk FFmpeg startup overhead. Monolithic produces a
+				// single continuous stream with better compression and no glitches.
+				const processKey = `pre-${movieFileId}-${quality}`;
+				this.jobManager.setOnCancel(job.id, () => {
+					this.transcoderService.stopTranscode(processKey);
+				});
 
-					if (file?.durationSeconds && file.durationSeconds > 0) {
-						this.jobManager.setOnCancel(job.id, () => {
-							this.chunkManager.cancelAllChunks(movieFileId, quality);
-						});
-
-						const chunkMap = await this.chunkManager.initializeChunkMap(
-							movieFileId,
-							quality,
-							filePath,
-							file.durationSeconds,
-						);
-						this.chunkManager.enqueueAllPending(movieFileId, quality);
-
-						// Poll for completion
-						await new Promise<void>((resolve, reject) => {
-							const check = setInterval(() => {
-								const progress = this.chunkManager.getProgress(
-									movieFileId,
-									quality,
-								);
-								helpers.reportProgress(progress.percent);
-								if (progress.completed === progress.total) {
-									clearInterval(check);
-									resolve();
-								}
-								// Check if cancelled
-								if (job.status === 'failed') {
-									clearInterval(check);
-									reject(new Error('Cancelled'));
-								}
-							}, 2000);
-						});
-
-						this.recordTranscodeCache(movieFileId, quality);
-					} else {
-						// Fallback: no duration info, use monolithic transcode
-						helpers.log('No duration info, falling back to monolithic transcode');
-						const processKey = `pre-${movieFileId}-${quality}`;
-						this.jobManager.setOnCancel(job.id, () => {
-							this.transcoderService.stopTranscode(processKey);
-						});
-						await this.transcoderService.preTranscode(
-							movieFileId,
-							filePath,
-							mode,
-							quality,
-							(percent) => helpers.reportProgress(percent),
-						);
-						this.recordTranscodeCache(movieFileId, quality);
-					}
-				} else {
-					// Monolithic transcode (legacy or remux)
-					const processKey = `pre-${movieFileId}-${quality}`;
-					this.jobManager.setOnCancel(job.id, () => {
-						this.transcoderService.stopTranscode(processKey);
-					});
-					await this.transcoderService.preTranscode(
-						movieFileId,
-						filePath,
-						mode,
-						quality,
-						(percent) => helpers.reportProgress(percent),
+				// Clear any leftover chunked cache before monolithic encode
+				const persistDir = this.transcoderService.getPersistentDir(
+					movieFileId,
+					quality,
+				);
+				const chunkMetaPath = path.join(persistDir, 'chunk-meta.json');
+				if (existsSync(chunkMetaPath)) {
+					this.logger.log(
+						`Clearing old chunked cache for ${movieFileId}/${quality} before monolithic encode`,
 					);
-					this.recordTranscodeCache(movieFileId, quality);
+					await this.transcoderService.clearCache(movieFileId);
 				}
 
-				// Notify clients so movie detail pages can refresh their file info
+				await this.transcoderService.preTranscode(
+					movieFileId,
+					filePath,
+					mode,
+					quality,
+					(percent) => helpers.reportProgress(percent),
+				);
+				this.recordTranscodeCache(movieFileId, quality);
+
+				// Notify clients so movie cards/detail pages update and active
+				// streams can switch to the completed cache
 				if (movieId) {
 					this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
 						movieId,
 						source: 'pre-transcode',
+					});
+					// Signal any active streams for this movie that a cache is ready
+					this.events.emit(WsEvent.JOB_COMPLETED, {
+						type: 'pre-transcode',
+						payload: { movieId, movieFileId, quality },
+						progress: 100,
 					});
 				}
 
@@ -398,7 +361,6 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const defaultQuality = enc?.quality || '1080p';
 		const encodeHighest = enc?.encodeHighestAvailable === true;
-		const useChunked = this.chunkManager.isEnabled();
 
 		// Get recently watched movie IDs for priority ordering
 		const recentlyWatched = this.database.db
@@ -431,12 +393,6 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			payload: Record<string, unknown>;
 			priority: number;
 		}> = [];
-		const pendingChunked: Array<{
-			fileId: string;
-			quality: string;
-			priority: number;
-		}> = [];
-
 		for (const { file, movieTitle } of allFiles) {
 			const mode = this.streamService.determineStreamMode(file);
 			if (mode !== StreamMode.TRANSCODE && mode !== StreamMode.DIRECT_STREAM) continue;
@@ -471,48 +427,26 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					this.guidResolver.warmup(file.id, movieTitle);
 				}
 
-				if (
-					useChunked &&
-					mode === StreamMode.TRANSCODE &&
-					file.durationSeconds &&
-					file.durationSeconds > 0
-				) {
-					// Chunked transcoding: initialize chunk map first (sequential, does disk I/O).
-					// Use a real delay (not just setTimeout(0)) to prevent event loop starvation
-					// on Windows where NTFS stat() calls saturate the I/O threadpool.
-					await this.chunkManager.initializeChunkMap(
-						file.id,
+					// Always use monolithic for background pre-transcode
+				pendingMonolithic.push({
+					type: JOB_TYPE.PRE_TRANSCODE,
+					label: `Resume transcode: ${title} (${quality})`,
+					payload: {
+						movieId: file.movieId,
+						movieFileId: file.id,
+						filePath: file.filePath,
+						mode,
 						quality,
-						file.filePath,
-						file.durationSeconds,
-					);
-					await new Promise((r) => setTimeout(r, 50));
-					pendingChunked.push({ fileId: file.id, quality, priority });
-				} else {
-					pendingMonolithic.push({
-						type: JOB_TYPE.PRE_TRANSCODE,
-						label: `Resume transcode: ${title} (${quality})`,
-						payload: {
-							movieId: file.movieId,
-							movieFileId: file.id,
-							filePath: file.filePath,
-							mode,
-							quality,
-						},
-						priority,
-					});
-				}
+					},
+					priority,
+				});
 				resumed++;
 			}
 		}
 
-		// Now that all chunk maps are initialized, enqueue everything.
-		// Jobs won't compete with chunk initialization for FFmpeg handles.
+		// Enqueue all monolithic pre-transcode jobs
 		for (const job of pendingMonolithic) {
 			this.jobManager.enqueue(job);
-		}
-		for (const { fileId, quality, priority } of pendingChunked) {
-			this.chunkManager.enqueueAllPending(fileId, quality, priority);
 		}
 
 		if (resumed > 0) {
