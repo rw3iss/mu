@@ -207,6 +207,8 @@
 		top: 0;
 		margin: 0;
 		padding: 0;
+		// Match the video's 3px right offset for the drag handle
+		padding-left: 3px;
 	}
 
 	.contentRow {
