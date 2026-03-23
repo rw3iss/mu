@@ -308,7 +308,7 @@ export function GlobalPlayer() {
 				video.removeEventListener('dblclick', handleDblClick);
 			};
 		}
-	}, [engine.videoRef.current, isPlayerActive.value]);
+	}, [engine.videoRef.current, isPlayerActive.value, playerMode.value]);
 
 	// Subtitle appearance settings
 	const [subSettings] = useSubtitleSettings();
