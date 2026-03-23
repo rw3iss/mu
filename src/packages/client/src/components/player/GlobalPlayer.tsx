@@ -284,6 +284,8 @@ export function GlobalPlayer() {
 			// Click to toggle play, double-click for fullscreen
 			const handleClick = (e: MouseEvent) => {
 				if (playerMode.value === 'mini') return;
+				// Only toggle play when clicking the video element itself
+				if (e.target !== video) return;
 				if (e.detail === 1) {
 					videoClickTimerRef.current = setTimeout(() => {
 						videoClickTimerRef.current = null;
@@ -583,7 +585,7 @@ export function GlobalPlayer() {
 				/>
 
 				{/* Top bar */}
-				<div class={styles.splitTopBar}>
+				<div class={styles.splitTopBar} onClick={(e: Event) => e.stopPropagation()}>
 					<button
 						class={styles.splitTopBtn}
 						onClick={() => minimizePlayer()}
@@ -762,6 +764,7 @@ export function GlobalPlayer() {
 			{!isMini && (
 				<div
 					class={`${styles.topHeader} ${showControls.value ? styles.topHeaderVisible : ''}`}
+					onClick={(e: Event) => e.stopPropagation()}
 					onMouseEnter={() => {
 						isHoveringControls.value = true;
 					}}
