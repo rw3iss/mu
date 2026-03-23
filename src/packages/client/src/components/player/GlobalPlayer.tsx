@@ -589,7 +589,7 @@ export function GlobalPlayer() {
 	// The top bar (32px) is a flex child above the spacer so it pushes naturally.
 	// The site header offset is handled by CSS (panel top: var(--topbar-height)).
 	const splitVideoHeight = isSplit
-		? `calc(${splitWidth.value}vw * 9 / 16)`
+		? `calc((${splitWidth.value}vw - 3px) * 9 / 16)`
 		: '0px';
 
 	return (
@@ -696,7 +696,7 @@ export function GlobalPlayer() {
 			<div
 				ref={videoWrapperRef}
 				class={`${styles.videoWrapper} ${isSplit ? styles.videoWrapperSplit : isMini ? styles.videoWrapperMini : styles.videoWrapperFull} ${!isMini && !isSplit && !showControls.value ? styles.hideCursor : ''}`}
-				style={isSplit ? { width: `${splitWidth.value}vw` } : undefined}
+				style={isSplit ? { width: `calc(${splitWidth.value}vw - 3px)` } : undefined}
 				onClick={isMini ? maximizePlayer : undefined}
 				onMouseMove={!isMini && !isSplit ? resetControlsTimer : undefined}
 			>

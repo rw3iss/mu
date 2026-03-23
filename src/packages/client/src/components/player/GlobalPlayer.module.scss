@@ -203,21 +203,16 @@
 }
 
 .videoWrapperSplit {
-  --split-drag-width: 2px;
   // Top-right corner, below site header + split top bar
-  // Inset by drag handle width so handle shows to the left of the video
+  // Width reduced by 3px and shifted right so drag handle is visible
   inset: auto;
   top: calc(var(--topbar-height, 56px) + var(--split-top-bar-height, 32px));
   right: 0;
   bottom: auto;
   left: auto;
-  // width is set via inline style, but we shrink by drag handle width
-  // so the handle is visible to the left of the video
+  // Width set via inline style as calc(splitWidth vw - 3px)
   aspect-ratio: 16 / 9;
   height: auto;
-  // Use padding-left to create space for drag handle
-  padding-left: var(--split-drag-width);
-  box-sizing: border-box;
   // Above the split panel so video renders on top
   z-index: calc(var(--z-player-controls, 900) + 2);
 
