@@ -19,23 +19,52 @@ fi
 
 echo "=== Mu Restart ==="
 
+# Read configured port
+SERVER_PORT=4000
+for config_path in \
+    "$PROJECT_ROOT/data/config/config.yml" \
+    "$SRC_DIR/data/config/config.yml" \
+    "$SRC_DIR/packages/server/data/config/config.yml"; do
+    if [ -f "$config_path" ]; then
+        parsed_port=$(grep -E '^\s+port:\s*[0-9]+' "$config_path" 2>/dev/null | head -1 | grep -oE '[0-9]+')
+        if [ -n "$parsed_port" ]; then
+            SERVER_PORT="$parsed_port"
+            break
+        fi
+    fi
+done
+
 # ── Windows: use NSSM service if available ──
 if $IS_WINDOWS && command -v nssm &>/dev/null; then
     # Check if service exists
     if nssm status mu-server &>/dev/null; then
-        nssm restart mu-server 2>/dev/null || {
-            nssm stop mu-server 2>/dev/null || true
-            sleep 2
-            nssm start mu-server 2>/dev/null || true
-        }
-        sleep 3
-        if netstat -ano 2>/dev/null | grep -q ":4000.*LISTENING"; then
-            echo "=== Restart complete (NSSM service) ==="
-            exit 0
-        else
-            echo "WARNING: NSSM service may have failed to start"
-            exit 1
-        fi
+        echo "Stopping NSSM service..."
+        nssm stop mu-server 2>/dev/null || true
+
+        # Wait for port to actually be freed (Windows can take a few seconds)
+        for i in 1 2 3 4 5 6 7 8; do
+            if ! netstat -ano 2>/dev/null | grep -q ":${SERVER_PORT:-4000}.*LISTENING"; then
+                break
+            fi
+            echo "Waiting for port ${SERVER_PORT:-4000} to be freed... ($i)"
+            sleep 1
+        done
+
+        echo "Starting NSSM service..."
+        nssm start mu-server 2>/dev/null || true
+
+        # Wait for the service to bind the port
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+            if netstat -ano 2>/dev/null | grep -q ":${SERVER_PORT:-4000}.*LISTENING"; then
+                echo "=== Restart complete (NSSM service) ==="
+                exit 0
+            fi
+            sleep 1
+        done
+
+        echo "WARNING: NSSM service may have failed to start"
+        tail -10 "$PROJECT_ROOT/data/logs/server.log" 2>/dev/null
+        exit 1
     fi
     # Service doesn't exist — fall through to nohup method
 fi
