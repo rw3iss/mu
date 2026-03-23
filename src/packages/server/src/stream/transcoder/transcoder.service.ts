@@ -1,5 +1,5 @@
-import crypto from 'node:crypto';
 import { ChildProcess, execSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -52,7 +52,6 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		this.cacheDir = path.resolve(
 			this.config.get<string>('cache.streamDir') || './data/cache/streams',
 		);
-
 	}
 
 	onModuleInit() {
@@ -116,7 +115,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 
 			for (const fileId of dirs) {
 				const filePath = path.join(persistBase, fileId);
-				try { if (!statSync(filePath).isDirectory()) continue; } catch { continue; }
+				try {
+					if (!statSync(filePath).isDirectory()) continue;
+				} catch {
+					continue;
+				}
 
 				// Check file exists in DB
 				const dbFile = this.database.db
@@ -126,13 +129,21 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					.get();
 
 				// Check movie_files table for this ID
-				const movieFile = this.database.db.select().from(movieFiles).where(eq(movieFiles.id, fileId)).get();
+				const movieFile = this.database.db
+					.select()
+					.from(movieFiles)
+					.where(eq(movieFiles.id, fileId))
+					.get();
 				if (!movieFile) continue;
 
 				const qualities = readdirSync(filePath);
 				for (const quality of qualities) {
 					const qPath = path.join(filePath, quality);
-					try { if (!statSync(qPath).isDirectory()) continue; } catch { continue; }
+					try {
+						if (!statSync(qPath).isDirectory()) continue;
+					} catch {
+						continue;
+					}
 
 					if (!existsSync(path.join(qPath, '.complete'))) continue;
 
@@ -150,30 +161,37 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					if (existing) continue;
 
 					// Count segments and size
-					const segFiles = readdirSync(qPath).filter((f: string) => f.startsWith('segment_') && f.endsWith('.ts'));
+					const segFiles = readdirSync(qPath).filter(
+						(f: string) => f.startsWith('segment_') && f.endsWith('.ts'),
+					);
 					let sizeBytes = 0;
 					for (const seg of segFiles) {
-						try { sizeBytes += statSync(path.join(qPath, seg)).size; } catch {}
+						try {
+							sizeBytes += statSync(path.join(qPath, seg)).size;
+						} catch {}
 					}
 
 					// Add to DB
 					const enc = this.getEncodingSettings();
-					this.database.db.insert(transcodeCache).values({
-						id: crypto.randomUUID(),
-						movieFileId: fileId,
-						quality,
-						encodingSettings: JSON.stringify({
-							hwAccel: enc.hwAccel,
-							preset: enc.preset,
-							rateControl: enc.rateControl,
-							crf: enc.crf,
-						}),
-						completedAt: new Date().toISOString(),
-						filePath: movieFile.filePath ?? null,
-						cachePath: `persistent/${fileId}/${quality}`,
-						sizeBytes,
-						segmentCount: segFiles.length,
-					}).run();
+					this.database.db
+						.insert(transcodeCache)
+						.values({
+							id: crypto.randomUUID(),
+							movieFileId: fileId,
+							quality,
+							encodingSettings: JSON.stringify({
+								hwAccel: enc.hwAccel,
+								preset: enc.preset,
+								rateControl: enc.rateControl,
+								crf: enc.crf,
+							}),
+							completedAt: new Date().toISOString(),
+							filePath: movieFile.filePath ?? null,
+							cachePath: `persistent/${fileId}/${quality}`,
+							sizeBytes,
+							segmentCount: segFiles.length,
+						})
+						.run();
 					added++;
 				}
 			}
@@ -413,7 +431,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.transcodeDebugger.recordFFmpegProgress(sessionId, progress);
 				})
 				.on('error', (err: Error) => {
-					this.logger.error(`FFmpeg error for session ${this.guidResolver.resolve(sessionId)}: ${err.message}`);
+					this.logger.error(
+						`FFmpeg error for session ${this.guidResolver.resolve(sessionId)}: ${err.message}`,
+					);
 					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(sessionId);
 
@@ -422,7 +442,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					if (this.isWindowsSpawnFailure(err) && hwAccel === 'none') {
 						// Software encoding also failed — FFmpeg itself is broken
 						this.markFfmpegSpawnBroken();
-						this.sessionStates.set(sessionId, { state: 'failed', error: 'FFmpeg cannot start (Windows DLL error) — try again in 60s' });
+						this.sessionStates.set(sessionId, {
+							state: 'failed',
+							error: 'FFmpeg cannot start (Windows DLL error) — try again in 60s',
+						});
 						reject(err);
 						return;
 					}
@@ -450,10 +473,16 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					reject(err);
 				})
 				.on('end', () => {
-					this.logger.log(`Transcode complete for session ${this.guidResolver.resolve(sessionId)}`);
+					this.logger.log(
+						`Transcode complete for session ${this.guidResolver.resolve(sessionId)}`,
+					);
 					this.activeProcesses.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'completed' });
-					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_complete', 'Transcode finished');
+					this.transcodeDebugger.recordEvent(
+						sessionId,
+						'ffmpeg_complete',
+						'Transcode finished',
+					);
 					// Write .complete marker for persistent cache
 					if (outputDir) {
 						writeFile(path.join(targetDir, '.complete'), '').catch(() => {});
@@ -540,10 +569,16 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					reject(err);
 				})
 				.on('end', () => {
-					this.logger.log(`Remux complete for session ${this.guidResolver.resolve(sessionId)}`);
+					this.logger.log(
+						`Remux complete for session ${this.guidResolver.resolve(sessionId)}`,
+					);
 					this.activeProcesses.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'completed' });
-					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_complete', 'Remux finished');
+					this.transcodeDebugger.recordEvent(
+						sessionId,
+						'ffmpeg_complete',
+						'Remux finished',
+					);
 					if (outputDir) {
 						writeFile(path.join(targetDir, '.complete'), '').catch(() => {});
 					}
@@ -574,7 +609,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 
 		// Already cached
 		if (await this.hasCachedTranscode(movieFileId, quality)) {
-			this.logger.log(`Pre-transcode skipped — cache exists for ${this.guidResolver.resolve(movieFileId)}/${quality}`);
+			this.logger.log(
+				`Pre-transcode skipped — cache exists for ${this.guidResolver.resolve(movieFileId)}/${quality}`,
+			);
 			return;
 		}
 
@@ -677,7 +714,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
 					this.resetFfmpegSpawnFailCount();
-					this.logger.log(`Pre-transcode started for ${this.guidResolver.resolve(movieFileId)}: ${commandLine}`);
+					this.logger.log(
+						`Pre-transcode started for ${this.guidResolver.resolve(movieFileId)}: ${commandLine}`,
+					);
 					this.transcodeDebugger.recordFFmpegCommand(processKey, commandLine);
 					this.transcodeDebugger.recordMilestone(processKey, 'ffmpegSpawned');
 				})
@@ -692,7 +731,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.transcodeDebugger.recordFFmpegProgress(processKey, progress);
 				})
 				.on('error', (err: Error) => {
-					this.logger.error(`Pre-transcode error for ${this.guidResolver.resolve(movieFileId)}: ${err.message}`);
+					this.logger.error(
+						`Pre-transcode error for ${this.guidResolver.resolve(movieFileId)}: ${err.message}`,
+					);
 					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(processKey);
 
@@ -730,9 +771,15 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					reject(err);
 				})
 				.on('end', () => {
-					this.logger.log(`Pre-transcode complete for ${this.guidResolver.resolve(movieFileId)}/${quality}`);
+					this.logger.log(
+						`Pre-transcode complete for ${this.guidResolver.resolve(movieFileId)}/${quality}`,
+					);
 					this.activeProcesses.delete(processKey);
-					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_complete', 'Pre-transcode finished');
+					this.transcodeDebugger.recordEvent(
+						processKey,
+						'ffmpeg_complete',
+						'Pre-transcode finished',
+					);
 					writeFile(path.join(persistDir, '.complete'), '')
 						.then(() => resolve())
 						.catch(() => resolve());
@@ -859,10 +906,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					return false;
 				}
 				// Check for non-stereo AAC that browsers may not handle in HLS
-				if (
-					audioStream.codec_name === 'aac' &&
-					audioStream.channels > 2
-				) {
+				if (audioStream.codec_name === 'aac' && audioStream.channels > 2) {
 					this.logger.warn(
 						`Segment health check: ${audioStream.channels}-channel AAC detected in ${cacheDir} — re-encode to stereo`,
 					);
@@ -925,13 +969,17 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	stopTranscode(sessionId: string): void {
 		const proc = this.activeProcesses.get(sessionId);
 		if (proc) {
-			this.logger.log(`Stopping transcode for session ${this.guidResolver.resolve(sessionId)}`);
+			this.logger.log(
+				`Stopping transcode for session ${this.guidResolver.resolve(sessionId)}`,
+			);
 			try {
 				// On Windows, SIGKILL is not available; use SIGTERM which works cross-platform.
 				// fluent-ffmpeg processes respond to SIGTERM gracefully.
 				proc.kill();
 			} catch (err) {
-				this.logger.warn(`Failed to kill FFmpeg process for session ${this.guidResolver.resolve(sessionId)}: ${err}`);
+				this.logger.warn(
+					`Failed to kill FFmpeg process for session ${this.guidResolver.resolve(sessionId)}: ${err}`,
+				);
 			}
 			this.activeProcesses.delete(sessionId);
 		}
@@ -954,7 +1002,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			} else {
 				execSync(`renice -n -5 -p ${proc.pid}`, { stdio: 'ignore' });
 			}
-			this.logger.debug(`Boosted FFmpeg priority for session ${this.guidResolver.resolve(sessionId)} (PID ${proc.pid})`);
+			this.logger.debug(
+				`Boosted FFmpeg priority for session ${this.guidResolver.resolve(sessionId)} (PID ${proc.pid})`,
+			);
 		} catch {
 			// Requires elevated privileges — silently ignore
 		}
@@ -968,9 +1018,13 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const sessionDir = this.getSessionDir(sessionId);
 		try {
 			await rm(sessionDir, { recursive: true, force: true });
-			this.logger.log(`Cleaned up transcode files for session ${this.guidResolver.resolve(sessionId)}`);
+			this.logger.log(
+				`Cleaned up transcode files for session ${this.guidResolver.resolve(sessionId)}`,
+			);
 		} catch (err) {
-			this.logger.warn(`Failed to clean up session ${this.guidResolver.resolve(sessionId)}: ${err}`);
+			this.logger.warn(
+				`Failed to clean up session ${this.guidResolver.resolve(sessionId)}: ${err}`,
+			);
 		}
 	}
 
@@ -1071,7 +1125,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			command
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
-					this.logger.log(`FFmpeg SW fallback started for session ${this.guidResolver.resolve(sessionId)}`);
+					this.logger.log(
+						`FFmpeg SW fallback started for session ${this.guidResolver.resolve(sessionId)}`,
+					);
 					this.logger.debug(`FFmpeg command: ${commandLine}`);
 					this.sessionStates.set(sessionId, { state: 'running' });
 					resolve();
@@ -1090,7 +1146,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					reject(err);
 				})
 				.on('end', () => {
-					this.logger.log(`SW fallback transcode complete for session ${this.guidResolver.resolve(sessionId)}`);
+					this.logger.log(
+						`SW fallback transcode complete for session ${this.guidResolver.resolve(sessionId)}`,
+					);
 					this.activeProcesses.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'completed' });
 					if (outputDir) {
@@ -1237,9 +1295,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		if (this.ffmpegSpawnBroken) return;
 		this.ffmpegSpawnBroken = true;
 		this.ffmpegSpawnBrokenUntil = Date.now() + 15_000;
-		this.logger.warn(
-			'FFmpeg spawn failed 3+ times — pausing background encoding for 15s',
-		);
+		this.logger.warn('FFmpeg spawn failed 3+ times — pausing background encoding for 15s');
 		setTimeout(() => {
 			this.ffmpegSpawnBroken = false;
 			this.ffmpegSpawnFailCount = 0;
@@ -1421,7 +1477,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.on('end', () => {
 					this.logger.debug(`Chunk encode complete: ${path.basename(outputPath)}`);
 					this.activeProcesses.delete(processKey);
-					this.transcodeDebugger.recordEvent(processKey, 'ffmpeg_complete', 'Chunk encode finished');
+					this.transcodeDebugger.recordEvent(
+						processKey,
+						'ffmpeg_complete',
+						'Chunk encode finished',
+					);
 					resolve();
 				});
 

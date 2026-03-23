@@ -75,7 +75,9 @@ export class AdminController {
 				}
 			} catch (err: any) {
 				failed++;
-				this.logger.warn(`Thumbnail failed for movie ${this.guidResolver.resolve(movieId)}: ${err.message}`);
+				this.logger.warn(
+					`Thumbnail failed for movie ${this.guidResolver.resolve(movieId)}: ${err.message}`,
+				);
 			}
 		}
 

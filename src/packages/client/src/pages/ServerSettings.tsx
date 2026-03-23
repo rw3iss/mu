@@ -105,7 +105,16 @@ function ServerInfoSection() {
 		<div class={styles.infoGrid}>
 			<div class={styles.uptimeBanner}>
 				<div class={styles.uptimeIcon}>
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
 						<circle cx="12" cy="12" r="10" />
 						<polyline points="12 6 12 12 16 14" />
 					</svg>
@@ -117,7 +126,9 @@ function ServerInfoSection() {
 			</div>
 			<div class={styles.infoRow}>
 				<span class={styles.infoLabel}>Platform</span>
-				<span class={styles.infoValue}>{info.platform} ({info.arch})</span>
+				<span class={styles.infoValue}>
+					{info.platform} ({info.arch})
+				</span>
 			</div>
 			<div class={styles.infoRow}>
 				<span class={styles.infoLabel}>Node.js</span>
@@ -125,12 +136,15 @@ function ServerInfoSection() {
 			</div>
 			<div class={styles.infoRow}>
 				<span class={styles.infoLabel}>CPU</span>
-				<span class={styles.infoValue}>{info.cpuModel} ({info.cpuCores} cores)</span>
+				<span class={styles.infoValue}>
+					{info.cpuModel} ({info.cpuCores} cores)
+				</span>
 			</div>
 			<div class={styles.infoRow}>
 				<span class={styles.infoLabel}>Memory</span>
 				<span class={styles.infoValue}>
-					{formatBytes(info.totalMemory - info.freeMemory)} / {formatBytes(info.totalMemory)} used
+					{formatBytes(info.totalMemory - info.freeMemory)} /{' '}
+					{formatBytes(info.totalMemory)} used
 				</span>
 			</div>
 			<div class={styles.infoRow}>
@@ -145,7 +159,9 @@ function ServerInfoSection() {
 					</div>
 					<div class={styles.infoRow}>
 						<span class={styles.infoLabel}>GPU Memory</span>
-						<span class={styles.infoValue}>{info.gpu.memoryUsed} / {info.gpu.memoryTotal}</span>
+						<span class={styles.infoValue}>
+							{info.gpu.memoryUsed} / {info.gpu.memoryTotal}
+						</span>
 					</div>
 					<div class={styles.infoRow}>
 						<span class={styles.infoLabel}>GPU Utilization</span>
@@ -156,7 +172,8 @@ function ServerInfoSection() {
 			<div class={styles.infoRow}>
 				<span class={styles.infoLabel}>HW Accel</span>
 				<span class={styles.infoValue}>
-					{info.hwAccel}{info.hwAccelBroken ? ' (broken — using software)' : ''}
+					{info.hwAccel}
+					{info.hwAccelBroken ? ' (broken — using software)' : ''}
 				</span>
 			</div>
 			<div class={styles.infoRow}>
@@ -189,8 +206,8 @@ function ServerInfoSection() {
 					<div class={styles.confirmModal}>
 						<p class={styles.confirmTitle}>Restart Server?</p>
 						<p class={styles.confirmDetail}>
-							This will stop all active streams and transcoding jobs.
-							The server will restart in a few seconds.
+							This will stop all active streams and transcoding jobs. The server will
+							restart in a few seconds.
 						</p>
 						<div class={styles.confirmActions}>
 							<Button variant="ghost" onClick={() => setShowRestartConfirm(false)}>
@@ -249,10 +266,15 @@ function StatsSection() {
 			<div class={styles.statCard}>
 				<div class={styles.statCardHeader}>
 					<span class={styles.statLabel}>CPU Load</span>
-					<span class={styles.statValue}>{sys.loadAvg[0].toFixed(2)} / {sys.cpuCount}</span>
+					<span class={styles.statValue}>
+						{sys.loadAvg[0].toFixed(2)} / {sys.cpuCount}
+					</span>
 				</div>
 				<div class={styles.statBar}>
-					<div class={styles.statBarFill} style={{ width: `${cpuRatio * 100}%`, background: meterColor(cpuRatio) }} />
+					<div
+						class={styles.statBarFill}
+						style={{ width: `${cpuRatio * 100}%`, background: meterColor(cpuRatio) }}
+					/>
 				</div>
 			</div>
 
@@ -267,35 +289,55 @@ function StatsSection() {
 					<span class={styles.statSegment}>Total: {formatBytes(memTotal)}</span>
 				</div>
 				<div class={styles.statBar}>
-					<div class={styles.statBarFill} style={{ width: `${memRatio * 100}%`, background: meterColor(memRatio) }} />
-					<div class={`${styles.statBarFill} ${styles.statBarOverlay}`} style={{ width: `${Math.max(appMemRatio * 100, 0.5)}%` }} />
+					<div
+						class={styles.statBarFill}
+						style={{ width: `${memRatio * 100}%`, background: meterColor(memRatio) }}
+					/>
+					<div
+						class={`${styles.statBarFill} ${styles.statBarOverlay}`}
+						style={{ width: `${Math.max(appMemRatio * 100, 0.5)}%` }}
+					/>
 				</div>
 			</div>
 
 			{/* Disk */}
-			{sys.diskTotal > 0 && (() => {
-				const diskTotal = sys.diskTotal || 1;
-				const diskUsed = diskTotal - sys.diskFree;
-				const diskRatio = diskUsed / diskTotal;
-				const appSize = sys.dataDirSize || 0;
-				const appDiskRatio = appSize / diskTotal;
-				return (
-					<div class={styles.statCard}>
-						<div class={styles.statCardHeader}>
-							<span class={styles.statLabel}>Disk</span>
+			{sys.diskTotal > 0 &&
+				(() => {
+					const diskTotal = sys.diskTotal || 1;
+					const diskUsed = diskTotal - sys.diskFree;
+					const diskRatio = diskUsed / diskTotal;
+					const appSize = sys.dataDirSize || 0;
+					const appDiskRatio = appSize / diskTotal;
+					return (
+						<div class={styles.statCard}>
+							<div class={styles.statCardHeader}>
+								<span class={styles.statLabel}>Disk</span>
+							</div>
+							<div class={styles.statSegments}>
+								<span class={styles.statSegment}>App: {formatBytes(appSize)}</span>
+								<span class={styles.statSegment}>
+									Used: {formatBytes(diskUsed)}
+								</span>
+								<span class={styles.statSegment}>
+									Total: {formatBytes(diskTotal)}
+								</span>
+							</div>
+							<div class={styles.statBar}>
+								<div
+									class={styles.statBarFill}
+									style={{
+										width: `${diskRatio * 100}%`,
+										background: meterColor(diskRatio),
+									}}
+								/>
+								<div
+									class={`${styles.statBarFill} ${styles.statBarOverlay}`}
+									style={{ width: `${Math.max(appDiskRatio * 100, 0.5)}%` }}
+								/>
+							</div>
 						</div>
-						<div class={styles.statSegments}>
-							<span class={styles.statSegment}>App: {formatBytes(appSize)}</span>
-							<span class={styles.statSegment}>Used: {formatBytes(diskUsed)}</span>
-							<span class={styles.statSegment}>Total: {formatBytes(diskTotal)}</span>
-						</div>
-						<div class={styles.statBar}>
-							<div class={styles.statBarFill} style={{ width: `${diskRatio * 100}%`, background: meterColor(diskRatio) }} />
-							<div class={`${styles.statBarFill} ${styles.statBarOverlay}`} style={{ width: `${Math.max(appDiskRatio * 100, 0.5)}%` }} />
-						</div>
-					</div>
-				);
-			})()}
+					);
+				})()}
 
 			{/* Library */}
 			<div class={styles.statCard}>
@@ -310,7 +352,8 @@ function StatsSection() {
 				<div class={styles.statCard}>
 					<div class={styles.statLabel}>Activity</div>
 					<div class={styles.statValue}>
-						{svc.activeStreams ?? 0} streams, {svc.activeTranscodes ?? 0} transcodes, {svc.runningJobs ?? 0} running / {svc.pendingJobs ?? 0} pending jobs
+						{svc.activeStreams ?? 0} streams, {svc.activeTranscodes ?? 0} transcodes,{' '}
+						{svc.runningJobs ?? 0} running / {svc.pendingJobs ?? 0} pending jobs
 					</div>
 				</div>
 			)}
@@ -335,14 +378,18 @@ function JobsSection() {
 					const data = await api.get<{ jobs: any[] }>('/admin/server/jobs');
 					setCurrentJobs(data.jobs);
 				} else {
-					const data = await api.get<{ jobs: any[] }>('/admin/server/jobs/history?limit=50');
+					const data = await api.get<{ jobs: any[] }>(
+						'/admin/server/jobs/history?limit=50',
+					);
 					setHistoryJobs(data.jobs);
 				}
 			} catch {}
 		};
 		load();
 		const interval = tab === 'current' ? setInterval(load, 3000) : null;
-		return () => { if (interval) clearInterval(interval); };
+		return () => {
+			if (interval) clearInterval(interval);
+		};
 	}, [tab]);
 
 	const handleAction = useCallback(async (id: string, action: string) => {
@@ -366,10 +413,7 @@ function JobsSection() {
 			cancelled: '#6b7280',
 		};
 		return (
-			<span
-				class={styles.statusBadge}
-				style={{ background: colors[status] || '#6b7280' }}
-			>
+			<span class={styles.statusBadge} style={{ background: colors[status] || '#6b7280' }}>
 				{status}
 			</span>
 		);
@@ -394,7 +438,9 @@ function JobsSection() {
 
 			<div class={styles.jobList}>
 				{(tab === 'current' ? currentJobs : historyJobs).length === 0 ? (
-					<div class={styles.emptyText}>No {tab === 'current' ? 'active' : 'historical'} jobs</div>
+					<div class={styles.emptyText}>
+						No {tab === 'current' ? 'active' : 'historical'} jobs
+					</div>
 				) : (
 					(tab === 'current' ? currentJobs : historyJobs).map((job) => (
 						<div
@@ -407,14 +453,21 @@ function JobsSection() {
 								{statusBadge(job.status)}
 								<span class={styles.jobLabel}>{job.label}</span>
 								{job.progress > 0 && job.progress < 100 && (
-									<span class={styles.jobProgress}>{job.progress.toFixed(0)}%</span>
+									<span class={styles.jobProgress}>
+										{job.progress.toFixed(0)}%
+									</span>
 								)}
 								{(job.startedAt || job.createdAt) && (
 									<span class={styles.jobTime}>
-										{new Date(job.startedAt || job.createdAt).toLocaleString(undefined, {
-											month: 'short', day: 'numeric',
-											hour: '2-digit', minute: '2-digit',
-										})}
+										{new Date(job.startedAt || job.createdAt).toLocaleString(
+											undefined,
+											{
+												month: 'short',
+												day: 'numeric',
+												hour: '2-digit',
+												minute: '2-digit',
+											},
+										)}
 									</span>
 								)}
 							</div>
@@ -435,13 +488,17 @@ function JobsSection() {
 									{job.payload?.filePath && (
 										<div class={styles.infoRow}>
 											<span class={styles.infoLabel}>File</span>
-											<span class={styles.infoValue}>{job.payload.filePath}</span>
+											<span class={styles.infoValue}>
+												{job.payload.filePath}
+											</span>
 										</div>
 									)}
 									{job.payload?.quality && (
 										<div class={styles.infoRow}>
 											<span class={styles.infoLabel}>Quality</span>
-											<span class={styles.infoValue}>{job.payload.quality}</span>
+											<span class={styles.infoValue}>
+												{job.payload.quality}
+											</span>
 										</div>
 									)}
 									{job.startedAt && (
@@ -455,29 +512,56 @@ function JobsSection() {
 									{job.durationMs != null && (
 										<div class={styles.infoRow}>
 											<span class={styles.infoLabel}>Duration</span>
-											<span class={styles.infoValue}>{formatDuration(job.durationMs)}</span>
+											<span class={styles.infoValue}>
+												{formatDuration(job.durationMs)}
+											</span>
 										</div>
 									)}
 									{job.error && (
 										<div class={styles.infoRow}>
 											<span class={styles.infoLabel}>Error</span>
-											<span class={`${styles.infoValue} ${styles.errorText}`}>{job.error}</span>
+											<span class={`${styles.infoValue} ${styles.errorText}`}>
+												{job.error}
+											</span>
 										</div>
 									)}
 									{tab === 'current' && (
 										<div class={styles.jobActions}>
 											{job.status === 'running' && (
-												<Button variant="ghost" size="sm" onClick={(e: Event) => { e.stopPropagation(); handleAction(job.id, 'pause'); }}>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={(e: Event) => {
+														e.stopPropagation();
+														handleAction(job.id, 'pause');
+													}}
+												>
 													Pause
 												</Button>
 											)}
 											{job.status === 'paused' && (
-												<Button variant="ghost" size="sm" onClick={(e: Event) => { e.stopPropagation(); handleAction(job.id, 'resume'); }}>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={(e: Event) => {
+														e.stopPropagation();
+														handleAction(job.id, 'resume');
+													}}
+												>
 													Resume
 												</Button>
 											)}
-											{(job.status === 'running' || job.status === 'pending' || job.status === 'paused') && (
-												<Button variant="ghost" size="sm" onClick={(e: Event) => { e.stopPropagation(); handleAction(job.id, 'cancel'); }}>
+											{(job.status === 'running' ||
+												job.status === 'pending' ||
+												job.status === 'paused') && (
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={(e: Event) => {
+														e.stopPropagation();
+														handleAction(job.id, 'cancel');
+													}}
+												>
 													Cancel
 												</Button>
 											)}

@@ -100,7 +100,9 @@ export class ThumbnailService {
 			);
 			return thumbnailUrl;
 		} catch (err: any) {
-			this.logger.warn(`Failed to generate thumbnail for movie ${this.guidResolver.resolve(movieId)}: ${err.message}`);
+			this.logger.warn(
+				`Failed to generate thumbnail for movie ${this.guidResolver.resolve(movieId)}: ${err.message}`,
+			);
 			return null;
 		}
 	}

@@ -16,7 +16,12 @@ import { TranscoderService } from './transcoder/transcoder.service.js';
 
 @Module({
 	imports: [RemoteModule],
-	controllers: [StreamController, SubtitleController, SubtitleManageController, TranscodeDebugController],
+	controllers: [
+		StreamController,
+		SubtitleController,
+		SubtitleManageController,
+		TranscodeDebugController,
+	],
 	providers: [
 		StreamService,
 		TranscoderService,

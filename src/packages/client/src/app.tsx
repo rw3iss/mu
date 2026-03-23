@@ -29,11 +29,11 @@ import {
 import { initTheme } from '@/state/theme.state';
 import '@/state/accentColor.state';
 import '@/state/appearance.state';
+import { audioEngine } from '@/audio/audio-engine';
 import { GlobalPlayer } from '@/components/player/GlobalPlayer';
 import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { wsService } from '@/services/websocket.service';
-import { audioEngine } from '@/audio/audio-engine';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
 import { initProcessingState } from '@/state/processing.state';
 

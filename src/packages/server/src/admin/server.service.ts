@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
@@ -94,7 +94,10 @@ export class ServerService {
 		};
 	}
 
-	getServerLogs(lines = 200, file = 'server'): { content: string; path: string; sizeBytes: number } {
+	getServerLogs(
+		lines = 200,
+		file = 'server',
+	): { content: string; path: string; sizeBytes: number } {
 		const logDir = path.resolve('./data/logs');
 		const fileName = file === 'transcode-debug' ? 'transcode-debug.log' : 'server.log';
 		const logPath = path.join(logDir, fileName);
@@ -117,9 +120,10 @@ export class ServerService {
 
 	private getGpuInfo(): Record<string, string> | null {
 		try {
-			const cmd = process.platform === 'win32'
-				? 'nvidia-smi --query-gpu=name,driver_version,memory.total,memory.used,utilization.gpu --format=csv,noheader,nounits'
-				: 'nvidia-smi --query-gpu=name,driver_version,memory.total,memory.used,utilization.gpu --format=csv,noheader,nounits 2>/dev/null';
+			const cmd =
+				process.platform === 'win32'
+					? 'nvidia-smi --query-gpu=name,driver_version,memory.total,memory.used,utilization.gpu --format=csv,noheader,nounits'
+					: 'nvidia-smi --query-gpu=name,driver_version,memory.total,memory.used,utilization.gpu --format=csv,noheader,nounits 2>/dev/null';
 
 			const output = execSync(cmd, { encoding: 'utf-8', timeout: 5000 }).trim();
 			if (!output) return null;

@@ -68,7 +68,9 @@ export class ImageService {
 		const movieDir = join(this.cacheDir, movieId);
 		if (existsSync(movieDir)) {
 			await rm(movieDir, { recursive: true, force: true });
-			this.logger.debug(`Cleared image cache for movie ${this.guidResolver.resolve(movieId)}`);
+			this.logger.debug(
+				`Cleared image cache for movie ${this.guidResolver.resolve(movieId)}`,
+			);
 		}
 	}
 

@@ -308,14 +308,20 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 			>
 				<div class={styles.deleteModalBody}>
 					{deleteSuccess ? (
-						<p style={{ textAlign: 'center', padding: '1rem 0', color: 'var(--color-success, #4caf50)' }}>
+						<p
+							style={{
+								textAlign: 'center',
+								padding: '1rem 0',
+								color: 'var(--color-success, #4caf50)',
+							}}
+						>
 							'{movie.title}' has been deleted.
 						</p>
 					) : (
 						<>
 							<p>
-								This will permanently delete the movie file(s) from disk and remove all
-								cached data. This action cannot be undone.
+								This will permanently delete the movie file(s) from disk and remove
+								all cached data. This action cannot be undone.
 							</p>
 							<label class={styles.deleteOption}>
 								<input

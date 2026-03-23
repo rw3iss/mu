@@ -109,7 +109,9 @@ export class MetadataController {
 		// Delete the movie_metadata record entirely
 		this.database.db.delete(movieMetadata).where(eq(movieMetadata.movieId, movieId)).run();
 
-		this.logger.log(`Cleared metadata for movie ${this.guidResolver.resolve(movieId)} (${movie.title})`);
+		this.logger.log(
+			`Cleared metadata for movie ${this.guidResolver.resolve(movieId)} (${movie.title})`,
+		);
 		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'clear-metadata' });
 
 		return { message: 'Metadata cleared' };
@@ -332,7 +334,9 @@ export class MetadataController {
 			this.logger.warn(`Failed to enqueue pre-transcode during rescan: ${err.message}`);
 		}
 
-		this.logger.log(`Rescanned ${results.length} file(s) for movie ${this.guidResolver.resolve(movieId)}`);
+		this.logger.log(
+			`Rescanned ${results.length} file(s) for movie ${this.guidResolver.resolve(movieId)}`,
+		);
 
 		// Emit WebSocket event
 		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'rescan' });

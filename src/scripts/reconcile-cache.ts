@@ -19,9 +19,10 @@ import Database from 'better-sqlite3';
 
 const shouldClean = process.argv.includes('--clean');
 
-const __dirname = typeof import.meta.dirname === 'string'
-	? import.meta.dirname
-	: path.dirname(fileURLToPath(import.meta.url));
+const __dirname =
+	typeof import.meta.dirname === 'string'
+		? import.meta.dirname
+		: path.dirname(fileURLToPath(import.meta.url));
 
 // Try multiple DB locations
 const dbPaths = [
@@ -71,7 +72,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS transcode_cache (
 )`);
 
 // Get all movie file IDs from DB
-const dbFiles = db.prepare('SELECT id, file_path FROM movie_files').all() as { id: string; file_path: string }[];
+const dbFiles = db.prepare('SELECT id, file_path FROM movie_files').all() as {
+	id: string;
+	file_path: string;
+}[];
 const dbFileIds = new Set(dbFiles.map((r) => r.id));
 
 // Build a lookup map: normalized file_path → file ID
@@ -91,7 +95,10 @@ for (const f of dbFiles) {
 
 // Get existing cache entries
 const existingCache = new Set(
-	db.prepare("SELECT movie_file_id || ':' || quality as k FROM transcode_cache").all().map((r: any) => r.k),
+	db
+		.prepare("SELECT movie_file_id || ':' || quality as k FROM transcode_cache")
+		.all()
+		.map((r: any) => r.k),
 );
 
 const dirs = readdirSync(cacheDir);
@@ -106,7 +113,11 @@ function tryMatchOrphan(dirPath: string): string | null {
 	// Try to find a matching movie file by reading chunk-meta.json
 	for (const quality of readdirSync(dirPath)) {
 		const qPath = path.join(dirPath, quality);
-		try { if (!statSync(qPath).isDirectory()) continue; } catch { continue; }
+		try {
+			if (!statSync(qPath).isDirectory()) continue;
+		} catch {
+			continue;
+		}
 
 		const metaPath = path.join(qPath, 'chunk-meta.json');
 		if (existsSync(metaPath)) {
@@ -144,7 +155,9 @@ function registerCache(fileId: string, quality: string, qualityPath: string): bo
 
 	let totalSize = 0;
 	for (const seg of segments) {
-		try { totalSize += statSync(path.join(qualityPath, seg)).size; } catch {}
+		try {
+			totalSize += statSync(path.join(qualityPath, seg)).size;
+		} catch {}
 	}
 
 	const id = crypto.randomUUID();
@@ -152,7 +165,9 @@ function registerCache(fileId: string, quality: string, qualityPath: string): bo
 		db.prepare(
 			'INSERT INTO transcode_cache (id, movie_file_id, quality, encoding_settings, completed_at) VALUES (?, ?, ?, ?, ?)',
 		).run(
-			id, fileId, quality,
+			id,
+			fileId,
+			quality,
 			JSON.stringify({ hwAccel: 'none', preset: 'veryfast', rateControl: 'crf', crf: 23 }),
 			new Date().toISOString(),
 		);
@@ -169,7 +184,11 @@ function registerCache(fileId: string, quality: string, qualityPath: string): bo
 
 for (const dirName of dirs) {
 	const dirPath = path.join(cacheDir, dirName);
-	try { if (!statSync(dirPath).isDirectory()) continue; } catch { continue; }
+	try {
+		if (!statSync(dirPath).isDirectory()) continue;
+	} catch {
+		continue;
+	}
 
 	const isKnown = dbFileIds.has(dirName);
 
@@ -185,7 +204,11 @@ for (const dirName of dirs) {
 			const qualities = readdirSync(dirPath);
 			for (const quality of qualities) {
 				const qPath = path.join(dirPath, quality);
-				try { if (!statSync(qPath).isDirectory()) continue; } catch { continue; }
+				try {
+					if (!statSync(qPath).isDirectory()) continue;
+				} catch {
+					continue;
+				}
 				if (registerCache(matchedId, quality, qPath)) {
 					added++;
 				}
@@ -211,7 +234,11 @@ for (const dirName of dirs) {
 	const qualities = readdirSync(dirPath);
 	for (const quality of qualities) {
 		const qPath = path.join(dirPath, quality);
-		try { if (!statSync(qPath).isDirectory()) continue; } catch { continue; }
+		try {
+			if (!statSync(qPath).isDirectory()) continue;
+		} catch {
+			continue;
+		}
 
 		const key = `${dirName}:${quality}`;
 		if (existingCache.has(key)) {
@@ -246,10 +273,14 @@ if (shouldClean) {
 console.log(`  Incomplete (no .complete):  ${incomplete}`);
 
 const totalCache = db.prepare('SELECT COUNT(*) as c FROM transcode_cache').get() as any;
-const totalFiles = db.prepare('SELECT COUNT(*) as c FROM movie_files WHERE available=1').get() as any;
+const totalFiles = db
+	.prepare('SELECT COUNT(*) as c FROM movie_files WHERE available=1')
+	.get() as any;
 console.log(`\n  Total cache entries:       ${totalCache.c}`);
 console.log(`  Total available files:     ${totalFiles.c}`);
-console.log(`  Cache coverage:            ${((totalCache.c / Math.max(totalFiles.c, 1)) * 100).toFixed(1)}%`);
+console.log(
+	`  Cache coverage:            ${((totalCache.c / Math.max(totalFiles.c, 1)) * 100).toFixed(1)}%`,
+);
 
 if (orphaned > 0 && !shouldClean) {
 	console.log(`\nRun with --clean to remove ${orphaned} orphaned cache directories`);

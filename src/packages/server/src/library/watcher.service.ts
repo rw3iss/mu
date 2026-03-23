@@ -1,6 +1,13 @@
 import { basename, extname } from 'node:path';
 import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, forwardRef } from '@nestjs/common';
+import {
+	forwardRef,
+	Inject,
+	Injectable,
+	Logger,
+	OnModuleDestroy,
+	OnModuleInit,
+} from '@nestjs/common';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { and, eq, like, sql } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
@@ -113,7 +120,9 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 
 		watcher.on('unlinkDir', (dirPath: string) => {
 			this.handleDirectoryRemoved(dirPath).catch((err) => {
-				this.logger.error(`Error handling removed directory ${dirPath}: ${(err as Error).message}`);
+				this.logger.error(
+					`Error handling removed directory ${dirPath}: ${(err as Error).message}`,
+				);
 			});
 		});
 
@@ -232,7 +241,11 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 
 		// Find all available files whose path starts with the removed directory
 		const affectedFiles = this.database.db
-			.select({ id: movieFiles.id, movieId: movieFiles.movieId, filePath: movieFiles.filePath })
+			.select({
+				id: movieFiles.id,
+				movieId: movieFiles.movieId,
+				filePath: movieFiles.filePath,
+			})
 			.from(movieFiles)
 			.where(and(like(movieFiles.filePath, `${dirPath}%`), eq(movieFiles.available, true)))
 			.all();
@@ -265,6 +278,8 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 			}
 		}
 
-		this.logger.log(`Directory removal affected ${affectedFiles.length} file(s), ${uniqueMovieIds.length} movie(s)`);
+		this.logger.log(
+			`Directory removal affected ${affectedFiles.length} file(s), ${uniqueMovieIds.length} movie(s)`,
+		);
 	}
 }

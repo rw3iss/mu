@@ -190,7 +190,9 @@ export class JobManagerService implements OnModuleDestroy {
 
 		const callback = this.onCancelCallbacks.get(id);
 		if (callback) {
-			try { callback(); } catch {}
+			try {
+				callback();
+			} catch {}
 			this.onCancelCallbacks.delete(id);
 		}
 		this.running.delete(id);
@@ -394,25 +396,28 @@ export class JobManagerService implements OnModuleDestroy {
 	private writeJobHistory(job: JobRecord, startTime: number): void {
 		try {
 			const durationMs = Math.round(performance.now() - startTime);
-			this.database.db.insert(jobHistory).values({
-				id: job.id,
-				type: job.type,
-				label: job.label,
-				status: job.status,
-				payload: job.payload ? JSON.stringify(job.payload) : null,
-				priority: job.priority,
-				progress: job.progress ?? 0,
-				result: job.result ? JSON.stringify(job.result) : null,
-				error: job.error ?? null,
-				createdAt: job.createdAt,
-				startedAt: job.startedAt ?? null,
-				completedAt: job.completedAt ?? null,
-				durationMs,
-				movieId: (job.payload?.movieId as string) ?? null,
-				movieTitle: (job.payload?.movieTitle as string) ?? job.label,
-				filePath: (job.payload?.filePath as string) ?? null,
-				quality: (job.payload?.quality as string) ?? null,
-			}).run();
+			this.database.db
+				.insert(jobHistory)
+				.values({
+					id: job.id,
+					type: job.type,
+					label: job.label,
+					status: job.status,
+					payload: job.payload ? JSON.stringify(job.payload) : null,
+					priority: job.priority,
+					progress: job.progress ?? 0,
+					result: job.result ? JSON.stringify(job.result) : null,
+					error: job.error ?? null,
+					createdAt: job.createdAt,
+					startedAt: job.startedAt ?? null,
+					completedAt: job.completedAt ?? null,
+					durationMs,
+					movieId: (job.payload?.movieId as string) ?? null,
+					movieTitle: (job.payload?.movieTitle as string) ?? job.label,
+					filePath: (job.payload?.filePath as string) ?? null,
+					quality: (job.payload?.quality as string) ?? null,
+				})
+				.run();
 		} catch (err: any) {
 			this.logger.warn(`Failed to write job history: ${err.message}`);
 		}

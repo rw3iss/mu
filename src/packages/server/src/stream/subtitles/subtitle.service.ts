@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs';
 import { access, mkdir, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
-import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import ffmpeg from 'fluent-ffmpeg';
+import { GuidResolverService } from '../../common/guid-resolver.service.js';
 
 interface SubtitleTrack {
 	index: number;
@@ -337,7 +337,9 @@ export class SubtitleService {
 		const dir = this.getSubtitleDir(movieFileId);
 		if (existsSync(dir)) {
 			await rm(dir, { recursive: true, force: true });
-			this.logger.debug(`Cleared subtitle cache for file ${this.guidResolver.resolve(movieFileId)}`);
+			this.logger.debug(
+				`Cleared subtitle cache for file ${this.guidResolver.resolve(movieFileId)}`,
+			);
 		}
 	}
 

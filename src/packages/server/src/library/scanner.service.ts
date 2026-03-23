@@ -1,7 +1,7 @@
 import { opendir, stat } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
@@ -253,7 +253,9 @@ export class ScannerService {
 			}
 
 			if (moviesRemoved > 0) {
-				this.logger.log(`Purged ${moviesRemoved} orphaned movie(s) with no available files`);
+				this.logger.log(
+					`Purged ${moviesRemoved} orphaned movie(s) with no available files`,
+				);
 			}
 
 			// Update source stats
@@ -420,7 +422,9 @@ export class ScannerService {
 			}
 		}
 
-		this.logger.log(`Rescanned ${results.length} file(s) for movie ${this.guidResolver.resolve(movieId)}`);
+		this.logger.log(
+			`Rescanned ${results.length} file(s) for movie ${this.guidResolver.resolve(movieId)}`,
+		);
 		return { files: results };
 	}
 

@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MediaModule } from '../media/media.module.js';
 import { MetadataModule } from '../metadata/metadata.module.js';
 import { MoviesModule } from '../movies/movies.module.js';

@@ -1,13 +1,13 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { Body, Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
 import { nowISO } from '@mu/shared';
+import { Body, Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
+import { desc, eq, sql } from 'drizzle-orm';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { DatabaseService } from '../database/database.service.js';
 import { jobHistory } from '../database/schema/index.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { ServerService } from './server.service.js';
-import { desc, eq, sql } from 'drizzle-orm';
 
 @Controller('admin/server')
 export class ServerController {
@@ -61,10 +61,7 @@ export class ServerController {
 
 	@Get('logs')
 	@Roles('admin')
-	getLogs(
-		@Query('lines') lines?: string,
-		@Query('file') file?: string,
-	) {
+	getLogs(@Query('lines') lines?: string, @Query('file') file?: string) {
 		const numLines = lines ? parseInt(lines, 10) : 200;
 		const logFile = file === 'transcode-debug' ? 'transcode-debug' : 'server';
 		return this.serverService.getServerLogs(numLines, logFile);
@@ -76,10 +73,7 @@ export class ServerController {
 
 	@Get('jobs')
 	@Roles('admin')
-	listJobs(
-		@Query('status') status?: string,
-		@Query('type') type?: string,
-	) {
+	listJobs(@Query('status') status?: string, @Query('type') type?: string) {
 		// Current in-memory jobs
 		const currentJobs = this.jobManager.listJobs({ type, status });
 
@@ -87,11 +81,12 @@ export class ServerController {
 			jobs: currentJobs.map((j) => ({
 				...j,
 				movieTitle: (j.payload?.movieId as string) ? undefined : undefined,
-				durationMs: j.startedAt && j.completedAt
-					? new Date(j.completedAt).getTime() - new Date(j.startedAt).getTime()
-					: j.startedAt
-						? Date.now() - new Date(j.startedAt).getTime()
-						: undefined,
+				durationMs:
+					j.startedAt && j.completedAt
+						? new Date(j.completedAt).getTime() - new Date(j.startedAt).getTime()
+						: j.startedAt
+							? Date.now() - new Date(j.startedAt).getTime()
+							: undefined,
 			})),
 		};
 	}
@@ -111,11 +106,16 @@ export class ServerController {
 		if (status) conditions.push(eq(jobHistory.status, status));
 		if (type) conditions.push(eq(jobHistory.type, type));
 
-		const where = conditions.length > 0
-			? conditions.length === 1 ? conditions[0] : sql`${conditions[0]} AND ${conditions[1]}`
-			: undefined;
+		const where =
+			conditions.length > 0
+				? conditions.length === 1
+					? conditions[0]
+					: sql`${conditions[0]} AND ${conditions[1]}`
+				: undefined;
 
-		const results = this.database.db.select().from(jobHistory)
+		const results = this.database.db
+			.select()
+			.from(jobHistory)
 			.where(where)
 			.orderBy(desc(jobHistory.completedAt))
 			.limit(numLimit)

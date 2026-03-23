@@ -140,14 +140,16 @@ export function FileInfoGrid({ movie, dark }: FileInfoGridProps) {
 						Cached Versions ({(movie as any).cachedVersions.length})
 					</h3>
 					<div class={styles.trackList}>
-						{(movie as any).cachedVersions.map((v: { quality: string; completedAt: string }) => (
-							<div key={v.quality} class={styles.trackItem}>
-								<span class={styles.trackCodec}>{v.quality.toUpperCase()}</span>
-								<span class={styles.trackMeta}>
-									{new Date(v.completedAt).toLocaleDateString()}
-								</span>
-							</div>
-						))}
+						{(movie as any).cachedVersions.map(
+							(v: { quality: string; completedAt: string }) => (
+								<div key={v.quality} class={styles.trackItem}>
+									<span class={styles.trackCodec}>{v.quality.toUpperCase()}</span>
+									<span class={styles.trackMeta}>
+										{new Date(v.completedAt).toLocaleDateString()}
+									</span>
+								</div>
+							),
+						)}
 					</div>
 				</div>
 			)}

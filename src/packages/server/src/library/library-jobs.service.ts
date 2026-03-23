@@ -7,10 +7,11 @@ import {
 	Inject,
 	Injectable,
 	Logger,
-	OnModuleInit,
 	OnApplicationBootstrap,
+	OnModuleInit,
 } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
+import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movies, transcodeCache, userWatchHistory } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -23,7 +24,6 @@ import { StreamService } from '../stream/stream.service.js';
 import { ChunkManagerService } from '../stream/transcoder/chunk-manager.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { LibraryService } from './library.service.js';
-import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { ScannerService } from './scanner.service.js';
 
 /** Well-known job types */
@@ -773,7 +773,11 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			.run();
 
 		// Look up source file path for reference
-		const file = this.database.db.select().from(movieFiles).where(eq(movieFiles.id, movieFileId)).get();
+		const file = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.id, movieFileId))
+			.get();
 		// Store relative cache path (movieFileId/quality) so it works if cache root moves
 		const cachePath = `persistent/${movieFileId}/${quality}`;
 

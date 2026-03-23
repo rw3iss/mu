@@ -343,8 +343,12 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 
 				// Debug: log key lifecycle events
 				hls.on(Hls.Events.MANIFEST_LOADED, () => console.log('[HLS] Manifest loaded'));
-				hls.on(Hls.Events.FRAG_LOADING, (_e, d) => console.log('[HLS] Loading fragment', d.frag.sn));
-				hls.on(Hls.Events.FRAG_BUFFERED, (_e, d) => console.log('[HLS] Fragment buffered', d.frag.sn));
+				hls.on(Hls.Events.FRAG_LOADING, (_e, d) =>
+					console.log('[HLS] Loading fragment', d.frag.sn),
+				);
+				hls.on(Hls.Events.FRAG_BUFFERED, (_e, d) =>
+					console.log('[HLS] Fragment buffered', d.frag.sn),
+				);
 				hls.on(Hls.Events.BUFFER_APPENDING, () => console.log('[HLS] Buffer appending'));
 				hls.on(Hls.Events.BUFFER_APPENDED, () => console.log('[HLS] Buffer appended'));
 				hls.on(Hls.Events.BUFFER_EOS, () => console.log('[HLS] Buffer EOS'));
@@ -390,13 +394,19 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 						hlsRef.current = null;
 						// Restart the stream from current position
 						const pos = video.currentTime;
-						import('../../state/globalPlayer.state.js').then(({ startGlobalStream }) => {
-							startGlobalStream().then((session) => {
-								if (session) {
-									engine.startStream(session, pos > 0 ? pos : undefined, true);
-								}
-							});
-						});
+						import('../../state/globalPlayer.state.js').then(
+							({ startGlobalStream }) => {
+								startGlobalStream().then((session) => {
+									if (session) {
+										engine.startStream(
+											session,
+											pos > 0 ? pos : undefined,
+											true,
+										);
+									}
+								});
+							},
+						);
 						return;
 					}
 

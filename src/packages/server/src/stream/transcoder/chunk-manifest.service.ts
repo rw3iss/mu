@@ -63,6 +63,8 @@ export class ChunkManifestService {
 
 		const manifest = lines.join('\n') + '\n';
 		await writeFile(path.join(cacheDir, 'stream.m3u8'), manifest);
-		this.logger.log(`Final manifest written for ${this.guidResolver.resolve(chunkMap.movieFileId)}/${chunkMap.quality}`);
+		this.logger.log(
+			`Final manifest written for ${this.guidResolver.resolve(chunkMap.movieFileId)}/${chunkMap.quality}`,
+		);
 	}
 }

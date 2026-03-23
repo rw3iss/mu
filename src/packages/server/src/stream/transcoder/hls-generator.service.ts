@@ -26,10 +26,14 @@ export class HlsGeneratorService {
 			return data;
 		} catch (err: any) {
 			if (err.code === 'ENOENT') {
-				this.logger.debug(`Manifest not yet available for session ${this.guidResolver.resolve(sessionId)}`);
+				this.logger.debug(
+					`Manifest not yet available for session ${this.guidResolver.resolve(sessionId)}`,
+				);
 				return null;
 			}
-			this.logger.error(`Error reading manifest for session ${this.guidResolver.resolve(sessionId)}: ${err.message}`);
+			this.logger.error(
+				`Error reading manifest for session ${this.guidResolver.resolve(sessionId)}: ${err.message}`,
+			);
 			throw err;
 		}
 	}

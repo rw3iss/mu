@@ -3,11 +3,11 @@ import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
 import { FontScaler, resetTextScale } from '@/components/common/FontScaler';
-import { ServerSettings } from '@/pages/ServerSettings';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
 import { useUiSetting } from '@/hooks/useUiSetting';
+import { ServerSettings } from '@/pages/ServerSettings';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
@@ -152,17 +152,38 @@ function meterColor(ratio: number): string {
 function CollapsibleSubtitleSettings() {
 	const [open, setOpen] = useState(false);
 	return (
-		<div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-md)', marginTop: 'var(--space-md)' }}>
+		<div
+			style={{
+				borderTop: '1px solid var(--color-border)',
+				paddingTop: 'var(--space-md)',
+				marginTop: 'var(--space-md)',
+			}}
+		>
 			<button
 				onClick={() => setOpen(!open)}
 				style={{
-					display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-					width: '100%', padding: '0', background: 'none', border: 'none',
-					cursor: 'pointer', color: 'var(--color-text-primary)',
+					display: 'flex',
+					justifyContent: 'space-between',
+					alignItems: 'center',
+					width: '100%',
+					padding: '0',
+					background: 'none',
+					border: 'none',
+					cursor: 'pointer',
+					color: 'var(--color-text-primary)',
 				}}
 			>
-				<span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-semibold)' }}>Subtitles</span>
-				<span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{open ? '\u25B2' : '\u25BC'}</span>
+				<span
+					style={{
+						fontSize: 'var(--font-size-lg)',
+						fontWeight: 'var(--font-weight-semibold)',
+					}}
+				>
+					Subtitles
+				</span>
+				<span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
+					{open ? '\u25B2' : '\u25BC'}
+				</span>
 			</button>
 			{open && (
 				<div style={{ paddingTop: 'var(--space-md)' }}>
@@ -1510,13 +1531,11 @@ export function Settings(props: SettingsProps) {
 							{/* Debug Transcoding */}
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>
-										Debug Transcoding
-									</span>
+									<span class={styles.settingLabel}>Debug Transcoding</span>
 									<span class={styles.settingDescription}>
 										Log detailed transcoding diagnostics (FFmpeg commands,
-										timing, segment production, errors) to a dedicated debug log.
-										View via Settings or API.
+										timing, segment production, errors) to a dedicated debug
+										log. View via Settings or API.
 									</span>
 								</div>
 								<label class={styles.toggle}>
@@ -2263,8 +2282,6 @@ export function Settings(props: SettingsProps) {
 								Mu is a self-hosted movie streaming platform that lets you organize,
 								browse, and stream your personal movie collection from anywhere.
 							</p>
-
-
 						</div>
 					)}
 				</div>

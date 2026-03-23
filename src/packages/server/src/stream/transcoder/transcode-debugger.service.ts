@@ -140,10 +140,7 @@ export class TranscodeDebuggerService implements OnModuleInit {
 		}
 	}
 
-	recordMilestone(
-		sessionId: string,
-		milestone: keyof TranscodeDebugContext['timing'],
-	): void {
+	recordMilestone(sessionId: string, milestone: keyof TranscodeDebugContext['timing']): void {
 		if (!this.isEnabled()) return;
 
 		const ctx = this.sessions.get(sessionId);
@@ -262,7 +259,10 @@ export class TranscodeDebuggerService implements OnModuleInit {
 		if (!proc.stderr) return;
 
 		proc.stderr.on('data', (data: Buffer) => {
-			const lines = data.toString().split('\n').filter((l) => l.trim());
+			const lines = data
+				.toString()
+				.split('\n')
+				.filter((l) => l.trim());
 			for (const line of lines) {
 				if (ctx.ffmpeg.stderrLines.length >= MAX_STDERR_LINES) {
 					ctx.ffmpeg.stderrLines.shift();
@@ -364,7 +364,9 @@ export class TranscodeDebuggerService implements OnModuleInit {
 			}
 		}
 
-		lines.push('\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
+		lines.push(
+			'\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550',
+		);
 
 		const summary = lines.join('\n');
 		this.logger.log(summary);

@@ -489,7 +489,9 @@ export class ChunkManagerService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private async finalize(map: ChunkMap, cacheDir: string): Promise<void> {
-		this.logger.log(`All chunks complete for ${this.guidResolver.resolve(map.movieFileId)}/${map.quality} — finalizing`);
+		this.logger.log(
+			`All chunks complete for ${this.guidResolver.resolve(map.movieFileId)}/${map.quality} — finalizing`,
+		);
 
 		// Write final manifest
 		await this.manifestService.writeFinalManifest(map, cacheDir);
