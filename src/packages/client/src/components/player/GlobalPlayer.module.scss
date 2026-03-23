@@ -299,17 +299,19 @@
 
 .splitDragHandle {
 	position: absolute;
-	left: -3px;
+	left: 0;
 	top: 0;
-	width: 6px;
+	width: 2px;
 	height: 100%;
 	cursor: col-resize;
-	z-index: 10;
-	background: transparent;
-	transition: background 0.2s;
+	// Above the video so it's always visible and clickable
+	z-index: calc(var(--z-player-controls, 900) + 5);
+	background: rgba(255, 255, 255, 0.15);
+	transition: width 0.15s, background 0.15s;
 
 	&:hover,
 	&:active {
+		width: 6px;
 		background: var(--color-accent, #646cff);
 	}
 }
