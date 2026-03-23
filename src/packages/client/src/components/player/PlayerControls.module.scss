@@ -185,16 +185,17 @@
 	transform: none;
 	margin-top: 0;
 	margin-bottom: 0;
+	flex: 1;
+	justify-content: center;
 }
 
-.splitTimeCenter {
-	flex: 1;
-	text-align: center;
+.splitTimeLeft {
 	font-size: 0.8rem;
 	color: rgba(255, 255, 255, 0.7);
 	font-variant-numeric: tabular-nums;
 	white-space: nowrap;
 	align-self: center;
+	padding: 0 0.5rem;
 }
 
 // Compact overrides when controls are inside the split panel

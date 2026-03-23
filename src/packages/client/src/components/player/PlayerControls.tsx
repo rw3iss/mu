@@ -413,6 +413,13 @@ export function PlayerControls({
 						</div>
 					)}
 
+					{/* Time display — left side in split mode */}
+					{isSplit && (
+						<div class={styles.splitTimeLeft}>
+							{formatTime(currentTime.value)} / {formatTime(duration.value)}
+						</div>
+					)}
+
 					{/* Center: skip-back, play, skip-forward */}
 					{(() => {
 						const st = getUiSetting<number[]>('skip_times', [5, 10, 20]);
@@ -557,13 +564,7 @@ export function PlayerControls({
 						);
 					})()}
 
-					{/* Center: time display (split mode only) */}
-					{isSplit && (
-						<div class={styles.splitTimeCenter}>
-							{formatTime(currentTime.value)} / {formatTime(duration.value)}
-						</div>
-					)}
-
+	
 					{/* Right: plugin buttons, info, volume, settings, fullscreen */}
 					<div class={styles.rightControls}>
 						{/* Plugin buttons — rendered before system buttons */}
