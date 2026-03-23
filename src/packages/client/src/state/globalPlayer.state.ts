@@ -236,8 +236,15 @@ export async function playMovie(
 /**
  * Minimize: shrink to mini-player bar.
  */
+/** Stores the mode before minimizing so we can restore it */
+let preMiniMode: PlayerMode | null = null;
+
 export function minimizePlayer(): void {
 	if (!globalMovieId.value) return;
+	// Remember current mode so restoring from mini goes back to it
+	if (playerMode.value !== 'mini') {
+		preMiniMode = playerMode.value;
+	}
 	playerMode.value = 'mini';
 }
 
@@ -246,7 +253,13 @@ export function minimizePlayer(): void {
  */
 export function maximizePlayer(): void {
 	if (!globalMovieId.value) return;
-	playerMode.value = 'full';
+	// Restore previous mode if coming from mini, otherwise go to full
+	if (playerMode.value === 'mini' && preMiniMode && preMiniMode !== 'mini' && preMiniMode !== 'hidden') {
+		playerMode.value = preMiniMode;
+	} else {
+		playerMode.value = 'full';
+	}
+	preMiniMode = null;
 }
 
 /**
