@@ -10,6 +10,7 @@ import {
 	videoEnabled,
 } from '@/state/audio-effects.state';
 import {
+	type PlayerMode,
 	closePlayer,
 	forceStartPosition,
 	globalMovie,
@@ -87,6 +88,8 @@ export function GlobalPlayer() {
 	const [_isInitializing, setIsInitializing] = useState(false);
 	const [preparingMessage, setPreparingMessage] = useState<string | null>(null);
 	const playbackInitRef = useRef(false);
+	/** Remembers the player mode before entering fullscreen, so we can restore it on exit */
+	const preFullscreenModeRef = useRef<PlayerMode | null>(null);
 	const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const resetControlsTimer = useCallback(() => {
@@ -487,23 +490,45 @@ export function GlobalPlayer() {
 		};
 	}, [subtitleTrack.value, currentSession.value?.sessionId, subSettings.timingOffsetMs]);
 
-	// Fullscreen toggle — uses document.documentElement so both video and bar are visible
+	// Fullscreen toggle — always enters full mode for true fullscreen
 	const handleToggleFullscreen = useCallback(async () => {
-		if (playerMode.value === 'mini') {
-			maximizePlayer();
-			return;
-		}
 		try {
 			if (document.fullscreenElement) {
 				await document.exitFullscreen();
-				isFullscreen.value = false;
+				// Restore previous mode (handled by fullscreenchange listener below)
 			} else {
+				// Remember current mode before switching to full
+				preFullscreenModeRef.current = playerMode.value;
+				// Switch to full mode so the full-screen overlay renders correctly
+				if (playerMode.value !== 'full') {
+					maximizePlayer();
+				}
 				await document.documentElement.requestFullscreen();
 				isFullscreen.value = true;
 			}
 		} catch (error) {
 			console.error('Fullscreen error:', error);
 		}
+	}, []);
+
+	// Restore previous mode when exiting fullscreen
+	useEffect(() => {
+		const handleFullscreenChange = () => {
+			if (!document.fullscreenElement) {
+				isFullscreen.value = false;
+				// Restore the mode the user was in before entering fullscreen
+				const prev = preFullscreenModeRef.current;
+				if (prev && prev !== 'full' && prev !== 'hidden') {
+					if (prev === 'split') splitPlayer();
+					else if (prev === 'mini') minimizePlayer();
+				}
+				preFullscreenModeRef.current = null;
+			} else {
+				isFullscreen.value = true;
+			}
+		};
+		document.addEventListener('fullscreenchange', handleFullscreenChange);
+		return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
 	}, []);
 
 	// Info panel toggle
