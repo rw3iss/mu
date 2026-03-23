@@ -204,8 +204,12 @@
 
 .videoWrapperSplit {
   // Top-right corner, sized to the split panel width
+  // Must explicitly reset inset from videoWrapperFull
+  inset: auto;
   top: 0;
   right: 0;
+  bottom: auto;
+  left: auto;
   // width set via inline style (splitWidth vw)
   aspect-ratio: 16 / 9;
   height: auto;

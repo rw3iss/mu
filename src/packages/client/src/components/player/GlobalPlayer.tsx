@@ -746,6 +746,7 @@ export function GlobalPlayer() {
 
 			{/* Loading spinner — shown while video is buffering (not when paused with content) */}
 			{!isMini &&
+				!isSplit &&
 				!preparingMessage &&
 				!streamError.value &&
 				isPlayerActive.value &&
@@ -756,7 +757,7 @@ export function GlobalPlayer() {
 				)}
 
 			{/* Preparing / error overlay */}
-			{preparingMessage && !isMini && (
+			{preparingMessage && !isMini && !isSplit && (
 				<div class={styles.preparingOverlay}>
 					<div class={styles.preparingContent}>
 						{!streamError.value && <div class={styles.preparingSpinner} />}
@@ -777,7 +778,7 @@ export function GlobalPlayer() {
 			)}
 
 			{/* Transcoding in-progress banner — auto-hides with controls */}
-			{!isMini && movie?.status === 'processing_playable' && (
+			{!isMini && !isSplit && movie?.status === 'processing_playable' && (
 				<div
 					class={`${styles.transcodingBanner} ${showControls.value ? styles.transcodingBannerVisible : ''}`}
 				>
@@ -786,7 +787,7 @@ export function GlobalPlayer() {
 			)}
 
 			{/* Top header — full mode only, fades with controls */}
-			{!isMini && (
+			{!isMini && !isSplit && (
 				<div
 					class={`${styles.topHeader} ${showControls.value ? styles.topHeaderVisible : ''}`}
 					onClick={(e: Event) => e.stopPropagation()}
@@ -853,40 +854,44 @@ export function GlobalPlayer() {
 				</div>
 			)}
 
-			{/* Info panel — fixed flyout, independent of player mode */}
-			<InfoPanel
-				movie={movie}
-				visible={showInfoPanel.value}
-				onClose={() => {
-					showInfoPanel.value = false;
-				}}
-			/>
-
-			{/* Effects panel — floating over the player */}
-			<EffectsPanel />
-
-			{/* Bottom bar — same layout in both modes */}
-			<div
-				class={`${styles.playerBar} ${isMini ? styles.playerBarMini : styles.playerBarFull} ${barVisible ? '' : styles.hidden}`}
-				onMouseEnter={() => {
-					isHoveringControls.value = true;
-				}}
-				onMouseLeave={() => {
-					isHoveringControls.value = false;
-				}}
-			>
-				<PlayerControls
-					visible={barVisible}
-					onTogglePlay={engine.togglePlay}
-					onSeek={engine.seek}
-					onToggleFullscreen={handleToggleFullscreen}
-					onToggleInfo={handleToggleInfo}
-					session={currentSession.value}
-					title={movie?.title}
-					hasMiniThumbnail={isMini}
-					leftSlot={isMini ? <div class={styles.miniSpacer} /> : null}
+			{/* Info panel — fixed flyout, full/mini mode only (split has inline info) */}
+			{!isSplit && (
+				<InfoPanel
+					movie={movie}
+					visible={showInfoPanel.value}
+					onClose={() => {
+						showInfoPanel.value = false;
+					}}
 				/>
-			</div>
+			)}
+
+			{/* Effects panel — full/mini mode only (split has its own) */}
+			{!isSplit && <EffectsPanel />}
+
+			{/* Bottom bar — full/mini mode only (split has inline controls) */}
+			{!isSplit && (
+				<div
+					class={`${styles.playerBar} ${isMini ? styles.playerBarMini : styles.playerBarFull} ${barVisible ? '' : styles.hidden}`}
+					onMouseEnter={() => {
+						isHoveringControls.value = true;
+					}}
+					onMouseLeave={() => {
+						isHoveringControls.value = false;
+					}}
+				>
+					<PlayerControls
+						visible={barVisible}
+						onTogglePlay={engine.togglePlay}
+						onSeek={engine.seek}
+						onToggleFullscreen={handleToggleFullscreen}
+						onToggleInfo={handleToggleInfo}
+						session={currentSession.value}
+						title={movie?.title}
+						hasMiniThumbnail={isMini}
+						leftSlot={isMini ? <div class={styles.miniSpacer} /> : null}
+					/>
+				</div>
+			)}
 		</>
 	);
 }
