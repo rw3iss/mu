@@ -190,8 +190,28 @@ export class StreamController {
 		const segment = await this.hlsGenerator.getSegment(sessionId, segmentNumber, dir);
 
 		if (!segment) {
-			// Segment not cached — trigger on-demand chunk encoding if chunk system is active
 			const sessionInfo = this.streamService.getSessionInfo(sessionId);
+
+			// Check if this is a "complete" cache with missing segments (corruption)
+			if (dir && sessionInfo?.movieFileId) {
+				const hasCached = await this.transcoderService.hasCachedTranscode(
+					sessionInfo.movieFileId,
+					sessionInfo.quality || '1080p',
+				);
+				if (hasCached) {
+					// Cache marked complete but segment is missing — corrupt cache
+					this.logger.warn(
+						`Corrupt cache: segment ${segmentNumber} missing from complete cache for ${this.guidResolver.resolve(sessionInfo.movieFileId)}. Clearing and restarting.`,
+					);
+					await this.transcoderService.clearCache(sessionInfo.movieFileId);
+					this.transcodeDebugger.recordClientRequest(sessionId, 'segment', segmentNumber, 410, Date.now() - requestStart);
+					return reply
+						.status(410)
+						.send({ message: 'Cache corrupted, please restart stream' });
+				}
+			}
+
+			// Segment not cached — trigger on-demand chunk encoding if chunk system is active
 			if (sessionInfo?.movieFileId) {
 				const chunkMap = this.chunkManager.getChunkMap(
 					sessionInfo.movieFileId,

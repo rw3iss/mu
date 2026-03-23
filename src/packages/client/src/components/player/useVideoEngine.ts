@@ -382,6 +382,24 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 					const resp = (data as any).response;
 					const statusCode = resp?.code ?? 0;
 
+					// 410 = cache corrupted, server cleared it — restart stream
+					if (statusCode === 410) {
+						console.warn('[HLS] Cache corrupted (410), restarting stream...');
+						setHlsStatus('Repairing stream cache...');
+						hls.destroy();
+						hlsRef.current = null;
+						// Restart the stream from current position
+						const pos = video.currentTime;
+						import('../../state/globalPlayer.state.js').then(({ startGlobalStream }) => {
+							startGlobalStream().then((session) => {
+								if (session) {
+									engine.startStream(session, pos > 0 ? pos : undefined, true);
+								}
+							});
+						});
+						return;
+					}
+
 					// Non-fatal 503s mean transcoding is in progress — show status
 					if (!data.fatal) {
 						if (statusCode === 503) {

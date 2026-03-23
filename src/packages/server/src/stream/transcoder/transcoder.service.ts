@@ -756,14 +756,18 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	): Promise<'complete' | 'partial' | 'invalid' | 'empty'> {
 		const dir = this.getPersistentDir(movieFileId, quality);
 
-		// Fast path: .complete marker exists — trust it (with codec health check)
+		// Fast path: .complete marker exists — trust it (with integrity checks)
 		try {
 			await access(path.join(dir, '.complete'));
-			// Quick sanity check: manifest exists
+			// Quick sanity check: manifest and first segment exist
 			try {
 				await access(path.join(dir, 'stream.m3u8'));
+				await access(path.join(dir, 'segment_0000.ts'));
 			} catch {
-				// .complete but no manifest — invalid
+				// .complete but missing manifest or first segment — invalid
+				this.logger.warn(
+					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} is missing manifest or segment_0000 — marking invalid`,
+				);
 				return 'invalid';
 			}
 			// Verify first segment has valid codecs for browser playback
