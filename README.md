@@ -262,6 +262,25 @@ nssm start mu-server     # start the service
 nssm restart mu-server   # restart the service
 
 
+### Auto-start service on boot:
+`pnpm setup:service` — Auto-start on boot
+- Windows: creates NSSM service (installs nssm if needed), offers nginx too
+- Linux: creates systemd unit, enables + starts
+- macOS: creates launchd plist, loads it
+
+`pnpm uninstall` — Clean removal
+- Stops and removes all services (NSSM/systemd/launchd)
+- Kills orphaned FFmpeg processes
+- Optionally deletes data (DB, config, cache)
+- Removes install directory
+
+### Update installation to latest release:
+`pnpm update` — Fetch latest release
+- Downloads from GitHub releases API
+- Creates timestamped backup
+- Runs upgrade-patch.sh if present in the release
+- Installs deps, builds, runs migrations, restarts
+
 ---
 
 ## License

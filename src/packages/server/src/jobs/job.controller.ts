@@ -35,17 +35,16 @@ export class JobController {
 	 */
 	@Get('processing-movies')
 	getProcessingMovies() {
-		// Active job-based processing
-		const allJobs = this.jobManager.listJobs({ type: 'pre-transcode', status: 'pending' });
-		const runningJobs = this.jobManager.listJobs({ type: 'pre-transcode', status: 'running' });
+		// Only return movies with ACTIVELY RUNNING transcode jobs
+		// (not pending/queued — those shouldn't show as "processing" in the UI)
+		const runningJobs = this.jobManager.listJobs({
+			type: 'pre-transcode',
+			status: 'running',
+		});
 		const movieIds = new Set<string>();
-		for (const job of [...allJobs, ...runningJobs]) {
+		for (const job of runningJobs) {
 			const mid = job.payload?.movieId as string | undefined;
 			if (mid) movieIds.add(mid);
-		}
-		// Also include movies that need transcoding but aren't being processed yet
-		for (const mid of this.jobManager.getUntranscodedMovieIds()) {
-			movieIds.add(mid);
 		}
 		return { movieIds: [...movieIds] };
 	}

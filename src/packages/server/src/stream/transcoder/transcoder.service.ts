@@ -915,9 +915,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				}
 			}
 
-			// Check video codec
+			// Check video codec (take first line only — MPEG-TS can report multiple streams)
 			const vidCmd = `ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "${segmentPath}"`;
-			const videoCodec = execSync(vidCmd, { encoding: 'utf-8', timeout: 10000 }).trim();
+			const videoCodec = execSync(vidCmd, { encoding: 'utf-8', timeout: 10000 }).trim().split('\n')[0]?.trim();
 			if (videoCodec && videoCodec !== 'h264') {
 				this.logger.warn(
 					`Segment health check: unexpected video codec "${videoCodec}" in ${cacheDir}`,
