@@ -162,13 +162,22 @@ export async function playMovie(
 		forceStartPosition.value = 0;
 	}
 
-	const wasMini = playerMode.value === 'mini';
+	// Determine the target mode: keep current mode if full/split,
+	// restore previous mode if mini, default to full if hidden
+	const resolveTargetMode = (): PlayerMode => {
+		if (playerMode.value === 'full' || playerMode.value === 'split') {
+			return playerMode.value;
+		}
+		if (playerMode.value === 'mini' && preMiniMode && preMiniMode !== 'mini' && preMiniMode !== 'hidden') {
+			return preMiniMode;
+		}
+		return 'full';
+	};
 
 	// Already loaded this movie - ensure it's playing
 	if (globalMovieId.value === movieId && currentSession.value) {
-		if (playerMode.value !== 'split') {
-			playerMode.value = 'full';
-		}
+		playerMode.value = resolveTargetMode();
+		preMiniMode = null;
 		const engine = sharedVideoEngine.value;
 		if (engine) {
 			const video = engine.videoRef.current;
@@ -211,10 +220,11 @@ export async function playMovie(
 		subtitleTrack.value = null;
 	}
 
-	// Set up new movie
+	// Set up new movie — preserve current mode (full/split)
 	globalMovieId.value = movieId;
 	globalMovie.value = null;
-	playerMode.value = 'full';
+	playerMode.value = resolveTargetMode();
+	preMiniMode = null;
 
 	// Force-save immediately with the new movieId and no session
 	// so a hard refresh during loading doesn't restore the old session
