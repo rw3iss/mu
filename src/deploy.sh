@@ -38,38 +38,7 @@ cd "$SRC_DIR"
 node scripts/migrate.js 2>/dev/null || echo "Migration script skipped"
 
 
-# ── 3. Stop existing server ──
-echo "--- stopping server ---"
-source "$SRC_DIR/stop.sh"
-
-# ── 4. Start server (detached) ──
-echo "--- starting server ---"
-cd "$SRC_DIR/packages/server"
-
-if [ ! -f "$SERVER_DIST" ]; then
-    echo "ERROR: $SERVER_DIST not found. Build may have failed."
-    exit 1
-fi
-
-LOG_DIR="$PROJECT_ROOT/data/logs"
-mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/server.log"
-mkdir -p "$(dirname "$PID_FILE")"
-
-NODE_ENV=production nohup node "$SERVER_DIST" >> "$LOG_FILE" 2>&1 &
-SERVER_PID=$!
-disown "$SERVER_PID" 2>/dev/null || true
-echo "$SERVER_PID" > "$PID_FILE"
-
-echo "Server started (PID: $SERVER_PID)"
-echo "Log file: $LOG_FILE"
-
-# ── 5. Verify startup ──
-sleep 3
-if kill -0 "$SERVER_PID" 2>/dev/null; then
-    echo "=== Deploy complete ==="
-else
-    echo "WARNING: Server may have failed to start. Check $LOG_FILE"
-    tail -20 "$LOG_FILE" 2>/dev/null
-    exit 1
-fi
+# ── 3. Restart server ──
+# restart.sh handles NSSM service on Windows, nohup fallback elsewhere
+bash "$SRC_DIR/restart.sh"
+echo "=== Deploy complete ==="

@@ -28,6 +28,21 @@ for config_path in \
     fi
 done
 
+# ── Windows: stop NSSM service if it exists ──
+if $IS_WINDOWS && command -v nssm &>/dev/null; then
+    if nssm status mu-server 2>/dev/null | grep -qE "RUNNING|PAUSED"; then
+        nssm stop mu-server 2>/dev/null || true
+        echo "NSSM service stopped"
+        # Wait for port to be freed
+        for i in 1 2 3 4 5; do
+            if ! netstat -ano 2>/dev/null | grep -q ":${SERVER_PORT}.*LISTENING"; then
+                break
+            fi
+            sleep 1
+        done
+    fi
+fi
+
 # ── Kill by port (most reliable) ──
 kill_port() {
     local port="$1"

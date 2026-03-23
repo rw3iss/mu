@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # restart.sh — Restart the Mu server without rebuilding.
 # Works on Linux, macOS, Windows (Git Bash / MSYS2), and WSL.
+# On Windows, prefers NSSM service if installed (avoids nohup FFmpeg issues).
 # Usage: ./restart.sh
 
 set -e
@@ -18,20 +19,26 @@ fi
 
 echo "=== Mu Restart ==="
 
-# Read configured port
-SERVER_PORT=4000
-for config_path in \
-    "$PROJECT_ROOT/data/config/config.yml" \
-    "$SRC_DIR/data/config/config.yml" \
-    "$SRC_DIR/packages/server/data/config/config.yml"; do
-    if [ -f "$config_path" ]; then
-        parsed_port=$(grep -E '^\s+port:\s*[0-9]+' "$config_path" 2>/dev/null | head -1 | grep -oE '[0-9]+')
-        if [ -n "$parsed_port" ]; then
-            SERVER_PORT="$parsed_port"
-            break
+# ── Windows: use NSSM service if available ──
+if $IS_WINDOWS && command -v nssm &>/dev/null; then
+    # Check if service exists
+    if nssm status mu-server &>/dev/null; then
+        nssm restart mu-server 2>/dev/null || {
+            nssm stop mu-server 2>/dev/null || true
+            sleep 2
+            nssm start mu-server 2>/dev/null || true
+        }
+        sleep 3
+        if netstat -ano 2>/dev/null | grep -q ":4000.*LISTENING"; then
+            echo "=== Restart complete (NSSM service) ==="
+            exit 0
+        else
+            echo "WARNING: NSSM service may have failed to start"
+            exit 1
         fi
     fi
-done
+    # Service doesn't exist — fall through to nohup method
+fi
 
 # ── Stop existing server ──
 source "$SRC_DIR/stop.sh"
@@ -48,8 +55,6 @@ LOG_FILE="$LOG_DIR/server.log"
 mkdir -p "$(dirname "$PID_FILE")"
 
 cd "$SRC_DIR/packages/server"
-# Prevent NVIDIA DLL loading in FFmpeg child processes (fixes 0xC0000142 on Windows SSH)
-export CUDA_VISIBLE_DEVICES=""
 NODE_ENV=production nohup node "$SERVER_DIST" >> "$LOG_FILE" 2>&1 &
 SERVER_PID=$!
 disown "$SERVER_PID" 2>/dev/null || true
