@@ -36,6 +36,7 @@ import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { wsService } from '@/services/websocket.service';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
 import { initProcessingState } from '@/state/processing.state';
+import { initConsoleDebug } from '@/utils/console-debug';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
 
@@ -79,6 +80,7 @@ export function App() {
 		wsService.connect();
 		initGlobalPlayer();
 		initProcessingState();
+		initConsoleDebug();
 
 		// Ensure AudioContext is created on first user interaction (Chrome requirement)
 		const unlockAudio = () => {
