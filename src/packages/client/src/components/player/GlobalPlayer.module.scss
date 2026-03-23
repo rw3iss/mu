@@ -293,12 +293,18 @@
 }
 
 .splitTopBar {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
 	display: flex;
-	align-items: center;
-	gap: 0.25rem;
-	padding: 0.5rem;
-	background: rgba(0, 0, 0, 0.6);
-	z-index: 2;
+	align-items: stretch;
+	height: 36px;
+	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+	z-index: 3;
+	pointer-events: none; // let clicks pass through to video EXCEPT on buttons
+	padding: 0;
+	gap: 0;
 }
 
 .splitTopBtn {
@@ -306,17 +312,21 @@
 	border: none;
 	color: white;
 	cursor: pointer;
-	padding: 0.25rem;
-	border-radius: 4px;
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	margin: 0;
+	border-radius: 0;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	opacity: 0.7;
-	transition: opacity 0.2s;
+	transition: opacity 0.15s, background 0.15s;
+	pointer-events: auto; // re-enable clicks on buttons
 
 	&:hover {
 		opacity: 1;
-		background: rgba(255, 255, 255, 0.1);
+		background: rgba(255, 255, 255, 0.15);
 	}
 }
 
@@ -325,6 +335,13 @@
 	aspect-ratio: 16 / 9;
 	background: black;
 	flex-shrink: 0;
+	position: relative;
+	overflow: hidden;
+}
+
+.splitVideoInner {
+	width: 100%;
+	height: 100%;
 	position: relative;
 
 	video {

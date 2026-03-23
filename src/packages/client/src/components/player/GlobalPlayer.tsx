@@ -584,65 +584,48 @@ export function GlobalPlayer() {
 					}}
 				/>
 
-				{/* Top bar */}
-				<div class={styles.splitTopBar} onClick={(e: Event) => e.stopPropagation()}>
-					<button
-						class={styles.splitTopBtn}
-						onClick={() => minimizePlayer()}
-						title="Minimize"
+				{/* Video area with overlaid top bar */}
+				<div class={styles.splitVideoArea}>
+					<div ref={videoWrapperRef} class={styles.splitVideoInner} />
+					<div
+						class={styles.splitTopBar}
+						onMouseDown={(e: Event) => e.stopPropagation()}
+						onClick={(e: Event) => e.stopPropagation()}
 					>
-						<svg
-							width={18}
-							height={18}
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth={2}
+						<button
+							class={styles.splitTopBtn}
+							onClick={() => minimizePlayer()}
+							title="Minimize"
 						>
-							<polyline points="6 9 12 15 18 9" />
-						</svg>
-					</button>
-					<button
-						class={styles.splitTopBtn}
-						onClick={() => maximizePlayer()}
-						title="Full screen"
-					>
-						<svg
-							width={18}
-							height={18}
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth={2}
+							<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+								<polyline points="6 9 12 15 18 9" />
+							</svg>
+						</button>
+						<button
+							class={styles.splitTopBtn}
+							onClick={() => maximizePlayer()}
+							title="Full screen"
 						>
-							<polyline points="15 3 21 3 21 9" />
-							<polyline points="9 21 3 21 3 15" />
-							<line x1="21" y1="3" x2="14" y2="10" />
-							<line x1="3" y1="21" x2="10" y2="14" />
-						</svg>
-					</button>
-					<div style={{ flex: 1 }} />
-					<button
-						class={styles.splitTopBtn}
-						onClick={() => closePlayer()}
-						title="Close"
-					>
-						<svg
-							width={18}
-							height={18}
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth={2}
+							<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+								<polyline points="15 3 21 3 21 9" />
+								<polyline points="9 21 3 21 3 15" />
+								<line x1="21" y1="3" x2="14" y2="10" />
+								<line x1="3" y1="21" x2="10" y2="14" />
+							</svg>
+						</button>
+						<div style={{ flex: 1 }} />
+						<button
+							class={styles.splitTopBtn}
+							onClick={() => closePlayer()}
+							title="Close"
 						>
-							<line x1="18" y1="6" x2="6" y2="18" />
-							<line x1="6" y1="6" x2="18" y2="18" />
-						</svg>
-					</button>
+							<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+								<line x1="18" y1="6" x2="6" y2="18" />
+								<line x1="6" y1="6" x2="18" y2="18" />
+							</svg>
+						</button>
+					</div>
 				</div>
-
-				{/* Video area */}
-				<div class={styles.splitVideoArea} ref={videoWrapperRef} />
 
 				{/* Title + time row */}
 				<div class={styles.splitTitleRow}>
