@@ -67,9 +67,15 @@ function offsetVttTimings(vtt: string, offsetMs: number): string {
 	});
 }
 
+let splitWidthSaveTimer: ReturnType<typeof setTimeout> | null = null;
 function setSplitWidth(w: number) {
 	splitWidth.value = w;
-	localStorage.setItem('mu_ui_split_width', String(w));
+	// Debounce localStorage write — signal updates are instant
+	if (splitWidthSaveTimer) clearTimeout(splitWidthSaveTimer);
+	splitWidthSaveTimer = setTimeout(() => {
+		localStorage.setItem('mu_ui_split_width', String(w));
+		splitWidthSaveTimer = null;
+	}, 200);
 }
 
 
