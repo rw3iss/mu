@@ -159,9 +159,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
+  align-self: stretch;
+  width: 42px;
+  margin: -5px 0;
+  margin-right: calc(-1 * var(--space-sm));
+  border-radius: 0;
   color: var(--color-text-muted);
   opacity: 0;
   flex-shrink: 0;
