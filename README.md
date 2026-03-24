@@ -323,6 +323,53 @@ nssm restart mu-server   # restart the service
 
 ---
 
+
+# GPU Doctor Utility:
+
+GPU Performance Doctor — ~/gpu-doctor/                                                                                                                                                                 Three entry points, same analysis:
+
+┌────────────────┬─────────────────────────────────────┬────────────────────┐
+│      File      │              Run from               │      Command       │
+├────────────────┼─────────────────────────────────────┼────────────────────┤
+│ gpu-doctor.sh  │ Git Bash, macOS Terminal, Linux     │ bash gpu-doctor.sh │
+├────────────────┼─────────────────────────────────────┼────────────────────┤
+│ gpu-doctor.ps1 │ PowerShell / Windows Terminal       │ .\gpu-doctor.ps1   │
+├────────────────┼─────────────────────────────────────┼────────────────────┤
+│ gpu-doctor.bat │ CMD prompt (double-click works too) │ gpu-doctor.bat     │
+└────────────────┴─────────────────────────────────────┴────────────────────┘
+
+What it checks:
+
+- GPU detection — NVIDIA via nvidia-smi, with AMD/Intel/Apple Silicon awareness
+- Thermals — temperature, fan speed, thermal/power/HW throttle detection
+- NVENC encoder — utilization %, active sessions, saturation warnings
+- VRAM pressure — usage percentage with capacity warnings
+- GPU processes — identifies Blue Iris, OBS, etc. competing for NVENC
+- FFmpeg — version, NVENC/CUVID/CUDA availability
+- Power plan — Windows plan, macOS Low Power Mode, Linux CPU governor
+- Driver version — flags outdated drivers
+- Clock speeds — current vs max boost
+
+What it fixes (interactively or with --auto):
+
+- Switch power plan to High Performance
+- Raise GPU power limit to maximum
+- Set CPU max processor state to 100%
+- Enable GPU persistence mode (Linux)
+- Set CPU governor to performance (Linux)
+- Disable Low Power Mode (macOS)
+
+Flags:
+
+- --report-only — diagnostics only, no fix offers
+- --auto — apply all safe fixes without prompting
+- --json — machine-readable JSON output
+
+Cross-platform:
+
+The bash script handles Windows (Git Bash/MSYS2/WSL), macOS, and Linux with platform-specific checks. The PowerShell script is Windows-native with identical analysis logic.
+
+
 ## License
 
 MIT
