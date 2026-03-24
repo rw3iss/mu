@@ -416,8 +416,7 @@ export function PlayerControls({
 					{/* Time display — left side in split mode */}
 					{isSplit && (
 						<div class={styles.splitTimeLeft}>
-							<span>{formatTime(currentTime.value)}</span>
-							<span>{formatTime(duration.value)}</span>
+							{formatTime(currentTime.value)} / {formatTime(duration.value)}
 						</div>
 					)}
 
