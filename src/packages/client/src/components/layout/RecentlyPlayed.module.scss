@@ -8,6 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   width: 100%;
   padding: 6px 0;
   color: var(--color-text-muted);
@@ -28,11 +29,20 @@
   }
 }
 
+.toggleLabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: inherit;
+}
+
 .list {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  max-height: min(240px, 40vh);
+  // Use more vertical space on larger screens, but leave room for the sidebar menu
+  // (~48px per menu item × ~8 items = ~384px + topbar 56px + toggle 30px ≈ 470px)
+  max-height: min(calc(100vh - 470px), 60vh);
   padding: 0 var(--space-xs) var(--space-xs);
 }
 

@@ -5,7 +5,7 @@ import { playMovie } from '@/state/globalPlayer.state';
 import { fetchHistory, historyEntries } from '@/state/history.state';
 import styles from './RecentlyPlayed.module.scss';
 
-const MAX_ITEMS = 8;
+const MAX_ITEMS = 20;
 
 export function RecentlyPlayed() {
 	const [collapsed, setCollapsed] = useUiSetting('recently_played_collapsed', false);
@@ -31,6 +31,7 @@ export function RecentlyPlayed() {
 				onClick={() => setCollapsed(!collapsed)}
 				title={collapsed ? 'Show recently played' : 'Hide recently played'}
 			>
+				<span class={styles.toggleLabel}>RECENT</span>
 				<svg
 					width="12"
 					height="12"
