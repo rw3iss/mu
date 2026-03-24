@@ -167,7 +167,19 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					mode: string;
 					quality: string;
 				};
-				helpers.log(`Pre-transcoding file ${movieFileId} (${mode}, ${quality})`);
+
+				// Warm the GUID resolver so all downstream logs show the movie title
+				const resolved = await this.guidResolver.resolveAsync(movieFileId);
+				if (movieId) await this.guidResolver.resolveAsync(movieId);
+				// Also warm the job ID itself so helpers.log shows the title
+				const title = resolved.includes('(')
+					? resolved.slice(0, resolved.lastIndexOf('(')).trim()
+					: resolved;
+				this.guidResolver.warmup(job.id, title);
+
+				helpers.log(
+					`Pre-transcoding ${this.guidResolver.resolve(movieFileId)} (${mode}, ${quality})`,
+				);
 
 				// Always use monolithic transcode for background pre-encoding.
 				// Chunked encoding creates audio discontinuities at chunk boundaries

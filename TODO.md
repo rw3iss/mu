@@ -1,7 +1,21 @@
+
 Names: viro? mu?
 INFO: ssh rw3iss@192.168.50.211
 
 --------------------------------------------------------------------------------
+- Movie "grouping" logic (ie. TV series):
+I want to create the concept of "grouping" movie items. This will be a series of attributes, and smart algorithms, to detect which movies in the library are part of the same ie. TV series, or other series, and also which series season they are part of for example. We might also add groups for similar or sequel movies, such as Lord of the Rings 1 through 3, and other Lord of the Rings related movies we might have downloaded. I would want to group all of those in a "Lord of the Rings" group.
+Movies will only ever belong to a single group, but might otherwise
+	- for each scanned item (ie. current movie), get it's full relative path from the root media library path it is from.
+	- if it is in the root, or in a folder only 1-level deep, then we have to analyze it by filename instead (execute <filaname-group-matching> procedure).
+	- if the file is deeper than 1 folder from the root, then it might be part of a series. The agorithm should look at each folder to the root, and see if it contains other folders for ie. each episode. If it detects multiple similar folders (ie. do a name match %).
+	- "<metadata-group-matching> procedure": first, if the current movie has metadata, look at the title, or see if has a 'series' property defined. Use the metadata to look for other movies with the same kind of metadata (ie. same title, or series name, etc). If it finds similar enough matches, "group them" into the same group.
+ 	- "<filename-group-matching> procedure": get the name 'index' of a movies in the library, including their file name, and location. Do a 'match %' analysis on the currentanalyze all other filenames f
+	- verification screen
+
+- Split Mode fix:
+	- fixed control overlay needs to show above the split player, with separate top and bottom section.
+
 
 // - keep manifest cache on client for recently played X movies. Don't let it refetch/load on next 'play', if the movie was unloaded.
 // - pre-empt manifest loading if user hovers over play button, or clicks it? fire off manifest request first, for fastest load.
