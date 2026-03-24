@@ -203,10 +203,10 @@
 }
 
 .videoWrapperSplit {
-  // Top-right corner, below site header + split top bar
-  // Width reduced by 3px and shifted right so drag handle is visible
+  // Top-right corner, below the split top bar (which matches site header height)
+  // Panel starts at top of page, so offset is just the top bar height
   inset: auto;
-  top: calc(var(--topbar-height, 56px) + var(--split-top-bar-height, 32px));
+  top: var(--topbar-height, 56px);
   right: 0;
   bottom: auto;
   left: auto;
@@ -283,12 +283,13 @@
 // ============================================
 
 .splitPanel {
-	--split-top-bar-height: 32px;
+	// Top bar matches the site header height so they align horizontally
+	--split-top-bar-height: var(--topbar-height, 56px);
 
 	position: fixed;
-	top: var(--topbar-height, 56px);
+	top: 0;
 	right: 0;
-	height: calc(100vh - var(--topbar-height, 56px));
+	height: 100vh;
 	background: var(--color-bg, #0a0a0a);
 	// Below the video wrapper so video renders on top
 	z-index: var(--z-player-controls, 900);

@@ -87,7 +87,7 @@ const HELP = `
   mu.player.mode('full')   Set mode: full | mini | split | hidden
   mu.player.volume(0.8)    Set volume (0-1)
   mu.player.seek(120)      Seek to time in seconds
-  mu.player.split(50)      Set split width (25-75 percent)
+  mu.player.split(50)      Set split width (25-62 percent)
 
 %cDebug:%c
   mu.hls(true)             Enable HLS.js debug logging
@@ -199,7 +199,7 @@ const mu = {
 				}
 			},
 			split: (percent: number) => {
-				const w = Math.max(25, Math.min(75, Math.round(percent)));
+				const w = Math.max(25, Math.min(62, Math.round(percent)));
 				splitWidth.value = w;
 				localStorage.setItem('mu_ui_split_width', String(w));
 				if (playerMode.value !== 'split') splitPlayer();

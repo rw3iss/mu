@@ -58,3 +58,11 @@ Include a 'Reset' icon button next to all Appearance settings, that will reset t
 Also fix bug in "Accent Color": when a custom color is selected in the first swatch, still show an overlay on the buton that it can be edited or changed, but with the background as the custom color.
 
 Ensure all of the above settings are integrated into those various locations they should be applied to, around the entire site, using the same methods to persist and load it on app init as the item gap setting is doing.
+
+--------------------------------------------------------------------------------
+
+Let's change the split mode video positioning a litte bit, and the site header width. Instead of letting the site header be full width, with the split mode right column under it at some x position, instead make the split panel right side start at the top of the window/page, and have the site header match the regular page's content, and let it get pushed or set to the left side width of the split view, so it stops right at the split view middle vertical handle separator.
+Then, adjust the split video top player controls, video element, and bottom player, as well as the content section below it, all up to the top of the page according to the changed offset (ie. update the offset calculations).
+However, in this new layout, make the top split mode player control button sizes (ie. the minimize, maximize, close buttons), the same height and width as the site header itself, so the top control bar's height matches the site headers in the left side of the split view.
+Adjust the offsets for the videos and other elements below it accordingly, for the split view.
+Also, set a maximum "split width" for the split view mode, to 50vw. The split mode should be allowed to be greater than 62% page or window width.
