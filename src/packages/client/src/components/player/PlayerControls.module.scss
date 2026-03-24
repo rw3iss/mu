@@ -209,6 +209,11 @@
 		padding: 0;
 		// Match the video's 3px right offset for the drag handle
 		padding-left: 3px;
+		// Push the seek track to the very top of its container
+		// so it touches the video bottom edge. The extra height
+		// below extends the drag target area.
+		align-items: flex-start;
+		padding-top: 2px;
 	}
 
 	.contentRow {
@@ -217,23 +222,35 @@
 	}
 
 	.mainRow {
-		height: 36px;
-		padding: 0 0.25rem;
+		height: var(--topbar-height, 56px);
+		padding: 0;
+		gap: 0;
 	}
 
 	.controlBtn {
-		width: 32px;
-		height: 32px;
+		width: var(--topbar-height, 56px);
+		height: var(--topbar-height, 56px);
+		margin: 0;
+		border-radius: 0;
 	}
 
 	.playBtn svg {
-		width: 22px;
-		height: 22px;
+		width: 24px;
+		height: 24px;
 	}
 
 	.rightControls {
 		margin-top: 0;
 		margin-bottom: 0;
+		gap: 0;
+	}
+
+	.centerControls {
+		gap: 0;
+	}
+
+	.skipWrap {
+		margin: 0;
 	}
 }
 
