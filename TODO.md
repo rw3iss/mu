@@ -2,15 +2,24 @@
 Names: viro? mu?
 INFO: ssh rw3iss@192.168.50.211
 
+Seek thumbnails on hover... option in settings.
 
---------------------------------------------------------------------------------
+Make a detailed plan to break out the site "theme" appearance settings into a object-oriented "theme" configuration object, that can be replaced (ie. new themes loaded), that will also support import and export (ie. uploading a theme file and importing it into the database). Make a new themes table that can track the theme configuration, and whether it is for light or dark mode. Replace the Settings > Appearance section with a more profile "theme profile" loader, setup with the current/default theme as it is (make a static default theme configuration we can edit). In the Theme editor there in the settings, ensure the user has the option to change the theme settings, as well as define whether to use the theme as the light theme, or the dark theme, when it is loaded. Then, allow the users of the app to select a different theme for light and dark. Show a 'theme' dropdown to select from the theme profiles, or have it use the default if there are none. Make a separate default theme for both the light and dark modes (ie. "Default (light)", "Default (dark)"). Show an 'edit' button next to the dropdown, which will expand the theme settings for that theme profile, and open the theme editor for it. The theme editor may become more advanced, but for now it should just allow editing the current settings shown in the appearance panel (applied to that current theme instance), and allow them to edit and update them. Include a 'copy to new' button to clone the current theme to a new theme. Ensure they can set the theme title and edit the theme in place. The theme configurations should save to the database, and be cached in the server and client on app load, for optimal performance. Both the light and dark themes should be able to define custom settings for all the different current appearance settings, however, we can move the 'Overlay Hide Timeout' and 'Show Recently Played' options outside of the theme profile settings, as they are global. You can move those two settings to the general tab, if you want. Include the rest as theme profile properties. Change the settings into a nice theme editor, allowing for saving and editing and assigning themes for both light and dark modes. Also include options to 'Import' a theme file, next to the theme selection dropdowns, and allow for loading a theme file into the app, first validating it, then putting it in the database, and setting it as the selected theme in that setting. In the 'edit' view, show an 'export' button at the button, which should export that same json format configuration for that current theme, which can be imported after by others. Use a filename of the current theme name given there in the editor. First design out the plan, and then implement it, taking care to craft a nice theming system for the site that is modular and well architected.
+ 
+- Settings : Appearance:
+	- separate light vs. dark theme option/setting
+	- define theme profiles, saved in db, import/export.
+	- separate settings a bit more
+	- make independent/module 'theme editor'.
+
+-----------------------------------------------------------------	---------------
 - Movie "grouping" logic (ie. TV series):
 I want to create the concept of "grouping" movie items. This will be a series of attributes, and smart algorithms, to detect which movies in the library are part of the same ie. TV series, or other series, and also which series season they are part of for example. We might also add groups for similar or sequel movies, such as Lord of the Rings 1 through 3, and other Lord of the Rings related movies we might have downloaded. I would want to group all of those in a "Lord of the Rings" group.
 Movies will only ever belong to a single group, but might otherwise
 	- for each scanned item (ie. current movie), get it's full relative path from the root media library path it is from.
 	- if it is in the root, or in a folder only 1-level deep, then we have to analyze it by filename instead (execute <filaname-group-matching> procedure).
 	- if the file is deeper than 1 folder from the root, then it might be part of a series. The agorithm should look at each folder to the root, and see if it contains other folders for ie. each episode. If it detects multiple similar folders (ie. do a name match %).
-	- "<metadata-group-matching> procedure": first, if the current movie has metadata, look at the title, or see if has a 'series' property defined. Use the metadata to look for other movies with the same kind of metadata (ie. same title, or series name, etc). If it finds similar enough matches, "group them" into the same group.
+	- "<metadata-group-matching> procedure": first, if the current movie has metadata, look at the title, or see if has a 'series' property defined. Use the metadata to look for other movies with the same kind of metadata (ie. same title, or series name, etc). If it finds similar enough matches, "group them" into t	he same group.
  	- "<filename-group-matching> procedure": get the name 'index' of a movies in the library, including their file name, and location. Do a 'match %' analysis on the currentanalyze all other filenames f
 	- verification screen
 
