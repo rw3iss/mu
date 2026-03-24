@@ -301,7 +301,17 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			// Validate existing cache before using it
 			let cacheState: 'complete' | 'partial' | 'invalid' | 'empty' = 'empty';
 			if (persistEnabled) {
-				cacheState = await this.transcoderService.validateCache(file.id, quality);
+				try {
+					cacheState = await this.transcoderService.validateCache(file.id, quality);
+					this.logger.debug(
+						`Cache validation for ${this.guidResolver.resolve(file.id)}/${quality}: ${cacheState}`,
+					);
+				} catch (err: any) {
+					this.logger.warn(
+						`Cache validation failed for ${this.guidResolver.resolve(file.id)}: ${err.message}`,
+					);
+					cacheState = 'empty';
+				}
 			}
 
 			this.transcodeDebugger.recordEvent(
