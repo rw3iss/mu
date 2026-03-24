@@ -259,6 +259,16 @@ export class DatabaseService implements OnModuleDestroy {
         size_bytes INTEGER,
         segment_count INTEGER
       );
+      CREATE TABLE IF NOT EXISTS themes (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        config TEXT NOT NULL,
+        is_default INTEGER DEFAULT 0,
+        created_by TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS audio_profiles (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

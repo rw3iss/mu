@@ -24,6 +24,8 @@ export type { NewScanLogEntry, ScanLogEntry } from './scan-log.ts';
 export { scanLog } from './scan-log.ts';
 export type { NewSetting, Setting } from './settings.ts';
 export { settings } from './settings.ts';
+export type { NewTheme, Theme } from './themes.ts';
+export { themes } from './themes.ts';
 export type { NewStreamSession, StreamSession } from './stream-sessions.ts';
 export { streamSessions } from './stream-sessions.ts';
 export type { NewTranscodeCacheEntry, TranscodeCacheEntry } from './transcode-cache.ts';

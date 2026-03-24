@@ -49,6 +49,16 @@ const tables = [
 		created_at TEXT NOT NULL,
 		updated_at TEXT NOT NULL
 	)`,
+	`CREATE TABLE IF NOT EXISTS themes (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		mode TEXT NOT NULL,
+		config TEXT NOT NULL,
+		is_default INTEGER DEFAULT 0,
+		created_by TEXT,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
 	`CREATE TABLE IF NOT EXISTS job_history (
 		id TEXT PRIMARY KEY,
 		type TEXT NOT NULL,
