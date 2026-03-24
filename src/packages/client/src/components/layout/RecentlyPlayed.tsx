@@ -65,6 +65,13 @@ export function RecentlyPlayed() {
 								<span class={styles.title}>{movie.title}</span>
 								{movie.year > 0 && <span class={styles.year}>{movie.year}</span>}
 							</div>
+							{/* Hover tooltip with larger poster */}
+							<div class={styles.tooltip}>
+								{movie.posterUrl && (
+									<img src={movie.posterUrl} alt="" class={styles.tooltipPoster} />
+								)}
+								<span class={styles.tooltipTitle}>{movie.title}</span>
+							</div>
 							<button
 								class={styles.playBtn}
 								onClick={(e) => {
