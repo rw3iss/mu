@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import type { ThemeConfig } from '@mu/shared';
 import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
-import { FontScaler, resetTextScale } from '@/components/common/FontScaler';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
@@ -12,32 +12,23 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
 import { sourcesService } from '@/services/sources.service';
-import { accentColor, resetAccentColor, setAccentColor } from '@/state/accentColor.state';
-import {
-	cardBorder,
-	disableHover,
-	type ItemSpacing,
-	itemRadius,
-	itemSpacing as itemSpacingSignal,
-	pageBg,
-	panelBg,
-	resetCardBorder,
-	resetDisableHover,
-	resetItemRadius,
-	resetItemSpacing,
-	resetPageBg,
-	resetPanelBg,
-	setCardBorder,
-	setDisableHover,
-	setItemRadius,
-	setItemSpacing,
-	setPageBg,
-	setPanelBg,
-} from '@/state/appearance.state';
+import { themesApi } from '@/services/themes.service';
+import { type ItemSpacing } from '@/state/appearance.state';
 import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import type { Theme } from '@/state/theme.state';
 import { setTheme, theme } from '@/state/theme.state';
+import {
+	themesList,
+	selectedDarkId,
+	selectedLightId,
+	editingThemeId,
+	setSelectedDarkId,
+	setSelectedLightId,
+	fetchThemes,
+	applyThemeConfig,
+	applyActiveTheme,
+} from '@/state/themes.state';
 import { AdminDashboard } from './AdminDashboard';
 import { Plugins } from './Plugins';
 import styles from './Settings.module.scss';
@@ -245,6 +236,15 @@ export function Settings(props: SettingsProps) {
 	// Appearance settings
 	const [showRecentlyPlayed, setShowRecentlyPlayed] = useUiSetting('show_recently_played', true);
 	const [showBorderEditor, setShowBorderEditor] = useState(false);
+	const [editConfig, setEditConfig] = useState<ThemeConfig | null>(null);
+	const [editThemeName, setEditThemeName] = useState('');
+	const importDarkRef = useRef<HTMLInputElement>(null);
+	const importLightRef = useRef<HTMLInputElement>(null);
+
+	// Fetch themes on mount
+	useEffect(() => {
+		fetchThemes();
+	}, []);
 
 	// Playback settings
 	const [defaultQuality, setDefaultQuality] = useState('auto');
@@ -701,428 +701,7 @@ export function Settings(props: SettingsProps) {
 								</label>
 							</div>
 
-							<div class={styles.actions}>
-								<Button
-									variant="primary"
-									loading={isSaving}
-									onClick={handleSaveRating}
-								>
-									Save Changes
-								</Button>
-							</div>
-						</div>
-					)}
-
-					{/* Appearance Tab */}
-					{activeTab === 'appearance' && (
-						<div class={styles.panel}>
-							<h2 class={styles.panelTitle}>Appearance</h2>
-
-							{/* Theme */}
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Theme</span>
-									<span class={styles.settingDescription}>
-										Choose your preferred color scheme
-									</span>
-								</div>
-								<div class={styles.themeSelect}>
-									{(['dark', 'light', 'auto'] as Theme[]).map((t) => (
-										<button
-											key={t}
-											class={`${styles.themeOption} ${theme.value === t ? styles.active : ''}`}
-											onClick={() => setTheme(t)}
-										>
-											{t.charAt(0).toUpperCase() + t.slice(1)}
-										</button>
-									))}
-								</div>
-							</div>
-
-							{/* Accent Color */}
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Accent Color</span>
-									<span class={styles.settingDescription}>
-										Customize the primary accent color across the app
-									</span>
-								</div>
-								<div class={styles.settingControl}>
-									<div class={styles.accentColorColumn}>
-										<div class={styles.accentColorPicker}>
-											{(() => {
-												const presets = [
-													{ label: 'Cyan', value: '#06b6d4' },
-													{ label: 'Blue', value: '#3b82f6' },
-													{ label: 'Purple', value: '#8b5cf6' },
-													{ label: 'Pink', value: '#ec4899' },
-													{ label: 'Amber', value: '#f59e0b' },
-													{ label: 'Green', value: '#22c55e' },
-													{ label: 'Red', value: '#ef4444' },
-												];
-
-												return presets.map((preset) => (
-													<button
-														key={preset.label}
-														class={`${styles.colorSwatch} ${accentColor.value === preset.value ? styles.activeSwatch : ''}`}
-														style={{
-															backgroundColor: preset.value,
-														}}
-														title={preset.label}
-														onClick={() => setAccentColor(preset.value)}
-													/>
-												));
-											})()}
-										</div>
-										<ColorPicker
-											value={accentColor.value || '#06b6d4'}
-											onChange={setAccentColor}
-										/>
-									</div>
-									<button
-										class={styles.resetBtn}
-										onClick={resetAccentColor}
-										title="Reset to default"
-									>
-										<svg
-											width="14"
-											height="14"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="1 4 1 10 7 10" />
-											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-										</svg>
-									</button>
-								</div>
-							</div>
-
-							{/* Page Background */}
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Page Background</span>
-									<span class={styles.settingDescription}>
-										Main app background color
-									</span>
-								</div>
-								<div class={styles.settingControl}>
-									<ColorPicker
-										value={pageBg.value || '#050709'}
-										onChange={setPageBg}
-									/>
-									<button
-										class={styles.resetBtn}
-										onClick={resetPageBg}
-										title="Reset to default"
-									>
-										<svg
-											width="14"
-											height="14"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="1 4 1 10 7 10" />
-											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-										</svg>
-									</button>
-								</div>
-							</div>
-
-							{/* Panel Background */}
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Panel Background</span>
-									<span class={styles.settingDescription}>
-										Sidebar, header, and card background color
-									</span>
-								</div>
-								<div class={styles.settingControl}>
-									<ColorPicker
-										value={panelBg.value || '#090b12'}
-										onChange={setPanelBg}
-									/>
-									<button
-										class={styles.resetBtn}
-										onClick={resetPanelBg}
-										title="Reset to default"
-									>
-										<svg
-											width="14"
-											height="14"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="1 4 1 10 7 10" />
-											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-										</svg>
-									</button>
-								</div>
-							</div>
-
-							{/* Item Spacing */}
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Item Spacing</span>
-									<span class={styles.settingDescription}>
-										Gap between cards and items across the site
-									</span>
-								</div>
-								<div class={styles.settingControl}>
-									<select
-										class={styles.select}
-										value={itemSpacingSignal.value}
-										onChange={(e) =>
-											setItemSpacing(
-												(e.target as HTMLSelectElement)
-													.value as ItemSpacing,
-											)
-										}
-									>
-										<option value="none">None</option>
-										<option value="minimal">Minimal</option>
-										<option value="compact">Compact</option>
-										<option value="normal">Normal</option>
-										<option value="comfortable">Comfortable</option>
-										<option value="spaced">Spaced</option>
-									</select>
-									<button
-										class={styles.resetBtn}
-										onClick={resetItemSpacing}
-										title="Reset to default"
-									>
-										<svg
-											width="14"
-											height="14"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="1 4 1 10 7 10" />
-											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-										</svg>
-									</button>
-								</div>
-							</div>
-
-							{/* Item Radius */}
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Item Radius</span>
-									<span class={styles.settingDescription}>
-										Border radius on cards and items (0-40px)
-									</span>
-								</div>
-								<div class={styles.settingControl}>
-									<div class={styles.rangeWithValue}>
-										<input
-											type="range"
-											class={styles.rangeInput}
-											min="0"
-											max="40"
-											step="1"
-											value={itemRadius.value}
-											onInput={(e) =>
-												setItemRadius(
-													parseInt(
-														(e.target as HTMLInputElement).value,
-														10,
-													),
-												)
-											}
-										/>
-										<span class={styles.rangeValue}>{itemRadius.value}px</span>
-									</div>
-									<button
-										class={styles.resetBtn}
-										onClick={resetItemRadius}
-										title="Reset to default"
-									>
-										<svg
-											width="14"
-											height="14"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="1 4 1 10 7 10" />
-											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-										</svg>
-									</button>
-								</div>
-							</div>
-
-							{/* Card Border */}
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Card Border</span>
-									<span class={styles.settingDescription}>
-										Customize card border style
-									</span>
-								</div>
-								<div class={styles.settingControl}>
-									<button
-										class={styles.borderPreview}
-										onClick={() => setShowBorderEditor(!showBorderEditor)}
-										title="Edit card border"
-									>
-										<span
-											class={styles.borderPreviewSample}
-											style={{
-												border: `${cardBorder.value.width}px solid ${cardBorder.value.color}`,
-												opacity: cardBorder.value.opacity,
-											}}
-										/>
-										<span class={styles.borderPreviewLabel}>
-											{cardBorder.value.width}px
-										</span>
-									</button>
-									<button
-										class={styles.resetBtn}
-										onClick={() => {
-											resetCardBorder();
-											setShowBorderEditor(false);
-										}}
-										title="Reset to default"
-									>
-										<svg
-											width="14"
-											height="14"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="1 4 1 10 7 10" />
-											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-										</svg>
-									</button>
-								</div>
-							</div>
-							{showBorderEditor && (
-								<div class={styles.borderEditor}>
-									<div class={styles.borderEditorRow}>
-										<span class={styles.borderEditorLabel}>Width</span>
-										<input
-											type="range"
-											class={styles.rangeInput}
-											min="0"
-											max="5"
-											step="1"
-											value={cardBorder.value.width}
-											onInput={(e) =>
-												setCardBorder({
-													...cardBorder.value,
-													width: parseInt(
-														(e.target as HTMLInputElement).value,
-														10,
-													),
-												})
-											}
-										/>
-										<span class={styles.rangeValue}>
-											{cardBorder.value.width}px
-										</span>
-									</div>
-									<div class={styles.borderEditorRow}>
-										<span class={styles.borderEditorLabel}>Color</span>
-										<ColorPicker
-											value={cardBorder.value.color}
-											onChange={(hex) =>
-												setCardBorder({
-													...cardBorder.value,
-													color: hex,
-												})
-											}
-											size={24}
-										/>
-									</div>
-									<div class={styles.borderEditorRow}>
-										<span class={styles.borderEditorLabel}>Opacity</span>
-										<input
-											type="range"
-											class={styles.rangeInput}
-											min="0"
-											max="1"
-											step="0.01"
-											value={cardBorder.value.opacity}
-											onInput={(e) =>
-												setCardBorder({
-													...cardBorder.value,
-													opacity: parseFloat(
-														(e.target as HTMLInputElement).value,
-													),
-												})
-											}
-										/>
-										<span class={styles.rangeValue}>
-											{Math.round(cardBorder.value.opacity * 100)}%
-										</span>
-									</div>
-								</div>
-							)}
-
-							{/* Disable Hover Effects */}
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Disable Hover Effects</span>
-									<span class={styles.settingDescription}>
-										Stop cards from animating on hover
-									</span>
-								</div>
-								<div class={styles.settingControl}>
-									<label class={styles.toggle}>
-										<input
-											type="checkbox"
-											checked={disableHover.value}
-											onChange={(e) =>
-												setDisableHover(
-													(e.target as HTMLInputElement).checked,
-												)
-											}
-										/>
-										<span class={styles.toggleTrack} />
-									</label>
-									<button
-										class={styles.resetBtn}
-										onClick={resetDisableHover}
-										title="Reset to default"
-									>
-										<svg
-											width="14"
-											height="14"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="1 4 1 10 7 10" />
-											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-										</svg>
-									</button>
-								</div>
-							</div>
+							<h3 class={styles.sectionTitle}>Display</h3>
 
 							{/* Show Recently Played */}
 							<div class={styles.settingRow}>
@@ -1149,37 +728,651 @@ export function Settings(props: SettingsProps) {
 							{/* Overlay Hide Timeout */}
 							<OverlayTimeoutSetting />
 
-							{/* Font Scale */}
+							<div class={styles.actions}>
+								<Button
+									variant="primary"
+									loading={isSaving}
+									onClick={handleSaveRating}
+								>
+									Save Changes
+								</Button>
+							</div>
+						</div>
+					)}
+
+					{/* Appearance Tab */}
+					{activeTab === 'appearance' && (
+						<div class={styles.panel}>
+							<h2 class={styles.panelTitle}>Appearance</h2>
+
+							{/* Theme Mode */}
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Font Scale</span>
+									<span class={styles.settingLabel}>Theme</span>
 									<span class={styles.settingDescription}>
-										Adjust the text size across the app
+										Choose your preferred color scheme
+									</span>
+								</div>
+								<div class={styles.themeSelect}>
+									{(['dark', 'light', 'auto'] as Theme[]).map((t) => (
+										<button
+											key={t}
+											class={`${styles.themeOption} ${theme.value === t ? styles.active : ''}`}
+											onClick={() => setTheme(t)}
+										>
+											{t.charAt(0).toUpperCase() + t.slice(1)}
+										</button>
+									))}
+								</div>
+							</div>
+
+							{/* Dark Theme Selector */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Dark Theme</span>
+									<span class={styles.settingDescription}>
+										Theme used in dark mode
 									</span>
 								</div>
 								<div class={styles.settingControl}>
-									<FontScaler />
+									<select
+										class={styles.select}
+										value={selectedDarkId.value}
+										onChange={(e) =>
+											setSelectedDarkId(
+												(e.target as HTMLSelectElement).value,
+											)
+										}
+									>
+										{themesList.value
+											.filter((t) => t.mode === 'dark')
+											.map((t) => (
+												<option key={t.id} value={t.id}>
+													{t.name}
+												</option>
+											))}
+									</select>
 									<button
 										class={styles.resetBtn}
-										onClick={resetTextScale}
-										title="Reset to default"
+										onClick={() => {
+											const t = themesList.value.find(
+												(t) => t.id === selectedDarkId.value,
+											);
+											if (t) {
+												editingThemeId.value = t.id;
+												setEditConfig({ ...t.config });
+												setEditThemeName(t.name);
+												setShowBorderEditor(false);
+											}
+										}}
+										title="Edit theme"
 									>
-										<svg
-											width="14"
-											height="14"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="1 4 1 10 7 10" />
-											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-										</svg>
+										Edit
 									</button>
+									<button
+										class={styles.resetBtn}
+										onClick={() => importDarkRef.current?.click()}
+										title="Import theme"
+									>
+										Import
+									</button>
+									<input
+										ref={importDarkRef}
+										type="file"
+										accept=".json"
+										style={{ display: 'none' }}
+										onChange={async (e) => {
+											const file = (e.target as HTMLInputElement).files?.[0];
+											if (!file) return;
+											try {
+												const text = await file.text();
+												const parsed = JSON.parse(text);
+												const imported =
+													await themesApi.importTheme(parsed);
+												await fetchThemes();
+												if (imported?.id) setSelectedDarkId(imported.id);
+												notifySuccess('Theme imported');
+											} catch {
+												notifyError('Failed to import theme');
+											}
+											(e.target as HTMLInputElement).value = '';
+										}}
+									/>
 								</div>
 							</div>
+
+							{/* Light Theme Selector */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Light Theme</span>
+									<span class={styles.settingDescription}>
+										Theme used in light mode
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<select
+										class={styles.select}
+										value={selectedLightId.value}
+										onChange={(e) =>
+											setSelectedLightId(
+												(e.target as HTMLSelectElement).value,
+											)
+										}
+									>
+										{themesList.value
+											.filter((t) => t.mode === 'light')
+											.map((t) => (
+												<option key={t.id} value={t.id}>
+													{t.name}
+												</option>
+											))}
+									</select>
+									<button
+										class={styles.resetBtn}
+										onClick={() => {
+											const t = themesList.value.find(
+												(t) => t.id === selectedLightId.value,
+											);
+											if (t) {
+												editingThemeId.value = t.id;
+												setEditConfig({ ...t.config });
+												setEditThemeName(t.name);
+												setShowBorderEditor(false);
+											}
+										}}
+										title="Edit theme"
+									>
+										Edit
+									</button>
+									<button
+										class={styles.resetBtn}
+										onClick={() => importLightRef.current?.click()}
+										title="Import theme"
+									>
+										Import
+									</button>
+									<input
+										ref={importLightRef}
+										type="file"
+										accept=".json"
+										style={{ display: 'none' }}
+										onChange={async (e) => {
+											const file = (e.target as HTMLInputElement).files?.[0];
+											if (!file) return;
+											try {
+												const text = await file.text();
+												const parsed = JSON.parse(text);
+												const imported =
+													await themesApi.importTheme(parsed);
+												await fetchThemes();
+												if (imported?.id) setSelectedLightId(imported.id);
+												notifySuccess('Theme imported');
+											} catch {
+												notifyError('Failed to import theme');
+											}
+											(e.target as HTMLInputElement).value = '';
+										}}
+									/>
+								</div>
+							</div>
+
+							{/* Theme Editor */}
+							{editingThemeId.value && editConfig && (() => {
+								const editingTheme = themesList.value.find(
+									(t) => t.id === editingThemeId.value,
+								);
+								if (!editingTheme) return null;
+
+								const updateEditConfig = (patch: Partial<ThemeConfig>) => {
+									const next = { ...editConfig, ...patch };
+									setEditConfig(next);
+									applyThemeConfig(next);
+								};
+
+								return (
+									<div
+										style={{
+											borderTop: '1px solid var(--color-border)',
+											paddingTop: 'var(--space-md)',
+											marginTop: 'var(--space-md)',
+										}}
+									>
+										<h3 class={styles.sectionTitle}>
+											Editing: {editThemeName}
+										</h3>
+
+										{/* Theme Name */}
+										<div class={styles.settingRow}>
+											<div class={styles.settingInfo}>
+												<span class={styles.settingLabel}>
+													Theme Name
+												</span>
+											</div>
+											<input
+												type="text"
+												class={styles.skipTimeInput}
+												style={{ width: '200px' }}
+												value={editThemeName}
+												onInput={(e) =>
+													setEditThemeName(
+														(e.target as HTMLInputElement).value,
+													)
+												}
+											/>
+										</div>
+
+										{/* Accent Color */}
+										<div class={styles.settingRow}>
+											<div class={styles.settingInfo}>
+												<span class={styles.settingLabel}>
+													Accent Color
+												</span>
+												<span class={styles.settingDescription}>
+													Customize the primary accent color
+												</span>
+											</div>
+											<div class={styles.settingControl}>
+												<div class={styles.accentColorColumn}>
+													<div class={styles.accentColorPicker}>
+														{[
+															{ label: 'Cyan', value: '#06b6d4' },
+															{ label: 'Blue', value: '#3b82f6' },
+															{ label: 'Purple', value: '#8b5cf6' },
+															{ label: 'Pink', value: '#ec4899' },
+															{ label: 'Amber', value: '#f59e0b' },
+															{ label: 'Green', value: '#22c55e' },
+															{ label: 'Red', value: '#ef4444' },
+														].map((preset) => (
+															<button
+																key={preset.label}
+																class={`${styles.colorSwatch} ${editConfig.accentColor === preset.value ? styles.activeSwatch : ''}`}
+																style={{
+																	backgroundColor: preset.value,
+																}}
+																title={preset.label}
+																onClick={() =>
+																	updateEditConfig({
+																		accentColor: preset.value,
+																	})
+																}
+															/>
+														))}
+													</div>
+													<ColorPicker
+														value={
+															editConfig.accentColor || '#06b6d4'
+														}
+														onChange={(v) =>
+															updateEditConfig({ accentColor: v })
+														}
+													/>
+												</div>
+											</div>
+										</div>
+
+										{/* Page Background */}
+										<div class={styles.settingRow}>
+											<div class={styles.settingInfo}>
+												<span class={styles.settingLabel}>
+													Page Background
+												</span>
+												<span class={styles.settingDescription}>
+													Main app background color
+												</span>
+											</div>
+											<div class={styles.settingControl}>
+												<ColorPicker
+													value={editConfig.pageBg || '#050709'}
+													onChange={(v) =>
+														updateEditConfig({ pageBg: v })
+													}
+												/>
+											</div>
+										</div>
+
+										{/* Panel Background */}
+										<div class={styles.settingRow}>
+											<div class={styles.settingInfo}>
+												<span class={styles.settingLabel}>
+													Panel Background
+												</span>
+												<span class={styles.settingDescription}>
+													Sidebar, header, and card background color
+												</span>
+											</div>
+											<div class={styles.settingControl}>
+												<ColorPicker
+													value={editConfig.panelBg || '#090b12'}
+													onChange={(v) =>
+														updateEditConfig({ panelBg: v })
+													}
+												/>
+											</div>
+										</div>
+
+										{/* Item Spacing */}
+										<div class={styles.settingRow}>
+											<div class={styles.settingInfo}>
+												<span class={styles.settingLabel}>
+													Item Spacing
+												</span>
+												<span class={styles.settingDescription}>
+													Gap between cards and items
+												</span>
+											</div>
+											<div class={styles.settingControl}>
+												<select
+													class={styles.select}
+													value={editConfig.itemSpacing}
+													onChange={(e) =>
+														updateEditConfig({
+															itemSpacing: (
+																e.target as HTMLSelectElement
+															).value as ItemSpacing,
+														})
+													}
+												>
+													<option value="none">None</option>
+													<option value="minimal">Minimal</option>
+													<option value="compact">Compact</option>
+													<option value="normal">Normal</option>
+													<option value="comfortable">
+														Comfortable
+													</option>
+													<option value="spaced">Spaced</option>
+												</select>
+											</div>
+										</div>
+
+										{/* Item Radius */}
+										<div class={styles.settingRow}>
+											<div class={styles.settingInfo}>
+												<span class={styles.settingLabel}>
+													Item Radius
+												</span>
+												<span class={styles.settingDescription}>
+													Border radius on cards (0-40px)
+												</span>
+											</div>
+											<div class={styles.settingControl}>
+												<div class={styles.rangeWithValue}>
+													<input
+														type="range"
+														class={styles.rangeInput}
+														min="0"
+														max="40"
+														step="1"
+														value={editConfig.itemRadius}
+														onInput={(e) =>
+															updateEditConfig({
+																itemRadius: parseInt(
+																	(e.target as HTMLInputElement)
+																		.value,
+																	10,
+																),
+															})
+														}
+													/>
+													<span class={styles.rangeValue}>
+														{editConfig.itemRadius}px
+													</span>
+												</div>
+											</div>
+										</div>
+
+										{/* Card Border */}
+										<div class={styles.settingRow}>
+											<div class={styles.settingInfo}>
+												<span class={styles.settingLabel}>
+													Card Border
+												</span>
+												<span class={styles.settingDescription}>
+													Customize card border style
+												</span>
+											</div>
+											<div class={styles.settingControl}>
+												<button
+													class={styles.borderPreview}
+													onClick={() =>
+														setShowBorderEditor(!showBorderEditor)
+													}
+													title="Edit card border"
+												>
+													<span
+														class={styles.borderPreviewSample}
+														style={{
+															border: `${editConfig.cardBorder.width}px solid ${editConfig.cardBorder.color}`,
+															opacity: editConfig.cardBorder.opacity,
+														}}
+													/>
+													<span class={styles.borderPreviewLabel}>
+														{editConfig.cardBorder.width}px
+													</span>
+												</button>
+											</div>
+										</div>
+										{showBorderEditor && (
+											<div class={styles.borderEditor}>
+												<div class={styles.borderEditorRow}>
+													<span class={styles.borderEditorLabel}>
+														Width
+													</span>
+													<input
+														type="range"
+														class={styles.rangeInput}
+														min="0"
+														max="5"
+														step="1"
+														value={editConfig.cardBorder.width}
+														onInput={(e) =>
+															updateEditConfig({
+																cardBorder: {
+																	...editConfig.cardBorder,
+																	width: parseInt(
+																		(
+																			e.target as HTMLInputElement
+																		).value,
+																		10,
+																	),
+																},
+															})
+														}
+													/>
+													<span class={styles.rangeValue}>
+														{editConfig.cardBorder.width}px
+													</span>
+												</div>
+												<div class={styles.borderEditorRow}>
+													<span class={styles.borderEditorLabel}>
+														Color
+													</span>
+													<ColorPicker
+														value={editConfig.cardBorder.color}
+														onChange={(hex) =>
+															updateEditConfig({
+																cardBorder: {
+																	...editConfig.cardBorder,
+																	color: hex,
+																},
+															})
+														}
+														size={24}
+													/>
+												</div>
+												<div class={styles.borderEditorRow}>
+													<span class={styles.borderEditorLabel}>
+														Opacity
+													</span>
+													<input
+														type="range"
+														class={styles.rangeInput}
+														min="0"
+														max="1"
+														step="0.01"
+														value={editConfig.cardBorder.opacity}
+														onInput={(e) =>
+															updateEditConfig({
+																cardBorder: {
+																	...editConfig.cardBorder,
+																	opacity: parseFloat(
+																		(
+																			e.target as HTMLInputElement
+																		).value,
+																	),
+																},
+															})
+														}
+													/>
+													<span class={styles.rangeValue}>
+														{Math.round(
+															editConfig.cardBorder.opacity * 100,
+														)}
+														%
+													</span>
+												</div>
+											</div>
+										)}
+
+										{/* Disable Hover Effects */}
+										<div class={styles.settingRow}>
+											<div class={styles.settingInfo}>
+												<span class={styles.settingLabel}>
+													Disable Hover Effects
+												</span>
+												<span class={styles.settingDescription}>
+													Stop cards from animating on hover
+												</span>
+											</div>
+											<div class={styles.settingControl}>
+												<label class={styles.toggle}>
+													<input
+														type="checkbox"
+														checked={editConfig.disableHover}
+														onChange={(e) =>
+															updateEditConfig({
+																disableHover: (
+																	e.target as HTMLInputElement
+																).checked,
+															})
+														}
+													/>
+													<span class={styles.toggleTrack} />
+												</label>
+											</div>
+										</div>
+
+										{/* Font Scale */}
+										<div class={styles.settingRow}>
+											<div class={styles.settingInfo}>
+												<span class={styles.settingLabel}>
+													Font Scale
+												</span>
+												<span class={styles.settingDescription}>
+													Adjust the text size across the app
+												</span>
+											</div>
+											<div class={styles.settingControl}>
+												<div class={styles.rangeWithValue}>
+													<input
+														type="range"
+														class={styles.rangeInput}
+														min="0.8"
+														max="1.2"
+														step="0.05"
+														value={editConfig.textScale}
+														onInput={(e) =>
+															updateEditConfig({
+																textScale: parseFloat(
+																	(e.target as HTMLInputElement)
+																		.value,
+																),
+															})
+														}
+													/>
+													<span class={styles.rangeValue}>
+														{editConfig.textScale}x
+													</span>
+												</div>
+											</div>
+										</div>
+
+										{/* Editor Actions */}
+										<div
+											class={styles.actions}
+											style={{ gap: '8px', flexWrap: 'wrap' }}
+										>
+											<Button
+												variant="primary"
+												onClick={async () => {
+													try {
+														await themesApi.update(
+															editingThemeId.value,
+															{
+																name: editThemeName,
+																config: editConfig,
+															},
+														);
+														await fetchThemes();
+														notifySuccess('Theme saved');
+													} catch {
+														notifyError('Failed to save theme');
+													}
+												}}
+											>
+												Save
+											</Button>
+											<Button
+												variant="secondary"
+												onClick={async () => {
+													try {
+														const created = await themesApi.create({
+															name: `Copy of ${editThemeName}`,
+															mode: editingTheme.mode,
+															config: editConfig,
+														});
+														await fetchThemes();
+														if (editingTheme.mode === 'dark') {
+															setSelectedDarkId(created.id);
+														} else {
+															setSelectedLightId(created.id);
+														}
+														editingThemeId.value = created.id;
+														setEditThemeName(created.name);
+														notifySuccess('Theme copied');
+													} catch {
+														notifyError('Failed to copy theme');
+													}
+												}}
+											>
+												Copy to New
+											</Button>
+											<Button
+												variant="secondary"
+												onClick={() =>
+													window.open(
+														themesApi.exportUrl(
+															editingThemeId.value,
+														),
+													)
+												}
+											>
+												Export
+											</Button>
+											<Button
+												variant="secondary"
+												onClick={() => {
+													editingThemeId.value = '';
+													setEditConfig(null);
+													setShowBorderEditor(false);
+													applyActiveTheme();
+												}}
+											>
+												Close
+											</Button>
+										</div>
+									</div>
+								);
+							})()}
 
 							{/* Subtitles Appearance (collapsible) */}
 							<CollapsibleSubtitleSettings />
