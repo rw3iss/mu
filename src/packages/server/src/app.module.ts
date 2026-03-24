@@ -24,6 +24,7 @@ import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { SharingModule } from './sharing/sharing.module.js';
 import { StreamModule } from './stream/stream.module.js';
+import { ThemesModule } from './themes/themes.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -51,6 +52,7 @@ import { UsersModule } from './users/users.module.js';
 		FilesystemModule,
 		AdminModule,
 		AudioProfilesModule,
+		ThemesModule,
 	],
 	providers: [
 		{
