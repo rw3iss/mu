@@ -215,15 +215,26 @@ pnpm check                    # lint + format (Biome)
 pnpm lint:fix                 # fix lint issues
 pnpm format                   # format code
 
-# Logs
+# Server settings (read/write settings outside the running server)
+pnpm settings                 # list all settings
+pnpm settings get <key>       # get a setting value
+pnpm settings set <key> <val> # set a setting
+pnpm settings delete <key>    # delete a setting
+
+# Server management
+pnpm status                   # show server mode, health, uptime
 pnpm logs                     # tail local server log
 pnpm logs:prod                # tail production server log via SSH
+pnpm fix:ffmpeg               # kill orphaned FFmpeg, clear flags, restart
+pnpm setup:service            # auto-start on boot (NSSM/systemd/launchd)
+pnpm update                   # fetch latest release, migrate, restart
+pnpm uninstall                # remove services and app
 
 # Plugins
 pnpm plugin:generate <id>     # scaffold a new plugin
 pnpm plugin:generate-client-api <id>  # generate client API from plugin schema
 
-# Server management (from src/)
+# Deploy (from src/)
 bash deploy.sh                # git pull, install, build, restart
 bash restart.sh               # stop + start (no rebuild)
 bash stop.sh                  # stop the running server
@@ -250,6 +261,35 @@ mu/
 
 
 # How-To Extended:
+
+### Server settings CLI
+
+Manage server settings from the command line without the web UI:
+
+```bash
+# List all settings
+pnpm settings
+
+# View encoding settings
+pnpm settings get encoding
+
+# Enable NVENC hardware acceleration
+pnpm settings set encoding '{"hwAccel":"nvenc","preset":"veryfast","quality":"1080p","rateControl":"crf","crf":23,"maxConcurrentJobs":2}'
+
+# Switch to software encoding
+pnpm settings set encoding '{"hwAccel":"none","preset":"veryfast","quality":"1080p","rateControl":"crf","crf":23,"maxConcurrentJobs":2}'
+
+# Clear the hwAccelBroken flag (after fixing GPU issues)
+pnpm settings delete hwAccelBroken
+
+# Enable/disable background pre-transcoding
+pnpm settings set library '{"persistTranscodes":true,"autoScanEnabled":true,"scanIntervalHours":6}'
+
+# View all settings as a table
+pnpm settings
+```
+
+There is also a browser console utility. Open the browser console (F12) and type `mu.help` for available commands.
 
 ### If you want to move the cache:
 1. Copy data/cache/streams/ to the new location
