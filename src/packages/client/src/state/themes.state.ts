@@ -1,5 +1,5 @@
-import { effect, signal } from '@preact/signals';
 import type { ThemeConfig, ThemeRecord } from '@mu/shared';
+import { effect, signal } from '@preact/signals';
 import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
 import { themesApi } from '@/services/themes.service';
 import { theme } from './theme.state';

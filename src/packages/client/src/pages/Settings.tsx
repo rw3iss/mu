@@ -1,6 +1,6 @@
+import type { ThemeConfig } from '@mu/shared';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
-import type { ThemeConfig } from '@mu/shared';
 import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
@@ -19,15 +19,15 @@ import { notifyError, notifySuccess } from '@/state/notifications.state';
 import type { Theme } from '@/state/theme.state';
 import { setTheme, theme } from '@/state/theme.state';
 import {
-	themesList,
+	applyActiveTheme,
+	applyThemeConfig,
+	editingThemeId,
+	fetchThemes,
 	selectedDarkId,
 	selectedLightId,
-	editingThemeId,
 	setSelectedDarkId,
 	setSelectedLightId,
-	fetchThemes,
-	applyThemeConfig,
-	applyActiveTheme,
+	themesList,
 } from '@/state/themes.state';
 import { AdminDashboard } from './AdminDashboard';
 import { Plugins } from './Plugins';
@@ -779,9 +779,7 @@ export function Settings(props: SettingsProps) {
 										class={styles.select}
 										value={selectedDarkId.value}
 										onChange={(e) =>
-											setSelectedDarkId(
-												(e.target as HTMLSelectElement).value,
-											)
+											setSelectedDarkId((e.target as HTMLSelectElement).value)
 										}
 									>
 										{themesList.value
@@ -917,462 +915,478 @@ export function Settings(props: SettingsProps) {
 							</div>
 
 							{/* Theme Editor */}
-							{editingThemeId.value && editConfig && (() => {
-								const editingTheme = themesList.value.find(
-									(t) => t.id === editingThemeId.value,
-								);
-								if (!editingTheme) return null;
+							{editingThemeId.value &&
+								editConfig &&
+								(() => {
+									const editingTheme = themesList.value.find(
+										(t) => t.id === editingThemeId.value,
+									);
+									if (!editingTheme) return null;
 
-								const updateEditConfig = (patch: Partial<ThemeConfig>) => {
-									const next = { ...editConfig, ...patch };
-									setEditConfig(next);
-									applyThemeConfig(next);
-								};
+									const updateEditConfig = (patch: Partial<ThemeConfig>) => {
+										const next = { ...editConfig, ...patch };
+										setEditConfig(next);
+										applyThemeConfig(next);
+									};
 
-								return (
-									<div
-										style={{
-											borderTop: '1px solid var(--color-border)',
-											paddingTop: 'var(--space-md)',
-											marginTop: 'var(--space-md)',
-										}}
-									>
-										<h3 class={styles.sectionTitle}>
-											Editing: {editThemeName}
-										</h3>
+									return (
+										<div
+											style={{
+												borderTop: '1px solid var(--color-border)',
+												paddingTop: 'var(--space-md)',
+												marginTop: 'var(--space-md)',
+											}}
+										>
+											<h3 class={styles.sectionTitle}>
+												Editing: {editThemeName}
+											</h3>
 
-										{/* Theme Name */}
-										<div class={styles.settingRow}>
-											<div class={styles.settingInfo}>
-												<span class={styles.settingLabel}>
-													Theme Name
-												</span>
+											{/* Theme Name */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Theme Name
+													</span>
+												</div>
+												<input
+													type="text"
+													class={styles.skipTimeInput}
+													style={{ width: '200px' }}
+													value={editThemeName}
+													onInput={(e) =>
+														setEditThemeName(
+															(e.target as HTMLInputElement).value,
+														)
+													}
+												/>
 											</div>
-											<input
-												type="text"
-												class={styles.skipTimeInput}
-												style={{ width: '200px' }}
-												value={editThemeName}
-												onInput={(e) =>
-													setEditThemeName(
-														(e.target as HTMLInputElement).value,
-													)
-												}
-											/>
-										</div>
 
-										{/* Accent Color */}
-										<div class={styles.settingRow}>
-											<div class={styles.settingInfo}>
-												<span class={styles.settingLabel}>
-													Accent Color
-												</span>
-												<span class={styles.settingDescription}>
-													Customize the primary accent color
-												</span>
-											</div>
-											<div class={styles.settingControl}>
-												<div class={styles.accentColorColumn}>
-													<div class={styles.accentColorPicker}>
-														{[
-															{ label: 'Cyan', value: '#06b6d4' },
-															{ label: 'Blue', value: '#3b82f6' },
-															{ label: 'Purple', value: '#8b5cf6' },
-															{ label: 'Pink', value: '#ec4899' },
-															{ label: 'Amber', value: '#f59e0b' },
-															{ label: 'Green', value: '#22c55e' },
-															{ label: 'Red', value: '#ef4444' },
-														].map((preset) => (
-															<button
-																key={preset.label}
-																class={`${styles.colorSwatch} ${editConfig.accentColor === preset.value ? styles.activeSwatch : ''}`}
-																style={{
-																	backgroundColor: preset.value,
-																}}
-																title={preset.label}
-																onClick={() =>
-																	updateEditConfig({
-																		accentColor: preset.value,
-																	})
-																}
-															/>
-														))}
+											{/* Accent Color */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Accent Color
+													</span>
+													<span class={styles.settingDescription}>
+														Customize the primary accent color
+													</span>
+												</div>
+												<div class={styles.settingControl}>
+													<div class={styles.accentColorColumn}>
+														<div class={styles.accentColorPicker}>
+															{[
+																{ label: 'Cyan', value: '#06b6d4' },
+																{ label: 'Blue', value: '#3b82f6' },
+																{
+																	label: 'Purple',
+																	value: '#8b5cf6',
+																},
+																{ label: 'Pink', value: '#ec4899' },
+																{
+																	label: 'Amber',
+																	value: '#f59e0b',
+																},
+																{
+																	label: 'Green',
+																	value: '#22c55e',
+																},
+																{ label: 'Red', value: '#ef4444' },
+															].map((preset) => (
+																<button
+																	key={preset.label}
+																	class={`${styles.colorSwatch} ${editConfig.accentColor === preset.value ? styles.activeSwatch : ''}`}
+																	style={{
+																		backgroundColor:
+																			preset.value,
+																	}}
+																	title={preset.label}
+																	onClick={() =>
+																		updateEditConfig({
+																			accentColor:
+																				preset.value,
+																		})
+																	}
+																/>
+															))}
+														</div>
+														<ColorPicker
+															value={
+																editConfig.accentColor || '#06b6d4'
+															}
+															onChange={(v) =>
+																updateEditConfig({ accentColor: v })
+															}
+														/>
 													</div>
+												</div>
+											</div>
+
+											{/* Page Background */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Page Background
+													</span>
+													<span class={styles.settingDescription}>
+														Main app background color
+													</span>
+												</div>
+												<div class={styles.settingControl}>
 													<ColorPicker
-														value={
-															editConfig.accentColor || '#06b6d4'
-														}
+														value={editConfig.pageBg || '#050709'}
 														onChange={(v) =>
-															updateEditConfig({ accentColor: v })
+															updateEditConfig({ pageBg: v })
 														}
 													/>
 												</div>
 											</div>
-										</div>
 
-										{/* Page Background */}
-										<div class={styles.settingRow}>
-											<div class={styles.settingInfo}>
-												<span class={styles.settingLabel}>
-													Page Background
-												</span>
-												<span class={styles.settingDescription}>
-													Main app background color
-												</span>
+											{/* Panel Background */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Panel Background
+													</span>
+													<span class={styles.settingDescription}>
+														Sidebar, header, and card background color
+													</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={editConfig.panelBg || '#090b12'}
+														onChange={(v) =>
+															updateEditConfig({ panelBg: v })
+														}
+													/>
+												</div>
 											</div>
-											<div class={styles.settingControl}>
-												<ColorPicker
-													value={editConfig.pageBg || '#050709'}
-													onChange={(v) =>
-														updateEditConfig({ pageBg: v })
-													}
-												/>
-											</div>
-										</div>
 
-										{/* Panel Background */}
-										<div class={styles.settingRow}>
-											<div class={styles.settingInfo}>
-												<span class={styles.settingLabel}>
-													Panel Background
-												</span>
-												<span class={styles.settingDescription}>
-													Sidebar, header, and card background color
-												</span>
-											</div>
-											<div class={styles.settingControl}>
-												<ColorPicker
-													value={editConfig.panelBg || '#090b12'}
-													onChange={(v) =>
-														updateEditConfig({ panelBg: v })
-													}
-												/>
-											</div>
-										</div>
-
-										{/* Item Spacing */}
-										<div class={styles.settingRow}>
-											<div class={styles.settingInfo}>
-												<span class={styles.settingLabel}>
-													Item Spacing
-												</span>
-												<span class={styles.settingDescription}>
-													Gap between cards and items
-												</span>
-											</div>
-											<div class={styles.settingControl}>
-												<select
-													class={styles.select}
-													value={editConfig.itemSpacing}
-													onChange={(e) =>
-														updateEditConfig({
-															itemSpacing: (
-																e.target as HTMLSelectElement
-															).value as ItemSpacing,
-														})
-													}
-												>
-													<option value="none">None</option>
-													<option value="minimal">Minimal</option>
-													<option value="compact">Compact</option>
-													<option value="normal">Normal</option>
-													<option value="comfortable">
-														Comfortable
-													</option>
-													<option value="spaced">Spaced</option>
-												</select>
-											</div>
-										</div>
-
-										{/* Item Radius */}
-										<div class={styles.settingRow}>
-											<div class={styles.settingInfo}>
-												<span class={styles.settingLabel}>
-													Item Radius
-												</span>
-												<span class={styles.settingDescription}>
-													Border radius on cards (0-40px)
-												</span>
-											</div>
-											<div class={styles.settingControl}>
-												<div class={styles.rangeWithValue}>
-													<input
-														type="range"
-														class={styles.rangeInput}
-														min="0"
-														max="40"
-														step="1"
-														value={editConfig.itemRadius}
-														onInput={(e) =>
+											{/* Item Spacing */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Item Spacing
+													</span>
+													<span class={styles.settingDescription}>
+														Gap between cards and items
+													</span>
+												</div>
+												<div class={styles.settingControl}>
+													<select
+														class={styles.select}
+														value={editConfig.itemSpacing}
+														onChange={(e) =>
 															updateEditConfig({
-																itemRadius: parseInt(
-																	(e.target as HTMLInputElement)
-																		.value,
-																	10,
-																),
+																itemSpacing: (
+																	e.target as HTMLSelectElement
+																).value as ItemSpacing,
 															})
 														}
-													/>
-													<span class={styles.rangeValue}>
-														{editConfig.itemRadius}px
-													</span>
+													>
+														<option value="none">None</option>
+														<option value="minimal">Minimal</option>
+														<option value="compact">Compact</option>
+														<option value="normal">Normal</option>
+														<option value="comfortable">
+															Comfortable
+														</option>
+														<option value="spaced">Spaced</option>
+													</select>
 												</div>
 											</div>
-										</div>
 
-										{/* Card Border */}
-										<div class={styles.settingRow}>
-											<div class={styles.settingInfo}>
-												<span class={styles.settingLabel}>
-													Card Border
-												</span>
-												<span class={styles.settingDescription}>
-													Customize card border style
-												</span>
-											</div>
-											<div class={styles.settingControl}>
-												<button
-													class={styles.borderPreview}
-													onClick={() =>
-														setShowBorderEditor(!showBorderEditor)
-													}
-													title="Edit card border"
-												>
-													<span
-														class={styles.borderPreviewSample}
-														style={{
-															border: `${editConfig.cardBorder.width}px solid ${editConfig.cardBorder.color}`,
-															opacity: editConfig.cardBorder.opacity,
-														}}
-													/>
-													<span class={styles.borderPreviewLabel}>
-														{editConfig.cardBorder.width}px
+											{/* Item Radius */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Item Radius
 													</span>
-												</button>
-											</div>
-										</div>
-										{showBorderEditor && (
-											<div class={styles.borderEditor}>
-												<div class={styles.borderEditorRow}>
-													<span class={styles.borderEditorLabel}>
-														Width
+													<span class={styles.settingDescription}>
+														Border radius on cards (0-40px)
 													</span>
-													<input
-														type="range"
-														class={styles.rangeInput}
-														min="0"
-														max="5"
-														step="1"
-														value={editConfig.cardBorder.width}
-														onInput={(e) =>
-															updateEditConfig({
-																cardBorder: {
-																	...editConfig.cardBorder,
-																	width: parseInt(
+												</div>
+												<div class={styles.settingControl}>
+													<div class={styles.rangeWithValue}>
+														<input
+															type="range"
+															class={styles.rangeInput}
+															min="0"
+															max="40"
+															step="1"
+															value={editConfig.itemRadius}
+															onInput={(e) =>
+																updateEditConfig({
+																	itemRadius: parseInt(
 																		(
 																			e.target as HTMLInputElement
 																		).value,
 																		10,
 																	),
-																},
-															})
-														}
-													/>
-													<span class={styles.rangeValue}>
-														{editConfig.cardBorder.width}px
+																})
+															}
+														/>
+														<span class={styles.rangeValue}>
+															{editConfig.itemRadius}px
+														</span>
+													</div>
+												</div>
+											</div>
+
+											{/* Card Border */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Card Border
+													</span>
+													<span class={styles.settingDescription}>
+														Customize card border style
 													</span>
 												</div>
-												<div class={styles.borderEditorRow}>
-													<span class={styles.borderEditorLabel}>
-														Color
-													</span>
-													<ColorPicker
-														value={editConfig.cardBorder.color}
-														onChange={(hex) =>
-															updateEditConfig({
-																cardBorder: {
-																	...editConfig.cardBorder,
-																	color: hex,
-																},
-															})
+												<div class={styles.settingControl}>
+													<button
+														class={styles.borderPreview}
+														onClick={() =>
+															setShowBorderEditor(!showBorderEditor)
 														}
-														size={24}
-													/>
+														title="Edit card border"
+													>
+														<span
+															class={styles.borderPreviewSample}
+															style={{
+																border: `${editConfig.cardBorder.width}px solid ${editConfig.cardBorder.color}`,
+																opacity:
+																	editConfig.cardBorder.opacity,
+															}}
+														/>
+														<span class={styles.borderPreviewLabel}>
+															{editConfig.cardBorder.width}px
+														</span>
+													</button>
 												</div>
-												<div class={styles.borderEditorRow}>
-													<span class={styles.borderEditorLabel}>
-														Opacity
+											</div>
+											{showBorderEditor && (
+												<div class={styles.borderEditor}>
+													<div class={styles.borderEditorRow}>
+														<span class={styles.borderEditorLabel}>
+															Width
+														</span>
+														<input
+															type="range"
+															class={styles.rangeInput}
+															min="0"
+															max="5"
+															step="1"
+															value={editConfig.cardBorder.width}
+															onInput={(e) =>
+																updateEditConfig({
+																	cardBorder: {
+																		...editConfig.cardBorder,
+																		width: parseInt(
+																			(
+																				e.target as HTMLInputElement
+																			).value,
+																			10,
+																		),
+																	},
+																})
+															}
+														/>
+														<span class={styles.rangeValue}>
+															{editConfig.cardBorder.width}px
+														</span>
+													</div>
+													<div class={styles.borderEditorRow}>
+														<span class={styles.borderEditorLabel}>
+															Color
+														</span>
+														<ColorPicker
+															value={editConfig.cardBorder.color}
+															onChange={(hex) =>
+																updateEditConfig({
+																	cardBorder: {
+																		...editConfig.cardBorder,
+																		color: hex,
+																	},
+																})
+															}
+															size={24}
+														/>
+													</div>
+													<div class={styles.borderEditorRow}>
+														<span class={styles.borderEditorLabel}>
+															Opacity
+														</span>
+														<input
+															type="range"
+															class={styles.rangeInput}
+															min="0"
+															max="1"
+															step="0.01"
+															value={editConfig.cardBorder.opacity}
+															onInput={(e) =>
+																updateEditConfig({
+																	cardBorder: {
+																		...editConfig.cardBorder,
+																		opacity: parseFloat(
+																			(
+																				e.target as HTMLInputElement
+																			).value,
+																		),
+																	},
+																})
+															}
+														/>
+														<span class={styles.rangeValue}>
+															{Math.round(
+																editConfig.cardBorder.opacity * 100,
+															)}
+															%
+														</span>
+													</div>
+												</div>
+											)}
+
+											{/* Disable Hover Effects */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Disable Hover Effects
 													</span>
-													<input
-														type="range"
-														class={styles.rangeInput}
-														min="0"
-														max="1"
-														step="0.01"
-														value={editConfig.cardBorder.opacity}
-														onInput={(e) =>
-															updateEditConfig({
-																cardBorder: {
-																	...editConfig.cardBorder,
-																	opacity: parseFloat(
+													<span class={styles.settingDescription}>
+														Stop cards from animating on hover
+													</span>
+												</div>
+												<div class={styles.settingControl}>
+													<label class={styles.toggle}>
+														<input
+															type="checkbox"
+															checked={editConfig.disableHover}
+															onChange={(e) =>
+																updateEditConfig({
+																	disableHover: (
+																		e.target as HTMLInputElement
+																	).checked,
+																})
+															}
+														/>
+														<span class={styles.toggleTrack} />
+													</label>
+												</div>
+											</div>
+
+											{/* Font Scale */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Font Scale
+													</span>
+													<span class={styles.settingDescription}>
+														Adjust the text size across the app
+													</span>
+												</div>
+												<div class={styles.settingControl}>
+													<div class={styles.rangeWithValue}>
+														<input
+															type="range"
+															class={styles.rangeInput}
+															min="0.8"
+															max="1.2"
+															step="0.05"
+															value={editConfig.textScale}
+															onInput={(e) =>
+																updateEditConfig({
+																	textScale: parseFloat(
 																		(
 																			e.target as HTMLInputElement
 																		).value,
 																	),
+																})
+															}
+														/>
+														<span class={styles.rangeValue}>
+															{editConfig.textScale}x
+														</span>
+													</div>
+												</div>
+											</div>
+
+											{/* Editor Actions */}
+											<div
+												class={styles.actions}
+												style={{ gap: '8px', flexWrap: 'wrap' }}
+											>
+												<Button
+													variant="primary"
+													onClick={async () => {
+														try {
+															await themesApi.update(
+																editingThemeId.value,
+																{
+																	name: editThemeName,
+																	config: editConfig,
 																},
-															})
+															);
+															await fetchThemes();
+															notifySuccess('Theme saved');
+														} catch {
+															notifyError('Failed to save theme');
 														}
-													/>
-													<span class={styles.rangeValue}>
-														{Math.round(
-															editConfig.cardBorder.opacity * 100,
-														)}
-														%
-													</span>
-												</div>
-											</div>
-										)}
-
-										{/* Disable Hover Effects */}
-										<div class={styles.settingRow}>
-											<div class={styles.settingInfo}>
-												<span class={styles.settingLabel}>
-													Disable Hover Effects
-												</span>
-												<span class={styles.settingDescription}>
-													Stop cards from animating on hover
-												</span>
-											</div>
-											<div class={styles.settingControl}>
-												<label class={styles.toggle}>
-													<input
-														type="checkbox"
-														checked={editConfig.disableHover}
-														onChange={(e) =>
-															updateEditConfig({
-																disableHover: (
-																	e.target as HTMLInputElement
-																).checked,
-															})
-														}
-													/>
-													<span class={styles.toggleTrack} />
-												</label>
-											</div>
-										</div>
-
-										{/* Font Scale */}
-										<div class={styles.settingRow}>
-											<div class={styles.settingInfo}>
-												<span class={styles.settingLabel}>
-													Font Scale
-												</span>
-												<span class={styles.settingDescription}>
-													Adjust the text size across the app
-												</span>
-											</div>
-											<div class={styles.settingControl}>
-												<div class={styles.rangeWithValue}>
-													<input
-														type="range"
-														class={styles.rangeInput}
-														min="0.8"
-														max="1.2"
-														step="0.05"
-														value={editConfig.textScale}
-														onInput={(e) =>
-															updateEditConfig({
-																textScale: parseFloat(
-																	(e.target as HTMLInputElement)
-																		.value,
-																),
-															})
-														}
-													/>
-													<span class={styles.rangeValue}>
-														{editConfig.textScale}x
-													</span>
-												</div>
-											</div>
-										</div>
-
-										{/* Editor Actions */}
-										<div
-											class={styles.actions}
-											style={{ gap: '8px', flexWrap: 'wrap' }}
-										>
-											<Button
-												variant="primary"
-												onClick={async () => {
-													try {
-														await themesApi.update(
-															editingThemeId.value,
-															{
-																name: editThemeName,
+													}}
+												>
+													Save
+												</Button>
+												<Button
+													variant="secondary"
+													onClick={async () => {
+														try {
+															const created = await themesApi.create({
+																name: `Copy of ${editThemeName}`,
+																mode: editingTheme.mode,
 																config: editConfig,
-															},
-														);
-														await fetchThemes();
-														notifySuccess('Theme saved');
-													} catch {
-														notifyError('Failed to save theme');
-													}
-												}}
-											>
-												Save
-											</Button>
-											<Button
-												variant="secondary"
-												onClick={async () => {
-													try {
-														const created = await themesApi.create({
-															name: `Copy of ${editThemeName}`,
-															mode: editingTheme.mode,
-															config: editConfig,
-														});
-														await fetchThemes();
-														if (editingTheme.mode === 'dark') {
-															setSelectedDarkId(created.id);
-														} else {
-															setSelectedLightId(created.id);
+															});
+															await fetchThemes();
+															if (editingTheme.mode === 'dark') {
+																setSelectedDarkId(created.id);
+															} else {
+																setSelectedLightId(created.id);
+															}
+															editingThemeId.value = created.id;
+															setEditThemeName(created.name);
+															notifySuccess('Theme copied');
+														} catch {
+															notifyError('Failed to copy theme');
 														}
-														editingThemeId.value = created.id;
-														setEditThemeName(created.name);
-														notifySuccess('Theme copied');
-													} catch {
-														notifyError('Failed to copy theme');
+													}}
+												>
+													Copy to New
+												</Button>
+												<Button
+													variant="secondary"
+													onClick={() =>
+														window.open(
+															themesApi.exportUrl(
+																editingThemeId.value,
+															),
+														)
 													}
-												}}
-											>
-												Copy to New
-											</Button>
-											<Button
-												variant="secondary"
-												onClick={() =>
-													window.open(
-														themesApi.exportUrl(
-															editingThemeId.value,
-														),
-													)
-												}
-											>
-												Export
-											</Button>
-											<Button
-												variant="secondary"
-												onClick={() => {
-													editingThemeId.value = '';
-													setEditConfig(null);
-													setShowBorderEditor(false);
-													applyActiveTheme();
-												}}
-											>
-												Close
-											</Button>
+												>
+													Export
+												</Button>
+												<Button
+													variant="secondary"
+													onClick={() => {
+														editingThemeId.value = '';
+														setEditConfig(null);
+														setShowBorderEditor(false);
+														applyActiveTheme();
+													}}
+												>
+													Close
+												</Button>
+											</div>
 										</div>
-									</div>
-								);
-							})()}
+									);
+								})()}
 
 							{/* Subtitles Appearance (collapsible) */}
 							<CollapsibleSubtitleSettings />

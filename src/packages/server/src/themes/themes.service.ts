@@ -1,9 +1,9 @@
 import {
 	DEFAULT_DARK_CONFIG,
 	DEFAULT_LIGHT_CONFIG,
+	nowISO,
 	type ThemeConfig,
 	type ThemeRecord,
-	nowISO,
 	validateThemeConfig,
 } from '@mu/shared';
 import {
@@ -118,11 +118,7 @@ export class ThemesService implements OnModuleInit {
 		this.refreshCache();
 	}
 
-	importTheme(data: {
-		name: string;
-		mode: 'dark' | 'light';
-		config: unknown;
-	}): ThemeRecord {
+	importTheme(data: { name: string; mode: 'dark' | 'light'; config: unknown }): ThemeRecord {
 		if (!validateThemeConfig(data.config)) {
 			throw new BadRequestException('Invalid theme config in import data');
 		}
@@ -134,7 +130,12 @@ export class ThemesService implements OnModuleInit {
 		});
 	}
 
-	exportTheme(id: string): { name: string; mode: string; config: ThemeConfig; exportedAt: string } {
+	exportTheme(id: string): {
+		name: string;
+		mode: string;
+		config: ThemeConfig;
+		exportedAt: string;
+	} {
 		const theme = this.findOne(id);
 		return {
 			name: theme.name,

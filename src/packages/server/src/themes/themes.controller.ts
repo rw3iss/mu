@@ -52,9 +52,7 @@ export class ThemesController {
 	}
 
 	@Post('import')
-	importTheme(
-		@Body() body: { name: string; mode: 'dark' | 'light'; config: unknown },
-	) {
+	importTheme(@Body() body: { name: string; mode: 'dark' | 'light'; config: unknown }) {
 		return this.service.importTheme(body);
 	}
 

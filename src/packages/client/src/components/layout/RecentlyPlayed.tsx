@@ -68,7 +68,11 @@ export function RecentlyPlayed() {
 							{/* Hover tooltip with larger poster */}
 							<div class={styles.tooltip}>
 								{movie.posterUrl && (
-									<img src={movie.posterUrl} alt="" class={styles.tooltipPoster} />
+									<img
+										src={movie.posterUrl}
+										alt=""
+										class={styles.tooltipPoster}
+									/>
 								)}
 								<span class={styles.tooltipTitle}>{movie.title}</span>
 							</div>
