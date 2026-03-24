@@ -213,6 +213,8 @@
   // Width set via inline style as calc(splitWidth vw - 3px)
   aspect-ratio: 16 / 9;
   height: auto;
+  // No transition in split mode — resize must be instant during drag
+  transition: none;
   // Above the split panel so video renders on top
   z-index: calc(var(--z-player-controls, 900) + 2);
 
