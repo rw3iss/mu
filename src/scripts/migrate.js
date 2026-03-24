@@ -113,6 +113,40 @@ for (const sql of alters) {
 	try { db.exec(sql); } catch (e) { /* column already exists */ }
 }
 
+// Seed default themes if none exist
+const themeCount = db.prepare('SELECT COUNT(*) as c FROM themes WHERE is_default = 1').get();
+if (themeCount.c === 0) {
+	const crypto = require('crypto');
+	const now = new Date().toISOString();
+	const darkConfig = JSON.stringify({
+		accentColor: '#06b6d4',
+		pageBg: '#050709',
+		panelBg: '#090b12',
+		itemSpacing: 'normal',
+		itemRadius: 3,
+		cardBorder: { width: 1, color: '#788cb4', opacity: 0.07 },
+		disableHover: false,
+		textScale: 1.0,
+	});
+	const lightConfig = JSON.stringify({
+		accentColor: '#0891b2',
+		pageBg: '#f8fafc',
+		panelBg: '#ffffff',
+		itemSpacing: 'normal',
+		itemRadius: 3,
+		cardBorder: { width: 1, color: '#94a3b8', opacity: 0.15 },
+		disableHover: false,
+		textScale: 1.0,
+	});
+	db.prepare(
+		'INSERT INTO themes (id, name, mode, config, is_default, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+	).run(crypto.randomUUID(), 'Default (Dark)', 'dark', darkConfig, 1, null, now, now);
+	db.prepare(
+		'INSERT INTO themes (id, name, mode, config, is_default, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+	).run(crypto.randomUUID(), 'Default (Light)', 'light', lightConfig, 1, null, now, now);
+	console.log('Seeded default themes');
+}
+
 // Verify
 const tableList = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all();
 console.log('Tables:', tableList.map(t => t.name).join(', '));

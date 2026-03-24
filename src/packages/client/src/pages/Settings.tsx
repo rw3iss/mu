@@ -791,7 +791,7 @@ export function Settings(props: SettingsProps) {
 											))}
 									</select>
 									<button
-										class={styles.resetBtn}
+										class={styles.themeActionBtn}
 										onClick={() => {
 											const t = themesList.value.find(
 												(t) => t.id === selectedDarkId.value,
@@ -808,7 +808,7 @@ export function Settings(props: SettingsProps) {
 										Edit
 									</button>
 									<button
-										class={styles.resetBtn}
+										class={styles.themeActionBtn}
 										onClick={() => importDarkRef.current?.click()}
 										title="Import theme"
 									>
@@ -866,7 +866,7 @@ export function Settings(props: SettingsProps) {
 											))}
 									</select>
 									<button
-										class={styles.resetBtn}
+										class={styles.themeActionBtn}
 										onClick={() => {
 											const t = themesList.value.find(
 												(t) => t.id === selectedLightId.value,
@@ -883,7 +883,7 @@ export function Settings(props: SettingsProps) {
 										Edit
 									</button>
 									<button
-										class={styles.resetBtn}
+										class={styles.themeActionBtn}
 										onClick={() => importLightRef.current?.click()}
 										title="Import theme"
 									>
