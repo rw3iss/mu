@@ -425,7 +425,9 @@ export function PlayerControls({
 						const st = getUiSetting<number[]>('skip_times', [5, 10, 20]);
 						const t = [st[0] ?? 5, st[1] ?? 10, st[2] ?? 20];
 						return (
-							<div class={`${styles.centerControls} ${isSplit ? styles.centerControlsSplit : ''}`}>
+							<div
+								class={`${styles.centerControls} ${isSplit ? styles.centerControlsSplit : ''}`}
+							>
 								{/* Skip Back — rollover reveals extended options */}
 								<div
 									class={styles.skipWrap}
@@ -564,32 +566,33 @@ export function PlayerControls({
 						);
 					})()}
 
-	
 					{/* Right: plugin buttons, info, volume, settings, fullscreen */}
 					<div class={styles.rightControls}>
 						{/* Plugin buttons — rendered before system buttons */}
 						<PluginSlot name={UI.PLAYER_BUTTON} context={{}} />
 
 						{/* Info — hidden in split mode (info shown inline) */}
-						{!isSplit && <button
-							class={styles.controlBtn}
-							onClick={onToggleInfo}
-							aria-label="Movie info"
-							title="Info"
-						>
-							<svg
-								width="20"
-								height="20"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="white"
-								stroke-width="2"
+						{!isSplit && (
+							<button
+								class={styles.controlBtn}
+								onClick={onToggleInfo}
+								aria-label="Movie info"
+								title="Info"
 							>
-								<circle cx="12" cy="12" r="10" />
-								<line x1="12" y1="16" x2="12" y2="12" />
-								<line x1="12" y1="8" x2="12.01" y2="8" />
-							</svg>
-						</button>}
+								<svg
+									width="20"
+									height="20"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="white"
+									stroke-width="2"
+								>
+									<circle cx="12" cy="12" r="10" />
+									<line x1="12" y1="16" x2="12" y2="12" />
+									<line x1="12" y1="8" x2="12.01" y2="8" />
+								</svg>
+							</button>
+						)}
 
 						{/* Effects */}
 						<div class={styles.effectsBtnWrap}>

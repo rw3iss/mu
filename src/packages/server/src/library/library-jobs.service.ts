@@ -190,11 +190,19 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 						.from(movieFiles)
 						.where(eq(movieFiles.id, movieFileId))
 						.get();
-					let storedTracks: { index: number; language?: string; title?: string; codec?: string }[] | undefined;
+					let storedTracks:
+						| { index: number; language?: string; title?: string; codec?: string }[]
+						| undefined;
 					if (file?.subtitleTracks) {
-						try { storedTracks = JSON.parse(file.subtitleTracks as string); } catch {}
+						try {
+							storedTracks = JSON.parse(file.subtitleTracks as string);
+						} catch {}
 					}
-					await this.subtitleService.extractSubtitles(filePath, movieFileId, storedTracks);
+					await this.subtitleService.extractSubtitles(
+						filePath,
+						movieFileId,
+						storedTracks,
+					);
 				} catch (err: any) {
 					helpers.log(`Subtitle extraction skipped: ${err.message}`);
 				}
@@ -209,10 +217,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				});
 
 				// Clear any leftover chunked cache before monolithic encode
-				const persistDir = this.transcoderService.getPersistentDir(
-					movieFileId,
-					quality,
-				);
+				const persistDir = this.transcoderService.getPersistentDir(movieFileId, quality);
 				const chunkMetaPath = path.join(persistDir, 'chunk-meta.json');
 				if (existsSync(chunkMetaPath)) {
 					this.logger.log(
@@ -463,7 +468,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					this.guidResolver.warmup(file.id, movieTitle);
 				}
 
-					// Always use monolithic for background pre-transcode
+				// Always use monolithic for background pre-transcode
 				pendingMonolithic.push({
 					type: JOB_TYPE.PRE_TRANSCODE,
 					label: `Resume transcode: ${title} (${quality})`,

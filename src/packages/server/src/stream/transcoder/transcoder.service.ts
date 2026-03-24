@@ -804,10 +804,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	 * Check manifest duration against the expected movie duration.
 	 * Returns true if the cache covers at least 95% of the movie.
 	 */
-	private async checkManifestDuration(
-		dir: string,
-		movieFileId: string,
-	): Promise<boolean> {
+	private async checkManifestDuration(dir: string, movieFileId: string): Promise<boolean> {
 		try {
 			const manifest = await readFile(path.join(dir, 'stream.m3u8'), 'utf-8');
 			// Sum all EXTINF durations
@@ -870,7 +867,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} is truncated — clearing for re-encode`,
 				);
 				// Remove the false .complete marker
-				try { await rm(path.join(dir, '.complete'), { force: true }); } catch {}
+				try {
+					await rm(path.join(dir, '.complete'), { force: true });
+				} catch {}
 				return 'invalid';
 			}
 			// Verify first segment has valid codecs for browser playback
@@ -979,7 +978,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 
 			// Check video codec (take first line only — MPEG-TS can report multiple streams)
 			const vidCmd = `ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "${segmentPath}"`;
-			const videoCodec = execSync(vidCmd, { encoding: 'utf-8', timeout: 10000 }).trim().split('\n')[0]?.trim();
+			const videoCodec = execSync(vidCmd, { encoding: 'utf-8', timeout: 10000 })
+				.trim()
+				.split('\n')[0]
+				?.trim();
 			if (videoCodec && videoCodec !== 'h264') {
 				this.logger.warn(
 					`Segment health check: unexpected video codec "${videoCodec}" in ${cacheDir}`,

@@ -168,7 +168,12 @@ export async function playMovie(
 		if (playerMode.value === 'full' || playerMode.value === 'split') {
 			return playerMode.value;
 		}
-		if (playerMode.value === 'mini' && preMiniMode && preMiniMode !== 'mini' && preMiniMode !== 'hidden') {
+		if (
+			playerMode.value === 'mini' &&
+			preMiniMode &&
+			preMiniMode !== 'mini' &&
+			preMiniMode !== 'hidden'
+		) {
 			return preMiniMode;
 		}
 		return 'full';
@@ -264,7 +269,12 @@ export function minimizePlayer(): void {
 export function maximizePlayer(): void {
 	if (!globalMovieId.value) return;
 	// Restore previous mode if coming from mini, otherwise go to full
-	if (playerMode.value === 'mini' && preMiniMode && preMiniMode !== 'mini' && preMiniMode !== 'hidden') {
+	if (
+		playerMode.value === 'mini' &&
+		preMiniMode &&
+		preMiniMode !== 'mini' &&
+		preMiniMode !== 'hidden'
+	) {
 		playerMode.value = preMiniMode;
 	} else {
 		playerMode.value = 'full';

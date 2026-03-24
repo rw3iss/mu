@@ -296,11 +296,14 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 							setShowDeleteModal(true);
 							// Fetch file info if not available (e.g. from movie cards)
 							if (!filePath) {
-								moviesService.get(movie.id).then((full) => {
-									if (full?.fileInfo?.filePath) {
-										setFilePath(full.fileInfo.filePath);
-									}
-								}).catch(() => {});
+								moviesService
+									.get(movie.id)
+									.then((full) => {
+										if (full?.fileInfo?.filePath) {
+											setFilePath(full.fileInfo.filePath);
+										}
+									})
+									.catch(() => {});
 							}
 						}}
 					>
@@ -354,7 +357,8 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 									if (!fp) return null;
 									// Extract parent folder name from path (handle both / and \)
 									const parts = fp.replace(/\\/g, '/').split('/');
-									const folderName = parts.length >= 2 ? parts[parts.length - 2] : null;
+									const folderName =
+										parts.length >= 2 ? parts[parts.length - 2] : null;
 									if (!folderName) return null;
 									return (
 										<span

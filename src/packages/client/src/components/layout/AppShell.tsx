@@ -20,7 +20,9 @@ export function AppShell({ children }: AppShellProps) {
 	return (
 		<div
 			class={`${styles.shell} ${collapsed ? styles.collapsed : ''} ${showMiniPlayer ? styles.withMiniPlayer : ''} ${showSplitPlayer ? styles.withSplitPlayer : ''}`}
-			style={showSplitPlayer ? { maxWidth: `calc(100vw - ${splitWidth.value}vw)` } : undefined}
+			style={
+				showSplitPlayer ? { maxWidth: `calc(100vw - ${splitWidth.value}vw)` } : undefined
+			}
 		>
 			<Sidebar collapsed={collapsed} onToggle={() => (sidebarCollapsed.value = !collapsed)} />
 			<div class={styles.main}>

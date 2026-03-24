@@ -89,7 +89,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							{movie.genres && movie.genres.length > 0 && (
 								<div class={styles.genres}>
 									{movie.genres.map((genre) => (
-										<span key={genre} class={styles.genreTag}>{genre}</span>
+										<span key={genre} class={styles.genreTag}>
+											{genre}
+										</span>
 									))}
 								</div>
 							)}
@@ -98,7 +100,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								{movie.rating != null && movie.rating > 0 && (
 									<div class={styles.ratingItem}>
 										<span class={styles.ratingSource}>You</span>
-										<span class={styles.ratingValue}>{movie.rating.toFixed(1)}</span>
+										<span class={styles.ratingValue}>
+											{movie.rating.toFixed(1)}
+										</span>
 									</div>
 								)}
 								{movie.imdbRating != null && movie.imdbRating > 0 && (
@@ -116,7 +120,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								{movie.metacriticRating != null && movie.metacriticRating > 0 && (
 									<div class={styles.ratingItem}>
 										<span class={styles.ratingSource}>Metacritic</span>
-										<span class={styles.ratingValue}>{movie.metacriticRating}</span>
+										<span class={styles.ratingValue}>
+											{movie.metacriticRating}
+										</span>
 									</div>
 								)}
 							</div>
@@ -136,7 +142,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 											<div key={member.name} class={styles.castMember}>
 												<span class={styles.castName}>{member.name}</span>
 												{member.character && (
-													<span class={styles.castCharacter}>{member.character}</span>
+													<span class={styles.castCharacter}>
+														{member.character}
+													</span>
 												)}
 											</div>
 										))}
@@ -181,7 +189,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 						{movie.genres && movie.genres.length > 0 && (
 							<div class={styles.genres}>
 								{movie.genres.map((genre) => (
-									<span key={genre} class={styles.genreTag}>{genre}</span>
+									<span key={genre} class={styles.genreTag}>
+										{genre}
+									</span>
 								))}
 							</div>
 						)}
@@ -190,7 +200,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							{movie.rating != null && movie.rating > 0 && (
 								<div class={styles.ratingItem}>
 									<span class={styles.ratingSource}>You</span>
-									<span class={styles.ratingValue}>{movie.rating.toFixed(1)}</span>
+									<span class={styles.ratingValue}>
+										{movie.rating.toFixed(1)}
+									</span>
 								</div>
 							)}
 							{movie.imdbRating != null && movie.imdbRating > 0 && (
@@ -228,7 +240,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										<div key={member.name} class={styles.castMember}>
 											<span class={styles.castName}>{member.name}</span>
 											{member.character && (
-												<span class={styles.castCharacter}>{member.character}</span>
+												<span class={styles.castCharacter}>
+													{member.character}
+												</span>
 											)}
 										</div>
 									))}

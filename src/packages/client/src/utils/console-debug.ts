@@ -14,13 +14,7 @@ import {
 	splitPlayer,
 	splitWidth,
 } from '@/state/globalPlayer.state';
-import {
-	currentSession,
-	currentTime,
-	duration,
-	isPlaying,
-	volume,
-} from '@/state/player.state';
+import { currentSession, currentTime, duration, isPlaying, volume } from '@/state/player.state';
 
 const PREFIX = 'mu_ui_';
 
@@ -60,7 +54,12 @@ function setConfig(key: string, value: string): void {
 	} else {
 		localStorage.setItem(fullKey, JSON.stringify(value));
 	}
-	console.log(`%c${fullKey}%c = %c${value}`, 'color: #82aaff', 'color: inherit', 'color: #c3e88d');
+	console.log(
+		`%c${fullKey}%c = %c${value}`,
+		'color: #82aaff',
+		'color: inherit',
+		'color: #c3e88d',
+	);
 }
 
 function deleteConfig(key: string): void {
@@ -106,10 +105,14 @@ function printHelp() {
 		HELP,
 		'color: #82aaff; font-weight: bold',
 		'',
-		'color: #ffcb6b; font-weight: bold', '',
-		'color: #ffcb6b; font-weight: bold', '',
-		'color: #ffcb6b; font-weight: bold', '',
-		'color: #ffcb6b; font-weight: bold', '',
+		'color: #ffcb6b; font-weight: bold',
+		'',
+		'color: #ffcb6b; font-weight: bold',
+		'',
+		'color: #ffcb6b; font-weight: bold',
+		'',
+		'color: #ffcb6b; font-weight: bold',
+		'',
 	);
 }
 
@@ -154,59 +157,56 @@ const mu = {
 		},
 	),
 
-	player: Object.assign(
-		() => playerState(),
-		{
-			play: () => {
-				const video = document.querySelector('video');
-				video?.play().catch(() => {});
-				console.log('Playing');
-			},
-			pause: () => {
-				const video = document.querySelector('video');
-				video?.pause();
-				console.log('Paused');
-			},
-			mode: (m: string) => {
-				switch (m) {
-					case 'full':
-						maximizePlayer();
-						break;
-					case 'mini':
-						minimizePlayer();
-						break;
-					case 'split':
-						splitPlayer();
-						break;
-					case 'hidden':
-						closePlayer();
-						break;
-					default:
-						console.log('Valid modes: full, mini, split, hidden');
-						return;
-				}
-				console.log(`Mode: ${m}`);
-			},
-			volume: (v: number) => {
-				volume.value = Math.max(0, Math.min(1, v));
-				console.log(`Volume: ${volume.value}`);
-			},
-			seek: (seconds: number) => {
-				const video = document.querySelector('video');
-				if (video) {
-					video.currentTime = seconds;
-					console.log(`Seeked to ${seconds}s`);
-				}
-			},
-			split: (percent: number) => {
-				const w = Math.max(25, Math.min(62, Math.round(percent)));
-				splitWidth.value = w;
-				localStorage.setItem('mu_ui_split_width', String(w));
-				if (playerMode.value !== 'split') splitPlayer();
-				console.log(`Split width: ${w}%`);
-			},
+	player: Object.assign(() => playerState(), {
+		play: () => {
+			const video = document.querySelector('video');
+			video?.play().catch(() => {});
+			console.log('Playing');
 		},
-	),
+		pause: () => {
+			const video = document.querySelector('video');
+			video?.pause();
+			console.log('Paused');
+		},
+		mode: (m: string) => {
+			switch (m) {
+				case 'full':
+					maximizePlayer();
+					break;
+				case 'mini':
+					minimizePlayer();
+					break;
+				case 'split':
+					splitPlayer();
+					break;
+				case 'hidden':
+					closePlayer();
+					break;
+				default:
+					console.log('Valid modes: full, mini, split, hidden');
+					return;
+			}
+			console.log(`Mode: ${m}`);
+		},
+		volume: (v: number) => {
+			volume.value = Math.max(0, Math.min(1, v));
+			console.log(`Volume: ${volume.value}`);
+		},
+		seek: (seconds: number) => {
+			const video = document.querySelector('video');
+			if (video) {
+				video.currentTime = seconds;
+				console.log(`Seeked to ${seconds}s`);
+			}
+		},
+		split: (percent: number) => {
+			const w = Math.max(25, Math.min(62, Math.round(percent)));
+			splitWidth.value = w;
+			localStorage.setItem('mu_ui_split_width', String(w));
+			if (playerMode.value !== 'split') splitPlayer();
+			console.log(`Split width: ${w}%`);
+		},
+	}),
 
 	hls: (enable: boolean) => {
 		if (enable) {
