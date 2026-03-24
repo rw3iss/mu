@@ -800,13 +800,57 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	 * Checks that the manifest exists, is parseable, and that the segments it
 	 * references actually exist on disk. Returns 'complete', 'partial', 'invalid', or 'empty'.
 	 */
+	/**
+	 * Check manifest duration against the expected movie duration.
+	 * Returns true if the cache covers at least 95% of the movie.
+	 */
+	private async checkManifestDuration(
+		dir: string,
+		movieFileId: string,
+	): Promise<boolean> {
+		try {
+			const manifest = await readFile(path.join(dir, 'stream.m3u8'), 'utf-8');
+			// Sum all EXTINF durations
+			const extinfs = manifest.match(/#EXTINF:([\d.]+)/g);
+			if (!extinfs || extinfs.length === 0) return false;
+
+			let cacheDuration = 0;
+			for (const e of extinfs) {
+				cacheDuration += Number.parseFloat(e.replace('#EXTINF:', ''));
+			}
+
+			// Get expected duration from DB
+			const file = this.database.db
+				.select({ durationSeconds: movieFiles.durationSeconds })
+				.from(movieFiles)
+				.where(eq(movieFiles.id, movieFileId))
+				.get();
+
+			if (!file?.durationSeconds || file.durationSeconds <= 0) {
+				// No expected duration — can't validate, trust the manifest
+				return true;
+			}
+
+			const ratio = cacheDuration / file.durationSeconds;
+			if (ratio < 0.95) {
+				this.logger.warn(
+					`Cache for ${this.guidResolver.resolve(movieFileId)} has ${Math.round(ratio * 100)}% of expected duration (${Math.round(cacheDuration)}s / ${file.durationSeconds}s) — incomplete`,
+				);
+				return false;
+			}
+			return true;
+		} catch {
+			return true; // Can't check — don't block
+		}
+	}
+
 	async validateCache(
 		movieFileId: string,
 		quality: string,
 	): Promise<'complete' | 'partial' | 'invalid' | 'empty'> {
 		const dir = this.getPersistentDir(movieFileId, quality);
 
-		// Fast path: .complete marker exists — trust it (with integrity checks)
+		// Fast path: .complete marker exists — verify integrity
 		try {
 			await access(path.join(dir, '.complete'));
 			// Quick sanity check: manifest and first segment exist
@@ -814,10 +858,19 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				await access(path.join(dir, 'stream.m3u8'));
 				await access(path.join(dir, 'segment_0000.ts'));
 			} catch {
-				// .complete but missing manifest or first segment — invalid
 				this.logger.warn(
 					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} is missing manifest or segment_0000 — marking invalid`,
 				);
+				return 'invalid';
+			}
+			// Verify duration covers the full movie (catches killed transcodes)
+			const durationOk = await this.checkManifestDuration(dir, movieFileId);
+			if (!durationOk) {
+				this.logger.warn(
+					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} is truncated — clearing for re-encode`,
+				);
+				// Remove the false .complete marker
+				try { await rm(path.join(dir, '.complete'), { force: true }); } catch {}
 				return 'invalid';
 			}
 			// Verify first segment has valid codecs for browser playback
@@ -846,16 +899,25 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			return files.includes('stream.m3u8') ? 'invalid' : 'empty';
 		}
 
-		// Has manifest with ENDLIST? Means FFmpeg finished but .complete wasn't written
+		// Has manifest with ENDLIST? Check if duration is complete before trusting it
 		if (files.includes('stream.m3u8')) {
 			try {
 				const manifest = await readFile(path.join(dir, 'stream.m3u8'), 'utf-8');
 				if (manifest.includes('#EXT-X-ENDLIST')) {
-					await writeFile(path.join(dir, '.complete'), '');
-					this.logger.log(
-						`Repaired missing .complete marker for ${this.guidResolver.resolve(movieFileId)}/${quality}`,
+					// Verify it's actually complete (FFmpeg writes ENDLIST even on kill)
+					const durationOk = await this.checkManifestDuration(dir, movieFileId);
+					if (durationOk) {
+						await writeFile(path.join(dir, '.complete'), '');
+						this.logger.log(
+							`Repaired missing .complete marker for ${this.guidResolver.resolve(movieFileId)}/${quality}`,
+						);
+						return 'complete';
+					}
+					// Truncated — treat as partial (will be cleaned and re-encoded)
+					this.logger.warn(
+						`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} has ENDLIST but is truncated — marking invalid`,
 					);
-					return 'complete';
+					return 'invalid';
 				}
 			} catch {}
 		}

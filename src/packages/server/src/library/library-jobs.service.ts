@@ -409,8 +409,14 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			}
 
 			for (const quality of qualities) {
-				const hasCached = await this.transcoderService.hasCachedTranscode(file.id, quality);
-				if (hasCached) continue;
+				// Full validation: checks .complete marker, duration, and codecs
+				const cacheState = await this.transcoderService.validateCache(file.id, quality);
+				if (cacheState === 'complete') continue;
+
+				// Clear invalid/partial caches so we start fresh
+				if (cacheState === 'invalid' || cacheState === 'partial') {
+					await this.transcoderService.clearCache(file.id);
+				}
 
 				// Skip if previously failed permanently (.failed marker)
 				const persistDir = this.transcoderService.getPersistentDir(file.id, quality);
