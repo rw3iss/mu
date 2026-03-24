@@ -3,7 +3,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Res } from '@nestjs/co
 import type { FastifyReply } from 'fastify';
 import { ThemesService } from './themes.service.js';
 
-@Controller('api/v1/themes')
+@Controller('themes')
 export class ThemesController {
 	constructor(private readonly service: ThemesService) {}
 
