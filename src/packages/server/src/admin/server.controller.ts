@@ -74,8 +74,19 @@ export class ServerController {
 	@Get('jobs')
 	@Roles('admin')
 	listJobs(@Query('status') status?: string, @Query('type') type?: string) {
-		// Current in-memory jobs
-		const currentJobs = this.jobManager.listJobs({ type, status });
+		// Current in-memory jobs, sorted: running first (earliest), then pending, then completed/failed
+		const statusOrder: Record<string, number> = { running: 0, pending: 1, paused: 2, completed: 3, failed: 4 };
+		const currentJobs = this.jobManager
+			.listJobs({ type, status })
+			.sort((a, b) => {
+				const oa = statusOrder[a.status] ?? 5;
+				const ob = statusOrder[b.status] ?? 5;
+				if (oa !== ob) return oa - ob;
+				// Within same status, earliest started/created first
+				const ta = a.startedAt ?? a.createdAt;
+				const tb = b.startedAt ?? b.createdAt;
+				return new Date(ta).getTime() - new Date(tb).getTime();
+			});
 
 		return {
 			jobs: currentJobs.map((j) => ({
