@@ -21,6 +21,7 @@ import { ThumbnailService } from '../media/thumbnail.service.js';
 import { MetadataService } from '../metadata/metadata.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { StreamService } from '../stream/stream.service.js';
+import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import { ChunkManagerService } from '../stream/transcoder/chunk-manager.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { LibraryService } from './library.service.js';
@@ -58,6 +59,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		private readonly database: DatabaseService,
 		private readonly chunkManager: ChunkManagerService,
 		private readonly guidResolver: GuidResolverService,
+		private readonly subtitleService: SubtitleService,
 	) {}
 
 	onModuleInit() {
@@ -180,6 +182,22 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				helpers.log(
 					`Pre-transcoding ${this.guidResolver.resolve(movieFileId)} (${mode}, ${quality})`,
 				);
+
+				// Pre-extract subtitles so they're cached when the user plays
+				try {
+					const file = this.database.db
+						.select()
+						.from(movieFiles)
+						.where(eq(movieFiles.id, movieFileId))
+						.get();
+					let storedTracks: { index: number; language?: string; title?: string; codec?: string }[] | undefined;
+					if (file?.subtitleTracks) {
+						try { storedTracks = JSON.parse(file.subtitleTracks as string); } catch {}
+					}
+					await this.subtitleService.extractSubtitles(filePath, movieFileId, storedTracks);
+				} catch (err: any) {
+					helpers.log(`Subtitle extraction skipped: ${err.message}`);
+				}
 
 				// Always use monolithic transcode for background pre-encoding.
 				// Chunked encoding creates audio discontinuities at chunk boundaries
