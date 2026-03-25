@@ -3,12 +3,12 @@
 // ============================================
 
 .loadingSpinner {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: var(--z-player-controls);
+  z-index: 2;
   pointer-events: none;
 }
 
@@ -30,9 +30,9 @@
 // ============================================
 
 .preparingOverlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: calc(var(--z-player-controls) + 1);
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;

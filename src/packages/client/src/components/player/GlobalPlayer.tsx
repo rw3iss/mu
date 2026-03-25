@@ -714,6 +714,7 @@ export function GlobalPlayer() {
 				onClick={isMini ? maximizePlayer : undefined}
 				onMouseMove={!isMini && !isSplit ? resetControlsTimer : undefined}
 			>
+				{/* Mini mode overlays */}
 				{isMini && (
 					<>
 						{preparingMessage && (
@@ -737,40 +738,39 @@ export function GlobalPlayer() {
 						</div>
 					</>
 				)}
-			</div>
 
-			{/* Loading spinner — shown while video is buffering (not when paused with content) */}
-			{!isMini &&
-				!isSplit &&
-				!preparingMessage &&
-				!streamError.value &&
-				isPlayerActive.value &&
-				isBuffering.value && (
-					<div class={styles.loadingSpinner}>
-						<div class={styles.loadingSpinnerIcon} />
+				{/* Loading spinner — inside video wrapper so it doesn't cover controls */}
+				{!isMini &&
+					!preparingMessage &&
+					!streamError.value &&
+					isPlayerActive.value &&
+					isBuffering.value && (
+						<div class={styles.loadingSpinner}>
+							<div class={styles.loadingSpinnerIcon} />
+						</div>
+					)}
+
+				{/* Preparing / error overlay — inside video wrapper so controls remain accessible */}
+				{preparingMessage && !isMini && (
+					<div class={styles.preparingOverlay}>
+						<div class={styles.preparingContent}>
+							{!streamError.value && <div class={styles.preparingSpinner} />}
+							<span>{preparingMessage}</span>
+							{streamError.value && (
+								<button
+									class={styles.preparingClose}
+									onClick={() => {
+										setPreparingMessage(null);
+										closePlayer();
+									}}
+								>
+									Close
+								</button>
+							)}
+						</div>
 					</div>
 				)}
-
-			{/* Preparing / error overlay */}
-			{preparingMessage && !isMini && !isSplit && (
-				<div class={styles.preparingOverlay}>
-					<div class={styles.preparingContent}>
-						{!streamError.value && <div class={styles.preparingSpinner} />}
-						<span>{preparingMessage}</span>
-						{streamError.value && (
-							<button
-								class={styles.preparingClose}
-								onClick={() => {
-									setPreparingMessage(null);
-									closePlayer();
-								}}
-							>
-								Close
-							</button>
-						)}
-					</div>
-				</div>
-			)}
+			</div>
 
 			{/* Transcoding in-progress banner — auto-hides with controls */}
 			{!isMini && !isSplit && movie?.status === 'processing_playable' && (
