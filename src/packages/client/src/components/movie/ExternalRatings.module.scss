@@ -25,6 +25,17 @@
   font-weight: var(--font-weight-bold);
 }
 
+.link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+
+  &:hover {
+    opacity: 0.85;
+    transform: scale(1.05);
+  }
+}
+
 // IMDb
 .imdb {
   background: #f5c518;

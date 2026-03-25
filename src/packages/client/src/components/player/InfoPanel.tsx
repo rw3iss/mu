@@ -105,12 +105,26 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										</span>
 									</div>
 								)}
-								{movie.imdbRating != null && movie.imdbRating > 0 && (
-									<div class={styles.ratingItem}>
+								{movie.imdbRating != null && movie.imdbRating > 0 ? (
+									<a
+										href={movie.imdbId ? `https://www.imdb.com/title/${movie.imdbId}/` : undefined}
+										target="_blank"
+										rel="noopener noreferrer"
+										class={`${styles.ratingItem} ${movie.imdbId ? styles.ratingLink : ''}`}
+									>
 										<span class={styles.ratingSource}>IMDb</span>
 										<span class={styles.ratingValue}>{movie.imdbRating}</span>
-									</div>
-								)}
+									</a>
+								) : movie.imdbId ? (
+									<a
+										href={`https://www.imdb.com/title/${movie.imdbId}/`}
+										target="_blank"
+										rel="noopener noreferrer"
+										class={`${styles.ratingItem} ${styles.ratingLink}`}
+									>
+										<span class={styles.ratingSource}>IMDb</span>
+									</a>
+								) : null}
 								{movie.rtRating != null && movie.rtRating > 0 && (
 									<div class={styles.ratingItem}>
 										<span class={styles.ratingSource}>RT</span>
@@ -205,12 +219,26 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									</span>
 								</div>
 							)}
-							{movie.imdbRating != null && movie.imdbRating > 0 && (
-								<div class={styles.ratingItem}>
+							{movie.imdbRating != null && movie.imdbRating > 0 ? (
+								<a
+									href={movie.imdbId ? `https://www.imdb.com/title/${movie.imdbId}/` : undefined}
+									target="_blank"
+									rel="noopener noreferrer"
+									class={`${styles.ratingItem} ${movie.imdbId ? styles.ratingLink : ''}`}
+								>
 									<span class={styles.ratingSource}>IMDb</span>
 									<span class={styles.ratingValue}>{movie.imdbRating}</span>
-								</div>
-							)}
+								</a>
+							) : movie.imdbId ? (
+								<a
+									href={`https://www.imdb.com/title/${movie.imdbId}/`}
+									target="_blank"
+									rel="noopener noreferrer"
+									class={`${styles.ratingItem} ${styles.ratingLink}`}
+								>
+									<span class={styles.ratingSource}>IMDb</span>
+								</a>
+							) : null}
 							{movie.rtRating != null && movie.rtRating > 0 && (
 								<div class={styles.ratingItem}>
 									<span class={styles.ratingSource}>RT</span>

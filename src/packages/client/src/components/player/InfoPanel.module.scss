@@ -156,6 +156,16 @@
   gap: 2px;
 }
 
+.ratingLink {
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+
+  &:hover {
+    opacity: 0.7;
+  }
+}
+
 .ratingSource {
   font-size: var(--font-size-xs);
   color: rgba(255, 255, 255, 0.4);
