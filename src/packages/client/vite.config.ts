@@ -62,7 +62,7 @@ export default defineConfig({
 	},
 	build: { outDir: 'dist', sourcemap: true },
 	server: {
-		port: 3001,
+		port: 4001,
 		fs: {
 			allow: [workspaceRoot],
 		},

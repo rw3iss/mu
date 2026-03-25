@@ -272,6 +272,8 @@ export class StreamController {
 		if (segmentNumber === 0) {
 			this.transcodeDebugger.recordMilestone(sessionId, 'firstSegmentServed');
 		}
+		// Update session heartbeat — keeps session alive even if progress POSTs fail
+		this.streamService.touchSession(sessionId);
 		return reply
 			.header('Content-Type', 'video/mp2t')
 			.header('Cache-Control', 'public, max-age=86400')

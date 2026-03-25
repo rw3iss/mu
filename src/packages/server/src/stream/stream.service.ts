@@ -37,7 +37,7 @@ interface StartStreamOptions {
 }
 
 /** Stale session timeout in minutes — sessions with no heartbeat for this long are reaped. */
-const SESSION_TIMEOUT_MINUTES = 30;
+const SESSION_TIMEOUT_MINUTES = 120;
 /** How often to check for stale sessions (ms). */
 const SESSION_REAP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -600,6 +600,22 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		this.logger.log(
 			`Seek-restart session ${this.guidResolver.resolve(sessionId)} from ${positionSeconds}s`,
 		);
+	}
+
+	/**
+	 * Lightweight heartbeat — updates lastActiveAt without changing position.
+	 * Called on every successful segment serve to keep the session alive.
+	 */
+	touchSession(sessionId: string) {
+		try {
+			this.database.db
+				.update(streamSessions)
+				.set({ lastActiveAt: nowISO() })
+				.where(eq(streamSessions.id, sessionId))
+				.run();
+		} catch {
+			// Non-critical — don't fail the segment request
+		}
 	}
 
 	async updateProgress(sessionId: string, positionSeconds: number) {
