@@ -370,6 +370,7 @@ function JobsSection() {
 	const [currentJobs, setCurrentJobs] = useState<any[]>([]);
 	const [historyJobs, setHistoryJobs] = useState<any[]>([]);
 	const [expandedJob, setExpandedJob] = useState<string | null>(null);
+	const [searchQuery, setSearchQuery] = useState('');
 
 	useEffect(() => {
 		const load = async () => {
@@ -436,13 +437,39 @@ function JobsSection() {
 				</button>
 			</div>
 
+			{/* Search bar */}
+			<div style={{ padding: '0.5rem 0' }}>
+				<input
+					type="text"
+					class={styles.input}
+					placeholder="Search jobs by title or filename..."
+					value={searchQuery}
+					onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+					style={{ width: '100%' }}
+				/>
+			</div>
+
 			<div class={styles.jobList}>
-				{(tab === 'current' ? currentJobs : historyJobs).length === 0 ? (
-					<div class={styles.emptyText}>
-						No {tab === 'current' ? 'active' : 'historical'} jobs
-					</div>
-				) : (
-					(tab === 'current' ? currentJobs : historyJobs).map((job) => (
+				{(() => {
+					const jobs = tab === 'current' ? currentJobs : historyJobs;
+					const q = searchQuery.toLowerCase().trim();
+					const filtered = q
+						? jobs.filter(
+								(job) =>
+									(job.label || '').toLowerCase().includes(q) ||
+									(job.payload?.filePath || '').toLowerCase().includes(q),
+							)
+						: jobs;
+					if (filtered.length === 0) {
+						return (
+							<div class={styles.emptyText}>
+								{q
+									? `No jobs matching "${searchQuery}"`
+									: `No ${tab === 'current' ? 'active' : 'historical'} jobs`}
+							</div>
+						);
+					}
+					return filtered.map((job) => (
 						<div
 							key={job.id}
 							class={styles.jobItem}
@@ -485,6 +512,12 @@ function JobsSection() {
 										<span class={styles.infoLabel}>ID</span>
 										<span class={styles.infoValue}>{job.id}</span>
 									</div>
+									{job.priority != null && (
+										<div class={styles.infoRow}>
+											<span class={styles.infoLabel}>Priority</span>
+											<span class={styles.infoValue}>{job.priority}</span>
+										</div>
+									)}
 									{job.payload?.filePath && (
 										<div class={styles.infoRow}>
 											<span class={styles.infoLabel}>File</span>
@@ -582,8 +615,8 @@ function JobsSection() {
 								</div>
 							)}
 						</div>
-					))
-				)}
+					));
+				})()}
 			</div>
 		</div>
 	);
