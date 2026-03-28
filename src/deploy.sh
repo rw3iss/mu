@@ -38,6 +38,14 @@ echo "Platform: $($IS_WINDOWS && echo 'Windows' || echo 'Unix')"
 echo "--- stopping server ---"
 if $IS_WINDOWS && command -v nssm &>/dev/null && nssm status mu-server &>/dev/null; then
     nssm stop mu-server 2>/dev/null || true
+    # Kill orphaned FFmpeg processes that NSSM doesn't clean up
+    ffmpeg_pids=$(tasklist 2>/dev/null | grep -i "ffmpeg" | awk '{print $2}' || true)
+    if [ -n "$ffmpeg_pids" ]; then
+        for pid in $ffmpeg_pids; do
+            taskkill //F //PID "$pid" 2>/dev/null || true
+        done
+        echo "Killed orphaned FFmpeg processes"
+    fi
 else
     source "$SRC_DIR/stop.sh" 2>/dev/null || true
 fi

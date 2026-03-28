@@ -41,6 +41,15 @@ if $IS_WINDOWS && command -v nssm &>/dev/null; then
         echo "Stopping NSSM service..."
         nssm stop mu-server 2>/dev/null || true
 
+        # Kill orphaned FFmpeg processes that NSSM doesn't clean up
+        ffmpeg_pids=$(tasklist 2>/dev/null | grep -i "ffmpeg" | awk '{print $2}' || true)
+        if [ -n "$ffmpeg_pids" ]; then
+            for pid in $ffmpeg_pids; do
+                taskkill //F //PID "$pid" 2>/dev/null || true
+            done
+            echo "Killed orphaned FFmpeg processes"
+        fi
+
         # Wait for port to actually be freed (Windows can take a few seconds)
         for i in 1 2 3 4 5 6 7 8; do
             if ! netstat -ano 2>/dev/null | grep -q ":${SERVER_PORT:-4000}.*LISTENING"; then
