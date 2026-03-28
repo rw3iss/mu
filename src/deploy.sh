@@ -50,11 +50,19 @@ else
     source "$SRC_DIR/stop.sh" 2>/dev/null || true
 fi
 
-# Wait for port to be freed
+# Wait for port to be freed, then force-kill if still held
 for i in 1 2 3 4 5 6 7 8 9 10; do
     if $IS_WINDOWS; then
         if ! netstat -ano 2>/dev/null | grep -q ":${SERVER_PORT}.*LISTENING"; then
             break
+        fi
+        # After 5 seconds, force-kill whatever holds the port
+        if [ "$i" -ge 5 ]; then
+            port_pids=$(netstat -ano 2>/dev/null | grep ":${SERVER_PORT} " | grep LISTENING | awk '{print $NF}' | sort -u || true)
+            for pid in $port_pids; do
+                echo "Force-killing PID $pid holding port $SERVER_PORT"
+                taskkill //F //PID "$pid" 2>/dev/null || true
+            done
         fi
     else
         if ! (command -v lsof &>/dev/null && lsof -ti ":${SERVER_PORT}" &>/dev/null) && \
