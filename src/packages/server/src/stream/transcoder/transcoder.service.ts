@@ -1141,12 +1141,14 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const segmentPattern = path.join(targetDir, 'segment_%04d.ts');
 		const enc = this.getEncodingSettings();
 		const segDuration = String(enc.segmentDuration);
+		// Force software settings — this is a SW fallback, ignore NVENC settings
+		const swRateOpts =
+			enc.rateControl === 'crf' ? ['-crf', String(enc.crf)] : ['-b:v', profile.videoBitrate];
+		const swPreset = enc.hwAccel === 'nvenc' ? 'veryfast' : enc.preset;
 		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
 		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
 		return new Promise<void>((resolve, reject) => {
-			const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
-
 			let command = this.createFfmpegCommand(filePath)
 				.outputOptions([
 					'-f',
@@ -1175,12 +1177,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					'0',
 					'-b:a',
 					profile.audioBitrate,
-					...videoRateOpts,
+					...swRateOpts,
 				])
 				.outputOptions([
 					'-preset',
-					enc.preset,
-					...(enc.pixFmt ? ['-pix_fmt', enc.pixFmt] : []),
+					swPreset,
 				])
 				.outputOptions(['-map', '0:v:0']);
 
@@ -1253,8 +1254,12 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const profile = (TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES] ??
 			TRANSCODING_PROFILES['1080p'])!;
 		const enc = this.getEncodingSettings();
-		const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
 		const segDuration = String(enc.segmentDuration);
+		// Force software settings — this is a SW fallback, ignore NVENC settings
+		const swRateOpts =
+			enc.rateControl === 'crf' ? ['-crf', String(enc.crf)] : ['-b:v', profile.videoBitrate];
+		// Map NVENC presets back to libx264 presets
+		const swPreset = enc.hwAccel === 'nvenc' ? 'veryfast' : enc.preset;
 		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
 		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
@@ -1291,12 +1296,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					'0',
 					'-b:a',
 					profile.audioBitrate,
-					...videoRateOpts,
+					...swRateOpts,
 				])
 				.outputOptions([
 					'-preset',
-					enc.preset,
-					...(enc.pixFmt ? ['-pix_fmt', enc.pixFmt] : []),
+					swPreset,
 				])
 				.outputOptions(['-map', '0:v:0', '-map', '0:a:0?'])
 				.output(outputPath)
