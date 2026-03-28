@@ -357,6 +357,22 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			if (!hasCached) {
+				// Final check: a pre-transcode job may have completed between the
+				// initial validateCache() and now. This catches the race condition
+				// where the user clicks Play right as a background job finishes.
+				if (
+					persistEnabled &&
+					(await this.transcoderService.hasCachedTranscode(file.id, quality))
+				) {
+					hasCached = true;
+					this.sessionDirs.set(sessionId, persistDir);
+					this.logger.log(
+						`Cache completed between validation and stream start — using cached version for ${this.guidResolver.resolve(file.id)}/${quality}`,
+					);
+				}
+			}
+
+			if (!hasCached) {
 				// Pause background encoding — live stream gets all FFmpeg capacity
 				this.chunkManager.pauseBackground();
 
