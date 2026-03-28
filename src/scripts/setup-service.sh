@@ -110,6 +110,39 @@ setup_windows() {
     nssm set mu-server AppStderrCreationDisposition 4
     nssm set mu-server Description "CineHost Movie Streaming Server"
 
+    # GPU access: offer to run service as the current user instead of SYSTEM.
+    # Windows services run in Session 0 which has no GPU access by default.
+    # Running as the logged-in user enables NVENC hardware encoding.
+    local has_gpu=false
+    if command -v nvidia-smi &>/dev/null && nvidia-smi --query-gpu=name --format=csv,noheader &>/dev/null 2>&1; then
+        has_gpu=true
+    fi
+
+    if $has_gpu; then
+        echo ""
+        info "NVIDIA GPU detected. Windows services run in Session 0 which cannot"
+        info "access the GPU for hardware encoding (NVENC). To enable NVENC, the"
+        info "service can run as your user account instead of SYSTEM."
+        echo ""
+        echo -en "  ${CYAN}Run service as current user for GPU access? (Y/n):${NC} "
+        read -r gpu_yn
+        if [ "${gpu_yn,,}" != "n" ]; then
+            local current_user
+            current_user=$(whoami)
+            # Get Windows-style username (DOMAIN\User)
+            local win_user
+            win_user=$(cmd.exe //c "echo %USERDOMAIN%\%USERNAME%" 2>/dev/null | tr -d '\r' || echo "$current_user")
+            echo -en "  ${CYAN}Enter password for ${win_user} (needed by NSSM):${NC} "
+            read -rs user_pass
+            echo ""
+            nssm set mu-server ObjectName "$win_user" "$user_pass" \
+                && log "Service will run as $win_user (GPU access enabled)." \
+                || warn "Failed to set service account. Service will run as SYSTEM (no GPU access)."
+        else
+            info "Service will run as SYSTEM (software encoding only)."
+        fi
+    fi
+
     info "Starting mu-server service..."
     nssm start mu-server \
         && log "Service started successfully." \

@@ -312,6 +312,26 @@ MU_CACHE__STREAMDIR=/path/to/custom/cache/streams
 2. Set the new path via config file or env var (above)
 3. Restart the server
 
+### GPU Encoding on Windows (NVENC)
+
+Windows services run in **Session 0**, which has no GPU access. If Mu is running as an NSSM service with the default `SYSTEM` account, NVENC hardware encoding will fail and fall back to software (libx264).
+
+To enable NVENC, configure the service to run as your user account:
+
+```bash
+# Set service to run as your user (enables GPU access)
+nssm set mu-server ObjectName "DOMAIN\Username" "password"
+nssm restart mu-server
+```
+
+Or re-run the service setup script, which will detect your GPU and offer this automatically:
+
+```bash
+pnpm setup:service
+```
+
+**Note:** The service account needs "Log on as a service" rights, which NSSM grants automatically. On Linux, systemd services already run as the installing user with full GPU access.
+
 ### Restart Windows service/server:
 nssm stop mu-server      # stop the service
 nssm start mu-server     # start the service
