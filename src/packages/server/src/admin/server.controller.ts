@@ -41,7 +41,9 @@ export class ServerController {
 		// Clear hwAccelBroken flag so the restarted server retries hardware encoding
 		if (this.settings.get<boolean>('hwAccelBroken', false)) {
 			this.settings.delete('hwAccelBroken');
-			this.logger.log('Cleared hwAccelBroken flag — will retry hardware encoding after restart');
+			this.logger.log(
+				'Cleared hwAccelBroken flag — will retry hardware encoding after restart',
+			);
 		}
 
 		// Spawn restart script as detached process, then exit

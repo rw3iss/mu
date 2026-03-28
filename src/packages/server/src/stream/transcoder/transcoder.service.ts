@@ -1179,10 +1179,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					profile.audioBitrate,
 					...swRateOpts,
 				])
-				.outputOptions([
-					'-preset',
-					swPreset,
-				])
+				.outputOptions(['-preset', swPreset])
 				.outputOptions(['-map', '0:v:0']);
 
 			if (options.audioTrack !== undefined) {
@@ -1298,10 +1295,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					profile.audioBitrate,
 					...swRateOpts,
 				])
-				.outputOptions([
-					'-preset',
-					swPreset,
-				])
+				.outputOptions(['-preset', swPreset])
 				.outputOptions(['-map', '0:v:0', '-map', '0:a:0?'])
 				.output(outputPath)
 				.on('start', (commandLine: string) => {

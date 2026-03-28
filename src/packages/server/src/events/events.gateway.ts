@@ -63,18 +63,23 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	}
 
 	@SubscribeMessage(WsEvent.SUBSCRIBE)
-	handleSubscribe(@ConnectedSocket() client: WebSocket, @MessageBody() channel: string) {
+	handleSubscribe(@ConnectedSocket() client: WebSocket, @MessageBody() data: unknown) {
 		const meta = this.clients.get(client);
-		if (meta) {
+		if (!meta) return;
+		// Client sends { channel: "library" } — extract the string
+		const channel = typeof data === 'string' ? data : (data as any)?.channel;
+		if (typeof channel === 'string') {
 			meta.channels.add(channel);
 			this.logger.debug(`Client subscribed to: ${channel}`);
 		}
 	}
 
 	@SubscribeMessage(WsEvent.UNSUBSCRIBE)
-	handleUnsubscribe(@ConnectedSocket() client: WebSocket, @MessageBody() channel: string) {
+	handleUnsubscribe(@ConnectedSocket() client: WebSocket, @MessageBody() data: unknown) {
 		const meta = this.clients.get(client);
-		if (meta) {
+		if (!meta) return;
+		const channel = typeof data === 'string' ? data : (data as any)?.channel;
+		if (typeof channel === 'string') {
 			meta.channels.delete(channel);
 		}
 	}
