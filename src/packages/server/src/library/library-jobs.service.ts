@@ -207,6 +207,21 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					helpers.log(`Subtitle extraction skipped: ${err.message}`);
 				}
 
+				// Validate cache — catch broken/truncated caches that hasCachedTranscode would miss
+				const cacheStatus = await this.transcoderService.validateCache(
+					movieFileId,
+					quality,
+				);
+				if (cacheStatus === 'complete') {
+					helpers.log(`Cache already valid for ${movieFileId}/${quality} — skipping`);
+					helpers.reportProgress(100);
+					return { movieFileId, quality, skipped: true };
+				}
+				if (cacheStatus === 'invalid') {
+					helpers.log(`Clearing invalid cache for ${movieFileId}/${quality}`);
+					await this.transcoderService.clearCache(movieFileId);
+				}
+
 				// Always use monolithic transcode for background pre-encoding.
 				// Chunked encoding creates audio discontinuities at chunk boundaries
 				// and has per-chunk FFmpeg startup overhead. Monolithic produces a
@@ -352,7 +367,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 	// ===========================================================
 
 	private listenForNewMovies(): void {
-		this.events.on(WsEvent.LIBRARY_MOVIE_ADDED, (data: unknown) => {
+		this.events.on(WsEvent.LIBRARY_MOVIE_ADDED, async (data: unknown) => {
 			const { movieId, title } = data as { movieId: string; title: string };
 
 			// Always enqueue metadata fetch
@@ -372,7 +387,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			});
 
 			// Enqueue pre-transcode if the file needs transcoding and caching is enabled
-			this.enqueuePreTranscodeIfNeeded(movieId, title);
+			await this.enqueuePreTranscodeIfNeeded(movieId, title);
 		});
 
 		this.logger.log(
@@ -533,7 +548,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		return [...movieIds];
 	}
 
-	enqueuePreTranscodeIfNeeded(movieId: string, title: string): void {
+	async enqueuePreTranscodeIfNeeded(movieId: string, title: string): Promise<void> {
 		const lib = this.settings.get<Record<string, unknown>>('library', {});
 		const persistEnabled = (lib as any)?.persistTranscodes !== false; // default true
 		if (!persistEnabled) return;
@@ -566,6 +581,36 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			}
 
 			for (const quality of qualities) {
+				// Validate existing cache — skip if already complete, clear if invalid
+				const cacheStatus = await this.transcoderService.validateCache(file.id, quality);
+				if (cacheStatus === 'complete') {
+					this.logger.debug(
+						`Skipping pre-transcode for ${title} (${quality}) — valid cache exists`,
+					);
+					continue;
+				}
+				if (cacheStatus === 'invalid') {
+					this.logger.log(
+						`Clearing invalid cache for ${title} (${quality}) before re-enqueue`,
+					);
+					await this.transcoderService.clearCache(file.id);
+				}
+
+				// Skip if a job is already pending/running for this file+quality
+				const existingJobs = this.jobManager.listJobs({ type: JOB_TYPE.PRE_TRANSCODE });
+				const alreadyQueued = existingJobs.some(
+					(j) =>
+						(j.status === 'pending' || j.status === 'running') &&
+						j.payload?.movieFileId === file.id &&
+						j.payload?.quality === quality,
+				);
+				if (alreadyQueued) {
+					this.logger.debug(
+						`Skipping pre-transcode for ${title} (${quality}) — job already queued`,
+					);
+					continue;
+				}
+
 				this.jobManager.enqueue({
 					type: JOB_TYPE.PRE_TRANSCODE,
 					label: `Pre-transcode: ${title} (${quality})`,

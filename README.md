@@ -177,6 +177,7 @@ Override any config value with `MU_` prefixed env vars. Use double underscores f
 | `MU_THIRD_PARTY__OMDB__API_KEY` | -- | OMDB API key |
 | `MU_THIRD_PARTY__OPENSUBTITLES__API_KEY` | -- | OpenSubtitles API key |
 | `MU_DATA_DIR` | `./data` | Data directory path |
+| `MU_CACHE__STREAMDIR` | `./data/cache/streams` | Transcode cache directory |
 
 ---
 
@@ -291,10 +292,25 @@ pnpm settings
 
 There is also a browser console utility. Open the browser console (F12) and type `mu.help` for available commands.
 
-### If you want to move the cache:
-1. Copy data/cache/streams/ to the new location
-2. Update cache.streamDir in data/config/config.yml (or env var MU_CACHE__STREAM_DIR)
-3. Restart server — everything works because DB only stores relative path
+### Custom Cache Directory
+
+Transcoded streams are stored in `data/cache/streams/` by default. To use a different location (e.g. a larger drive):
+
+**Option 1: Config file** — add to `data/config/config.yml`:
+```yaml
+cache:
+  streamDir: /path/to/custom/cache/streams
+```
+
+**Option 2: Environment variable:**
+```bash
+MU_CACHE__STREAMDIR=/path/to/custom/cache/streams
+```
+
+**Moving an existing cache:**
+1. Copy `data/cache/streams/` to the new location
+2. Set the new path via config file or env var (above)
+3. Restart the server
 
 ### Restart Windows service/server:
 nssm stop mu-server      # stop the service

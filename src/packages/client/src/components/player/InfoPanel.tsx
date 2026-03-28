@@ -107,7 +107,11 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								)}
 								{movie.imdbRating != null && movie.imdbRating > 0 ? (
 									<a
-										href={movie.imdbId ? `https://www.imdb.com/title/${movie.imdbId}/` : undefined}
+										href={
+											movie.imdbId
+												? `https://www.imdb.com/title/${movie.imdbId}/`
+												: undefined
+										}
 										target="_blank"
 										rel="noopener noreferrer"
 										class={`${styles.ratingItem} ${movie.imdbId ? styles.ratingLink : ''}`}
@@ -221,7 +225,11 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							)}
 							{movie.imdbRating != null && movie.imdbRating > 0 ? (
 								<a
-									href={movie.imdbId ? `https://www.imdb.com/title/${movie.imdbId}/` : undefined}
+									href={
+										movie.imdbId
+											? `https://www.imdb.com/title/${movie.imdbId}/`
+											: undefined
+									}
 									target="_blank"
 									rel="noopener noreferrer"
 									class={`${styles.ratingItem} ${movie.imdbId ? styles.ratingLink : ''}`}

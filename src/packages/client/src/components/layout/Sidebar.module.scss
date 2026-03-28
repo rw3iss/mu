@@ -97,11 +97,10 @@
 }
 
 .nav {
-	flex: 1;
+	flex-shrink: 0;
 	padding: 0;
 	margin: 0;
 	list-style: none;
-	overflow-y: auto;
 
 	li {
 		padding: 0;

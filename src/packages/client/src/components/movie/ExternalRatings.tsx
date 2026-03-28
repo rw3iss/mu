@@ -7,9 +7,17 @@ interface ExternalRatingsProps {
 	imdbId?: string;
 }
 
-export function ExternalRatings({ imdbRating, rtRating, metacriticRating, imdbId }: ExternalRatingsProps) {
+export function ExternalRatings({
+	imdbRating,
+	rtRating,
+	metacriticRating,
+	imdbId,
+}: ExternalRatingsProps) {
 	const hasAny =
-		imdbRating !== undefined || rtRating !== undefined || metacriticRating !== undefined || imdbId;
+		imdbRating !== undefined ||
+		rtRating !== undefined ||
+		metacriticRating !== undefined ||
+		imdbId;
 
 	if (!hasAny) {
 		return null;
@@ -20,7 +28,12 @@ export function ExternalRatings({ imdbRating, rtRating, metacriticRating, imdbId
 	return (
 		<div class={styles.ratings}>
 			{imdbRating !== undefined && imdbUrl ? (
-				<a href={imdbUrl} target="_blank" rel="noopener noreferrer" class={`${styles.badge} ${styles.imdb} ${styles.link}`}>
+				<a
+					href={imdbUrl}
+					target="_blank"
+					rel="noopener noreferrer"
+					class={`${styles.badge} ${styles.imdb} ${styles.link}`}
+				>
 					<span class={styles.source}>IMDb</span>
 					<span class={styles.score}>{imdbRating.toFixed(1)}</span>
 				</a>
@@ -30,7 +43,12 @@ export function ExternalRatings({ imdbRating, rtRating, metacriticRating, imdbId
 					<span class={styles.score}>{imdbRating.toFixed(1)}</span>
 				</div>
 			) : imdbUrl ? (
-				<a href={imdbUrl} target="_blank" rel="noopener noreferrer" class={`${styles.badge} ${styles.imdb} ${styles.link}`}>
+				<a
+					href={imdbUrl}
+					target="_blank"
+					rel="noopener noreferrer"
+					class={`${styles.badge} ${styles.imdb} ${styles.link}`}
+				>
 					<span class={styles.source}>IMDb</span>
 				</a>
 			) : null}

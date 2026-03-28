@@ -32,8 +32,8 @@ export class JobManagerService implements OnModuleDestroy {
 	/** Cleanup callbacks for running jobs (e.g. kill FFmpeg) */
 	private readonly onCancelCallbacks = new Map<string, () => void>();
 
-	/** Max concurrent jobs */
-	private maxConcurrency = 4;
+	/** Max concurrent jobs (default 2 to avoid saturating the system) */
+	private maxConcurrency = 2;
 
 	/** Callback to get untranscoded movie IDs (registered by LibraryJobsService) */
 	private untranscodedMovieIdsFn: (() => string[]) | null = null;

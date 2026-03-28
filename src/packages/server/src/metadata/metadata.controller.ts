@@ -324,11 +324,11 @@ export class MetadataController {
 			}
 		}
 
-		// Enqueue pre-transcode jobs if needed (file available but no cached transcode)
+		// Enqueue pre-transcode jobs if needed (file available but no valid cached transcode)
 		let transcoding = false;
 		const movieTitle = movie?.title || 'Unknown';
 		try {
-			this.libraryJobs.enqueuePreTranscodeIfNeeded(movieId, movieTitle);
+			await this.libraryJobs.enqueuePreTranscodeIfNeeded(movieId, movieTitle);
 			transcoding = true;
 		} catch (err: any) {
 			this.logger.warn(`Failed to enqueue pre-transcode during rescan: ${err.message}`);

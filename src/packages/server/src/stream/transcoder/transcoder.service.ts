@@ -2,6 +2,7 @@ import { ChildProcess, execSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
@@ -367,8 +368,6 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					'2',
 					'-vf',
 					scaleFilter,
-					'-threads',
-					'0',
 					'-g',
 					gopSize,
 					'-sc_threshold',
@@ -672,8 +671,6 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						'2',
 						'-vf',
 						scaleFilter,
-						'-threads',
-						'0',
 						'-g',
 						gopSize,
 						'-sc_threshold',
@@ -790,6 +787,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			const ffmpegProcess = (command as any).ffmpegProc;
 			if (ffmpegProcess) {
 				this.activeProcesses.set(processKey, ffmpegProcess);
+				this.lowerProcessPriority(ffmpegProcess, processKey);
 				this.transcodeDebugger.attachStderr(processKey, ffmpegProcess);
 			}
 		});
@@ -1163,8 +1161,6 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					'2',
 					'-vf',
 					scaleFilter,
-					'-threads',
-					'0',
 					'-g',
 					gopSize,
 					'-sc_threshold',
@@ -1282,8 +1278,6 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					'2',
 					'-vf',
 					scaleFilter,
-					'-threads',
-					'0',
 					'-g',
 					gopSize,
 					'-sc_threshold',
@@ -1391,7 +1385,28 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		if (process.platform === 'win32') {
 			command.inputOptions(['-hwaccel', 'none']);
 		}
+		// Limit FFmpeg thread count to avoid saturating the system.
+		// Reserve at least 2 cores for the OS and the Node.js process.
+		const cpuCount = os.cpus().length;
+		const maxThreads = Math.max(1, Math.floor(cpuCount / 2));
+		command.outputOptions(['-threads', String(maxThreads)]);
 		return command;
+	}
+
+	/**
+	 * Lower the OS priority of a spawned FFmpeg child process so it doesn't
+	 * starve the rest of the system. Uses os.setPriority() which maps to
+	 * BELOW_NORMAL_PRIORITY_CLASS on Windows and nice 10 on Unix.
+	 */
+	private lowerProcessPriority(proc: ChildProcess, label: string): void {
+		if (!proc.pid) return;
+		try {
+			// os.constants.priority.PRIORITY_BELOW_NORMAL = 10 on Windows, nice 10 on Unix
+			os.setPriority(proc.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
+			this.logger.debug(`Set below-normal priority for FFmpeg PID ${proc.pid} (${label})`);
+		} catch (err: any) {
+			this.logger.debug(`Could not lower priority for PID ${proc.pid}: ${err.message}`);
+		}
 	}
 
 	private getEncodingSettings() {
@@ -1463,8 +1478,6 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					'2',
 					'-vf',
 					scaleFilter,
-					'-threads',
-					'0',
 					'-g',
 					gopSize,
 					'-sc_threshold',
@@ -1555,6 +1568,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			const ffmpegProcess = (command as any).ffmpegProc;
 			if (ffmpegProcess) {
 				this.activeProcesses.set(processKey, ffmpegProcess);
+				this.lowerProcessPriority(ffmpegProcess, processKey);
 				this.transcodeDebugger.attachStderr(processKey, ffmpegProcess);
 			}
 		});

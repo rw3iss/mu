@@ -1,6 +1,10 @@
 .recentlyPlayed {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  // Leave a gap the height of one nav item above
+  margin-top: 56px;
   border-top: 1px solid var(--color-border);
 }
 
@@ -39,10 +43,9 @@
 .list {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  // Use more vertical space on larger screens, but leave room for the sidebar menu
-  // (~48px per menu item × ~8 items = ~384px + topbar 56px + toggle 30px ≈ 470px)
-  max-height: min(calc(100vh - 470px), 60vh);
   padding: 0;
 }
 
