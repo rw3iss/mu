@@ -7,3 +7,8 @@ const root = document.getElementById('app');
 if (root) {
 	render(<App />, root);
 }
+
+// Register service worker for PWA installability
+if ('serviceWorker' in navigator) {
+	navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
