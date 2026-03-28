@@ -290,14 +290,21 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const targetDir = outputDir || this.getSessionDir(sessionId);
 
 		// Clean out stale partial files from a previously failed transcode
+		// NEVER wipe a directory that has a .complete marker — it's a valid cache
 		if (outputDir) {
 			try {
-				await access(path.join(targetDir, 'stream.m3u8'));
-				// File exists but no .complete marker (checked by caller) — wipe and recreate
-				this.logger.warn(`Removing stale partial transcode in ${targetDir}`);
-				await rm(targetDir, { recursive: true, force: true });
+				await access(path.join(targetDir, '.complete'));
+				// Complete cache exists — don't destroy it
+				this.logger.log(`Target dir has .complete marker — reusing cached version`);
 			} catch {
-				// No existing file — nothing to clean
+				// No .complete — safe to clean stale partials
+				try {
+					await access(path.join(targetDir, 'stream.m3u8'));
+					this.logger.warn(`Removing stale partial transcode in ${targetDir}`);
+					await rm(targetDir, { recursive: true, force: true });
+				} catch {
+					// No existing file — nothing to clean
+				}
 			}
 		}
 
@@ -502,13 +509,19 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const targetDir = outputDir || this.getSessionDir(sessionId);
 
 		// Clean out stale partial files from a previously failed remux
+		// Never wipe a directory with a .complete marker
 		if (outputDir) {
 			try {
-				await access(path.join(targetDir, 'stream.m3u8'));
-				this.logger.warn(`Removing stale partial remux in ${targetDir}`);
-				await rm(targetDir, { recursive: true, force: true });
+				await access(path.join(targetDir, '.complete'));
+				this.logger.log(`Remux target has .complete marker — reusing cached version`);
 			} catch {
-				// No existing file — nothing to clean
+				try {
+					await access(path.join(targetDir, 'stream.m3u8'));
+					this.logger.warn(`Removing stale partial remux in ${targetDir}`);
+					await rm(targetDir, { recursive: true, force: true });
+				} catch {
+					// No existing file — nothing to clean
+				}
 			}
 		}
 
@@ -612,12 +625,20 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		}
 
 		// Clean out stale partial files from a previously failed pre-transcode
+		// Never wipe a directory with a .complete marker
 		try {
-			await access(path.join(persistDir, 'stream.m3u8'));
-			this.logger.warn(`Removing stale partial pre-transcode in ${persistDir}`);
-			await rm(persistDir, { recursive: true, force: true });
+			await access(path.join(persistDir, '.complete'));
+			this.logger.log(`Pre-transcode dir has .complete marker — skipping`);
+			return;
 		} catch {
-			// No existing file — nothing to clean
+			// No .complete — safe to clean
+			try {
+				await access(path.join(persistDir, 'stream.m3u8'));
+				this.logger.warn(`Removing stale partial pre-transcode in ${persistDir}`);
+				await rm(persistDir, { recursive: true, force: true });
+			} catch {
+				// No existing file — nothing to clean
+			}
 		}
 
 		await mkdir(persistDir, { recursive: true });
@@ -736,16 +757,16 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					}
 
 					// If hardware acceleration was used, retry with software encoding
+					// For background pre-transcode, only fall back for this job — don't
+					// persist hwAccelBroken globally, as it may be a transient issue
 					if (
 						isTranscode &&
 						hwAccel !== 'none' &&
 						!this.swFallbackAttempted.has(processKey)
 					) {
 						this.swFallbackAttempted.add(processKey);
-						this.hwAccelBroken = true;
-						this.settings.set('hwAccelBroken', true);
 						this.logger.warn(
-							`Hardware acceleration (${hwAccel}) failed for pre-transcode ${this.guidResolver.resolve(movieFileId)}, switching to software encoding globally`,
+							`Hardware acceleration (${hwAccel}) failed for pre-transcode ${this.guidResolver.resolve(movieFileId)}, retrying with software (not persisting globally)`,
 						);
 						this.preTranscodeWithSoftware(
 							movieFileId,
@@ -839,38 +860,34 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	): Promise<'complete' | 'partial' | 'invalid' | 'empty'> {
 		const dir = this.getPersistentDir(movieFileId, quality);
 
-		// Fast path: .complete marker exists — verify integrity
+		// Fast path: .complete marker exists — trust it.
+		// The .complete marker is written by our own code only after FFmpeg exits
+		// successfully. If it exists with a manifest and first segment, the cache
+		// is valid regardless of duration ratio or codec probe results.
 		try {
 			await access(path.join(dir, '.complete'));
-			// Quick sanity check: manifest and first segment exist
+			// Sanity check: manifest and first segment must exist
 			try {
 				await access(path.join(dir, 'stream.m3u8'));
 				await access(path.join(dir, 'segment_0000.ts'));
 			} catch {
 				this.logger.warn(
-					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} is missing manifest or segment_0000 — marking invalid`,
+					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} has .complete but missing manifest or segment_0000 — marking invalid`,
 				);
 				return 'invalid';
 			}
-			// Verify duration covers the full movie (catches killed transcodes)
+			// Run optional checks but only log warnings — never reject a .complete cache
 			const durationOk = await this.checkManifestDuration(dir, movieFileId);
 			if (!durationOk) {
 				this.logger.warn(
-					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} is truncated — clearing for re-encode`,
+					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} may be truncated but .complete exists — using anyway`,
 				);
-				// Remove the false .complete marker
-				try {
-					await rm(path.join(dir, '.complete'), { force: true });
-				} catch {}
-				return 'invalid';
 			}
-			// Verify first segment has valid codecs for browser playback
 			const healthy = await this.probeSegmentHealth(dir);
 			if (!healthy) {
 				this.logger.warn(
-					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} has codec issues — marking invalid for re-encode`,
+					`Cache for ${this.guidResolver.resolve(movieFileId)}/${quality} has potential codec issues but .complete exists — using anyway`,
 				);
-				return 'invalid';
 			}
 			return 'complete';
 		} catch {
@@ -1539,11 +1556,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					}
 
 					// If hardware encoding failed, retry with software
+					// Don't persist hwAccelBroken for background chunks — transient issues
 					if (hwAccel !== 'none' && !forceSoftware) {
-						this.hwAccelBroken = true;
-						this.settings.set('hwAccelBroken', true);
 						this.logger.warn(
-							`HW accel failed for chunk ${path.basename(outputPath)}, switching to software for all future chunks`,
+							`HW accel failed for chunk ${path.basename(outputPath)}, retrying with software (not persisting globally)`,
 						);
 						this.transcodeChunk(
 							filePath,

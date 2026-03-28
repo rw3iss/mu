@@ -25,7 +25,7 @@ export function RecentlyPlayed() {
 	const items = entries.slice(0, MAX_ITEMS);
 
 	return (
-		<div class={styles.recentlyPlayed}>
+		<div class={`${styles.recentlyPlayed} ${collapsed ? styles.isCollapsed : ''}`}>
 			<button
 				class={`${styles.toggleBtn} ${collapsed ? styles.collapsed : ''}`}
 				onClick={() => setCollapsed(!collapsed)}
