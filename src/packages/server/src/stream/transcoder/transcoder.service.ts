@@ -331,10 +331,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const gopSize = String(Math.round((Number(segDuration) * 24) / 2) * 2);
 
 		return new Promise<void>((resolve, reject) => {
-			const videoRateOpts =
-				enc.rateControl === 'crf'
-					? ['-crf', String(enc.crf)]
-					: ['-b:v', profile.videoBitrate];
+			const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
 
 			// Use scale filter instead of .size() to preserve aspect ratio
 			const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
@@ -656,10 +653,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					quality as keyof typeof TRANSCODING_PROFILES
 				] ?? TRANSCODING_PROFILES['1080p'])!;
 				const videoCodec = this.getVideoCodec(hwAccel);
-				const videoRateOpts =
-					enc.rateControl === 'crf'
-						? ['-crf', String(enc.crf)]
-						: ['-b:v', profile.videoBitrate];
+				const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
 				const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
 				const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
@@ -1134,10 +1128,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
 		return new Promise<void>((resolve, reject) => {
-			const videoRateOpts =
-				enc.rateControl === 'crf'
-					? ['-crf', String(enc.crf)]
-					: ['-b:v', profile.videoBitrate];
+			const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
 
 			let command = this.createFfmpegCommand(filePath)
 				.outputOptions([
@@ -1245,8 +1236,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const profile = (TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES] ??
 			TRANSCODING_PROFILES['1080p'])!;
 		const enc = this.getEncodingSettings();
-		const videoRateOpts =
-			enc.rateControl === 'crf' ? ['-crf', String(enc.crf)] : ['-b:v', profile.videoBitrate];
+		const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
 		const segDuration = String(enc.segmentDuration);
 		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
 		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
@@ -1409,6 +1399,23 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
+	/**
+	 * Build rate-control FFmpeg options, mapping -crf to -cq for NVENC.
+	 * NVENC does not support -crf; it uses -cq (constant quality) instead.
+	 */
+	getRateControlOpts(
+		enc: ReturnType<TranscoderService['getEncodingSettings']>,
+		fallbackBitrate: string,
+	): string[] {
+		if (enc.rateControl === 'crf') {
+			if (enc.hwAccel === 'nvenc') {
+				return ['-rc', 'constqp', '-cq', String(enc.crf)];
+			}
+			return ['-crf', String(enc.crf)];
+		}
+		return ['-b:v', fallbackBitrate];
+	}
+
 	private getEncodingSettings() {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const configuredHwAccel = enc?.hwAccel || 'none';
@@ -1452,8 +1459,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const forceSoftware = useSoftware || this.hwAccelBroken;
 		const hwAccel = forceSoftware ? 'none' : enc.hwAccel;
 		const videoCodec = forceSoftware ? 'libx264' : this.getVideoCodec(hwAccel);
-		const videoRateOpts =
-			enc.rateControl === 'crf' ? ['-crf', String(enc.crf)] : ['-b:v', profile.videoBitrate];
+		const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
 		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
 		const gopSize = String(Math.round((chunkDuration * 24) / 2) * 2);
 		const processKey = `chunk-${path.basename(outputPath, '.ts')}`;

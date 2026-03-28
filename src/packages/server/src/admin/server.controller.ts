@@ -7,6 +7,7 @@ import { Roles } from '../common/decorators/roles.decorator.js';
 import { DatabaseService } from '../database/database.service.js';
 import { jobHistory } from '../database/schema/index.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { ServerService } from './server.service.js';
 
 @Controller('admin/server')
@@ -17,6 +18,7 @@ export class ServerController {
 		private readonly serverService: ServerService,
 		private readonly jobManager: JobManagerService,
 		private readonly database: DatabaseService,
+		private readonly settings: SettingsService,
 	) {}
 
 	@Get('info')
@@ -35,6 +37,12 @@ export class ServerController {
 	@Roles('admin')
 	async restart() {
 		this.logger.warn('Server restart requested via API');
+
+		// Clear hwAccelBroken flag so the restarted server retries hardware encoding
+		if (this.settings.get<boolean>('hwAccelBroken', false)) {
+			this.settings.delete('hwAccelBroken');
+			this.logger.log('Cleared hwAccelBroken flag — will retry hardware encoding after restart');
+		}
 
 		// Spawn restart script as detached process, then exit
 		const scriptDir = path.resolve(import.meta.dirname, '..', '..', '..', '..');
