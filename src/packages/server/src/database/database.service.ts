@@ -25,8 +25,8 @@ export class DatabaseService implements OnModuleDestroy {
 		const explicitPath = this.config.get<string>('database.path');
 		const dataDir = resolve(
 			this.config.get<string>('dataDir') ||
-			this.config.get<string>('datadir') ||
-			'../../data',
+				this.config.get<string>('datadir') ||
+				'../../data',
 		);
 		const dbPath = resolve(explicitPath || join(dataDir, 'db', 'mu.db'));
 		const dbDir = dirname(dbPath);

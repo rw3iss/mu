@@ -30,7 +30,10 @@ for (const envPath of [
 			const key = trimmed.slice(0, eqIdx).trim();
 			let val = trimmed.slice(eqIdx + 1).trim();
 			// Remove surrounding quotes
-			if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+			if (
+				(val.startsWith('"') && val.endsWith('"')) ||
+				(val.startsWith("'") && val.endsWith("'"))
+			) {
 				val = val.slice(1, -1);
 			}
 			// Don't override existing env vars (NSSM/system vars take precedence)

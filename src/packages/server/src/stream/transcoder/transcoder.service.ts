@@ -57,8 +57,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			this.config.get<string>('cache.streamdir');
 		const dataDir = path.resolve(
 			this.config.get<string>('dataDir') ||
-			this.config.get<string>('datadir') ||
-			'../../data',
+				this.config.get<string>('datadir') ||
+				'../../data',
 		);
 		this.cacheDir = path.resolve(configCacheDir || path.join(dataDir, 'cache', 'streams'));
 	}
@@ -254,6 +254,33 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	/**
 	 * Remove persistent cache for one file (all qualities) or all files.
 	 */
+	/**
+	 * Clear a specific quality cache for a movie file.
+	 */
+	async clearCacheQuality(movieFileId: string, quality: string): Promise<void> {
+		const dir = this.getPersistentDir(movieFileId, quality);
+		// Clear health cache
+		for (const key of this.healthCache.keys()) {
+			if (key.includes(movieFileId)) this.healthCache.delete(key);
+		}
+		try {
+			await rm(dir, { recursive: true, force: true });
+			this.logger.log(`Cleared cache: ${movieFileId}/${quality}`);
+		} catch (err) {
+			this.logger.warn(`Failed to clear cache ${dir}: ${err}`);
+		}
+		// Remove DB entry
+		this.database.db
+			.delete(transcodeCache)
+			.where(
+				and(
+					eq(transcodeCache.movieFileId, movieFileId),
+					eq(transcodeCache.quality, quality),
+				),
+			)
+			.run();
+	}
+
 	async clearCache(movieFileId?: string): Promise<void> {
 		// Clear health check cache for affected directories
 		if (movieFileId) {

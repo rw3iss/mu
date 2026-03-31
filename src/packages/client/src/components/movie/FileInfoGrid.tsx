@@ -1,14 +1,37 @@
+import { useState } from 'preact/hooks';
+import { streamService } from '@/services/stream.service';
+import { currentUser } from '@/state/auth.state';
 import type { Movie } from '@/state/library.state';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
 import styles from './FileInfoGrid.module.scss';
 
 interface FileInfoGridProps {
 	movie: Movie;
+	/** Called after a cached version is deleted so parent can refresh */
+	onCacheDeleted?: () => void;
 	/** Use dark-on-dark palette for player flyout panels */
 	dark?: boolean;
 }
 
-export function FileInfoGrid({ movie, dark }: FileInfoGridProps) {
+export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps) {
+	const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+	const [deleting, setDeleting] = useState(false);
+	const isAdmin = currentUser.value?.role === 'admin';
+
+	const handleDeleteCache = async (quality: string) => {
+		setDeleting(true);
+		try {
+			await streamService.deleteCachedVersion(movie.id, quality);
+			notifySuccess(`Deleted cached ${quality.toUpperCase()} version`);
+			setConfirmDelete(null);
+			onCacheDeleted?.();
+		} catch {
+			notifyError('Failed to delete cached version');
+		} finally {
+			setDeleting(false);
+		}
+	};
 	const fi = movie.fileInfo;
 	if (!fi) return null;
 
@@ -147,6 +170,43 @@ export function FileInfoGrid({ movie, dark }: FileInfoGridProps) {
 									<span class={styles.trackMeta}>
 										{new Date(v.completedAt).toLocaleDateString()}
 									</span>
+									{isAdmin && (
+										<>
+											{confirmDelete === v.quality ? (
+												<span
+													style={{
+														display: 'flex',
+														gap: '4px',
+														marginLeft: 'auto',
+													}}
+												>
+													<button
+														class={styles.trackDeleteBtn}
+														style={{ color: 'var(--color-error)' }}
+														disabled={deleting}
+														onClick={() => handleDeleteCache(v.quality)}
+													>
+														{deleting ? '...' : 'Confirm'}
+													</button>
+													<button
+														class={styles.trackDeleteBtn}
+														onClick={() => setConfirmDelete(null)}
+													>
+														Cancel
+													</button>
+												</span>
+											) : (
+												<button
+													class={styles.trackDeleteBtn}
+													style={{ marginLeft: 'auto' }}
+													onClick={() => setConfirmDelete(v.quality)}
+													title="Delete cached version"
+												>
+													{'\u2715'}
+												</button>
+											)}
+										</>
+									)}
 								</div>
 							),
 						)}

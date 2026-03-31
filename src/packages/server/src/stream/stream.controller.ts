@@ -14,6 +14,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles } from '../database/schema/index.js';
@@ -342,5 +343,30 @@ export class StreamController {
 	@Get('sessions')
 	async getActiveSessions() {
 		return this.streamService.getActiveSessions();
+	}
+
+	/**
+	 * Delete a cached transcode for a specific movie file + quality.
+	 */
+	@Delete('cache/:movieId/:quality')
+	@Roles('admin')
+	async deleteCachedVersion(
+		@Param('movieId') movieId: string,
+		@Param('quality') quality: string,
+	) {
+		// Find the movie file for this movie
+		const file = this.db.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, movieId))
+			.get();
+
+		if (!file) throw new NotFoundException('Movie file not found');
+
+		await this.transcoderService.clearCacheQuality(file.id, quality);
+		this.logger.log(
+			`Deleted cached version ${quality} for ${this.guidResolver.resolve(movieId)}`,
+		);
+		return { success: true };
 	}
 }

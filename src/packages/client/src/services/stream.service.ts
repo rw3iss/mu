@@ -55,6 +55,13 @@ export const streamService = {
 	},
 
 	/**
+	 * Delete a cached transcode for a movie at a specific quality.
+	 */
+	deleteCachedVersion(movieId: string, quality: string): Promise<{ success: boolean }> {
+		return api.delete(`/stream/cache/${movieId}/${quality}`);
+	},
+
+	/**
 	 * Start a new stream session for a movie.
 	 * For remote movies, routes through the local proxy.
 	 */

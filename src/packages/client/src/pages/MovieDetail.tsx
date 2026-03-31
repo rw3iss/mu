@@ -777,7 +777,15 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 								{showFileInfo && (
 									<div class={styles.fileInfoContent}>
-										<FileInfoGrid movie={movie} />
+										<FileInfoGrid
+											movie={movie}
+											onCacheDeleted={() => {
+												moviesService
+													.get(id!)
+													.then(setMovie)
+													.catch(() => {});
+											}}
+										/>
 
 										{/* Subtitles */}
 										<div class={styles.trackSection}>
