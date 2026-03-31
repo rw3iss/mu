@@ -9,6 +9,29 @@
 const path = require('path');
 const fs = require('fs');
 
+// Load .env file if present
+for (const envPath of [
+	path.resolve(__dirname, '..', '.env'),
+	path.resolve(__dirname, '..', '..', '.env'),
+]) {
+	if (fs.existsSync(envPath)) {
+		const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
+		for (const line of lines) {
+			const trimmed = line.trim();
+			if (!trimmed || trimmed.startsWith('#')) continue;
+			const eqIdx = trimmed.indexOf('=');
+			if (eqIdx < 1) continue;
+			const key = trimmed.slice(0, eqIdx).trim();
+			let val = trimmed.slice(eqIdx + 1).trim();
+			if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+				val = val.slice(1, -1);
+			}
+			if (!(key in process.env)) process.env[key] = val;
+		}
+		break;
+	}
+}
+
 const dataDir = process.env.MU_DATA_DIR || process.env.MU_DATADIR;
 const dbPaths = [
 	// Env var / explicit data dir

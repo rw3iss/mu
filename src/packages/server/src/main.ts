@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import fastifyCookie from '@fastify/cookie';
 import fastifyCors from '@fastify/cors';
 import fastifyJwt from '@fastify/jwt';
@@ -12,6 +12,35 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { WsAdapter } from '@nestjs/platform-ws';
 import { AppModule } from './app.module.js';
 import { ConfigService } from './config/config.service.js';
+
+// Load .env file if present (no external dependency needed).
+// Searches: src/.env, project root .env, server package .env
+for (const envPath of [
+	resolve(import.meta.dirname, '..', '..', '..', '.env'),
+	resolve(import.meta.dirname, '..', '..', '..', '..', '.env'),
+	resolve(import.meta.dirname, '..', '.env'),
+]) {
+	if (existsSync(envPath)) {
+		const lines = readFileSync(envPath, 'utf-8').split('\n');
+		for (const line of lines) {
+			const trimmed = line.trim();
+			if (!trimmed || trimmed.startsWith('#')) continue;
+			const eqIdx = trimmed.indexOf('=');
+			if (eqIdx < 1) continue;
+			const key = trimmed.slice(0, eqIdx).trim();
+			let val = trimmed.slice(eqIdx + 1).trim();
+			// Remove surrounding quotes
+			if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+				val = val.slice(1, -1);
+			}
+			// Don't override existing env vars (NSSM/system vars take precedence)
+			if (!(key in process.env)) {
+				process.env[key] = val;
+			}
+		}
+		break; // only load the first .env found
+	}
+}
 
 async function bootstrap() {
 	const app = await NestFactory.create<NestFastifyApplication>(
