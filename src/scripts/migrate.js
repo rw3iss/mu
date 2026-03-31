@@ -9,7 +9,11 @@
 const path = require('path');
 const fs = require('fs');
 
+const dataDir = process.env.MU_DATA_DIR || process.env.MU_DATADIR;
 const dbPaths = [
+	// Env var / explicit data dir
+	...(dataDir ? [path.resolve(dataDir, 'db', 'mu.db')] : []),
+	// Standard locations
 	path.resolve(__dirname, '..', 'data', 'db', 'mu.db'),
 	path.resolve(__dirname, '..', '..', 'data', 'db', 'mu.db'),
 	path.resolve(__dirname, '..', 'packages', 'server', 'data', 'db', 'mu.db'),
