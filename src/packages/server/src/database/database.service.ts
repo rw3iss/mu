@@ -21,8 +21,13 @@ export class DatabaseService implements OnModuleDestroy {
 
 	async initialize() {
 		// Resolve DB path: explicit database.path > dataDir/db/mu.db > ./data/db/mu.db
+		// Check both camelCase and lowercase (env vars are lowercased by config loader)
 		const explicitPath = this.config.get<string>('database.path');
-		const dataDir = resolve(this.config.get<string>('dataDir', '../../data'));
+		const dataDir = resolve(
+			this.config.get<string>('dataDir') ||
+			this.config.get<string>('datadir') ||
+			'../../data',
+		);
 		const dbPath = resolve(explicitPath || join(dataDir, 'db', 'mu.db'));
 		const dbDir = dirname(dbPath);
 

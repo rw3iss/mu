@@ -12,6 +12,8 @@ Seek thumbnails on hover... option in settings.
 
 - need "ignore folders" in a media library, ie. to ignore /temp folder in torrents folder.
 
+- make it easier to transfer data/cache directories (add better help... have simple 'data' vs 'stream' envs)
+
 -----------------------------------------------------------------	---------------
 - Movie "grouping" logic (ie. TV series):
 I want to create the concept of "grouping" movie items. This will be a series of attributes, and smart algorithms, to detect which movies in the library are part of the same ie. TV series, or other series, and also which series season they are part of for example. We might also add groups for similar or sequel movies, such as Lord of the Rings 1 through 3, and other Lord of the Rings related movies we might have downloaded. I would want to group all of those in a "Lord of the Rings" group.

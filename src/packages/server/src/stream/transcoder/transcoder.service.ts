@@ -51,8 +51,15 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		private readonly guidResolver: GuidResolverService,
 	) {
 		// Use config/env for initial cache dir — DB override applied in onModuleInit
-		const configCacheDir = this.config.get<string>('cache.streamDir');
-		const dataDir = path.resolve(this.config.get<string>('dataDir', '../../data'));
+		// Check both camelCase and lowercase (env vars are lowercased by config loader)
+		const configCacheDir =
+			this.config.get<string>('cache.streamDir') ||
+			this.config.get<string>('cache.streamdir');
+		const dataDir = path.resolve(
+			this.config.get<string>('dataDir') ||
+			this.config.get<string>('datadir') ||
+			'../../data',
+		);
 		this.cacheDir = path.resolve(configCacheDir || path.join(dataDir, 'cache', 'streams'));
 	}
 

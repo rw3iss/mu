@@ -162,6 +162,21 @@ export function loadConfig(): MuConfig {
 	const envConfig = envToConfig(process.env);
 	const merged = deepMerge(fileConfig, envConfig);
 
+	// Inject dataDir from the env var we already resolved (env parser splits
+	// MU_DATA_DIR into { data: { dir: ... } } which doesn't match the schema's
+	// top-level dataDir field)
+	if (process.env.MU_DATA_DIR || process.env.MU_DATADIR) {
+		merged.dataDir = dataDir;
+	}
+
+	// Inject cache.streamDir from MU_CACHE__STREAMDIR (env parser lowercases
+	// to cache.streamdir, but config lookups use cache.streamDir)
+	const envCacheDir = process.env.MU_CACHE__STREAMDIR || process.env.MU_CACHE_STREAMDIR;
+	if (envCacheDir) {
+		if (!merged.cache || typeof merged.cache !== 'object') merged.cache = {};
+		(merged.cache as Record<string, unknown>).streamDir = envCacheDir;
+	}
+
 	// Validate against the schema.
 	const parsed = configSchema.parse(merged);
 
