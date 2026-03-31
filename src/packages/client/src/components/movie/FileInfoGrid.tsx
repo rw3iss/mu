@@ -173,13 +173,7 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 									{isAdmin && (
 										<>
 											{confirmDelete === v.quality ? (
-												<span
-													style={{
-														display: 'flex',
-														gap: '4px',
-														marginLeft: 'auto',
-													}}
-												>
+												<span style={{ display: 'flex', gap: '4px' }}>
 													<button
 														class={styles.trackDeleteBtn}
 														style={{ color: 'var(--color-error)' }}
@@ -198,11 +192,9 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 											) : (
 												<button
 													class={styles.trackDeleteBtn}
-													style={{ marginLeft: 'auto' }}
 													onClick={() => setConfirmDelete(v.quality)}
-													title="Delete cached version"
 												>
-													{'\u2715'}
+													Delete
 												</button>
 											)}
 										</>
