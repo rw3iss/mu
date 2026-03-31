@@ -41,7 +41,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	private ffmpegSpawnBroken = false;
 	private ffmpegSpawnBrokenUntil = 0;
 	private ffmpegSpawnFailCount = 0;
-	private readonly cacheDir: string;
+	private cacheDir: string;
 
 	constructor(
 		private readonly config: ConfigService,
@@ -50,15 +50,21 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		private readonly transcodeDebugger: TranscodeDebuggerService,
 		private readonly guidResolver: GuidResolverService,
 	) {
-		// DB setting overrides config file / env var
-		const lib = this.settings.get<Record<string, unknown>>('library', {}) as any;
-		const dbCacheDir = lib?.cacheDir;
+		// Use config/env for initial cache dir — DB override applied in onModuleInit
 		this.cacheDir = path.resolve(
-			dbCacheDir || this.config.get<string>('cache.streamDir') || './data/cache/streams',
+			this.config.get<string>('cache.streamDir') || './data/cache/streams',
 		);
 	}
 
 	onModuleInit() {
+		// DB setting overrides config file / env var for cache directory
+		const lib = this.settings.get<Record<string, unknown>>('library', {}) as any;
+		const dbCacheDir = lib?.cacheDir;
+		if (dbCacheDir) {
+			this.cacheDir = path.resolve(dbCacheDir);
+			this.logger.log(`Cache directory overridden by settings: ${this.cacheDir}`);
+		}
+
 		// Restore hwAccelBroken from persisted settings
 		this.hwAccelBroken = this.settings.get<boolean>('hwAccelBroken', false);
 		if (this.hwAccelBroken) {
