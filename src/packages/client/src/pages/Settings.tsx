@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
+import { FolderBrowser } from '@/components/common/FolderBrowser';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
@@ -258,6 +259,8 @@ export function Settings(props: SettingsProps) {
 	const [mediaPathEntries, setMediaPathEntries] = useState<MediaPathEntryData[]>([]);
 	const [fetchExtendedMetadata, setFetchExtendedMetadata] = useState(true);
 	const [persistTranscodes, setPersistTranscodes] = useState(true);
+	const [cacheDir, setCacheDir] = useState('');
+	const [isCacheBrowseOpen, setIsCacheBrowseOpen] = useState(false);
 	const [autoScanEnabled, setAutoScanEnabled] = useState(true);
 	const [minFileSizeMB, setMinFileSizeMB] = useState('50');
 	const [nextScanAt, setNextScanAt] = useState<string | null>(null);
@@ -349,6 +352,7 @@ export function Settings(props: SettingsProps) {
 						setFetchExtendedMetadata(library.fetchExtendedMetadata);
 					if (typeof library.persistTranscodes === 'boolean')
 						setPersistTranscodes(library.persistTranscodes);
+					if (typeof library.cacheDir === 'string') setCacheDir(library.cacheDir);
 					if (typeof library.autoScanEnabled === 'boolean')
 						setAutoScanEnabled(library.autoScanEnabled);
 					if (library.minFileSizeMB != null)
@@ -514,6 +518,7 @@ export function Settings(props: SettingsProps) {
 					scanIntervalHours: parseInt(scanInterval, 10),
 					fetchExtendedMetadata,
 					persistTranscodes,
+					cacheDir: cacheDir || undefined,
 					autoScanEnabled,
 					minFileSizeMB: parseInt(minFileSizeMB, 10) || 0,
 				},
@@ -543,6 +548,7 @@ export function Settings(props: SettingsProps) {
 		mediaPathEntries,
 		fetchExtendedMetadata,
 		persistTranscodes,
+		cacheDir,
 		autoScanEnabled,
 		minFileSizeMB,
 		sharingEnabled,
@@ -2022,6 +2028,54 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.toggleTrack} />
 								</label>
 							</div>
+
+							{persistTranscodes && (
+								<div class={styles.settingRow}>
+									<div class={styles.settingInfo}>
+										<span class={styles.settingLabel}>Cache Directory</span>
+										<span class={styles.settingDescription}>
+											Where transcoded files are stored. Leave empty for
+											default (data/cache/streams).
+										</span>
+									</div>
+									<div
+										style={{
+											display: 'flex',
+											alignItems: 'center',
+											gap: '6px',
+											flex: 1,
+											maxWidth: '400px',
+										}}
+									>
+										<input
+											type="text"
+											class={styles.input}
+											style={{ flex: 1 }}
+											value={cacheDir}
+											placeholder="data/cache/streams (default)"
+											onInput={(e) =>
+												setCacheDir((e.target as HTMLInputElement).value)
+											}
+										/>
+										<Button
+											variant="secondary"
+											size="sm"
+											onClick={() => setIsCacheBrowseOpen(true)}
+										>
+											Browse
+										</Button>
+									</div>
+									<FolderBrowser
+										isOpen={isCacheBrowseOpen}
+										onClose={() => setIsCacheBrowseOpen(false)}
+										onSelect={(path) => {
+											setCacheDir(path);
+											setIsCacheBrowseOpen(false);
+										}}
+										initialPath={cacheDir || undefined}
+									/>
+								</div>
+							)}
 
 							<h3 class={styles.encodingSectionTitle}>Library Sharing</h3>
 

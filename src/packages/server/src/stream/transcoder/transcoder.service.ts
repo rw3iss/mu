@@ -50,8 +50,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		private readonly transcodeDebugger: TranscodeDebuggerService,
 		private readonly guidResolver: GuidResolverService,
 	) {
+		// DB setting overrides config file / env var
+		const lib = this.settings.get<Record<string, unknown>>('library', {}) as any;
+		const dbCacheDir = lib?.cacheDir;
 		this.cacheDir = path.resolve(
-			this.config.get<string>('cache.streamDir') || './data/cache/streams',
+			dbCacheDir || this.config.get<string>('cache.streamDir') || './data/cache/streams',
 		);
 	}
 
