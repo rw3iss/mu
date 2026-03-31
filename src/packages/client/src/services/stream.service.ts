@@ -58,14 +58,17 @@ export const streamService = {
 	 * Start a new stream session for a movie.
 	 * For remote movies, routes through the local proxy.
 	 */
-	startStream(movieId: string): Promise<StreamSession> {
+	startStream(movieId: string, options?: { audioTrack?: number }): Promise<StreamSession> {
 		const remote = parseRemoteId(movieId);
 		if (remote) {
 			return api.get<StreamSession>(
 				`/remote/stream/${remote.serverId}/${remote.remoteMovieId}/start`,
 			);
 		}
-		return api.get<StreamSession>(`/stream/${movieId}/start`);
+		const params = new URLSearchParams();
+		if (options?.audioTrack != null) params.set('audioTrack', String(options.audioTrack));
+		const qs = params.toString();
+		return api.get<StreamSession>(`/stream/${movieId}/start${qs ? `?${qs}` : ''}`);
 	},
 
 	/**

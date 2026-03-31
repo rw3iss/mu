@@ -25,6 +25,7 @@ import {
 	startGlobalStream,
 } from '@/state/globalPlayer.state';
 import {
+	audioTrack,
 	currentSession,
 	currentTime,
 	duration,
@@ -33,6 +34,7 @@ import {
 	isFullscreen,
 	isHoveringControls,
 	isPlaying,
+	restoreAudioTrackChoice,
 	restoreSubtitleChoice,
 	showControls,
 	showInfoPanel,
@@ -174,11 +176,16 @@ export function GlobalPlayer() {
 				}
 			}
 
-			// Restore subtitle
+			// Restore subtitle and audio track choices
 			const movieId = globalMovieId.value;
 			const session = currentSession.value;
-			if (movieId && session && session.subtitles.length > 0) {
-				restoreSubtitleChoice(movieId, session.subtitles);
+			if (movieId && session) {
+				if (session.subtitles.length > 0) {
+					restoreSubtitleChoice(movieId, session.subtitles);
+				}
+				if (session.audioTracks.length > 1) {
+					restoreAudioTrackChoice(movieId, session.audioTracks);
+				}
 			}
 		};
 
@@ -491,6 +498,13 @@ export function GlobalPlayer() {
 	const handleToggleFullscreen = useCallback(async () => {
 		try {
 			if (document.fullscreenElement) {
+				// If in split/mini mode while fullscreen, switch to full mode
+				// instead of exiting fullscreen
+				if (playerMode.value !== 'full') {
+					preFullscreenModeRef.current = null; // don't restore split on exit
+					maximizePlayer();
+					return;
+				}
 				await document.exitFullscreen();
 				// Restore previous mode (handled by fullscreenchange listener below)
 			} else {

@@ -224,6 +224,21 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// Determine stream mode based on container, video codec, and audio codec
 		const mode = this.determineStreamMode(file);
 
+		// Resolve preferred audio track: explicit option > preferred language > default (0)
+		if (options.audioTrack == null) {
+			const playback = this.settings.get<Record<string, unknown>>('playback', {}) as any;
+			const preferredLang = playback?.preferredAudioLanguage || 'eng';
+			const tracks = this.parseAudioTracks(file);
+			if (tracks.length > 1) {
+				const match = tracks.find(
+					(t) => t.language?.toLowerCase() === preferredLang.toLowerCase(),
+				);
+				if (match) {
+					options.audioTrack = match.index;
+				}
+			}
+		}
+
 		const sessionId = crypto.randomUUID();
 		this.guidResolver.warmup(sessionId, movieTitle);
 		const quality = options.quality || this.resolveDefaultQuality(file.id, file.videoHeight);

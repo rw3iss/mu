@@ -248,6 +248,7 @@ export function Settings(props: SettingsProps) {
 
 	// Playback settings
 	const [defaultQuality, setDefaultQuality] = useState('auto');
+	const [preferredAudioLanguage, setPreferredAudioLanguage] = useState('eng');
 	const [autoplay, setAutoplay] = useState(true);
 	const [bufferSize, setBufferSizeSetting] = useUiSetting('buffer_size', 'normal');
 	const [skipTimes, setSkipTimes] = useUiSetting<number[]>('skip_times', [5, 10, 20]);
@@ -258,6 +259,7 @@ export function Settings(props: SettingsProps) {
 	const [fetchExtendedMetadata, setFetchExtendedMetadata] = useState(true);
 	const [persistTranscodes, setPersistTranscodes] = useState(true);
 	const [autoScanEnabled, setAutoScanEnabled] = useState(true);
+	const [minFileSizeMB, setMinFileSizeMB] = useState('50');
 	const [nextScanAt, setNextScanAt] = useState<string | null>(null);
 
 	// Encoding settings
@@ -328,6 +330,8 @@ export function Settings(props: SettingsProps) {
 				if (playback) {
 					if (typeof playback.defaultQuality === 'string')
 						setDefaultQuality(playback.defaultQuality);
+					if (typeof playback.preferredAudioLanguage === 'string')
+						setPreferredAudioLanguage(playback.preferredAudioLanguage);
 					if (typeof playback.autoplay === 'boolean') setAutoplay(playback.autoplay);
 					if (typeof playback.bufferSize === 'string') {
 						setBufferSizeSetting(playback.bufferSize);
@@ -347,6 +351,8 @@ export function Settings(props: SettingsProps) {
 						setPersistTranscodes(library.persistTranscodes);
 					if (typeof library.autoScanEnabled === 'boolean')
 						setAutoScanEnabled(library.autoScanEnabled);
+					if (library.minFileSizeMB != null)
+						setMinFileSizeMB(String(library.minFileSizeMB));
 				}
 
 				const encoding = data.encoding as Record<string, unknown> | undefined;
@@ -440,7 +446,7 @@ export function Settings(props: SettingsProps) {
 		setIsSaving(true);
 		try {
 			await api.put('/settings/playback', {
-				value: { defaultQuality, autoplay, bufferSize, skipTimes },
+				value: { defaultQuality, preferredAudioLanguage, autoplay, bufferSize, skipTimes },
 			});
 			setBufferSizeSetting(bufferSize);
 			setSkipTimes(skipTimes);
@@ -470,6 +476,7 @@ export function Settings(props: SettingsProps) {
 		}
 	}, [
 		defaultQuality,
+		preferredAudioLanguage,
 		autoplay,
 		bufferSize,
 		skipTimes,
@@ -508,6 +515,7 @@ export function Settings(props: SettingsProps) {
 					fetchExtendedMetadata,
 					persistTranscodes,
 					autoScanEnabled,
+					minFileSizeMB: parseInt(minFileSizeMB, 10) || 0,
 				},
 			});
 
@@ -536,6 +544,7 @@ export function Settings(props: SettingsProps) {
 		fetchExtendedMetadata,
 		persistTranscodes,
 		autoScanEnabled,
+		minFileSizeMB,
 		sharingEnabled,
 		sharingPassword,
 		sharingServerName,
@@ -1422,6 +1431,49 @@ export function Settings(props: SettingsProps) {
 
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Preferred Audio Language
+									</span>
+									<span class={styles.settingDescription}>
+										Default audio track language for transcoded streams
+									</span>
+								</div>
+								<select
+									class={styles.select}
+									value={preferredAudioLanguage}
+									onChange={(e) =>
+										setPreferredAudioLanguage(
+											(e.target as HTMLSelectElement).value,
+										)
+									}
+								>
+									<option value="eng">English</option>
+									<option value="spa">Spanish</option>
+									<option value="fra">French</option>
+									<option value="deu">German</option>
+									<option value="ita">Italian</option>
+									<option value="por">Portuguese</option>
+									<option value="rus">Russian</option>
+									<option value="jpn">Japanese</option>
+									<option value="kor">Korean</option>
+									<option value="zho">Chinese</option>
+									<option value="hin">Hindi</option>
+									<option value="ara">Arabic</option>
+									<option value="tha">Thai</option>
+									<option value="vie">Vietnamese</option>
+									<option value="pol">Polish</option>
+									<option value="nld">Dutch</option>
+									<option value="swe">Swedish</option>
+									<option value="nor">Norwegian</option>
+									<option value="dan">Danish</option>
+									<option value="fin">Finnish</option>
+									<option value="tur">Turkish</option>
+									<option value="und">Undetermined</option>
+								</select>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Autoplay</span>
 									<span class={styles.settingDescription}>
 										Automatically start playing when opening a movie
@@ -1916,6 +1968,37 @@ export function Settings(props: SettingsProps) {
 									/>
 									<span class={styles.toggleTrack} />
 								</label>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Minimum File Size</span>
+									<span class={styles.settingDescription}>
+										Skip files smaller than this during scanning (filters out
+										junk/promo files). Set to 0 to disable.
+									</span>
+								</div>
+								<div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+									<input
+										type="number"
+										class={styles.input}
+										style={{ width: '80px', textAlign: 'right' }}
+										value={minFileSizeMB}
+										min="0"
+										max="1000"
+										onChange={(e) =>
+											setMinFileSizeMB((e.target as HTMLInputElement).value)
+										}
+									/>
+									<span
+										style={{
+											fontSize: '13px',
+											color: 'var(--color-text-muted)',
+										}}
+									>
+										MB
+									</span>
+								</div>
 							</div>
 
 							<div class={styles.settingRow}>

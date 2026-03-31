@@ -11,6 +11,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { mediaSources, movieFiles, movies, scanLog } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { MoviesService } from '../movies/movies.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 interface ParsedFilename {
 	title: string;
@@ -64,6 +65,7 @@ export class ScannerService {
 		private readonly guidResolver: GuidResolverService,
 		@Inject(forwardRef(() => MoviesService))
 		private readonly moviesService: MoviesService,
+		private readonly settings: SettingsService,
 	) {}
 
 	async scanSource(sourceId: string) {
@@ -113,6 +115,13 @@ export class ScannerService {
 					const fileName = basename(filePath);
 					const fileModifiedAt = fileStat.mtime.toISOString();
 					const fileSize = fileStat.size;
+
+					// Skip junk/promo files under the configured minimum size
+					const lib = this.settings.get<Record<string, unknown>>('library', {}) as any;
+					const minSizeMB = lib?.minFileSizeMB ?? 50;
+					if (minSizeMB > 0 && fileSize < minSizeMB * 1024 * 1024) {
+						continue;
+					}
 
 					const existing = this.database.db
 						.select()

@@ -190,7 +190,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 				))}
 			</ul>
 
-			{!collapsed && <RecentlyPlayed />}
+			{!collapsed && (
+				<>
+					<div class={styles.spacer} />
+					<RecentlyPlayed />
+				</>
+			)}
 
 			{user && !collapsed && (
 				<div class={styles.userInfo}>

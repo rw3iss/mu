@@ -15,6 +15,7 @@ import type { Movie } from '@/state/library.state';
 import { notifyError } from '@/state/notifications.state';
 import type { StreamSession } from '@/state/player.state';
 import {
+	audioTrack,
 	currentSession,
 	currentTime,
 	duration,
@@ -314,7 +315,19 @@ export async function startGlobalStream(): Promise<StreamSession | null> {
 	streamError.value = null;
 
 	try {
-		const session = await startStream(movieId);
+		// Pass saved audio track preference if one exists
+		const savedAudioTrack =
+			audioTrack.value ??
+			(() => {
+				try {
+					return localStorage.getItem(`mu_audiotrack_${movieId}`);
+				} catch {
+					return null;
+				}
+			})();
+		const session = await startStream(movieId, {
+			audioTrack: savedAudioTrack != null ? parseInt(savedAudioTrack, 10) : undefined,
+		});
 		return session;
 	} catch (err: any) {
 		console.error('Failed to start global stream:', err);

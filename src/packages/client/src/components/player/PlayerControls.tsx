@@ -17,6 +17,7 @@ import {
 import { globalMovie, globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import type { StreamSession } from '@/state/player.state';
 import {
+	audioTrack,
 	currentSession,
 	currentTime,
 	duration,
@@ -24,6 +25,7 @@ import {
 	isMuted,
 	isPlaying,
 	quality,
+	saveAudioTrackChoice,
 	saveSubtitleChoice,
 	setVolume,
 	subtitleTrack,
@@ -100,7 +102,7 @@ export function PlayerControls({
 }: PlayerControlsProps) {
 	const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 	const [settingsPanel, setSettingsPanel] = useState<
-		'main' | 'quality' | 'subtitles' | 'subtitle-manage'
+		'main' | 'quality' | 'subtitles' | 'subtitle-manage' | 'audio'
 	>('main');
 	const [seekHover, setSeekHover] = useState<number | null>(null);
 	const [showVolume, setShowVolume] = useState(false);
@@ -257,6 +259,19 @@ export function PlayerControls({
 		}
 		setShowSettingsMenu(false);
 		setSettingsPanel('main');
+	}, []);
+
+	const handleAudioTrackSelect = useCallback((trackId: string) => {
+		const movieId = globalMovieId.value;
+		if (movieId) {
+			saveAudioTrackChoice(movieId, trackId);
+		} else {
+			audioTrack.value = trackId;
+		}
+		setShowSettingsMenu(false);
+		setSettingsPanel('main');
+		// Audio track change requires restarting the stream with the new track
+		// For now, notify the user — a full restart would interrupt playback
 	}, []);
 
 	const toggleSettings = useCallback(() => {
@@ -724,6 +739,37 @@ export function PlayerControls({
 													{' \u203A'}
 												</span>
 											</button>
+
+											{(session?.audioTracks?.length ?? 0) > 1 && (
+												<button
+													class={styles.menuRow}
+													onClick={() => setSettingsPanel('audio')}
+												>
+													<span class={styles.menuRowLabel}>
+														Audio Track
+													</span>
+													<span class={styles.menuRowValue}>
+														{audioTrack.value
+															? (session?.audioTracks?.find(
+																	(t) =>
+																		String(t.id) ===
+																		audioTrack.value,
+																)?.label ??
+																session?.audioTracks
+																	?.find(
+																		(t) =>
+																			String(t.id) ===
+																			audioTrack.value,
+																	)
+																	?.language?.toUpperCase() ??
+																`Track ${audioTrack.value}`)
+															: (session?.audioTracks?.[0]?.label ??
+																session?.audioTracks?.[0]?.language?.toUpperCase() ??
+																'Default')}
+														{' \u203A'}
+													</span>
+												</button>
+											)}
 										</>
 									)}
 
@@ -918,6 +964,46 @@ export function PlayerControls({
 													/>
 												)}
 											</div>
+										</>
+									)}
+
+									{settingsPanel === 'audio' && (
+										<>
+											<button
+												class={styles.menuBack}
+												onClick={() => setSettingsPanel('main')}
+											>
+												{'\u2039'} Audio Track
+											</button>
+											{(session?.audioTracks ?? []).map((track) => {
+												const trackId = String(track.id);
+												const isSelected = audioTrack.value
+													? audioTrack.value === trackId
+													: trackId ===
+														String(session?.audioTracks?.[0]?.id);
+												const lang = (
+													track.language || 'und'
+												).toUpperCase();
+												const label =
+													track.label && track.label !== track.language
+														? `${lang} — ${track.label}`
+														: lang;
+												const channels = track.channels
+													? ` (${track.channels === 6 ? '5.1' : track.channels === 8 ? '7.1' : `${track.channels}ch`})`
+													: '';
+												return (
+													<button
+														key={trackId}
+														class={`${styles.menuItem} ${isSelected ? styles.selected : ''}`}
+														onClick={() =>
+															handleAudioTrackSelect(trackId)
+														}
+													>
+														{label}
+														{channels}
+													</button>
+												);
+											})}
 										</>
 									)}
 								</div>

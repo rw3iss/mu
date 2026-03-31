@@ -81,6 +81,35 @@ export function restoreSubtitleChoice(movieId: string, availableTracks: Subtitle
 	}
 }
 export const audioTrack = signal<string | null>(null);
+
+/** Save the selected audio track for a movie so it persists across refreshes. */
+export function saveAudioTrackChoice(movieId: string, trackIndex: string | null): void {
+	audioTrack.value = trackIndex;
+	try {
+		if (trackIndex) {
+			localStorage.setItem(`mu_audiotrack_${movieId}`, trackIndex);
+		} else {
+			localStorage.removeItem(`mu_audiotrack_${movieId}`);
+		}
+	} catch {
+		/* ignore */
+	}
+}
+
+/** Restore the previously selected audio track for a movie. */
+export function restoreAudioTrackChoice(movieId: string, availableTracks: AudioTrack[]): void {
+	try {
+		const saved = localStorage.getItem(`mu_audiotrack_${movieId}`);
+		if (saved && availableTracks.some((t) => String(t.id) === saved)) {
+			audioTrack.value = saved;
+		} else {
+			audioTrack.value = null;
+		}
+	} catch {
+		audioTrack.value = null;
+	}
+}
+
 export const isBuffering = signal(false);
 export const showControls = signal(true);
 export const isHoveringControls = signal(false);
@@ -91,8 +120,11 @@ export const streamError = signal<string | null>(null);
 // Actions
 // ============================================
 
-export async function startStream(movieId: string): Promise<StreamSession> {
-	const session = await streamService.startStream(movieId);
+export async function startStream(
+	movieId: string,
+	options?: { audioTrack?: number },
+): Promise<StreamSession> {
+	const session = await streamService.startStream(movieId, options);
 	currentSession.value = session;
 	currentTime.value = session.startPosition || 0;
 	return session;

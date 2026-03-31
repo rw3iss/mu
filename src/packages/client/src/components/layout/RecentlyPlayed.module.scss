@@ -3,13 +3,10 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  // Leave a gap the height of one nav item above
-  margin-top: 56px;
   border-top: 1px solid var(--color-border);
 
   &.isCollapsed {
     flex: 0;
-    margin-top: auto;
   }
 }
 
