@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Database from 'better-sqlite3';
 import { BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
@@ -20,7 +20,10 @@ export class DatabaseService implements OnModuleDestroy {
 	}
 
 	async initialize() {
-		const dbPath = resolve(this.config.get<string>('database.path', './data/db/mu.db'));
+		// Resolve DB path: explicit database.path > dataDir/db/mu.db > ./data/db/mu.db
+		const explicitPath = this.config.get<string>('database.path');
+		const dataDir = resolve(this.config.get<string>('dataDir', '../../data'));
+		const dbPath = resolve(explicitPath || join(dataDir, 'db', 'mu.db'));
 		const dbDir = dirname(dbPath);
 
 		if (!existsSync(dbDir)) {
