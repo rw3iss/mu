@@ -171,7 +171,7 @@ Override any config value with `MU_` prefixed env vars. Use double underscores f
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MU_SERVER__PORT` | `4000` | Server port |
-| `MU_SERVER__LOG_LEVEL` | `info` | Log verbosity |
+| `MU_SERVER__LOG_LEVEL` | `info` | Log verbosity |s
 | `MU_TRANSCODING__HW_ACCEL` | `none` | Hardware acceleration |
 | `MU_THIRD_PARTY__TMDB__API_KEY` | -- | TMDB API key |
 | `MU_THIRD_PARTY__OMDB__API_KEY` | -- | OMDB API key |

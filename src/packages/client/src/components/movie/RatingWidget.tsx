@@ -18,7 +18,7 @@ export function RatingWidget({
 	size = 'md',
 }: RatingWidgetProps) {
 	const [isEditing, setIsEditing] = useState(false);
-	const [editValue, setEditValue] = useState(value);
+	const [editText, setEditText] = useState('');
 
 	const percentage = (value / max) * 100;
 
@@ -27,33 +27,33 @@ export function RatingWidget({
 	const handleEdit = useCallback(() => {
 		if (editable) {
 			setIsEditing(true);
-			setEditValue(value);
+			setEditText(value > 0 ? value.toFixed(1) : '');
 		}
 	}, [editable, value]);
 
-	const handleChange = useCallback(
-		(e: Event) => {
-			const target = e.target as HTMLInputElement;
-			const newValue = parseFloat(target.value);
-			if (!Number.isNaN(newValue) && newValue >= 0 && newValue <= max) {
-				setEditValue(newValue);
-			}
-		},
-		[max],
-	);
+	const handleChange = useCallback((e: Event) => {
+		const raw = (e.target as HTMLInputElement).value;
+		// Allow digits, one decimal point, and empty string while typing
+		if (raw === '' || /^\d{0,2}\.?\d{0,1}$/.test(raw)) {
+			setEditText(raw);
+		}
+	}, []);
 
 	const submittedRef = { current: false };
 	const handleSubmit = useCallback(() => {
 		if (submittedRef.current) return;
 		submittedRef.current = true;
-		onChange?.(editValue);
+		const parsed = parseFloat(editText);
+		if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= max) {
+			onChange?.(Math.round(parsed * 10) / 10);
+		}
 		setIsEditing(false);
-	}, [editValue, onChange]);
+	}, [editText, max, onChange]);
 
 	const handleCancel = useCallback(() => {
 		setIsEditing(false);
-		setEditValue(value);
-	}, [value]);
+		setEditText('');
+	}, []);
 
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent) => {
@@ -70,15 +70,13 @@ export function RatingWidget({
 		return (
 			<div class={`${styles.widget} ${styles[size]}`}>
 				<input
-					type="number"
+					type="text"
+					inputMode="decimal"
 					class={styles.input}
-					value={editValue}
+					value={editText}
 					onInput={handleChange}
 					onKeyDown={handleKeyDown}
 					onBlur={handleSubmit}
-					min="0"
-					max={max}
-					step="0.1"
 					autoFocus
 				/>
 				<span class={styles.maxLabel}>/ {max}</span>

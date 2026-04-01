@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { route } from 'preact-router';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
@@ -79,7 +80,12 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							/>
 						)}
 						<div class={styles.inlineContent}>
-							<h2 class={styles.title}>{movie.title}</h2>
+							<h2
+								class={`${styles.title} ${styles.titleLink}`}
+								onClick={() => route(`/movie/${movie.id}`)}
+							>
+								{movie.title}
+							</h2>
 							<div class={styles.meta}>
 								{movie.year > 0 && <span>{movie.year}</span>}
 								{runtimeText && <span>{runtimeText}</span>}
