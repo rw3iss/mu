@@ -4,6 +4,6 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "builder": "tsc",
-    "typeCheck": false
+    "typeCheck": true
   }
 }
