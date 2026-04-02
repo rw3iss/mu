@@ -32,6 +32,9 @@ export async function fetchProcessingMovies(): Promise<void> {
 export function initProcessingState(): void {
 	fetchProcessingMovies();
 
+	// Subscribe to job events channel so the server broadcasts them to us
+	wsService.subscribe('job');
+
 	// When a pre-transcode job starts, add the movieId
 	wsService.on('job:started', (data: unknown) => {
 		const ev = data as { type?: string; payload?: { movieId?: string } };
