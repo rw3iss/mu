@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import yaml from 'js-yaml';
 import { configSchema } from './config.schema.js';
 import type { MuConfig } from './config.types.js';
@@ -179,6 +179,25 @@ export function loadConfig(): MuConfig {
 
 	// Validate against the schema.
 	const parsed = configSchema.parse(merged);
+
+	// When MU_DATA_DIR is set, override default relative paths in database/cache
+	// so everything lives under the custom data directory
+	if (process.env.MU_DATA_DIR || process.env.MU_DATADIR) {
+		const resolvedData = resolve(parsed.dataDir);
+		// Only override if still at Zod defaults (relative paths)
+		if (parsed.database.path === './data/db/mu.db') {
+			parsed.database.path = join(resolvedData, 'db', 'mu.db');
+		}
+		if (parsed.cache.streamDir === './data/cache/streams') {
+			parsed.cache.streamDir = join(resolvedData, 'cache', 'streams');
+		}
+		if (parsed.cache.imageDir === './data/cache/images') {
+			parsed.cache.imageDir = join(resolvedData, 'cache', 'images');
+		}
+		if (parsed.media.thumbnailDir === './data/thumbnails') {
+			parsed.media.thumbnailDir = join(resolvedData, 'thumbnails');
+		}
+	}
 
 	// Ensure all required data directories exist.
 	const resolvedDataDir = resolve(parsed.dataDir);
