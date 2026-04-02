@@ -855,7 +855,10 @@ export function PlayerControls({
 													<SubtitlePanel
 														movieId={globalMovieId.value}
 														fileName={
-															globalMovie.value?.fileInfo?.fileName ??
+															globalMovie.value?.fileInfo?.fileName ||
+															globalMovie.value?.fileInfo?.filePath
+																?.split(/[/\\]/)
+																.pop() ||
 															undefined
 														}
 														existingTracks={(

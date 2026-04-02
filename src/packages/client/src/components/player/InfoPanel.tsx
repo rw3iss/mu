@@ -5,8 +5,9 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
-import { globalMovie } from '@/state/globalPlayer.state';
+import { globalMovie, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
+import { showInfoPanel } from '@/state/player.state';
 import styles from './InfoPanel.module.scss';
 
 interface InfoPanelProps {
@@ -164,12 +165,27 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									<div class={styles.castList}>
 										{movie.cast.slice(0, 8).map((member) => (
 											<div key={member.name} class={styles.castMember}>
-												<span class={styles.castName}>{member.name}</span>
-												{member.character && (
-													<span class={styles.castCharacter}>
-														{member.character}
+												<div class={styles.castPhoto}>
+													{member.profileUrl ? (
+														<img
+															src={member.profileUrl}
+															alt={member.name}
+															loading="lazy"
+														/>
+													) : (
+														<div class={styles.castPhotoPlaceholder} />
+													)}
+												</div>
+												<div class={styles.castInfo}>
+													<span class={styles.castName}>
+														{member.name}
 													</span>
-												)}
+													{member.character && (
+														<span class={styles.castCharacter}>
+															{member.character}
+														</span>
+													)}
+												</div>
 											</div>
 										))}
 									</div>
@@ -202,7 +218,18 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							/>
 						)}
 
-						<h2 class={styles.title}>{movie.title}</h2>
+						<h2
+							class={`${styles.title} ${styles.titleLink}`}
+							onClick={() => {
+								route(`/movie/${movie.id}`);
+								if (playerMode.value === 'full') {
+									minimizePlayer();
+								}
+								showInfoPanel.value = false;
+							}}
+						>
+							{movie.title}
+						</h2>
 
 						<div class={styles.meta}>
 							{movie.year > 0 && <span>{movie.year}</span>}

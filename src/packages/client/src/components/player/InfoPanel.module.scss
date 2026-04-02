@@ -215,11 +215,37 @@
 
 .castMember {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-sm);
   padding: var(--space-xs) 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.castPhoto {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.1);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.castPhotoPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.castInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .castName {
@@ -231,8 +257,6 @@
 .castCharacter {
   font-size: var(--font-size-xs);
   color: rgba(255, 255, 255, 0.4);
-  text-align: right;
-  flex-shrink: 0;
 }
 
 .fileInfoToggle {
