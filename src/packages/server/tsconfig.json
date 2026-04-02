@@ -5,12 +5,13 @@
     "rootDir": "./src",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    "noEmit": false,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
     "paths": {
       "@mu/shared": ["../shared/dist/index.js"]
     }
   },
-  "include": ["src/**/*"],
-  "references": [
-    { "path": "../shared" }
-  ]
+  "include": ["src/**/*"]
 }
