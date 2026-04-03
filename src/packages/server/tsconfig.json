@@ -10,7 +10,7 @@
     "declaration": false,
     "declarationMap": false,
     "paths": {
-      "@mu/shared": ["../shared/dist/index.js"]
+      "@mu/shared": ["../shared/dist/index.d.ts"]
     }
   },
   "include": ["src/**/*"]
