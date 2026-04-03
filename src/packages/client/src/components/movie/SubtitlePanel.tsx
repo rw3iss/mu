@@ -1,6 +1,7 @@
 import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import { subtitlesService } from '@/services/subtitles.service';
+import { globalMovie } from '@/state/globalPlayer.state';
 import styles from './SubtitlePanel.module.scss';
 
 interface SubtitlePanelProps {
@@ -26,8 +27,12 @@ export function SubtitlePanel({
 	onSubtitlesChanged,
 	onTrackAdded,
 	onTrackDeleted,
-	fileName,
+	fileName: fileNameProp,
 }: SubtitlePanelProps) {
+	// Resolve fileName: prop > globalMovie fileInfo > filePath extraction
+	const fileName = fileNameProp
+		|| globalMovie.value?.fileInfo?.fileName
+		|| globalMovie.value?.fileInfo?.filePath?.split(/[/\\]/).pop();
 	const [tracks, setTracks] = useState<MovieSubtitleInfo[]>(existingTracks ?? []);
 	const [tracksOpen, setTracksOpen] = useState(true);
 	const [searchResults, setSearchResults] = useState<SubtitleSearchResult[]>([]);
