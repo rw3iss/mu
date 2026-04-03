@@ -497,12 +497,35 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 								networkRecoveries = 0;
 								transcodingRecoveries = 0;
 							} else {
-								// All reloads exhausted — give up
-								const msg = `Stream failed: unable to load video after ${MAX_FULL_RELOADS} attempts`;
-								console.error('[HLS] All full reloads exhausted');
-								setPlaybackError(msg);
+								// All reloads exhausted — session is likely dead.
+								// Try restarting with a brand new stream session.
+								const movieId = globalMovieId.value;
+								const pos = video.currentTime;
+								console.warn(
+									`[HLS] All reloads exhausted, restarting stream session from ${pos}s`,
+								);
 								hls.destroy();
 								hlsRef.current = null;
+
+								if (movieId) {
+									setHlsStatus('Reconnecting...');
+									streamService
+										.startStream(movieId)
+										.then((newSession) => {
+											currentSession.value = newSession;
+											// The session change will trigger a new HLS setup
+											// via the useEffect that watches currentSession
+										})
+										.catch(() => {
+											setPlaybackError(
+												'Stream session expired. Click play to restart.',
+											);
+										});
+								} else {
+									setPlaybackError(
+										'Stream session expired. Click play to restart.',
+									);
+								}
 							}
 							break;
 						}

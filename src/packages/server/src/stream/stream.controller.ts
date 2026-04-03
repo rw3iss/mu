@@ -338,6 +338,15 @@ export class StreamController {
 	}
 
 	/**
+	 * Heartbeat endpoint — keeps session alive during pause.
+	 */
+	@Post(':sessionId/heartbeat')
+	heartbeat(@Param('sessionId') sessionId: string) {
+		this.streamService.touchSession(sessionId);
+		return { ok: true };
+	}
+
+	/**
 	 * List all active streaming sessions (admin endpoint).
 	 */
 	@Get('sessions')

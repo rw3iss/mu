@@ -319,6 +319,16 @@ export function GlobalPlayer() {
 		}
 	}, [engine.videoRef.current, isPlayerActive.value, playerMode.value]);
 
+	// Session heartbeat — keeps the server session alive during pause
+	useEffect(() => {
+		const session = currentSession.value;
+		if (!session?.sessionId) return;
+		const interval = setInterval(() => {
+			streamService.heartbeat(session.sessionId).catch(() => {});
+		}, 2 * 60 * 1000); // every 2 minutes
+		return () => clearInterval(interval);
+	}, [currentSession.value?.sessionId]);
+
 	// Subtitle appearance settings
 	const [subSettings] = useSubtitleSettings();
 

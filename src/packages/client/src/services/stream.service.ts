@@ -55,6 +55,13 @@ export const streamService = {
 	},
 
 	/**
+	 * Send a heartbeat to keep a stream session alive during pause.
+	 */
+	heartbeat(sessionId: string): Promise<{ ok: boolean }> {
+		return api.post(`/stream/${sessionId}/heartbeat`);
+	},
+
+	/**
 	 * Delete a cached transcode for a movie at a specific quality.
 	 */
 	deleteCachedVersion(movieId: string, quality: string): Promise<{ success: boolean }> {
