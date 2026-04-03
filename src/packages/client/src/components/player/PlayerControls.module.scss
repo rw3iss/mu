@@ -443,7 +443,7 @@
 	flex-direction: column;
 	align-items: center;
 	gap: 8px;
-	padding: 14px 14px;
+	padding: 14px 28px;
 	background: rgba(18, 18, 18, 0.97);
 	border: 1px solid rgba(255, 255, 255, 0.08);
 	border-radius: 6px;
@@ -476,26 +476,33 @@
 .volumeSlider {
 	writing-mode: vertical-lr;
 	direction: rtl;
-	width: 8px;
+	width: 32px;
 	height: 120px;
 	appearance: none;
-	background: rgba(255, 255, 255, 0.18);
+	background: transparent;
 	border-radius: 2px;
 	outline: none;
 	cursor: pointer;
+	// Visible track drawn via pseudo-element on the container instead
+	background-image: linear-gradient(to right,
+		transparent calc(50% - 5px),
+		rgba(255, 255, 255, 0.18) calc(50% - 5px),
+		rgba(255, 255, 255, 0.18) calc(50% + 5px),
+		transparent calc(50% + 5px)
+	);
 
 	&::-webkit-slider-thumb {
 		appearance: none;
-		width: 14px;
-		height: 14px;
+		width: 16px;
+		height: 16px;
 		background: #ffffff;
 		border-radius: 50%;
 		cursor: pointer;
 	}
 
 	&::-moz-range-thumb {
-		width: 14px;
-		height: 14px;
+		width: 16px;
+		height: 16px;
 		background: #ffffff;
 		border-radius: 50%;
 		cursor: pointer;

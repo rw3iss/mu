@@ -30,9 +30,10 @@ export function SubtitlePanel({
 	fileName: fileNameProp,
 }: SubtitlePanelProps) {
 	// Resolve fileName: prop > globalMovie fileInfo > filePath extraction
-	const fileName = fileNameProp
-		|| globalMovie.value?.fileInfo?.fileName
-		|| globalMovie.value?.fileInfo?.filePath?.split(/[/\\]/).pop();
+	const fileName =
+		fileNameProp ||
+		globalMovie.value?.fileInfo?.fileName ||
+		globalMovie.value?.fileInfo?.filePath?.split(/[/\\]/).pop();
 	const [tracks, setTracks] = useState<MovieSubtitleInfo[]>(existingTracks ?? []);
 	const [tracksOpen, setTracksOpen] = useState(true);
 	const [searchResults, setSearchResults] = useState<SubtitleSearchResult[]>([]);

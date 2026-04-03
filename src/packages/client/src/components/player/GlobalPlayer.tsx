@@ -130,9 +130,23 @@ export function GlobalPlayer() {
 			) {
 				return;
 			}
-			if (e.key === ' ' && playerMode.value !== 'hidden') {
+			if (playerMode.value === 'hidden') return;
+			if (e.key === ' ') {
 				e.preventDefault();
 				engine.togglePlay();
+			} else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+				e.preventDefault();
+				const skipTimes = getUiSetting<number[]>('skip_times', [5, 10, 20]);
+				const skipSeconds = skipTimes[0] ?? 5;
+				const video = engine.videoRef.current;
+				if (video) {
+					const newTime =
+						e.key === 'ArrowLeft'
+							? Math.max(0, video.currentTime - skipSeconds)
+							: Math.min(video.duration || Infinity, video.currentTime + skipSeconds);
+					video.currentTime = newTime;
+					currentTime.value = newTime;
+				}
 			}
 		}
 		document.addEventListener('keydown', handleGlobalKeyDown);
@@ -323,9 +337,12 @@ export function GlobalPlayer() {
 	useEffect(() => {
 		const session = currentSession.value;
 		if (!session?.sessionId) return;
-		const interval = setInterval(() => {
-			streamService.heartbeat(session.sessionId).catch(() => {});
-		}, 2 * 60 * 1000); // every 2 minutes
+		const interval = setInterval(
+			() => {
+				streamService.heartbeat(session.sessionId).catch(() => {});
+			},
+			2 * 60 * 1000,
+		); // every 2 minutes
 		return () => clearInterval(interval);
 	}, [currentSession.value?.sessionId]);
 
