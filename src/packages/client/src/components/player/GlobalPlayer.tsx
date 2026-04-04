@@ -649,7 +649,10 @@ export function GlobalPlayer() {
 		<>
 			{/* Split mode panel — everything except the video (which stays in the shared wrapper) */}
 			{isSplit && (
-				<div class={styles.splitPanel} style={{ width: `${splitWidth.value}vw` }}>
+				<div
+					class={`${styles.splitPanel} ${isExclusive ? styles.splitPanelExclusive : ''}`}
+					style={{ width: `${splitWidth.value}vw` }}
+				>
 					{/* Drag handle on left edge */}
 					<div
 						class={styles.splitDragHandle}
@@ -759,29 +762,27 @@ export function GlobalPlayer() {
 						class={`${styles.splitInfoArea} ${isExclusive ? styles.splitInfoExclusive : ''}`}
 					>
 						{isExclusive ? (
-							<div class={styles.exclusiveOverlay}>
+							<button
+								class={styles.exclusiveOverlay}
+								onClick={() => {
+									splitExclusive.value = false;
+								}}
+								title="Show info panel"
+							>
 								<div class={styles.exclusiveHoverContent}>
 									<span class={styles.exclusiveTitle}>{movie?.title}</span>
-									<button
-										class={styles.exclusiveExpandBtn}
-										onClick={() => {
-											splitExclusive.value = false;
-										}}
-										title="Show info panel"
+									<svg
+										width={16}
+										height={16}
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth={2}
 									>
-										<svg
-											width={16}
-											height={16}
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth={2}
-										>
-											<polyline points="6 9 12 15 18 9" />
-										</svg>
-									</button>
+										<polyline points="6 9 12 15 18 9" />
+									</svg>
 								</div>
-							</div>
+							</button>
 						) : (
 							<>
 								<button
