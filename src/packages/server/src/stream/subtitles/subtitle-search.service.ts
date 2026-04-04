@@ -364,9 +364,7 @@ export class SubtitleSearchService {
 		fileUrl: string,
 	): Promise<{ data: Buffer; fileName: string; format: string }> {
 		// Subdl fileId is the download URL path
-		const downloadUrl = fileUrl.startsWith('http')
-			? fileUrl
-			: `https://dl.subdl.com${fileUrl}`;
+		const downloadUrl = fileUrl.startsWith('http') ? fileUrl : `https://dl.subdl.com${fileUrl}`;
 
 		const response = await fetch(downloadUrl, {
 			headers: { 'User-Agent': this.OS_USER_AGENT },

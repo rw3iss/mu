@@ -20,6 +20,7 @@ import {
 	type PlayerMode,
 	playerMode,
 	restoredAutoplay,
+	splitExclusive,
 	splitPlayer,
 	splitWidth,
 	startGlobalStream,
@@ -635,6 +636,14 @@ export function GlobalPlayer() {
 	// The top bar (32px) is a flex child above the spacer so it pushes naturally.
 	// The site header offset is handled by CSS (panel top: var(--topbar-height)).
 	const splitVideoHeight = isSplit ? `calc((${splitWidth.value}vw - 3px) * 9 / 16)` : '0px';
+	const isExclusive = isSplit && splitExclusive.value;
+
+	// In exclusive mode, calculate the top offset to center the video vertically
+	// The video height in px is approximately (splitWidth% of viewport width) * 9/16
+	// Center offset = (windowHeight - videoHeight) / 2
+	const exclusiveTopStyle = isExclusive
+		? `calc((100vh - (${splitWidth.value}vw - 3px) * 9 / 16) / 2)`
+		: undefined;
 
 	return (
 		<>
@@ -723,7 +732,15 @@ export function GlobalPlayer() {
 					</div>
 
 					{/* Spacer for video area (video is positioned fixed via the shared wrapper) */}
-					<div style={{ height: splitVideoHeight, flexShrink: 0 }} />
+					<div
+						style={{
+							height: isExclusive
+								? `calc(${exclusiveTopStyle} + ${splitVideoHeight} - var(--topbar-height, 56px))`
+								: splitVideoHeight,
+							flexShrink: 0,
+							transition: 'height 300ms ease',
+						}}
+					/>
 
 					{/* Seek bar + controls — directly below video, full width */}
 					<PlayerControls
@@ -738,8 +755,59 @@ export function GlobalPlayer() {
 					/>
 
 					{/* Movie info — inline, no flyout */}
-					<div class={styles.splitInfoArea}>
-						{movie && <InfoPanel movie={movie} visible onClose={() => {}} inline />}
+					<div
+						class={`${styles.splitInfoArea} ${isExclusive ? styles.splitInfoExclusive : ''}`}
+					>
+						{isExclusive ? (
+							<div class={styles.exclusiveOverlay}>
+								<div class={styles.exclusiveHoverContent}>
+									<span class={styles.exclusiveTitle}>{movie?.title}</span>
+									<button
+										class={styles.exclusiveExpandBtn}
+										onClick={() => {
+											splitExclusive.value = false;
+										}}
+										title="Show info panel"
+									>
+										<svg
+											width={16}
+											height={16}
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth={2}
+										>
+											<polyline points="6 9 12 15 18 9" />
+										</svg>
+									</button>
+								</div>
+							</div>
+						) : (
+							<>
+								<button
+									class={styles.exclusiveCloseBtn}
+									onClick={() => {
+										splitExclusive.value = true;
+									}}
+									title="Hide info panel"
+								>
+									<svg
+										width={14}
+										height={14}
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth={2.5}
+									>
+										<line x1="18" y1="6" x2="6" y2="18" />
+										<line x1="6" y1="6" x2="18" y2="18" />
+									</svg>
+								</button>
+								{movie && (
+									<InfoPanel movie={movie} visible onClose={() => {}} inline />
+								)}
+							</>
+						)}
 					</div>
 
 					{/* Effects panel */}
@@ -751,7 +819,16 @@ export function GlobalPlayer() {
 			<div
 				ref={videoWrapperRef}
 				class={`${styles.videoWrapper} ${isSplit ? styles.videoWrapperSplit : isMini ? styles.videoWrapperMini : styles.videoWrapperFull} ${!isMini && !isSplit && !showControls.value ? styles.hideCursor : ''}`}
-				style={isSplit ? { width: `calc(${splitWidth.value}vw - 3px)` } : undefined}
+				style={
+					isSplit
+						? {
+								width: `calc(${splitWidth.value}vw - 3px)`,
+								...(exclusiveTopStyle
+									? { top: exclusiveTopStyle, transition: 'top 300ms ease' }
+									: {}),
+							}
+						: undefined
+				}
 				onClick={isMini ? maximizePlayer : undefined}
 				onMouseMove={!isMini && !isSplit ? resetControlsTimer : undefined}
 			>

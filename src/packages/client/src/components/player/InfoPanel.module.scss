@@ -188,6 +188,14 @@
   color: #ffffff;
 }
 
+.votesLabel {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: default;
+  align-self: center;
+  margin-left: 2px;
+}
+
 .section {
   margin-bottom: var(--space-lg);
 }

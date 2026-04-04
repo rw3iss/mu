@@ -429,6 +429,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								rtRating={movie.rtRating}
 								metacriticRating={movie.metacriticRating}
 								imdbId={movie.imdbId}
+								imdbVotes={movie.imdbVotes}
 							/>
 							<PluginSlot name={UI.MOVIE_PAGE_RATING} context={{ movie }} />
 						</div>

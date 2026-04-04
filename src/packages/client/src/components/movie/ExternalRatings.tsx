@@ -5,6 +5,7 @@ interface ExternalRatingsProps {
 	rtRating?: number;
 	metacriticRating?: number;
 	imdbId?: string;
+	imdbVotes?: number;
 }
 
 export function ExternalRatings({
@@ -12,6 +13,7 @@ export function ExternalRatings({
 	rtRating,
 	metacriticRating,
 	imdbId,
+	imdbVotes,
 }: ExternalRatingsProps) {
 	const hasAny =
 		imdbRating !== undefined ||
@@ -77,6 +79,16 @@ export function ExternalRatings({
 					<span class={styles.source}>MC</span>
 					<span class={styles.score}>{metacriticRating}</span>
 				</div>
+			)}
+			{imdbVotes != null && imdbVotes > 0 && (
+				<span class={styles.votes} title="IMDb votes">
+					{imdbVotes >= 1000000
+						? `${(imdbVotes / 1000000).toFixed(1)}M`
+						: imdbVotes >= 1000
+							? `${(imdbVotes / 1000).toFixed(1)}K`
+							: String(imdbVotes)}{' '}
+					votes
+				</span>
 			)}
 		</div>
 	);

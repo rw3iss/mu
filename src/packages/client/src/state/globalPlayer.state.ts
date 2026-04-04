@@ -75,6 +75,9 @@ export const splitWidth = signal<number>(
 	parseInt(localStorage.getItem('mu_ui_split_width') || '50', 10),
 );
 
+/** When true, split mode hides info panel and centers the video vertically */
+export const splitExclusive = signal(false);
+
 // Computed
 export const isPlayerActive = computed(() => playerMode.value !== 'hidden');
 

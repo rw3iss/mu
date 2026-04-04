@@ -300,6 +300,7 @@ function EqTab() {
 							onInput={(e) =>
 								updateInputGain(parseFloat((e.target as HTMLInputElement).value))
 							}
+							onDblClick={() => updateInputGain(0)}
 						/>
 						<span class={`${styles.eqLabel} ${styles.eqLabelAmp}`}>Amp</span>
 					</div>
@@ -322,6 +323,7 @@ function EqTab() {
 										parseFloat((e.target as HTMLInputElement).value),
 									)
 								}
+								onDblClick={() => updateEqBand(i, 0)}
 							/>
 							<span class={styles.eqLabel}>{formatFreq(band.frequency)}</span>
 						</div>
