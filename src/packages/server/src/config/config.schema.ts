@@ -136,5 +136,13 @@ export const configSchema = z.object({
 		})
 		.default(() => ({}) as any),
 
+	tls: z
+		.object({
+			hostname: z.string().default(''),
+			certPath: z.string().default(''),
+			keyPath: z.string().default(''),
+		})
+		.default(() => ({}) as any),
+
 	dataDir: z.string().default('../../data'),
 });
