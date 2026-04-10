@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import http from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import fastifyCookie from '@fastify/cookie';
@@ -45,10 +46,54 @@ for (const envPath of [
 	}
 }
 
+/**
+ * Try to load TLS cert/key from well-known paths.
+ * Priority: config tls.certPath/tls.keyPath > Let's Encrypt live dir.
+ */
+function loadTlsCredentials(config: ConfigService, logger: Logger): { cert: Buffer; key: Buffer } | null {
+	const certPath = config.get<string | undefined>('tls.certPath');
+	const keyPath = config.get<string | undefined>('tls.keyPath');
+
+	// Explicit config paths
+	if (certPath && keyPath && existsSync(certPath) && existsSync(keyPath)) {
+		logger.log(`TLS: using certs from config (${certPath})`);
+		return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
+	}
+
+	// Auto-detect Let's Encrypt on the current host
+	const hostname = config.get<string>('tls.hostname', '');
+	const searchDirs = hostname
+		? [
+				// Windows certbot
+				`C:/Certbot/live/${hostname}`,
+				// Linux certbot
+				`/etc/letsencrypt/live/${hostname}`,
+			]
+		: [];
+
+	for (const dir of searchDirs) {
+		const fullchain = join(dir, 'fullchain.pem');
+		const privkey = join(dir, 'privkey.pem');
+		if (existsSync(fullchain) && existsSync(privkey)) {
+			logger.log(`TLS: using Let's Encrypt certs from ${dir}`);
+			return { cert: readFileSync(fullchain), key: readFileSync(privkey) };
+		}
+	}
+
+	return null;
+}
+
 async function bootstrap() {
+	const preConfig = new ConfigService();
+	const bootstrapLogger = new Logger('Bootstrap');
+	const tls = loadTlsCredentials(preConfig, bootstrapLogger);
+
+	const httpsOptions = tls ? { https: { cert: tls.cert, key: tls.key } } : {};
+
 	const app = await NestFactory.create<NestFastifyApplication>(
 		AppModule,
 		new FastifyAdapter({
+			...httpsOptions,
 			logger: {
 				level: process.env.MU_SERVER_LOG_LEVEL ?? 'info',
 				transport:
@@ -139,7 +184,26 @@ async function bootstrap() {
 	const port = config.get<number>('server.port', 4000);
 
 	await app.listen(port, host);
-	logger.log(`Mu server v0.1.0 running at http://${host}:${port}`);
+	const proto = tls ? 'https' : 'http';
+	logger.log(`Mu server v0.1.0 running at ${proto}://${host}:${port}`);
+
+	// When TLS is active, start a tiny HTTP server that redirects to HTTPS.
+	if (tls) {
+		const httpPort = config.get<number>('server.httpRedirectPort', 80);
+		try {
+			http
+				.createServer((req, res) => {
+					const location = `https://${req.headers.host?.replace(`:${httpPort}`, `:${port}`) ?? `localhost:${port}`}${req.url}`;
+					res.writeHead(301, { Location: location });
+					res.end();
+				})
+				.listen(httpPort, host, () => {
+					logger.log(`HTTP→HTTPS redirect listening on ${host}:${httpPort}`);
+				});
+		} catch (err) {
+			logger.warn(`Could not start HTTP redirect on port ${httpPort}: ${err}`);
+		}
+	}
 }
 
 bootstrap().catch((err) => {
