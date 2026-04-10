@@ -15,6 +15,7 @@ import { PersonDetail } from '@/pages/PersonDetail';
 // Player is now handled entirely by GlobalPlayer (no dedicated route)
 import { PlaylistDetail } from '@/pages/PlaylistDetail';
 import { Playlists } from '@/pages/Playlists';
+import { PublicWatch } from '@/pages/PublicWatch';
 import { Search } from '@/pages/Search';
 import { Settings } from '@/pages/Settings';
 import { Setup } from '@/pages/Setup';
@@ -50,6 +51,9 @@ function Redirect({ to, path: _path }: { to: string; path: string }) {
 
 function enforceAuth(url: string): boolean {
 	if (isLoading.value) return false;
+
+	// Public share-watch route bypasses all auth enforcement.
+	if (url.startsWith('/watch/')) return false;
 
 	if (!isSetupComplete.value && url !== '/setup') {
 		route('/setup', true);
@@ -139,12 +143,18 @@ export function App() {
 
 	const path = currentPath.value;
 	const isAuthRoute = path === '/login' || path === '/setup';
+	const isPublicWatch = path.startsWith('/watch/');
 
 	return (
 		<div>
 			<Toast />
 			{!isAuthRoute && <GlobalPlayer />}
-			{isAuthRoute ? (
+			{isPublicWatch ? (
+				<Router onChange={handleRouteChange}>
+					<PublicWatch path="/watch/:token" />
+					<NotFound default />
+				</Router>
+			) : isAuthRoute ? (
 				<Router onChange={handleRouteChange}>
 					<Login path="/login" />
 					<Setup path="/setup" />

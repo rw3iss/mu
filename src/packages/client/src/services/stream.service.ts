@@ -1,5 +1,14 @@
 import type { StreamSession } from '@/state/player.state';
+import { shareToken } from '@/state/share.state';
 import { api } from './api';
+
+/** Build a URL query-string credential to append to streaming URLs (HLS / native video). */
+function buildStreamUrlCredential(): string {
+	const share = shareToken.value;
+	if (share) return `shareToken=${encodeURIComponent(share)}`;
+	const token = localStorage.getItem('mu_token');
+	return `token=${encodeURIComponent(token || '')}`;
+}
 
 // ============================================
 // Remote movie ID helpers
@@ -182,15 +191,13 @@ export const streamService = {
 	 * Get the stream URL for direct playback
 	 */
 	getStreamUrl(sessionId: string): string {
-		const token = localStorage.getItem('mu_token');
-		return `/api/v1/stream/${sessionId}/media?token=${encodeURIComponent(token || '')}`;
+		return `/api/v1/stream/${sessionId}/media?${buildStreamUrlCredential()}`;
 	},
 
 	/**
 	 * Get subtitle file URL
 	 */
 	getSubtitleUrl(sessionId: string, trackId: string): string {
-		const token = localStorage.getItem('mu_token');
-		return `/api/v1/stream/${sessionId}/subtitles/${trackId}?token=${encodeURIComponent(token || '')}`;
+		return `/api/v1/stream/${sessionId}/subtitles/${trackId}?${buildStreamUrlCredential()}`;
 	},
 };

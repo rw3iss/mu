@@ -15,6 +15,7 @@ import {
 	updateProgress,
 	volume,
 } from '@/state/player.state';
+import { shareToken } from '@/state/share.state';
 
 const BUFFER_CONFIGS: Record<
 	string,
@@ -25,6 +26,32 @@ const BUFFER_CONFIGS: Record<
 	large: { maxBufferLength: 60, maxMaxBufferLength: 120, maxBufferSize: 120 * 1024 * 1024 },
 	max: { maxBufferLength: 120, maxMaxBufferLength: 240, maxBufferSize: 250 * 1024 * 1024 },
 };
+
+/**
+ * Module-level singleton video element.
+ *
+ * Created lazily the first time any `useVideoEngine` hook instance runs, and
+ * reused on every subsequent remount. This is load-bearing for Web Audio:
+ * `createMediaElementSource()` permanently binds the element to an audio
+ * graph, and the browser refuses to create a second source node for the same
+ * element. If we created a new `<video>` on every hook mount, the audio
+ * engine's graph would be orphaned (stuck on the old element) and the new
+ * element would bypass EQ/compressor processing entirely.
+ */
+let sharedVideoElement: HTMLVideoElement | null = null;
+
+function getSharedVideoElement(): HTMLVideoElement {
+	if (!sharedVideoElement) {
+		const video = document.createElement('video');
+		video.playsInline = true;
+		video.crossOrigin = 'anonymous';
+		video.style.width = '100%';
+		video.style.height = '100%';
+		video.style.objectFit = 'contain';
+		sharedVideoElement = video;
+	}
+	return sharedVideoElement;
+}
 
 const MAX_RECOVERIES = 12;
 const RECOVERY_BASE_DELAY_MS = 1500;
@@ -97,61 +124,59 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		return BUFFER_CONFIGS[stored] || BUFFER_CONFIGS.normal;
 	}, []);
 
-	// Create the video element once on mount (only when enabled)
+	// Attach event listeners to the shared video element on mount.
+	// The element itself is a module-level singleton — only the event
+	// listeners are per-mount, so refs captured in their closures stay fresh.
 	useEffect(() => {
 		if (!enabled) return;
 
-		if (!videoRef.current) {
-			const video = document.createElement('video');
-			video.playsInline = true;
-			video.crossOrigin = 'anonymous';
-			video.style.width = '100%';
-			video.style.height = '100%';
-			video.style.objectFit = 'contain';
-			videoRef.current = video;
+		const video = getSharedVideoElement();
+		videoRef.current = video;
 
-			video.addEventListener('durationchange', () => {
-				if (video.duration && Number.isFinite(video.duration)) {
-					// Prefer the known movie duration from session (full length)
-					// over HLS-reported duration (which grows during transcoding)
-					const knownDuration = currentSession.value?.durationSeconds;
-					if (knownDuration && knownDuration > video.duration) {
-						duration.value = knownDuration;
-					} else {
-						duration.value = video.duration;
-					}
+		const onDurationChange = () => {
+			if (video.duration && Number.isFinite(video.duration)) {
+				// Prefer the known movie duration from session (full length)
+				// over HLS-reported duration (which grows during transcoding)
+				const knownDuration = currentSession.value?.durationSeconds;
+				if (knownDuration && knownDuration > video.duration) {
+					duration.value = knownDuration;
+				} else {
+					duration.value = video.duration;
 				}
-			});
-			video.addEventListener('play', () => {
-				isPlaying.value = true;
-				intendedPlayingRef.current = true;
-			});
-			video.addEventListener('pause', () => {
-				// Ignore pause events caused by:
-				// 1. Explicit moves via moveVideoTo() set movingRef
-				// 2. Implicit detachment (e.g. mini bar unmount) detected via document.contains
-				// 3. Programmatic destroy/reinit (suppressPauseRef) — async pause events
-				//    from old HLS destroy must not reset intendedPlayingRef for the new stream
-				if (movingRef.current || suppressPauseRef.current || !document.contains(video))
-					return;
-				isPlaying.value = false;
-				intendedPlayingRef.current = false;
-			});
-			video.addEventListener('waiting', () => {
-				isBuffering.value = true;
-			});
-			video.addEventListener('canplay', () => {
-				isBuffering.value = false;
-			});
+			}
+		};
+		const onPlay = () => {
+			isPlaying.value = true;
+			intendedPlayingRef.current = true;
+			audioEngine.resume();
+		};
+		const onPause = () => {
+			// Ignore pause events caused by:
+			// 1. Explicit moves via moveVideoTo() set movingRef
+			// 2. Implicit detachment (e.g. mini bar unmount) detected via document.contains
+			// 3. Programmatic destroy/reinit (suppressPauseRef) — async pause events
+			//    from old HLS destroy must not reset intendedPlayingRef for the new stream
+			if (movingRef.current || suppressPauseRef.current || !document.contains(video)) return;
+			isPlaying.value = false;
+			intendedPlayingRef.current = false;
+		};
+		const onWaiting = () => {
+			isBuffering.value = true;
+		};
+		const onCanPlay = () => {
+			isBuffering.value = false;
+		};
 
-			// Attach Web Audio API processing chain
-			audioEngine.attach(video);
-			initAudioEffects();
+		video.addEventListener('durationchange', onDurationChange);
+		video.addEventListener('play', onPlay);
+		video.addEventListener('pause', onPause);
+		video.addEventListener('waiting', onWaiting);
+		video.addEventListener('canplay', onCanPlay);
 
-			video.addEventListener('play', () => {
-				audioEngine.resume();
-			});
-		}
+		// Attach Web Audio API processing chain.
+		// Idempotent on the shared element — subsequent mounts are no-ops.
+		audioEngine.attach(video);
+		initAudioEffects();
 
 		// 60fps time tracking via requestAnimationFrame
 		const tick = () => {
@@ -225,9 +250,14 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				hlsRef.current.destroy();
 				hlsRef.current = null;
 			}
-			if (videoRef.current?.parentNode) {
-				videoRef.current.parentNode.removeChild(videoRef.current);
-			}
+			// Remove hook-scoped event listeners from the shared element.
+			// DO NOT remove the element from DOM or null the shared reference —
+			// it must persist across remounts to keep the Web Audio graph alive.
+			video.removeEventListener('durationchange', onDurationChange);
+			video.removeEventListener('play', onPlay);
+			video.removeEventListener('pause', onPause);
+			video.removeEventListener('waiting', onWaiting);
+			video.removeEventListener('canplay', onCanPlay);
 			videoRef.current = null;
 		};
 	}, [enabled]);
@@ -291,11 +321,16 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				const isAbsoluteUrl = streamUrl.startsWith('http');
 				let directUrl: string;
 				if (!isAbsoluteUrl) {
-					const token = localStorage.getItem('mu_token');
 					const sep = streamUrl.includes('?') ? '&' : '?';
-					directUrl = token
-						? `${streamUrl}${sep}token=${encodeURIComponent(token)}`
-						: streamUrl;
+					const share = shareToken.value;
+					if (share) {
+						directUrl = `${streamUrl}${sep}shareToken=${encodeURIComponent(share)}`;
+					} else {
+						const token = localStorage.getItem('mu_token');
+						directUrl = token
+							? `${streamUrl}${sep}token=${encodeURIComponent(token)}`
+							: streamUrl;
+					}
 				} else {
 					directUrl = streamUrl;
 				}
@@ -316,7 +351,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 					// Video stays paused — frame will render once loaded
 				}
 			} else {
-				const token = localStorage.getItem('mu_token');
+				const share = shareToken.value;
+				const token = share ? null : localStorage.getItem('mu_token');
 				const hls = new Hls({
 					debug: localStorage.getItem('mu_hls_debug') === '1',
 					startPosition,
@@ -334,7 +370,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 					fragLoadingRetryDelay: 2000,
 					fragLoadingMaxRetryTimeout: 30000,
 					xhrSetup(xhr) {
-						if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+						if (share) xhr.setRequestHeader('X-Share-Token', share);
+						else if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 					},
 				});
 
@@ -484,7 +521,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 									maxMaxBufferLength: bufferConfig.maxMaxBufferLength,
 									maxBufferSize: bufferConfig.maxBufferSize,
 									xhrSetup(xhr) {
-										if (token)
+										if (share) xhr.setRequestHeader('X-Share-Token', share);
+										else if (token)
 											xhr.setRequestHeader(
 												'Authorization',
 												`Bearer ${token}`,

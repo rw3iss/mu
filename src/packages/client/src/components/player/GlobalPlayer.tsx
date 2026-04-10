@@ -37,11 +37,14 @@ import {
 	isPlaying,
 	restoreAudioTrackChoice,
 	restoreSubtitleChoice,
+	setVolume,
 	showControls,
 	showInfoPanel,
 	streamError,
 	subtitleTrack,
+	volume,
 } from '@/state/player.state';
+import { shareMode } from '@/state/share.state';
 import { setSharedVideoEngine } from '@/state/videoEngineRef';
 import { EffectsPanel } from './EffectsPanel';
 import styles from './GlobalPlayer.module.scss';
@@ -589,19 +592,21 @@ export function GlobalPlayer() {
 		showInfoPanel.value = !showInfoPanel.value;
 	}, []);
 
-	// Close panels when clicking outside (e.g. on the main app, minimized player area, etc.)
+	// Close panels when clicking outside
 	useEffect(() => {
 		const handleGlobalClick = (e: MouseEvent) => {
 			const target = e.target as HTMLElement;
-			// If click is inside the player controls or panels, ignore (they handle their own clicks)
-			if (target.closest('[data-player-panel]')) return;
+			const clickedPanel = target.closest('[data-player-panel]');
 
-			// Close effects panel if open
+			// Close effects panel if click is outside it
 			if (showEffectsPanel.value) {
-				closeEffectsPanel();
+				const effectsEl = document.querySelector('[data-effects-panel]');
+				if (!effectsEl?.contains(target)) {
+					closeEffectsPanel();
+				}
 			}
-			// Close info panel if open
-			if (showInfoPanel.value) {
+			// Close info panel if click is outside any player panel
+			if (showInfoPanel.value && !clickedPanel) {
 				showInfoPanel.value = false;
 			}
 		};
@@ -832,6 +837,15 @@ export function GlobalPlayer() {
 				}
 				onClick={isMini ? maximizePlayer : undefined}
 				onMouseMove={!isMini && !isSplit ? resetControlsTimer : undefined}
+				onWheel={
+					!isMini
+						? (e: WheelEvent) => {
+								e.preventDefault();
+								const delta = e.deltaY > 0 ? -0.05 : 0.05;
+								setVolume(volume.value + delta);
+							}
+						: undefined
+				}
 			>
 				{/* Mini mode overlays */}
 				{isMini && (
@@ -912,59 +926,69 @@ export function GlobalPlayer() {
 						isHoveringControls.value = false;
 					}}
 				>
-					<button
-						class={styles.topBtn}
-						onClick={minimizePlayer}
-						aria-label="Minimize player"
-					>
-						<svg
-							width="20"
-							height="20"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="white"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
+					{!shareMode.value && (
+						<button
+							class={styles.topBtn}
+							onClick={minimizePlayer}
+							aria-label="Minimize player"
 						>
-							<polyline points="6 9 12 15 18 9" />
-						</svg>
-					</button>
-					<button
-						class={styles.topBtn}
-						onClick={splitPlayer}
-						aria-label="Split view"
-						title="Split view"
-					>
-						<svg
-							width="20"
-							height="20"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="white"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
+							<svg
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="white"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<polyline points="6 9 12 15 18 9" />
+							</svg>
+						</button>
+					)}
+					{!shareMode.value && (
+						<button
+							class={styles.topBtn}
+							onClick={splitPlayer}
+							aria-label="Split view"
+							title="Split view"
 						>
-							<rect x="3" y="3" width="18" height="18" rx="2" />
-							<line x1="12" y1="3" x2="12" y2="21" />
-						</svg>
-					</button>
-					<button class={styles.topBtn} onClick={closePlayer} aria-label="Close player">
-						<svg
-							width="20"
-							height="20"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="white"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
+							<svg
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="white"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<rect x="3" y="3" width="18" height="18" rx="2" />
+								<line x1="12" y1="3" x2="12" y2="21" />
+							</svg>
+						</button>
+					)}
+					{!shareMode.value && (
+						<button
+							class={styles.topBtn}
+							onClick={closePlayer}
+							aria-label="Close player"
 						>
-							<line x1="18" y1="6" x2="6" y2="18" />
-							<line x1="6" y1="6" x2="18" y2="18" />
-						</svg>
-					</button>
+							<svg
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="white"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<line x1="18" y1="6" x2="6" y2="18" />
+								<line x1="6" y1="6" x2="18" y2="18" />
+							</svg>
+						</button>
+					)}
 				</div>
 			)}
 

@@ -10,6 +10,8 @@ interface SubtitleTrack {
 	language: string;
 	title: string;
 	external?: boolean;
+	forced?: boolean;
+	codec?: string;
 }
 
 @Injectable()
@@ -30,7 +32,13 @@ export class SubtitleService {
 		filePath: string,
 		movieFileId: string,
 		/** Pre-loaded subtitle track info from DB (skips FFprobe if provided) */
-		storedTracks?: { index: number; language?: string; title?: string; codec?: string }[],
+		storedTracks?: {
+			index: number;
+			language?: string;
+			title?: string;
+			codec?: string;
+			forced?: boolean;
+		}[],
 	): Promise<SubtitleTrack[]> {
 		const outputDir = this.getSubtitleDir(movieFileId);
 		await mkdir(outputDir, { recursive: true });
@@ -50,6 +58,8 @@ export class SubtitleService {
 						index: i,
 						language: track.language || 'und',
 						title: track.title || `Track ${i}`,
+						forced: track.forced,
+						codec: track.codec,
 					});
 					continue;
 				} catch {
@@ -62,6 +72,8 @@ export class SubtitleService {
 						index: i,
 						language: track.language || 'und',
 						title: track.title || `Track ${i}`,
+						forced: track.forced,
+						codec: track.codec,
 					});
 				} catch (err) {
 					this.logger.warn(

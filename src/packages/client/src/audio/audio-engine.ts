@@ -48,9 +48,20 @@ export const DEFAULT_COMPRESSOR: CompressorSettings = {
 	mix: 1,
 };
 
+/**
+ * Minimum wet-gain when the compressor is enabled. Web Audio (Chrome) will
+ * cull processing of upstream nodes whose output feeds only a 0-gain node,
+ * which causes `DynamicsCompressorNode.reduction` to read 0 even though
+ * the user enabled the compressor. A floor of 0.0005 (~ -66 dBFS) is
+ * inaudible but forces Chrome to keep pulling samples through the compressor,
+ * so the Gain Reduction meter reflects reality at any mix setting.
+ */
+const WET_GAIN_FLOOR = 0.0005;
+
 export class AudioEngine {
 	private ctx: AudioContext | null = null;
 	private source: MediaElementAudioSourceNode | null = null;
+	private boundElement: HTMLMediaElement | null = null;
 	private inputGainNode: GainNode | null = null;
 	private filters: BiquadFilterNode[] = [];
 	private compressor: DynamicsCompressorNode | null = null;
@@ -66,14 +77,39 @@ export class AudioEngine {
 	private attached = false;
 
 	/**
-	 * Attach to a video/audio element. Call once — the source node is
-	 * permanently bound to the element (Web Audio API limitation).
+	 * Attach to a video/audio element.
+	 *
+	 * Idempotent: calling with the same element is a no-op. Calling with a
+	 * different element logs a warning and is refused — browsers permanently
+	 * bind a `MediaElementSourceNode` to its element, so the only way to
+	 * "re-attach" to a new element is to destroy() the engine first. The
+	 * caller should ensure the video element is a singleton for the app
+	 * lifetime.
 	 */
 	attach(element: HTMLMediaElement): void {
-		if (this.attached) return;
+		if (this.attached) {
+			if (this.boundElement !== element) {
+				console.warn(
+					'[audioEngine] attach() called with a different element than the one ' +
+						'already bound. Ignoring — call destroy() first to re-bind. This ' +
+						'indicates the video element is being recreated across component ' +
+						'remounts; the new element will bypass EQ/compressor processing.',
+				);
+			}
+			return;
+		}
 
-		this.ctx = new AudioContext();
-		this.source = this.ctx.createMediaElementSource(element);
+		try {
+			this.ctx = new AudioContext();
+			this.source = this.ctx.createMediaElementSource(element);
+			this.boundElement = element;
+		} catch (err) {
+			console.error('[audioEngine] Failed to create MediaElementSource:', err);
+			this.ctx = null;
+			this.source = null;
+			this.boundElement = null;
+			return;
+		}
 
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
@@ -243,6 +279,7 @@ export class AudioEngine {
 		this.dryGainNode = null;
 		this.wetGainNode = null;
 		this.compMergeNode = null;
+		this.boundElement = null;
 		this.attached = false;
 	}
 
@@ -261,10 +298,12 @@ export class AudioEngine {
 		this.wetGainNode?.disconnect();
 		this.compMergeNode?.disconnect();
 
-		// Build chain: source → inputGain → [EQ] → [Compressor w/ dry/wet mix] → destination
+		// Build chain: source → [Amp/inputGain] → [EQ] → [Compressor w/ dry/wet mix] → destination
 		let current: AudioNode = this.source;
 
-		if (this.eqEnabled && this.inputGainNode) {
+		// Amp / input-gain: apply whenever EITHER effect is active, so the Amp
+		// slider works independently of the EQ bands.
+		if ((this.eqEnabled || this.compressorEnabled) && this.inputGainNode) {
 			current.connect(this.inputGainNode);
 			current = this.inputGainNode;
 		}
@@ -313,7 +352,14 @@ export class AudioEngine {
 		const wet = Math.max(0, Math.min(1, mix ?? 1));
 		const dry = 1 - wet;
 		if (this.dryGainNode) this.dryGainNode.gain.value = dry;
-		if (this.wetGainNode) this.wetGainNode.gain.value = wet;
+		// Floor wet gain to a tiny non-zero value when the compressor is
+		// enabled, so Chrome keeps pulling samples through the compressor and
+		// the Gain Reduction meter stays live. The floor is inaudible.
+		if (this.wetGainNode) {
+			this.wetGainNode.gain.value = this.compressorEnabled
+				? Math.max(wet, WET_GAIN_FLOOR)
+				: wet;
+		}
 	}
 
 	private dbToLinear(db: number): number {

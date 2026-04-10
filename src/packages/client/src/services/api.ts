@@ -1,5 +1,6 @@
 import { route } from 'preact-router';
 import { currentUser } from '@/state/auth.state';
+import { shareToken } from '@/state/share.state';
 
 // ============================================
 // Types
@@ -38,6 +39,12 @@ const BASE_URL =
 	'/api/v1';
 
 function getAuthHeaders(): Record<string, string> {
+	// Share-watch mode: send ONLY the share token — never leak a logged-in user's
+	// bearer token alongside it. The server guard prefers the share header.
+	const share = shareToken.value;
+	if (share) {
+		return { 'X-Share-Token': share };
+	}
 	const token = localStorage.getItem('mu_token');
 	if (token) {
 		return { Authorization: `Bearer ${token}` };
@@ -59,9 +66,13 @@ function buildQueryString(params?: Record<string, string>): string {
 
 async function handleResponse<T>(response: Response): Promise<T> {
 	if (response.status === 401) {
-		localStorage.removeItem('mu_token');
-		currentUser.value = null;
-		route('/login', true);
+		// In share-watch mode, don't redirect to /login — the PublicWatch page
+		// will surface a "share link invalid or expired" error.
+		if (!shareToken.value) {
+			localStorage.removeItem('mu_token');
+			currentUser.value = null;
+			route('/login', true);
+		}
 		throw new ApiError(401, 'Unauthorized', null);
 	}
 

@@ -317,12 +317,25 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								<div class={styles.castList}>
 									{movie.cast.slice(0, 8).map((member) => (
 										<div key={member.name} class={styles.castMember}>
-											<span class={styles.castName}>{member.name}</span>
-											{member.character && (
-												<span class={styles.castCharacter}>
-													{member.character}
-												</span>
-											)}
+											<div class={styles.castPhoto}>
+												{member.profileUrl ? (
+													<img
+														src={member.profileUrl}
+														alt={member.name}
+														loading="lazy"
+													/>
+												) : (
+													<div class={styles.castPhotoPlaceholder} />
+												)}
+											</div>
+											<div class={styles.castInfo}>
+												<span class={styles.castName}>{member.name}</span>
+												{member.character && (
+													<span class={styles.castCharacter}>
+														{member.character}
+													</span>
+												)}
+											</div>
 										</div>
 									))}
 								</div>

@@ -28,6 +28,7 @@ import {
 	subtitleTrack,
 	volume,
 } from '@/state/player.state';
+import { shareMode } from '@/state/share.state';
 import { sharedVideoEngine } from '@/state/videoEngineRef';
 
 // ============================================
@@ -88,6 +89,9 @@ export const isPlayerActive = computed(() => playerMode.value !== 'hidden');
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function writePersistState(): void {
+	// Never persist player state for share-watch viewers — we don't want a
+	// public viewer's movie id or session polluting the owner's normal app.
+	if (shareMode.value) return;
 	if (!globalMovieId.value) {
 		localStorage.removeItem(STORAGE_KEY);
 		return;
@@ -260,6 +264,8 @@ let preMiniMode: PlayerMode | null = null;
 
 export function minimizePlayer(): void {
 	if (!globalMovieId.value) return;
+	// Share viewers must stay in full mode
+	if (shareMode.value) return;
 	// Remember current mode so restoring from mini goes back to it
 	if (playerMode.value !== 'mini') {
 		preMiniMode = playerMode.value;
@@ -291,6 +297,8 @@ export function maximizePlayer(): void {
  */
 export function splitPlayer(): void {
 	if (!globalMovieId.value) return;
+	// Share viewers must stay in full mode
+	if (shareMode.value) return;
 	playerMode.value = 'split';
 }
 

@@ -7,6 +7,7 @@ import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
 import { MovieOptionsMenu } from '@/components/movie/MovieOptionsMenu';
 import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { RatingWidget } from '@/components/movie/RatingWidget';
+import { ShareMovieModal } from '@/components/movie/ShareMovieModal';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
@@ -29,6 +30,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	const [movie, setMovie] = useState<Movie | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [inWatchlist, setInWatchlist] = useState(false);
+	const [showShareModal, setShowShareModal] = useState(false);
 
 	// Transcode progress tracking
 	const [transcodeProgress, setTranscodeProgress] = useState<number | null>(null);
@@ -512,6 +514,16 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								</Button>
 							)}
 							{!isRemote && (
+								<Button
+									variant="ghost"
+									size="lg"
+									onClick={() => setShowShareModal(true)}
+									title="Share this movie"
+								>
+									{'\u2197'} Share
+								</Button>
+							)}
+							{!isRemote && (
 								<MovieOptionsMenu movie={movie} onMovieUpdate={handleMovieUpdate} />
 							)}
 						</div>
@@ -856,6 +868,14 @@ export function MovieDetail({ id }: MovieDetailProps) {
 					</div>
 				</div>
 			</div>
+			{movie && (
+				<ShareMovieModal
+					movieId={movie.id}
+					movieTitle={movie.title}
+					isOpen={showShareModal}
+					onClose={() => setShowShareModal(false)}
+				/>
+			)}
 		</div>
 	);
 }

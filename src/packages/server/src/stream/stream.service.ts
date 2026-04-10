@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { and, eq, lt } from 'drizzle-orm';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
+import { SessionRegistryService } from '../common/session-registry.service.js';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
@@ -35,6 +36,77 @@ interface StartStreamOptions {
 	audioTrack?: number;
 	subtitleTrack?: number;
 }
+
+/**
+ * ISO 639-1/2 → display name map for subtitle labels.
+ * Only the common cases — anything missing falls back to the uppercased code.
+ */
+const SUBTITLE_LANGUAGE_NAMES: Record<string, string> = {
+	und: 'Unknown',
+	eng: 'English',
+	en: 'English',
+	spa: 'Spanish',
+	es: 'Spanish',
+	fre: 'French',
+	fra: 'French',
+	fr: 'French',
+	ger: 'German',
+	deu: 'German',
+	de: 'German',
+	ita: 'Italian',
+	it: 'Italian',
+	por: 'Portuguese',
+	pt: 'Portuguese',
+	rus: 'Russian',
+	ru: 'Russian',
+	jpn: 'Japanese',
+	ja: 'Japanese',
+	kor: 'Korean',
+	ko: 'Korean',
+	chi: 'Chinese',
+	zho: 'Chinese',
+	zh: 'Chinese',
+	ara: 'Arabic',
+	ar: 'Arabic',
+	hin: 'Hindi',
+	hi: 'Hindi',
+	dut: 'Dutch',
+	nld: 'Dutch',
+	nl: 'Dutch',
+	swe: 'Swedish',
+	sv: 'Swedish',
+	nor: 'Norwegian',
+	no: 'Norwegian',
+	dan: 'Danish',
+	da: 'Danish',
+	fin: 'Finnish',
+	fi: 'Finnish',
+	pol: 'Polish',
+	pl: 'Polish',
+	tur: 'Turkish',
+	tr: 'Turkish',
+	cze: 'Czech',
+	ces: 'Czech',
+	cs: 'Czech',
+	gre: 'Greek',
+	ell: 'Greek',
+	el: 'Greek',
+	heb: 'Hebrew',
+	he: 'Hebrew',
+	tha: 'Thai',
+	th: 'Thai',
+	vie: 'Vietnamese',
+	vi: 'Vietnamese',
+	ind: 'Indonesian',
+	id: 'Indonesian',
+	hun: 'Hungarian',
+	hu: 'Hungarian',
+	rum: 'Romanian',
+	ron: 'Romanian',
+	ro: 'Romanian',
+	ukr: 'Ukrainian',
+	uk: 'Ukrainian',
+};
 
 /** Stale session timeout in minutes — sessions with no heartbeat for this long are reaped. */
 const SESSION_TIMEOUT_MINUTES = 120;
@@ -64,6 +136,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		private readonly chunkManager: ChunkManagerService,
 		private readonly transcodeDebugger: TranscodeDebuggerService,
 		private readonly guidResolver: GuidResolverService,
+		private readonly sessionRegistry: SessionRegistryService,
 	) {}
 
 	onModuleInit(): void {
@@ -243,8 +316,8 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		this.guidResolver.warmup(sessionId, movieTitle);
 		const quality = options.quality || this.resolveDefaultQuality(file.id, file.videoHeight);
 
-		// Skip session tracking for shared/anonymous streams (__shared__ has no DB user record)
-		if (userId !== '__shared__') {
+		// Skip session tracking for shared/anonymous streams (sentinel users have no DB record)
+		if (userId !== '__shared__' && userId !== '__share__') {
 			await this.database.db.insert(streamSessions).values({
 				id: sessionId,
 				movieId,
@@ -454,7 +527,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// entry exists (so the movie appears in history immediately on play).
 		// Skip for shared/anonymous sessions — __shared__ user has no DB record.
 		let resumePosition = 0;
-		if (userId !== '__shared__') {
+		if (userId !== '__shared__' && userId !== '__share__') {
 			const historyRows = await this.database.db
 				.select()
 				.from(userWatchHistory)
@@ -494,6 +567,8 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 		// Store session info for chunk manager lookups
 		this.sessionInfo.set(sessionId, { movieFileId: file.id, quality });
+		// Register session→movieId mapping for share-token scope checks (guard reads this)
+		this.sessionRegistry.set(sessionId, { movieId, movieFileId: file.id });
 
 		this.events.emit(WsEvent.STREAM_STARTED, {
 			sessionId,
@@ -527,20 +602,12 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			ready,
 			format: directPlay ? 'native' : 'hls',
 			quality,
-			subtitles: subtitleTracks.map((t, i) => {
-				const lang = (t.language || 'und').toUpperCase();
-				const title =
-					t.title && t.title !== `Track ${t.index}` && t.title !== t.language
-						? t.title
-						: null;
-				const label = title ? `${lang} — ${title}` : `${lang} (Track ${i + 1})`;
-				return {
-					id: String(t.index),
-					label,
-					language: t.language,
-					url: `/api/v1/stream/${sessionId}/subtitles/${t.index}.vtt`,
-				};
-			}),
+			subtitles: subtitleTracks.map((t, i) => ({
+				id: String(t.index),
+				label: this.buildSubtitleLabel(t, i),
+				language: t.language,
+				url: `/api/v1/stream/${sessionId}/subtitles/${t.index}.vtt`,
+			})),
 			audioTracks,
 			qualities,
 			startPosition: resumePosition,
@@ -656,6 +723,9 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			.where(eq(streamSessions.id, sessionId));
 
 		if (sessions.length === 0) {
+			// Share/anonymous viewers don't have a persisted session row —
+			// silently accept the progress update so the client doesn't error out.
+			if (this.sessionRegistry.get(sessionId)) return;
 			throw new NotFoundException(`Stream session ${sessionId} not found`);
 		}
 
@@ -722,6 +792,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			}
 			this.sessionDirs.delete(sessionId);
 			this.sessionInfo.delete(sessionId);
+			this.sessionRegistry.delete(sessionId);
 		}
 
 		// Resume background chunk encoding (was paused for live stream priority)
@@ -818,6 +889,42 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	 */
 	getSessionInfo(sessionId: string): { movieFileId: string; quality: string } | undefined {
 		return this.sessionInfo.get(sessionId);
+	}
+
+	/**
+	 * Build a human-readable label for a subtitle track.
+	 *
+	 * Handles the common garbage cases we see from ffprobe tags:
+	 * - title missing → uses language + track number
+	 * - title equals language code ("und" / "UND" / "eng") → drops the title
+	 * - title is a literal "Track N" string → drops the title
+	 * - disambiguates same-language tracks by always appending a track number
+	 */
+	private buildSubtitleLabel(
+		t: { index: number; language: string; title: string; forced?: boolean; external?: boolean },
+		i: number,
+	): string {
+		const langCode = (t.language || 'und').toLowerCase().trim();
+		const langDisplay = SUBTITLE_LANGUAGE_NAMES[langCode] || langCode.toUpperCase();
+
+		const rawTitle = (t.title || '').trim();
+		const normalizedTitle = rawTitle.toLowerCase();
+		const isUselessTitle =
+			!rawTitle ||
+			/^track\s*\d+$/i.test(rawTitle) ||
+			normalizedTitle === langCode ||
+			normalizedTitle === langDisplay.toLowerCase() ||
+			normalizedTitle === 'und' ||
+			normalizedTitle === 'unknown' ||
+			normalizedTitle === 'undefined';
+
+		const parts: string[] = [langDisplay];
+		if (!isUselessTitle) parts.push(rawTitle);
+		if (t.forced) parts.push('Forced');
+		if (t.external) parts.push('External');
+		// Always append a track number so same-language tracks are distinguishable
+		parts.push(`#${i + 1}`);
+		return parts.join(' \u00B7 ');
 	}
 
 	/**

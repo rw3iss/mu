@@ -606,7 +606,12 @@ export function EffectsPanel() {
 	const videoProfileName = getActiveProfileName(allProfiles, activeVideoProfileId.value);
 
 	return (
-		<div class={styles.panel} data-player-panel onClick={(e) => e.stopPropagation()}>
+		<div
+			class={styles.panel}
+			data-player-panel
+			data-effects-panel
+			onClick={(e) => e.stopPropagation()}
+		>
 			<div class={styles.header}>
 				<span class={styles.headerTitle}>Effects</span>
 				<button class={styles.closeBtn} onClick={toggleEffectsPanel} aria-label="Close">
