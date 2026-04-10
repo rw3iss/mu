@@ -55,13 +55,19 @@ function loadTlsCredentials(config: ConfigService, logger: Logger): { cert: Buff
 	const keyPath = config.get<string | undefined>('tls.keyPath');
 
 	// Explicit config paths
-	if (certPath && keyPath && existsSync(certPath) && existsSync(keyPath)) {
-		logger.log(`TLS: using certs from config (${certPath})`);
-		return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
+	if (certPath && keyPath) {
+		const certExists = existsSync(certPath);
+		const keyExists = existsSync(keyPath);
+		if (certExists && keyExists) {
+			logger.log(`TLS: using certs from config (${certPath})`);
+			return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
+		}
+		logger.warn(`TLS: config has certPath/keyPath but files not found (cert=${certExists}, key=${keyExists}): ${certPath}`);
 	}
 
 	// Auto-detect Let's Encrypt on the current host
 	const hostname = config.get<string>('tls.hostname', '');
+	logger.log(`TLS: hostname=${hostname || '(not set)'}, certPath=${certPath || '(not set)'}, keyPath=${keyPath || '(not set)'}`);
 	const searchDirs = hostname
 		? [
 				// Windows certbot
@@ -190,19 +196,17 @@ async function bootstrap() {
 	// When TLS is active, start a tiny HTTP server that redirects to HTTPS.
 	if (tls) {
 		const httpPort = config.get<number>('server.httpRedirectPort', 80);
-		try {
-			http
-				.createServer((req, res) => {
-					const location = `https://${req.headers.host?.replace(`:${httpPort}`, `:${port}`) ?? `localhost:${port}`}${req.url}`;
-					res.writeHead(301, { Location: location });
-					res.end();
-				})
-				.listen(httpPort, host, () => {
-					logger.log(`HTTP→HTTPS redirect listening on ${host}:${httpPort}`);
-				});
-		} catch (err) {
-			logger.warn(`Could not start HTTP redirect on port ${httpPort}: ${err}`);
-		}
+		const httpServer = http.createServer((req, res) => {
+			const location = `https://${req.headers.host?.replace(`:${httpPort}`, `:${port}`) ?? `localhost:${port}`}${req.url}`;
+			res.writeHead(301, { Location: location });
+			res.end();
+		});
+		httpServer.on('error', (err: any) => {
+			logger.warn(`Could not start HTTP redirect on port ${httpPort}: ${err.message}`);
+		});
+		httpServer.listen(httpPort, host, () => {
+			logger.log(`HTTP→HTTPS redirect listening on ${host}:${httpPort}`);
+		});
 	}
 }
 
