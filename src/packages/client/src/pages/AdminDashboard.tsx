@@ -30,6 +30,9 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	const [generatingThumbnails, setGeneratingThumbnails] = useState(false);
 	const [removingBroken, setRemovingBroken] = useState(false);
 	const [showRemoveBrokenConfirm, setShowRemoveBrokenConfirm] = useState(false);
+	const [clearingWatched, setClearingWatched] = useState(false);
+	const [showClearWatchedConfirm, setShowClearWatchedConfirm] = useState(false);
+	const [watchedMovieCount, setWatchedMovieCount] = useState(0);
 
 	useEffect(() => {
 		loadData();
@@ -45,6 +48,10 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 
 			if (info.status === 'fulfilled') setSystemInfo(info.value);
 			if (sessions.status === 'fulfilled') setActiveSessions(sessions.value);
+
+			api.get<{ count: number }>('/history/watched/count')
+				.then((res) => setWatchedMovieCount(res.count))
+				.catch(() => {});
 		} catch (error) {
 			console.error('Failed to load admin data:', error);
 		} finally {
@@ -99,6 +106,20 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 			notifyError('Failed to remove broken movies');
 		} finally {
 			setRemovingBroken(false);
+		}
+	}, []);
+
+	const handleClearWatched = useCallback(async () => {
+		setClearingWatched(true);
+		try {
+			const result = await api.delete<{ clearedCount: number }>('/history/watched');
+			notifySuccess(`Cleared watched status for ${result.clearedCount} movie(s)`);
+			setWatchedMovieCount(0);
+			fetchMovies(1);
+		} catch {
+			notifyError('Failed to clear watched history');
+		} finally {
+			setClearingWatched(false);
 		}
 	}, []);
 
@@ -211,6 +232,13 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					>
 						Remove Broken Movies
 					</Button>
+					<Button
+						variant="danger"
+						onClick={() => setShowClearWatchedConfirm(true)}
+						loading={clearingWatched}
+					>
+						Clear Watched History
+					</Button>
 				</div>
 				<ConfirmDialog
 					isOpen={showRemoveBrokenConfirm}
@@ -219,6 +247,15 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					title="Remove Broken Movies"
 					message="This will scan all movies in the library and remove any whose source files are missing from disk. Related metadata, caches, and thumbnails will also be cleaned up. This cannot be undone."
 					confirmLabel="Remove Broken Movies"
+					variant="danger"
+				/>
+				<ConfirmDialog
+					isOpen={showClearWatchedConfirm}
+					onClose={() => setShowClearWatchedConfirm(false)}
+					onConfirm={handleClearWatched}
+					title="Clear Watched History"
+					message={`This will reset the "watched" status for ${watchedMovieCount} movie(s). Resume positions will be preserved. This cannot be undone.`}
+					confirmLabel="Clear Watched History"
 					variant="danger"
 				/>
 			</section>
