@@ -30,9 +30,12 @@ import {
 	setPageSize,
 	setServerFilter,
 	setViewMode,
+	hideWatched,
 	showHidden,
+	toggleHideWatched,
 	toggleShowHidden,
 	totalMovies,
+	watchedCount,
 	totalPages,
 	viewMode,
 } from '@/state/library.state';
@@ -70,6 +73,7 @@ export function Library(_props: LibraryProps) {
 	const [isUpdating, setIsUpdating] = useState(false);
 	const debouncedSearch = useDebounce(localSearch, 300);
 	const pendingScrollRef = useRef<number | null>(null);
+	const initialLoadRef = useRef(true);
 
 	useEffect(() => {
 		initViewMode();
@@ -113,6 +117,11 @@ export function Library(_props: LibraryProps) {
 	}, []);
 
 	useEffect(() => {
+		// Skip the initial mount — the first useEffect already loads the correct page
+		if (initialLoadRef.current) {
+			initialLoadRef.current = false;
+			return;
+		}
 		searchMovies(debouncedSearch);
 	}, [debouncedSearch]);
 
@@ -181,6 +190,9 @@ export function Library(_props: LibraryProps) {
 						{hiddenCount.value > 0 && !showHidden.value && (
 							<span class={styles.hiddenCount}> ({hiddenCount.value} hidden)</span>
 						)}
+						{watchedCount.value > 0 && !hideWatched.value && (
+							<span class={styles.hiddenCount}> ({watchedCount.value} watched)</span>
+						)}
 					</span>
 				</div>
 				<Button variant="secondary" size="sm" loading={isUpdating} onClick={handleUpdate}>
@@ -222,6 +234,14 @@ export function Library(_props: LibraryProps) {
 					title={showHidden.value ? 'Showing all movies' : 'Show hidden movies'}
 				>
 					{showHidden.value ? '\u{1F441} Hidden' : '\u{1F441} Hidden'}
+				</button>
+
+				<button
+					class={`${styles.showHiddenBtn} ${hideWatched.value ? styles.active : ''}`}
+					onClick={toggleHideWatched}
+					title={hideWatched.value ? 'Showing unwatched only' : 'Hide watched movies'}
+				>
+					{hideWatched.value ? '\u2713 Unwatched' : '\u{1F441} Unwatched'}
 				</button>
 
 				<div class={styles.toolbarActions}>
