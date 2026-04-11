@@ -9,6 +9,7 @@ export interface MovieListResponse {
 	movies: Movie[];
 	total: number;
 	hiddenCount?: number;
+	watchedCount?: number;
 	page: number;
 	pageSize: number;
 }
@@ -164,5 +165,13 @@ export const moviesService = {
 	 */
 	cancelProcessing(movieId: string): Promise<{ cancelled: number }> {
 		return api.post<{ cancelled: number }>(`/jobs/cancel-by-movie/${movieId}`);
+	},
+
+	markWatched(movieId: string): Promise<{ success: boolean }> {
+		return api.post<{ success: boolean }>(`/movies/${movieId}/watched`);
+	},
+
+	markUnwatched(movieId: string): Promise<{ success: boolean }> {
+		return api.delete<{ success: boolean }>(`/movies/${movieId}/watched`);
 	},
 };

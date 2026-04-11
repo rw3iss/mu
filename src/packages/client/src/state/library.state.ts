@@ -48,6 +48,7 @@ export interface Movie {
 	watchProgress?: number;
 	watchPosition?: number;
 	durationSeconds?: number;
+	watched?: boolean;
 	inWatchlist?: boolean;
 	status?: 'idle' | 'processing' | 'processing_playable';
 	remoteOrigin?: RemoteOrigin;
@@ -116,6 +117,10 @@ export const isLoading = signal(false);
 export const searchQuery = signal('');
 export const viewMode = signal<ViewMode>('grid');
 export const showHidden = signal(false);
+export const hideWatched = signal(
+	localStorage.getItem('mu_hide_watched') === 'true',
+);
+export const watchedCount = signal(0);
 export const localOnly = signal(localStorage.getItem('mu_local_only') === 'true');
 /** Server filter: 'all' | 'local' | serverId */
 export const serverFilter = signal(localStorage.getItem('mu_server_filter') || 'all');
@@ -170,6 +175,10 @@ export async function fetchMovies(page = 1): Promise<void> {
 			params.showHidden = 'true';
 		}
 
+		if (hideWatched.value) {
+			params.hideWatched = 'true';
+		}
+
 		const sf = serverFilter.value;
 		if (sf && sf !== 'all') {
 			params.server = sf;
@@ -179,6 +188,7 @@ export async function fetchMovies(page = 1): Promise<void> {
 		movies.value = response.movies;
 		totalMovies.value = response.total;
 		hiddenCount.value = response.hiddenCount ?? 0;
+		watchedCount.value = response.watchedCount ?? 0;
 
 		// Track remote servers
 		const rs = (response as any).remoteServers;
@@ -225,6 +235,12 @@ export function updateMovieInList(updated: Movie): void {
 
 export function toggleShowHidden(): void {
 	showHidden.value = !showHidden.value;
+	fetchMovies(1);
+}
+
+export function toggleHideWatched(): void {
+	hideWatched.value = !hideWatched.value;
+	localStorage.setItem('mu_hide_watched', String(hideWatched.value));
 	fetchMovies(1);
 }
 
