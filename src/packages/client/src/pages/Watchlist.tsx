@@ -80,13 +80,10 @@ export function Watchlist(_props: WatchlistProps) {
 	return (
 		<div class={styles.watchlist}>
 			<div class={styles.header}>
-				<h1 class={styles.title}>Watchlist</h1>
-				{movies.length > 0 && (
-					<span class={styles.count}>
-						{movies.length} {viewingUnwatched ? 'unwatched ' : ''}
-						{movies.length === 1 ? 'movie' : 'movies'}
-					</span>
-				)}
+				<h1 class={styles.title}>{viewingUnwatched ? 'Unwatched Movies' : 'Watchlist'}</h1>
+				<span class={styles.count}>
+					{movies.length} {movies.length === 1 ? 'movie' : 'movies'}
+				</span>
 				<button
 					onClick={() => setViewingUnwatched(!viewingUnwatched)}
 					style={{

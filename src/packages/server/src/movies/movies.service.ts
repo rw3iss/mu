@@ -175,6 +175,7 @@ export class MoviesService {
 				.select({ count: count() })
 				.from(movies)
 				.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
+				.leftJoin(userWatchHistory, historyJoinCond)
 				.where(where)
 				.get();
 			total = countResult?.count ?? 0;
@@ -193,6 +194,7 @@ export class MoviesService {
 			const countResult = this.database.db
 				.select({ count: count() })
 				.from(movies)
+				.leftJoin(userWatchHistory, historyJoinCond)
 				.where(where)
 				.get();
 			total = countResult?.count ?? 0;

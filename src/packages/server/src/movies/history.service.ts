@@ -1,12 +1,42 @@
 import { nowISO, paginationDefaults } from '@mu/shared';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movies, userWatchHistory } from '../database/schema/index.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 @Injectable()
-export class HistoryService {
-	constructor(private readonly database: DatabaseService) {}
+export class HistoryService implements OnModuleInit {
+	private readonly logger = new Logger('HistoryService');
+
+	constructor(
+		private readonly database: DatabaseService,
+		private readonly settings: SettingsService,
+	) {}
+
+	/**
+	 * On startup, backfill `completed = true` for any watch history entries
+	 * where positionSeconds exceeds the watched threshold but completed was
+	 * never set (legacy data from before auto-detection was added).
+	 */
+	onModuleInit() {
+		const threshold = this.settings.get<number>('watchedThresholdSeconds', 30);
+		const result = this.database.db
+			.update(userWatchHistory)
+			.set({ completed: true })
+			.where(
+				and(
+					sql`(${userWatchHistory.completed} IS NULL OR ${userWatchHistory.completed} = 0)`,
+					sql`${userWatchHistory.positionSeconds} >= ${threshold}`,
+				),
+			)
+			.run();
+		if (result.changes > 0) {
+			this.logger.log(
+				`Backfilled ${result.changes} watch history entries as completed (threshold: ${threshold}s)`,
+			);
+		}
+	}
 
 	addToHistory(
 		userId: string,
