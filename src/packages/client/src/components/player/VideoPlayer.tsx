@@ -51,7 +51,7 @@ export function VideoPlayer({
 					clickTimer = setTimeout(() => {
 						clickTimer = null;
 						engine.togglePlay();
-					}, 200);
+					}, 250);
 				}
 			};
 			const handleDblClick = () => {

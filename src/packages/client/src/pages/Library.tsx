@@ -14,6 +14,7 @@ import {
 	filters,
 	hasRemoteServers,
 	hiddenCount,
+	hideWatched,
 	initRemoteServers,
 	initSortPrefs,
 	initViewMode,
@@ -30,14 +31,13 @@ import {
 	setPageSize,
 	setServerFilter,
 	setViewMode,
-	hideWatched,
 	showHidden,
 	toggleHideWatched,
 	toggleShowHidden,
 	totalMovies,
-	watchedCount,
 	totalPages,
 	viewMode,
+	watchedCount,
 } from '@/state/library.state';
 import styles from './Library.module.scss';
 

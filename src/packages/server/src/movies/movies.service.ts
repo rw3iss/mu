@@ -209,7 +209,12 @@ export class MoviesService {
 			? this.database.db
 					.select({ count: count() })
 					.from(userWatchHistory)
-					.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, true)))
+					.where(
+						and(
+							eq(userWatchHistory.userId, userId),
+							eq(userWatchHistory.completed, true),
+						),
+					)
 					.get()
 			: null;
 		const watchedCount = watchedCountResult?.count ?? 0;
@@ -222,7 +227,7 @@ export class MoviesService {
 					rating: row.rating ?? 0,
 					watchPosition: position,
 					durationSeconds: row.durationSeconds ?? 0,
-					watched: row.watchCompleted === true || row.watchCompleted === 1,
+					watched: !!row.watchCompleted,
 				});
 			}),
 			total,
@@ -238,7 +243,10 @@ export class MoviesService {
 			const firstKey = this.listCache.keys().next().value;
 			if (firstKey) this.listCache.delete(firstKey);
 		}
-		this.listCache.set(cacheKey, { data: result, expires: Date.now() + MoviesService.CACHE_TTL_MS });
+		this.listCache.set(cacheKey, {
+			data: result,
+			expires: Date.now() + MoviesService.CACHE_TTL_MS,
+		});
 
 		return result;
 	}
@@ -290,7 +298,7 @@ export class MoviesService {
 				.get();
 			if (historyEntry) {
 				watchPosition = historyEntry.completed ? 0 : (historyEntry.positionSeconds ?? 0);
-				watched = historyEntry.completed === true || historyEntry.completed === 1;
+				watched = !!historyEntry.completed;
 			}
 		}
 

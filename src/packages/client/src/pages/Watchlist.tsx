@@ -83,7 +83,8 @@ export function Watchlist(_props: WatchlistProps) {
 				<h1 class={styles.title}>Watchlist</h1>
 				{movies.length > 0 && (
 					<span class={styles.count}>
-						{movies.length} {viewingUnwatched ? 'unwatched ' : ''}{movies.length === 1 ? 'movie' : 'movies'}
+						{movies.length} {viewingUnwatched ? 'unwatched ' : ''}
+						{movies.length === 1 ? 'movie' : 'movies'}
 					</span>
 				)}
 				<button
@@ -92,7 +93,9 @@ export function Watchlist(_props: WatchlistProps) {
 						padding: '4px 12px',
 						borderRadius: 'var(--radius-md)',
 						border: '1px solid var(--color-border)',
-						background: viewingUnwatched ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+						background: viewingUnwatched
+							? 'var(--color-accent)'
+							: 'var(--color-bg-elevated)',
 						color: viewingUnwatched ? '#fff' : 'var(--color-text-secondary)',
 						cursor: 'pointer',
 						fontSize: 'var(--font-size-sm)',

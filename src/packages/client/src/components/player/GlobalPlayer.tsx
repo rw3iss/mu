@@ -312,7 +312,7 @@ export function GlobalPlayer() {
 					videoClickTimerRef.current = setTimeout(() => {
 						videoClickTimerRef.current = null;
 						engine.togglePlay();
-					}, 200);
+					}, 250);
 				}
 			};
 			const handleDblClick = (e: MouseEvent) => {
@@ -325,12 +325,22 @@ export function GlobalPlayer() {
 				handleToggleFullscreen();
 			};
 
+			// Scroll wheel to adjust volume (must be non-passive to preventDefault)
+			const handleWheel = (e: WheelEvent) => {
+				if (playerMode.value === 'mini') return;
+				e.preventDefault();
+				const delta = e.deltaY > 0 ? -0.05 : 0.05;
+				setVolume(volume.value + delta);
+			};
+
 			video.addEventListener('click', handleClick);
 			video.addEventListener('dblclick', handleDblClick);
+			wrapper.addEventListener('wheel', handleWheel, { passive: false });
 			return () => {
 				if (videoClickTimerRef.current) clearTimeout(videoClickTimerRef.current);
 				video.removeEventListener('click', handleClick);
 				video.removeEventListener('dblclick', handleDblClick);
+				wrapper.removeEventListener('wheel', handleWheel);
 			};
 		}
 	}, [engine.videoRef.current, isPlayerActive.value, playerMode.value]);
@@ -835,15 +845,6 @@ export function GlobalPlayer() {
 				}
 				onClick={isMini ? maximizePlayer : undefined}
 				onMouseMove={!isMini && !isSplit ? resetControlsTimer : undefined}
-				onWheel={
-					!isMini
-						? (e: WheelEvent) => {
-								e.preventDefault();
-								const delta = e.deltaY > 0 ? -0.05 : 0.05;
-								setVolume(volume.value + delta);
-							}
-						: undefined
-				}
 			>
 				{/* Mini mode overlays */}
 				{isMini && (

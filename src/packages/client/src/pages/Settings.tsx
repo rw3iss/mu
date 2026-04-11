@@ -762,8 +762,8 @@ export function Settings(props: SettingsProps) {
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Watched Threshold</span>
 									<span class={styles.settingDescription}>
-										Mark movies as "watched" after this many seconds of cumulative
-										play time. Range: 4–1800 seconds (30 minutes).
+										Mark movies as "watched" after this many seconds of
+										cumulative play time. Range: 4–1800 seconds (30 minutes).
 									</span>
 								</div>
 								<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -774,12 +774,20 @@ export function Settings(props: SettingsProps) {
 										max={1800}
 										value={watchedThreshold}
 										onInput={(e) => {
-											const val = parseInt((e.target as HTMLInputElement).value, 10);
-											if (!isNaN(val)) setWatchedThreshold(val);
+											const val = parseInt(
+												(e.target as HTMLInputElement).value,
+												10,
+											);
+											if (!Number.isNaN(val)) setWatchedThreshold(val);
 										}}
 										style={{ width: '80px' }}
 									/>
-									<span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+									<span
+										style={{
+											fontSize: 'var(--font-size-sm)',
+											color: 'var(--color-text-secondary)',
+										}}
+									>
 										seconds
 									</span>
 								</div>

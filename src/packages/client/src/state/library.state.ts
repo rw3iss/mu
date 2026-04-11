@@ -117,9 +117,7 @@ export const isLoading = signal(false);
 export const searchQuery = signal('');
 export const viewMode = signal<ViewMode>('grid');
 export const showHidden = signal(false);
-export const hideWatched = signal(
-	localStorage.getItem('mu_hide_watched') === 'true',
-);
+export const hideWatched = signal(localStorage.getItem('mu_hide_watched') === 'true');
 export const watchedCount = signal(0);
 export const localOnly = signal(localStorage.getItem('mu_local_only') === 'true');
 /** Server filter: 'all' | 'local' | serverId */
