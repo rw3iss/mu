@@ -201,12 +201,14 @@ export class MoviesController {
 	@Post(':id/watched')
 	markWatched(@Param('id') movieId: string, @CurrentUser('id') userId: string) {
 		this.historyService.markWatched(userId, movieId);
+		this.moviesService.invalidateListCache();
 		return { success: true };
 	}
 
 	@Delete(':id/watched')
 	markUnwatched(@Param('id') movieId: string, @CurrentUser('id') userId: string) {
 		this.historyService.markUnwatched(userId, movieId);
+		this.moviesService.invalidateListCache();
 		return { success: true };
 	}
 

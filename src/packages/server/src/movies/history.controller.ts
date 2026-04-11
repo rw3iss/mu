@@ -19,6 +19,17 @@ export class HistoryController {
 		);
 	}
 
+	@Get('watched/count')
+	getWatchedCount(@CurrentUser('id') userId: string) {
+		return { count: this.historyService.getWatchedCount(userId) };
+	}
+
+	@Delete('watched')
+	clearWatched(@CurrentUser('id') userId: string) {
+		const cleared = this.historyService.clearWatchedFlags(userId);
+		return { success: true, clearedCount: cleared };
+	}
+
 	@Delete()
 	clearHistory(@CurrentUser('id') userId: string) {
 		this.historyService.clearHistory(userId);

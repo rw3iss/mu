@@ -184,4 +184,23 @@ export class HistoryService {
 			};
 		});
 	}
+
+	getWatchedCount(userId: string): number {
+		const result = this.database.db
+			.select({ count: count() })
+			.from(userWatchHistory)
+			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, true)))
+			.get();
+		return result?.count ?? 0;
+	}
+
+	clearWatchedFlags(userId: string): number {
+		const watchedCount = this.getWatchedCount(userId);
+		this.database.db
+			.update(userWatchHistory)
+			.set({ completed: false })
+			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, true)))
+			.run();
+		return watchedCount;
+	}
 }
