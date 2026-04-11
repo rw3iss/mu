@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { MovieGrid } from '@/components/movie/MovieGrid';
 import { api } from '@/services/api';
+import { moviesService } from '@/services/movies.service';
 import type { Movie } from '@/state/library.state';
 import styles from './Watchlist.module.scss';
 
@@ -11,8 +12,10 @@ interface WatchlistProps {
 export function Watchlist(_props: WatchlistProps) {
 	const [movies, setMovies] = useState<Movie[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [viewingUnwatched, setViewingUnwatched] = useState(false);
 
 	useEffect(() => {
+		if (viewingUnwatched) return;
 		async function load() {
 			setIsLoading(true);
 			try {
@@ -56,7 +59,23 @@ export function Watchlist(_props: WatchlistProps) {
 		}
 
 		load();
-	}, []);
+	}, [viewingUnwatched]);
+
+	useEffect(() => {
+		if (!viewingUnwatched) return;
+		setIsLoading(true);
+		moviesService
+			.list({ hideWatched: 'true', pageSize: '200', sortBy: 'addedAt', sortOrder: 'desc' })
+			.then((response) => {
+				setMovies(response.movies);
+			})
+			.catch((error) => {
+				console.error('Failed to load unwatched movies:', error);
+			})
+			.finally(() => {
+				setIsLoading(false);
+			});
+	}, [viewingUnwatched]);
 
 	return (
 		<div class={styles.watchlist}>
@@ -64,15 +83,34 @@ export function Watchlist(_props: WatchlistProps) {
 				<h1 class={styles.title}>Watchlist</h1>
 				{movies.length > 0 && (
 					<span class={styles.count}>
-						{movies.length} {movies.length === 1 ? 'movie' : 'movies'}
+						{movies.length} {viewingUnwatched ? 'unwatched ' : ''}{movies.length === 1 ? 'movie' : 'movies'}
 					</span>
 				)}
+				<button
+					onClick={() => setViewingUnwatched(!viewingUnwatched)}
+					style={{
+						padding: '4px 12px',
+						borderRadius: 'var(--radius-md)',
+						border: '1px solid var(--color-border)',
+						background: viewingUnwatched ? 'var(--color-accent)' : 'var(--color-bg-elevated)',
+						color: viewingUnwatched ? '#fff' : 'var(--color-text-secondary)',
+						cursor: 'pointer',
+						fontSize: 'var(--font-size-sm)',
+						marginLeft: 'var(--space-md)',
+					}}
+				>
+					{viewingUnwatched ? 'View Watchlist' : 'View Unwatched'}
+				</button>
 			</div>
 
 			<MovieGrid
 				movies={movies}
 				isLoading={isLoading}
-				emptyMessage="Your watchlist is empty. Browse the library and add movies you want to watch."
+				emptyMessage={
+					viewingUnwatched
+						? 'All movies have been watched! Nice.'
+						: 'Your watchlist is empty. Browse the library and add movies you want to watch.'
+				}
 			/>
 		</div>
 	);
