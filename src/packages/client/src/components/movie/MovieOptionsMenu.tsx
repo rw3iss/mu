@@ -79,6 +79,27 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 		[movie, onMovieUpdate],
 	);
 
+	const handleWatchedToggle = useCallback(
+		async (e: Event) => {
+			e.stopPropagation();
+			try {
+				if (movie.watched) {
+					await moviesService.markUnwatched(movie.id);
+					onMovieUpdate?.({ ...movie, watched: false });
+					notifySuccess('Marked as unwatched');
+				} else {
+					await moviesService.markWatched(movie.id);
+					onMovieUpdate?.({ ...movie, watched: true });
+					notifySuccess('Marked as watched');
+				}
+				setOpen(false);
+			} catch {
+				notifyError('Failed to update watched status');
+			}
+		},
+		[movie, onMovieUpdate],
+	);
+
 	const handleRescan = useCallback(
 		async (e: Event) => {
 			e.stopPropagation();
@@ -259,6 +280,10 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 							{movie.hidden ? '\u{1F441}' : '\u{1F6AB}'}
 						</span>
 						{movie.hidden ? 'Unhide from Library' : 'Hide from Library'}
+					</button>
+					<button class={styles.menuItem} onClick={handleWatchedToggle}>
+						<span class={styles.menuIcon}>{movie.watched ? '\u21A9' : '\u2713'}</span>
+						{movie.watched ? 'Mark as Unwatched' : 'Mark as Watched'}
 					</button>
 					{confirmingRemove ? (
 						<div class={styles.confirmRow}>
