@@ -37,7 +37,26 @@ export class MoviesService {
 		private readonly subtitleService: SubtitleService,
 	) {}
 
+	private readonly listCache = new Map<string, { data: any; expires: number }>();
+	private static readonly CACHE_TTL_MS = 60_000; // 60 seconds
+	private static readonly CACHE_MAX_ENTRIES = 100;
+
+	/** Invalidate all cached movie list results. */
+	invalidateListCache(): void {
+		this.listCache.clear();
+	}
+
+	private getCacheKey(query: MovieListQuery, userId?: string): string {
+		return JSON.stringify({ ...query, userId });
+	}
+
 	findAll(query: MovieListQuery, userId?: string) {
+		const cacheKey = this.getCacheKey(query, userId);
+		const cached = this.listCache.get(cacheKey);
+		if (cached && cached.expires > Date.now()) {
+			return cached.data;
+		}
+
 		const { page, pageSize, offset } = paginationDefaults(query);
 
 		const conditions = [];
@@ -195,7 +214,7 @@ export class MoviesService {
 			: null;
 		const watchedCount = watchedCountResult?.count ?? 0;
 
-		return {
+		const result = {
 			movies: data.map((row) => {
 				const position = row.watchCompleted ? 0 : (row.watchPosition ?? 0);
 				return this.applyPosterFallback({
@@ -213,6 +232,15 @@ export class MoviesService {
 			pageSize,
 			totalPages: Math.ceil(total / pageSize),
 		};
+
+		// Evict oldest entries if over max
+		if (this.listCache.size >= MoviesService.CACHE_MAX_ENTRIES) {
+			const firstKey = this.listCache.keys().next().value;
+			if (firstKey) this.listCache.delete(firstKey);
+		}
+		this.listCache.set(cacheKey, { data: result, expires: Date.now() + MoviesService.CACHE_TTL_MS });
+
+		return result;
 	}
 
 	async findById(id: string, userId?: string) {
@@ -486,6 +514,7 @@ export class MoviesService {
 			playSettings: string | null;
 		}>,
 	) {
+		this.invalidateListCache();
 		const existing = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 
 		if (!existing) {
@@ -535,6 +564,7 @@ export class MoviesService {
 	 * Idempotent — returns silently if the movie does not exist.
 	 */
 	async purgeMovie(id: string) {
+		this.invalidateListCache();
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 		if (!movie) return;
 
@@ -560,6 +590,7 @@ export class MoviesService {
 	}
 
 	remove(id: string) {
+		this.invalidateListCache();
 		const existing = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 
 		if (!existing) {
@@ -571,6 +602,7 @@ export class MoviesService {
 	}
 
 	async deleteFromDisk(id: string, deleteEnclosingFolder: boolean): Promise<void> {
+		this.invalidateListCache();
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 
 		if (!movie) {
@@ -648,6 +680,7 @@ export class MoviesService {
 		_userId: string,
 		_extra?: { playlistId?: string },
 	) {
+		this.invalidateListCache();
 		const results = { processed: 0, errors: [] as string[] };
 
 		for (const movieId of movieIds) {
