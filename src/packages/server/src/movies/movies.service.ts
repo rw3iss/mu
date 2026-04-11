@@ -47,6 +47,17 @@ export class MoviesService {
 			conditions.push(sql`(${movies.hidden} IS NULL OR ${movies.hidden} = 0)`);
 		}
 
+		// Filter watched/unwatched movies (requires userId for the join)
+		if (String(query.hideWatched) === 'true' && userId) {
+			conditions.push(
+				sql`(${userWatchHistory.completed} IS NULL OR ${userWatchHistory.completed} = 0)`,
+			);
+		}
+
+		if (String(query.watchedOnly) === 'true' && userId) {
+			conditions.push(sql`${userWatchHistory.completed} = 1`);
+		}
+
 		if (query.search) {
 			conditions.push(like(movies.title, `%${query.search}%`));
 		}
@@ -175,6 +186,15 @@ export class MoviesService {
 			.get();
 		const hiddenCount = hiddenResult?.count ?? 0;
 
+		const watchedCountResult = userId
+			? this.database.db
+					.select({ count: count() })
+					.from(userWatchHistory)
+					.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, true)))
+					.get()
+			: null;
+		const watchedCount = watchedCountResult?.count ?? 0;
+
 		return {
 			movies: data.map((row) => {
 				const position = row.watchCompleted ? 0 : (row.watchPosition ?? 0);
@@ -183,11 +203,12 @@ export class MoviesService {
 					rating: row.rating ?? 0,
 					watchPosition: position,
 					durationSeconds: row.durationSeconds ?? 0,
-					watchCompleted: undefined,
+					watched: row.watchCompleted === true || row.watchCompleted === 1,
 				});
 			}),
 			total,
 			hiddenCount,
+			watchedCount,
 			page,
 			pageSize,
 			totalPages: Math.ceil(total / pageSize),
@@ -218,6 +239,7 @@ export class MoviesService {
 		let userRating = 0;
 		let watchPosition = 0;
 		let durationSeconds = 0;
+		let watched = false;
 		if (userId) {
 			const watchlistEntry = this.database.db
 				.select()
@@ -240,6 +262,7 @@ export class MoviesService {
 				.get();
 			if (historyEntry) {
 				watchPosition = historyEntry.completed ? 0 : (historyEntry.positionSeconds ?? 0);
+				watched = historyEntry.completed === true || historyEntry.completed === 1;
 			}
 		}
 
@@ -337,6 +360,7 @@ export class MoviesService {
 			...this.flattenMovie(movie, metadata, inWatchlist, userRating),
 			status,
 			watchPosition,
+			watched,
 			durationSeconds,
 			fileInfo,
 			playSettings,
