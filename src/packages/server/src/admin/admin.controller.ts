@@ -45,6 +45,32 @@ export class AdminController {
 	}
 
 	/**
+	 * Fix broken thumbnails — movies that have a thumbnail URL in the DB
+	 * but the actual image file is missing on disk.
+	 */
+	@Post('fix-broken-thumbnails')
+	@Roles('admin')
+	async fixBrokenThumbnails() {
+		const brokenIds = this.thumbnailService.getBrokenThumbnailMovieIds();
+		const count = brokenIds.length;
+		this.logger.log(`Found ${count} movies with broken thumbnails, regenerating...`);
+
+		if (count > 0) {
+			this.generateThumbnailsBatch(brokenIds).catch((err) =>
+				this.logger.error(`Broken thumbnail fix failed: ${err.message}`),
+			);
+		}
+
+		return {
+			message:
+				count > 0
+					? `Regenerating ${count} broken thumbnail(s)`
+					: 'No broken thumbnails found',
+			movieCount: count,
+		};
+	}
+
+	/**
 	 * End a specific streaming session.
 	 */
 	@Delete('sessions/:sessionId')

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, statSync, unlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { ConfigService } from '../config/config.service.js';
@@ -105,6 +105,30 @@ export class ThumbnailService {
 			);
 			return null;
 		}
+	}
+
+	/**
+	 * Find movies whose thumbnail_url is set but the actual file is missing on disk.
+	 */
+	getBrokenThumbnailMovieIds(): string[] {
+		const allWithUrl = this.database.db
+			.select({ id: movies.id, thumbnailUrl: movies.thumbnailUrl })
+			.from(movies)
+			.where(sql`${movies.thumbnailUrl} IS NOT NULL AND ${movies.thumbnailUrl} != ''`)
+			.all();
+
+		const broken: string[] = [];
+		for (const m of allWithUrl) {
+			const match = m.thumbnailUrl?.match(/thumbnails\/([^?]+)/);
+			if (match) {
+				const filePath = join(this.thumbnailDir, match[1]!);
+				if (!existsSync(filePath)) broken.push(m.id);
+			} else {
+				// URL doesn't match expected pattern — treat as broken
+				broken.push(m.id);
+			}
+		}
+		return broken;
 	}
 
 	/**

@@ -28,6 +28,8 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
 	const [endingAll, setEndingAll] = useState(false);
 	const [generatingThumbnails, setGeneratingThumbnails] = useState(false);
+	const [fixingThumbnails, setFixingThumbnails] = useState(false);
+	const [showFixThumbnailsConfirm, setShowFixThumbnailsConfirm] = useState(false);
 	const [removingBroken, setRemovingBroken] = useState(false);
 	const [showRemoveBrokenConfirm, setShowRemoveBrokenConfirm] = useState(false);
 	const [clearingWatched, setClearingWatched] = useState(false);
@@ -86,6 +88,24 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 			notifyError('Failed to start thumbnail generation');
 		} finally {
 			setGeneratingThumbnails(false);
+		}
+	}, []);
+
+	const handleFixBrokenThumbnails = useCallback(async () => {
+		setFixingThumbnails(true);
+		try {
+			const result = await api.post<{ movieCount: number; message: string }>(
+				'/admin/fix-broken-thumbnails',
+			);
+			if (result.movieCount > 0) {
+				notifySuccess(`Regenerating ${result.movieCount} broken thumbnail(s)`);
+			} else {
+				notifySuccess('No broken thumbnails found');
+			}
+		} catch {
+			notifyError('Failed to fix broken thumbnails');
+		} finally {
+			setFixingThumbnails(false);
 		}
 	}, []);
 
@@ -226,6 +246,13 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						Fetch Missing Thumbnails
 					</Button>
 					<Button
+						variant="secondary"
+						onClick={() => setShowFixThumbnailsConfirm(true)}
+						loading={fixingThumbnails}
+					>
+						Fix Broken Thumbnails
+					</Button>
+					<Button
 						variant="danger"
 						onClick={() => setShowRemoveBrokenConfirm(true)}
 						loading={removingBroken}
@@ -240,6 +267,15 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						Clear Watched History
 					</Button>
 				</div>
+				<ConfirmDialog
+					isOpen={showFixThumbnailsConfirm}
+					onClose={() => setShowFixThumbnailsConfirm(false)}
+					onConfirm={handleFixBrokenThumbnails}
+					title="Fix Broken Thumbnails"
+					message="This will scan all movies for missing thumbnail files on disk and regenerate them. This may take a while for large libraries."
+					confirmLabel="Fix Thumbnails"
+					variant="primary"
+				/>
 				<ConfirmDialog
 					isOpen={showRemoveBrokenConfirm}
 					onClose={() => setShowRemoveBrokenConfirm(false)}
