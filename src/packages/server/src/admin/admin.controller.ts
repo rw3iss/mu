@@ -5,9 +5,12 @@ import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movies } from '../database/schema/index.js';
+import { JobManagerService } from '../jobs/job-manager.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { MoviesService } from '../movies/movies.service.js';
 import { StreamService } from '../stream/stream.service.js';
+
+const JOB_TYPE_THUMBNAIL = 'thumbnail';
 
 @Controller('admin')
 export class AdminController {
@@ -17,8 +20,9 @@ export class AdminController {
 		private readonly database: DatabaseService,
 		private readonly streamService: StreamService,
 		private readonly thumbnailService: ThumbnailService,
-		private readonly guidResolver: GuidResolverService,
+		readonly _guidResolver: GuidResolverService,
 		private readonly moviesService: MoviesService,
+		private readonly jobManager: JobManagerService,
 	) {}
 
 	/**
@@ -28,43 +32,59 @@ export class AdminController {
 	@Roles('admin')
 	async generateMissingThumbnails() {
 		const moviesWithoutThumbnails = this.database.db
-			.select({ id: movies.id })
+			.select({ id: movies.id, title: movies.title })
 			.from(movies)
 			.where(isNull(movies.thumbnailUrl))
 			.all();
 
 		const count = moviesWithoutThumbnails.length;
-		this.logger.log(`Starting thumbnail generation for ${count} movies`);
+		this.logger.log(`Enqueuing thumbnail generation for ${count} movies`);
 
-		// Run in background so the request returns immediately
-		this.generateThumbnailsBatch(moviesWithoutThumbnails.map((m) => m.id)).catch((err) =>
-			this.logger.error(`Thumbnail batch failed: ${err.message}`),
-		);
+		for (const m of moviesWithoutThumbnails) {
+			this.jobManager.enqueue({
+				type: JOB_TYPE_THUMBNAIL,
+				label: `Generate thumbnail: ${m.title ?? m.id.slice(0, 8)}`,
+				payload: { movieId: m.id },
+				priority: 40,
+			});
+		}
 
 		return { message: 'Thumbnail generation started', movieCount: count };
 	}
 
 	/**
 	 * Fix broken thumbnails — movies that have a thumbnail URL in the DB
-	 * but the actual image file is missing on disk.
+	 * but the actual image file is missing on disk. Enqueues each as a job.
 	 */
 	@Post('fix-broken-thumbnails')
 	@Roles('admin')
 	async fixBrokenThumbnails() {
 		const brokenIds = this.thumbnailService.getBrokenThumbnailMovieIds();
 		const count = brokenIds.length;
-		this.logger.log(`Found ${count} movies with broken thumbnails, regenerating...`);
+		this.logger.log(`Found ${count} movies with broken thumbnails, enqueuing jobs...`);
 
 		if (count > 0) {
-			this.generateThumbnailsBatch(brokenIds).catch((err) =>
-				this.logger.error(`Broken thumbnail fix failed: ${err.message}`),
-			);
+			// Look up titles for better job labels
+			const movieRows = this.database.db
+				.select({ id: movies.id, title: movies.title })
+				.from(movies)
+				.all();
+			const titleMap = new Map(movieRows.map((m) => [m.id, m.title]));
+
+			for (const id of brokenIds) {
+				this.jobManager.enqueue({
+					type: JOB_TYPE_THUMBNAIL,
+					label: `Fix thumbnail: ${titleMap.get(id) ?? id.slice(0, 8)}`,
+					payload: { movieId: id },
+					priority: 35,
+				});
+			}
 		}
 
 		return {
 			message:
 				count > 0
-					? `Regenerating ${count} broken thumbnail(s)`
+					? `Enqueued ${count} thumbnail regeneration job(s)`
 					: 'No broken thumbnails found',
 			movieCount: count,
 		};
@@ -153,30 +173,5 @@ export class AdminController {
 			}
 		}
 		this.logger.log(`Broken movie cleanup complete: ${purged}/${brokenMovies.length} purged`);
-	}
-
-	private async generateThumbnailsBatch(movieIds: string[]) {
-		let generated = 0;
-		let failed = 0;
-
-		for (const movieId of movieIds) {
-			try {
-				const result = await this.thumbnailService.generateForMovie(movieId);
-				if (result) {
-					generated++;
-				} else {
-					failed++;
-				}
-			} catch (err: any) {
-				failed++;
-				this.logger.warn(
-					`Thumbnail failed for movie ${this.guidResolver.resolve(movieId)}: ${err.message}`,
-				);
-			}
-		}
-
-		this.logger.log(
-			`Thumbnail batch complete: ${generated} generated, ${failed} failed out of ${movieIds.length}`,
-		);
 	}
 }
