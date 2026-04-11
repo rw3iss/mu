@@ -302,6 +302,16 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									<span class={styles.ratingValue}>{movie.metacriticRating}</span>
 								</div>
 							)}
+							{movie.imdbVotes != null && movie.imdbVotes > 0 && (
+								<span class={styles.votesLabel} title="IMDb votes">
+									{movie.imdbVotes >= 1000000
+										? `${(movie.imdbVotes / 1000000).toFixed(1)}M`
+										: movie.imdbVotes >= 1000
+											? `${(movie.imdbVotes / 1000).toFixed(1)}K`
+											: String(movie.imdbVotes)}{' '}
+									votes
+								</span>
+							)}
 						</div>
 
 						{movie.overview && (

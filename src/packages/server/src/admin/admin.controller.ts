@@ -1,10 +1,12 @@
+import { existsSync } from 'node:fs';
 import { Controller, Delete, Logger, Param, Post } from '@nestjs/common';
-import { isNull } from 'drizzle-orm';
+import { eq, isNull } from 'drizzle-orm';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { movies } from '../database/schema/index.js';
+import { movieFiles, movies } from '../database/schema/index.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
+import { MoviesService } from '../movies/movies.service.js';
 import { StreamService } from '../stream/stream.service.js';
 
 @Controller('admin')
@@ -16,6 +18,7 @@ export class AdminController {
 		private readonly streamService: StreamService,
 		private readonly thumbnailService: ThumbnailService,
 		private readonly guidResolver: GuidResolverService,
+		private readonly moviesService: MoviesService,
 	) {}
 
 	/**
@@ -59,6 +62,71 @@ export class AdminController {
 	async endAllSessions() {
 		const ended = await this.streamService.endAllSessions();
 		return { success: true, endedCount: ended };
+	}
+
+	/**
+	 * Remove movies whose files no longer exist on disk.
+	 * Movies with zero file records are also removed.
+	 */
+	@Post('remove-broken-movies')
+	@Roles('admin')
+	async removeBrokenMovies() {
+		const allMovies = this.database.db
+			.select({ id: movies.id, title: movies.title })
+			.from(movies)
+			.all();
+
+		const broken: { id: string; title: string }[] = [];
+
+		for (const movie of allMovies) {
+			const files = this.database.db
+				.select({ id: movieFiles.id, filePath: movieFiles.filePath })
+				.from(movieFiles)
+				.where(eq(movieFiles.movieId, movie.id))
+				.all();
+
+			// No files at all → broken
+			if (files.length === 0) {
+				broken.push(movie);
+				continue;
+			}
+
+			// All files missing from disk → broken
+			const anyExists = files.some((f) => existsSync(f.filePath));
+			if (!anyExists) {
+				broken.push(movie);
+			}
+		}
+
+		this.logger.log(`Found ${broken.length} broken movie(s) out of ${allMovies.length} total`);
+
+		// Purge in background so the request returns quickly
+		this.purgeBrokenBatch(broken).catch((err) =>
+			this.logger.error(`Broken movie cleanup failed: ${err.message}`),
+		);
+
+		return {
+			message:
+				broken.length > 0
+					? `Removing ${broken.length} broken movie(s)`
+					: 'No broken movies found',
+			removedCount: broken.length,
+			removed: broken.map((m) => ({ id: m.id, title: m.title })),
+		};
+	}
+
+	private async purgeBrokenBatch(brokenMovies: { id: string; title: string }[]) {
+		let purged = 0;
+		for (const movie of brokenMovies) {
+			try {
+				await this.moviesService.purgeMovie(movie.id);
+				purged++;
+				this.logger.log(`Purged broken movie: ${movie.title}`);
+			} catch (err: any) {
+				this.logger.warn(`Failed to purge ${movie.title}: ${err.message}`);
+			}
+		}
+		this.logger.log(`Broken movie cleanup complete: ${purged}/${brokenMovies.length} purged`);
 	}
 
 	private async generateThumbnailsBatch(movieIds: string[]) {

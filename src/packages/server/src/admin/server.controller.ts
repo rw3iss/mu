@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { nowISO } from '@mu/shared';
-import { Body, Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
 import { desc, eq, sql } from 'drizzle-orm';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { DatabaseService } from '../database/database.service.js';

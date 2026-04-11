@@ -170,35 +170,32 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 									<span class={styles.trackMeta}>
 										{new Date(v.completedAt).toLocaleDateString()}
 									</span>
-									{isAdmin && (
-										<>
-											{confirmDelete === v.quality ? (
-												<span style={{ display: 'flex', gap: '4px' }}>
-													<button
-														class={styles.trackDeleteBtn}
-														style={{ color: 'var(--color-error)' }}
-														disabled={deleting}
-														onClick={() => handleDeleteCache(v.quality)}
-													>
-														{deleting ? '...' : 'Confirm'}
-													</button>
-													<button
-														class={styles.trackDeleteBtn}
-														onClick={() => setConfirmDelete(null)}
-													>
-														Cancel
-													</button>
-												</span>
-											) : (
+									{isAdmin &&
+										(confirmDelete === v.quality ? (
+											<span style={{ display: 'flex', gap: '4px' }}>
 												<button
 													class={styles.trackDeleteBtn}
-													onClick={() => setConfirmDelete(v.quality)}
+													style={{ color: 'var(--color-error)' }}
+													disabled={deleting}
+													onClick={() => handleDeleteCache(v.quality)}
 												>
-													Delete
+													{deleting ? '...' : 'Confirm'}
 												</button>
-											)}
-										</>
-									)}
+												<button
+													class={styles.trackDeleteBtn}
+													onClick={() => setConfirmDelete(null)}
+												>
+													Cancel
+												</button>
+											</span>
+										) : (
+											<button
+												class={styles.trackDeleteBtn}
+												onClick={() => setConfirmDelete(v.quality)}
+											>
+												Delete
+											</button>
+										))}
 								</div>
 							),
 						)}

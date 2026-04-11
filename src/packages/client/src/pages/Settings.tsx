@@ -116,7 +116,7 @@ interface ServerStats {
 	};
 }
 
-function formatBytes(bytes: number): string {
+function _formatBytes(bytes: number): string {
 	const gb = bytes / (1024 * 1024 * 1024);
 	if (gb >= 1000) {
 		return `${(gb / 1024).toFixed(1)} TB`;
@@ -124,7 +124,7 @@ function formatBytes(bytes: number): string {
 	return `${gb.toFixed(1)} GB`;
 }
 
-function formatUptime(seconds: number): string {
+function _formatUptime(seconds: number): string {
 	const d = Math.floor(seconds / 86400);
 	const h = Math.floor((seconds % 86400) / 3600);
 	const m = Math.floor((seconds % 3600) / 60);
@@ -135,7 +135,7 @@ function formatUptime(seconds: number): string {
 	return parts.join(' ');
 }
 
-function meterColor(ratio: number): string {
+function _meterColor(ratio: number): string {
 	if (ratio < 0.6) return 'var(--color-accent, #4caf50)';
 	if (ratio < 0.85) return '#ff9800';
 	return '#f44336';
@@ -607,7 +607,7 @@ export function Settings(props: SettingsProps) {
 	const nextScanText = autoScanEnabled ? formatNextScan(nextScanAt) : null;
 
 	// Server stats polling
-	const [serverStats, setServerStats] = useState<ServerStats | null>(null);
+	const [_serverStats, setServerStats] = useState<ServerStats | null>(null);
 	const statsTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	useEffect(() => {

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import type { ActiveSession } from '@/services/stream.service';
 import { streamService } from '@/services/stream.service';
+import { fetchMovies } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './AdminDashboard.module.scss';
 
@@ -26,6 +28,8 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
 	const [endingAll, setEndingAll] = useState(false);
 	const [generatingThumbnails, setGeneratingThumbnails] = useState(false);
+	const [removingBroken, setRemovingBroken] = useState(false);
+	const [showRemoveBrokenConfirm, setShowRemoveBrokenConfirm] = useState(false);
 
 	useEffect(() => {
 		loadData();
@@ -75,6 +79,26 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 			notifyError('Failed to start thumbnail generation');
 		} finally {
 			setGeneratingThumbnails(false);
+		}
+	}, []);
+
+	const handleRemoveBroken = useCallback(async () => {
+		setRemovingBroken(true);
+		try {
+			const result = await api.post<{ removedCount: number; message: string }>(
+				'/admin/remove-broken-movies',
+			);
+			if (result.removedCount > 0) {
+				notifySuccess(`Removed ${result.removedCount} broken movie(s)`);
+				// Refresh library state so the list is up to date
+				fetchMovies(1);
+			} else {
+				notifySuccess('No broken movies found');
+			}
+		} catch {
+			notifyError('Failed to remove broken movies');
+		} finally {
+			setRemovingBroken(false);
 		}
 	}, []);
 
@@ -180,7 +204,23 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					>
 						Fetch Missing Thumbnails
 					</Button>
+					<Button
+						variant="danger"
+						onClick={() => setShowRemoveBrokenConfirm(true)}
+						loading={removingBroken}
+					>
+						Remove Broken Movies
+					</Button>
 				</div>
+				<ConfirmDialog
+					isOpen={showRemoveBrokenConfirm}
+					onClose={() => setShowRemoveBrokenConfirm(false)}
+					onConfirm={handleRemoveBroken}
+					title="Remove Broken Movies"
+					message="This will scan all movies in the library and remove any whose source files are missing from disk. Related metadata, caches, and thumbnails will also be cleaned up. This cannot be undone."
+					confirmLabel="Remove Broken Movies"
+					variant="danger"
+				/>
 			</section>
 
 			{/* Active Sessions */}

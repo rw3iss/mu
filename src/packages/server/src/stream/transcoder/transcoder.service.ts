@@ -1,7 +1,7 @@
 import { ChildProcess, execSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { access, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
@@ -139,7 +139,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				}
 
 				// Check file exists in DB
-				const dbFile = this.database.db
+				const _dbFile = this.database.db
 					.select({ id: transcodeCache.movieFileId })
 					.from(transcodeCache)
 					.where(eq(transcodeCache.movieFileId, fileId))

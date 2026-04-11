@@ -244,3 +244,19 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
 }
+
+.pageSizeSelect {
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  margin-left: var(--space-sm);
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+}

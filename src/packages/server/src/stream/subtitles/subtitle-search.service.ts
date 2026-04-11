@@ -392,7 +392,7 @@ export class SubtitleSearchService {
 	 */
 	private async extractSubtitleFromZip(
 		zipData: Buffer,
-		sourceId: string,
+		_sourceId: string,
 	): Promise<{ data: Buffer; fileName: string; format: string }> {
 		// Simple zip extraction — find the first .srt/.vtt/.ass file
 		// ZIP local file header signature: PK\x03\x04

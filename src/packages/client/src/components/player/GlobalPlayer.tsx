@@ -26,10 +26,8 @@ import {
 	startGlobalStream,
 } from '@/state/globalPlayer.state';
 import {
-	audioTrack,
 	currentSession,
 	currentTime,
-	duration,
 	initPlayerSettings,
 	isBuffering,
 	isFullscreen,
@@ -176,7 +174,7 @@ export function GlobalPlayer() {
 		if (!isPlayerActive.value || !globalMovieId.value) return;
 
 		// Helper: after playback is initialized (paused), restore the saved play state.
-		const restorePlayState = (isDirectPlay: boolean) => {
+		const _restorePlayState = (isDirectPlay: boolean) => {
 			// restoredAutoplay: true/false = restoring from refresh, null = user clicked play
 			const isRestore = restoredAutoplay.value !== null;
 			const shouldPlay = restoredAutoplay.value ?? true;

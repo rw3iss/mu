@@ -335,7 +335,7 @@ export class TranscodeDebuggerService implements OnModuleInit {
 		try {
 			const dir = path.dirname(this.logPath);
 			await mkdir(dir, { recursive: true });
-			await appendFile(this.logPath, message + '\n');
+			await appendFile(this.logPath, `${message}\n`);
 		} catch (err) {
 			this.logger.warn(`Failed to write transcode debug log: ${err}`);
 		}

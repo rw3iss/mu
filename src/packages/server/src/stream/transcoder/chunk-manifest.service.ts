@@ -38,7 +38,7 @@ export class ChunkManifestService {
 		}
 
 		lines.push('#EXT-X-ENDLIST');
-		return lines.join('\n') + '\n';
+		return `${lines.join('\n')}\n`;
 	}
 
 	/**
@@ -61,7 +61,7 @@ export class ChunkManifestService {
 
 		lines.push('#EXT-X-ENDLIST');
 
-		const manifest = lines.join('\n') + '\n';
+		const manifest = `${lines.join('\n')}\n`;
 		await writeFile(path.join(cacheDir, 'stream.m3u8'), manifest);
 		this.logger.log(
 			`Final manifest written for ${this.guidResolver.resolve(chunkMap.movieFileId)}/${chunkMap.quality}`,

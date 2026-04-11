@@ -204,7 +204,7 @@ export class RemoteController {
 		if (!trackMatch) {
 			return reply.status(404).send({ message: 'Invalid subtitle track path' });
 		}
-		const trackIndex = trackMatch[1];
+		const _trackIndex = trackMatch[1];
 
 		// Try multiple endpoints — the session may be a session ID or a file ID.
 		// The shared subtitle endpoint uses file ID and sharing auth.

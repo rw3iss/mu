@@ -271,7 +271,7 @@ export class RemoteService {
 		const authToken = server.password
 			? createHash('sha256').update(server.password).digest('hex')
 			: '';
-		const tokenParam = authToken ? `?token=${authToken}` : '';
+		const _tokenParam = authToken ? `?token=${authToken}` : '';
 
 		const isDirectPlay = session.directPlay === true;
 		let streamUrl: string;

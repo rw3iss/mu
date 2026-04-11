@@ -1,8 +1,8 @@
 import { execSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { count, sql } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -12,10 +12,8 @@ import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 
 @Injectable()
 export class ServerService {
-	private readonly logger = new Logger('ServerService');
-
 	constructor(
-		private readonly config: ConfigService,
+		readonly _config: ConfigService,
 		private readonly settings: SettingsService,
 		private readonly database: DatabaseService,
 		private readonly transcoder: TranscoderService,

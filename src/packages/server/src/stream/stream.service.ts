@@ -19,7 +19,6 @@ import {
 	movieFiles,
 	movies,
 	streamSessions,
-	transcodeCache,
 	users,
 	userWatchHistory,
 } from '../database/schema/index.js';
@@ -514,7 +513,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 								},
 								outputDir,
 							);
-						} catch (e2: any) {
+						} catch (_e2: any) {
 							this.chunkManager.resumeBackground();
 							throw new BadRequestException('Unable to play this file.');
 						}
@@ -672,7 +671,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		this.transcoderService.stopTranscode(sessionId);
 
 		// Clean up ephemeral session dir (not persistent cache)
-		const sessionDir = this.transcoderService.getSessionDir(sessionId);
+		const _sessionDir = this.transcoderService.getSessionDir(sessionId);
 		const currentDir = this.sessionDirs.get(sessionId);
 		const persistDir = this.transcoderService.getPersistentDir(movieFile.id, quality);
 

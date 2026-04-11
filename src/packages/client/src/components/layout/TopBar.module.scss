@@ -13,6 +13,10 @@
   z-index: var(--z-sticky);
   transition: left var(--transition-normal);
 
+  &.collapsed {
+    left: var(--sidebar-collapsed-width);
+  }
+
   @include mobile {
     left: 0;
     padding: 0 var(--space-md);

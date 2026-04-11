@@ -111,7 +111,7 @@ export const movies = signal<Movie[]>([]);
 export const totalMovies = signal(0);
 export const hiddenCount = signal(0);
 export const currentPage = signal(1);
-export const pageSize = signal(40);
+export const pageSize = signal(parseInt(localStorage.getItem('mu_page_size') || '40', 10) || 40);
 export const isLoading = signal(false);
 export const searchQuery = signal('');
 export const viewMode = signal<ViewMode>('grid');
@@ -258,6 +258,33 @@ export async function initRemoteServers(): Promise<void> {
 	} catch {
 		// Remote servers not available
 	}
+}
+
+export function setPageSize(size: number): void {
+	pageSize.value = size;
+	localStorage.setItem('mu_page_size', String(size));
+	fetchMovies(1);
+}
+
+/** Save the current library scroll position so we can restore it on back-nav. */
+export function saveLibraryScroll(): void {
+	try {
+		sessionStorage.setItem(
+			'mu_library_scroll',
+			JSON.stringify({ page: currentPage.value, scrollY: window.scrollY }),
+		);
+	} catch {}
+}
+
+/** Restore saved scroll position (returns the saved page, or null). */
+export function restoreLibraryScroll(): { page: number; scrollY: number } | null {
+	try {
+		const raw = sessionStorage.getItem('mu_library_scroll');
+		if (!raw) return null;
+		const saved = JSON.parse(raw);
+		if (saved && typeof saved.page === 'number') return saved;
+	} catch {}
+	return null;
 }
 
 export function initSortPrefs(): void {

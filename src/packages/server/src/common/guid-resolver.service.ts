@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles } from '../database/schema/movie-files.js';
@@ -15,7 +15,6 @@ const CACHE_TTL_MS = 30 * 60 * 1000;
 
 @Injectable()
 export class GuidResolverService {
-	private readonly logger = new Logger(GuidResolverService.name);
 	private readonly cache = new Map<string, CacheEntry>();
 	private readonly customResolvers = new Map<string, (guid: string) => Promise<string | null>>();
 

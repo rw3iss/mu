@@ -407,7 +407,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				let transcodingRecoveries = 0;
 				let mediaRecoveries = 0;
 				let fullReloads = 0;
-				let lastSuccessTime = Date.now();
+				let _lastSuccessTime = Date.now();
 				recoveryTimerRef.current = null;
 
 				// Reset recovery counters on successful fragment load
@@ -415,7 +415,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 					networkRecoveries = 0;
 					transcodingRecoveries = 0;
 					fullReloads = 0;
-					lastSuccessTime = Date.now();
+					_lastSuccessTime = Date.now();
 					if (hlsStatus) setHlsStatus(null);
 				});
 

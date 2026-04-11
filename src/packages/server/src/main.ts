@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import http from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
+import http from 'node:http';
 import { join, resolve } from 'node:path';
 import fastifyCookie from '@fastify/cookie';
 import fastifyCors from '@fastify/cors';
@@ -50,7 +50,10 @@ for (const envPath of [
  * Try to load TLS cert/key from well-known paths.
  * Priority: config tls.certPath/tls.keyPath > Let's Encrypt live dir.
  */
-function loadTlsCredentials(config: ConfigService, logger: Logger): { cert: Buffer; key: Buffer } | null {
+function loadTlsCredentials(
+	config: ConfigService,
+	logger: Logger,
+): { cert: Buffer; key: Buffer } | null {
 	const certPath = config.get<string | undefined>('tls.certPath');
 	const keyPath = config.get<string | undefined>('tls.keyPath');
 
@@ -62,12 +65,16 @@ function loadTlsCredentials(config: ConfigService, logger: Logger): { cert: Buff
 			logger.log(`TLS: using certs from config (${certPath})`);
 			return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
 		}
-		logger.warn(`TLS: config has certPath/keyPath but files not found (cert=${certExists}, key=${keyExists}): ${certPath}`);
+		logger.warn(
+			`TLS: config has certPath/keyPath but files not found (cert=${certExists}, key=${keyExists}): ${certPath}`,
+		);
 	}
 
 	// Auto-detect Let's Encrypt on the current host
 	const hostname = config.get<string>('tls.hostname', '');
-	logger.log(`TLS: hostname=${hostname || '(not set)'}, certPath=${certPath || '(not set)'}, keyPath=${keyPath || '(not set)'}`);
+	logger.log(
+		`TLS: hostname=${hostname || '(not set)'}, certPath=${certPath || '(not set)'}, keyPath=${keyPath || '(not set)'}`,
+	);
 	const searchDirs = hostname
 		? [
 				// Windows certbot

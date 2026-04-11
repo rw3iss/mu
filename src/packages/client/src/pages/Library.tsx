@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { MovieGrid } from '@/components/movie/MovieGrid';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -19,11 +19,15 @@ import {
 	initViewMode,
 	isLoading,
 	movies,
+	pageSize,
 	remoteServerList,
+	restoreLibraryScroll,
+	saveLibraryScroll,
 	searchMovies,
 	searchQuery,
 	serverFilter,
 	setFilters,
+	setPageSize,
 	setServerFilter,
 	setViewMode,
 	showHidden,
@@ -33,6 +37,27 @@ import {
 	viewMode,
 } from '@/state/library.state';
 import styles from './Library.module.scss';
+
+const PAGE_SIZE_OPTIONS = [20, 40, 60, 80, 100];
+
+/** Update URL query params without triggering a full navigation. */
+function syncUrlParams(page: number, size: number) {
+	const url = new URL(window.location.href);
+	if (page > 1) url.searchParams.set('page', String(page));
+	else url.searchParams.delete('page');
+	if (size !== 40) url.searchParams.set('pageSize', String(size));
+	else url.searchParams.delete('pageSize');
+	window.history.replaceState(null, '', url.toString());
+}
+
+/** Read page/pageSize from URL query params. */
+function readUrlParams(): { page: number; size: number } | null {
+	const url = new URL(window.location.href);
+	const p = parseInt(url.searchParams.get('page') || '', 10);
+	const s = parseInt(url.searchParams.get('pageSize') || '', 10);
+	if (p > 0 || s > 0) return { page: p > 0 ? p : 1, size: s > 0 ? s : pageSize.value };
+	return null;
+}
 
 interface LibraryProps {
 	path?: string;
@@ -44,17 +69,47 @@ export function Library(_props: LibraryProps) {
 	const [showFilters, setShowFilters] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
 	const debouncedSearch = useDebounce(localSearch, 300);
+	const pendingScrollRef = useRef<number | null>(null);
 
 	useEffect(() => {
 		initViewMode();
 		initSortPrefs();
 		initRemoteServers();
-		fetchMovies(1);
+
+		// Determine which page to load: URL params > scroll restore > page 1
+		const urlParams = readUrlParams();
+		const scrollRestore = restoreLibraryScroll();
+
+		let startPage = 1;
+		if (urlParams) {
+			startPage = urlParams.page;
+			if (urlParams.size !== pageSize.value) {
+				pageSize.value = urlParams.size;
+			}
+		} else if (scrollRestore) {
+			startPage = scrollRestore.page;
+			pendingScrollRef.current = scrollRestore.scrollY;
+		}
+
+		fetchMovies(startPage).then(() => {
+			syncUrlParams(startPage, pageSize.value);
+			// Restore scroll after movies render
+			if (pendingScrollRef.current != null) {
+				requestAnimationFrame(() => {
+					window.scrollTo(0, pendingScrollRef.current!);
+					pendingScrollRef.current = null;
+				});
+			}
+		});
 		loadGenres();
 
 		// Subscribe to live library events so new movies appear automatically
 		libraryEvents.start();
-		return () => libraryEvents.stop();
+		return () => {
+			libraryEvents.stop();
+			// Save scroll position on unmount (e.g., navigating to a movie detail page)
+			saveLibraryScroll();
+		};
 	}, []);
 
 	useEffect(() => {
@@ -87,7 +142,14 @@ export function Library(_props: LibraryProps) {
 	}, []);
 
 	const handlePageChange = useCallback((page: number) => {
-		fetchMovies(page);
+		fetchMovies(page).then(() => syncUrlParams(page, pageSize.value));
+		window.scrollTo({ top: 0, behavior: 'smooth' });
+	}, []);
+
+	const handlePageSizeChange = useCallback((e: Event) => {
+		const size = parseInt((e.target as HTMLSelectElement).value, 10);
+		setPageSize(size);
+		syncUrlParams(1, size);
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}, []);
 
@@ -277,6 +339,18 @@ export function Library(_props: LibraryProps) {
 					>
 						Next
 					</Button>
+					<select
+						class={styles.pageSizeSelect}
+						value={pageSize.value}
+						onChange={handlePageSizeChange}
+						title="Movies per page"
+					>
+						{PAGE_SIZE_OPTIONS.map((n) => (
+							<option key={n} value={n}>
+								{n} per page
+							</option>
+						))}
+					</select>
 				</div>
 			)}
 			<PluginSlot name={UI.LIBRARY_BOTTOM} context={{}} />

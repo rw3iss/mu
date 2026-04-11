@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';

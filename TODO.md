@@ -1,7 +1,4 @@
 
-Names: viro? mu?
-INFO: ssh rw3iss@192.168.50.211
-
 Seek thumbnails on hover... option in settings.
 
 - Settings : Appearance:

@@ -1,7 +1,6 @@
 import { computed, effect, signal } from '@preact/signals';
 import { audioEngine } from '@/audio/audio-engine';
 import { moviesService } from '@/services/movies.service';
-import { streamService } from '@/services/stream.service';
 import {
 	closeEffectsPanel,
 	fetchProfiles,

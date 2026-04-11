@@ -57,7 +57,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		private readonly transcoderService: TranscoderService,
 		private readonly streamService: StreamService,
 		private readonly database: DatabaseService,
-		private readonly chunkManager: ChunkManagerService,
+		readonly _chunkManager: ChunkManagerService,
 		private readonly guidResolver: GuidResolverService,
 		private readonly subtitleService: SubtitleService,
 	) {}
@@ -521,7 +521,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		if (!persistEnabled) return [];
 
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
-		const defaultQuality = enc?.quality || '1080p';
+		const _defaultQuality = enc?.quality || '1080p';
 
 		const allFiles = this.database.db
 			.select({ file: movieFiles })
