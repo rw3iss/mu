@@ -62,6 +62,44 @@ function readUrlParams(): { page: number; size: number } | null {
 	return null;
 }
 
+/**
+ * Build a window of page numbers around the current page, with ellipsis gaps.
+ * Shows at most `maxButtons` page numbers plus up to 2 ellipsis indicators.
+ */
+function getPageNumbers(current: number, total: number, maxButtons = 10): (number | '...')[] {
+	if (total <= maxButtons) {
+		return Array.from({ length: total }, (_, i) => i + 1);
+	}
+
+	const pages: (number | '...')[] = [];
+	// Always show first page
+	pages.push(1);
+
+	// Calculate the window around current page
+	const sideCount = Math.floor((maxButtons - 2) / 2); // pages on each side of current
+	let start = Math.max(2, current - sideCount);
+	let end = Math.min(total - 1, current + sideCount);
+
+	// Adjust if window is too small on one side
+	const windowSize = end - start + 1;
+	const targetSize = maxButtons - 2; // minus first and last
+	if (windowSize < targetSize) {
+		if (start === 2) {
+			end = Math.min(total - 1, start + targetSize - 1);
+		} else {
+			start = Math.max(2, end - targetSize + 1);
+		}
+	}
+
+	if (start > 2) pages.push('...');
+	for (let i = start; i <= end; i++) pages.push(i);
+	if (end < total - 1) pages.push('...');
+
+	// Always show last page
+	pages.push(total);
+	return pages;
+}
+
 interface LibraryProps {
 	path?: string;
 }
@@ -340,25 +378,62 @@ export function Library(_props: LibraryProps) {
 			{/* Pagination */}
 			{totalPages.value > 1 && (
 				<div class={styles.pagination}>
-					<Button
-						variant="secondary"
-						size="sm"
+					{/* First / Prev */}
+					<button
+						class={styles.pageBtn}
+						disabled={currentPage.value <= 1}
+						onClick={() => handlePageChange(1)}
+						title="First page"
+					>
+						&#x00AB;
+					</button>
+					<button
+						class={styles.pageBtn}
 						disabled={currentPage.value <= 1}
 						onClick={() => handlePageChange(currentPage.value - 1)}
+						title="Previous page"
 					>
-						Previous
-					</Button>
+						&#x2039;
+					</button>
+
+					{/* Page number buttons */}
+					{getPageNumbers(currentPage.value, totalPages.value).map((p) =>
+						p === '...' ? (
+							<span class={styles.pageEllipsis} key={`e${Math.random()}`}>
+								...
+							</span>
+						) : (
+							<button
+								key={p}
+								class={`${styles.pageBtn} ${p === currentPage.value ? styles.active : ''}`}
+								onClick={() => handlePageChange(p as number)}
+							>
+								{p}
+							</button>
+						),
+					)}
+
+					{/* Next / Last */}
+					<button
+						class={styles.pageBtn}
+						disabled={currentPage.value >= totalPages.value}
+						onClick={() => handlePageChange(currentPage.value + 1)}
+						title="Next page"
+					>
+						&#x203A;
+					</button>
+					<button
+						class={styles.pageBtn}
+						disabled={currentPage.value >= totalPages.value}
+						onClick={() => handlePageChange(totalPages.value)}
+						title="Last page"
+					>
+						&#x00BB;
+					</button>
+
 					<span class={styles.pageInfo}>
 						Page {currentPage.value} of {totalPages.value}
 					</span>
-					<Button
-						variant="secondary"
-						size="sm"
-						disabled={currentPage.value >= totalPages.value}
-						onClick={() => handlePageChange(currentPage.value + 1)}
-					>
-						Next
-					</Button>
 					<select
 						class={styles.pageSizeSelect}
 						value={pageSize.value}
