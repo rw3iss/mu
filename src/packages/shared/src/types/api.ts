@@ -29,6 +29,8 @@ export interface MovieListQuery extends PaginationQuery {
 	ratingTo?: number;
 	resolution?: string;
 	watched?: boolean;
+	hideWatched?: boolean;
+	watchedOnly?: boolean;
 	hasSubtitles?: boolean;
 	showHidden?: boolean;
 	/** Filter by media server: 'local', 'all', or a specific remote server ID */
