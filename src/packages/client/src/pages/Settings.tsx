@@ -307,6 +307,9 @@ export function Settings(props: SettingsProps) {
 	// Rating settings
 	const [showExternalRatings, setShowExternalRatings] = useState(true);
 
+	// Watch tracking settings
+	const [watchedThreshold, setWatchedThreshold] = useState(30);
+
 	// Notification settings
 	const [notifyScanResults, setNotifyScanResults] = useState(true);
 	const [notifyPlaylist, setNotifyPlaylist] = useState(true);
@@ -432,6 +435,13 @@ export function Settings(props: SettingsProps) {
 					if (typeof rating.showExternalRatings === 'boolean')
 						setShowExternalRatings(rating.showExternalRatings);
 				}
+
+				// Load watched threshold
+				api.get<{ value: number }>('/settings/watchedThresholdSeconds')
+					.then((res) => {
+						if (res?.value) setWatchedThreshold(res.value);
+					})
+					.catch(() => {});
 			} catch {
 				// Settings may not exist yet — use defaults
 			} finally {
@@ -562,13 +572,16 @@ export function Settings(props: SettingsProps) {
 			await api.put('/settings/rating', {
 				value: { showExternalRatings },
 			});
-			notifySuccess('Rating settings saved');
+			await api.put('/settings/watchedThresholdSeconds', {
+				value: Math.max(4, Math.min(1800, watchedThreshold)),
+			});
+			notifySuccess('General settings saved');
 		} catch {
 			notifyError('Failed to save settings');
 		} finally {
 			setIsSaving(false);
 		}
-	}, [showExternalRatings]);
+	}, [showExternalRatings, watchedThreshold]);
 
 	// Scan state
 	const [isScanning, setIsScanning] = useState(false);
@@ -742,6 +755,35 @@ export function Settings(props: SettingsProps) {
 
 							{/* Overlay Hide Timeout */}
 							<OverlayTimeoutSetting />
+
+							<h3 class={styles.sectionTitle}>Watch Tracking</h3>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Watched Threshold</span>
+									<span class={styles.settingDescription}>
+										Mark movies as "watched" after this many seconds of cumulative
+										play time. Range: 4–1800 seconds (30 minutes).
+									</span>
+								</div>
+								<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+									<input
+										type="number"
+										class={styles.select}
+										min={4}
+										max={1800}
+										value={watchedThreshold}
+										onInput={(e) => {
+											const val = parseInt((e.target as HTMLInputElement).value, 10);
+											if (!isNaN(val)) setWatchedThreshold(val);
+										}}
+										style={{ width: '80px' }}
+									/>
+									<span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+										seconds
+									</span>
+								</div>
+							</div>
 
 							<div class={styles.actions}>
 								<Button
