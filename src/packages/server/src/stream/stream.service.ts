@@ -120,6 +120,11 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	private readonly sessionDirs = new Map<string, string>();
 	/** Track movieFileId and quality per session for chunk manager lookups */
 	private readonly sessionInfo = new Map<string, { movieFileId: string; quality: string }>();
+	/** Track last progress position/time per session for cumulative watch time calculation */
+	private readonly sessionProgress = new Map<
+		string,
+		{ lastPosition: number; lastTime: number }
+	>();
 
 	/** Interval timer for reaping stale sessions */
 	private reapInterval: ReturnType<typeof setInterval> | null = null;
@@ -179,6 +184,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		let reaped = 0;
 		for (const session of staleSessions) {
 			try {
+				this.sessionProgress.delete(session.id);
 				await this.endStream(session.id);
 				reaped++;
 				this.logger.log(
@@ -738,7 +744,21 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			})
 			.where(eq(streamSessions.id, sessionId));
 
-		// Upsert watch history
+		// Calculate cumulative watch time increment
+		const now = Date.now();
+		const prev = this.sessionProgress.get(sessionId);
+		let increment = 0;
+		if (prev) {
+			const posDelta = positionSeconds - prev.lastPosition;
+			const timeDelta = (now - prev.lastTime) / 1000;
+			// Only count if playing forward at a reasonable speed (not seeking)
+			if (posDelta > 0 && posDelta < timeDelta * 2.5) {
+				increment = Math.round(posDelta);
+			}
+		}
+		this.sessionProgress.set(sessionId, { lastPosition: positionSeconds, lastTime: now });
+
+		// Upsert watch history with cumulative duration tracking
 		const existing = await this.database.db
 			.select()
 			.from(userWatchHistory)
@@ -750,20 +770,29 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			);
 
 		if (existing.length > 0) {
+			const entry = existing[0]!;
+			const newDuration = (entry.durationWatchedSeconds ?? 0) + increment;
+			const threshold = this.settings.get<number>('watchedThresholdSeconds', 30);
+			const shouldComplete = !entry.completed && newDuration >= threshold;
+
 			await this.database.db
 				.update(userWatchHistory)
 				.set({
 					positionSeconds,
+					durationWatchedSeconds: newDuration,
+					...(shouldComplete ? { completed: true } : {}),
 					watchedAt: nowISO(),
 				})
-				.where(eq(userWatchHistory.id, existing[0]!.id));
+				.where(eq(userWatchHistory.id, entry.id));
 		} else {
+			const threshold = this.settings.get<number>('watchedThresholdSeconds', 30);
 			await this.database.db.insert(userWatchHistory).values({
 				id: crypto.randomUUID(),
 				userId: session.userId,
 				movieId: session.movieId,
 				positionSeconds,
-				durationWatchedSeconds: 0,
+				durationWatchedSeconds: increment,
+				completed: increment >= threshold,
 				watchedAt: nowISO(),
 			});
 		}
@@ -791,6 +820,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			}
 			this.sessionDirs.delete(sessionId);
 			this.sessionInfo.delete(sessionId);
+			this.sessionProgress.delete(sessionId);
 			this.sessionRegistry.delete(sessionId);
 		}
 
