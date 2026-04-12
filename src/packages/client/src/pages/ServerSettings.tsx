@@ -408,23 +408,32 @@ function JobsSection() {
 		}
 	}, []);
 
-	const handleBulkCancel = useCallback(async () => {
-		if (selected.size === 0) return;
-		setCancellingBulk(true);
-		try {
-			await Promise.allSettled(
-				[...selected].map((id) => api.post(`/admin/server/jobs/${id}/cancel`)),
-			);
-			setSelected(new Set());
-			const data = await api.get<{ jobs: any[] }>('/admin/server/jobs');
-			setCurrentJobs(data.jobs);
-			notifySuccess(`Cancelled ${selected.size} job(s)`);
-		} catch {
-			notifyError('Failed to cancel some jobs');
-		} finally {
-			setCancellingBulk(false);
-		}
-	}, [selected]);
+	const handleBulkAction = useCallback(
+		async (action: 'cancel' | 'pause' | 'prioritize') => {
+			if (selected.size === 0) return;
+			setCancellingBulk(true);
+			try {
+				await Promise.allSettled(
+					[...selected].map((id) => api.post(`/admin/server/jobs/${id}/${action}`)),
+				);
+				const count = selected.size;
+				setSelected(new Set());
+				const data = await api.get<{ jobs: any[] }>('/admin/server/jobs');
+				setCurrentJobs(data.jobs);
+				const labels: Record<string, string> = {
+					cancel: 'Cancelled',
+					pause: 'Paused',
+					prioritize: 'Prioritized',
+				};
+				notifySuccess(`${labels[action]} ${count} job(s)`);
+			} catch {
+				notifyError(`Failed to ${action} some jobs`);
+			} finally {
+				setCancellingBulk(false);
+			}
+		},
+		[selected],
+	);
 
 	const statusColors: Record<string, string> = {
 		running: '#22c55e',
@@ -470,12 +479,28 @@ function JobsSection() {
 						<div class={styles.bulkActions}>
 							<span class={styles.bulkCount}>{selected.size} selected</span>
 							<Button
-								variant="danger"
+								variant="secondary"
 								size="sm"
-								onClick={handleBulkCancel}
+								onClick={() => handleBulkAction('prioritize')}
 								loading={cancellingBulk}
 							>
-								Cancel Selected
+								Prioritize
+							</Button>
+							<Button
+								variant="secondary"
+								size="sm"
+								onClick={() => handleBulkAction('pause')}
+								loading={cancellingBulk}
+							>
+								Pause
+							</Button>
+							<Button
+								variant="danger"
+								size="sm"
+								onClick={() => handleBulkAction('cancel')}
+								loading={cancellingBulk}
+							>
+								Cancel
 							</Button>
 						</div>
 					)}
