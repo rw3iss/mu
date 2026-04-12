@@ -426,17 +426,6 @@ function JobsSection() {
 		}
 	}, [selected]);
 
-	const toggleSelect = useCallback(
-		(id: string, e: Event) => {
-			e.stopPropagation();
-			const next = new Set(selected);
-			if (next.has(id)) next.delete(id);
-			else next.add(id);
-			setSelected(next);
-		},
-		[selected],
-	);
-
 	const statusColors: Record<string, string> = {
 		running: '#22c55e',
 		pending: '#f59e0b',
@@ -457,24 +446,6 @@ function JobsSection() {
 					(job.payload?.filePath || '').toLowerCase().includes(q),
 			)
 		: jobs;
-
-	// Cancellable jobs in current filtered view
-	const cancellableIds = filtered
-		.filter((j) => j.status === 'running' || j.status === 'pending' || j.status === 'paused')
-		.map((j) => j.id);
-	const allSelected = cancellableIds.length > 0 && cancellableIds.every((id) => selected.has(id));
-
-	const toggleSelectAll = useCallback(
-		(e: Event) => {
-			e.stopPropagation();
-			if (allSelected) {
-				setSelected(new Set());
-			} else {
-				setSelected(new Set(cancellableIds));
-			}
-		},
-		[allSelected, cancellableIds],
-	);
 
 	return (
 		<div class={styles.jobsContainer}>
@@ -510,12 +481,6 @@ function JobsSection() {
 					)}
 				</div>
 				<div class={styles.jobsSearchRow}>
-					{tab === 'current' && cancellableIds.length > 0 && (
-						<label class={styles.selectAllCheck} onClick={toggleSelectAll}>
-							<input type="checkbox" checked={allSelected} onChange={() => {}} />
-							<span class={styles.selectAllLabel}>All</span>
-						</label>
-					)}
 					<div class={styles.jobsSearchWrap}>
 						<svg
 							class={styles.jobsSearchIcon}
@@ -571,20 +536,15 @@ function JobsSection() {
 							<div
 								key={job.id}
 								class={`${styles.jobItem} ${isSelected ? styles.jobItemSelected : ''}`}
-								onClick={() =>
-									setExpandedJob(expandedJob === job.id ? null : job.id)
-								}
+								onClick={() => {
+									if (tab !== 'current' || !isCancellable) return;
+									const next = new Set(selected);
+									if (next.has(job.id)) next.delete(job.id);
+									else next.add(job.id);
+									setSelected(next);
+								}}
 							>
 								<div class={styles.jobHeader}>
-									{tab === 'current' && isCancellable && (
-										<input
-											type="checkbox"
-											checked={isSelected}
-											class={styles.jobCheck}
-											onClick={(e: Event) => toggleSelect(job.id, e)}
-											onChange={() => {}}
-										/>
-									)}
 									<span class={styles.jobType}>{job.type}</span>
 									<span
 										class={styles.statusBadge}
@@ -612,6 +572,29 @@ function JobsSection() {
 											})}
 										</span>
 									)}
+									<button
+										class={styles.jobDetailsBtn}
+										onClick={(e: Event) => {
+											e.stopPropagation();
+											setExpandedJob(expandedJob === job.id ? null : job.id);
+										}}
+										title="Details"
+									>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											{expandedJob === job.id ? (
+												<polyline points="18 15 12 9 6 15" />
+											) : (
+												<polyline points="6 9 12 15 18 9" />
+											)}
+										</svg>
+									</button>
 								</div>
 								{job.progress > 0 && job.status === 'running' && (
 									<div class={styles.jobProgressBar}>
