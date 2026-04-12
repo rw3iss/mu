@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
@@ -373,6 +373,7 @@ function JobsSection() {
 	const [searchQuery, setSearchQuery] = useState('');
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [cancellingBulk, setCancellingBulk] = useState(false);
+	const lastSelectedRef = useRef<string | null>(null);
 
 	useEffect(() => {
 		const load = async () => {
@@ -561,11 +562,39 @@ function JobsSection() {
 							<div
 								key={job.id}
 								class={`${styles.jobItem} ${isSelected ? styles.jobItemSelected : ''}`}
-								onClick={() => {
+								onClick={(e: MouseEvent) => {
 									if (tab !== 'current' || !isCancellable) return;
 									const next = new Set(selected);
-									if (next.has(job.id)) next.delete(job.id);
-									else next.add(job.id);
+
+									if (e.shiftKey && lastSelectedRef.current) {
+										// Shift-click: select range from last selected to current
+										const lastIdx = filtered.findIndex(
+											(j) => j.id === lastSelectedRef.current,
+										);
+										const curIdx = filtered.findIndex((j) => j.id === job.id);
+										if (lastIdx !== -1 && curIdx !== -1) {
+											const [from, to] =
+												lastIdx < curIdx
+													? [lastIdx, curIdx]
+													: [curIdx, lastIdx];
+											for (let i = from; i <= to; i++) {
+												const j = filtered[i];
+												if (
+													j.status === 'running' ||
+													j.status === 'pending' ||
+													j.status === 'paused'
+												) {
+													next.add(j.id);
+												}
+											}
+										}
+									} else {
+										// Normal click: toggle single item
+										if (next.has(job.id)) next.delete(job.id);
+										else next.add(job.id);
+									}
+
+									lastSelectedRef.current = job.id;
 									setSelected(next);
 								}}
 							>
