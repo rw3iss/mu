@@ -1,5 +1,13 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';

@@ -105,23 +105,30 @@ export class AdminController {
 			.all();
 
 		const missing = allMovies.filter((m) => !this.spriteService.hasSprites(m.id));
-		this.logger.log(`Enqueuing sprite generation for ${missing.length} movies`);
+		const count = missing.length;
+		this.logger.log(`Enqueuing sprite generation for ${count} movies`);
 
-		for (const m of missing) {
-			this.jobManager.enqueue({
-				type: JOB_TYPE_SPRITE,
-				label: `Generate sprites: ${m.title ?? m.id.slice(0, 8)}`,
-				payload: { movieId: m.id },
-				priority: 50,
+		// Enqueue in background so the request returns immediately
+		if (count > 0) {
+			setImmediate(() => {
+				for (const m of missing) {
+					this.jobManager.enqueue({
+						type: JOB_TYPE_SPRITE,
+						label: `Generate sprites: ${m.title ?? m.id.slice(0, 8)}`,
+						payload: { movieId: m.id },
+						priority: 50,
+					});
+				}
+				this.logger.log(`Finished enqueuing ${count} sprite jobs`);
 			});
 		}
 
 		return {
 			message:
-				missing.length > 0
-					? `Enqueued ${missing.length} sprite generation job(s)`
+				count > 0
+					? `Enqueuing ${count} sprite generation job(s)`
 					: 'All movies already have sprite sheets',
-			movieCount: missing.length,
+			movieCount: count,
 		};
 	}
 
