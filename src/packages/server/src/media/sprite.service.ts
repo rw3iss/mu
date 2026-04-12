@@ -131,11 +131,16 @@ export class SpriteService {
 		try {
 			const args = [
 				'-y',
-				'-threads', '2',
-				'-i', file.filePath.replace(/\\/g, '/'),
-				'-vf', `fps=${fps},scale=${FRAME_WIDTH}:-2,tile=${COLUMNS}x${ROWS}`,
-				'-q:v', String(QUALITY),
-				'-threads', '2',
+				'-threads',
+				'2',
+				'-i',
+				file.filePath.replace(/\\/g, '/'),
+				'-vf',
+				`fps=${fps},scale=${FRAME_WIDTH}:-2,tile=${COLUMNS}x${ROWS}`,
+				'-q:v',
+				String(QUALITY),
+				'-threads',
+				'2',
 				'-an',
 				outputPattern,
 			];

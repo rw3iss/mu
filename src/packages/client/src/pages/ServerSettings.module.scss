@@ -145,11 +145,31 @@
 
 // ── Jobs ──
 
+.jobsContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.jobsToolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--color-bg-primary);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-sm);
+}
+
+.jobsToolbarTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .tabs {
   display: flex;
   gap: 0;
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: var(--space-md);
 }
 
 .tab {
@@ -170,10 +190,107 @@
   }
 }
 
+.bulkActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.bulkCount {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.jobsSearchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.selectAllCheck {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  input[type='checkbox'] {
+    accent-color: var(--color-accent);
+    cursor: pointer;
+  }
+}
+
+.selectAllLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.jobsSearchWrap {
+  position: relative;
+  flex: 1;
+}
+
+.jobsSearchIcon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.jobsSearchInput {
+  width: 100%;
+  padding: 6px 30px 6px 32px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  outline: none;
+  transition: border-color 120ms ease;
+
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  &:focus {
+    border-color: var(--color-accent);
+  }
+}
+
+.jobsSearchClear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  line-height: 1;
+
+  &:hover {
+    color: var(--color-text-primary);
+  }
+}
+
+.jobsCount {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .jobList {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  overflow-y: auto;
 }
 
 .jobItem {
@@ -182,25 +299,38 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease;
 
   &:hover {
     background: var(--color-bg-tertiary);
   }
+
+  &.jobItemSelected {
+    border-color: var(--color-accent);
+    background: rgba(var(--color-accent-rgb, 59, 130, 246), 0.06);
+  }
+}
+
+.jobCheck {
+  flex-shrink: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
 }
 
 .jobHeader {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .jobType {
-  font-size: var(--font-size-xs);
+  font-size: 10px;
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-muted);
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .jobLabel {
@@ -217,6 +347,7 @@
   font-size: var(--font-size-xs);
   color: var(--color-accent);
   font-weight: var(--font-weight-semibold);
+  flex-shrink: 0;
 }
 
 .jobTime {
@@ -263,6 +394,7 @@
   border-radius: 10px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  flex-shrink: 0;
 }
 
 // ── Logs ──

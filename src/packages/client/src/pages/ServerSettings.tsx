@@ -371,6 +371,8 @@ function JobsSection() {
 	const [historyJobs, setHistoryJobs] = useState<any[]>([]);
 	const [expandedJob, setExpandedJob] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [selected, setSelected] = useState<Set<string>>(new Set());
+	const [cancellingBulk, setCancellingBulk] = useState(false);
 
 	useEffect(() => {
 		const load = async () => {
@@ -393,10 +395,12 @@ function JobsSection() {
 		};
 	}, [tab]);
 
+	// Clear selection when switching tabs
+	useEffect(() => setSelected(new Set()), [tab]);
+
 	const handleAction = useCallback(async (id: string, action: string) => {
 		try {
 			await api.post(`/admin/server/jobs/${id}/${action}`);
-			// Refresh
 			const data = await api.get<{ jobs: any[] }>('/admin/server/jobs');
 			setCurrentJobs(data.jobs);
 		} catch {
@@ -404,219 +408,331 @@ function JobsSection() {
 		}
 	}, []);
 
-	const statusBadge = (status: string) => {
-		const colors: Record<string, string> = {
-			running: '#22c55e',
-			pending: '#f59e0b',
-			completed: '#06b6d4',
-			failed: '#ef4444',
-			paused: '#8b5cf6',
-			cancelled: '#6b7280',
-		};
-		return (
-			<span class={styles.statusBadge} style={{ background: colors[status] || '#6b7280' }}>
-				{status}
-			</span>
-		);
+	const handleBulkCancel = useCallback(async () => {
+		if (selected.size === 0) return;
+		setCancellingBulk(true);
+		try {
+			await Promise.allSettled(
+				[...selected].map((id) => api.post(`/admin/server/jobs/${id}/cancel`)),
+			);
+			setSelected(new Set());
+			const data = await api.get<{ jobs: any[] }>('/admin/server/jobs');
+			setCurrentJobs(data.jobs);
+			notifySuccess(`Cancelled ${selected.size} job(s)`);
+		} catch {
+			notifyError('Failed to cancel some jobs');
+		} finally {
+			setCancellingBulk(false);
+		}
+	}, [selected]);
+
+	const toggleSelect = useCallback(
+		(id: string, e: Event) => {
+			e.stopPropagation();
+			const next = new Set(selected);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
+			setSelected(next);
+		},
+		[selected],
+	);
+
+	const statusColors: Record<string, string> = {
+		running: '#22c55e',
+		pending: '#f59e0b',
+		completed: '#06b6d4',
+		failed: '#ef4444',
+		paused: '#8b5cf6',
+		cancelled: '#6b7280',
 	};
 
+	// Filter jobs
+	const jobs = tab === 'current' ? currentJobs : historyJobs;
+	const q = searchQuery.toLowerCase().trim();
+	const filtered = q
+		? jobs.filter(
+				(job) =>
+					(job.label || '').toLowerCase().includes(q) ||
+					(job.type || '').toLowerCase().includes(q) ||
+					(job.payload?.filePath || '').toLowerCase().includes(q),
+			)
+		: jobs;
+
+	// Cancellable jobs in current filtered view
+	const cancellableIds = filtered
+		.filter((j) => j.status === 'running' || j.status === 'pending' || j.status === 'paused')
+		.map((j) => j.id);
+	const allSelected = cancellableIds.length > 0 && cancellableIds.every((id) => selected.has(id));
+
+	const toggleSelectAll = useCallback(
+		(e: Event) => {
+			e.stopPropagation();
+			if (allSelected) {
+				setSelected(new Set());
+			} else {
+				setSelected(new Set(cancellableIds));
+			}
+		},
+		[allSelected, cancellableIds],
+	);
+
 	return (
-		<div>
-			<div class={styles.tabs}>
-				<button
-					class={`${styles.tab} ${tab === 'current' ? styles.tabActive : ''}`}
-					onClick={() => setTab('current')}
-				>
-					Current ({currentJobs.length})
-				</button>
-				<button
-					class={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`}
-					onClick={() => setTab('history')}
-				>
-					History
-				</button>
-			</div>
-
-			{/* Search bar */}
-			<div style={{ padding: '0.5rem 0' }}>
-				<input
-					type="text"
-					class={styles.input}
-					placeholder="Search jobs by title or filename..."
-					value={searchQuery}
-					onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
-					style={{ width: '100%' }}
-				/>
-			</div>
-
-			<div class={styles.jobList}>
-				{(() => {
-					const jobs = tab === 'current' ? currentJobs : historyJobs;
-					const q = searchQuery.toLowerCase().trim();
-					const filtered = q
-						? jobs.filter(
-								(job) =>
-									(job.label || '').toLowerCase().includes(q) ||
-									(job.payload?.filePath || '').toLowerCase().includes(q),
-							)
-						: jobs;
-					if (filtered.length === 0) {
-						return (
-							<div class={styles.emptyText}>
-								{q
-									? `No jobs matching "${searchQuery}"`
-									: `No ${tab === 'current' ? 'active' : 'historical'} jobs`}
-							</div>
-						);
-					}
-					return filtered.map((job) => (
-						<div
-							key={job.id}
-							class={styles.jobItem}
-							onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
+		<div class={styles.jobsContainer}>
+			{/* Sticky toolbar: tabs + search + bulk actions */}
+			<div class={styles.jobsToolbar}>
+				<div class={styles.jobsToolbarTop}>
+					<div class={styles.tabs}>
+						<button
+							class={`${styles.tab} ${tab === 'current' ? styles.tabActive : ''}`}
+							onClick={() => setTab('current')}
 						>
-							<div class={styles.jobHeader}>
-								<span class={styles.jobType}>{job.type}</span>
-								{statusBadge(job.status)}
-								<span class={styles.jobLabel}>{job.label}</span>
-								{job.progress > 0 && job.progress < 100 && (
-									<span class={styles.jobProgress}>
-										{job.progress.toFixed(0)}%
+							Current ({currentJobs.length})
+						</button>
+						<button
+							class={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`}
+							onClick={() => setTab('history')}
+						>
+							History
+						</button>
+					</div>
+					{tab === 'current' && selected.size > 0 && (
+						<div class={styles.bulkActions}>
+							<span class={styles.bulkCount}>{selected.size} selected</span>
+							<Button
+								variant="danger"
+								size="sm"
+								onClick={handleBulkCancel}
+								loading={cancellingBulk}
+							>
+								Cancel Selected
+							</Button>
+						</div>
+					)}
+				</div>
+				<div class={styles.jobsSearchRow}>
+					{tab === 'current' && cancellableIds.length > 0 && (
+						<label class={styles.selectAllCheck} onClick={toggleSelectAll}>
+							<input type="checkbox" checked={allSelected} onChange={() => {}} />
+							<span class={styles.selectAllLabel}>All</span>
+						</label>
+					)}
+					<div class={styles.jobsSearchWrap}>
+						<svg
+							class={styles.jobsSearchIcon}
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<circle cx="11" cy="11" r="8" />
+							<line x1="21" y1="21" x2="16.65" y2="16.65" />
+						</svg>
+						<input
+							type="text"
+							class={styles.jobsSearchInput}
+							placeholder="Search jobs..."
+							value={searchQuery}
+							onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+						/>
+						{searchQuery && (
+							<button
+								class={styles.jobsSearchClear}
+								onClick={() => setSearchQuery('')}
+								title="Clear search"
+							>
+								x
+							</button>
+						)}
+					</div>
+					<span class={styles.jobsCount}>
+						{filtered.length} job{filtered.length !== 1 ? 's' : ''}
+					</span>
+				</div>
+			</div>
+
+			{/* Job list */}
+			<div class={styles.jobList}>
+				{filtered.length === 0 ? (
+					<div class={styles.emptyText}>
+						{q
+							? `No jobs matching "${searchQuery}"`
+							: `No ${tab === 'current' ? 'active' : 'historical'} jobs`}
+					</div>
+				) : (
+					filtered.map((job) => {
+						const isCancellable =
+							job.status === 'running' ||
+							job.status === 'pending' ||
+							job.status === 'paused';
+						const isSelected = selected.has(job.id);
+						return (
+							<div
+								key={job.id}
+								class={`${styles.jobItem} ${isSelected ? styles.jobItemSelected : ''}`}
+								onClick={() =>
+									setExpandedJob(expandedJob === job.id ? null : job.id)
+								}
+							>
+								<div class={styles.jobHeader}>
+									{tab === 'current' && isCancellable && (
+										<input
+											type="checkbox"
+											checked={isSelected}
+											class={styles.jobCheck}
+											onClick={(e: Event) => toggleSelect(job.id, e)}
+											onChange={() => {}}
+										/>
+									)}
+									<span class={styles.jobType}>{job.type}</span>
+									<span
+										class={styles.statusBadge}
+										style={{
+											background: statusColors[job.status] || '#6b7280',
+										}}
+									>
+										{job.status}
 									</span>
-								)}
-								{(job.startedAt || job.createdAt) && (
-									<span class={styles.jobTime}>
-										{new Date(job.startedAt || job.createdAt).toLocaleString(
-											undefined,
-											{
+									<span class={styles.jobLabel}>{job.label}</span>
+									{job.progress > 0 && job.progress < 100 && (
+										<span class={styles.jobProgress}>
+											{job.progress.toFixed(0)}%
+										</span>
+									)}
+									{(job.startedAt || job.createdAt) && (
+										<span class={styles.jobTime}>
+											{new Date(
+												job.startedAt || job.createdAt,
+											).toLocaleString(undefined, {
 												month: 'short',
 												day: 'numeric',
 												hour: '2-digit',
 												minute: '2-digit',
-											},
+											})}
+										</span>
+									)}
+								</div>
+								{job.progress > 0 && job.status === 'running' && (
+									<div class={styles.jobProgressBar}>
+										<div
+											class={styles.jobProgressFill}
+											style={{ width: `${job.progress}%` }}
+										/>
+									</div>
+								)}
+								{expandedJob === job.id && (
+									<div class={styles.jobDetails}>
+										<div class={styles.infoRow}>
+											<span class={styles.infoLabel}>ID</span>
+											<span class={styles.infoValue}>{job.id}</span>
+										</div>
+										{job.priority != null && (
+											<div class={styles.infoRow}>
+												<span class={styles.infoLabel}>Priority</span>
+												<span class={styles.infoValue}>{job.priority}</span>
+											</div>
 										)}
-									</span>
+										{job.payload?.filePath && (
+											<div class={styles.infoRow}>
+												<span class={styles.infoLabel}>File</span>
+												<span class={styles.infoValue}>
+													{job.payload.filePath}
+												</span>
+											</div>
+										)}
+										{job.payload?.quality && (
+											<div class={styles.infoRow}>
+												<span class={styles.infoLabel}>Quality</span>
+												<span class={styles.infoValue}>
+													{job.payload.quality}
+												</span>
+											</div>
+										)}
+										{job.startedAt && (
+											<div class={styles.infoRow}>
+												<span class={styles.infoLabel}>Started</span>
+												<span class={styles.infoValue}>
+													{new Date(job.startedAt).toLocaleString()}
+												</span>
+											</div>
+										)}
+										{job.durationMs != null && (
+											<div class={styles.infoRow}>
+												<span class={styles.infoLabel}>Duration</span>
+												<span class={styles.infoValue}>
+													{formatDuration(job.durationMs)}
+												</span>
+											</div>
+										)}
+										{job.error && (
+											<div class={styles.infoRow}>
+												<span class={styles.infoLabel}>Error</span>
+												<span
+													class={`${styles.infoValue} ${styles.errorText}`}
+												>
+													{job.error}
+												</span>
+											</div>
+										)}
+										{tab === 'current' && (
+											<div class={styles.jobActions}>
+												{job.status === 'pending' && job.priority !== 1 && (
+													<Button
+														variant="ghost"
+														size="sm"
+														onClick={(e: Event) => {
+															e.stopPropagation();
+															handleAction(job.id, 'prioritize');
+														}}
+													>
+														Prioritize
+													</Button>
+												)}
+												{job.status === 'running' && (
+													<Button
+														variant="ghost"
+														size="sm"
+														onClick={(e: Event) => {
+															e.stopPropagation();
+															handleAction(job.id, 'pause');
+														}}
+													>
+														Pause
+													</Button>
+												)}
+												{job.status === 'paused' && (
+													<Button
+														variant="ghost"
+														size="sm"
+														onClick={(e: Event) => {
+															e.stopPropagation();
+															handleAction(job.id, 'resume');
+														}}
+													>
+														Resume
+													</Button>
+												)}
+												{isCancellable && (
+													<Button
+														variant="ghost"
+														size="sm"
+														onClick={(e: Event) => {
+															e.stopPropagation();
+															handleAction(job.id, 'cancel');
+														}}
+													>
+														Cancel
+													</Button>
+												)}
+											</div>
+										)}
+									</div>
 								)}
 							</div>
-							{job.progress > 0 && job.status === 'running' && (
-								<div class={styles.jobProgressBar}>
-									<div
-										class={styles.jobProgressFill}
-										style={{ width: `${job.progress}%` }}
-									/>
-								</div>
-							)}
-							{expandedJob === job.id && (
-								<div class={styles.jobDetails}>
-									<div class={styles.infoRow}>
-										<span class={styles.infoLabel}>ID</span>
-										<span class={styles.infoValue}>{job.id}</span>
-									</div>
-									{job.priority != null && (
-										<div class={styles.infoRow}>
-											<span class={styles.infoLabel}>Priority</span>
-											<span class={styles.infoValue}>{job.priority}</span>
-										</div>
-									)}
-									{job.payload?.filePath && (
-										<div class={styles.infoRow}>
-											<span class={styles.infoLabel}>File</span>
-											<span class={styles.infoValue}>
-												{job.payload.filePath}
-											</span>
-										</div>
-									)}
-									{job.payload?.quality && (
-										<div class={styles.infoRow}>
-											<span class={styles.infoLabel}>Quality</span>
-											<span class={styles.infoValue}>
-												{job.payload.quality}
-											</span>
-										</div>
-									)}
-									{job.startedAt && (
-										<div class={styles.infoRow}>
-											<span class={styles.infoLabel}>Started</span>
-											<span class={styles.infoValue}>
-												{new Date(job.startedAt).toLocaleString()}
-											</span>
-										</div>
-									)}
-									{job.durationMs != null && (
-										<div class={styles.infoRow}>
-											<span class={styles.infoLabel}>Duration</span>
-											<span class={styles.infoValue}>
-												{formatDuration(job.durationMs)}
-											</span>
-										</div>
-									)}
-									{job.error && (
-										<div class={styles.infoRow}>
-											<span class={styles.infoLabel}>Error</span>
-											<span class={`${styles.infoValue} ${styles.errorText}`}>
-												{job.error}
-											</span>
-										</div>
-									)}
-									{tab === 'current' && (
-										<div class={styles.jobActions}>
-											{job.status === 'pending' && job.priority !== 1 && (
-												<Button
-													variant="ghost"
-													size="sm"
-													onClick={(e: Event) => {
-														e.stopPropagation();
-														handleAction(job.id, 'prioritize');
-													}}
-												>
-													Prioritize
-												</Button>
-											)}
-											{job.status === 'running' && (
-												<Button
-													variant="ghost"
-													size="sm"
-													onClick={(e: Event) => {
-														e.stopPropagation();
-														handleAction(job.id, 'pause');
-													}}
-												>
-													Pause
-												</Button>
-											)}
-											{job.status === 'paused' && (
-												<Button
-													variant="ghost"
-													size="sm"
-													onClick={(e: Event) => {
-														e.stopPropagation();
-														handleAction(job.id, 'resume');
-													}}
-												>
-													Resume
-												</Button>
-											)}
-											{(job.status === 'running' ||
-												job.status === 'pending' ||
-												job.status === 'paused') && (
-												<Button
-													variant="ghost"
-													size="sm"
-													onClick={(e: Event) => {
-														e.stopPropagation();
-														handleAction(job.id, 'cancel');
-													}}
-												>
-													Cancel
-												</Button>
-											)}
-										</div>
-									)}
-								</div>
-							)}
-						</div>
-					));
-				})()}
+						);
+					})
+				)}
 			</div>
 		</div>
 	);
