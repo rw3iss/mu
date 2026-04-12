@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import {
 	existsSync,
 	mkdirSync,
@@ -18,7 +18,7 @@ import { movieFiles } from '../database/schema/index.js';
 const COLUMNS = 10;
 const ROWS = 10;
 const FRAMES_PER_SHEET = COLUMNS * ROWS;
-const FRAME_WIDTH = 240;
+const FRAME_WIDTH = 120;
 const QUALITY = 5; // FFmpeg JPEG quality (2=best, 31=worst)
 
 export interface SpriteMeta {
@@ -103,9 +103,9 @@ export class SpriteService {
 			return null;
 		}
 
-		// Calculate interval: target ~3600 frames, clamp 1-5s
-		const rawInterval = durationSeconds / 3600;
-		const interval = Math.max(1, Math.min(5, Math.round(rawInterval * 10) / 10));
+		// Calculate interval: target ~2400 frames at 3s default, clamp 3-10s
+		const rawInterval = durationSeconds / 2400;
+		const interval = Math.max(3, Math.min(10, Math.round(rawInterval * 10) / 10));
 		const totalFrames = Math.floor(durationSeconds / interval);
 		const sheetCount = Math.ceil(totalFrames / FRAMES_PER_SHEET);
 
@@ -129,20 +129,18 @@ export class SpriteService {
 		const outputPattern = join(movieDir, '%03d.jpg');
 
 		try {
-			const cmd = [
-				`"${ffmpegPath}"`,
+			const args = [
 				'-y',
-				'-i',
-				`"${file.filePath.replace(/\\/g, '/')}"`,
-				'-vf',
-				`fps=${fps},scale=${FRAME_WIDTH}:-2,tile=${COLUMNS}x${ROWS}`,
-				'-q:v',
-				String(QUALITY),
+				'-threads', '2',
+				'-i', file.filePath.replace(/\\/g, '/'),
+				'-vf', `fps=${fps},scale=${FRAME_WIDTH}:-2,tile=${COLUMNS}x${ROWS}`,
+				'-q:v', String(QUALITY),
+				'-threads', '2',
 				'-an',
 				outputPattern,
-			].join(' ');
+			];
 
-			execSync(cmd, { timeout: 600_000, stdio: 'pipe' });
+			await this.runFfmpeg(ffmpegPath, args);
 		} catch (err: any) {
 			this.logger.error(`FFmpeg sprite generation failed for ${movieId}: ${err.message}`);
 			// Clean up partial output
@@ -163,7 +161,7 @@ export class SpriteService {
 		}
 
 		// Determine actual frame height from the first sheet
-		const frameHeight = Math.round((FRAME_WIDTH / 16) * 9); // default 135 for 16:9
+		const frameHeight = Math.round((FRAME_WIDTH / 16) * 9); // 68 for 16:9 at 120px wide
 		// Note: FFmpeg scale=-2 preserves aspect ratio, height auto-calculated
 
 		const actualSheetCount = files.length;
@@ -185,6 +183,38 @@ export class SpriteService {
 			`Sprite sheets complete for ${movieId}: ${actualSheetCount} sheets, ${totalFrames} frames`,
 		);
 		return meta;
+	}
+
+	/** Run FFmpeg asynchronously with low priority so it doesn't block the server */
+	private runFfmpeg(ffmpegPath: string, args: string[]): Promise<void> {
+		return new Promise((resolve, reject) => {
+			const proc = spawn(ffmpegPath, args, {
+				stdio: 'pipe',
+				// On Windows, BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
+				...(process.platform === 'win32' ? { windowsHide: true } : {}),
+			});
+
+			let stderr = '';
+			proc.stderr?.on('data', (chunk: Buffer) => {
+				stderr += chunk.toString();
+			});
+
+			const timeout = setTimeout(() => {
+				proc.kill('SIGKILL');
+				reject(new Error('FFmpeg timed out after 10 minutes'));
+			}, 600_000);
+
+			proc.on('close', (code) => {
+				clearTimeout(timeout);
+				if (code === 0) resolve();
+				else reject(new Error(`FFmpeg exited with code ${code}: ${stderr.slice(-500)}`));
+			});
+
+			proc.on('error', (err) => {
+				clearTimeout(timeout);
+				reject(err);
+			});
+		});
 	}
 
 	private detectFfmpeg(): string {
