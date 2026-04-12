@@ -869,7 +869,7 @@ export function GlobalPlayer() {
 						: undefined
 				}
 				onClick={isMini ? maximizePlayer : undefined}
-				onMouseMove={!isMini && !isSplit ? resetControlsTimer : undefined}
+				onMouseMove={!isMini && (!isSplit || isExclusive) ? resetControlsTimer : undefined}
 			>
 				{/* Mini mode overlays */}
 				{isMini && (
