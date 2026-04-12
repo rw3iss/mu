@@ -1,13 +1,5 @@
 import { execSync, spawn } from 'node:child_process';
-import {
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-	renameSync,
-	rmSync,
-	writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
@@ -119,57 +111,92 @@ export class SpriteService {
 				`(${totalFrames} frames, ${interval}s interval)`,
 		);
 
-		// Detect FFmpeg path (same logic as transcoder)
 		const ffmpegPath = this.detectFfmpeg();
+		const filePath = file.filePath.replace(/\\/g, '/');
+		const framesDir = join(movieDir, '_frames');
+		mkdirSync(framesDir, { recursive: true });
 
-		// Generate all sheets in a single FFmpeg command.
-		// FFmpeg's tile filter with fps outputs sequentially numbered files.
-		// We use: fps=1/interval -> scale -> tile=10x10
-		const fps = 1 / interval;
-		const outputPattern = join(movieDir, '%03d.jpg');
-
+		// Extract individual frames using -ss input seeking (near-instant per frame).
+		// This is MUCH faster than fps filter which decodes every frame sequentially.
 		try {
-			const args = [
-				'-y',
-				'-threads',
-				'2',
-				'-i',
-				file.filePath.replace(/\\/g, '/'),
-				'-vf',
-				`fps=${fps},scale=${FRAME_WIDTH}:-2,tile=${COLUMNS}x${ROWS}`,
-				'-q:v',
-				String(QUALITY),
-				'-threads',
-				'2',
-				'-an',
-				outputPattern,
-			];
+			for (let i = 0; i < totalFrames; i++) {
+				const timestamp = i * interval;
+				const framePath = join(framesDir, `${String(i).padStart(5, '0')}.jpg`);
+				await this.runFfmpeg(ffmpegPath, [
+					'-ss',
+					String(timestamp),
+					'-i',
+					filePath,
+					'-vf',
+					`scale=${FRAME_WIDTH}:-2`,
+					'-frames:v',
+					'1',
+					'-q:v',
+					String(QUALITY),
+					'-y',
+					framePath,
+				]);
 
-			await this.runFfmpeg(ffmpegPath, args);
+				if (i % 50 === 0) {
+					onProgress?.(Math.round((i / totalFrames) * 90));
+				}
+			}
 		} catch (err: any) {
-			this.logger.error(`FFmpeg sprite generation failed for ${movieId}: ${err.message}`);
-			// Clean up partial output
+			this.logger.error(`Frame extraction failed for ${movieId}: ${err.message}`);
 			if (existsSync(movieDir)) rmSync(movieDir, { recursive: true });
 			return null;
 		}
 
-		// Rename files from 001.jpg, 002.jpg to 0.jpg, 1.jpg (0-indexed)
-		const files = readdirSync(movieDir)
+		// Stitch frames into sprite sheets using tile filter
+		const extractedFrames = readdirSync(framesDir)
 			.filter((f) => f.endsWith('.jpg'))
 			.sort();
-		for (let i = 0; i < files.length; i++) {
-			const src = join(movieDir, files[i]!);
-			const dst = join(movieDir, `${i}.jpg`);
-			if (src !== dst) {
-				renameSync(src, dst);
+		const actualTotalFrames = extractedFrames.length;
+		const actualSheetCount = Math.ceil(actualTotalFrames / FRAMES_PER_SHEET);
+
+		try {
+			for (let s = 0; s < actualSheetCount; s++) {
+				const startIdx = s * FRAMES_PER_SHEET;
+				const endIdx = Math.min(startIdx + FRAMES_PER_SHEET, actualTotalFrames);
+				const chunkFrames = extractedFrames.slice(startIdx, endIdx);
+
+				// Create a temporary concat file listing the frames for this sheet
+				const concatPath = join(movieDir, `_concat_${s}.txt`);
+				const concatContent = chunkFrames
+					.map((f) => `file '${join(framesDir, f).replace(/\\/g, '/')}'`)
+					.join('\n');
+				writeFileSync(concatPath, concatContent);
+
+				// Use concat demuxer + tile to stitch into a grid
+				const rows = Math.ceil(chunkFrames.length / COLUMNS);
+				await this.runFfmpeg(ffmpegPath, [
+					'-f',
+					'concat',
+					'-safe',
+					'0',
+					'-i',
+					concatPath.replace(/\\/g, '/'),
+					'-vf',
+					`tile=${COLUMNS}x${rows}`,
+					'-q:v',
+					String(QUALITY),
+					'-y',
+					join(movieDir, `${s}.jpg`),
+				]);
+
+				// Clean up concat file
+				rmSync(concatPath, { force: true });
 			}
+		} catch (err: any) {
+			this.logger.error(`Sheet stitching failed for ${movieId}: ${err.message}`);
+			if (existsSync(movieDir)) rmSync(movieDir, { recursive: true });
+			return null;
 		}
 
-		// Determine actual frame height from the first sheet
-		const frameHeight = Math.round((FRAME_WIDTH / 16) * 9); // 68 for 16:9 at 120px wide
-		// Note: FFmpeg scale=-2 preserves aspect ratio, height auto-calculated
+		// Clean up individual frames
+		rmSync(framesDir, { recursive: true, force: true });
 
-		const actualSheetCount = files.length;
+		const frameHeight = Math.round((FRAME_WIDTH / 16) * 9);
 
 		const meta: SpriteMeta = {
 			interval,
