@@ -106,12 +106,17 @@ export function GlobalPlayer() {
 		}
 	}, []);
 
-	// Auto-hide controls when playing starts
+	// Auto-hide controls when playing starts (full mode + exclusive split mode)
 	useEffect(() => {
-		if (isPlaying.value && playerMode.value !== 'mini' && playerMode.value !== 'split') {
+		const isExclusiveSplit = playerMode.value === 'split' && splitExclusive.value;
+		if (
+			isPlaying.value &&
+			playerMode.value !== 'mini' &&
+			(playerMode.value !== 'split' || isExclusiveSplit)
+		) {
 			resetControlsTimer();
 		}
-	}, [isPlaying.value]);
+	}, [isPlaying.value, splitExclusive.value]);
 
 	// Expose the video engine via module-level ref so Player page can access it
 	useEffect(() => {
@@ -642,14 +647,14 @@ export function GlobalPlayer() {
 	const movie = globalMovie.value;
 	const isMini = playerMode.value === 'mini';
 	const isSplit = playerMode.value === 'split';
-	// In full mode, the bar fades with controls; in mini/split mode, always visible
-	const barVisible = isMini || isSplit || showControls.value;
+	const isExclusive = isSplit && splitExclusive.value;
+	// In full mode and exclusive split mode, the bar fades; in mini/normal split, always visible
+	const barVisible = isMini || (isSplit && !isExclusive) || showControls.value;
 
 	// Spacer height = just the video (aspect ratio based on split width).
 	// The top bar (32px) is a flex child above the spacer so it pushes naturally.
 	// The site header offset is handled by CSS (panel top: var(--topbar-height)).
 	const splitVideoHeight = isSplit ? `calc((${splitWidth.value}vw - 3px) * 9 / 16)` : '0px';
-	const isExclusive = isSplit && splitExclusive.value;
 
 	// In exclusive mode, calculate the top offset to center the video vertically
 	// The video height in px is approximately (splitWidth% of viewport width) * 9/16
@@ -665,6 +670,20 @@ export function GlobalPlayer() {
 				<div
 					class={`${styles.splitPanel} ${isExclusive ? styles.splitPanelExclusive : ''}`}
 					style={{ width: `${splitWidth.value}vw` }}
+					onMouseMove={isExclusive ? resetControlsTimer : undefined}
+					onMouseLeave={
+						isExclusive
+							? () => {
+									if (isPlaying.value) {
+										if (controlsTimerRef.current)
+											clearTimeout(controlsTimerRef.current);
+										controlsTimerRef.current = setTimeout(() => {
+											showControls.value = false;
+										}, 300);
+									}
+								}
+							: undefined
+					}
 				>
 					{/* Drag handle on left edge */}
 					<div
@@ -690,8 +709,10 @@ export function GlobalPlayer() {
 						}}
 					/>
 
-					{/* Top bar — overlays the video area */}
-					<div class={styles.splitTopBar}>
+					{/* Top bar — overlays the video area, hides in exclusive mode */}
+					<div
+						class={`${styles.splitTopBar} ${isExclusive && !showControls.value ? styles.splitBarHidden : ''}`}
+					>
 						<button
 							class={styles.splitTopBtn}
 							onClick={() => minimizePlayer()}
@@ -759,16 +780,20 @@ export function GlobalPlayer() {
 					/>
 
 					{/* Seek bar + controls — directly below video, full width */}
-					<PlayerControls
-						visible
-						isSplit
-						onTogglePlay={engine.togglePlay}
-						onSeek={engine.seek}
-						onToggleFullscreen={handleToggleFullscreen}
-						onToggleInfo={handleToggleInfo}
-						session={currentSession.value}
-						title={movie?.title}
-					/>
+					<div
+						class={`${isExclusive && !showControls.value ? styles.splitBarHidden : ''}`}
+					>
+						<PlayerControls
+							visible
+							isSplit
+							onTogglePlay={engine.togglePlay}
+							onSeek={engine.seek}
+							onToggleFullscreen={handleToggleFullscreen}
+							onToggleInfo={handleToggleInfo}
+							session={currentSession.value}
+							title={movie?.title}
+						/>
+					</div>
 
 					{/* Movie info — inline, no flyout */}
 					<div

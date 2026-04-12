@@ -305,7 +305,14 @@
 
 	.splitTopBar {
 		background: #000;
+		transition: opacity 300ms ease;
 	}
+}
+
+.splitBarHidden {
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 300ms ease;
 }
 
 .splitDragHandle {
