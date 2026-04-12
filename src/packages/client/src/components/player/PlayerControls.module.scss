@@ -101,6 +101,36 @@
 	pointer-events: none;
 }
 
+.seekTooltipSprite {
+	position: absolute;
+	bottom: calc(100% + 10px);
+	transform: translateX(-50%);
+	pointer-events: none;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	z-index: 10;
+}
+
+.spriteFrame {
+	border: 2px solid rgba(255, 255, 255, 0.8);
+	border-radius: 4px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+	background-repeat: no-repeat;
+	background-color: #000;
+}
+
+.spriteTime {
+	margin-top: 4px;
+	background: rgba(0, 0, 0, 0.85);
+	color: #fff;
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	padding: 1px 6px;
+	border-radius: 3px;
+	white-space: nowrap;
+}
+
 // ============================================
 // Row 2: Content row — left slot + controls
 // ============================================

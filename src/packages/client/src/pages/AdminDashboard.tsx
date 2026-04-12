@@ -30,6 +30,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	const [generatingThumbnails, setGeneratingThumbnails] = useState(false);
 	const [fixingThumbnails, setFixingThumbnails] = useState(false);
 	const [showFixThumbnailsConfirm, setShowFixThumbnailsConfirm] = useState(false);
+	const [generatingSprites, setGeneratingSprites] = useState(false);
 	const [removingBroken, setRemovingBroken] = useState(false);
 	const [showRemoveBrokenConfirm, setShowRemoveBrokenConfirm] = useState(false);
 	const [clearingWatched, setClearingWatched] = useState(false);
@@ -106,6 +107,24 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 			notifyError('Failed to fix broken thumbnails');
 		} finally {
 			setFixingThumbnails(false);
+		}
+	}, []);
+
+	const handleGenerateSprites = useCallback(async () => {
+		setGeneratingSprites(true);
+		try {
+			const result = await api.post<{ movieCount: number; message: string }>(
+				'/admin/generate-sprites',
+			);
+			if (result.movieCount > 0) {
+				notifySuccess(`Enqueued sprite generation for ${result.movieCount} movies`);
+			} else {
+				notifySuccess('All movies already have sprite sheets');
+			}
+		} catch {
+			notifyError('Failed to start sprite generation');
+		} finally {
+			setGeneratingSprites(false);
 		}
 	}, []);
 
@@ -251,6 +270,13 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						loading={fixingThumbnails}
 					>
 						Fix Broken Thumbnails
+					</Button>
+					<Button
+						variant="secondary"
+						onClick={handleGenerateSprites}
+						loading={generatingSprites}
+					>
+						Generate Seek Sprites
 					</Button>
 					<Button
 						variant="danger"

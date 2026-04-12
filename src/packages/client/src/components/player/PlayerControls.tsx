@@ -28,6 +28,7 @@ import {
 	saveAudioTrackChoice,
 	saveSubtitleChoice,
 	setVolume,
+	spriteMeta,
 	subtitleTrack,
 	toggleMute,
 	volume,
@@ -156,12 +157,14 @@ export function PlayerControls({
 	);
 
 	// ── Seek bar: hover tooltip ──
+	const [seekHoverX, setSeekHoverX] = useState(0);
 	const handleSeekHover = useCallback((e: MouseEvent) => {
 		const bar = seekBarRef.current;
 		if (!bar) return;
 		const rect = bar.getBoundingClientRect();
 		const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
 		setSeekHover(fraction * duration.value);
+		setSeekHoverX(e.clientX - rect.left);
 	}, []);
 
 	// ── Seek bar: drag ──
@@ -387,16 +390,70 @@ export function PlayerControls({
 						<div class={styles.seekProgress} style={{ width: `${progress}%` }} />
 						<div class={styles.seekThumb} style={{ left: `${progress}%` }} />
 					</div>
-					{seekHover !== null && (
-						<div
-							class={styles.seekTooltip}
-							style={{
-								left: `${(seekHover / (duration.value || 1)) * 100}%`,
-							}}
-						>
-							{formatTime(seekHover)}
-						</div>
-					)}
+					{seekHover !== null &&
+						(() => {
+							const meta = spriteMeta.value;
+							const barWidth = seekBarRef.current?.offsetWidth ?? 1;
+							const tooltipWidth = meta ? meta.frameWidth + 4 : 0;
+							// Clamp tooltip so it doesn't overflow the seek bar
+							const rawLeft = seekHoverX;
+							const clampedLeft = meta
+								? Math.max(
+										tooltipWidth / 2,
+										Math.min(rawLeft, barWidth - tooltipWidth / 2),
+									)
+								: rawLeft;
+
+							if (meta) {
+								const movieId = globalMovieId.value;
+								const frameIndex = Math.min(
+									Math.floor(seekHover / meta.interval),
+									meta.totalFrames - 1,
+								);
+								const framesPerSheet = meta.columns * meta.rows;
+								const sheetIndex = Math.floor(frameIndex / framesPerSheet);
+								const frameInSheet = frameIndex % framesPerSheet;
+								const col = frameInSheet % meta.columns;
+								const row = Math.floor(frameInSheet / meta.columns);
+								const bgX = -(col * meta.frameWidth);
+								const bgY = -(row * meta.frameHeight);
+
+								return (
+									<div
+										class={styles.seekTooltipSprite}
+										style={{
+											left: `${clampedLeft}px`,
+											width: `${meta.frameWidth}px`,
+										}}
+									>
+										<div
+											class={styles.spriteFrame}
+											style={{
+												width: `${meta.frameWidth}px`,
+												height: `${meta.frameHeight}px`,
+												backgroundImage: `url(/api/v1/media/sprites/${movieId}/${sheetIndex}.jpg)`,
+												backgroundPosition: `${bgX}px ${bgY}px`,
+												backgroundSize: `${meta.frameWidth * meta.columns}px ${meta.frameHeight * meta.rows}px`,
+											}}
+										/>
+										<span class={styles.spriteTime}>
+											{formatTime(seekHover)}
+										</span>
+									</div>
+								);
+							}
+
+							return (
+								<div
+									class={styles.seekTooltip}
+									style={{
+										left: `${(seekHover / (duration.value || 1)) * 100}%`,
+									}}
+								>
+									{formatTime(seekHover)}
+								</div>
+							);
+						})()}
 				</div>
 			</div>
 

@@ -6,11 +6,13 @@ import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movies } from '../database/schema/index.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
+import { SpriteService } from '../media/sprite.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { MoviesService } from '../movies/movies.service.js';
 import { StreamService } from '../stream/stream.service.js';
 
 const JOB_TYPE_THUMBNAIL = 'thumbnail';
+const JOB_TYPE_SPRITE = 'sprite-sheet';
 
 @Controller('admin')
 export class AdminController {
@@ -23,6 +25,7 @@ export class AdminController {
 		readonly _guidResolver: GuidResolverService,
 		private readonly moviesService: MoviesService,
 		private readonly jobManager: JobManagerService,
+		private readonly spriteService: SpriteService,
 	) {}
 
 	/**
@@ -87,6 +90,38 @@ export class AdminController {
 					? `Enqueued ${count} thumbnail regeneration job(s)`
 					: 'No broken thumbnails found',
 			movieCount: count,
+		};
+	}
+
+	/**
+	 * Generate seek-preview sprite sheets for all movies that don't have them yet.
+	 */
+	@Post('generate-sprites')
+	@Roles('admin')
+	async generateMissingSprites() {
+		const allMovies = this.database.db
+			.select({ id: movies.id, title: movies.title })
+			.from(movies)
+			.all();
+
+		const missing = allMovies.filter((m) => !this.spriteService.hasSprites(m.id));
+		this.logger.log(`Enqueuing sprite generation for ${missing.length} movies`);
+
+		for (const m of missing) {
+			this.jobManager.enqueue({
+				type: JOB_TYPE_SPRITE,
+				label: `Generate sprites: ${m.title ?? m.id.slice(0, 8)}`,
+				payload: { movieId: m.id },
+				priority: 50,
+			});
+		}
+
+		return {
+			message:
+				missing.length > 0
+					? `Enqueued ${missing.length} sprite generation job(s)`
+					: 'All movies already have sprite sheets',
+			movieCount: missing.length,
 		};
 	}
 

@@ -116,6 +116,18 @@ export const isHoveringControls = signal(false);
 export const showInfoPanel = signal(false);
 export const streamError = signal<string | null>(null);
 
+// Seek sprite metadata (loaded when stream starts)
+export interface SpriteMeta {
+	interval: number;
+	frameWidth: number;
+	frameHeight: number;
+	columns: number;
+	rows: number;
+	sheetCount: number;
+	totalFrames: number;
+}
+export const spriteMeta = signal<SpriteMeta | null>(null);
+
 // ============================================
 // Actions
 // ============================================
@@ -127,6 +139,16 @@ export async function startStream(
 	const session = await streamService.startStream(movieId, options);
 	currentSession.value = session;
 	currentTime.value = session.startPosition || 0;
+
+	// Fetch sprite sheet metadata for seek previews (non-blocking)
+	spriteMeta.value = null;
+	fetch(`/api/v1/media/sprites/${movieId}/meta.json`)
+		.then((r) => (r.ok ? r.json() : null))
+		.then((meta) => {
+			if (meta) spriteMeta.value = meta;
+		})
+		.catch(() => {});
+
 	return session;
 }
 

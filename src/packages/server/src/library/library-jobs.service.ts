@@ -17,6 +17,7 @@ import { movieFiles, movies, transcodeCache, userWatchHistory } from '../databas
 import { EventsService } from '../events/events.service.js';
 import type { JobHelpers, JobRecord } from '../jobs/job.interface.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
+import { SpriteService } from '../media/sprite.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { MetadataService } from '../metadata/metadata.service.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -33,6 +34,7 @@ export const JOB_TYPE = {
 	SCAN_ALL: 'scan-all',
 	METADATA: 'metadata',
 	THUMBNAIL: 'thumbnail',
+	SPRITE_SHEET: 'sprite-sheet',
 	CLEANUP: 'cleanup',
 	PRE_TRANSCODE: 'pre-transcode',
 } as const;
@@ -52,6 +54,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		private readonly libraryService: LibraryService,
 		private readonly metadata: MetadataService,
 		private readonly thumbnail: ThumbnailService,
+		private readonly sprite: SpriteService,
 		private readonly settings: SettingsService,
 		private readonly events: EventsService,
 		private readonly transcoderService: TranscoderService,
@@ -120,6 +123,20 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				const url = await this.thumbnail.generateForMovie(movieId);
 				helpers.reportProgress(100);
 				return { thumbnailUrl: url };
+			},
+		);
+
+		// Sprite sheet handler
+		this.jobManager.registerHandler(
+			JOB_TYPE.SPRITE_SHEET,
+			async (job: JobRecord, helpers: JobHelpers) => {
+				const movieId = job.payload.movieId as string;
+				helpers.log(`Generating sprite sheets for movie ${movieId}`);
+				const meta = await this.sprite.generateForMovie(movieId, (p) =>
+					helpers.reportProgress(p),
+				);
+				helpers.reportProgress(100);
+				return meta;
 			},
 		);
 
@@ -384,6 +401,14 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				label: `Generate thumbnail: ${title}`,
 				payload: { movieId },
 				priority: 30,
+			});
+
+			// Enqueue sprite sheet generation for seek previews
+			this.jobManager.enqueue({
+				type: JOB_TYPE.SPRITE_SHEET,
+				label: `Generate sprites: ${title}`,
+				payload: { movieId },
+				priority: 45,
 			});
 
 			// Enqueue pre-transcode if the file needs transcoding and caching is enabled
