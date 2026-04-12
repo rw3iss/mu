@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
@@ -63,7 +63,7 @@ export class SpriteService {
 		const metaPath = this.getMetaPath(movieId);
 		if (!existsSync(metaPath)) return null;
 		try {
-			const raw = require('node:fs').readFileSync(metaPath, 'utf-8');
+			const raw = readFileSync(metaPath, 'utf-8');
 			return JSON.parse(raw) as SpriteMeta;
 		} catch {
 			return null;
@@ -150,7 +150,7 @@ export class SpriteService {
 			const src = join(movieDir, files[i]!);
 			const dst = join(movieDir, `${i}.jpg`);
 			if (src !== dst) {
-				require('node:fs').renameSync(src, dst);
+				renameSync(src, dst);
 			}
 		}
 
