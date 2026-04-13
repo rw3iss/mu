@@ -327,12 +327,9 @@ export function GlobalPlayer() {
 					clearTimeout(videoClickTimerRef.current);
 					videoClickTimerRef.current = null;
 				}
-				// In fullscreen full mode: exit fullscreen and minimize
+				// In fullscreen full mode: just exit fullscreen (stay in full mode)
 				if (document.fullscreenElement && playerMode.value === 'full') {
-					document
-						.exitFullscreen()
-						.then(() => minimizePlayer())
-						.catch(() => {});
+					document.exitFullscreen().catch(() => {});
 					return;
 				}
 				handleToggleFullscreen();
