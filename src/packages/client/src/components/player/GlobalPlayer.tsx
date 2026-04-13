@@ -327,6 +327,14 @@ export function GlobalPlayer() {
 					clearTimeout(videoClickTimerRef.current);
 					videoClickTimerRef.current = null;
 				}
+				// In fullscreen full mode: exit fullscreen and minimize
+				if (document.fullscreenElement && playerMode.value === 'full') {
+					document
+						.exitFullscreen()
+						.then(() => minimizePlayer())
+						.catch(() => {});
+					return;
+				}
 				handleToggleFullscreen();
 			};
 
