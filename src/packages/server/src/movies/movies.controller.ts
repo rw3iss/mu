@@ -2,6 +2,7 @@ import type { MovieListQuery } from '@mu/shared';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { MetadataService } from '../metadata/metadata.service.js';
 import { RemoteService } from '../remote/remote.service.js';
 import { HistoryService } from './history.service.js';
 import { MoviesService } from './movies.service.js';
@@ -14,6 +15,7 @@ export class MoviesController {
 		private readonly ratingsService: RatingsService,
 		private readonly historyService: HistoryService,
 		private readonly remoteService: RemoteService,
+		private readonly metadataService: MetadataService,
 	) {}
 
 	@Get()
@@ -213,12 +215,65 @@ export class MoviesController {
 	}
 
 	@Post('bulk')
-	bulkAction(
-		@Body() body: { action: string; movieIds: string[]; playlistId?: string },
+	@Roles('admin')
+	async bulkAction(
+		@Body()
+		body: {
+			action: string;
+			movieIds: string[];
+			options?: { deleteEnclosingFolder?: boolean };
+		},
 		@CurrentUser('id') userId: string,
 	) {
-		return this.moviesService.bulkAction(body.action, body.movieIds, userId, {
-			playlistId: body.playlistId,
-		});
+		const { action, movieIds, options } = body;
+		const results: { movieId: string; success: boolean; error?: string }[] = [];
+
+		for (const movieId of movieIds) {
+			try {
+				switch (action) {
+					case 'rescan':
+						await this.metadataService.rescanMovie(movieId);
+						break;
+					case 'refresh_metadata':
+						await this.metadataService.refreshMetadata(movieId);
+						break;
+					case 'clear_metadata':
+						await this.metadataService.clearMetadata(movieId);
+						break;
+					case 'hide':
+						await this.moviesService.update(movieId, { hidden: true });
+						break;
+					case 'unhide':
+						await this.moviesService.update(movieId, { hidden: false });
+						break;
+					case 'mark_watched':
+						this.historyService.markWatched(userId, movieId);
+						break;
+					case 'mark_unwatched':
+						this.historyService.markUnwatched(userId, movieId);
+						break;
+					case 'remove':
+						this.moviesService.remove(movieId);
+						break;
+					case 'delete_from_disk':
+						await this.moviesService.deleteFromDisk(
+							movieId,
+							options?.deleteEnclosingFolder ?? false,
+						);
+						break;
+					default:
+						throw new Error(`Unknown bulk action: ${action}`);
+				}
+				results.push({ movieId, success: true });
+			} catch (err: any) {
+				results.push({ movieId, success: false, error: err?.message ?? 'Unknown error' });
+			}
+		}
+
+		this.moviesService.invalidateListCache();
+
+		const processed = results.filter((r) => r.success).length;
+		const errors = results.filter((r) => !r.success);
+		return { processed, total: movieIds.length, errors, results };
 	}
 }

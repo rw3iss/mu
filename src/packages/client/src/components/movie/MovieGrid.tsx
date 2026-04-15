@@ -11,6 +11,9 @@ interface MovieGridProps {
 	isLoading?: boolean;
 	emptyMessage?: string;
 	viewMode?: ViewMode;
+	selectionMode?: boolean;
+	selectedIds?: Set<string>;
+	onToggleSelect?: (id: string) => void;
 }
 
 export function MovieGrid({
@@ -18,6 +21,9 @@ export function MovieGrid({
 	isLoading = false,
 	emptyMessage = 'No movies found',
 	viewMode = 'grid',
+	selectionMode = false,
+	selectedIds,
+	onToggleSelect,
 }: MovieGridProps) {
 	if (isLoading) {
 		return (
@@ -35,11 +41,20 @@ export function MovieGrid({
 		);
 	}
 
+	const containerClass = selectionMode ? styles.selectionMode : '';
+
 	if (viewMode === 'list') {
 		return (
-			<div class={styles.list}>
+			<div class={`${styles.list} ${containerClass}`}>
 				{movies.map((movie) => (
-					<MovieListItem key={movie.id} movie={movie} onMovieUpdate={updateMovieInList} />
+					<MovieListItem
+						key={movie.id}
+						movie={movie}
+						onMovieUpdate={updateMovieInList}
+						selectionMode={selectionMode}
+						selected={selectedIds?.has(movie.id) ?? false}
+						onToggleSelect={onToggleSelect}
+					/>
 				))}
 			</div>
 		);
@@ -47,12 +62,15 @@ export function MovieGrid({
 
 	if (viewMode === 'large') {
 		return (
-			<div class={styles.largeGrid}>
+			<div class={`${styles.largeGrid} ${containerClass}`}>
 				{movies.map((movie) => (
 					<MovieLargeCard
 						key={movie.id}
 						movie={movie}
 						onMovieUpdate={updateMovieInList}
+						selectionMode={selectionMode}
+						selected={selectedIds?.has(movie.id) ?? false}
+						onToggleSelect={onToggleSelect}
 					/>
 				))}
 			</div>
@@ -60,9 +78,16 @@ export function MovieGrid({
 	}
 
 	return (
-		<div class={styles.grid}>
+		<div class={`${styles.grid} ${containerClass}`}>
 			{movies.map((movie) => (
-				<MovieCard key={movie.id} movie={movie} onMovieUpdate={updateMovieInList} />
+				<MovieCard
+					key={movie.id}
+					movie={movie}
+					onMovieUpdate={updateMovieInList}
+					selectionMode={selectionMode}
+					selected={selectedIds?.has(movie.id) ?? false}
+					onToggleSelect={onToggleSelect}
+				/>
 			))}
 		</div>
 	);

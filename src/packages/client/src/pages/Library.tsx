@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
+import type { BulkAction } from '@/components/movie/BulkActionsBar';
+import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
 import { MovieGrid } from '@/components/movie/MovieGrid';
 import { useDebounce } from '@/hooks/useDebounce';
 import { PluginSlot } from '@/plugins/PluginSlot';
@@ -109,6 +111,13 @@ export function Library(_props: LibraryProps) {
 	const [genres, setGenres] = useState<string[]>([]);
 	const [showFilters, setShowFilters] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
+	const [editMode, setEditMode] = useState(false);
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	const [bulkLoading, setBulkLoading] = useState(false);
+	const [bulkStatus, setBulkStatus] = useState<{
+		type: 'success' | 'error';
+		message: string;
+	} | null>(null);
 	const debouncedSearch = useDebounce(localSearch, 300);
 	const pendingScrollRef = useRef<number | null>(null);
 	const initialLoadRef = useRef(true);
@@ -216,6 +225,58 @@ export function Library(_props: LibraryProps) {
 	const handleToggleDirection = useCallback(() => {
 		setFilters({ sortOrder: filters.value.sortOrder === 'asc' ? 'desc' : 'asc' });
 	}, []);
+
+	const handleToggleSelect = useCallback((id: string) => {
+		setSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
+			return next;
+		});
+	}, []);
+
+	const handleExitEditMode = useCallback(() => {
+		setEditMode(false);
+		setSelectedIds(new Set());
+		setBulkStatus(null);
+	}, []);
+
+	const handleBulkAction = useCallback(
+		async (action: BulkAction, options?: Record<string, unknown>) => {
+			if (selectedIds.size === 0) return;
+			setBulkLoading(true);
+			setBulkStatus(null);
+			try {
+				const ids = Array.from(selectedIds);
+				const result = await moviesService.bulkAction(action, ids, options as any);
+				const failed = result.errors.length;
+				if (failed === 0) {
+					setBulkStatus({
+						type: 'success',
+						message: `Done: ${result.processed} updated`,
+					});
+				} else {
+					setBulkStatus({
+						type: 'error',
+						message: `${result.processed} succeeded, ${failed} failed`,
+					});
+				}
+				// Refresh the movie list after destructive/mutating operations
+				await fetchMovies(currentPage.value);
+				// Clear selection after remove/delete
+				if (action === 'remove' || action === 'delete_from_disk') {
+					setSelectedIds(new Set());
+				}
+			} catch (err: any) {
+				setBulkStatus({ type: 'error', message: err?.message ?? 'Action failed' });
+			} finally {
+				setBulkLoading(false);
+				// Auto-clear success status after 4 seconds
+				setTimeout(() => setBulkStatus(null), 4000);
+			}
+		},
+		[selectedIds],
+	);
 
 	return (
 		<div class={styles.library}>
@@ -332,6 +393,22 @@ export function Library(_props: LibraryProps) {
 						</button>
 					</div>
 
+					<button
+						class={`${styles.editBtn} ${editMode ? styles.active : ''}`}
+						onClick={() => {
+							if (editMode) {
+								handleExitEditMode();
+							} else {
+								setEditMode(true);
+								setBulkStatus(null);
+							}
+						}}
+						aria-label="Toggle edit mode"
+						title="Select movies for bulk actions"
+					>
+						{'\u270E'}
+					</button>
+
 					<Button variant="ghost" size="sm" onClick={() => setShowFilters(!showFilters)}>
 						Filters{' '}
 						{filters.value.genres.length > 0 ? `(${filters.value.genres.length})` : ''}
@@ -363,11 +440,27 @@ export function Library(_props: LibraryProps) {
 
 			<PluginSlot name={UI.LIBRARY_TOOLBAR} context={{}} />
 
+			{/* Bulk Actions Bar */}
+			{editMode && (
+				<BulkActionsBar
+					selectedIds={selectedIds}
+					selectedMovies={movies.value.filter((m) => selectedIds.has(m.id))}
+					onAction={handleBulkAction}
+					isLoading={bulkLoading}
+					status={bulkStatus}
+					onClearSelection={() => setSelectedIds(new Set())}
+					onExitEditMode={handleExitEditMode}
+				/>
+			)}
+
 			{/* Movie Grid */}
 			<MovieGrid
 				movies={movies.value}
 				isLoading={isLoading.value}
 				viewMode={viewMode.value}
+				selectionMode={editMode}
+				selectedIds={selectedIds}
+				onToggleSelect={handleToggleSelect}
 				emptyMessage={
 					searchQuery.value
 						? `No results for "${searchQuery.value}"`

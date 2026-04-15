@@ -41,6 +41,12 @@
   }
 }
 
+.selectionMode {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-lg);
+}
+
 .loading {
   display: flex;
   align-items: center;

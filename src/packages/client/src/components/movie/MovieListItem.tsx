@@ -12,27 +12,40 @@ import { MovieOptionsMenu } from './MovieOptionsMenu';
 interface MovieListItemProps {
 	movie: Movie;
 	onMovieUpdate?: (movie: Movie) => void;
+	selectionMode?: boolean;
+	selected?: boolean;
+	onToggleSelect?: (id: string) => void;
 }
 
-export function MovieListItem({ movie, onMovieUpdate }: MovieListItemProps) {
+export function MovieListItem({
+	movie,
+	onMovieUpdate,
+	selectionMode = false,
+	selected = false,
+	onToggleSelect,
+}: MovieListItemProps) {
 	const handleClick = useCallback(() => {
-		route(`/movie/${movie.id}`);
-	}, [movie.id]);
+		if (selectionMode) {
+			onToggleSelect?.(movie.id);
+		} else {
+			route(`/movie/${movie.id}`);
+		}
+	}, [movie.id, selectionMode, onToggleSelect]);
 
 	const handlePlay = useCallback(
 		(e: Event) => {
 			e.stopPropagation();
-			playMovie(movie.id, { fromBeginning: true });
+			if (!selectionMode) playMovie(movie.id, { fromBeginning: true });
 		},
-		[movie.id],
+		[movie.id, selectionMode],
 	);
 
 	const handleResume = useCallback(
 		(e: Event) => {
 			e.stopPropagation();
-			playMovie(movie.id);
+			if (!selectionMode) playMovie(movie.id);
 		},
-		[movie.id],
+		[movie.id, selectionMode],
 	);
 
 	const rating = movie.rating ?? 0;
@@ -52,11 +65,16 @@ export function MovieListItem({ movie, onMovieUpdate }: MovieListItemProps) {
 
 	return (
 		<div
-			class={`${styles.row} ${movie.hidden ? styles.hidden : ''}`}
+			class={`${styles.row} ${movie.hidden ? styles.hidden : ''} ${selectionMode ? styles.selectable : ''} ${selected ? styles.selected : ''}`}
 			onClick={handleClick}
 			role="button"
 			tabIndex={0}
 		>
+			{selectionMode && (
+				<div class={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`}>
+					{selected && '\u2713'}
+				</div>
+			)}
 			<div class={styles.poster}>
 				{movie.posterUrl ? (
 					<img
@@ -99,24 +117,28 @@ export function MovieListItem({ movie, onMovieUpdate }: MovieListItemProps) {
 					</span>
 				)}
 				<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
-				<button
-					class={styles.playButton}
-					onClick={handlePlay}
-					aria-label={`Play ${movie.title}`}
-				>
-					Play
-				</button>
-				{hasWatchProgress(movie) && (
-					<button
-						class={styles.resumeButton}
-						onClick={handleResume}
-						aria-label={`Resume ${movie.title}`}
-					>
-						Resume
-					</button>
-				)}
-				{!movie.remoteOrigin && (
-					<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+				{!selectionMode && (
+					<>
+						<button
+							class={styles.playButton}
+							onClick={handlePlay}
+							aria-label={`Play ${movie.title}`}
+						>
+							Play
+						</button>
+						{hasWatchProgress(movie) && (
+							<button
+								class={styles.resumeButton}
+								onClick={handleResume}
+								aria-label={`Resume ${movie.title}`}
+							>
+								Resume
+							</button>
+						)}
+						{!movie.remoteOrigin && (
+							<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+						)}
+					</>
 				)}
 			</div>
 		</div>

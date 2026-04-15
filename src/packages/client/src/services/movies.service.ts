@@ -174,4 +174,22 @@ export const moviesService = {
 	markUnwatched(movieId: string): Promise<{ success: boolean }> {
 		return api.delete<{ success: boolean }>(`/movies/${movieId}/watched`);
 	},
+
+	/**
+	 * Perform a bulk action on multiple movies.
+	 * Actions: rescan, refresh_metadata, clear_metadata, hide, unhide,
+	 *          mark_watched, mark_unwatched, remove, delete_from_disk
+	 */
+	bulkAction(
+		action: string,
+		movieIds: string[],
+		options?: { deleteEnclosingFolder?: boolean },
+	): Promise<{
+		processed: number;
+		total: number;
+		errors: { movieId: string; error: string }[];
+		results: { movieId: string; success: boolean; error?: string }[];
+	}> {
+		return api.post('/movies/bulk', { action, movieIds, options });
+	},
 };

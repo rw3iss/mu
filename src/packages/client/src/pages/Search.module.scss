@@ -4,9 +4,16 @@
 
 .header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-md);
   margin-bottom: var(--space-xl);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
 }
 
 .title {
@@ -18,6 +25,61 @@
 .count {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.viewToggle {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.viewButton {
+  padding: var(--space-sm) var(--space-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  transition: all var(--transition-fast);
+  min-width: 36px;
+
+  &.active {
+    background: var(--color-accent);
+    color: #ffffff;
+  }
+
+  &:hover:not(.active) {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
+  }
+}
+
+.editBtn {
+  padding: var(--space-sm);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  min-width: 36px;
+  transition: all var(--transition-fast);
+
+  &.active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #ffffff;
+  }
+
+  &:hover:not(.active) {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
+  }
 }
 
 .empty {

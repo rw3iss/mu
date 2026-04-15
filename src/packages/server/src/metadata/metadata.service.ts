@@ -1,6 +1,8 @@
+import { existsSync, statSync } from 'node:fs';
 import { nowISO, WsEvent } from '@mu/shared';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
@@ -327,6 +329,178 @@ export class MetadataService {
 		}
 
 		return results;
+	}
+
+	/**
+	 * Clear all metadata for a movie and reset its title to the filename-derived name.
+	 */
+	async clearMetadata(movieId: string): Promise<void> {
+		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
+		if (!movie) throw new NotFoundException(`Movie ${movieId} not found`);
+
+		const file = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, movieId))
+			.get();
+		let baseTitle = movie.title;
+		if (file?.fileName) {
+			baseTitle = file.fileName
+				.replace(/\.[^.]+$/, '')
+				.replace(/[._]/g, ' ')
+				.replace(/\s+/g, ' ')
+				.trim();
+		}
+
+		this.database.db
+			.update(movies)
+			.set({
+				title: baseTitle,
+				year: null,
+				overview: null,
+				tagline: null,
+				originalTitle: null,
+				posterUrl: null,
+				backdropUrl: null,
+				trailerUrl: null,
+				imdbId: null,
+				tmdbId: null,
+				releaseDate: null,
+				language: null,
+				country: null,
+				contentRating: null,
+				runtimeMinutes: null,
+				updatedAt: nowISO(),
+			})
+			.where(eq(movies.id, movieId))
+			.run();
+
+		this.database.db.delete(movieMetadata).where(eq(movieMetadata.movieId, movieId)).run();
+		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'clear-metadata' });
+	}
+
+	/**
+	 * Re-probe a movie's files with FFprobe and update codec info in the DB.
+	 */
+	async rescanMovie(
+		movieId: string,
+	): Promise<{ updated: number; missing: number; errors: number }> {
+		const files = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, movieId))
+			.all();
+
+		let updated = 0;
+		let missing = 0;
+		let errors = 0;
+
+		for (const file of files) {
+			if (!existsSync(file.filePath)) {
+				this.database.db
+					.update(movieFiles)
+					.set({ available: false })
+					.where(eq(movieFiles.id, file.id))
+					.run();
+				missing++;
+				continue;
+			}
+
+			try {
+				const stat = statSync(file.filePath);
+				if (stat.size < 1024) {
+					this.database.db
+						.update(movieFiles)
+						.set({ available: false })
+						.where(eq(movieFiles.id, file.id))
+						.run();
+					errors++;
+					continue;
+				}
+
+				if (!file.available) {
+					this.database.db
+						.update(movieFiles)
+						.set({ available: true })
+						.where(eq(movieFiles.id, file.id))
+						.run();
+				}
+			} catch {
+				missing++;
+				continue;
+			}
+
+			try {
+				await new Promise<void>((resolve, reject) => {
+					ffmpeg.ffprobe(file.filePath, (err, metadata) => {
+						if (err) {
+							reject(err);
+							return;
+						}
+
+						const videoStream = metadata.streams?.find((s) => s.codec_type === 'video');
+						const audioStream = metadata.streams?.find((s) => s.codec_type === 'audio');
+						const width = videoStream?.width;
+						const height = videoStream?.height;
+						let resolution: string | undefined;
+						if (height) {
+							if (height >= 2160) resolution = '2160p';
+							else if (height >= 1080) resolution = '1080p';
+							else if (height >= 720) resolution = '720p';
+							else if (height >= 480) resolution = '480p';
+							else resolution = `${height}p`;
+						}
+						const audioStreams = (metadata.streams ?? []).filter(
+							(s) => s.codec_type === 'audio',
+						);
+						const audioTracks = audioStreams.map((s: any, i: number) => ({
+							index: i,
+							codec: s.codec_name ?? 'unknown',
+							language: s.tags?.language ?? 'und',
+							title: s.tags?.title ?? `Track ${i + 1}`,
+							channels: s.channels ?? 0,
+						}));
+						const subtitleStreams = (metadata.streams ?? []).filter(
+							(s) => s.codec_type === 'subtitle',
+						);
+						const subtitleTracks = subtitleStreams.map((s: any, i: number) => ({
+							index: i,
+							codec: s.codec_name ?? 'unknown',
+							language: s.tags?.language ?? 'und',
+							title: s.tags?.title ?? `Track ${i + 1}`,
+						}));
+
+						this.database.db
+							.update(movieFiles)
+							.set({
+								codecVideo: videoStream?.codec_name ?? null,
+								codecAudio: audioStream?.codec_name ?? null,
+								resolution: resolution ?? file.resolution,
+								durationSeconds: metadata.format?.duration
+									? Math.round(metadata.format.duration)
+									: null,
+								bitrate: metadata.format?.bit_rate
+									? Math.round(Number(metadata.format.bit_rate))
+									: null,
+								videoWidth: width ?? null,
+								videoHeight: height ?? null,
+								audioTracks: JSON.stringify(audioTracks),
+								subtitleTracks: JSON.stringify(subtitleTracks),
+							})
+							.where(eq(movieFiles.id, file.id))
+							.run();
+
+						resolve();
+					});
+				});
+				updated++;
+			} catch {
+				errors++;
+			}
+		}
+
+		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'rescan' });
+		return { updated, missing, errors };
 	}
 
 	/**

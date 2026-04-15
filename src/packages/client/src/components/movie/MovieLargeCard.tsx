@@ -1,4 +1,4 @@
-import { useCallback } from 'preact/hooks';
+import { useCallback, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
@@ -12,28 +12,53 @@ import { MovieOptionsMenu } from './MovieOptionsMenu';
 interface MovieLargeCardProps {
 	movie: Movie;
 	onMovieUpdate?: (movie: Movie) => void;
+	selectionMode?: boolean;
+	selected?: boolean;
+	onToggleSelect?: (id: string) => void;
 }
 
-export function MovieLargeCard({ movie, onMovieUpdate }: MovieLargeCardProps) {
+export function MovieLargeCard({
+	movie,
+	onMovieUpdate,
+	selectionMode = false,
+	selected = false,
+	onToggleSelect,
+}: MovieLargeCardProps) {
 	const handleClick = useCallback(() => {
-		route(`/movie/${movie.id}`);
-	}, [movie.id]);
+		if (selectionMode) {
+			onToggleSelect?.(movie.id);
+		} else {
+			route(`/movie/${movie.id}`);
+		}
+	}, [movie.id, selectionMode, onToggleSelect]);
 
 	const handlePlay = useCallback(
 		(e: Event) => {
 			e.stopPropagation();
-			playMovie(movie.id, { fromBeginning: true });
+			if (!selectionMode) playMovie(movie.id, { fromBeginning: true });
 		},
-		[movie.id],
+		[movie.id, selectionMode],
 	);
 
 	const handleResume = useCallback(
 		(e: Event) => {
 			e.stopPropagation();
-			playMovie(movie.id);
+			if (!selectionMode) playMovie(movie.id);
 		},
-		[movie.id],
+		[movie.id, selectionMode],
 	);
+
+	const [tooltipVisible, setTooltipVisible] = useState(false);
+	const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const handleTitleMouseEnter = useCallback(() => {
+		tooltipTimer.current = setTimeout(() => setTooltipVisible(true), 1000);
+	}, []);
+
+	const handleTitleMouseLeave = useCallback(() => {
+		if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
+		setTooltipVisible(false);
+	}, []);
 
 	const rating = movie.rating ?? 0;
 	const ratingColor = getRatingColor(rating);
@@ -55,11 +80,16 @@ export function MovieLargeCard({ movie, onMovieUpdate }: MovieLargeCardProps) {
 
 	return (
 		<div
-			class={`${styles.card} ${movie.hidden ? styles.hidden : ''}`}
+			class={`${styles.card} ${movie.hidden ? styles.hidden : ''} ${selectionMode ? styles.selectable : ''} ${selected ? styles.selected : ''}`}
 			onClick={handleClick}
 			role="button"
 			tabIndex={0}
 		>
+			{selectionMode && (
+				<div class={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`}>
+					{selected && '\u2713'}
+				</div>
+			)}
 			{movie.hidden && <span class={styles.hiddenLabel}>Hidden</span>}
 			<div class={styles.thumbnail}>
 				{imageUrl ? (
@@ -75,24 +105,26 @@ export function MovieLargeCard({ movie, onMovieUpdate }: MovieLargeCardProps) {
 					</div>
 				)}
 
-				<div class={styles.overlay}>
-					<button
-						class={styles.playButton}
-						onClick={handlePlay}
-						aria-label={`Play ${movie.title}`}
-					>
-						Play
-					</button>
-					{hasWatchProgress(movie) && (
+				{!selectionMode && (
+					<div class={styles.overlay}>
 						<button
-							class={styles.resumeButton}
-							onClick={handleResume}
-							aria-label={`Resume ${movie.title}`}
+							class={styles.playButton}
+							onClick={handlePlay}
+							aria-label={`Play ${movie.title}`}
 						>
-							Resume
+							Play
 						</button>
-					)}
-				</div>
+						{hasWatchProgress(movie) && (
+							<button
+								class={styles.resumeButton}
+								onClick={handleResume}
+								aria-label={`Resume ${movie.title}`}
+							>
+								Resume
+							</button>
+						)}
+					</div>
+				)}
 			</div>
 
 			{hasWatchProgress(movie) && (
@@ -106,7 +138,14 @@ export function MovieLargeCard({ movie, onMovieUpdate }: MovieLargeCardProps) {
 
 			<div class={styles.info}>
 				<div class={styles.infoTop}>
-					<h3 class={styles.title}>{movie.title}</h3>
+					<h3
+						class={styles.title}
+						onMouseEnter={handleTitleMouseEnter}
+						onMouseLeave={handleTitleMouseLeave}
+					>
+						{movie.title}
+						{tooltipVisible && <span class={styles.titleTooltip}>{movie.title}</span>}
+					</h3>
 					<div class={styles.infoRight}>
 						{rating > 0 && (
 							<span class={styles.ratingBadge} style={{ background: ratingColor }}>
@@ -114,7 +153,7 @@ export function MovieLargeCard({ movie, onMovieUpdate }: MovieLargeCardProps) {
 							</span>
 						)}
 						<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
-						{!movie.remoteOrigin && (
+						{!selectionMode && !movie.remoteOrigin && (
 							<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
 						)}
 					</div>

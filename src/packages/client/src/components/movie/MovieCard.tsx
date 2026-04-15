@@ -1,4 +1,4 @@
-import { useCallback } from 'preact/hooks';
+import { useCallback, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
@@ -14,28 +14,53 @@ import { MovieOptionsMenu } from './MovieOptionsMenu';
 interface MovieCardProps {
 	movie: Movie;
 	onMovieUpdate?: (movie: Movie) => void;
+	selectionMode?: boolean;
+	selected?: boolean;
+	onToggleSelect?: (id: string) => void;
 }
 
-export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
+export function MovieCard({
+	movie,
+	onMovieUpdate,
+	selectionMode = false,
+	selected = false,
+	onToggleSelect,
+}: MovieCardProps) {
 	const handleClick = useCallback(() => {
-		route(`/movie/${movie.id}`);
-	}, [movie.id]);
+		if (selectionMode) {
+			onToggleSelect?.(movie.id);
+		} else {
+			route(`/movie/${movie.id}`);
+		}
+	}, [movie.id, selectionMode, onToggleSelect]);
 
 	const handlePlay = useCallback(
 		(e: Event) => {
 			e.stopPropagation();
-			playMovie(movie.id, { fromBeginning: true });
+			if (!selectionMode) playMovie(movie.id, { fromBeginning: true });
 		},
-		[movie.id],
+		[movie.id, selectionMode],
 	);
 
 	const handleResume = useCallback(
 		(e: Event) => {
 			e.stopPropagation();
-			playMovie(movie.id);
+			if (!selectionMode) playMovie(movie.id);
 		},
-		[movie.id],
+		[movie.id, selectionMode],
 	);
+
+	const [tooltipVisible, setTooltipVisible] = useState(false);
+	const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const handleTitleMouseEnter = useCallback(() => {
+		tooltipTimer.current = setTimeout(() => setTooltipVisible(true), 1000);
+	}, []);
+
+	const handleTitleMouseLeave = useCallback(() => {
+		if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
+		setTooltipVisible(false);
+	}, []);
 
 	const rating = movie.rating ?? 0;
 	const ratingColor = getRatingColor(rating);
@@ -46,11 +71,16 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 
 	return (
 		<div
-			class={`${styles.card} ${movie.hidden ? styles.hidden : ''} ${isProcessing ? styles.processing : ''}`}
+			class={`${styles.card} ${movie.hidden ? styles.hidden : ''} ${isProcessing ? styles.processing : ''} ${selectionMode ? styles.selectable : ''} ${selected ? styles.selected : ''}`}
 			onClick={handleClick}
 			role="button"
 			tabIndex={0}
 		>
+			{selectionMode && (
+				<div class={`${styles.checkbox} ${selected ? styles.checkboxChecked : ''}`}>
+					{selected && '\u2713'}
+				</div>
+			)}
 			{isProcessing && (
 				<div class={styles.processingOverlay}>
 					{progress != null ? `${progress}%` : 'Processing...'}
@@ -85,24 +115,26 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 					</div>
 				)}
 
-				<div class={styles.overlay}>
-					<button
-						class={styles.playButton}
-						onClick={handlePlay}
-						aria-label={`Play ${movie.title}`}
-					>
-						Play
-					</button>
-					{hasWatchProgress(movie) && (
+				{!selectionMode && (
+					<div class={styles.overlay}>
 						<button
-							class={styles.resumeButton}
-							onClick={handleResume}
-							aria-label={`Resume ${movie.title}`}
+							class={styles.playButton}
+							onClick={handlePlay}
+							aria-label={`Play ${movie.title}`}
 						>
-							Resume
+							Play
 						</button>
-					)}
-				</div>
+						{hasWatchProgress(movie) && (
+							<button
+								class={styles.resumeButton}
+								onClick={handleResume}
+								aria-label={`Resume ${movie.title}`}
+							>
+								Resume
+							</button>
+						)}
+					</div>
+				)}
 			</div>
 
 			{hasWatchProgress(movie) && (
@@ -115,7 +147,14 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 			)}
 
 			<div class={styles.info}>
-				<h3 class={styles.title}>{movie.title}</h3>
+				<h3
+					class={styles.title}
+					onMouseEnter={handleTitleMouseEnter}
+					onMouseLeave={handleTitleMouseLeave}
+				>
+					{movie.title}
+					{tooltipVisible && <span class={styles.titleTooltip}>{movie.title}</span>}
+				</h3>
 				<div class={styles.details}>
 					{movie.year && <span class={styles.year}>{movie.year}</span>}
 					{movie.year && movie.runtime > 0 && <span class={styles.dot}>{'\u00B7'}</span>}
@@ -125,7 +164,7 @@ export function MovieCard({ movie, onMovieUpdate }: MovieCardProps) {
 						</span>
 					)}
 					<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
-					{!movie.remoteOrigin && (
+					{!selectionMode && !movie.remoteOrigin && (
 						<span class={styles.optionsWrap}>
 							<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
 						</span>
