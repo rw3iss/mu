@@ -1,6 +1,6 @@
 import { existsSync, statSync } from 'node:fs';
 import { basename } from 'node:path';
-import { nowISO, WsEvent } from '@mu/shared';
+import { WsEvent } from '@mu/shared';
 import { Controller, Logger, Param, Post } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
@@ -63,57 +63,11 @@ export class MetadataController {
 	@Post('movies/:id/clear-metadata')
 	@Roles('admin')
 	async clearMetadata(@Param('id') movieId: string) {
-		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
-		if (!movie) return { message: 'Movie not found' };
-
-		// Derive a basic title from the movie's file name
-		const file = this.database.db
-			.select()
-			.from(movieFiles)
-			.where(eq(movieFiles.movieId, movieId))
-			.get();
-		let baseTitle = movie.title;
-		if (file?.fileName) {
-			// Strip extension and clean up filename for display
-			baseTitle = file.fileName
-				.replace(/\.[^.]+$/, '')
-				.replace(/[._]/g, ' ')
-				.replace(/\s+/g, ' ')
-				.trim();
+		try {
+			await this.metadataService.clearMetadata(movieId);
+		} catch {
+			return { message: 'Movie not found' };
 		}
-
-		// Clear all metadata and reset title to filename-derived name
-		this.database.db
-			.update(movies)
-			.set({
-				title: baseTitle,
-				year: null,
-				overview: null,
-				tagline: null,
-				originalTitle: null,
-				posterUrl: null,
-				backdropUrl: null,
-				trailerUrl: null,
-				imdbId: null,
-				tmdbId: null,
-				releaseDate: null,
-				language: null,
-				country: null,
-				contentRating: null,
-				runtimeMinutes: null,
-				updatedAt: nowISO(),
-			})
-			.where(eq(movies.id, movieId))
-			.run();
-
-		// Delete the movie_metadata record entirely
-		this.database.db.delete(movieMetadata).where(eq(movieMetadata.movieId, movieId)).run();
-
-		this.logger.log(
-			`Cleared metadata for movie ${this.guidResolver.resolve(movieId)} (${movie.title})`,
-		);
-		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'clear-metadata' });
-
 		return { message: 'Metadata cleared' };
 	}
 
