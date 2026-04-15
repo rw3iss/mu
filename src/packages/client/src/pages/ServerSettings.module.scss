@@ -334,6 +334,26 @@
   white-space: nowrap;
 }
 
+.jobRetryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color 120ms ease, background 120ms ease;
+
+  &:hover {
+    color: #fff;
+    background: var(--color-accent);
+  }
+}
+
 .jobDetailsBtn {
   display: inline-flex;
   align-items: center;

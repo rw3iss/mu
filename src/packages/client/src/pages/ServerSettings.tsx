@@ -626,6 +626,29 @@ function JobsSection() {
 											})}
 										</span>
 									)}
+									{job.status === 'failed' && (
+										<button
+											class={styles.jobRetryBtn}
+											onClick={(e: Event) => {
+												e.stopPropagation();
+												handleAction(job.id, 'retry');
+											}}
+											title="Retry"
+										>
+											<svg
+												width="14"
+												height="14"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2"
+												stroke-linecap="round"
+											>
+												<polyline points="23 4 23 10 17 10" />
+												<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+											</svg>
+										</button>
+									)}
 									<button
 										class={styles.jobDetailsBtn}
 										onClick={(e: Event) => {

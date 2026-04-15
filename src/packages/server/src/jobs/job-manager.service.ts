@@ -241,6 +241,25 @@ export class JobManagerService implements OnModuleDestroy {
 	}
 
 	/**
+	 * Retry a failed or cancelled job by re-enqueuing it with the same descriptor.
+	 */
+	retry(id: string): string | null {
+		const job = this.jobs.get(id);
+		if (!job || (job.status !== 'failed' && job.status !== 'completed')) return null;
+
+		// Remove the old job record
+		this.jobs.delete(id);
+
+		// Re-enqueue with the same descriptor
+		return this.enqueue({
+			type: job.type,
+			label: job.label,
+			payload: job.payload,
+			priority: job.priority,
+		});
+	}
+
+	/**
 	 * Find jobs whose payload matches a key/value pair.
 	 */
 	findJobsByPayload(

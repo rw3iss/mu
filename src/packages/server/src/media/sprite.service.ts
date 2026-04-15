@@ -112,7 +112,8 @@ export class SpriteService {
 		);
 
 		const ffmpegPath = this.detectFfmpeg();
-		const filePath = file.filePath.replace(/\\/g, '/');
+		// Use the native file path — spawn passes args individually so special chars are safe
+		const filePath = file.filePath;
 		const framesDir = join(movieDir, '_frames');
 		mkdirSync(framesDir, { recursive: true });
 
@@ -175,7 +176,7 @@ export class SpriteService {
 					'-safe',
 					'0',
 					'-i',
-					concatPath.replace(/\\/g, '/'),
+					concatPath,
 					'-vf',
 					`tile=${COLUMNS}x${rows}`,
 					'-q:v',

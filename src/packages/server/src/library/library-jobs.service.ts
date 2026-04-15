@@ -160,8 +160,40 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					}
 				}
 
+				// Retry any failed metadata/thumbnail/sprite jobs from previous runs
+				const retryTypes = [JOB_TYPE.METADATA, JOB_TYPE.THUMBNAIL, JOB_TYPE.SPRITE_SHEET];
+				let retriedCount = 0;
+				for (const type of retryTypes) {
+					const failedJobs = this.jobManager
+						.listJobs({ type })
+						.filter((j) => j.status === 'failed');
+					for (const failedJob of failedJobs) {
+						// Skip if a pending/running job already exists for the same movieId
+						const movieId = failedJob.payload?.movieId as string | undefined;
+						if (movieId) {
+							const existing = this.jobManager.findJobsByPayload(
+								'movieId',
+								movieId,
+								type,
+								['pending', 'running'],
+							);
+							if (existing.length > 0) continue;
+						}
+						this.jobManager.retry(failedJob.id);
+						retriedCount++;
+					}
+				}
+				if (retriedCount > 0) {
+					helpers.log(`Retried ${retriedCount} previously failed job(s)`);
+				}
+
 				helpers.reportProgress(100);
-				return { sourceCount: sources.length, totalFilesFound, totalFilesAdded };
+				return {
+					sourceCount: sources.length,
+					totalFilesFound,
+					totalFilesAdded,
+					retriedCount,
+				};
 			},
 		);
 

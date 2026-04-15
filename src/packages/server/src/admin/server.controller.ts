@@ -177,4 +177,11 @@ export class ServerController {
 		const result = this.jobManager.prioritize(id);
 		return { success: result };
 	}
+
+	@Post('jobs/:id/retry')
+	@Roles('admin')
+	retryJob(@Param('id') id: string) {
+		const newId = this.jobManager.retry(id);
+		return { success: !!newId, newJobId: newId };
+	}
 }
