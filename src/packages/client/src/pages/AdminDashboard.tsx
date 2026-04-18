@@ -3,7 +3,7 @@ import { Button } from '@/components/common/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
-import type { ActiveSession } from '@/services/stream.service';
+import type { ActiveSession, SessionHistoryEntry } from '@/services/stream.service';
 import { streamService } from '@/services/stream.service';
 import { fetchMovies } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
@@ -36,6 +36,9 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	const [clearingWatched, setClearingWatched] = useState(false);
 	const [showClearWatchedConfirm, setShowClearWatchedConfirm] = useState(false);
 	const [watchedMovieCount, setWatchedMovieCount] = useState(0);
+	const [sessionHistory, setSessionHistory] = useState<SessionHistoryEntry[]>([]);
+	const [clearingHistory, setClearingHistory] = useState(false);
+	const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
 
 	useEffect(() => {
 		loadData();
@@ -44,13 +47,15 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	async function loadData() {
 		setIsLoading(true);
 		try {
-			const [info, sessions] = await Promise.allSettled([
+			const [info, sessions, history] = await Promise.allSettled([
 				api.get<SystemInfo>('/admin/system'),
 				streamService.getActiveSessions(),
+				streamService.getSessionHistory(),
 			]);
 
 			if (info.status === 'fulfilled') setSystemInfo(info.value);
 			if (sessions.status === 'fulfilled') setActiveSessions(sessions.value);
+			if (history.status === 'fulfilled') setSessionHistory(history.value);
 
 			api.get<{ count: number }>('/history/watched/count')
 				.then((res) => setWatchedMovieCount(res.count))
@@ -185,6 +190,22 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 			notifyError('Failed to end sessions');
 		} finally {
 			setEndingAll(false);
+		}
+	}, []);
+
+	const handleClearSessionHistory = useCallback(async () => {
+		setClearingHistory(true);
+		try {
+			const result = await streamService.clearSessionHistory();
+			setSessionHistory((prev) => prev.filter((s) => s.isActive));
+			notifySuccess(
+				`Cleared ${result.clearedCount} history entries (${result.preservedCount} active preserved)`,
+			);
+			fetchMovies(1);
+		} catch {
+			notifyError('Failed to clear session history');
+		} finally {
+			setClearingHistory(false);
 		}
 	}, []);
 
@@ -371,6 +392,79 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						))}
 					</div>
 				)}
+			</section>
+
+			{/* Session History */}
+			<section class={styles.section}>
+				<div class={styles.sectionHeader}>
+					<h2 class={styles.sectionTitle}>
+						Session History{' '}
+						<span class={styles.countBadge}>{sessionHistory.length}</span>
+					</h2>
+					{sessionHistory.length > 0 && (
+						<Button
+							variant="danger"
+							size="sm"
+							onClick={() => setShowClearHistoryConfirm(true)}
+							loading={clearingHistory}
+						>
+							Clear History
+						</Button>
+					)}
+				</div>
+				{sessionHistory.length === 0 ? (
+					<p class={styles.emptyText}>No session history</p>
+				) : (
+					<div class={styles.historyList}>
+						{sessionHistory.map((entry) => (
+							<div
+								key={entry.id}
+								class={`${styles.historyItem} ${entry.isActive ? styles.historyActive : ''}`}
+							>
+								<div class={styles.sessionInfo}>
+									<span class={styles.sessionUser}>
+										{entry.username || 'Unknown user'}
+									</span>
+									<span class={styles.sessionMovie}>
+										{entry.movieTitle || 'Unknown movie'}
+										{entry.movieYear ? ` (${entry.movieYear})` : ''}
+									</span>
+								</div>
+								<div class={styles.historyMeta}>
+									{entry.completed && (
+										<span class={styles.completedBadge}>Watched</span>
+									)}
+									{entry.durationWatchedSeconds != null &&
+										entry.durationWatchedSeconds > 0 && (
+											<span class={styles.historyDuration}>
+												{Math.floor(entry.durationWatchedSeconds / 60)}m
+												watched
+											</span>
+										)}
+									{entry.isActive && (
+										<span class={styles.activeBadge}>Active</span>
+									)}
+								</div>
+								<span class={styles.sessionTime}>
+									{new Date(entry.watchedAt).toLocaleDateString()}{' '}
+									{new Date(entry.watchedAt).toLocaleTimeString([], {
+										hour: '2-digit',
+										minute: '2-digit',
+									})}
+								</span>
+							</div>
+						))}
+					</div>
+				)}
+				<ConfirmDialog
+					isOpen={showClearHistoryConfirm}
+					onClose={() => setShowClearHistoryConfirm(false)}
+					onConfirm={handleClearSessionHistory}
+					title="Clear Session History"
+					message={`This will clear ${sessionHistory.filter((s) => !s.isActive).length} history entries. Entries for currently active streams will be preserved. This will also reset "watched" status and resume positions for all cleared movies. This cannot be undone.`}
+					confirmLabel="Clear History"
+					variant="danger"
+				/>
 			</section>
 		</div>
 	);

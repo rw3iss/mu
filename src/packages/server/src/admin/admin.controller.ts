@@ -1,10 +1,16 @@
 import { existsSync } from 'node:fs';
-import { Controller, Delete, Logger, Param, Post } from '@nestjs/common';
+import { Controller, Delete, Get, Logger, Param, Post } from '@nestjs/common';
 import { eq, isNull } from 'drizzle-orm';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { movieFiles, movies } from '../database/schema/index.js';
+import {
+	movieFiles,
+	movies,
+	streamSessions,
+	users,
+	userWatchHistory,
+} from '../database/schema/index.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { SpriteService } from '../media/sprite.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
@@ -150,6 +156,96 @@ export class AdminController {
 	async endAllSessions() {
 		const ended = await this.streamService.endAllSessions();
 		return { success: true, endedCount: ended };
+	}
+
+	/**
+	 * Get session history — past watch records across all users.
+	 */
+	@Get('session-history')
+	@Roles('admin')
+	getSessionHistory() {
+		// Get current active session movie+user pairs to mark them
+		const activeSessionPairs = new Set(
+			this.database.db
+				.select({
+					movieId: streamSessions.movieId,
+					userId: streamSessions.userId,
+				})
+				.from(streamSessions)
+				.all()
+				.map((s) => `${s.userId}:${s.movieId}`),
+		);
+
+		const rows = this.database.db
+			.select({
+				id: userWatchHistory.id,
+				userId: userWatchHistory.userId,
+				username: users.username,
+				movieId: userWatchHistory.movieId,
+				movieTitle: movies.title,
+				movieYear: movies.year,
+				watchedAt: userWatchHistory.watchedAt,
+				durationWatchedSeconds: userWatchHistory.durationWatchedSeconds,
+				completed: userWatchHistory.completed,
+				positionSeconds: userWatchHistory.positionSeconds,
+			})
+			.from(userWatchHistory)
+			.leftJoin(users, eq(userWatchHistory.userId, users.id))
+			.leftJoin(movies, eq(userWatchHistory.movieId, movies.id))
+			.orderBy(userWatchHistory.watchedAt)
+			.all();
+
+		return rows.map((row) => ({
+			...row,
+			isActive: activeSessionPairs.has(`${row.userId}:${row.movieId}`),
+		}));
+	}
+
+	/**
+	 * Clear all session history (watch records) except entries for currently active streams.
+	 */
+	@Delete('session-history')
+	@Roles('admin')
+	clearSessionHistory() {
+		// Find history IDs belonging to active streams — preserve those
+		const activeStreams = this.database.db
+			.select({ userId: streamSessions.userId, movieId: streamSessions.movieId })
+			.from(streamSessions)
+			.all();
+
+		const activePairs = new Set(activeStreams.map((s) => `${s.userId}:${s.movieId}`));
+
+		// Get all history entries
+		const allHistory = this.database.db
+			.select({
+				id: userWatchHistory.id,
+				userId: userWatchHistory.userId,
+				movieId: userWatchHistory.movieId,
+			})
+			.from(userWatchHistory)
+			.all();
+
+		// Delete non-active entries
+		let cleared = 0;
+		for (const entry of allHistory) {
+			if (!activePairs.has(`${entry.userId}:${entry.movieId}`)) {
+				this.database.db
+					.delete(userWatchHistory)
+					.where(eq(userWatchHistory.id, entry.id))
+					.run();
+				cleared++;
+			}
+		}
+
+		this.moviesService.invalidateListCache();
+		this.logger.log(
+			`Cleared ${cleared} session history entries (preserved ${allHistory.length - cleared} active)`,
+		);
+		return {
+			success: true,
+			clearedCount: cleared,
+			preservedCount: allHistory.length - cleared,
+		};
 	}
 
 	/**

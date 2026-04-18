@@ -36,6 +36,20 @@ export interface ActiveSession {
 	lastActivity: string;
 }
 
+export interface SessionHistoryEntry {
+	id: string;
+	userId: string;
+	username: string | null;
+	movieId: string;
+	movieTitle: string | null;
+	movieYear: number | null;
+	watchedAt: string;
+	durationWatchedSeconds: number | null;
+	completed: boolean | null;
+	positionSeconds: number | null;
+	isActive: boolean;
+}
+
 // ============================================
 // Stream Service
 // ============================================
@@ -178,6 +192,22 @@ export const streamService = {
 	 */
 	endAllSessions(): Promise<{ endedCount: number }> {
 		return api.delete<{ endedCount: number }>('/admin/sessions');
+	},
+
+	/**
+	 * Get session history — past watch records across all users (admin)
+	 */
+	getSessionHistory(): Promise<SessionHistoryEntry[]> {
+		return api.get<SessionHistoryEntry[]>('/admin/session-history');
+	},
+
+	/**
+	 * Clear all session history except currently-active sessions (admin)
+	 */
+	clearSessionHistory(): Promise<{ clearedCount: number; preservedCount: number }> {
+		return api.delete<{ clearedCount: number; preservedCount: number }>(
+			'/admin/session-history',
+		);
 	},
 
 	/**
