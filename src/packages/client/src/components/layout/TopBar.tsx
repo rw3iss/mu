@@ -67,7 +67,6 @@ export function TopBar() {
 					value={searchValue}
 					onInput={handleSearch}
 					onFocus={handleSearchFocus}
-					onMouseEnter={handleSearchFocus}
 					aria-label="Search movies"
 				/>
 				{searchValue && (
