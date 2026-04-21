@@ -30,6 +30,16 @@ export function TopBar() {
 		[searchValue],
 	);
 
+	const handleSearchFocus = useCallback(() => {
+		if (searchValue.trim()) {
+			const current = window.location.pathname + window.location.search;
+			const target = `/search?q=${encodeURIComponent(searchValue.trim())}`;
+			if (current !== target) {
+				route(target);
+			}
+		}
+	}, [searchValue]);
+
 	const themeLabel = theme.value === 'dark' ? 'Dark' : theme.value === 'light' ? 'Light' : 'Auto';
 
 	return (
@@ -56,6 +66,8 @@ export function TopBar() {
 					placeholder="Search movies..."
 					value={searchValue}
 					onInput={handleSearch}
+					onFocus={handleSearchFocus}
+					onMouseEnter={handleSearchFocus}
 					aria-label="Search movies"
 				/>
 				{searchValue && (
