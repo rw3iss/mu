@@ -4,6 +4,7 @@ import { route } from 'preact-router';
 import { currentPath } from '@/app';
 import { currentUser, logout } from '@/state/auth.state';
 import { isPlayerActive, playerMode } from '@/state/globalPlayer.state';
+import { fetchMovies } from '@/state/library.state';
 import { RecentlyPlayed } from './RecentlyPlayed';
 import styles from './Sidebar.module.scss';
 
@@ -153,6 +154,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 	const showMiniPlayer = isPlayerActive.value && playerMode.value === 'mini';
 
 	const handleNav = useCallback((path: string) => {
+		if (path === '/library') {
+			// Clear saved scroll/page so clicking Library starts fresh at page 1
+			sessionStorage.removeItem('mu_library_scroll');
+			// If already on the library page, force reset to page 1
+			if (window.location.pathname === '/library') {
+				fetchMovies(1);
+				window.scrollTo({ top: 0, behavior: 'smooth' });
+				// Clear page param from URL
+				window.history.replaceState(null, '', '/library');
+				return;
+			}
+		}
 		route(path);
 	}, []);
 
