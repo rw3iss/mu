@@ -480,10 +480,30 @@ export class MoviesService {
 			.map(this.applyPosterFallback);
 	}
 
-	search(q: string) {
+	search(q: string, userId?: string) {
+		const ratingJoinCond = userId
+			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
+			: eq(movies.id, userRatings.movieId);
+
 		return this.database.db
-			.select()
+			.select({
+				id: movies.id,
+				title: movies.title,
+				year: movies.year,
+				overview: movies.overview,
+				runtimeMinutes: movies.runtimeMinutes,
+				posterUrl: movies.posterUrl,
+				thumbnailUrl: movies.thumbnailUrl,
+				backdropUrl: movies.backdropUrl,
+				imdbId: movies.imdbId,
+				tmdbId: movies.tmdbId,
+				contentRating: movies.contentRating,
+				hidden: movies.hidden,
+				addedAt: movies.addedAt,
+				rating: userRatings.rating,
+			})
 			.from(movies)
+			.leftJoin(userRatings, ratingJoinCond)
 			.where(like(movies.title, `%${q}%`))
 			.orderBy(asc(movies.title))
 			.limit(50)

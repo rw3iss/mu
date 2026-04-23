@@ -106,6 +106,11 @@ export function MovieListItem({
 				<div class={styles.meta}>
 					{movie.year && <span>{movie.year}</span>}
 					{runtimeStr && <span>{runtimeStr}</span>}
+					{rating > 0 && (
+						<span class={styles.userRating} style={{ color: ratingColor }}>
+							{'\u2605'} {rating.toFixed(1)}
+						</span>
+					)}
 					{formattedDate && <span>{formattedDate}</span>}
 				</div>
 			</div>

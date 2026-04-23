@@ -129,9 +129,9 @@ export class MoviesController {
 	}
 
 	@Get('search')
-	search(@Query('q') q: string) {
-		const movies = this.moviesService.search(q ?? '');
-		return { movies, total: movies.length, page: 1, pageSize: movies.length };
+	search(@Query('q') q: string, @CurrentUser('id') userId: string) {
+		const results = this.moviesService.search(q ?? '', userId);
+		return { movies: results, total: results.length, page: 1, pageSize: results.length };
 	}
 
 	@Get('recent')

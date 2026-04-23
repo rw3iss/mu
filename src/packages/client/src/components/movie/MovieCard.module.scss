@@ -280,6 +280,12 @@
   color: var(--color-text-muted);
 }
 
+.userRating {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
 .optionsWrap {
   margin-left: auto;
 }

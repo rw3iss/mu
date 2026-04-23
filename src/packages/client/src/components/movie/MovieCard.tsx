@@ -163,6 +163,15 @@ export function MovieCard({
 							{Math.floor(movie.runtime / 60)}h {movie.runtime % 60}m
 						</span>
 					)}
+					{rating > 0 && (
+						<span
+							class={styles.userRating}
+							style={{ color: ratingColor }}
+							title={`Your rating: ${rating.toFixed(1)}`}
+						>
+							{'\u2605'} {rating.toFixed(1)}
+						</span>
+					)}
 					<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
 					{!selectionMode && !movie.remoteOrigin && (
 						<span class={styles.optionsWrap}>
