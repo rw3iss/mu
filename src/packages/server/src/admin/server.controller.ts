@@ -147,7 +147,12 @@ export class ServerController {
 			.offset(numOffset)
 			.all();
 
-		return { jobs: results };
+		return {
+			jobs: results.map((j) => ({
+				...j,
+				payload: j.payload ? JSON.parse(j.payload) : null,
+			})),
+		};
 	}
 
 	@Post('jobs/:id/pause')
