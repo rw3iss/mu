@@ -38,12 +38,15 @@ export function SubtitlePanel({
 	const [tracksOpen, setTracksOpen] = useState(true);
 	const [searchResults, setSearchResults] = useState<SubtitleSearchResult[]>([]);
 	const [isSearching, setIsSearching] = useState(false);
+	const [searchOpen, setSearchOpen] = useState(false);
 	const [searchDone, setSearchDone] = useState(false);
 	const [downloadingId, setDownloadingId] = useState<string | null>(null);
 	const [isUploading, setIsUploading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [confirmDeleteTrack, setConfirmDeleteTrack] = useState<MovieSubtitleInfo | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [filterQuery, setFilterQuery] = useState('');
+	const [copied, setCopied] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -75,15 +78,36 @@ export function SubtitlePanel({
 		[movieId, refreshTracks, onTrackDeleted],
 	);
 
-	const handleSearch = useCallback(async () => {
+	const handleSearchClick = useCallback(async () => {
+		if (searchOpen && !searchDone) {
+			// Toggle closed if no search has happened
+			setSearchOpen(false);
+			return;
+		}
+		if (searchOpen && searchDone && !filterQuery) {
+			// Already open with results, empty filter — clear filter (no-op since already empty)
+			// Just close the panel
+			setSearchOpen(false);
+			setSearchDone(false);
+			setSearchResults([]);
+			setFilterQuery('');
+			return;
+		}
+		if (searchOpen && filterQuery) {
+			// Clear the filter query
+			setFilterQuery('');
+			return;
+		}
+		// Perform search
+		setSearchOpen(true);
 		setIsSearching(true);
 		setError(null);
 		setSearchResults([]);
+		setFilterQuery('');
 		try {
 			const { results } = await subtitlesService.search(movieId);
 			setSearchResults(results);
 			setSearchDone(true);
-			// Scroll results into view after render
 			if (results.length > 0) {
 				setTimeout(
 					() =>
@@ -95,13 +119,12 @@ export function SubtitlePanel({
 				);
 			}
 		} catch {
-			// Show a friendly message instead of raw API errors (e.g. 404 when no file available)
 			setSearchDone(true);
 			setSearchResults([]);
 		} finally {
 			setIsSearching(false);
 		}
-	}, [movieId]);
+	}, [movieId, searchOpen, searchDone, filterQuery]);
 
 	const handleDownload = useCallback(
 		async (result: SubtitleSearchResult) => {
@@ -146,6 +169,27 @@ export function SubtitlePanel({
 		},
 		[movieId, refreshTracks],
 	);
+
+	const handleCopyFileName = useCallback(() => {
+		if (!fileName) return;
+		navigator.clipboard.writeText(fileName).then(() => {
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2000);
+		});
+	}, [fileName]);
+
+	// Filter results by query
+	const filteredResults = filterQuery
+		? searchResults.filter((r) => {
+				const q = filterQuery.toLowerCase();
+				return (
+					(r.releaseName || '').toLowerCase().includes(q) ||
+					(r.language || '').toLowerCase().includes(q) ||
+					(r.label || '').toLowerCase().includes(q) ||
+					(r.format || '').toLowerCase().includes(q)
+				);
+			})
+		: searchResults;
 
 	return (
 		<div class={styles.panel}>
@@ -208,97 +252,167 @@ export function SubtitlePanel({
 				</div>
 			)}
 
-			{/* Search */}
+			{/* Search Online */}
 			<div class={styles.searchSection}>
-				<button class={styles.actionBtn} onClick={handleSearch} disabled={isSearching}>
-					{isSearching ? (
-						<>
-							<span class={styles.spinner} />
-							Searching...
-						</>
-					) : (
-						<>
-							<svg
-								width="14"
-								height="14"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
+				<button
+					class={styles.sectionHeader}
+					onClick={handleSearchClick}
+					disabled={isSearching}
+				>
+					<span class={styles.sectionTitle}>
+						{isSearching ? (
+							<>
+								<span class={styles.spinner} /> Searching...
+							</>
+						) : (
+							'Search Online'
+						)}
+					</span>
+					<span class={styles.searchHeaderRight}>
+						{searchOpen && fileName && (
+							<span class={styles.fileNameInline} title={fileName}>
+								{fileName}
+							</span>
+						)}
+						{searchOpen && fileName && (
+							<button
+								class={`${styles.copyBtn} ${copied ? styles.copyBtnDone : ''}`}
+								onClick={(e) => {
+									e.stopPropagation();
+									handleCopyFileName();
+								}}
+								title="Copy file name"
 							>
-								<circle cx="11" cy="11" r="8" />
-								<line x1="21" y1="21" x2="16.65" y2="16.65" />
-							</svg>
-							Search Online
-						</>
-					)}
+								{copied ? (
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="#4ade80"
+										stroke-width="2.5"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<polyline points="20 6 9 17 4 12" />
+									</svg>
+								) : (
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+										<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+									</svg>
+								)}
+							</button>
+						)}
+						<span class={styles.arrow}>{searchOpen ? '\u25B2' : '\u25BC'}</span>
+					</span>
 				</button>
 
-				{searchDone && searchResults.length === 0 && !isSearching && (
-					<div class={styles.emptyText}>No subtitles found online</div>
-				)}
-
-				{searchResults.length > 0 && (
-					<div class={styles.resultsList} ref={resultsRef}>
-						{fileName && <div class={styles.fileNameLabel}>File: {fileName}</div>}
-						{searchResults.map((r) => (
-							<div key={r.fileId} class={styles.resultItem}>
-								<div class={styles.resultInfo}>
-									<div class={styles.resultTopRow}>
-										<span class={styles.resultLang}>
-											{r.language.toUpperCase()}
-										</span>
-										{r.hashMatch && (
-											<span class={styles.badgeAccent}>Hash Match</span>
-										)}
-										{r.hearingImpaired && (
-											<span class={styles.badgeMuted}>HI</span>
-										)}
-										{r.format && (
-											<span class={styles.badgeMuted}>
-												{r.format.toUpperCase()}
-											</span>
-										)}
-										{r.downloads != null && (
-											<span class={styles.resultDownloads}>
-												{r.downloads.toLocaleString()} DL
-											</span>
-										)}
-									</div>
-									{r.releaseName && (
-										<span class={styles.resultRelease}>{r.releaseName}</span>
-									)}
-								</div>
+				{searchOpen && (
+					<>
+						{/* Filter input */}
+						<div class={styles.filterWrap}>
+							<input
+								type="text"
+								class={styles.filterInput}
+								placeholder="Filter results..."
+								value={filterQuery}
+								onInput={(e) =>
+									setFilterQuery((e.target as HTMLInputElement).value)
+								}
+							/>
+							{filterQuery && (
 								<button
-									class={styles.downloadBtn}
-									onClick={() => handleDownload(r)}
-									disabled={downloadingId === r.fileId}
-									title="Download subtitle"
+									class={styles.filterClear}
+									onClick={() => setFilterQuery('')}
+									title="Clear filter"
 								>
-									{downloadingId === r.fileId ? (
-										<span class={styles.spinner} />
-									) : (
-										<svg
-											width="14"
-											height="14"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-											<polyline points="7 10 12 15 17 10" />
-											<line x1="12" y1="15" x2="12" y2="3" />
-										</svg>
-									)}
+									{'\u2715'}
 								</button>
+							)}
+						</div>
+
+						{searchDone && filteredResults.length === 0 && !isSearching && (
+							<div class={styles.emptyText}>
+								{searchResults.length === 0
+									? 'No subtitles found online'
+									: 'No results match filter'}
 							</div>
-						))}
-					</div>
+						)}
+
+						{filteredResults.length > 0 && (
+							<div class={styles.resultsList} ref={resultsRef}>
+								{filteredResults.map((r) => (
+									<div key={r.fileId} class={styles.resultItem}>
+										<div class={styles.resultInfo}>
+											<div class={styles.resultTopRow}>
+												<span class={styles.resultLang}>
+													{r.language.toUpperCase()}
+												</span>
+												{r.hashMatch && (
+													<span class={styles.badgeAccent}>
+														Hash Match
+													</span>
+												)}
+												{r.hearingImpaired && (
+													<span class={styles.badgeMuted}>HI</span>
+												)}
+												{r.format && (
+													<span class={styles.badgeMuted}>
+														{r.format.toUpperCase()}
+													</span>
+												)}
+												{r.downloads != null && (
+													<span class={styles.resultDownloads}>
+														{r.downloads.toLocaleString()} DL
+													</span>
+												)}
+											</div>
+											{r.releaseName && (
+												<span class={styles.resultRelease}>
+													{r.releaseName}
+												</span>
+											)}
+										</div>
+										<button
+											class={styles.downloadBtn}
+											onClick={() => handleDownload(r)}
+											disabled={downloadingId === r.fileId}
+											title="Download subtitle"
+										>
+											{downloadingId === r.fileId ? (
+												<span class={styles.spinner} />
+											) : (
+												<svg
+													width="14"
+													height="14"
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													stroke-width="2"
+													stroke-linecap="round"
+													stroke-linejoin="round"
+												>
+													<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+													<polyline points="7 10 12 15 17 10" />
+													<line x1="12" y1="15" x2="12" y2="3" />
+												</svg>
+											)}
+										</button>
+									</div>
+								))}
+							</div>
+						)}
+					</>
 				)}
 			</div>
 

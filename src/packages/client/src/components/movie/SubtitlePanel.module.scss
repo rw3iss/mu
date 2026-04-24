@@ -172,6 +172,94 @@
   }
 }
 
+.searchHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.fileNameInline {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.copyBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  transition: color 120ms ease, background 120ms ease;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-text-primary);
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.copyBtnDone {
+  color: #4ade80 !important;
+}
+
+.filterWrap {
+  position: relative;
+  padding: 4px 0;
+}
+
+.filterInput {
+  width: 100%;
+  padding: 6px 28px 6px 10px;
+  font-size: 11px;
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  outline: none;
+  transition: border-color 120ms ease;
+
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  &:focus {
+    border-color: var(--color-accent);
+  }
+}
+
+.filterClear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 120ms ease, background 120ms ease;
+
+  &:hover {
+    color: var(--color-text-primary);
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
 // ── Search results ──
 
 .resultsList {
@@ -181,16 +269,6 @@
   overflow-y: auto;
 }
 
-.fileNameLabel {
-  padding: 6px 8px;
-  margin: 0 0 4px;
-  font-size: 11px;
-  color: var(--color-text-muted);
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 3px;
-  word-break: break-all;
-  flex-shrink: 0;
-}
 
 .resultItem {
   display: flex;
