@@ -71,6 +71,16 @@
   word-break: break-all;
 }
 
+.infoLink {
+  color: var(--color-accent);
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 // ── Stats ──
 
 .statsGrid {

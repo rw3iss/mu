@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
@@ -685,7 +686,20 @@ function JobsSection() {
 									<div class={styles.jobDetails}>
 										<div class={styles.infoRow}>
 											<span class={styles.infoLabel}>ID</span>
-											<span class={styles.infoValue}>{job.id}</span>
+											{job.payload?.movieId ? (
+												<a
+													class={`${styles.infoValue} ${styles.infoLink}`}
+													href={`/movie/${job.payload.movieId}`}
+													onClick={(e: Event) => {
+														e.preventDefault();
+														route(`/movie/${job.payload.movieId}`);
+													}}
+												>
+													{job.id}
+												</a>
+											) : (
+												<span class={styles.infoValue}>{job.id}</span>
+											)}
 										</div>
 										{job.priority != null && (
 											<div class={styles.infoRow}>
