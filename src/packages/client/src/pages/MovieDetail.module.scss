@@ -1,6 +1,7 @@
 .detail {
   position: relative;
   padding-bottom: 40px;
+  margin: 0 -8px;
   animation: fadeIn 300ms ease;
 }
 
@@ -38,8 +39,8 @@
 .backdrop {
   position: absolute;
   top: calc(-1 * var(--topbar-height) - var(--space-lg));
-  left: calc(-1 * var(--space-lg));
-  right: calc(-1 * var(--space-lg));
+  left: calc(-1 * var(--space-lg) + 8px);
+  right: calc(-1 * var(--space-lg) + 8px);
   height: 420px;
   overflow: hidden;
   z-index: -1;
@@ -68,7 +69,7 @@
 
 .innerWrap {
   position: relative;
-  max-width: 1920px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
