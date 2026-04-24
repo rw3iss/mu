@@ -38,7 +38,7 @@
 
 .backdrop {
   position: absolute;
-  top: calc(-1 * var(--topbar-height) - var(--space-lg));
+  top: calc(-1 * var(--space-lg));
   left: calc(-1 * var(--space-lg) + 8px);
   right: calc(-1 * var(--space-lg) + 8px);
   height: 420px;

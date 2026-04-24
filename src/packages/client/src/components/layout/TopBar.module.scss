@@ -1,8 +1,6 @@
 .topbar {
-  position: fixed;
+  position: sticky;
   top: 0;
-  right: 0;
-  left: var(--sidebar-width);
   height: var(--topbar-height);
   display: flex;
   align-items: center;
@@ -11,14 +9,8 @@
   background: var(--panel-bg);
   border-bottom: 1px solid var(--color-border);
   z-index: var(--z-sticky);
-  transition: left 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
-
-  &.collapsed {
-    left: var(--sidebar-collapsed-width);
-  }
 
   @include mobile {
-    left: 0;
     padding: 0 var(--space-md);
   }
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { useDebounce } from '@/hooks/useDebounce';
 import { theme, toggleTheme } from '@/state/theme.state';
-import { sidebarCollapsed } from './AppShell';
+
 import styles from './TopBar.module.scss';
 
 export function TopBar() {
@@ -43,7 +43,7 @@ export function TopBar() {
 	const themeLabel = theme.value === 'dark' ? 'Dark' : theme.value === 'light' ? 'Light' : 'Auto';
 
 	return (
-		<header class={`${styles.topbar} ${sidebarCollapsed.value ? styles.collapsed : ''}`}>
+		<header class={styles.topbar}>
 			<form class={styles.searchForm} onSubmit={handleSearchSubmit}>
 				<span class={styles.searchIcon}>
 					<svg

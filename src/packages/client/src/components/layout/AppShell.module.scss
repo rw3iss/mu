@@ -39,7 +39,6 @@
 .content {
   flex: 1;
   padding: var(--space-lg);
-  padding-top: calc(var(--topbar-height) + var(--space-lg));
   width: 100%;
   position: relative;
   z-index: 1;
@@ -50,7 +49,6 @@
 
   @include mobile {
     padding: var(--space-md);
-    padding-top: calc(var(--topbar-height) + var(--space-md));
     margin-left: 0;
   }
 }
