@@ -13,9 +13,18 @@ function shouldNotifyPlaylist(): boolean {
 interface MoviePlaylistsProps {
 	movieId: string;
 	remoteInfo?: { title: string; posterUrl?: string; serverId: string };
+	/** Called when the member playlist count changes, so parent can show count in header. */
+	onCountChange?: (count: number) => void;
+	/** If true, hide the built-in section title (parent manages it). */
+	hideTitle?: boolean;
 }
 
-export function MoviePlaylists({ movieId, remoteInfo }: MoviePlaylistsProps) {
+export function MoviePlaylists({
+	movieId,
+	remoteInfo,
+	onCountChange,
+	hideTitle,
+}: MoviePlaylistsProps) {
 	const [allPlaylists, setAllPlaylists] = useState<Playlist[]>([]);
 	const [memberPlaylists, setMemberPlaylists] = useState<MoviePlaylistInfo[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -46,6 +55,10 @@ export function MoviePlaylists({ movieId, remoteInfo }: MoviePlaylistsProps) {
 			cancelled = true;
 		};
 	}, [movieId]);
+
+	useEffect(() => {
+		onCountChange?.(memberPlaylists.length);
+	}, [memberPlaylists.length, onCountChange]);
 
 	const memberIds = new Set(memberPlaylists.map((p) => p.id));
 	const availablePlaylists = allPlaylists.filter((p) => !memberIds.has(p.id));
@@ -82,7 +95,7 @@ export function MoviePlaylists({ movieId, remoteInfo }: MoviePlaylistsProps) {
 
 	return (
 		<div class={styles.playlistsSection}>
-			<h2 class={styles.sectionTitle}>Playlists</h2>
+			{!hideTitle && <h2 class={styles.sectionTitle}>Playlists</h2>}
 
 			{allPlaylists.length === 0 ? (
 				<span class={styles.noPlaylists}>No playlists yet</span>

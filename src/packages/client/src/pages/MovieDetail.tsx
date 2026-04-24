@@ -166,6 +166,8 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	const [showFileInfo, setShowFileInfo] = useState(false);
 	const [showPlaySettings, setShowPlaySettings] = useState(false);
 	const [showSubtitles, setShowSubtitles] = useState(false);
+	const [showPlaylists, setShowPlaylists] = useState(true);
+	const [playlistCount, setPlaylistCount] = useState(0);
 	const [audioProfiles, setAudioProfiles] = useState<AudioProfile[]>([]);
 	const [selectedEqProfile, setSelectedEqProfile] = useState<string>('');
 	const [selectedCompProfile, setSelectedCompProfile] = useState<string>('');
@@ -670,6 +672,37 @@ export function MovieDetail({ id }: MovieDetailProps) {
 							</div>
 						)}
 
+						{/* Playlists */}
+						<div class={styles.fileInfoSection}>
+							<button
+								class={styles.fileInfoToggle}
+								onClick={() => setShowPlaylists(!showPlaylists)}
+							>
+								<h2 class={styles.sectionTitle}>
+									Playlists{playlistCount > 0 ? ` (${playlistCount})` : ''}
+								</h2>
+								<span class={styles.fileInfoArrow}>
+									{showPlaylists ? '\u25B2' : '\u25BC'}
+								</span>
+							</button>
+							{showPlaylists && (
+								<MoviePlaylists
+									movieId={movie.id}
+									hideTitle
+									onCountChange={setPlaylistCount}
+									remoteInfo={
+										isRemote && movie.remoteOrigin
+											? {
+													title: movie.title,
+													posterUrl: movie.posterUrl,
+													serverId: movie.remoteOrigin.serverId,
+												}
+											: undefined
+									}
+								/>
+							)}
+						</div>
+
 						{/* Play Settings (local only) */}
 						{!isRemote && (
 							<div class={styles.fileInfoSection}>
@@ -849,22 +882,6 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						)}
 
 						<PluginSlot name={UI.MOVIE_PAGE_CONTENT} context={{ movie }} />
-					</div>
-
-					{/* Playlists (right column) */}
-					<div class={styles.playlistsColumn}>
-						<MoviePlaylists
-							movieId={movie.id}
-							remoteInfo={
-								isRemote && movie.remoteOrigin
-									? {
-											title: movie.title,
-											posterUrl: movie.posterUrl,
-											serverId: movie.remoteOrigin.serverId,
-										}
-									: undefined
-							}
-						/>
 					</div>
 				</div>
 			</div>
