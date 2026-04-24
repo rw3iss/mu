@@ -2,7 +2,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  left: var(--sidebar-width);
+  left: var(--sidebar-collapsed-width);
   height: var(--topbar-height);
   display: flex;
   align-items: center;
@@ -11,14 +11,17 @@
   background: var(--panel-bg);
   border-bottom: 1px solid var(--color-border);
   z-index: var(--z-sticky);
-  transition: left var(--transition-normal);
+  transform: translateX(calc(var(--sidebar-width) - var(--sidebar-collapsed-width)));
+  transition: transform 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  will-change: transform;
 
   &.collapsed {
-    left: var(--sidebar-collapsed-width);
+    transform: translateX(0);
   }
 
   @include mobile {
     left: 0;
+    transform: none;
     padding: 0 var(--space-md);
   }
 }
