@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { nowISO } from '@mu/shared';
-import { Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
+import { Controller, Delete, Get, Logger, Param, Post, Query } from '@nestjs/common';
 import { desc, eq, sql } from 'drizzle-orm';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -153,6 +153,14 @@ export class ServerController {
 				payload: j.payload ? JSON.parse(j.payload) : null,
 			})),
 		};
+	}
+
+	@Delete('jobs/history')
+	@Roles('admin')
+	clearJobHistory() {
+		const result = this.database.db.delete(jobHistory).run();
+		this.logger.warn(`Cleared job history: ${result.changes} rows deleted`);
+		return { success: true, deleted: result.changes };
 	}
 
 	@Post('jobs/:id/pause')

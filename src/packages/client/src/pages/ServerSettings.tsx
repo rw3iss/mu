@@ -374,6 +374,8 @@ function JobsSection() {
 	const [searchQuery, setSearchQuery] = useState('');
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	const [cancellingBulk, setCancellingBulk] = useState(false);
+	const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
+	const [clearingHistory, setClearingHistory] = useState(false);
 	const lastSelectedRef = useRef<string | null>(null);
 
 	useEffect(() => {
@@ -436,6 +438,20 @@ function JobsSection() {
 		},
 		[selected],
 	);
+
+	const handleClearHistory = useCallback(async () => {
+		setClearingHistory(true);
+		try {
+			const result = await api.delete<{ deleted: number }>('/admin/server/jobs/history');
+			setHistoryJobs([]);
+			setShowClearHistoryConfirm(false);
+			notifySuccess(`Cleared ${result.deleted} job${result.deleted !== 1 ? 's' : ''}`);
+		} catch {
+			notifyError('Failed to clear job history');
+		} finally {
+			setClearingHistory(false);
+		}
+	}, []);
 
 	const statusColors: Record<string, string> = {
 		running: '#22c55e',
@@ -503,6 +519,18 @@ function JobsSection() {
 								loading={cancellingBulk}
 							>
 								Cancel
+							</Button>
+						</div>
+					)}
+					{tab === 'history' && historyJobs.length > 0 && (
+						<div class={styles.bulkActions}>
+							<Button
+								variant="danger"
+								size="sm"
+								onClick={() => setShowClearHistoryConfirm(true)}
+								loading={clearingHistory}
+							>
+								Delete All
 							</Button>
 						</div>
 					)}
@@ -808,6 +836,35 @@ function JobsSection() {
 					})
 				)}
 			</div>
+
+			{showClearHistoryConfirm && (
+				<div class={styles.confirmOverlay}>
+					<div class={styles.confirmModal}>
+						<p class={styles.confirmTitle}>Delete all job history?</p>
+						<p class={styles.confirmDetail}>
+							This will permanently remove all {historyJobs.length} job history record
+							{historyJobs.length !== 1 ? 's' : ''}. Currently running and pending
+							jobs are not affected. This cannot be undone.
+						</p>
+						<div class={styles.confirmActions}>
+							<Button
+								variant="ghost"
+								onClick={() => setShowClearHistoryConfirm(false)}
+								disabled={clearingHistory}
+							>
+								Cancel
+							</Button>
+							<Button
+								variant="danger"
+								onClick={handleClearHistory}
+								loading={clearingHistory}
+							>
+								Delete All
+							</Button>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }
