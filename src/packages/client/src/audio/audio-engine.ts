@@ -77,6 +77,7 @@ export class AudioEngine {
 	private currentCompressor: CompressorSettings = { ...DEFAULT_COMPRESSOR };
 	private attached = false;
 	private deviceChangeListener: (() => void) | null = null;
+	private interactionResumeListener: (() => void) | null = null;
 
 	/**
 	 * Register the media element for later lazy attachment. Does NOT create an
@@ -118,7 +119,7 @@ export class AudioEngine {
 		}
 
 		try {
-			this.ctx = new AudioContext();
+			this.ctx = new AudioContext({ latencyHint: 'playback' });
 			this.source = this.ctx.createMediaElementSource(target);
 			this.boundElement = target;
 		} catch (err) {
@@ -133,6 +134,18 @@ export class AudioEngine {
 		// device changes instead of holding the device that was default at
 		// creation time. Chrome 110+ supports `AudioContext.setSinkId('')`.
 		this.pinSinkToDefault();
+
+		// Force the context to running state. Chrome may start it suspended
+		// even when attach() is reached from a click handler if signal/effect
+		// indirection breaks the user-gesture chain. Without this, enabling
+		// EQ/comp creates a silent context — and because
+		// createMediaElementSource() permanently re-routes the element away
+		// from its native audio path, that silence persists even after
+		// disabling effects again. resume() is best-effort: if the browser
+		// rejects (no user gesture credited yet) the global interaction
+		// listener installed below picks it up on the next click/keypress.
+		this.ctx.resume().catch(() => {});
+		this.installResumeOnInteraction();
 
 		// Recover from OS audio device changes and context state transitions.
 		this.installRecoveryHandlers();
@@ -175,13 +188,19 @@ export class AudioEngine {
 
 	setEqEnabled(enabled: boolean): void {
 		this.eqEnabled = enabled;
-		if (enabled) this.attach();
+		if (enabled) {
+			this.attach();
+			this.ctx?.resume().catch(() => {});
+		}
 		this.rebuildChain();
 	}
 
 	setCompressorEnabled(enabled: boolean): void {
 		this.compressorEnabled = enabled;
-		if (enabled) this.attach();
+		if (enabled) {
+			this.attach();
+			this.ctx?.resume().catch(() => {});
+		}
 		if (!enabled) {
 			// When disabling, reset dry/wet gains to safe values
 			if (this.dryGainNode) this.dryGainNode.gain.value = 1;
@@ -292,6 +311,7 @@ export class AudioEngine {
 	}
 
 	destroy(): void {
+		this.removeInteractionResumeListener();
 		if (this.deviceChangeListener && navigator.mediaDevices) {
 			navigator.mediaDevices.removeEventListener('devicechange', this.deviceChangeListener);
 			this.deviceChangeListener = null;
@@ -325,6 +345,30 @@ export class AudioEngine {
 		setSinkId.call(this.ctx, '').catch((err: unknown) => {
 			console.warn('[audioEngine] setSinkId(default) failed:', err);
 		});
+	}
+
+	private installResumeOnInteraction(): void {
+		if (this.interactionResumeListener || typeof document === 'undefined') return;
+		const handler = () => {
+			if (!this.ctx) return;
+			if (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted') {
+				this.ctx.resume().catch(() => {});
+			}
+		};
+		this.interactionResumeListener = handler;
+		document.addEventListener('pointerdown', handler, { capture: true });
+		document.addEventListener('keydown', handler, { capture: true });
+	}
+
+	private removeInteractionResumeListener(): void {
+		if (!this.interactionResumeListener || typeof document === 'undefined') return;
+		document.removeEventListener('pointerdown', this.interactionResumeListener, {
+			capture: true,
+		});
+		document.removeEventListener('keydown', this.interactionResumeListener, {
+			capture: true,
+		});
+		this.interactionResumeListener = null;
 	}
 
 	private installRecoveryHandlers(): void {
