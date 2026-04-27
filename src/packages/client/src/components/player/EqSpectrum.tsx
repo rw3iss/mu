@@ -97,14 +97,20 @@ export function EqSpectrum() {
 				mags[j] = sum / (hi - lo + 1) / 255;
 			}
 
-			// Filled area path: edge points pinned to bottom corners so the
-			// fill closes cleanly along the canvas baseline.
+			const firstY = h - mags[0]! * h;
+			const lastY = h - mags[mags.length - 1]! * h;
+
+			// Filled area path: extend horizontally to the canvas edges at
+			// the first/last sample's height so the leftmost and rightmost
+			// segments are filled flush, then drop down each edge to close.
 			ctx2d.beginPath();
 			ctx2d.moveTo(0, h);
-			ctx2d.lineTo(SAMPLE_X_FRAC[0]! * w, h - mags[0]! * h);
+			ctx2d.lineTo(0, firstY);
+			ctx2d.lineTo(SAMPLE_X_FRAC[0]! * w, firstY);
 			for (let j = 1; j < mags.length; j++) {
 				ctx2d.lineTo(SAMPLE_X_FRAC[j]! * w, h - mags[j]! * h);
 			}
+			ctx2d.lineTo(w, lastY);
 			ctx2d.lineTo(w, h);
 			ctx2d.closePath();
 
@@ -115,12 +121,15 @@ export function EqSpectrum() {
 			ctx2d.fillStyle = grad;
 			ctx2d.fill();
 
-			// Crisp top line.
+			// Crisp top line — same edge extension so the stroke runs
+			// fully from the left canvas edge to the right.
 			ctx2d.beginPath();
-			ctx2d.moveTo(SAMPLE_X_FRAC[0]! * w, h - mags[0]! * h);
+			ctx2d.moveTo(0, firstY);
+			ctx2d.lineTo(SAMPLE_X_FRAC[0]! * w, firstY);
 			for (let j = 1; j < mags.length; j++) {
 				ctx2d.lineTo(SAMPLE_X_FRAC[j]! * w, h - mags[j]! * h);
 			}
+			ctx2d.lineTo(w, lastY);
 			ctx2d.strokeStyle = 'rgba(129, 140, 248, 0.9)';
 			ctx2d.lineWidth = 1.5;
 			ctx2d.stroke();

@@ -220,7 +220,7 @@ export class AudioEngine {
 		// Spectrum analyser — tapped post-EQ in rebuildChain() so the
 		// frequency-domain visualization reflects the EQ-applied signal.
 		this.analyser = this.ctx.createAnalyser();
-		this.analyser.fftSize = 4096;
+		this.analyser.fftSize = 8192;
 		this.analyser.smoothingTimeConstant = 0.7;
 
 		this.attached = true;
