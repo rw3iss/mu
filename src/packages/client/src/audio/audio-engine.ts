@@ -62,6 +62,7 @@ export class AudioEngine {
 	private ctx: AudioContext | null = null;
 	private source: MediaElementAudioSourceNode | null = null;
 	private boundElement: HTMLMediaElement | null = null;
+	private pendingElement: HTMLMediaElement | null = null;
 	private inputGainNode: GainNode | null = null;
 	private filters: BiquadFilterNode[] = [];
 	private compressor: DynamicsCompressorNode | null = null;
@@ -75,9 +76,24 @@ export class AudioEngine {
 	private currentBands: EqBand[] = [...DEFAULT_EQ_BANDS];
 	private currentCompressor: CompressorSettings = { ...DEFAULT_COMPRESSOR };
 	private attached = false;
+	private deviceChangeListener: (() => void) | null = null;
 
 	/**
-	 * Attach to a video/audio element.
+	 * Register the media element for later lazy attachment. Does NOT create an
+	 * AudioContext or `MediaElementSourceNode` — that only happens when the user
+	 * actually enables EQ/compressor via {@link ensureAttached}. Until then the
+	 * element plays through its native audio path, which follows the OS default
+	 * output device (matches YouTube and any other `<video>` consumer).
+	 */
+	register(element: HTMLMediaElement): void {
+		this.pendingElement = element;
+	}
+
+	/**
+	 * Attach to a video/audio element. Lazily called by {@link setEqEnabled} /
+	 * {@link setCompressorEnabled} when first enabled. Direct callers can pass
+	 * an explicit element; otherwise the previously {@link register}-ed
+	 * element is used.
 	 *
 	 * Idempotent: calling with the same element is a no-op. Calling with a
 	 * different element logs a warning and is refused — browsers permanently
@@ -86,9 +102,11 @@ export class AudioEngine {
 	 * caller should ensure the video element is a singleton for the app
 	 * lifetime.
 	 */
-	attach(element: HTMLMediaElement): void {
+	attach(element?: HTMLMediaElement): void {
+		const target = element ?? this.pendingElement;
+		if (!target) return;
 		if (this.attached) {
-			if (this.boundElement !== element) {
+			if (this.boundElement !== target) {
 				console.warn(
 					'[audioEngine] attach() called with a different element than the one ' +
 						'already bound. Ignoring — call destroy() first to re-bind. This ' +
@@ -101,8 +119,8 @@ export class AudioEngine {
 
 		try {
 			this.ctx = new AudioContext();
-			this.source = this.ctx.createMediaElementSource(element);
-			this.boundElement = element;
+			this.source = this.ctx.createMediaElementSource(target);
+			this.boundElement = target;
 		} catch (err) {
 			console.error('[audioEngine] Failed to create MediaElementSource:', err);
 			this.ctx = null;
@@ -110,6 +128,14 @@ export class AudioEngine {
 			this.boundElement = null;
 			return;
 		}
+
+		// Pin the sink to "follow OS default device" so the context tracks
+		// device changes instead of holding the device that was default at
+		// creation time. Chrome 110+ supports `AudioContext.setSinkId('')`.
+		this.pinSinkToDefault();
+
+		// Recover from OS audio device changes and context state transitions.
+		this.installRecoveryHandlers();
 
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
@@ -149,11 +175,13 @@ export class AudioEngine {
 
 	setEqEnabled(enabled: boolean): void {
 		this.eqEnabled = enabled;
+		if (enabled) this.attach();
 		this.rebuildChain();
 	}
 
 	setCompressorEnabled(enabled: boolean): void {
 		this.compressorEnabled = enabled;
+		if (enabled) this.attach();
 		if (!enabled) {
 			// When disabling, reset dry/wet gains to safe values
 			if (this.dryGainNode) this.dryGainNode.gain.value = 1;
@@ -264,6 +292,10 @@ export class AudioEngine {
 	}
 
 	destroy(): void {
+		if (this.deviceChangeListener && navigator.mediaDevices) {
+			navigator.mediaDevices.removeEventListener('devicechange', this.deviceChangeListener);
+			this.deviceChangeListener = null;
+		}
 		if (this.source) {
 			this.source.disconnect();
 			this.source = null;
@@ -284,6 +316,36 @@ export class AudioEngine {
 	}
 
 	// ── Private ──
+
+	private pinSinkToDefault(): void {
+		if (!this.ctx) return;
+		const setSinkId = (this.ctx as AudioContext & { setSinkId?: (id: string) => Promise<void> })
+			.setSinkId;
+		if (typeof setSinkId !== 'function') return;
+		setSinkId.call(this.ctx, '').catch((err: unknown) => {
+			console.warn('[audioEngine] setSinkId(default) failed:', err);
+		});
+	}
+
+	private installRecoveryHandlers(): void {
+		if (!this.ctx) return;
+		this.ctx.addEventListener('statechange', () => {
+			const state = this.ctx?.state;
+			if (state === 'suspended' || state === 'interrupted') {
+				this.ctx?.resume().catch(() => {});
+			}
+		});
+		if (navigator.mediaDevices && !this.deviceChangeListener) {
+			this.deviceChangeListener = () => {
+				if (!this.ctx) return;
+				if (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted') {
+					this.ctx.resume().catch(() => {});
+				}
+				this.pinSinkToDefault();
+			};
+			navigator.mediaDevices.addEventListener('devicechange', this.deviceChangeListener);
+		}
+	}
 
 	private rebuildChain(): void {
 		if (!this.ctx || !this.source) return;

@@ -173,9 +173,12 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		video.addEventListener('waiting', onWaiting);
 		video.addEventListener('canplay', onCanPlay);
 
-		// Attach Web Audio API processing chain.
-		// Idempotent on the shared element — subsequent mounts are no-ops.
-		audioEngine.attach(video);
+		// Register the video element with the audio engine. Web Audio is NOT
+		// engaged until the user enables EQ or compressor — until then, audio
+		// flows natively through the <video> element so it follows the OS
+		// default device (matches YouTube). This avoids a stale AudioContext
+		// pinned to the device that was default when the page first loaded.
+		audioEngine.register(video);
 		initAudioEffects();
 
 		// 60fps time tracking via requestAnimationFrame
