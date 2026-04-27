@@ -330,6 +330,65 @@ export class AudioEngine {
 		return this.compressor.reduction;
 	}
 
+	/**
+	 * List available audio output devices. Labels are empty until the user
+	 * has granted microphone permission to this origin (Chrome quirk).
+	 */
+	async listOutputDevices(): Promise<{ deviceId: string; label: string }[]> {
+		if (!navigator.mediaDevices?.enumerateDevices) return [];
+		const all = await navigator.mediaDevices.enumerateDevices();
+		return all
+			.filter((d) => d.kind === 'audiooutput')
+			.map((d) => ({ deviceId: d.deviceId, label: d.label || '(no label)' }));
+	}
+
+	/**
+	 * Force the hidden output <audio> element onto a specific device id.
+	 * Pass '' (empty string) to use the OS default. Use this when the
+	 * default sink is broken on the current Chrome process.
+	 */
+	async setOutputDevice(deviceId: string): Promise<void> {
+		if (!this.outputAudio) {
+			throw new Error('Audio engine not attached. Enable EQ or compressor first.');
+		}
+		const el = this.outputAudio as HTMLAudioElement & {
+			setSinkId?: (id: string) => Promise<void>;
+		};
+		if (typeof el.setSinkId !== 'function') {
+			throw new Error('HTMLMediaElement.setSinkId not supported in this browser');
+		}
+		await el.setSinkId(deviceId);
+		console.log(`[audioEngine] output device set to ${deviceId || '(default)'}`);
+	}
+
+	/**
+	 * Play a 1-second 440Hz tone through the same hidden output element
+	 * the chain feeds into. Lets you verify the output path independently
+	 * of the video source. If you can't hear this tone, the output sink
+	 * itself is broken and no setSinkId() can fix it from JS — restart
+	 * Chrome or pick a different device via setOutputDevice().
+	 */
+	async playTestTone(): Promise<void> {
+		this.attach();
+		if (!this.ctx || !this.streamDest) {
+			throw new Error('Audio engine not attached');
+		}
+		await this.ctx.resume().catch(() => {});
+		const osc = this.ctx.createOscillator();
+		const gain = this.ctx.createGain();
+		osc.frequency.value = 440;
+		gain.gain.value = 0.15;
+		osc.connect(gain);
+		gain.connect(this.streamDest);
+		osc.start();
+		console.log('[audioEngine] test tone (440Hz) → streamDest for 1s');
+		setTimeout(() => {
+			osc.stop();
+			osc.disconnect();
+			gain.disconnect();
+		}, 1000);
+	}
+
 	/** Create/resume AudioContext. Call from user gesture (click). */
 	ensureContext(): void {
 		if (this.ctx && this.ctx.state === 'suspended') {
