@@ -1,6 +1,6 @@
 import { Spinner } from '@/components/common/Spinner';
 import type { Movie, ViewMode } from '@/state/library.state';
-import { updateMovieInList } from '@/state/library.state';
+import { removeMovieFromList, updateMovieInList } from '@/state/library.state';
 import { MovieCard } from './MovieCard';
 import styles from './MovieGrid.module.scss';
 import { MovieLargeCard } from './MovieLargeCard';
@@ -14,6 +14,13 @@ interface MovieGridProps {
 	selectionMode?: boolean;
 	selectedIds?: Set<string>;
 	onToggleSelect?: (id: string) => void;
+	/**
+	 * Called when a card's options menu removes the movie (Remove from
+	 * Library / Delete from Disk). Defaults to removing the movie from
+	 * the global library state, which Library/Home pages subscribe to.
+	 * Search supplies its own callback so it updates its local results.
+	 */
+	onMovieRemoved?: (movieId: string) => void;
 }
 
 export function MovieGrid({
@@ -24,6 +31,7 @@ export function MovieGrid({
 	selectionMode = false,
 	selectedIds,
 	onToggleSelect,
+	onMovieRemoved = removeMovieFromList,
 }: MovieGridProps) {
 	if (isLoading) {
 		return (
@@ -51,6 +59,7 @@ export function MovieGrid({
 						key={movie.id}
 						movie={movie}
 						onMovieUpdate={updateMovieInList}
+						onMovieRemoved={onMovieRemoved}
 						selectionMode={selectionMode}
 						selected={selectedIds?.has(movie.id) ?? false}
 						onToggleSelect={onToggleSelect}
@@ -68,6 +77,7 @@ export function MovieGrid({
 						key={movie.id}
 						movie={movie}
 						onMovieUpdate={updateMovieInList}
+						onMovieRemoved={onMovieRemoved}
 						selectionMode={selectionMode}
 						selected={selectedIds?.has(movie.id) ?? false}
 						onToggleSelect={onToggleSelect}
@@ -84,6 +94,7 @@ export function MovieGrid({
 					key={movie.id}
 					movie={movie}
 					onMovieUpdate={updateMovieInList}
+					onMovieRemoved={onMovieRemoved}
 					selectionMode={selectionMode}
 					selected={selectedIds?.has(movie.id) ?? false}
 					onToggleSelect={onToggleSelect}

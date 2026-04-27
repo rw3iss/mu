@@ -12,6 +12,7 @@ import { MovieOptionsMenu } from './MovieOptionsMenu';
 interface MovieListItemProps {
 	movie: Movie;
 	onMovieUpdate?: (movie: Movie) => void;
+	onMovieRemoved?: (movieId: string) => void;
 	selectionMode?: boolean;
 	selected?: boolean;
 	onToggleSelect?: (id: string) => void;
@@ -20,6 +21,7 @@ interface MovieListItemProps {
 export function MovieListItem({
 	movie,
 	onMovieUpdate,
+	onMovieRemoved,
 	selectionMode = false,
 	selected = false,
 	onToggleSelect,
@@ -141,7 +143,12 @@ export function MovieListItem({
 							</button>
 						)}
 						{!movie.remoteOrigin && (
-							<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+							<MovieOptionsMenu
+								movie={movie}
+								onMovieUpdate={onMovieUpdate}
+								onMovieRemoved={onMovieRemoved}
+								compact
+							/>
 						)}
 					</>
 				)}

@@ -11,11 +11,23 @@ import styles from './MovieOptionsMenu.module.scss';
 interface MovieOptionsMenuProps {
 	movie: Movie;
 	onMovieUpdate?: (movie: Movie) => void;
+	/**
+	 * Called after the movie is removed from the library or deleted from
+	 * disk. When provided, the menu does NOT navigate away — the parent
+	 * is expected to drop the movie from its list. When omitted (e.g.
+	 * from MovieDetail), the menu falls back to navigating to /library.
+	 */
+	onMovieRemoved?: (movieId: string) => void;
 	/** When true, shows inline in a card corner */
 	compact?: boolean;
 }
 
-export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptionsMenuProps) {
+export function MovieOptionsMenu({
+	movie,
+	onMovieUpdate,
+	onMovieRemoved,
+	compact,
+}: MovieOptionsMenuProps) {
 	const [open, setOpen] = useState(false);
 	const [rescanState, setRescanState] = useState<'idle' | 'loading' | 'complete'>('idle');
 	const [refreshState, setRefreshState] = useState<'idle' | 'loading' | 'complete'>('idle');
@@ -162,12 +174,16 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 				await moviesService.remove(movie.id);
 				notifySuccess(`'${movie.title}' removed from library`);
 				setOpen(false);
-				route('/library');
+				if (onMovieRemoved) {
+					onMovieRemoved(movie.id);
+				} else {
+					route('/library');
+				}
 			} catch {
 				notifyError('Failed to remove movie');
 			}
 		},
-		[movie.id],
+		[movie.id, movie.title, onMovieRemoved],
 	);
 
 	const handleDeleteFromDisk = useCallback(async () => {
@@ -182,14 +198,18 @@ export function MovieOptionsMenu({ movie, onMovieUpdate, compact }: MovieOptions
 				setShowDeleteModal(false);
 				setDeleteSuccess(false);
 				setOpen(false);
-				route('/library');
+				if (onMovieRemoved) {
+					onMovieRemoved(movie.id);
+				} else {
+					route('/library');
+				}
 			}, 1200);
 		} catch (err: any) {
 			notifyError(err?.message || 'Failed to delete movie from disk');
 		} finally {
 			setIsDeleting(false);
 		}
-	}, [movie.id, deleteFolder]);
+	}, [movie.id, deleteFolder, onMovieRemoved]);
 
 	const toggleMenu = useCallback(
 		(e: Event) => {

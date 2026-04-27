@@ -185,6 +185,9 @@ export function Search({ q }: SearchProps) {
 						selectionMode={editMode}
 						selectedIds={selectedIds}
 						onToggleSelect={handleToggleSelect}
+						onMovieRemoved={(id) =>
+							setResults((prev) => prev.filter((m) => m.id !== id))
+						}
 						emptyMessage={`No results for "${query}"`}
 					/>
 				</>

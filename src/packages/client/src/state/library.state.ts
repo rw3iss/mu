@@ -231,6 +231,10 @@ export function updateMovieInList(updated: Movie): void {
 	movies.value = movies.value.map((m) => (m.id === updated.id ? { ...m, ...updated } : m));
 }
 
+export function removeMovieFromList(movieId: string): void {
+	movies.value = movies.value.filter((m) => m.id !== movieId);
+}
+
 export function toggleShowHidden(): void {
 	showHidden.value = !showHidden.value;
 	fetchMovies(1);

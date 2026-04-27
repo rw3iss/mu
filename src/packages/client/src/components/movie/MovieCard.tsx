@@ -14,6 +14,7 @@ import { MovieOptionsMenu } from './MovieOptionsMenu';
 interface MovieCardProps {
 	movie: Movie;
 	onMovieUpdate?: (movie: Movie) => void;
+	onMovieRemoved?: (movieId: string) => void;
 	selectionMode?: boolean;
 	selected?: boolean;
 	onToggleSelect?: (id: string) => void;
@@ -22,6 +23,7 @@ interface MovieCardProps {
 export function MovieCard({
 	movie,
 	onMovieUpdate,
+	onMovieRemoved,
 	selectionMode = false,
 	selected = false,
 	onToggleSelect,
@@ -175,7 +177,12 @@ export function MovieCard({
 					<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
 					{!selectionMode && !movie.remoteOrigin && (
 						<span class={styles.optionsWrap}>
-							<MovieOptionsMenu movie={movie} onMovieUpdate={onMovieUpdate} compact />
+							<MovieOptionsMenu
+								movie={movie}
+								onMovieUpdate={onMovieUpdate}
+								onMovieRemoved={onMovieRemoved}
+								compact
+							/>
 						</span>
 					)}
 				</div>
