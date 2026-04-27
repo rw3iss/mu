@@ -70,6 +70,7 @@ export class AudioEngine {
 	private dryGainNode: GainNode | null = null;
 	private wetGainNode: GainNode | null = null;
 	private compMergeNode: GainNode | null = null;
+	private analyser: AnalyserNode | null = null;
 	private streamDest: MediaStreamAudioDestinationNode | null = null;
 	private outputAudio: HTMLAudioElement | null = null;
 	private eqEnabled = false;
@@ -216,6 +217,12 @@ export class AudioEngine {
 		this.compMergeNode = this.ctx.createGain();
 		this.applyMix(this.currentCompressor.mix);
 
+		// Spectrum analyser — tapped post-EQ in rebuildChain() so the
+		// frequency-domain visualization reflects the EQ-applied signal.
+		this.analyser = this.ctx.createAnalyser();
+		this.analyser.fftSize = 4096;
+		this.analyser.smoothingTimeConstant = 0.7;
+
 		this.attached = true;
 		this.rebuildChain();
 	}
@@ -330,6 +337,27 @@ export class AudioEngine {
 		return this.compressor.reduction;
 	}
 
+	/** FFT size of the spectrum analyser (0 if not attached). */
+	getFftSize(): number {
+		return this.analyser?.fftSize ?? 0;
+	}
+
+	/** Sample rate of the AudioContext (or 44100 fallback). */
+	getSampleRate(): number {
+		return this.ctx?.sampleRate ?? 44100;
+	}
+
+	/**
+	 * Fill `buffer` with the current frequency magnitudes (0..255). Buffer
+	 * length should be `getFftSize() / 2`. Returns false if no analyser
+	 * exists yet (engine not attached).
+	 */
+	getFrequencyData(buffer: Uint8Array): boolean {
+		if (!this.analyser) return false;
+		this.analyser.getByteFrequencyData(buffer);
+		return true;
+	}
+
 	/**
 	 * List available audio output devices. Labels are empty until the user
 	 * has granted microphone permission to this origin (Chrome quirk).
@@ -427,6 +455,7 @@ export class AudioEngine {
 			this.outputAudio = null;
 		}
 		this.streamDest = null;
+		this.analyser = null;
 		this.inputGainNode = null;
 		this.filters = [];
 		this.compressor = null;
@@ -561,6 +590,11 @@ export class AudioEngine {
 				current = filter;
 			}
 		}
+
+		// Tap the analyser AFTER the EQ stage (or at source if no EQ) so
+		// the spectrum reflects the EQ-applied signal. Analyser is a
+		// side-tap — connecting to it does not affect the main routing.
+		if (this.analyser) current.connect(this.analyser);
 
 		if (
 			this.compressorEnabled &&

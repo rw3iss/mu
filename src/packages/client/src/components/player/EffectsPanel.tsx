@@ -27,9 +27,11 @@ import {
 	saveVideoProfile,
 	setEffectsTab,
 	showEffectsPanel,
+	spectrumEnabled,
 	toggleCompressor,
 	toggleEffectsPanel,
 	toggleEq,
+	toggleSpectrum,
 	toggleVideoEffects,
 	updateCompProfile,
 	updateCompressorParam,
@@ -43,6 +45,7 @@ import {
 	videoEnabled,
 } from '@/state/audio-effects.state';
 import styles from './EffectsPanel.module.scss';
+import { EqSpectrum } from './EqSpectrum';
 
 function formatFreq(hz: number): string {
 	return hz >= 1000 ? `${hz / 1000}k` : `${hz}`;
@@ -263,6 +266,7 @@ function EqTab() {
 	const enabled = eqEnabled.value;
 	const inputGain = eqInputGain.value;
 	const activeId = activeEqProfileId.value;
+	const spectrumOn = spectrumEnabled.value;
 
 	return (
 		<div>
@@ -284,31 +288,13 @@ function EqTab() {
 			/>
 
 			<CollapsibleSettings settingKey="effects_eq_settings_open">
-				<div class={styles.eqGrid}>
-					<div class={styles.eqBand}>
-						<span class={styles.eqValue}>
-							{inputGain > 0 ? '+' : ''}
-							{inputGain.toFixed(1)}
-						</span>
-						<input
-							type="range"
-							class={styles.eqSlider}
-							min="-12"
-							max="12"
-							step="0.5"
-							value={inputGain}
-							onInput={(e) =>
-								updateInputGain(parseFloat((e.target as HTMLInputElement).value))
-							}
-							onDblClick={() => updateInputGain(0)}
-						/>
-						<span class={`${styles.eqLabel} ${styles.eqLabelAmp}`}>Amp</span>
-					</div>
-					{bands.map((band, i) => (
-						<div class={styles.eqBand} key={band.frequency}>
+				<div class={styles.eqGridWrap}>
+					{spectrumOn && <EqSpectrum />}
+					<div class={styles.eqGrid}>
+						<div class={styles.eqBand}>
 							<span class={styles.eqValue}>
-								{band.gain > 0 ? '+' : ''}
-								{band.gain.toFixed(1)}
+								{inputGain > 0 ? '+' : ''}
+								{inputGain.toFixed(1)}
 							</span>
 							<input
 								type="range"
@@ -316,23 +302,55 @@ function EqTab() {
 								min="-12"
 								max="12"
 								step="0.5"
-								value={band.gain}
+								value={inputGain}
 								onInput={(e) =>
-									updateEqBand(
-										i,
+									updateInputGain(
 										parseFloat((e.target as HTMLInputElement).value),
 									)
 								}
-								onDblClick={() => updateEqBand(i, 0)}
+								onDblClick={() => updateInputGain(0)}
 							/>
-							<span class={styles.eqLabel}>{formatFreq(band.frequency)}</span>
+							<span class={`${styles.eqLabel} ${styles.eqLabelAmp}`}>Amp</span>
 						</div>
-					))}
+						{bands.map((band, i) => (
+							<div class={styles.eqBand} key={band.frequency}>
+								<span class={styles.eqValue}>
+									{band.gain > 0 ? '+' : ''}
+									{band.gain.toFixed(1)}
+								</span>
+								<input
+									type="range"
+									class={styles.eqSlider}
+									min="-12"
+									max="12"
+									step="0.5"
+									value={band.gain}
+									onInput={(e) =>
+										updateEqBand(
+											i,
+											parseFloat((e.target as HTMLInputElement).value),
+										)
+									}
+									onDblClick={() => updateEqBand(i, 0)}
+								/>
+								<span class={styles.eqLabel}>{formatFreq(band.frequency)}</span>
+							</div>
+						))}
+					</div>
 				</div>
 
-				<button class={styles.resetBtn} onClick={resetEq}>
-					Reset EQ
-				</button>
+				<div class={styles.eqActions}>
+					<button class={styles.resetBtn} onClick={resetEq}>
+						Reset EQ
+					</button>
+					<button
+						class={`${styles.resetBtn} ${spectrumOn ? styles.resetBtnActive : ''}`}
+						onClick={toggleSpectrum}
+						aria-pressed={spectrumOn}
+					>
+						Spectrum
+					</button>
+				</div>
 			</CollapsibleSettings>
 		</div>
 	);

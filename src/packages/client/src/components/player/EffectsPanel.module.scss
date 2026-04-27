@@ -268,7 +268,13 @@
 
 // ── EQ ──
 
+.eqGridWrap {
+  position: relative;
+}
+
 .eqGrid {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 2px;
   align-items: flex-end;
@@ -462,14 +468,30 @@
   text-align: center;
 }
 
+.eqActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .resetBtn {
   margin-top: 8px;
   padding: 4px 10px;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.5);
-  transition: color var(--transition-fast);
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
 
   &:hover {
     color: #fff;
+  }
+
+  &.resetBtnActive {
+    color: #fff;
+    background: var(--color-accent);
+
+    &:hover {
+      background: var(--color-accent);
+    }
   }
 }

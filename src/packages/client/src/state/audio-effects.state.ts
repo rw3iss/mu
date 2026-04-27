@@ -19,6 +19,7 @@ export const effectsTab = signal<'eq' | 'compressor' | 'video'>('eq');
 export const eqEnabled = signal(false);
 export const eqInputGain = signal(0);
 export const eqBands = signal<EqBand[]>(DEFAULT_EQ_BANDS.map((b) => ({ ...b })));
+export const spectrumEnabled = signal(false);
 
 export const compressorEnabled = signal(false);
 export const compressorSettings = signal<CompressorSettings>({ ...DEFAULT_COMPRESSOR });
@@ -68,6 +69,7 @@ export function initAudioEffects(): void {
 	);
 
 	const savedInputGain = getUiSetting('audio_eq_input_gain', 0);
+	const savedSpectrum = getUiSetting('audio_spectrum_enabled', false);
 
 	// Apply to engine first
 	if (savedBands) audioEngine.setBands(savedBands);
@@ -75,6 +77,10 @@ export function initAudioEffects(): void {
 	audioEngine.setEqEnabled(savedEq);
 	audioEngine.setCompressorEnabled(savedComp);
 	audioEngine.setInputGain(savedInputGain);
+	if (savedSpectrum && !savedEq && !savedComp) {
+		// Spectrum needs the audio graph attached even if no effect is on.
+		audioEngine.attach();
+	}
 
 	const savedVideoEnabled = getUiSetting('video_effects_enabled', false);
 	const savedVideoEffects = getUiSetting<VideoEffectSettings | null>(
@@ -91,6 +97,7 @@ export function initAudioEffects(): void {
 	batch(() => {
 		eqEnabled.value = savedEq;
 		eqInputGain.value = savedInputGain;
+		spectrumEnabled.value = savedSpectrum;
 		compressorEnabled.value = savedComp;
 		if (savedBands) eqBands.value = savedBands;
 		if (savedCompSettings) compressorSettings.value = savedCompSettings;
@@ -123,6 +130,16 @@ export function toggleEq(): void {
 	eqEnabled.value = next;
 	audioEngine.setEqEnabled(next);
 	setUiSetting('audio_eq_enabled', next);
+}
+
+export function toggleSpectrum(): void {
+	const next = !spectrumEnabled.value;
+	spectrumEnabled.value = next;
+	if (next) {
+		// Spectrum needs the analyser node, which is created on attach.
+		audioEngine.attach();
+	}
+	setUiSetting('audio_spectrum_enabled', next);
 }
 
 export function toggleCompressor(): void {
