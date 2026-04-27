@@ -151,6 +151,14 @@ export class AudioEngine {
 		this.outputAudio.style.display = 'none';
 		document.body.appendChild(this.outputAudio);
 
+		// Force the output element onto the OS default audio device. Chrome
+		// renders MediaStream-fed <audio> elements through the WebRTC audio
+		// path, which has its own device routing separate from regular
+		// <video> playback — so even if <video> is fine, this element can
+		// be pinned to a stale sink. setSinkId('') resolves to the current
+		// default device. Re-applied on devicechange via pinSinkToDefault().
+		this.pinOutputAudioToDefault();
+
 		// Belt-and-suspenders: also try to pin AudioContext.destination to
 		// the OS default device. Even though we route through streamDest,
 		// some Chrome builds gate stream production on destination state.
@@ -379,8 +387,26 @@ export class AudioEngine {
 			.setSinkId;
 		if (typeof setSinkId !== 'function') return;
 		setSinkId.call(this.ctx, '').catch((err: unknown) => {
-			console.warn('[audioEngine] setSinkId(default) failed:', err);
+			console.warn('[audioEngine] AudioContext.setSinkId(default) failed:', err);
 		});
+	}
+
+	private pinOutputAudioToDefault(): void {
+		if (!this.outputAudio) return;
+		const el = this.outputAudio as HTMLAudioElement & {
+			setSinkId?: (id: string) => Promise<void>;
+		};
+		if (typeof el.setSinkId !== 'function') {
+			console.warn('[audioEngine] <audio>.setSinkId not supported in this browser');
+			return;
+		}
+		el.setSinkId('')
+			.then(() => {
+				console.log('[audioEngine] <audio>.setSinkId(default) ok');
+			})
+			.catch((err: unknown) => {
+				console.warn('[audioEngine] <audio>.setSinkId(default) failed:', err);
+			});
 	}
 
 	private installResumeOnInteraction(): void {
@@ -441,6 +467,7 @@ export class AudioEngine {
 					this.ctx.resume().catch(() => {});
 				}
 				this.pinSinkToDefault();
+				this.pinOutputAudioToDefault();
 			};
 			navigator.mediaDevices.addEventListener('devicechange', this.deviceChangeListener);
 		}
