@@ -356,8 +356,9 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			} else {
 				const share = shareToken.value;
 				const token = share ? null : localStorage.getItem('mu_token');
+				const hlsDebug = localStorage.getItem('mu_hls_debug') === '1';
 				const hls = new Hls({
-					debug: localStorage.getItem('mu_hls_debug') === '1',
+					debug: hlsDebug,
 					startPosition,
 					enableWorker: true,
 					lowLatencyMode: false,
@@ -381,17 +382,20 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				hls.loadSource(streamUrl);
 				hls.attachMedia(video);
 
-				// Debug: log key lifecycle events
-				hls.on(Hls.Events.MANIFEST_LOADED, () => console.log('[HLS] Manifest loaded'));
-				hls.on(Hls.Events.FRAG_LOADING, (_e, d) =>
-					console.log('[HLS] Loading fragment', d.frag.sn),
-				);
-				hls.on(Hls.Events.FRAG_BUFFERED, (_e, d) =>
-					console.log('[HLS] Fragment buffered', d.frag.sn),
-				);
-				hls.on(Hls.Events.BUFFER_APPENDING, () => console.log('[HLS] Buffer appending'));
-				hls.on(Hls.Events.BUFFER_APPENDED, () => console.log('[HLS] Buffer appended'));
-				hls.on(Hls.Events.BUFFER_EOS, () => console.log('[HLS] Buffer EOS'));
+				if (hlsDebug) {
+					hls.on(Hls.Events.MANIFEST_LOADED, () => console.log('[HLS] Manifest loaded'));
+					hls.on(Hls.Events.FRAG_LOADING, (_e, d) =>
+						console.log('[HLS] Loading fragment', d.frag.sn),
+					);
+					hls.on(Hls.Events.FRAG_BUFFERED, (_e, d) =>
+						console.log('[HLS] Fragment buffered', d.frag.sn),
+					);
+					hls.on(Hls.Events.BUFFER_APPENDING, () =>
+						console.log('[HLS] Buffer appending'),
+					);
+					hls.on(Hls.Events.BUFFER_APPENDED, () => console.log('[HLS] Buffer appended'));
+					hls.on(Hls.Events.BUFFER_EOS, () => console.log('[HLS] Buffer EOS'));
+				}
 
 				hls.on(Hls.Events.MANIFEST_PARSED, () => {
 					setHlsStatus(null);
