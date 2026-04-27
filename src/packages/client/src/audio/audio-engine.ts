@@ -70,6 +70,8 @@ export class AudioEngine {
 	private dryGainNode: GainNode | null = null;
 	private wetGainNode: GainNode | null = null;
 	private compMergeNode: GainNode | null = null;
+	private streamDest: MediaStreamAudioDestinationNode | null = null;
+	private outputAudio: HTMLAudioElement | null = null;
 	private eqEnabled = false;
 	private compressorEnabled = false;
 	private inputGainDb = 0;
@@ -130,9 +132,25 @@ export class AudioEngine {
 			return;
 		}
 
-		// Pin the sink to "follow OS default device" so the context tracks
-		// device changes instead of holding the device that was default at
-		// creation time. Chrome 110+ supports `AudioContext.setSinkId('')`.
+		// Route audio output through a MediaStream consumed by a hidden
+		// <audio> element instead of `AudioContext.destination`. On
+		// Chrome/Windows, AudioContext.destination can pin to a stale audio
+		// sink after OS audio changes (and `setSinkId('')` does not always
+		// recover it). HTMLMediaElement uses the native audio path that
+		// always follows the OS default device — same path <video> and
+		// YouTube use. The hidden <audio> element pulls from the Web Audio
+		// graph via MediaStream, so EQ/compressor still apply.
+		this.streamDest = this.ctx.createMediaStreamDestination();
+		this.outputAudio = document.createElement('audio');
+		this.outputAudio.srcObject = this.streamDest.stream;
+		this.outputAudio.autoplay = true;
+		this.outputAudio.style.display = 'none';
+		document.body.appendChild(this.outputAudio);
+		this.outputAudio.play().catch(() => {});
+
+		// Belt-and-suspenders: also try to pin AudioContext.destination to
+		// the OS default device. Even though we route through streamDest,
+		// some Chrome builds gate stream production on destination state.
 		this.pinSinkToDefault();
 
 		// Force the context to running state. Chrome may start it suspended
@@ -324,6 +342,12 @@ export class AudioEngine {
 			this.ctx.close().catch(() => {});
 			this.ctx = null;
 		}
+		if (this.outputAudio) {
+			this.outputAudio.srcObject = null;
+			this.outputAudio.remove();
+			this.outputAudio = null;
+		}
+		this.streamDest = null;
 		this.inputGainNode = null;
 		this.filters = [];
 		this.compressor = null;
@@ -442,7 +466,10 @@ export class AudioEngine {
 			current = this.compMergeNode;
 		}
 
-		current.connect(this.ctx.destination);
+		// Route to streamDest (consumed by hidden <audio> element) when
+		// available; fall back to AudioContext.destination if creation
+		// failed for any reason.
+		current.connect(this.streamDest ?? this.ctx.destination);
 	}
 
 	private applyCompressorSettings(s: CompressorSettings): void {
