@@ -132,6 +132,10 @@ export class AudioEngine {
 			return;
 		}
 
+		console.log(
+			`[audioEngine] attached. ctx.state=${this.ctx.state} sampleRate=${this.ctx.sampleRate} baseLatency=${(this.ctx as AudioContext & { baseLatency?: number }).baseLatency ?? 'n/a'}`,
+		);
+
 		// Route audio output through a MediaStream consumed by a hidden
 		// <audio> element instead of `AudioContext.destination`. On
 		// Chrome/Windows, AudioContext.destination can pin to a stale audio
@@ -146,7 +150,6 @@ export class AudioEngine {
 		this.outputAudio.autoplay = true;
 		this.outputAudio.style.display = 'none';
 		document.body.appendChild(this.outputAudio);
-		this.outputAudio.play().catch(() => {});
 
 		// Belt-and-suspenders: also try to pin AudioContext.destination to
 		// the OS default device. Even though we route through streamDest,
@@ -162,7 +165,16 @@ export class AudioEngine {
 		// disabling effects again. resume() is best-effort: if the browser
 		// rejects (no user gesture credited yet) the global interaction
 		// listener installed below picks it up on the next click/keypress.
-		this.ctx.resume().catch(() => {});
+		this.ctx
+			.resume()
+			.then(() => {
+				console.log(`[audioEngine] resume() resolved. ctx.state=${this.ctx?.state}`);
+				this.startOutputAudio();
+			})
+			.catch((err) => {
+				console.warn('[audioEngine] resume() rejected:', err);
+				this.startOutputAudio();
+			});
 		this.installResumeOnInteraction();
 
 		// Recover from OS audio device changes and context state transitions.
@@ -395,12 +407,31 @@ export class AudioEngine {
 		this.interactionResumeListener = null;
 	}
 
+	private startOutputAudio(): void {
+		if (!this.outputAudio) return;
+		const tracks = this.streamDest?.stream.getAudioTracks() ?? [];
+		console.log(
+			`[audioEngine] starting output <audio>. tracks=${tracks.length} ctx.state=${this.ctx?.state}`,
+		);
+		this.outputAudio
+			.play()
+			.then(() => {
+				console.log('[audioEngine] output <audio> playing.');
+			})
+			.catch((err) => {
+				console.warn('[audioEngine] output <audio> play() rejected:', err);
+			});
+	}
+
 	private installRecoveryHandlers(): void {
 		if (!this.ctx) return;
 		this.ctx.addEventListener('statechange', () => {
 			const state = this.ctx?.state;
+			console.log(`[audioEngine] ctx statechange → ${state}`);
 			if (state === 'suspended' || state === 'interrupted') {
 				this.ctx?.resume().catch(() => {});
+			} else if (state === 'running') {
+				this.startOutputAudio();
 			}
 		});
 		if (navigator.mediaDevices && !this.deviceChangeListener) {
@@ -502,3 +533,7 @@ export class AudioEngine {
 
 /** Singleton audio engine instance shared across the app. */
 export const audioEngine = new AudioEngine();
+
+if (typeof window !== 'undefined') {
+	(window as Window & { __audioEngine?: AudioEngine }).__audioEngine = audioEngine;
+}
