@@ -577,7 +577,8 @@
 	position: absolute;
 	bottom: 100%;
 	right: 0;
-	min-width: 180px;
+	min-width: 260px;
+	max-width: 320px;
 	max-height: 80vh;
 	overflow-y: auto;
 	background: rgba(18, 18, 18, 0.97);
@@ -594,7 +595,8 @@
 	width: 100%;
 	align-items: center;
 	justify-content: space-between;
-	padding: 8px 14px;
+	gap: 12px;
+	padding: 10px 16px;
 	color: rgba(255, 255, 255, 0.9);
 	font-size: 13px;
 	transition: background 120ms ease;
@@ -606,11 +608,25 @@
 
 .menuRowLabel {
 	font-weight: 500;
+	flex-shrink: 0;
 }
 
 .menuRowValue {
 	color: rgba(255, 255, 255, 0.45);
 	font-size: 12px;
+	min-width: 0;
+	flex: 1 1 auto;
+	text-align: right;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.menuRowChevron {
+	color: rgba(255, 255, 255, 0.45);
+	font-size: 14px;
+	flex-shrink: 0;
+	margin-left: 2px;
 }
 
 .menuBack {

@@ -778,7 +778,9 @@ export function PlayerControls({
 													{quality.value === 'auto'
 														? 'Auto'
 														: quality.value}
-													{' \u203A'}
+												</span>
+												<span class={styles.menuRowChevron}>
+													{'\u203A'}
 												</span>
 											</button>
 
@@ -793,7 +795,9 @@ export function PlayerControls({
 																(t) => t.id === subtitleTrack.value,
 															)?.label ?? 'On')
 														: 'Off'}
-													{' \u203A'}
+												</span>
+												<span class={styles.menuRowChevron}>
+													{'\u203A'}
 												</span>
 											</button>
 
@@ -823,7 +827,9 @@ export function PlayerControls({
 															: (session?.audioTracks?.[0]?.label ??
 																session?.audioTracks?.[0]?.language?.toUpperCase() ??
 																'Default')}
-														{' \u203A'}
+													</span>
+													<span class={styles.menuRowChevron}>
+														{'\u203A'}
 													</span>
 												</button>
 											)}
