@@ -555,7 +555,7 @@ const VIDEO_PARAMS: {
 		unit: '%',
 		default: 0,
 	},
-	{ key: 'crop', label: 'Crop', min: 100, max: 130, step: 1, unit: '%', default: 100 },
+	{ key: 'crop', label: 'Crop', min: 100, max: 200, step: 1, unit: '%', default: 100 },
 	{ key: 'sharpen', label: 'Sharpen', min: 0, max: 100, step: 1, unit: '%', default: 0 },
 ];
 
