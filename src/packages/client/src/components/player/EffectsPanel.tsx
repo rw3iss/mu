@@ -527,6 +527,17 @@ const VIDEO_PARAMS: {
 		unit: '%',
 		default: 100,
 	},
+	{ key: 'gamma', label: 'Gamma', min: 50, max: 200, step: 1, unit: '%', default: 100 },
+	{
+		key: 'blackLevel',
+		label: 'Black Level',
+		min: 0,
+		max: 30,
+		step: 1,
+		unit: '%',
+		default: 0,
+	},
+	{ key: 'crop', label: 'Crop', min: 100, max: 130, step: 1, unit: '%', default: 100 },
 ];
 
 function VideoTab() {

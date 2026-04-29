@@ -431,25 +431,37 @@ export function GlobalPlayer() {
 		}
 
 		const v = videoEffects.value;
-		const filters = [
+		const cssFilters = [
 			`brightness(${v.brightness / 100})`,
 			`contrast(${v.contrast / 100})`,
 			`saturate(${v.saturation / 100})`,
 			v.hueRotate !== 0 ? `hue-rotate(${v.hueRotate}deg)` : '',
 			v.sepia > 0 ? `sepia(${v.sepia / 100})` : '',
 			v.grayscale > 0 ? `grayscale(${v.grayscale / 100})` : '',
-		]
-			.filter(Boolean)
-			.join(' ');
+		].filter(Boolean);
 
-		video.style.filter = filters;
+		// Gamma + black-level live in an SVG <feComponentTransfer> chain
+		// (CSS filter has no equivalent). Reference it FIRST in the chain
+		// so its output feeds the CSS color filters, matching the natural
+		// grading order: black-point → gamma → brightness → contrast →
+		// saturation. Only inject the URL when at least one is non-default
+		// so we skip a no-op pass when the user hasn't touched them.
+		const usesSvg = (v.gamma ?? 100) !== 100 || (v.blackLevel ?? 0) !== 0;
+		video.style.filter = usesSvg
+			? ['url(#mu-video-filter)', ...cssFilters].join(' ')
+			: cssFilters.join(' ');
 
-		// Vertical scale stretches/squishes the video frame to correct
-		// busted aspect ratios. Applied as a CSS transform so it composites
-		// on the GPU and doesn't trigger a relayout. The bounding box stays
-		// the same — only the rendered content scales vertically.
+		// Geometric transforms: uniform crop zooms past letterbox bars,
+		// vertical scale corrects squished/stretched aspect. Combined into
+		// a single transform so they compose; CSS scale composites on the
+		// GPU with zero relayout. The <video> bounding box stays the same;
+		// overflow on the parent container clips overdraw.
 		const scaleY = (v.verticalScale ?? 100) / 100;
-		video.style.transform = scaleY === 1 ? '' : `scaleY(${scaleY})`;
+		const crop = (v.crop ?? 100) / 100;
+		const parts: string[] = [];
+		if (crop !== 1) parts.push(`scale(${crop})`);
+		if (scaleY !== 1) parts.push(`scaleY(${scaleY})`);
+		video.style.transform = parts.join(' ');
 	}, [videoEnabled.value, videoEffects.value]);
 
 	// Apply selected subtitle track to the video element
@@ -676,8 +688,38 @@ export function GlobalPlayer() {
 		? `calc((100vh - (${splitWidth.value}vw - 3px) * 9 / 16) / 2)`
 		: undefined;
 
+	// SVG filter for gamma + black-level (CSS filter has no equivalent).
+	// Identity values (gamma=1, black=0) make this a pass-through; the
+	// useEffect above only references the filter URL when one is
+	// non-default, so the cost when unused is zero.
+	const ve = videoEffects.value;
+	const blackLevel = (ve.blackLevel ?? 0) / 100;
+	const blackSlope = blackLevel < 1 ? 1 / (1 - blackLevel) : 1;
+	const blackIntercept = blackLevel < 1 ? -blackLevel / (1 - blackLevel) : 0;
+	const gammaValue = (ve.gamma ?? 100) / 100;
+	const gammaExponent = gammaValue > 0 ? 1 / gammaValue : 1;
+
 	return (
 		<>
+			<svg
+				width="0"
+				height="0"
+				style={{ position: 'absolute', pointerEvents: 'none' }}
+				aria-hidden="true"
+			>
+				<filter id="mu-video-filter" color-interpolation-filters="sRGB">
+					<feComponentTransfer result="afterBlack">
+						<feFuncR type="linear" slope={blackSlope} intercept={blackIntercept} />
+						<feFuncG type="linear" slope={blackSlope} intercept={blackIntercept} />
+						<feFuncB type="linear" slope={blackSlope} intercept={blackIntercept} />
+					</feComponentTransfer>
+					<feComponentTransfer in="afterBlack">
+						<feFuncR type="gamma" amplitude="1" exponent={gammaExponent} offset="0" />
+						<feFuncG type="gamma" amplitude="1" exponent={gammaExponent} offset="0" />
+						<feFuncB type="gamma" amplitude="1" exponent={gammaExponent} offset="0" />
+					</feComponentTransfer>
+				</filter>
+			</svg>
 			{/* Split mode panel — everything except the video (which stays in the shared wrapper) */}
 			{isSplit && (
 				<div
