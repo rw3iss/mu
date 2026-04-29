@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'preact/hooks';
 import { audioEngine } from '@/audio/audio-engine';
+import { useCanvasAnimator } from '@/hooks/useCanvasAnimator';
 import styles from './EqSpectrum.module.scss';
 
 /**
@@ -33,41 +33,21 @@ const SAMPLE_FREQS: number[] = (() => {
 // band-i and band-(i+1) = column i+1.5. With 11 columns (each 1/11 wide),
 // center of column c = (c + 0.5)/11.
 const SAMPLE_X_FRAC: number[] = SAMPLE_FREQS.map((_, j) => {
-	const col = 1 + j * 0.5; // band 0 at col 1, midpoint 0 at col 1.5, ...
+	const col = 1 + j * 0.5;
 	return (col + 0.5) / 11;
 });
 
 export function EqSpectrum() {
-	const canvasRef = useRef<HTMLCanvasElement | null>(null);
-	const rafRef = useRef<number | null>(null);
-
-	useEffect(() => {
-		const canvas = canvasRef.current;
-		if (!canvas) return;
-		const ctx2d = canvas.getContext('2d');
-		if (!ctx2d) return;
-
-		// Resize canvas to its rendered size for crisp drawing on HiDPI.
-		const resize = () => {
-			const dpr = window.devicePixelRatio || 1;
-			const { clientWidth, clientHeight } = canvas;
-			canvas.width = Math.max(1, Math.floor(clientWidth * dpr));
-			canvas.height = Math.max(1, Math.floor(clientHeight * dpr));
-			ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
-		};
-		resize();
-		const ro = new ResizeObserver(resize);
-		ro.observe(canvas);
-
+	const canvasRef = useCanvasAnimator(() => {
 		const fftSize = audioEngine.getFftSize() || 4096;
 		const sampleRate = audioEngine.getSampleRate();
 		const binCount = fftSize / 2;
 		const binHz = sampleRate / fftSize;
 		const data = new Uint8Array(binCount);
 
-		// Pre-compute the FFT-bin window for each sample frequency so the
-		// rAF loop has zero allocation. Each sample averages bins between
-		// the geometric midpoints of its neighbours, capped to [0, binCount-1].
+		// Pre-compute the FFT-bin window for each sample frequency. Each
+		// sample averages bins between the geometric midpoints of its
+		// neighbours, capped to [0, binCount-1].
 		const sampleBinRanges: { lo: number; hi: number }[] = SAMPLE_FREQS.map((f, j) => {
 			const fLo = j === 0 ? f / Math.SQRT2 : Math.sqrt(f * SAMPLE_FREQS[j - 1]!);
 			const fHi =
@@ -78,18 +58,13 @@ export function EqSpectrum() {
 			const hi = Math.max(lo, Math.min(binCount - 1, Math.round(fHi / binHz)));
 			return { lo, hi };
 		});
+		const mags: number[] = new Array(SAMPLE_FREQS.length);
 
-		const draw = () => {
-			rafRef.current = requestAnimationFrame(draw);
+		return (ctx, w, h) => {
 			const ok = audioEngine.getFrequencyData(data);
-			const w = canvas.clientWidth;
-			const h = canvas.clientHeight;
-			ctx2d.clearRect(0, 0, w, h);
+			ctx.clearRect(0, 0, w, h);
 			if (!ok) return;
 
-			// Compute magnitude for each sample frequency by averaging the
-			// FFT bins covering it, then normalise 0..255 → 0..1.
-			const mags: number[] = new Array(SAMPLE_FREQS.length);
 			for (let j = 0; j < SAMPLE_FREQS.length; j++) {
 				const { lo, hi } = sampleBinRanges[j]!;
 				let sum = 0;
@@ -100,48 +75,35 @@ export function EqSpectrum() {
 			const firstY = h - mags[0]! * h;
 			const lastY = h - mags[mags.length - 1]! * h;
 
-			// Filled area path: extend horizontally to the canvas edges at
-			// the first/last sample's height so the leftmost and rightmost
-			// segments are filled flush, then drop down each edge to close.
-			ctx2d.beginPath();
-			ctx2d.moveTo(0, h);
-			ctx2d.lineTo(0, firstY);
-			ctx2d.lineTo(SAMPLE_X_FRAC[0]! * w, firstY);
+			ctx.beginPath();
+			ctx.moveTo(0, h);
+			ctx.lineTo(0, firstY);
+			ctx.lineTo(SAMPLE_X_FRAC[0]! * w, firstY);
 			for (let j = 1; j < mags.length; j++) {
-				ctx2d.lineTo(SAMPLE_X_FRAC[j]! * w, h - mags[j]! * h);
+				ctx.lineTo(SAMPLE_X_FRAC[j]! * w, h - mags[j]! * h);
 			}
-			ctx2d.lineTo(w, lastY);
-			ctx2d.lineTo(w, h);
-			ctx2d.closePath();
+			ctx.lineTo(w, lastY);
+			ctx.lineTo(w, h);
+			ctx.closePath();
 
-			// Accent-coloured fill, alpha so the slider thumbs read on top.
-			const grad = ctx2d.createLinearGradient(0, 0, 0, h);
+			const grad = ctx.createLinearGradient(0, 0, 0, h);
 			grad.addColorStop(0, 'rgba(99, 102, 241, 0.55)');
 			grad.addColorStop(1, 'rgba(99, 102, 241, 0.05)');
-			ctx2d.fillStyle = grad;
-			ctx2d.fill();
+			ctx.fillStyle = grad;
+			ctx.fill();
 
-			// Crisp top line — same edge extension so the stroke runs
-			// fully from the left canvas edge to the right.
-			ctx2d.beginPath();
-			ctx2d.moveTo(0, firstY);
-			ctx2d.lineTo(SAMPLE_X_FRAC[0]! * w, firstY);
+			ctx.beginPath();
+			ctx.moveTo(0, firstY);
+			ctx.lineTo(SAMPLE_X_FRAC[0]! * w, firstY);
 			for (let j = 1; j < mags.length; j++) {
-				ctx2d.lineTo(SAMPLE_X_FRAC[j]! * w, h - mags[j]! * h);
+				ctx.lineTo(SAMPLE_X_FRAC[j]! * w, h - mags[j]! * h);
 			}
-			ctx2d.lineTo(w, lastY);
-			ctx2d.strokeStyle = 'rgba(129, 140, 248, 0.9)';
-			ctx2d.lineWidth = 1.5;
-			ctx2d.stroke();
+			ctx.lineTo(w, lastY);
+			ctx.strokeStyle = 'rgba(129, 140, 248, 0.9)';
+			ctx.lineWidth = 1.5;
+			ctx.stroke();
 		};
-		rafRef.current = requestAnimationFrame(draw);
-
-		return () => {
-			ro.disconnect();
-			if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-			rafRef.current = null;
-		};
-	}, []);
+	});
 
 	return <canvas ref={canvasRef} class={styles.canvas} />;
 }

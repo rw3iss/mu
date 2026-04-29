@@ -23,6 +23,7 @@ export const spectrumEnabled = signal(false);
 
 export const compressorEnabled = signal(false);
 export const compressorSettings = signal<CompressorSettings>({ ...DEFAULT_COMPRESSOR });
+export const compressorVisualizerEnabled = signal(false);
 
 // Video effects
 export interface VideoEffectSettings {
@@ -80,6 +81,7 @@ export function initAudioEffects(): void {
 
 	const savedInputGain = getUiSetting('audio_eq_input_gain', 0);
 	const savedSpectrum = getUiSetting('audio_spectrum_enabled', false);
+	const savedCompVisualizer = getUiSetting('audio_compressor_visualizer', false);
 
 	// Apply to engine first
 	if (savedBands) audioEngine.setBands(savedBands);
@@ -87,8 +89,9 @@ export function initAudioEffects(): void {
 	audioEngine.setEqEnabled(savedEq);
 	audioEngine.setCompressorEnabled(savedComp);
 	audioEngine.setInputGain(savedInputGain);
-	if (savedSpectrum && !savedEq && !savedComp) {
-		// Spectrum needs the audio graph attached even if no effect is on.
+	if ((savedSpectrum || savedCompVisualizer) && !savedEq && !savedComp) {
+		// Visualizers need the audio graph attached even if no effect is on
+		// (the analyser node lives in the graph).
 		audioEngine.attach();
 	}
 
@@ -109,6 +112,7 @@ export function initAudioEffects(): void {
 		eqInputGain.value = savedInputGain;
 		spectrumEnabled.value = savedSpectrum;
 		compressorEnabled.value = savedComp;
+		compressorVisualizerEnabled.value = savedCompVisualizer;
 		if (savedBands) eqBands.value = savedBands;
 		if (savedCompSettings) compressorSettings.value = savedCompSettings;
 		videoEnabled.value = savedVideoEnabled;
@@ -154,6 +158,18 @@ export function toggleSpectrum(): void {
 		audioEngine.attach();
 	}
 	setUiSetting('audio_spectrum_enabled', next);
+}
+
+export function toggleCompressorVisualizer(): void {
+	const next = !compressorVisualizerEnabled.value;
+	compressorVisualizerEnabled.value = next;
+	if (next) {
+		// Visualizer reads input level from the analyser and the live
+		// reduction value from the compressor — both live in the audio
+		// graph, so we attach lazily here as the spectrum toggle does.
+		audioEngine.attach();
+	}
+	setUiSetting('audio_compressor_visualizer', next);
 }
 
 export function toggleCompressor(): void {

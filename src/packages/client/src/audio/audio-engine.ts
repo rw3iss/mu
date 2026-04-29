@@ -359,6 +359,18 @@ export class AudioEngine {
 	}
 
 	/**
+	 * Fill `buffer` with raw PCM samples (0..255 around 128 for silence).
+	 * Buffer length should be `getFftSize()`. Returns false if no
+	 * analyser exists yet. Use this to compute peak / RMS levels for
+	 * meters and live signal indicators.
+	 */
+	getTimeDomainData(buffer: Uint8Array): boolean {
+		if (!this.analyser) return false;
+		this.analyser.getByteTimeDomainData(buffer);
+		return true;
+	}
+
+	/**
 	 * List available audio output devices. Labels are empty until the user
 	 * has granted microphone permission to this origin (Chrome quirk).
 	 */

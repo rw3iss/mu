@@ -8,6 +8,7 @@ import {
 	activeVideoProfileId,
 	compressorEnabled,
 	compressorSettings,
+	compressorVisualizerEnabled,
 	copyProfile,
 	deleteProfile,
 	effectsTab,
@@ -29,6 +30,7 @@ import {
 	showEffectsPanel,
 	spectrumEnabled,
 	toggleCompressor,
+	toggleCompressorVisualizer,
 	toggleEffectsPanel,
 	toggleEq,
 	toggleSpectrum,
@@ -44,6 +46,7 @@ import {
 	videoEffects,
 	videoEnabled,
 } from '@/state/audio-effects.state';
+import { CompressorCurve } from './CompressorCurve';
 import styles from './EffectsPanel.module.scss';
 import { EqSpectrum } from './EqSpectrum';
 
@@ -378,6 +381,7 @@ function CompressorTab() {
 	const enabled = compressorEnabled.value;
 	const settings = compressorSettings.value;
 	const activeId = activeCompProfileId.value;
+	const visualizerOn = compressorVisualizerEnabled.value;
 	const [reduction, setReduction] = useState(0);
 	const rafRef = useRef<number>(0);
 
@@ -414,33 +418,38 @@ function CompressorTab() {
 			/>
 
 			<CollapsibleSettings settingKey="effects_comp_settings_open">
-				{COMP_PARAMS.map((param) => (
-					<div class={styles.compParam} key={param.key}>
-						<div class={styles.compParamHeader}>
-							<span class={styles.compParamLabel}>{param.label}</span>
-							<span class={styles.compParamValue}>
-								{param.key === 'attack' || param.key === 'release'
-									? settings[param.key].toFixed(3)
-									: settings[param.key].toFixed(1)}
-								{param.unit}
-							</span>
-						</div>
-						<input
-							type="range"
-							class={styles.compSlider}
-							min={param.min}
-							max={param.max}
-							step={param.step}
-							value={settings[param.key]}
-							onInput={(e) =>
-								updateCompressorParam(
-									param.key,
-									parseFloat((e.target as HTMLInputElement).value),
-								)
-							}
-						/>
+				<div class={styles.compParamsWrap}>
+					{visualizerOn && <CompressorCurve />}
+					<div class={styles.compParamsInner}>
+						{COMP_PARAMS.map((param) => (
+							<div class={styles.compParam} key={param.key}>
+								<div class={styles.compParamHeader}>
+									<span class={styles.compParamLabel}>{param.label}</span>
+									<span class={styles.compParamValue}>
+										{param.key === 'attack' || param.key === 'release'
+											? settings[param.key].toFixed(3)
+											: settings[param.key].toFixed(1)}
+										{param.unit}
+									</span>
+								</div>
+								<input
+									type="range"
+									class={styles.compSlider}
+									min={param.min}
+									max={param.max}
+									step={param.step}
+									value={settings[param.key]}
+									onInput={(e) =>
+										updateCompressorParam(
+											param.key,
+											parseFloat((e.target as HTMLInputElement).value),
+										)
+									}
+								/>
+							</div>
+						))}
 					</div>
-				))}
+				</div>
 
 				{enabled && (
 					<div class={styles.reductionMeter}>
@@ -485,9 +494,18 @@ function CompressorTab() {
 					</div>
 				</div>
 
-				<button class={styles.resetBtn} onClick={resetCompressor}>
-					Reset Compressor
-				</button>
+				<div class={styles.eqActions}>
+					<button class={styles.resetBtn} onClick={resetCompressor}>
+						Reset Compressor
+					</button>
+					<button
+						class={`${styles.resetBtn} ${visualizerOn ? styles.resetBtnActive : ''}`}
+						onClick={toggleCompressorVisualizer}
+						aria-pressed={visualizerOn}
+					>
+						Visualize
+					</button>
+				</div>
 			</CollapsibleSettings>
 		</div>
 	);

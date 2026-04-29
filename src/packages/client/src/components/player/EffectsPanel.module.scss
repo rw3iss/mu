@@ -350,6 +350,15 @@
 
 // ── Compressor ──
 
+.compParamsWrap {
+  position: relative;
+}
+
+.compParamsInner {
+  position: relative;
+  z-index: 1;
+}
+
 .compParam {
   margin-bottom: 10px;
 }
