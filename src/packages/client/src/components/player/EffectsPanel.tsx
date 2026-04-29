@@ -521,8 +521,8 @@ const VIDEO_PARAMS: {
 	{
 		key: 'verticalScale',
 		label: 'Vertical Scale',
-		min: 75,
-		max: 125,
+		min: 65,
+		max: 135,
 		step: 1,
 		unit: '%',
 		default: 100,
