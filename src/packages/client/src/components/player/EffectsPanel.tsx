@@ -518,6 +518,15 @@ const VIDEO_PARAMS: {
 	},
 	{ key: 'sepia', label: 'Sepia', min: 0, max: 100, step: 1, unit: '%', default: 0 },
 	{ key: 'grayscale', label: 'Grayscale', min: 0, max: 100, step: 1, unit: '%', default: 0 },
+	{
+		key: 'verticalScale',
+		label: 'Vertical Scale',
+		min: 75,
+		max: 125,
+		step: 1,
+		unit: '%',
+		default: 100,
+	},
 ];
 
 function VideoTab() {

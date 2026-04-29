@@ -32,6 +32,7 @@ export interface VideoEffectSettings {
 	hueRotate: number; // 0-360, default 0
 	sepia: number; // 0-100, default 0
 	grayscale: number; // 0-100, default 0
+	verticalScale: number; // 75-125, default 100 — fixes squished/stretched aspect
 }
 
 export const DEFAULT_VIDEO_EFFECTS: VideoEffectSettings = {
@@ -41,6 +42,7 @@ export const DEFAULT_VIDEO_EFFECTS: VideoEffectSettings = {
 	hueRotate: 0,
 	sepia: 0,
 	grayscale: 0,
+	verticalScale: 100,
 };
 
 export const videoEnabled = signal(false);
@@ -102,7 +104,11 @@ export function initAudioEffects(): void {
 		if (savedBands) eqBands.value = savedBands;
 		if (savedCompSettings) compressorSettings.value = savedCompSettings;
 		videoEnabled.value = savedVideoEnabled;
-		if (savedVideoEffects) videoEffects.value = savedVideoEffects;
+		// Merge with defaults so old saved settings missing newer fields
+		// (e.g. verticalScale) don't yield undefined → NaN at render time.
+		if (savedVideoEffects) {
+			videoEffects.value = { ...DEFAULT_VIDEO_EFFECTS, ...savedVideoEffects };
+		}
 		activeEqProfileId.value = savedEqProfileId;
 		activeCompProfileId.value = savedCompProfileId;
 		activeVideoProfileId.value = savedVideoProfileId;
@@ -446,7 +452,7 @@ export function loadVideoProfile(id: string): void {
 
 	const config = JSON.parse(profile.config);
 	const effects: VideoEffectSettings | null = config.videoEffects
-		? { ...config.videoEffects }
+		? { ...DEFAULT_VIDEO_EFFECTS, ...config.videoEffects }
 		: null;
 
 	if (effects) {

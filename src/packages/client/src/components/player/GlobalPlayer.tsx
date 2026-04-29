@@ -426,6 +426,7 @@ export function GlobalPlayer() {
 
 		if (!videoEnabled.value) {
 			video.style.filter = '';
+			video.style.transform = '';
 			return;
 		}
 
@@ -442,6 +443,13 @@ export function GlobalPlayer() {
 			.join(' ');
 
 		video.style.filter = filters;
+
+		// Vertical scale stretches/squishes the video frame to correct
+		// busted aspect ratios. Applied as a CSS transform so it composites
+		// on the GPU and doesn't trigger a relayout. The bounding box stays
+		// the same — only the rendered content scales vertically.
+		const scaleY = (v.verticalScale ?? 100) / 100;
+		video.style.transform = scaleY === 1 ? '' : `scaleY(${scaleY})`;
 	}, [videoEnabled.value, videoEffects.value]);
 
 	// Apply selected subtitle track to the video element
