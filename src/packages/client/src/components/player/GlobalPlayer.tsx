@@ -700,13 +700,13 @@ export function GlobalPlayer() {
 	const blackIntercept = blackLevel < 1 ? -blackLevel / (1 - blackLevel) : 0;
 	const gammaValue = (ve.gamma ?? 100) / 100;
 	const gammaExponent = gammaValue > 0 ? 1 / gammaValue : 1;
-	// Unsharp-mask kernel parameterised by amount a in [0, 1]:
-	//   [ 0   -a    0]
-	//   [-a  1+4a  -a]
-	//   [ 0   -a    0]
-	// Sum is 1 so brightness is preserved. a=0 → identity (pure no-op).
+	// Unsharp mask via blur+composite: out = (1+a)·source − a·blur(source).
+	// We use this instead of feConvolveMatrix because Chrome's video
+	// filter pipeline silently drops convolveMatrix on <video> elements
+	// in many builds, while feGaussianBlur + feComposite both run
+	// reliably. a=0 gives k2=1, k3=0, which is identity (the blur is
+	// computed but multiplied out), so the slider at 0 is a true no-op.
 	const sharpenAmount = (ve.sharpen ?? 0) / 100;
-	const sharpenKernel = `0 ${-sharpenAmount} 0 ${-sharpenAmount} ${1 + 4 * sharpenAmount} ${-sharpenAmount} 0 ${-sharpenAmount} 0`;
 
 	return (
 		<>
@@ -727,11 +727,15 @@ export function GlobalPlayer() {
 						<feFuncG type="gamma" amplitude="1" exponent={gammaExponent} offset="0" />
 						<feFuncB type="gamma" amplitude="1" exponent={gammaExponent} offset="0" />
 					</feComponentTransfer>
-					<feConvolveMatrix
+					<feGaussianBlur in="afterGamma" stdDeviation="1" result="sharpenBlur" />
+					<feComposite
 						in="afterGamma"
-						order="3"
-						preserveAlpha="true"
-						kernelMatrix={sharpenKernel}
+						in2="sharpenBlur"
+						operator="arithmetic"
+						k1="0"
+						k2={1 + sharpenAmount}
+						k3={-sharpenAmount}
+						k4="0"
 					/>
 				</filter>
 			</svg>
