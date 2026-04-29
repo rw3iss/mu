@@ -36,6 +36,7 @@ export interface VideoEffectSettings {
 	gamma: number; // 50-200, default 100 — power-curve midtones (value/100 = gamma)
 	blackLevel: number; // 0-30, default 0 — pulls black point up; crushes shadows
 	crop: number; // 100-130, default 100 — uniform zoom past letterbox bars
+	sharpen: number; // 0-100, default 0 — unsharp-mask amount (value/100 = kernel weight)
 }
 
 export const DEFAULT_VIDEO_EFFECTS: VideoEffectSettings = {
@@ -49,6 +50,7 @@ export const DEFAULT_VIDEO_EFFECTS: VideoEffectSettings = {
 	gamma: 100,
 	blackLevel: 0,
 	crop: 100,
+	sharpen: 0,
 };
 
 export const videoEnabled = signal(false);

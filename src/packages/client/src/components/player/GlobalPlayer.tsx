@@ -440,13 +440,14 @@ export function GlobalPlayer() {
 			v.grayscale > 0 ? `grayscale(${v.grayscale / 100})` : '',
 		].filter(Boolean);
 
-		// Gamma + black-level live in an SVG <feComponentTransfer> chain
-		// (CSS filter has no equivalent). Reference it FIRST in the chain
-		// so its output feeds the CSS color filters, matching the natural
-		// grading order: black-point → gamma → brightness → contrast →
-		// saturation. Only inject the URL when at least one is non-default
-		// so we skip a no-op pass when the user hasn't touched them.
-		const usesSvg = (v.gamma ?? 100) !== 100 || (v.blackLevel ?? 0) !== 0;
+		// Gamma, black-level, and sharpen live in an SVG filter chain (CSS
+		// has no equivalent for any of them). Reference it FIRST in the
+		// CSS filter chain so its output feeds brightness/contrast/sat,
+		// matching natural grading order: black-point → gamma → sharpen
+		// → brightness → contrast → saturation. Only inject the URL when
+		// at least one is non-default so we skip a no-op pass when unused.
+		const usesSvg =
+			(v.gamma ?? 100) !== 100 || (v.blackLevel ?? 0) !== 0 || (v.sharpen ?? 0) !== 0;
 		video.style.filter = usesSvg
 			? ['url(#mu-video-filter)', ...cssFilters].join(' ')
 			: cssFilters.join(' ');
@@ -688,16 +689,24 @@ export function GlobalPlayer() {
 		? `calc((100vh - (${splitWidth.value}vw - 3px) * 9 / 16) / 2)`
 		: undefined;
 
-	// SVG filter for gamma + black-level (CSS filter has no equivalent).
-	// Identity values (gamma=1, black=0) make this a pass-through; the
-	// useEffect above only references the filter URL when one is
-	// non-default, so the cost when unused is zero.
+	// SVG filter for gamma + black-level + sharpen (CSS has no equivalent
+	// for any of these). All three identity at default (gamma=1, black=0,
+	// sharpen=0) → pass-through. The useEffect above only references the
+	// filter URL when at least one is non-default so the cost when unused
+	// is zero.
 	const ve = videoEffects.value;
 	const blackLevel = (ve.blackLevel ?? 0) / 100;
 	const blackSlope = blackLevel < 1 ? 1 / (1 - blackLevel) : 1;
 	const blackIntercept = blackLevel < 1 ? -blackLevel / (1 - blackLevel) : 0;
 	const gammaValue = (ve.gamma ?? 100) / 100;
 	const gammaExponent = gammaValue > 0 ? 1 / gammaValue : 1;
+	// Unsharp-mask kernel parameterised by amount a in [0, 1]:
+	//   [ 0   -a    0]
+	//   [-a  1+4a  -a]
+	//   [ 0   -a    0]
+	// Sum is 1 so brightness is preserved. a=0 → identity (pure no-op).
+	const sharpenAmount = (ve.sharpen ?? 0) / 100;
+	const sharpenKernel = `0 ${-sharpenAmount} 0 ${-sharpenAmount} ${1 + 4 * sharpenAmount} ${-sharpenAmount} 0 ${-sharpenAmount} 0`;
 
 	return (
 		<>
@@ -713,11 +722,17 @@ export function GlobalPlayer() {
 						<feFuncG type="linear" slope={blackSlope} intercept={blackIntercept} />
 						<feFuncB type="linear" slope={blackSlope} intercept={blackIntercept} />
 					</feComponentTransfer>
-					<feComponentTransfer in="afterBlack">
+					<feComponentTransfer in="afterBlack" result="afterGamma">
 						<feFuncR type="gamma" amplitude="1" exponent={gammaExponent} offset="0" />
 						<feFuncG type="gamma" amplitude="1" exponent={gammaExponent} offset="0" />
 						<feFuncB type="gamma" amplitude="1" exponent={gammaExponent} offset="0" />
 					</feComponentTransfer>
+					<feConvolveMatrix
+						in="afterGamma"
+						order="3"
+						preserveAlpha="true"
+						kernelMatrix={sharpenKernel}
+					/>
 				</filter>
 			</svg>
 			{/* Split mode panel — everything except the video (which stays in the shared wrapper) */}
