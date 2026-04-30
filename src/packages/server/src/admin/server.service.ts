@@ -22,6 +22,8 @@ export class ServerService {
 	async getServerInfo() {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const hwAccelBroken = this.settings.get<boolean>('hwAccelBroken', false);
+		const hwAccelBrokenSince = this.settings.get<string | null>('hwAccelBrokenSince', null);
+		const hwAccelBrokenReason = this.settings.get<string | null>('hwAccelBrokenReason', null);
 
 		return {
 			uptime: process.uptime(),
@@ -38,6 +40,8 @@ export class ServerService {
 			serverVersion: '0.1.0',
 			hwAccel: enc?.hwAccel || 'none',
 			hwAccelBroken,
+			hwAccelBrokenSince,
+			hwAccelBrokenReason,
 			encoding: {
 				preset: enc?.preset || 'veryfast',
 				quality: enc?.quality || '1080p',
@@ -90,6 +94,10 @@ export class ServerService {
 				activeTranscodes: this.transcoder.getActiveTranscodeCount(),
 			},
 		};
+	}
+
+	resetHwAccelBroken(): void {
+		this.transcoder.resetHwAccelBroken();
 	}
 
 	getServerLogs(

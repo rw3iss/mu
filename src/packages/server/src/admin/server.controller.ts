@@ -163,6 +163,13 @@ export class ServerController {
 		return { success: true, deleted: result.changes };
 	}
 
+	@Post('encoder/reset')
+	@Roles('admin')
+	resetEncoder() {
+		this.serverService.resetHwAccelBroken();
+		return { success: true };
+	}
+
 	@Post('jobs/:id/pause')
 	@Roles('admin')
 	pauseJob(@Param('id') id: string) {

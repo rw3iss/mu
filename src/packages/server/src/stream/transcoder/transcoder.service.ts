@@ -4,6 +4,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { WsEvent } from '@mu/shared';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
@@ -11,6 +12,7 @@ import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import { ConfigService } from '../../config/config.service.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, transcodeCache } from '../../database/schema/index.js';
+import { EventsService } from '../../events/events.service.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import { TranscodeDebuggerService } from './transcode-debugger.service.js';
 import { TRANSCODING_PROFILES } from './transcoder.profiles.js';
@@ -35,6 +37,13 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	private readonly sessionStates = new Map<string, { state: TranscodeState; error?: string }>();
 	/** Sessions that have already retried with software encoding (prevents infinite loops) */
 	private readonly swFallbackAttempted = new Set<string>();
+	/**
+	 * Rolling buffer of the last N stderr lines per active session, used by
+	 * {@link isHardwareEncoderFailure} to distinguish real GPU failures from
+	 * input-path / IO errors. Bounded to keep memory predictable.
+	 */
+	private readonly sessionStderr = new Map<string, string[]>();
+	private static readonly STDERR_BUFFER_LINES = 50;
 	/** If true, hardware encoding has failed and all encodes should use software */
 	private hwAccelBroken = false;
 	/** If true, FFmpeg itself cannot spawn (Windows DLL init failure) — skip background encodes */
@@ -49,6 +58,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		private readonly database: DatabaseService,
 		private readonly transcodeDebugger: TranscodeDebuggerService,
 		private readonly guidResolver: GuidResolverService,
+		private readonly events: EventsService,
 	) {
 		// Use config/env for initial cache dir — DB override applied in onModuleInit
 		// Check both camelCase and lowercase (env vars are lowercased by config loader)
@@ -460,6 +470,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
 					this.resetFfmpegSpawnFailCount();
+					this.sessionStderr.set(sessionId, []);
 					this.logger.log(
 						`FFmpeg started for session ${this.guidResolver.resolve(sessionId)}, outputDir=${targetDir}`,
 					);
@@ -469,6 +480,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.transcodeDebugger.recordMilestone(sessionId, 'ffmpegSpawned');
 					// Resolve immediately once FFmpeg starts; segments will be generated progressively
 					resolve();
+				})
+				.on('stderr', (line: string) => {
+					this.appendSessionStderr(sessionId, line);
 				})
 				.on('progress', (progress: any) => {
 					this.logger.debug(
@@ -482,6 +496,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					);
 					this.transcodeDebugger.recordEvent(sessionId, 'ffmpeg_error', err.message);
 					this.activeProcesses.delete(sessionId);
+					const stderrLines = this.sessionStderr.get(sessionId) ?? [];
 
 					// Windows DLL init failure with NVENC — likely NVIDIA DLLs can't load
 					// in non-interactive session. Fall through to software retry first.
@@ -492,18 +507,27 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 							state: 'failed',
 							error: 'FFmpeg cannot start (Windows DLL error) — try again in 60s',
 						});
+						this.sessionStderr.delete(sessionId);
 						reject(err);
 						return;
 					}
 
-					// If hardware acceleration was used, retry with software encoding
-					if (hwAccel !== 'none' && !this.swFallbackAttempted.has(sessionId)) {
+					// Only retry with software encoding when the failure looks
+					// like a real hardware-encoder problem. Path-parse errors
+					// (e.g. brackets in filename), missing files, or permission
+					// errors used to mistakenly flip hwAccelBroken globally and
+					// disable hardware encoding for everyone — even though the
+					// GPU was fine. The detector is conservative: anything we
+					// can't confidently attribute to the GPU fails the job
+					// without polluting global state.
+					if (
+						hwAccel !== 'none' &&
+						!this.swFallbackAttempted.has(sessionId) &&
+						this.isHardwareEncoderFailure(hwAccel, err.message, stderrLines)
+					) {
 						this.swFallbackAttempted.add(sessionId);
-						this.hwAccelBroken = true;
-						this.settings.set('hwAccelBroken', true);
-						this.logger.warn(
-							`Hardware acceleration (${hwAccel}) failed for session ${this.guidResolver.resolve(sessionId)}, switching to software encoding globally`,
-						);
+						const reason = stderrLines.slice(-3).join(' | ') || err.message;
+						this.setHwAccelBroken(reason, hwAccel);
 						this.retryWithSoftware(sessionId, filePath, options, outputDir).catch(
 							(retryErr) => {
 								this.logger.error(
@@ -515,6 +539,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					}
 
 					this.sessionStates.set(sessionId, { state: 'failed', error: err.message });
+					this.sessionStderr.delete(sessionId);
 					// Only reject if we haven't resolved yet
 					reject(err);
 				})
@@ -523,6 +548,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						`Transcode complete for session ${this.guidResolver.resolve(sessionId)}`,
 					);
 					this.activeProcesses.delete(sessionId);
+					this.sessionStderr.delete(sessionId);
 					this.sessionStates.set(sessionId, { state: 'completed' });
 					this.transcodeDebugger.recordEvent(
 						sessionId,
@@ -1425,11 +1451,20 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 
 	/**
 	 * Create an FFmpeg command with base input options.
+	 *
+	 * The input path is wrapped in the `file:` protocol so FFmpeg never
+	 * tries to interpret it. Without this, square brackets in folder /
+	 * file names (`[TGx]`, `[Hurtom]`, `[Ukr, Eng]` in YIFY-style
+	 * release tags) collide with FFmpeg's filter-graph and `concat:`
+	 * syntax — input parsing fails before encoding even starts, with
+	 * an error that previously got misattributed to the encoder.
+	 *
 	 * On Windows, explicitly disables hardware decoding to prevent
-	 * NVIDIA DLL loading failures (0xC0000142) in non-interactive sessions.
+	 * NVIDIA DLL loading failures (0xC0000142) in non-interactive
+	 * sessions.
 	 */
 	private createFfmpegCommand(filePath: string): ReturnType<typeof ffmpeg> {
-		const command = ffmpeg(filePath);
+		const command = ffmpeg(`file:${filePath}`);
 		if (process.platform === 'win32') {
 			command.inputOptions(['-hwaccel', 'none']);
 		}
@@ -1439,6 +1474,120 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const maxThreads = Math.max(1, Math.floor(cpuCount / 2));
 		command.outputOptions(['-threads', String(maxThreads)]);
 		return command;
+	}
+
+	/**
+	 * Append a single FFmpeg stderr line to the rolling buffer for the
+	 * session. Bounded to {@link STDERR_BUFFER_LINES} lines so memory
+	 * stays predictable even on long-running encodes that emit progress
+	 * to stderr.
+	 */
+	private appendSessionStderr(sessionId: string, line: string): void {
+		const buf = this.sessionStderr.get(sessionId);
+		if (!buf) return;
+		buf.push(line);
+		if (buf.length > TranscoderService.STDERR_BUFFER_LINES) {
+			buf.splice(0, buf.length - TranscoderService.STDERR_BUFFER_LINES);
+		}
+	}
+
+	/**
+	 * Decide whether an FFmpeg error is plausibly a hardware-encoder
+	 * problem (NVENC / QSV / VAAPI / DXVA) vs a generic input/output
+	 * issue (path parse error, file not found, permission denied).
+	 *
+	 * Conservative by design: anything that isn't clearly a hardware
+	 * failure returns false, so `hwAccelBroken` only flips on real GPU
+	 * problems. The bracket-in-path bug used to fail-fast at input
+	 * parse, then this code mistakenly attributed the failure to the
+	 * encoder and globally disabled hardware encoding for everyone.
+	 */
+	private isHardwareEncoderFailure(
+		hwAccel: string,
+		errMessage: string,
+		stderrLines: string[],
+	): boolean {
+		if (hwAccel === 'none') return false;
+		const haystack = `${errMessage}\n${stderrLines.join('\n')}`.toLowerCase();
+		// Generic "input file is bad" markers — these are NEVER the
+		// encoder's fault; bail out before the hardware check.
+		if (
+			haystack.includes('error opening input file') ||
+			haystack.includes('no such file or directory') ||
+			haystack.includes('permission denied') ||
+			haystack.includes('protocol not found')
+		) {
+			return false;
+		}
+		// Hardware-specific failure markers. Lower-cased haystack so
+		// the patterns match across FFmpeg versions and capitalisations.
+		const hwMarkers = [
+			'nvenc',
+			'nv_enc',
+			'openencodesession',
+			'cannot load nvencodeapi',
+			'cuda',
+			'cuvid',
+			'qsv',
+			'vaapi',
+			'dxva',
+			'd3d11va',
+			'no nvenc capable devices',
+			'no capable devices found',
+			'driver does not support',
+			'gpu',
+		];
+		return hwMarkers.some((m) => haystack.includes(m));
+	}
+
+	/**
+	 * Mark hardware encoding as broken globally and broadcast a
+	 * `server:status` event so the client can surface a banner.
+	 *
+	 * `reason` should be the most diagnostic piece of FFmpeg output we
+	 * have (last stderr line, the encoder name, etc.) so the user can
+	 * see what actually went wrong. `since` lets the client deduplicate
+	 * dismissals against re-fires of the same failure.
+	 */
+	private setHwAccelBroken(reason: string, hwAccel: string): void {
+		if (this.hwAccelBroken) return; // already flipped — don't re-broadcast
+		this.hwAccelBroken = true;
+		this.settings.set('hwAccelBroken', true);
+		const since = new Date().toISOString();
+		this.settings.set('hwAccelBrokenSince', since);
+		this.settings.set('hwAccelBrokenReason', reason);
+		this.logger.error(
+			`Hardware encoder (${hwAccel}) BROKEN — falling back to software for all sessions. Reason: ${reason}`,
+		);
+		this.events.emit(WsEvent.SERVER_STATUS, {
+			type: 'encoder-degraded',
+			encoderDegraded: true,
+			hwAccel,
+			reason,
+			since,
+		});
+	}
+
+	/**
+	 * Manually clear the hwAccelBroken flag — used by the admin "Reset
+	 * & Retry" button when a user has fixed the GPU / driver / DLL
+	 * issue and wants to attempt hardware encoding again. Subsequent
+	 * encode failures will of course re-flip the flag if the underlying
+	 * problem isn't actually fixed.
+	 */
+	resetHwAccelBroken(): void {
+		if (!this.hwAccelBroken) return;
+		this.hwAccelBroken = false;
+		this.settings.delete('hwAccelBroken');
+		this.settings.delete('hwAccelBrokenSince');
+		this.settings.delete('hwAccelBrokenReason');
+		this.logger.log(
+			'Hardware encoder broken flag manually cleared — will retry hardware encoding',
+		);
+		this.events.emit(WsEvent.SERVER_STATUS, {
+			type: 'encoder-degraded',
+			encoderDegraded: false,
+		});
 	}
 
 	/**

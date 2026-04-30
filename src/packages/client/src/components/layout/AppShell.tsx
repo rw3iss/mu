@@ -2,6 +2,7 @@ import { signal } from '@preact/signals';
 import { ComponentChildren } from 'preact';
 import { isPlayerActive, playerMode, splitWidth } from '@/state/globalPlayer.state';
 import styles from './AppShell.module.scss';
+import { EncoderHealthBanner } from './EncoderHealthBanner';
 import { MobileNav } from './MobileNav';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
@@ -30,6 +31,7 @@ export function AppShell({ children }: AppShellProps) {
 				<main class={styles.content}>{children}</main>
 			</div>
 			<MobileNav />
+			<EncoderHealthBanner />
 		</div>
 	);
 }
