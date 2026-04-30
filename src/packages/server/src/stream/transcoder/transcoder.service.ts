@@ -1280,8 +1280,18 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						`FFmpeg SW fallback error for session ${this.guidResolver.resolve(sessionId)}: ${err.message}`,
 					);
 					this.activeProcesses.delete(sessionId);
-					this.sessionStates.set(sessionId, { state: 'failed', error: err.message });
-					reject(err);
+
+					// Software encoding ALSO failed. If it's the Windows DLL
+					// init failure it means FFmpeg can't spawn at all — engage
+					// the circuit breaker and surface the encoder banner so
+					// the user knows why their next several jobs will fail too.
+					if (this.isWindowsSpawnFailure(err)) {
+						this.markFfmpegSpawnBroken();
+					}
+
+					const friendly = this.explainFfmpegError(err, []);
+					this.sessionStates.set(sessionId, { state: 'failed', error: friendly });
+					reject(new Error(friendly));
 				})
 				.on('end', () => {
 					this.logger.log(
@@ -1389,7 +1399,17 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						`Pre-transcode SW fallback error for ${this.guidResolver.resolve(movieFileId)}: ${err.message}`,
 					);
 					this.activeProcesses.delete(processKey);
-					reject(err);
+
+					// Same handling as the live-stream SW fallback path: if the
+					// software fallback ALSO hits a Windows DLL init failure,
+					// FFmpeg itself is busted and queueing more jobs will just
+					// keep failing. Engage the circuit breaker.
+					if (this.isWindowsSpawnFailure(err)) {
+						this.markFfmpegSpawnBroken();
+					}
+
+					const friendly = this.explainFfmpegError(err, []);
+					reject(new Error(friendly));
 				})
 				.on('end', () => {
 					this.logger.log(
@@ -1431,6 +1451,18 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		this.ffmpegSpawnBroken = true;
 		this.ffmpegSpawnBrokenUntil = Date.now() + 15_000;
 		this.logger.warn('FFmpeg spawn failed 3+ times — pausing background encoding for 15s');
+
+		// Surface to the user via the encoder-health banner. This is a
+		// stronger failure than hwAccelBroken (NVENC-only): FFmpeg
+		// can't spawn at all, so the software fallback won't save us
+		// either. We piggyback on the same banner channel rather than
+		// inventing a parallel UI path — the user just needs to know
+		// "encoding is busted right now, here's why".
+		this.setHwAccelBroken(
+			'FFmpeg failed to start (Windows DLL init error 0xC0000142). Software fallback also failed. Try restarting the audio / GPU service in Task Manager, or restart Windows.',
+			'spawn',
+		);
+
 		setTimeout(() => {
 			this.ffmpegSpawnBroken = false;
 			this.ffmpegSpawnFailCount = 0;
