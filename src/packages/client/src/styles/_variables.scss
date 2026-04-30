@@ -40,6 +40,16 @@
   --color-border: rgba(120, 140, 180, 0.07);
   --color-border-strong: rgba(120, 140, 180, 0.15);
 
+  // Surface overlays — translucent fills that should invert in light theme.
+  // 1 = subtlest (resting backgrounds, hairlines), 2 = hover/elevated,
+  // 3 = active/pressed, hi-contrast = dividers and emphasis.
+  // Replace ad-hoc rgba(255,255,255,…) values with these so the player
+  // popups, menu rows, sliders, and toggle states track the theme.
+  --surface-overlay-1: rgba(255, 255, 255, 0.06);
+  --surface-overlay-2: rgba(255, 255, 255, 0.10);
+  --surface-overlay-3: rgba(255, 255, 255, 0.15);
+  --surface-overlay-strong: rgba(255, 255, 255, 0.30);
+
   // Spacing scale
   --space-xs: 4px;
   --space-sm: 8px;
@@ -148,6 +158,11 @@
 
   --color-border: rgba(0, 0, 0, 0.07);
   --color-border-strong: rgba(0, 0, 0, 0.14);
+
+  --surface-overlay-1: rgba(0, 0, 0, 0.04);
+  --surface-overlay-2: rgba(0, 0, 0, 0.07);
+  --surface-overlay-3: rgba(0, 0, 0, 0.12);
+  --surface-overlay-strong: rgba(0, 0, 0, 0.25);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.08);

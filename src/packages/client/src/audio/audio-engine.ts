@@ -111,7 +111,7 @@ export class AudioEngine {
 		if (!target) return;
 		if (this.attached) {
 			if (this.boundElement !== target) {
-				console.warn(
+				dwarn(
 					'[audioEngine] attach() called with a different element than the one ' +
 						'already bound. Ignoring — call destroy() first to re-bind. This ' +
 						'indicates the video element is being recreated across component ' +
@@ -133,7 +133,7 @@ export class AudioEngine {
 			return;
 		}
 
-		console.log(
+		dlog(
 			`[audioEngine] attached. ctx.state=${this.ctx.state} sampleRate=${this.ctx.sampleRate} baseLatency=${(this.ctx as AudioContext & { baseLatency?: number }).baseLatency ?? 'n/a'}`,
 		);
 
@@ -177,11 +177,11 @@ export class AudioEngine {
 		this.ctx
 			.resume()
 			.then(() => {
-				console.log(`[audioEngine] resume() resolved. ctx.state=${this.ctx?.state}`);
+				dlog(`[audioEngine] resume() resolved. ctx.state=${this.ctx?.state}`);
 				this.startOutputAudio();
 			})
 			.catch((err) => {
-				console.warn('[audioEngine] resume() rejected:', err);
+				dwarn('[audioEngine] resume() rejected:', err);
 				this.startOutputAudio();
 			});
 		this.installResumeOnInteraction();
@@ -398,7 +398,7 @@ export class AudioEngine {
 			throw new Error('HTMLMediaElement.setSinkId not supported in this browser');
 		}
 		await el.setSinkId(deviceId);
-		console.log(`[audioEngine] output device set to ${deviceId || '(default)'}`);
+		dlog(`[audioEngine] output device set to ${deviceId || '(default)'}`);
 	}
 
 	/**
@@ -421,7 +421,7 @@ export class AudioEngine {
 		osc.connect(gain);
 		gain.connect(this.streamDest);
 		osc.start();
-		console.log('[audioEngine] test tone (440Hz) → streamDest for 1s');
+		dlog('[audioEngine] test tone (440Hz) → streamDest for 1s');
 		setTimeout(() => {
 			osc.stop();
 			osc.disconnect();
@@ -487,7 +487,7 @@ export class AudioEngine {
 			.setSinkId;
 		if (typeof setSinkId !== 'function') return;
 		setSinkId.call(this.ctx, '').catch((err: unknown) => {
-			console.warn('[audioEngine] AudioContext.setSinkId(default) failed:', err);
+			dwarn('[audioEngine] AudioContext.setSinkId(default) failed:', err);
 		});
 	}
 
@@ -497,15 +497,15 @@ export class AudioEngine {
 			setSinkId?: (id: string) => Promise<void>;
 		};
 		if (typeof el.setSinkId !== 'function') {
-			console.warn('[audioEngine] <audio>.setSinkId not supported in this browser');
+			dwarn('[audioEngine] <audio>.setSinkId not supported in this browser');
 			return;
 		}
 		el.setSinkId('')
 			.then(() => {
-				console.log('[audioEngine] <audio>.setSinkId(default) ok');
+				dlog('[audioEngine] <audio>.setSinkId(default) ok');
 			})
 			.catch((err: unknown) => {
-				console.warn('[audioEngine] <audio>.setSinkId(default) failed:', err);
+				dwarn('[audioEngine] <audio>.setSinkId(default) failed:', err);
 			});
 	}
 
@@ -536,16 +536,16 @@ export class AudioEngine {
 	private startOutputAudio(): void {
 		if (!this.outputAudio) return;
 		const tracks = this.streamDest?.stream.getAudioTracks() ?? [];
-		console.log(
+		dlog(
 			`[audioEngine] starting output <audio>. tracks=${tracks.length} ctx.state=${this.ctx?.state}`,
 		);
 		this.outputAudio
 			.play()
 			.then(() => {
-				console.log('[audioEngine] output <audio> playing.');
+				dlog('[audioEngine] output <audio> playing.');
 			})
 			.catch((err) => {
-				console.warn('[audioEngine] output <audio> play() rejected:', err);
+				dwarn('[audioEngine] output <audio> play() rejected:', err);
 			});
 	}
 
@@ -553,7 +553,7 @@ export class AudioEngine {
 		if (!this.ctx) return;
 		this.ctx.addEventListener('statechange', () => {
 			const state = this.ctx?.state;
-			console.log(`[audioEngine] ctx statechange → ${state}`);
+			dlog(`[audioEngine] ctx statechange → ${state}`);
 			if (state === 'suspended' || state === 'interrupted') {
 				this.ctx?.resume().catch(() => {});
 			} else if (state === 'running') {
@@ -661,6 +661,18 @@ export class AudioEngine {
 	private dbToLinear(db: number): number {
 		return 10 ** (db / 20);
 	}
+}
+
+/** Diagnostic logger gated by `localStorage.mu_audio_debug = '1'`.
+ * Mirrors the HLS debug-flag convention used in the player engine.
+ * Errors are not gated — they always surface. */
+function dlog(...args: unknown[]): void {
+	if (typeof localStorage === 'undefined') return;
+	if (localStorage.getItem('mu_audio_debug') === '1') console.log(...args);
+}
+function dwarn(...args: unknown[]): void {
+	if (typeof localStorage === 'undefined') return;
+	if (localStorage.getItem('mu_audio_debug') === '1') console.warn(...args);
 }
 
 /** Singleton audio engine instance shared across the app. */

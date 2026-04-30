@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import type { Movie } from '@/state/library.state';
+import { removeMovieFromList, updateMovieInList } from '@/state/library.state';
 import { MovieCard } from './MovieCard';
 import styles from './MovieCarousel.module.scss';
 
@@ -7,9 +8,20 @@ interface MovieCarouselProps {
 	title: string;
 	movies: Movie[];
 	onSeeAll?: () => void;
+	/** Defaults to the global library-state mutators so home-page carousels
+	 * stay in sync after a card-level action (delete-from-disk, hide,
+	 * refresh-metadata). Pages with locally-owned lists can override. */
+	onMovieUpdate?: (movie: Movie) => void;
+	onMovieRemoved?: (movieId: string) => void;
 }
 
-export function MovieCarousel({ title, movies, onSeeAll }: MovieCarouselProps) {
+export function MovieCarousel({
+	title,
+	movies,
+	onSeeAll,
+	onMovieUpdate = updateMovieInList,
+	onMovieRemoved = removeMovieFromList,
+}: MovieCarouselProps) {
 	const trackRef = useRef<HTMLDivElement>(null);
 	const [canScrollLeft, setCanScrollLeft] = useState(false);
 	const [canScrollRight, setCanScrollRight] = useState(false);
@@ -71,7 +83,11 @@ export function MovieCarousel({ title, movies, onSeeAll }: MovieCarouselProps) {
 				<div ref={trackRef} class={styles.track}>
 					{movies.map((movie) => (
 						<div key={movie.id} class={styles.item}>
-							<MovieCard movie={movie} />
+							<MovieCard
+								movie={movie}
+								onMovieUpdate={onMovieUpdate}
+								onMovieRemoved={onMovieRemoved}
+							/>
 						</div>
 					))}
 				</div>
