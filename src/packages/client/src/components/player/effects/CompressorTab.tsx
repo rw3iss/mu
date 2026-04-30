@@ -3,10 +3,18 @@ import { audioEngine } from '@/audio/audio-engine';
 import { ToggleButton } from '@/components/common/ToggleButton';
 import { useAnimationFrame } from '@/hooks/useAnimationFrame';
 import {
+	autoCompFactor,
+	autoCompOpen,
+	autoCompRunning,
+	autoCompSampleSeconds,
 	compressorEnabled,
 	compressorSettings,
 	compressorVisualizerEnabled,
 	resetCompressor,
+	runAutoComp,
+	setAutoCompFactor,
+	setAutoCompSampleSeconds,
+	toggleAutoCompControls,
 	toggleCompressor,
 	toggleCompressorVisualizer,
 	updateCompressorParam,
@@ -43,6 +51,10 @@ export function CompressorTab() {
 	const settings = compressorSettings.value;
 	const activeId = activeCompProfileId.value;
 	const visualizerOn = compressorVisualizerEnabled.value;
+	const autoOpen = autoCompOpen.value;
+	const autoRunning = autoCompRunning.value;
+	const autoSeconds = autoCompSampleSeconds.value;
+	const autoFactor = autoCompFactor.value;
 	const [reduction, setReduction] = useState(0);
 
 	useAnimationFrame(() => {
@@ -149,13 +161,107 @@ export function CompressorTab() {
 				</div>
 
 				<div class={styles.eqActions}>
-					<button class={styles.resetBtn} onClick={resetCompressor}>
-						Reset Compressor
-					</button>
+					<ToggleButton onClick={resetCompressor}>Reset Compressor</ToggleButton>
 					<ToggleButton pressed={visualizerOn} onClick={toggleCompressorVisualizer}>
 						Visualize
 					</ToggleButton>
+					<ToggleButton pressed={autoOpen} onClick={toggleAutoCompControls}>
+						Auto
+					</ToggleButton>
 				</div>
+
+				{autoOpen && (
+					<div class={styles.autoPanel}>
+						<div class={styles.autoField}>
+							<label class={styles.autoLabel} for="autoCompSeconds">
+								Sample Secs
+								<span
+									class={styles.autoHelp}
+									title="How many seconds of audio to capture before measuring peak and RMS levels. Longer samples are more representative of the source's typical dynamics; 2–4 seconds is usually plenty."
+								>
+									?
+								</span>
+							</label>
+							<input
+								id="autoCompSeconds"
+								type="number"
+								min={1}
+								max={10}
+								step={1}
+								value={autoSeconds}
+								disabled={autoRunning}
+								onInput={(e) =>
+									setAutoCompSampleSeconds(
+										parseInt((e.target as HTMLInputElement).value, 10),
+									)
+								}
+								class={styles.autoSeconds}
+							/>
+						</div>
+
+						<div class={`${styles.autoField} ${styles.autoFieldFactor}`}>
+							<label class={styles.autoLabel} for="autoCompFactor">
+								Factor
+								<span class={styles.autoValue}>{autoFactor.toFixed(1)}</span>
+								<span
+									class={styles.autoHelp}
+									title="Strength of the derived compression. 1.0 applies the full computed threshold/ratio/makeup; 0.5 blends halfway between no compression and the computed values; 0.1 is a barely-audible nudge. Default 0.5 — full strength can squash dynamics on already-loud sources."
+								>
+									?
+								</span>
+							</label>
+							<input
+								id="autoCompFactor"
+								type="range"
+								min={0.1}
+								max={1}
+								step={0.1}
+								value={autoFactor}
+								disabled={autoRunning}
+								onInput={(e) =>
+									setAutoCompFactor(
+										parseFloat((e.target as HTMLInputElement).value),
+									)
+								}
+								class={styles.autoFactorSlider}
+							/>
+						</div>
+
+						<div class={styles.autoRunWrap}>
+							<button
+								type="button"
+								class={styles.autoRunBtn}
+								onClick={() => {
+									runAutoComp();
+								}}
+								disabled={autoRunning}
+								title={
+									autoRunning
+										? 'Sampling…'
+										: `Sample for ${autoSeconds}s and apply derived compressor settings at ${autoFactor.toFixed(1)}× strength`
+								}
+								aria-label="Run auto-Compressor sampler"
+							>
+								{autoRunning ? (
+									<span class={styles.autoSpinner} aria-hidden="true" />
+								) : (
+									<>
+										<svg
+											width="11"
+											height="11"
+											viewBox="0 0 24 24"
+											fill="currentColor"
+											aria-hidden="true"
+										>
+											<polygon points="6,4 20,12 6,20" />
+										</svg>
+										Sample
+									</>
+								)}
+							</button>
+						</div>
+					</div>
+				)}
 			</CollapsibleSettings>
 		</div>
 	);

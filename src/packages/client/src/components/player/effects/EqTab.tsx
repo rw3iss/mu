@@ -126,12 +126,12 @@ export function EqTab() {
 				</div>
 
 				{autoOpen && (
-					<div class={styles.autoEqPanel}>
-						<div class={styles.autoEqField}>
-							<label class={styles.autoEqLabel} for="autoEqSeconds">
+					<div class={styles.autoPanel}>
+						<div class={styles.autoField}>
+							<label class={styles.autoLabel} for="autoEqSeconds">
 								Sample Secs
 								<span
-									class={styles.autoEqHelp}
+									class={styles.autoHelp}
 									title="How many seconds of audio to capture before computing the band averages. Longer samples are more representative; 2–4 seconds is usually plenty."
 								>
 									?
@@ -150,16 +150,16 @@ export function EqTab() {
 										parseInt((e.target as HTMLInputElement).value, 10),
 									)
 								}
-								class={styles.autoEqSeconds}
+								class={styles.autoSeconds}
 							/>
 						</div>
 
-						<div class={`${styles.autoEqField} ${styles.autoEqFieldFactor}`}>
-							<label class={styles.autoEqLabel} for="autoEqFactor">
+						<div class={`${styles.autoField} ${styles.autoFieldFactor}`}>
+							<label class={styles.autoLabel} for="autoEqFactor">
 								Factor
-								<span class={styles.autoEqValue}>{autoFactor.toFixed(1)}</span>
+								<span class={styles.autoValue}>{autoFactor.toFixed(1)}</span>
 								<span
-									class={styles.autoEqHelp}
+									class={styles.autoHelp}
 									title="Strength of the correction. 1.0 applies the full flattening offset to each band; 0.5 applies half (subtler); 0.1 is barely audible. Default 0.5 — full strength tends to over-correct."
 								>
 									?
@@ -178,14 +178,14 @@ export function EqTab() {
 										parseFloat((e.target as HTMLInputElement).value),
 									)
 								}
-								class={styles.autoEqFactorSlider}
+								class={styles.autoFactorSlider}
 							/>
 						</div>
 
-						<div class={styles.autoEqRunWrap}>
+						<div class={styles.autoRunWrap}>
 							<button
 								type="button"
-								class={styles.autoEqRunBtn}
+								class={styles.autoRunBtn}
 								onClick={() => {
 									runAutoEq();
 								}}
@@ -198,7 +198,7 @@ export function EqTab() {
 								aria-label="Run auto-EQ sampler"
 							>
 								{autoRunning ? (
-									<span class={styles.autoEqSpinner} aria-hidden="true" />
+									<span class={styles.autoSpinner} aria-hidden="true" />
 								) : (
 									<>
 										<svg

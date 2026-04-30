@@ -67,6 +67,17 @@ export const compressorEnabled = signal(false);
 export const compressorSettings = signal<CompressorSettings>({ ...DEFAULT_COMPRESSOR });
 export const compressorVisualizerEnabled = signal(false);
 
+// Auto-Compressor — sample the live signal for N seconds, measure peak
+// and RMS levels, then derive sensible compressor settings (threshold
+// at the midpoint of peak/RMS, ratio scaled by crest factor, makeup
+// gain to compensate for the average loss). The factor multiplier
+// blends from "no compression" (neutral) to the computed values, so
+// 0.5 is a half-strength version of the auto-derived settings.
+export const autoCompOpen = signal(false);
+export const autoCompSampleSeconds = signal(2);
+export const autoCompFactor = signal(0.5);
+export const autoCompRunning = signal(false);
+
 // ============================================
 // Initialization
 // ============================================
@@ -359,6 +370,136 @@ export function resetCompressor(): void {
 	audioEngine.setCompressorSettings(freshSettings);
 	compressorSettings.value = freshSettings;
 	setUiSetting('audio_compressor_settings', freshSettings);
+}
+
+// ============================================
+// Auto-Compressor actions
+// ============================================
+
+export function toggleAutoCompControls(): void {
+	autoCompOpen.value = !autoCompOpen.value;
+}
+
+export function setAutoCompSampleSeconds(n: number): void {
+	if (!Number.isFinite(n)) return;
+	autoCompSampleSeconds.value = Math.max(1, Math.min(10, Math.floor(n)));
+}
+
+export function setAutoCompFactor(n: number): void {
+	if (!Number.isFinite(n)) return;
+	const clamped = Math.max(0.1, Math.min(1, n));
+	autoCompFactor.value = Math.round(clamped * 10) / 10;
+}
+
+/**
+ * Sample the live audio for `autoCompSampleSeconds` seconds, measure
+ * peak and RMS levels in dBFS, then derive a sensible compressor
+ * setting:
+ *
+ *   - threshold = midpoint between peak and RMS (compress everything
+ *     louder than the average of the two)
+ *   - ratio scaled by crest factor (peak − RMS): low crest = already
+ *     compressed material → low ratio; high crest = dynamic source
+ *     → higher ratio
+ *   - makeupGain ≈ the loss the new threshold + ratio will introduce
+ *     for the loudest peaks, so the average level is preserved
+ *   - knee, attack, release, mix held to musical defaults
+ *
+ * The `autoCompFactor` then blends linearly from neutral (no
+ * compression: threshold 0, ratio 1, makeup 0) to the computed
+ * values. At factor=1.0 you get the full derived setting, at
+ * factor=0.5 you get half-strength compression that lifts dynamics
+ * without squashing them.
+ *
+ * The analyser is tapped post-EQ but pre-compressor in our chain,
+ * so we don't need to bypass the compressor first — the analyser
+ * already sees source-level dynamics regardless of the current
+ * compressor state.
+ */
+export async function runAutoComp(): Promise<void> {
+	if (autoCompRunning.value) return;
+	autoCompRunning.value = true;
+	try {
+		const seconds = autoCompSampleSeconds.value;
+		const factor = autoCompFactor.value;
+
+		// Make sure the engine is attached so the analyser node exists.
+		audioEngine.attach();
+		await new Promise<void>((r) => setTimeout(r, 50));
+
+		const fftSize = audioEngine.getFftSize() || 8192;
+		const buf = new Uint8Array(fftSize);
+
+		let peakAbs = 0;
+		let sumSq = 0;
+		let totalSamples = 0;
+		await new Promise<void>((resolve) => {
+			const endTime = performance.now() + seconds * 1000;
+			const tick = () => {
+				if (performance.now() >= endTime) {
+					resolve();
+					return;
+				}
+				if (audioEngine.getTimeDomainData(buf)) {
+					for (let i = 0; i < buf.length; i++) {
+						// Map byte 0..255 to amplitude −1..+1 (128 = silence).
+						const v = (buf[i]! - 128) / 128;
+						const abs = Math.abs(v);
+						if (abs > peakAbs) peakAbs = abs;
+						sumSq += v * v;
+					}
+					totalSamples += buf.length;
+				}
+				requestAnimationFrame(tick);
+			};
+			requestAnimationFrame(tick);
+		});
+
+		if (totalSamples === 0 || peakAbs === 0) return;
+
+		const FLOOR_DB = -60;
+		const peakDb = Math.max(FLOOR_DB, 20 * Math.log10(peakAbs));
+		const rms = Math.sqrt(sumSq / totalSamples);
+		const rmsDb = rms > 0 ? Math.max(FLOOR_DB, 20 * Math.log10(rms)) : FLOOR_DB;
+		const crest = peakDb - rmsDb;
+
+		// Ideal settings derived from the measured dynamics.
+		const idealThreshold = (peakDb + rmsDb) / 2;
+		const idealRatio = crest < 6 ? 2 : crest < 10 ? 4 : crest < 15 ? 6 : 8;
+		const idealMakeup = Math.max(0, (peakDb - idealThreshold) * (1 - 1 / idealRatio));
+
+		// Linear interpolate from neutral (no compression) to the ideal
+		// values by the factor multiplier.
+		const newThreshold = factor * idealThreshold;
+		const newRatio = 1 + factor * (idealRatio - 1);
+		const newMakeup = factor * idealMakeup;
+
+		const settings: CompressorSettings = {
+			...compressorSettings.value,
+			threshold: Math.max(-100, Math.min(0, Math.round(newThreshold))),
+			knee: 30,
+			ratio: Math.max(1, Math.min(20, Math.round(newRatio * 2) / 2)),
+			attack: 0.005,
+			release: 0.2,
+			makeupGain: Math.max(0, Math.min(24, Math.round(newMakeup * 2) / 2)),
+			mix: compressorSettings.value.mix ?? 1,
+		};
+
+		compressorSettings.value = settings;
+		audioEngine.setCompressorSettings(settings);
+		setUiSetting('audio_compressor_settings', settings);
+
+		// Make the new settings audible — switch the compressor on if
+		// the user hadn't enabled it yet (otherwise the slider changes
+		// would be a no-op for them).
+		if (!compressorEnabled.value) {
+			compressorEnabled.value = true;
+			audioEngine.setCompressorEnabled(true);
+			setUiSetting('audio_compressor_enabled', true);
+		}
+	} finally {
+		autoCompRunning.value = false;
+	}
 }
 
 // ============================================
