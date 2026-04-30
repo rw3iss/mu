@@ -367,6 +367,7 @@ function JobsSection() {
 	const [cancellingBulk, setCancellingBulk] = useState(false);
 	const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
 	const [clearingHistory, setClearingHistory] = useState(false);
+	const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
 	const lastSelectedRef = useRef<string | null>(null);
 
 	useEffect(() => {
@@ -400,6 +401,56 @@ function JobsSection() {
 			setCurrentJobs(data.jobs);
 		} catch {
 			notifyError(`Failed to ${action} job`);
+		}
+	}, []);
+
+	/**
+	 * Retry a failed/completed job. Most failed jobs live in the
+	 * `job_history` table (not the in-memory queue), so the server's
+	 * retry endpoint may report a structured reason ("Job not found",
+	 * "No handler registered", etc.) we surface inline. Tracks the
+	 * in-flight retry id locally so the row's icon button can show a
+	 * spinner instead of looking dead.
+	 */
+	const handleRetry = useCallback(async (id: string) => {
+		setRetryingIds((s) => {
+			const next = new Set(s);
+			next.add(id);
+			return next;
+		});
+		try {
+			const result = await api.post<{
+				success: boolean;
+				newJobId: string | null;
+				reason?: string;
+			}>(`/admin/server/jobs/${id}/retry`);
+			if (result.success && result.newJobId) {
+				notifySuccess('Job re-queued');
+				// Refresh both lists so the new job shows up in current
+				// and the original entry's status (if any) updates in history.
+				try {
+					const [current, history] = await Promise.all([
+						api.get<{ jobs: any[] }>('/admin/server/jobs'),
+						api.get<{ jobs: any[] }>('/admin/server/jobs/history?limit=50'),
+					]);
+					setCurrentJobs(current.jobs);
+					setHistoryJobs(history.jobs);
+				} catch {
+					/* ignore — next poll tick will catch up */
+				}
+			} else {
+				notifyError(`Retry failed: ${result.reason ?? 'unknown reason'}`);
+			}
+		} catch (err: unknown) {
+			notifyError(
+				`Retry failed: ${(err as { message?: string })?.message ?? 'request error'}`,
+			);
+		} finally {
+			setRetryingIds((s) => {
+				const next = new Set(s);
+				next.delete(id);
+				return next;
+			});
 		}
 	}, []);
 
@@ -651,22 +702,27 @@ function JobsSection() {
 											class={styles.jobRetryBtn}
 											onClick={(e: Event) => {
 												e.stopPropagation();
-												handleAction(job.id, 'retry');
+												handleRetry(job.id);
 											}}
-											title="Retry"
+											title={retryingIds.has(job.id) ? 'Retrying…' : 'Retry'}
+											disabled={retryingIds.has(job.id)}
 										>
-											<svg
-												width="14"
-												height="14"
-												viewBox="0 0 24 24"
-												fill="none"
-												stroke="currentColor"
-												stroke-width="2"
-												stroke-linecap="round"
-											>
-												<polyline points="23 4 23 10 17 10" />
-												<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-											</svg>
+											{retryingIds.has(job.id) ? (
+												<span class={styles.jobRetrySpinner} />
+											) : (
+												<svg
+													width="14"
+													height="14"
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													stroke-width="2"
+													stroke-linecap="round"
+												>
+													<polyline points="23 4 23 10 17 10" />
+													<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+												</svg>
+											)}
 										</button>
 									)}
 									<button

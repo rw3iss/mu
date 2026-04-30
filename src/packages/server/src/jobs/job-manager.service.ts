@@ -1,5 +1,6 @@
 import { nowISO, WsEvent } from '@mu/shared';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { AsyncTask, SimpleIntervalJob, ToadScheduler } from 'toad-scheduler';
 import { DatabaseService } from '../database/database.service.js';
 import { jobHistory } from '../database/schema/index.js';
@@ -241,22 +242,56 @@ export class JobManagerService implements OnModuleDestroy {
 	}
 
 	/**
-	 * Retry a failed or cancelled job by re-enqueuing it with the same descriptor.
+	 * Retry a failed or cancelled job by re-enqueuing it with the same
+	 * descriptor. Looks the source job up first in the in-memory map
+	 * (recent jobs that haven't been written to history yet) and then
+	 * in the `job_history` table (everything older).
+	 *
+	 * Returns a structured result so callers can surface the *reason*
+	 * a retry failed — "job not found", "job still running", "no
+	 * handler registered for this type" — instead of an opaque null.
 	 */
-	retry(id: string): string | null {
-		const job = this.jobs.get(id);
-		if (!job || (job.status !== 'failed' && job.status !== 'completed')) return null;
+	retry(id: string): { ok: true; newId: string } | { ok: false; reason: string } {
+		// 1. In-memory lookup (recent / non-history jobs)
+		const live = this.jobs.get(id);
+		if (live) {
+			if (live.status === 'pending' || live.status === 'running') {
+				return { ok: false, reason: 'Job is still pending or running.' };
+			}
+			this.jobs.delete(id);
+			const newId = this.enqueue({
+				type: live.type,
+				label: live.label,
+				payload: live.payload,
+				priority: live.priority,
+			});
+			return { ok: true, newId };
+		}
 
-		// Remove the old job record
-		this.jobs.delete(id);
-
-		// Re-enqueue with the same descriptor
-		return this.enqueue({
-			type: job.type,
-			label: job.label,
-			payload: job.payload,
-			priority: job.priority,
+		// 2. job_history lookup (jobs that already finished)
+		const row = this.database.db.select().from(jobHistory).where(eq(jobHistory.id, id)).get();
+		if (!row) {
+			return { ok: false, reason: `Job ${id} not found.` };
+		}
+		if (!this.handlers.has(row.type)) {
+			return {
+				ok: false,
+				reason: `No handler registered for job type "${row.type}". The plugin or module that owns this job may have been disabled.`,
+			};
+		}
+		let payload: Record<string, unknown> | undefined;
+		try {
+			payload = row.payload ? JSON.parse(row.payload) : undefined;
+		} catch {
+			return { ok: false, reason: 'Stored payload is not valid JSON.' };
+		}
+		const newId = this.enqueue({
+			type: row.type,
+			label: row.label,
+			payload,
+			priority: row.priority ?? undefined,
 		});
+		return { ok: true, newId };
 	}
 
 	/**

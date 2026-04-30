@@ -358,10 +358,28 @@
   border-radius: var(--radius-sm);
   transition: color 120ms ease, background 120ms ease;
 
-  &:hover {
+  &:hover:not(:disabled) {
     color: #fff;
     background: var(--color-accent);
   }
+
+  &:disabled {
+    cursor: progress;
+    opacity: 0.85;
+  }
+}
+
+.jobRetrySpinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: var(--color-accent);
+  animation: jobRetrySpin 700ms linear infinite;
+}
+
+@keyframes jobRetrySpin {
+  to { transform: rotate(360deg); }
 }
 
 .jobDetailsBtn {
