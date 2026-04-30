@@ -46,6 +46,15 @@ export const eqInputGain = signal(0);
 export const eqBands = signal<EqBand[]>(DEFAULT_EQ_BANDS.map((b) => ({ ...b })));
 export const spectrumEnabled = signal(false);
 
+// Auto-EQ — sample the live signal for N seconds, compute the average
+// energy at each of the 10 EQ band frequencies, then drive each slider
+// to (cross-band-mean − band) so the slider values sum to zero and the
+// post-EQ output is roughly flat. Visible as an "Auto" pill toggle next
+// to "Spectrum"; expanding it shows a seconds input + apply button.
+export const autoEqOpen = signal(false);
+export const autoEqSampleSeconds = signal(2);
+export const autoEqRunning = signal(false);
+
 // ============================================
 // Compressor
 // ============================================
@@ -180,6 +189,121 @@ export function resetEq(): void {
 	eqInputGain.value = 0;
 	setUiSetting('audio_eq_bands', freshBands);
 	setUiSetting('audio_eq_input_gain', 0);
+}
+
+// ============================================
+// Auto-EQ actions
+// ============================================
+
+export function toggleAutoEqControls(): void {
+	autoEqOpen.value = !autoEqOpen.value;
+}
+
+export function setAutoEqSampleSeconds(n: number): void {
+	if (!Number.isFinite(n)) return;
+	autoEqSampleSeconds.value = Math.max(1, Math.min(10, Math.floor(n)));
+}
+
+/**
+ * Sample the live audio for `autoEqSampleSeconds` seconds, compute
+ * the time-averaged magnitude at each of the 10 EQ band frequencies,
+ * then drive each slider to `(cross-band-mean − band)` clamped to
+ * the slider's ±12 dB range. By construction the slider values sum
+ * to zero (each cut is balanced by an equal boost elsewhere), so the
+ * EQ "flattens" the spectrum without changing the overall level.
+ *
+ * The analyser is tapped post-EQ in the audio graph, so we reset the
+ * EQ bands to flat before sampling — that way the analyser sees the
+ * unprocessed source signal and the corrections we compute aren't
+ * compounded with whatever EQ shape was already in place.
+ *
+ * If EQ was off when invoked, it gets switched on as part of running
+ * (otherwise the corrections we apply would be inaudible).
+ */
+export async function runAutoEq(): Promise<void> {
+	if (autoEqRunning.value) return;
+	autoEqRunning.value = true;
+	try {
+		const seconds = autoEqSampleSeconds.value;
+
+		// Make sure the engine is attached and EQ is in a known flat
+		// state so the post-EQ analyser sees the source signal directly.
+		if (!eqEnabled.value) {
+			eqEnabled.value = true;
+			audioEngine.setEqEnabled(true);
+			setUiSetting('audio_eq_enabled', true);
+		}
+		const flatBands = DEFAULT_EQ_BANDS.map((b) => ({ ...b }));
+		audioEngine.setBands(flatBands);
+		eqBands.value = flatBands;
+
+		// One frame of breathing room so the disconnect/reconnect inside
+		// rebuildChain settles before we start reading the analyser.
+		await new Promise<void>((r) => setTimeout(r, 50));
+
+		const fftSize = audioEngine.getFftSize() || 8192;
+		const sampleRate = audioEngine.getSampleRate();
+		const binCount = fftSize / 2;
+		const binHz = sampleRate / fftSize;
+		const buf = new Uint8Array(binCount);
+
+		// Pre-compute, for each band, the FFT-bin window centred on its
+		// frequency and bounded by the geometric midpoints with its
+		// neighbours. Same approach as EqSpectrum's per-band bins.
+		const eqFreqs = DEFAULT_EQ_BANDS.map((b) => b.frequency);
+		const bandRanges = eqFreqs.map((f, i) => {
+			const fLo = i === 0 ? f / Math.SQRT2 : Math.sqrt(f * eqFreqs[i - 1]!);
+			const fHi = i === eqFreqs.length - 1 ? f * Math.SQRT2 : Math.sqrt(f * eqFreqs[i + 1]!);
+			return {
+				lo: Math.max(0, Math.round(fLo / binHz)),
+				hi: Math.min(binCount - 1, Math.round(fHi / binHz)),
+			};
+		});
+
+		// Accumulate per-band byte values across rAF ticks for the
+		// requested duration, then average at the end.
+		const accum = new Array<number>(eqFreqs.length).fill(0);
+		let frames = 0;
+		await new Promise<void>((resolve) => {
+			const endTime = performance.now() + seconds * 1000;
+			const tick = () => {
+				if (performance.now() >= endTime) {
+					resolve();
+					return;
+				}
+				if (audioEngine.getFrequencyData(buf)) {
+					for (let i = 0; i < eqFreqs.length; i++) {
+						const { lo, hi } = bandRanges[i]!;
+						let sum = 0;
+						for (let b = lo; b <= hi; b++) sum += buf[b]!;
+						accum[i]! += sum / (hi - lo + 1);
+					}
+					frames++;
+				}
+				requestAnimationFrame(tick);
+			};
+			requestAnimationFrame(tick);
+		});
+
+		if (frames === 0) return; // analyser produced nothing — skip apply.
+
+		// Convert byte (0..255) to approximate dBFS using the
+		// AnalyserNode's default scale: 0 → -100 dB, 255 → -30 dB.
+		const avgDb = accum.map((v) => (v / frames / 255) * 70 - 100);
+		const meanDb = avgDb.reduce((a, b) => a + b, 0) / avgDb.length;
+		// Each band: cut if it's louder than the mean, boost if quieter.
+		// Clamp to slider range and round to the slider's 0.5 dB step.
+		const offsets = avgDb.map((d) => {
+			const raw = meanDb - d;
+			const clamped = Math.max(-12, Math.min(12, raw));
+			return Math.round(clamped * 2) / 2;
+		});
+		offsets.forEach((offset, i) => {
+			updateEqBand(i, offset);
+		});
+	} finally {
+		autoEqRunning.value = false;
+	}
 }
 
 // ============================================

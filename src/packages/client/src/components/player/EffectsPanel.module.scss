@@ -481,6 +481,86 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+// ── Auto-EQ inline controls (revealed when the "Auto" toggle is on) ──
+
+.autoEqSeconds {
+  width: 48px;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--color-text-primary);
+  background: var(--surface-overlay-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  // Hide the spinner buttons in WebKit/Chromium for a cleaner look —
+  // the +/- arrows are unnecessary here since the value is bounded
+  // 1–10 and almost always 2 or 3.
+  -webkit-appearance: none;
+  appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.autoEqUnit {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-left: -4px;
+}
+
+.autoEqApply {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+
+  &:hover:not(:disabled) {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+  }
+
+  &:disabled {
+    cursor: progress;
+    opacity: 0.85;
+  }
+}
+
+.autoEqSpinner {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  animation: autoEqSpin 700ms linear infinite;
+}
+
+@keyframes autoEqSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .resetBtn {

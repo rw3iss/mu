@@ -1,10 +1,16 @@
 import { ToggleButton } from '@/components/common/ToggleButton';
 import {
+	autoEqOpen,
+	autoEqRunning,
+	autoEqSampleSeconds,
 	eqBands,
 	eqEnabled,
 	eqInputGain,
 	resetEq,
+	runAutoEq,
+	setAutoEqSampleSeconds,
 	spectrumEnabled,
+	toggleAutoEqControls,
 	toggleEq,
 	toggleSpectrum,
 	updateEqBand,
@@ -31,6 +37,9 @@ export function EqTab() {
 	const inputGain = eqInputGain.value;
 	const activeId = activeEqProfileId.value;
 	const spectrumOn = spectrumEnabled.value;
+	const autoOpen = autoEqOpen.value;
+	const autoRunning = autoEqRunning.value;
+	const autoSeconds = autoEqSampleSeconds.value;
 
 	return (
 		<div>
@@ -110,6 +119,57 @@ export function EqTab() {
 					<ToggleButton pressed={spectrumOn} onClick={toggleSpectrum}>
 						Spectrum
 					</ToggleButton>
+					<ToggleButton pressed={autoOpen} onClick={toggleAutoEqControls}>
+						Auto
+					</ToggleButton>
+					{autoOpen && (
+						<>
+							<input
+								type="number"
+								min={1}
+								max={10}
+								step={1}
+								value={autoSeconds}
+								disabled={autoRunning}
+								onInput={(e) =>
+									setAutoEqSampleSeconds(
+										parseInt((e.target as HTMLInputElement).value, 10),
+									)
+								}
+								class={styles.autoEqSeconds}
+								title="Sample duration (seconds)"
+							/>
+							<span class={styles.autoEqUnit}>s</span>
+							<button
+								type="button"
+								class={styles.autoEqApply}
+								onClick={() => {
+									runAutoEq();
+								}}
+								disabled={autoRunning}
+								title={
+									autoRunning
+										? 'Sampling…'
+										: `Sample for ${autoSeconds}s and auto-flatten EQ`
+								}
+								aria-label="Run auto-EQ"
+							>
+								{autoRunning ? (
+									<span class={styles.autoEqSpinner} aria-hidden="true" />
+								) : (
+									<svg
+										width="11"
+										height="11"
+										viewBox="0 0 24 24"
+										fill="currentColor"
+										aria-hidden="true"
+									>
+										<polygon points="6,4 20,12 6,20" />
+									</svg>
+								)}
+							</button>
+						</>
+					)}
 				</div>
 			</CollapsibleSettings>
 		</div>
