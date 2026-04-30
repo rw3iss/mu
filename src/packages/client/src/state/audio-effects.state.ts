@@ -53,6 +53,10 @@ export const spectrumEnabled = signal(false);
 // to "Spectrum"; expanding it shows a seconds input + apply button.
 export const autoEqOpen = signal(false);
 export const autoEqSampleSeconds = signal(2);
+// Factor multiplier applied to each band's correction. 1.0 = full
+// flatten, 0.5 = half-strength (default — full strength tends to
+// over-correct on dense source material), 0.1 = barely audible nudge.
+export const autoEqFactor = signal(0.5);
 export const autoEqRunning = signal(false);
 
 // ============================================
@@ -204,6 +208,13 @@ export function setAutoEqSampleSeconds(n: number): void {
 	autoEqSampleSeconds.value = Math.max(1, Math.min(10, Math.floor(n)));
 }
 
+export function setAutoEqFactor(n: number): void {
+	if (!Number.isFinite(n)) return;
+	// Clamp to 0.1..1.0 in 0.1 increments (the slider's resolution).
+	const clamped = Math.max(0.1, Math.min(1, n));
+	autoEqFactor.value = Math.round(clamped * 10) / 10;
+}
+
 /**
  * Sample the live audio for `autoEqSampleSeconds` seconds, compute
  * the time-averaged magnitude at each of the 10 EQ band frequencies,
@@ -292,9 +303,13 @@ export async function runAutoEq(): Promise<void> {
 		const avgDb = accum.map((v) => (v / frames / 255) * 70 - 100);
 		const meanDb = avgDb.reduce((a, b) => a + b, 0) / avgDb.length;
 		// Each band: cut if it's louder than the mean, boost if quieter.
-		// Clamp to slider range and round to the slider's 0.5 dB step.
+		// Scale by `autoEqFactor` so the user can dial down the strength
+		// of the correction (default 0.5 — full-strength flattening tends
+		// to over-correct on dense source material). Clamp to slider
+		// range and round to the slider's 0.5 dB step.
+		const factor = autoEqFactor.value;
 		const offsets = avgDb.map((d) => {
-			const raw = meanDb - d;
+			const raw = (meanDb - d) * factor;
 			const clamped = Math.max(-12, Math.min(12, raw));
 			return Math.round(clamped * 2) / 2;
 		});

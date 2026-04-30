@@ -484,20 +484,88 @@
   flex-wrap: wrap;
 }
 
-// ── Auto-EQ inline controls (revealed when the "Auto" toggle is on) ──
+// ── Auto-EQ controls panel (revealed when the "Auto" toggle is on) ──
+// Sits below the action row inside the EQ tab. Three columns: sample
+// duration on the left, factor slider in the middle, run button on
+// the right. Each field has a small text label with a `?` help icon
+// rendering its tooltip on hover (browser title attribute).
+
+.autoEqPanel {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--surface-overlay-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  animation: autoEqSlideIn 160ms ease;
+}
+
+.autoEqField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.autoEqFieldFactor {
+  flex: 1;
+  min-width: 80px;
+}
+
+.autoEqLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.autoEqValue {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: var(--font-weight-normal);
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: none;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.autoEqHelp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+  }
+}
 
 .autoEqSeconds {
-  width: 48px;
+  width: 56px;
   padding: 4px 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-primary);
   background: var(--surface-overlay-1);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   text-align: center;
-  // Hide the spinner buttons in WebKit/Chromium for a cleaner look —
-  // the +/- arrows are unnecessary here since the value is bounded
-  // 1–10 and almost always 2 or 3.
   -webkit-appearance: none;
   appearance: textfield;
 
@@ -518,22 +586,36 @@
   }
 }
 
-.autoEqUnit {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-left: -4px;
+.autoEqFactorSlider {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
-.autoEqApply {
+.autoEqRunWrap {
+  display: flex;
+  align-items: flex-end;
+}
+
+.autoEqRunBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+  gap: 6px;
+  min-width: 84px;
+  height: 28px;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
   color: #fff;
   background: var(--color-accent);
   border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background var(--transition-fast);
 
@@ -560,6 +642,17 @@
 @keyframes autoEqSpin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes autoEqSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

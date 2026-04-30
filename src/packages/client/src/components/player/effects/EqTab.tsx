@@ -1,5 +1,6 @@
 import { ToggleButton } from '@/components/common/ToggleButton';
 import {
+	autoEqFactor,
 	autoEqOpen,
 	autoEqRunning,
 	autoEqSampleSeconds,
@@ -8,6 +9,7 @@ import {
 	eqInputGain,
 	resetEq,
 	runAutoEq,
+	setAutoEqFactor,
 	setAutoEqSampleSeconds,
 	spectrumEnabled,
 	toggleAutoEqControls,
@@ -40,6 +42,7 @@ export function EqTab() {
 	const autoOpen = autoEqOpen.value;
 	const autoRunning = autoEqRunning.value;
 	const autoSeconds = autoEqSampleSeconds.value;
+	const autoFactor = autoEqFactor.value;
 
 	return (
 		<div>
@@ -113,18 +116,29 @@ export function EqTab() {
 				</div>
 
 				<div class={styles.eqActions}>
-					<button class={styles.resetBtn} onClick={resetEq}>
-						Reset EQ
-					</button>
+					<ToggleButton onClick={resetEq}>Reset EQ</ToggleButton>
 					<ToggleButton pressed={spectrumOn} onClick={toggleSpectrum}>
 						Spectrum
 					</ToggleButton>
 					<ToggleButton pressed={autoOpen} onClick={toggleAutoEqControls}>
 						Auto
 					</ToggleButton>
-					{autoOpen && (
-						<>
+				</div>
+
+				{autoOpen && (
+					<div class={styles.autoEqPanel}>
+						<div class={styles.autoEqField}>
+							<label class={styles.autoEqLabel} for="autoEqSeconds">
+								Sample Secs
+								<span
+									class={styles.autoEqHelp}
+									title="How many seconds of audio to capture before computing the band averages. Longer samples are more representative; 2–4 seconds is usually plenty."
+								>
+									?
+								</span>
+							</label>
 							<input
+								id="autoEqSeconds"
 								type="number"
 								min={1}
 								max={10}
@@ -137,12 +151,41 @@ export function EqTab() {
 									)
 								}
 								class={styles.autoEqSeconds}
-								title="Sample duration (seconds)"
 							/>
-							<span class={styles.autoEqUnit}>s</span>
+						</div>
+
+						<div class={`${styles.autoEqField} ${styles.autoEqFieldFactor}`}>
+							<label class={styles.autoEqLabel} for="autoEqFactor">
+								Factor
+								<span class={styles.autoEqValue}>{autoFactor.toFixed(1)}</span>
+								<span
+									class={styles.autoEqHelp}
+									title="Strength of the correction. 1.0 applies the full flattening offset to each band; 0.5 applies half (subtler); 0.1 is barely audible. Default 0.5 — full strength tends to over-correct."
+								>
+									?
+								</span>
+							</label>
+							<input
+								id="autoEqFactor"
+								type="range"
+								min={0.1}
+								max={1}
+								step={0.1}
+								value={autoFactor}
+								disabled={autoRunning}
+								onInput={(e) =>
+									setAutoEqFactor(
+										parseFloat((e.target as HTMLInputElement).value),
+									)
+								}
+								class={styles.autoEqFactorSlider}
+							/>
+						</div>
+
+						<div class={styles.autoEqRunWrap}>
 							<button
 								type="button"
-								class={styles.autoEqApply}
+								class={styles.autoEqRunBtn}
 								onClick={() => {
 									runAutoEq();
 								}}
@@ -150,27 +193,30 @@ export function EqTab() {
 								title={
 									autoRunning
 										? 'Sampling…'
-										: `Sample for ${autoSeconds}s and auto-flatten EQ`
+										: `Sample for ${autoSeconds}s and apply correction at ${autoFactor.toFixed(1)}× strength`
 								}
-								aria-label="Run auto-EQ"
+								aria-label="Run auto-EQ sampler"
 							>
 								{autoRunning ? (
 									<span class={styles.autoEqSpinner} aria-hidden="true" />
 								) : (
-									<svg
-										width="11"
-										height="11"
-										viewBox="0 0 24 24"
-										fill="currentColor"
-										aria-hidden="true"
-									>
-										<polygon points="6,4 20,12 6,20" />
-									</svg>
+									<>
+										<svg
+											width="11"
+											height="11"
+											viewBox="0 0 24 24"
+											fill="currentColor"
+											aria-hidden="true"
+										>
+											<polygon points="6,4 20,12 6,20" />
+										</svg>
+										Sample
+									</>
 								)}
 							</button>
-						</>
-					)}
-				</div>
+						</div>
+					</div>
+				)}
 			</CollapsibleSettings>
 		</div>
 	);

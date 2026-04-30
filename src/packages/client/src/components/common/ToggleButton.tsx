@@ -2,7 +2,15 @@ import type { ComponentChildren } from 'preact';
 import styles from './ToggleButton.module.scss';
 
 interface ToggleButtonProps {
-	pressed: boolean;
+	/**
+	 * When supplied, the button behaves as a two-state toggle and the
+	 * fill colour indicates the current state. When omitted, the
+	 * component renders as a plain pill action button — same baseline
+	 * visual, no pressed state, no `aria-pressed` annotation. Used so
+	 * Reset / Run-style buttons share the toggle pills' styling without
+	 * misrepresenting their semantics.
+	 */
+	pressed?: boolean;
 	onClick: () => void;
 	children: ComponentChildren;
 	/** Accessible label override; defaults to the children when those are
@@ -38,7 +46,13 @@ export function ToggleButton({
 	title,
 	'aria-label': ariaLabel,
 }: ToggleButtonProps) {
-	const klass = [styles.button, styles[size], pressed ? styles.pressed : '', className ?? '']
+	const isToggle = pressed !== undefined;
+	const klass = [
+		styles.button,
+		styles[size],
+		pressed === true ? styles.pressed : '',
+		className ?? '',
+	]
 		.filter(Boolean)
 		.join(' ');
 	return (
@@ -46,7 +60,7 @@ export function ToggleButton({
 			type="button"
 			class={klass}
 			onClick={onClick}
-			aria-pressed={pressed}
+			aria-pressed={isToggle ? pressed : undefined}
 			aria-label={ariaLabel}
 			disabled={disabled}
 			title={title}
