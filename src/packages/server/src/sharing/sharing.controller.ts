@@ -17,6 +17,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Public } from '../common/decorators/public.decorator.js';
+import { parseJsonArray } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movies } from '../database/schema/index.js';
 import { MoviesService } from '../movies/movies.service.js';
@@ -202,9 +203,9 @@ export class SharingController {
 		@Param('movieId') movieId: string,
 	): Promise<{ subtitles: MovieSubtitleInfo[] }> {
 		const file = this.getMovieFile(movieId);
-		const tracks = file.subtitleTracks ? JSON.parse(file.subtitleTracks) : [];
+		const tracks = parseJsonArray<Record<string, unknown>>(file.subtitleTracks);
 		return {
-			subtitles: (tracks as any[]).map((t: any) => ({
+			subtitles: tracks.map((t: any) => ({
 				index: t.index,
 				language: t.language || 'und',
 				label: t.title || t.language || `Track ${t.index}`,
@@ -295,7 +296,7 @@ export class SharingController {
 				.where(eq(movieFiles.id, file.id))
 				.run();
 		} else {
-			const existing = JSON.parse(file.subtitleTracks || '[]') as any[];
+			const existing = parseJsonArray<Record<string, unknown>>(file.subtitleTracks);
 			const newIdx = existing.length;
 			existing.push({
 				index: newIdx,
@@ -381,7 +382,7 @@ export class SharingController {
 				.where(eq(movieFiles.id, file.id))
 				.run();
 		} else {
-			const existing = JSON.parse(file.subtitleTracks || '[]') as any[];
+			const existing = parseJsonArray<Record<string, unknown>>(file.subtitleTracks);
 			const newIdx = existing.length;
 			existing.push({
 				index: newIdx,

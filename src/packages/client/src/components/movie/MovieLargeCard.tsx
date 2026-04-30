@@ -1,22 +1,15 @@
 import { useCallback, useRef, useState } from 'preact/hooks';
-import { route } from 'preact-router';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
-import { playMovie } from '@/state/globalPlayer.state';
-import type { Movie } from '@/state/library.state';
 import { getRatingColor } from '@/utils/rating-color';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieLargeCard.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
 
-interface MovieLargeCardProps {
-	movie: Movie;
-	onMovieUpdate?: (movie: Movie) => void;
-	onMovieRemoved?: (movieId: string) => void;
-	selectionMode?: boolean;
-	selected?: boolean;
-	onToggleSelect?: (id: string) => void;
-}
+import type { MovieDisplayProps } from './types';
+import { useMovieCardBehavior } from './useMovieCardBehavior';
+
+type MovieLargeCardProps = MovieDisplayProps;
 
 export function MovieLargeCard({
 	movie,
@@ -26,29 +19,11 @@ export function MovieLargeCard({
 	selected = false,
 	onToggleSelect,
 }: MovieLargeCardProps) {
-	const handleClick = useCallback(() => {
-		if (selectionMode) {
-			onToggleSelect?.(movie.id);
-		} else {
-			route(`/movie/${movie.id}`);
-		}
-	}, [movie.id, selectionMode, onToggleSelect]);
-
-	const handlePlay = useCallback(
-		(e: Event) => {
-			e.stopPropagation();
-			if (!selectionMode) playMovie(movie.id, { fromBeginning: true });
-		},
-		[movie.id, selectionMode],
-	);
-
-	const handleResume = useCallback(
-		(e: Event) => {
-			e.stopPropagation();
-			if (!selectionMode) playMovie(movie.id);
-		},
-		[movie.id, selectionMode],
-	);
+	const {
+		onCardClick: handleClick,
+		onPlayFromStart: handlePlay,
+		onResume: handleResume,
+	} = useMovieCardBehavior(movie, selectionMode, onToggleSelect);
 
 	const [tooltipVisible, setTooltipVisible] = useState(false);
 	const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import { route } from 'preact-router';
-import { Button } from '@/components/common/Button';
-import { Modal } from '@/components/common/Modal';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { moviesService } from '@/services/movies.service';
-import { closePlayer, globalMovieId } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { DeleteMovieModal } from './DeleteMovieModal';
 import styles from './MovieOptionsMenu.module.scss';
+import { useMenuOpen } from './useMenuOpen';
 
 interface MovieOptionsMenuProps {
 	movie: Movie;
@@ -22,49 +22,21 @@ interface MovieOptionsMenuProps {
 	compact?: boolean;
 }
 
+/** Async-with-feedback action UI state: idle → loading → complete → idle. */
+type AsyncActionState = 'idle' | 'loading' | 'complete';
+
 export function MovieOptionsMenu({
 	movie,
 	onMovieUpdate,
 	onMovieRemoved,
 	compact,
 }: MovieOptionsMenuProps) {
-	const [open, setOpen] = useState(false);
-	const [rescanState, setRescanState] = useState<'idle' | 'loading' | 'complete'>('idle');
-	const [refreshState, setRefreshState] = useState<'idle' | 'loading' | 'complete'>('idle');
-	const [confirmingRemove, setConfirmingRemove] = useState(false);
-	const [confirmingClearMeta, setConfirmingClearMeta] = useState(false);
+	const { open, setOpen, ref: menuRef } = useMenuOpen();
+	const [rescanState, setRescanState] = useState<AsyncActionState>('idle');
+	const [refreshState, setRefreshState] = useState<AsyncActionState>('idle');
+	const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+	const [showClearMetaConfirm, setShowClearMetaConfirm] = useState(false);
 	const [showDeleteModal, setShowDeleteModal] = useState(false);
-	const [deleteFolder, setDeleteFolder] = useState(false);
-	const [isDeleting, setIsDeleting] = useState(false);
-	const [deleteSuccess, setDeleteSuccess] = useState(false);
-	const [filePath, setFilePath] = useState<string | null>(movie.fileInfo?.filePath ?? null);
-	const menuRef = useRef<HTMLDivElement>(null);
-
-	// Close on outside click + raise parent card z-index while open
-	useEffect(() => {
-		if (!open) return;
-
-		// Raise the nearest card/row ancestor so the menu overlays sibling cards
-		const card = menuRef.current?.closest('[role="button"]') as HTMLElement | null;
-		if (card) {
-			card.style.zIndex = '50';
-			card.style.position = 'relative';
-		}
-
-		const handleClick = (e: MouseEvent) => {
-			if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-				setOpen(false);
-				setConfirmingRemove(false);
-			}
-		};
-		document.addEventListener('mousedown', handleClick);
-		return () => {
-			document.removeEventListener('mousedown', handleClick);
-			if (card) {
-				card.style.zIndex = '';
-			}
-		};
-	}, [open]);
 
 	const refreshMovie = useCallback(async () => {
 		try {
@@ -74,6 +46,8 @@ export function MovieOptionsMenu({
 			// ignore
 		}
 	}, [movie.id, onMovieUpdate]);
+
+	// ── Action handlers ────────────────────────────────────────────────
 
 	const handleHideToggle = useCallback(
 		async (e: Event) => {
@@ -88,7 +62,7 @@ export function MovieOptionsMenu({
 				notifyError('Failed to update movie');
 			}
 		},
-		[movie, onMovieUpdate],
+		[movie, onMovieUpdate, setOpen],
 	);
 
 	const handleWatchedToggle = useCallback(
@@ -109,7 +83,7 @@ export function MovieOptionsMenu({
 				notifyError('Failed to update watched status');
 			}
 		},
-		[movie, onMovieUpdate],
+		[movie, onMovieUpdate, setOpen],
 	);
 
 	const handleRescan = useCallback(
@@ -119,7 +93,9 @@ export function MovieOptionsMenu({
 			setRescanState('loading');
 			try {
 				const result = await moviesService.rescan(movie.id);
-				const updatedCount = result.files.filter((f: any) => f.updated).length;
+				const updatedCount = result.files.filter(
+					(f: { updated?: boolean }) => f.updated,
+				).length;
 				await refreshMovie();
 				setRescanState('complete');
 				notifySuccess(`Re-scanned ${result.files.length} file(s), ${updatedCount} updated`);
@@ -129,7 +105,7 @@ export function MovieOptionsMenu({
 				notifyError('Failed to re-scan movie files');
 			}
 		},
-		[movie.id, refreshMovie],
+		[movie.id, refreshMovie, setOpen],
 	);
 
 	const handleRefreshMetadata = useCallback(
@@ -148,78 +124,63 @@ export function MovieOptionsMenu({
 				notifyError('Failed to refresh metadata');
 			}
 		},
-		[movie.id, refreshMovie],
+		[movie.id, refreshMovie, setOpen],
 	);
 
-	const handleClearMetadata = useCallback(
-		async (e: Event) => {
-			e.stopPropagation();
-			setConfirmingClearMeta(false);
-			setOpen(false);
-			try {
-				await moviesService.clearMetadata(movie.id);
-				await refreshMovie();
-				notifySuccess('Metadata cleared');
-			} catch {
-				notifyError('Failed to clear metadata');
-			}
-		},
-		[movie.id, refreshMovie],
-	);
-
-	const handleRemove = useCallback(
-		async (e: Event) => {
-			e.stopPropagation();
-			try {
-				await moviesService.remove(movie.id);
-				notifySuccess(`'${movie.title}' removed from library`);
-				setOpen(false);
-				if (onMovieRemoved) {
-					onMovieRemoved(movie.id);
-				} else {
-					route('/library');
-				}
-			} catch {
-				notifyError('Failed to remove movie');
-			}
-		},
-		[movie.id, movie.title, onMovieRemoved],
-	);
-
-	const handleDeleteFromDisk = useCallback(async () => {
-		setIsDeleting(true);
+	const handleClearMetadata = useCallback(async () => {
+		setShowClearMetaConfirm(false);
 		try {
-			if (globalMovieId.value === movie.id) {
-				await closePlayer();
-			}
-			await moviesService.deleteFromDisk(movie.id, deleteFolder);
-			setDeleteSuccess(true);
-			setTimeout(() => {
-				setShowDeleteModal(false);
-				setDeleteSuccess(false);
-				setOpen(false);
-				if (onMovieRemoved) {
-					onMovieRemoved(movie.id);
-				} else {
-					route('/library');
-				}
-			}, 1200);
-		} catch (err: any) {
-			notifyError(err?.message || 'Failed to delete movie from disk');
-		} finally {
-			setIsDeleting(false);
+			await moviesService.clearMetadata(movie.id);
+			await refreshMovie();
+			notifySuccess('Metadata cleared');
+		} catch {
+			notifyError('Failed to clear metadata');
 		}
-	}, [movie.id, deleteFolder, onMovieRemoved]);
+	}, [movie.id, refreshMovie]);
+
+	const handleRemove = useCallback(async () => {
+		setShowRemoveConfirm(false);
+		try {
+			await moviesService.remove(movie.id);
+			notifySuccess(`'${movie.title}' removed from library`);
+			if (onMovieRemoved) {
+				onMovieRemoved(movie.id);
+			} else {
+				route('/library');
+			}
+		} catch {
+			notifyError('Failed to remove movie');
+		}
+	}, [movie.id, movie.title, onMovieRemoved]);
+
+	const handleDeleted = useCallback(() => {
+		setOpen(false);
+		if (onMovieRemoved) {
+			onMovieRemoved(movie.id);
+		} else {
+			route('/library');
+		}
+	}, [movie.id, onMovieRemoved, setOpen]);
 
 	const toggleMenu = useCallback(
 		(e: Event) => {
 			e.stopPropagation();
 			e.preventDefault();
 			setOpen(!open);
-			setConfirmingRemove(false);
 		},
-		[open],
+		[open, setOpen],
 	);
+
+	// Helper for the two async-feedback actions (rescan + refresh
+	// metadata). Their display label cycles through three values
+	// driven by the AsyncActionState; the ✓ glyph stands in for the
+	// idle icon while the action is still completing.
+	function asyncLabel(
+		state: AsyncActionState,
+		labels: { idle: string; loading: string; complete: string },
+	): string {
+		return labels[state];
+	}
 
 	return (
 		<div class={`${styles.container} ${compact ? styles.compact : ''}`} ref={menuRef}>
@@ -244,13 +205,13 @@ export function MovieOptionsMenu({
 						disabled={rescanState !== 'idle'}
 					>
 						<span class={styles.menuIcon}>
-							{rescanState === 'complete' ? '\u2713' : '\u{1F50D}'}
+							{rescanState === 'complete' ? '✓' : '🔍'}
 						</span>
-						{rescanState === 'loading'
-							? 'Scanning...'
-							: rescanState === 'complete'
-								? 'Scanned'
-								: 'Re-scan File'}
+						{asyncLabel(rescanState, {
+							idle: 'Re-scan File',
+							loading: 'Scanning...',
+							complete: 'Scanned',
+						})}
 					</button>
 					<button
 						class={styles.menuItem}
@@ -258,189 +219,86 @@ export function MovieOptionsMenu({
 						disabled={refreshState !== 'idle'}
 					>
 						<span class={styles.menuIcon}>
-							{refreshState === 'complete' ? '\u2713' : '\u21BB'}
+							{refreshState === 'complete' ? '✓' : '↻'}
 						</span>
-						{refreshState === 'loading'
-							? 'Refreshing...'
-							: refreshState === 'complete'
-								? 'Complete'
-								: 'Refresh Metadata'}
+						{asyncLabel(refreshState, {
+							idle: 'Refresh Metadata',
+							loading: 'Refreshing...',
+							complete: 'Complete',
+						})}
 					</button>
-					{confirmingClearMeta ? (
-						<div class={styles.confirmRow}>
-							<span>Clear all metadata?</span>
-							<button class={styles.confirmYes} onClick={handleClearMetadata}>
-								Yes
-							</button>
-							<button
-								class={styles.confirmNo}
-								onClick={(e: Event) => {
-									e.stopPropagation();
-									setConfirmingClearMeta(false);
-								}}
-							>
-								Cancel
-							</button>
-						</div>
-					) : (
-						<button
-							class={styles.menuItem}
-							onClick={(e: Event) => {
-								e.stopPropagation();
-								setConfirmingClearMeta(true);
-							}}
-						>
-							<span class={styles.menuIcon}>{'\u2715'}</span>
-							Clear Metadata
-						</button>
-					)}
+					<button
+						class={styles.menuItem}
+						onClick={(e: Event) => {
+							e.stopPropagation();
+							setOpen(false);
+							setShowClearMetaConfirm(true);
+						}}
+					>
+						<span class={styles.menuIcon}>{'✕'}</span>
+						Clear Metadata
+					</button>
 					<div class={styles.menuDivider} />
 					<button class={styles.menuItem} onClick={handleHideToggle}>
-						<span class={styles.menuIcon}>
-							{movie.hidden ? '\u{1F441}' : '\u{1F6AB}'}
-						</span>
+						<span class={styles.menuIcon}>{movie.hidden ? '👁' : '🚫'}</span>
 						{movie.hidden ? 'Unhide from Library' : 'Hide from Library'}
 					</button>
 					<button class={styles.menuItem} onClick={handleWatchedToggle}>
-						<span class={styles.menuIcon}>{movie.watched ? '\u21A9' : '\u2713'}</span>
+						<span class={styles.menuIcon}>{movie.watched ? '↩' : '✓'}</span>
 						{movie.watched ? 'Mark as Unwatched' : 'Mark as Watched'}
 					</button>
-					{confirmingRemove ? (
-						<div class={styles.confirmRow}>
-							<span>Remove?</span>
-							<button class={styles.confirmYes} onClick={handleRemove}>
-								Yes
-							</button>
-							<button
-								class={styles.confirmNo}
-								onClick={(e: Event) => {
-									e.stopPropagation();
-									setConfirmingRemove(false);
-								}}
-							>
-								Cancel
-							</button>
-						</div>
-					) : (
-						<button
-							class={`${styles.menuItem} ${styles.danger}`}
-							onClick={(e: Event) => {
-								e.stopPropagation();
-								setConfirmingRemove(true);
-							}}
-						>
-							<span class={styles.menuIcon}>{'\u2715'}</span>
-							Remove from Library
-						</button>
-					)}
 					<button
 						class={`${styles.menuItem} ${styles.danger}`}
 						onClick={(e: Event) => {
 							e.stopPropagation();
-							setDeleteFolder(false);
-							setShowDeleteModal(true);
-							// Fetch file info if not available (e.g. from movie cards)
-							if (!filePath) {
-								moviesService
-									.get(movie.id)
-									.then((full) => {
-										if (full?.fileInfo?.filePath) {
-											setFilePath(full.fileInfo.filePath);
-										}
-									})
-									.catch(() => {});
-							}
+							setOpen(false);
+							setShowRemoveConfirm(true);
 						}}
 					>
-						<span class={styles.menuIcon}>{'\u{1F5D1}'}</span>
+						<span class={styles.menuIcon}>{'✕'}</span>
+						Remove from Library
+					</button>
+					<button
+						class={`${styles.menuItem} ${styles.danger}`}
+						onClick={(e: Event) => {
+							e.stopPropagation();
+							setShowDeleteModal(true);
+						}}
+					>
+						<span class={styles.menuIcon}>{'🗑'}</span>
 						Delete from Disk
 					</button>
 				</div>
 			)}
 
-			<Modal
+			<ConfirmDialog
+				isOpen={showClearMetaConfirm}
+				onClose={() => setShowClearMetaConfirm(false)}
+				onConfirm={handleClearMetadata}
+				title="Clear all metadata?"
+				message={`Reset '${movie.title}' to its file-scan defaults and remove all fetched metadata. This cannot be undone.`}
+				confirmLabel="Clear Metadata"
+				variant="danger"
+			/>
+
+			<ConfirmDialog
+				isOpen={showRemoveConfirm}
+				onClose={() => setShowRemoveConfirm(false)}
+				onConfirm={handleRemove}
+				title="Remove from Library?"
+				message={`'${movie.title}' will be removed from the library. The source file on disk is not deleted.`}
+				confirmLabel="Remove"
+				variant="danger"
+			/>
+
+			<DeleteMovieModal
 				isOpen={showDeleteModal}
-				onClose={() => !deleteSuccess && setShowDeleteModal(false)}
-				title={deleteSuccess ? 'Deleted' : 'Delete from Disk'}
-			>
-				<div class={styles.deleteModalBody}>
-					{deleteSuccess ? (
-						<p
-							style={{
-								textAlign: 'center',
-								padding: '1rem 0',
-								color: 'var(--color-success, #4caf50)',
-							}}
-						>
-							'{movie.title}' has been deleted.
-						</p>
-					) : (
-						<>
-							<p>
-								This will permanently delete the movie file(s) from disk and remove
-								all cached data. This action cannot be undone.
-							</p>
-							<label class={styles.deleteOption}>
-								<input
-									type="radio"
-									name="deleteMode"
-									checked={!deleteFolder}
-									onChange={() => setDeleteFolder(false)}
-								/>
-								Delete movie file only
-							</label>
-							<label class={styles.deleteOption}>
-								<input
-									type="radio"
-									name="deleteMode"
-									checked={deleteFolder}
-									onChange={() => setDeleteFolder(true)}
-								/>
-								Delete file and enclosing folder
-								{(() => {
-									const fp = filePath;
-									if (!fp) return null;
-									// Extract parent folder name from path (handle both / and \)
-									const parts = fp.replace(/\\/g, '/').split('/');
-									const folderName =
-										parts.length >= 2 ? parts[parts.length - 2] : null;
-									if (!folderName) return null;
-									return (
-										<span
-											style={{
-												display: 'block',
-												fontSize: '0.8em',
-												opacity: 0.6,
-												marginTop: '0.2rem',
-												marginLeft: '1.5rem',
-												wordBreak: 'break-all',
-											}}
-										>
-											({folderName})
-										</span>
-									);
-								})()}
-							</label>
-							<div class={styles.deleteActions}>
-								<Button
-									variant="secondary"
-									onClick={() => setShowDeleteModal(false)}
-									disabled={isDeleting}
-								>
-									Cancel
-								</Button>
-								<Button
-									variant="danger"
-									onClick={handleDeleteFromDisk}
-									loading={isDeleting}
-								>
-									Delete Permanently
-								</Button>
-							</div>
-						</>
-					)}
-				</div>
-			</Modal>
+				movieId={movie.id}
+				movieTitle={movie.title}
+				filePath={movie.fileInfo?.filePath ?? null}
+				onClose={() => setShowDeleteModal(false)}
+				onDeleted={handleDeleted}
+			/>
 		</div>
 	);
 }

@@ -1525,10 +1525,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		if (hay.includes('permission denied')) {
 			return 'Cannot read source file — permission denied.';
 		}
-		if (
-			hay.includes('no nvenc capable devices') ||
-			hay.includes('cannot load nvencodeapi')
-		) {
+		if (hay.includes('no nvenc capable devices') || hay.includes('cannot load nvencodeapi')) {
 			return 'Hardware encoder (NVENC) is unavailable on this system. Software encoding will be used instead.';
 		}
 		if (hay.includes('3221225794') || hay.includes('c0000142')) {

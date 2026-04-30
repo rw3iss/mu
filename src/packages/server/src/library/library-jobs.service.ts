@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
+import { parseJsonArray } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movies, transcodeCache, userWatchHistory } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -239,14 +240,12 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 						.from(movieFiles)
 						.where(eq(movieFiles.id, movieFileId))
 						.get();
-					let storedTracks:
-						| { index: number; language?: string; title?: string; codec?: string }[]
-						| undefined;
-					if (file?.subtitleTracks) {
-						try {
-							storedTracks = JSON.parse(file.subtitleTracks as string);
-						} catch {}
-					}
+					const storedTracks = parseJsonArray<{
+						index: number;
+						language?: string;
+						title?: string;
+						codec?: string;
+					}>(file?.subtitleTracks as string | null | undefined);
 					await this.subtitleService.extractSubtitles(
 						filePath,
 						movieFileId,

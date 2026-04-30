@@ -494,13 +494,8 @@
   &:hover {
     color: #fff;
   }
-
-  &.resetBtnActive {
-    color: #fff;
-    background: var(--color-accent);
-
-    &:hover {
-      background: var(--color-accent);
-    }
-  }
 }
+
+// Note: the previous `.resetBtnActive` toggle variant moved out of
+// this stylesheet — Spectrum / Visualize now use the shared
+// <ToggleButton> component which owns its own pressed-state styling.

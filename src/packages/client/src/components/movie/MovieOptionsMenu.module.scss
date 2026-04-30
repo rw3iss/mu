@@ -117,43 +117,8 @@
 	margin: 4px 0;
 }
 
-.confirmRow {
-	display: flex;
-	align-items: center;
-	gap: var(--space-sm);
-	padding: 8px 14px;
-	font-size: var(--font-size-sm);
-	color: var(--color-text-secondary);
-}
-
-.confirmYes,
-.confirmNo {
-	padding: 2px 10px;
-	border-radius: var(--radius-sm);
-	border: 1px solid var(--color-border);
-	font-size: var(--font-size-xs);
-	cursor: pointer;
-	transition: background 120ms ease;
-}
-
-.confirmYes {
-	background: #ef4444;
-	border-color: #ef4444;
-	color: #fff;
-
-	&:hover {
-		background: #dc2626;
-	}
-}
-
-.confirmNo {
-	background: var(--color-bg-elevated);
-	color: var(--color-text-secondary);
-
-	&:hover {
-		border-color: var(--color-accent);
-	}
-}
+// (Inline confirmRow / confirmYes / confirmNo styles removed —
+// destructive confirms now use the shared <ConfirmDialog>.)
 
 .deleteModalBody {
 	display: flex;

@@ -4,6 +4,7 @@ import type { MovieListQuery } from '@mu/shared';
 import { nowISO, paginationDefaults } from '@mu/shared';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, asc, count, desc, eq, like, sql } from 'drizzle-orm';
+import { parseJsonArray, parseJsonObject, stringifyJsonObject } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
 	jobHistory,
@@ -310,16 +311,6 @@ export class MoviesService {
 			durationSeconds = firstFile.durationSeconds ?? 0;
 		}
 
-		const parseJson = (val: string | null | undefined): any[] => {
-			if (!val) return [];
-			try {
-				const parsed = JSON.parse(val);
-				return Array.isArray(parsed) ? parsed : [];
-			} catch {
-				return [];
-			}
-		};
-
 		const fileInfo = firstFile
 			? {
 					containerFormat: firstFile.containerFormat,
@@ -337,8 +328,8 @@ export class MoviesService {
 					fileSize: firstFile.fileSize,
 					fileName: firstFile.fileName,
 					filePath: firstFile.filePath,
-					audioTracks: parseJson(firstFile.audioTracks),
-					subtitleTracks: parseJson(firstFile.subtitleTracks),
+					audioTracks: parseJsonArray(firstFile.audioTracks),
+					subtitleTracks: parseJsonArray(firstFile.subtitleTracks),
 				}
 			: null;
 
@@ -368,15 +359,7 @@ export class MoviesService {
 			}
 		}
 
-		// Parse play settings JSON
-		let playSettings = null;
-		if (movie.playSettings) {
-			try {
-				playSettings = JSON.parse(movie.playSettings);
-			} catch {
-				playSettings = null;
-			}
-		}
+		const playSettings = parseJsonObject(movie.playSettings);
 
 		// Get cached transcode versions for this movie's files
 		const cachedVersions: { quality: string; completedAt: string }[] = [];
@@ -410,22 +393,16 @@ export class MoviesService {
 	 * Flatten a movie row + metadata into the shape the client expects.
 	 */
 	private flattenMovie(movie: any, metadata: any, inWatchlist = false, userRating = 0) {
-		const parseJson = (val: string | null | undefined): any[] => {
-			if (!val) return [];
-			try {
-				const parsed = JSON.parse(val);
-				return Array.isArray(parsed) ? parsed : [];
-			} catch {
-				return [];
-			}
-		};
-
 		// Use thumbnailUrl as poster fallback when no TMDB poster is set
 		const posterUrl = movie.posterUrl || movie.thumbnailUrl || '';
 		const thumbnailUrl = movie.thumbnailUrl || '';
 
-		const directors = parseJson(metadata?.directors);
-		const writers = parseJson(metadata?.writers);
+		// Directors / writers may be either bare strings ("Christopher
+		// Nolan") or objects shaped like `{ name: string, ... }` (TMDB
+		// response). Widen the parsed type so the `directors[0]?.name`
+		// fallback below type-checks.
+		const directors = parseJsonArray<string | { name?: string }>(metadata?.directors);
+		const writers = parseJsonArray<string | { name?: string }>(metadata?.writers);
 
 		return {
 			id: movie.id,
@@ -446,8 +423,8 @@ export class MoviesService {
 			tmdbId: movie.tmdbId ?? undefined,
 			hidden: movie.hidden ?? false,
 			addedAt: movie.addedAt ?? '',
-			genres: parseJson(metadata?.genres),
-			cast: parseJson(metadata?.cast),
+			genres: parseJsonArray(metadata?.genres),
+			cast: parseJsonArray(metadata?.cast),
 			director:
 				directors.length > 0
 					? typeof directors[0] === 'string'
@@ -456,8 +433,8 @@ export class MoviesService {
 					: undefined,
 			directors: directors.length > 0 ? directors : undefined,
 			writers: writers.length > 0 ? writers : undefined,
-			keywords: parseJson(metadata?.keywords),
-			productionCompanies: parseJson(metadata?.productionCompanies),
+			keywords: parseJsonArray(metadata?.keywords),
+			productionCompanies: parseJsonArray(metadata?.productionCompanies),
 			budget: metadata?.budget ?? undefined,
 			revenue: metadata?.revenue ?? undefined,
 			imdbRating: metadata?.imdbRating ?? undefined,
@@ -551,32 +528,19 @@ export class MoviesService {
 			throw new NotFoundException(`Movie ${id} not found`);
 		}
 
-		// Merge partial playSettings into existing JSON rather than replacing wholesale
+		// Merge partial playSettings into existing JSON rather than
+		// replacing wholesale. Both sides go through `parseJsonObject`
+		// so malformed / non-object payloads are silently dropped.
 		if (data.playSettings !== undefined && data.playSettings !== null) {
-			try {
-				const incoming = JSON.parse(data.playSettings);
-				if (typeof incoming === 'object' && incoming !== null) {
-					let merged = incoming;
-					if (existing.playSettings) {
-						try {
-							const current = JSON.parse(existing.playSettings);
-							merged = { ...current, ...incoming };
-						} catch {
-							// existing was invalid — just use incoming
-						}
-					}
-					// Remove keys set to null
-					for (const key of Object.keys(merged)) {
-						if (merged[key] === null) delete merged[key];
-					}
-					data = {
-						...data,
-						playSettings:
-							Object.keys(merged).length > 0 ? JSON.stringify(merged) : null,
-					};
+			const incoming = parseJsonObject(data.playSettings);
+			if (incoming) {
+				const current = parseJsonObject(existing.playSettings) ?? {};
+				const merged: Record<string, unknown> = { ...current, ...incoming };
+				// Remove keys set to null in the incoming partial.
+				for (const key of Object.keys(merged)) {
+					if (merged[key] === null) delete merged[key];
 				}
-			} catch {
-				// incoming is not valid JSON — pass through as-is
+				data = { ...data, playSettings: stringifyJsonObject(merged) };
 			}
 		}
 
@@ -687,17 +651,8 @@ export class MoviesService {
 
 		const genreSet = new Set<string>();
 		for (const row of rows) {
-			if (row.genres) {
-				try {
-					const parsed = JSON.parse(row.genres);
-					if (Array.isArray(parsed)) {
-						for (const g of parsed) {
-							if (typeof g === 'string' && g.trim()) genreSet.add(g.trim());
-						}
-					}
-				} catch {
-					// skip malformed
-				}
+			for (const g of parseJsonArray<unknown>(row.genres)) {
+				if (typeof g === 'string' && g.trim()) genreSet.add(g.trim());
 			}
 		}
 

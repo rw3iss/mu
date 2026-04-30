@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { and, eq, lt } from 'drizzle-orm';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
+import { parseJsonArray } from '../common/json-fields.js';
 import { SessionRegistryService } from '../common/session-registry.service.js';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -364,14 +365,12 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// Extract subtitles — use stored track info from DB to skip FFprobe
 		let subtitleTracks: { index: number; language: string; title: string }[] = [];
 		try {
-			let storedTracks:
-				| { index: number; language?: string; title?: string; codec?: string }[]
-				| undefined;
-			if (file.subtitleTracks) {
-				try {
-					storedTracks = JSON.parse(file.subtitleTracks as string);
-				} catch {}
-			}
+			const storedTracks = parseJsonArray<{
+				index: number;
+				language?: string;
+				title?: string;
+				codec?: string;
+			}>(file.subtitleTracks as string | null | undefined);
 			subtitleTracks = await this.subtitleService.extractSubtitles(
 				file.filePath,
 				file.id,
