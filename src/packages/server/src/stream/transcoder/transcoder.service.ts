@@ -538,10 +538,13 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						return;
 					}
 
-					this.sessionStates.set(sessionId, { state: 'failed', error: err.message });
+					const friendly = this.explainFfmpegError(err, stderrLines);
+					this.sessionStates.set(sessionId, { state: 'failed', error: friendly });
 					this.sessionStderr.delete(sessionId);
-					// Only reject if we haven't resolved yet
-					reject(err);
+					// Reject with the friendly message so the job-history
+					// entry is self-explanatory; the original technical
+					// error has already been logged at error level above.
+					reject(new Error(friendly));
 				})
 				.on('end', () => {
 					this.logger.log(
@@ -1489,6 +1492,54 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		if (buf.length > TranscoderService.STDERR_BUFFER_LINES) {
 			buf.splice(0, buf.length - TranscoderService.STDERR_BUFFER_LINES);
 		}
+	}
+
+	/**
+	 * Translate a raw FFmpeg failure into a short, human-readable
+	 * explanation that ends up in `jobHistory.error` and the admin UI.
+	 *
+	 * Without this, the user sees opaque exit codes (e.g. 3199971767 =
+	 * AVERROR_INVALIDDATA) and has to look them up. With this, common
+	 * failure modes (corrupt file, missing file, GPU unavailable, etc.)
+	 * become self-explanatory at a glance. The original technical
+	 * message is still logged at error level for diagnosis.
+	 */
+	private explainFfmpegError(err: Error, stderrLines: string[]): string {
+		const hay = `${err.message}\n${stderrLines.join('\n')}`.toLowerCase();
+		if (
+			hay.includes('ebml header parsing failed') ||
+			hay.includes('invalid as first byte of an ebml')
+		) {
+			return 'Source file appears corrupt — the Matroska/MKV header is missing or damaged. The file may have been truncated or incompletely downloaded.';
+		}
+		if (hay.includes('invalid data found when processing input')) {
+			return 'Source file format could not be parsed — the file is corrupt or in an unsupported format.';
+		}
+		if (
+			hay.includes('no such file or directory') ||
+			hay.includes('error opening input file') ||
+			hay.includes('error opening input files')
+		) {
+			return 'Could not open source file — it may have been moved, renamed, or the path contains characters FFmpeg cannot parse.';
+		}
+		if (hay.includes('permission denied')) {
+			return 'Cannot read source file — permission denied.';
+		}
+		if (
+			hay.includes('no nvenc capable devices') ||
+			hay.includes('cannot load nvencodeapi')
+		) {
+			return 'Hardware encoder (NVENC) is unavailable on this system. Software encoding will be used instead.';
+		}
+		if (hay.includes('3221225794') || hay.includes('c0000142')) {
+			return 'FFmpeg failed to start (Windows DLL initialization error). Will retry shortly.';
+		}
+		if (hay.includes('protocol not found')) {
+			return 'FFmpeg refused the input — likely a path containing FFmpeg-reserved characters.';
+		}
+		// Strip the noisy "ffmpeg exited with code N: " prefix when nothing
+		// matched, so at minimum the user sees the human-readable tail.
+		return err.message.replace(/^ffmpeg exited with code \d+:\s*/i, '');
 	}
 
 	/**
