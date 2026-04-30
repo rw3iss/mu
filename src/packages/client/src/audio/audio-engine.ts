@@ -137,32 +137,44 @@ export class AudioEngine {
 			`[audioEngine] attached. ctx.state=${this.ctx.state} sampleRate=${this.ctx.sampleRate} baseLatency=${(this.ctx as AudioContext & { baseLatency?: number }).baseLatency ?? 'n/a'}`,
 		);
 
-		// Route audio output through a MediaStream consumed by a hidden
-		// <audio> element instead of `AudioContext.destination`. On
-		// Chrome/Windows, AudioContext.destination can pin to a stale audio
-		// sink after OS audio changes (and `setSinkId('')` does not always
-		// recover it). HTMLMediaElement uses the native audio path that
-		// always follows the OS default device — same path <video> and
-		// YouTube use. The hidden <audio> element pulls from the Web Audio
-		// graph via MediaStream, so EQ/compressor still apply.
-		this.streamDest = this.ctx.createMediaStreamDestination();
-		this.outputAudio = document.createElement('audio');
-		this.outputAudio.srcObject = this.streamDest.stream;
-		this.outputAudio.autoplay = true;
-		this.outputAudio.style.display = 'none';
-		document.body.appendChild(this.outputAudio);
+		// Output routing.
+		//
+		// Default: route directly to `AudioContext.destination`. This is
+		// the canonical Web Audio output path — zero extra latency, no
+		// double-buffering, follows the OS default device via the
+		// browser's normal audio sink resolution.
+		//
+		// Opt-in via `localStorage.mu_audio_use_mediastream = '1'`:
+		// route through a `MediaStreamAudioDestinationNode` consumed by
+		// a hidden `<audio>` element. This is the workaround for the
+		// stale-sink bug we hit on Chrome/Windows once before — useful
+		// fallback if `AudioContext.destination` ever stops producing
+		// audio after an OS audio-device change. The cost when on is a
+		// ~250–500ms HTMLMediaElement buffer that briefly overlaps with
+		// the `<video>`'s native audio (until Chrome finishes muting
+		// it), audible as a half-second echo that fades over the first
+		// few seconds of playback.
+		const useMediaStreamRouting =
+			typeof localStorage !== 'undefined' &&
+			localStorage.getItem('mu_audio_use_mediastream') === '1';
 
-		// Force the output element onto the OS default audio device. Chrome
-		// renders MediaStream-fed <audio> elements through the WebRTC audio
-		// path, which has its own device routing separate from regular
-		// <video> playback — so even if <video> is fine, this element can
-		// be pinned to a stale sink. setSinkId('') resolves to the current
-		// default device. Re-applied on devicechange via pinSinkToDefault().
-		this.pinOutputAudioToDefault();
+		if (useMediaStreamRouting) {
+			this.streamDest = this.ctx.createMediaStreamDestination();
+			this.outputAudio = document.createElement('audio');
+			this.outputAudio.srcObject = this.streamDest.stream;
+			this.outputAudio.autoplay = true;
+			this.outputAudio.style.display = 'none';
+			document.body.appendChild(this.outputAudio);
+			// Force the output element onto the OS default device — Chrome
+			// renders MediaStream-fed <audio> through the WebRTC audio
+			// path, which has its own device routing separate from <video>.
+			this.pinOutputAudioToDefault();
+		}
 
-		// Belt-and-suspenders: also try to pin AudioContext.destination to
-		// the OS default device. Even though we route through streamDest,
-		// some Chrome builds gate stream production on destination state.
+		// Pin `AudioContext.destination` to the OS default device. With
+		// direct routing this is what actually plays the audio; with
+		// MediaStream routing it's belt-and-suspenders (some Chrome
+		// builds gate stream production on destination state).
 		this.pinSinkToDefault();
 
 		// Force the context to running state. Chrome may start it suspended
@@ -383,34 +395,34 @@ export class AudioEngine {
 	}
 
 	/**
-	 * Force the hidden output <audio> element onto a specific device id.
-	 * Pass '' (empty string) to use the OS default. Use this when the
-	 * default sink is broken on the current Chrome process.
+	 * Force the audio output onto a specific device id. Pass '' (empty
+	 * string) for the OS default. In direct routing mode (default) the
+	 * sink id is set on the AudioContext; in MediaStream-routing mode
+	 * it's set on the hidden output <audio> element.
 	 */
 	async setOutputDevice(deviceId: string): Promise<void> {
-		if (!this.outputAudio) {
+		if (!this.ctx) {
 			throw new Error('Audio engine not attached. Enable EQ or compressor first.');
 		}
-		const el = this.outputAudio as HTMLAudioElement & {
+		const target = (this.outputAudio ?? this.ctx) as {
 			setSinkId?: (id: string) => Promise<void>;
 		};
-		if (typeof el.setSinkId !== 'function') {
-			throw new Error('HTMLMediaElement.setSinkId not supported in this browser');
+		if (typeof target.setSinkId !== 'function') {
+			throw new Error('setSinkId not supported in this browser');
 		}
-		await el.setSinkId(deviceId);
+		await target.setSinkId(deviceId);
 		dlog(`[audioEngine] output device set to ${deviceId || '(default)'}`);
 	}
 
 	/**
-	 * Play a 1-second 440Hz tone through the same hidden output element
-	 * the chain feeds into. Lets you verify the output path independently
-	 * of the video source. If you can't hear this tone, the output sink
-	 * itself is broken and no setSinkId() can fix it from JS — restart
-	 * Chrome or pick a different device via setOutputDevice().
+	 * Play a 1-second 440Hz tone through whichever output path is
+	 * active (AudioContext.destination by default, or the hidden
+	 * <audio> element when MediaStream routing is enabled). Lets you
+	 * verify the output path independently of the video source.
 	 */
 	async playTestTone(): Promise<void> {
 		this.attach();
-		if (!this.ctx || !this.streamDest) {
+		if (!this.ctx) {
 			throw new Error('Audio engine not attached');
 		}
 		await this.ctx.resume().catch(() => {});
@@ -419,9 +431,9 @@ export class AudioEngine {
 		osc.frequency.value = 440;
 		gain.gain.value = 0.15;
 		osc.connect(gain);
-		gain.connect(this.streamDest);
+		gain.connect(this.streamDest ?? this.ctx.destination);
 		osc.start();
-		dlog('[audioEngine] test tone (440Hz) → streamDest for 1s');
+		dlog('[audioEngine] test tone (440Hz) for 1s');
 		setTimeout(() => {
 			osc.stop();
 			osc.disconnect();
