@@ -1,5 +1,6 @@
 import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
 import { useCallback, useRef, useState } from 'preact/hooks';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { subtitlesService } from '@/services/subtitles.service';
 import { globalMovie } from '@/state/globalPlayer.state';
 import styles from './SubtitlePanel.module.scss';
@@ -459,45 +460,37 @@ export function SubtitlePanel({
 
 			{error && <div class={styles.error}>{error}</div>}
 
-			{/* Delete confirmation modal */}
-			{confirmDeleteTrack && (
-				<div class={styles.confirmOverlay}>
-					<div class={styles.confirmModal}>
-						<p class={styles.confirmTitle}>Delete Subtitle?</p>
-						<p class={styles.confirmDetail}>
-							{confirmDeleteTrack.label}
-							{confirmDeleteTrack.language && confirmDeleteTrack.language !== 'und'
-								? ` (${confirmDeleteTrack.language.toUpperCase()})`
-								: ''}
-							{confirmDeleteTrack.external ? ' — External' : ' — Embedded'}
-							{confirmDeleteTrack.codec
-								? ` — ${confirmDeleteTrack.codec.toUpperCase()}`
-								: ''}
-						</p>
-						<p class={styles.confirmWarning}>
-							{confirmDeleteTrack.external
-								? 'This will delete the subtitle file from disk.'
-								: 'This will remove the embedded track from the cache.'}
-						</p>
-						<div class={styles.confirmActions}>
-							<button
-								class={styles.confirmCancel}
-								onClick={() => setConfirmDeleteTrack(null)}
-								disabled={isDeleting}
-							>
-								Cancel
-							</button>
-							<button
-								class={styles.confirmDelete}
-								onClick={() => handleDelete(confirmDeleteTrack)}
-								disabled={isDeleting}
-							>
-								{isDeleting ? 'Deleting...' : 'Delete'}
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
+			<ConfirmDialog
+				isOpen={confirmDeleteTrack !== null}
+				onClose={() => setConfirmDeleteTrack(null)}
+				onConfirm={() => confirmDeleteTrack && handleDelete(confirmDeleteTrack)}
+				title="Delete Subtitle?"
+				message={
+					confirmDeleteTrack && (
+						<>
+							<p class={styles.confirmDetail}>
+								{confirmDeleteTrack.label}
+								{confirmDeleteTrack.language &&
+								confirmDeleteTrack.language !== 'und'
+									? ` (${confirmDeleteTrack.language.toUpperCase()})`
+									: ''}
+								{confirmDeleteTrack.external ? ' — External' : ' — Embedded'}
+								{confirmDeleteTrack.codec
+									? ` — ${confirmDeleteTrack.codec.toUpperCase()}`
+									: ''}
+							</p>
+							<p class={styles.confirmWarning}>
+								{confirmDeleteTrack.external
+									? 'This will delete the subtitle file from disk.'
+									: 'This will remove the embedded track from the cache.'}
+							</p>
+						</>
+					)
+				}
+				confirmLabel="Delete"
+				variant="danger"
+				loading={isDeleting}
+			/>
 		</div>
 	);
 }

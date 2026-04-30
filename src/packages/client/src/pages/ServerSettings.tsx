@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
@@ -202,25 +203,15 @@ function ServerInfoSection() {
 				</Button>
 			</div>
 
-			{showRestartConfirm && (
-				<div class={styles.confirmOverlay}>
-					<div class={styles.confirmModal}>
-						<p class={styles.confirmTitle}>Restart Server?</p>
-						<p class={styles.confirmDetail}>
-							This will stop all active streams and transcoding jobs. The server will
-							restart in a few seconds.
-						</p>
-						<div class={styles.confirmActions}>
-							<Button variant="ghost" onClick={() => setShowRestartConfirm(false)}>
-								Cancel
-							</Button>
-							<Button variant="primary" onClick={handleRestart}>
-								Restart
-							</Button>
-						</div>
-					</div>
-				</div>
-			)}
+			<ConfirmDialog
+				isOpen={showRestartConfirm}
+				onClose={() => setShowRestartConfirm(false)}
+				onConfirm={handleRestart}
+				title="Restart Server?"
+				message="This will stop all active streams and transcoding jobs. The server will restart in a few seconds."
+				confirmLabel="Restart"
+				variant="primary"
+			/>
 		</div>
 	);
 }
@@ -837,34 +828,18 @@ function JobsSection() {
 				)}
 			</div>
 
-			{showClearHistoryConfirm && (
-				<div class={styles.confirmOverlay}>
-					<div class={styles.confirmModal}>
-						<p class={styles.confirmTitle}>Delete all job history?</p>
-						<p class={styles.confirmDetail}>
-							This will permanently remove all {historyJobs.length} job history record
-							{historyJobs.length !== 1 ? 's' : ''}. Currently running and pending
-							jobs are not affected. This cannot be undone.
-						</p>
-						<div class={styles.confirmActions}>
-							<Button
-								variant="ghost"
-								onClick={() => setShowClearHistoryConfirm(false)}
-								disabled={clearingHistory}
-							>
-								Cancel
-							</Button>
-							<Button
-								variant="danger"
-								onClick={handleClearHistory}
-								loading={clearingHistory}
-							>
-								Delete All
-							</Button>
-						</div>
-					</div>
-				</div>
-			)}
+			<ConfirmDialog
+				isOpen={showClearHistoryConfirm}
+				onClose={() => setShowClearHistoryConfirm(false)}
+				onConfirm={handleClearHistory}
+				title="Delete all job history?"
+				message={`This will permanently remove all ${historyJobs.length} job history record${
+					historyJobs.length !== 1 ? 's' : ''
+				}. Currently running and pending jobs are not affected. This cannot be undone.`}
+				confirmLabel="Delete All"
+				variant="danger"
+				loading={clearingHistory}
+			/>
 		</div>
 	);
 }

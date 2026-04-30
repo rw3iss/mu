@@ -532,41 +532,5 @@
   gap: var(--space-sm);
 }
 
-// ── Confirm Modal ──
-
-.confirmOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.confirmModal {
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-lg);
-  max-width: 400px;
-  width: 90%;
-}
-
-.confirmTitle {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  margin-bottom: var(--space-sm);
-}
-
-.confirmDetail {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-md);
-}
-
-.confirmActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-sm);
-}
+// (Inline confirm-modal styles removed — now using the shared
+// `<ConfirmDialog>` component from `components/common/`.)

@@ -573,6 +573,12 @@
 	align-items: stretch;
 }
 
+// The player popup intentionally stays on a dark surface in both
+// themes — it overlays the video frame, so light-theme text-on-light
+// would lose contrast against the picture. Border, hover and value
+// colours track tokens so they still pick up small theme tweaks; only
+// the panel background and the panel-internal text base stay fixed
+// to keep readability over arbitrary movie content.
 .menu {
 	position: absolute;
 	bottom: 100%;
@@ -582,7 +588,7 @@
 	max-height: 80vh;
 	overflow-y: auto;
 	background: rgba(18, 18, 18, 0.97);
-	border: 1px solid rgba(255, 255, 255, 0.08);
+	border: 1px solid var(--surface-overlay-2);
 	border-radius: 6px;
 	padding: 4px 0;
 	box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
@@ -602,7 +608,7 @@
 	transition: background 120ms ease;
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--surface-overlay-1);
 	}
 }
 
