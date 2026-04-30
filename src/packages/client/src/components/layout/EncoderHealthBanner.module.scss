@@ -1,6 +1,9 @@
 .banner {
+  // Anchor top-right, just under the TopBar — bottom-right was getting
+  // hidden behind the mini-player bar (which is always present once a
+  // movie is open). Top-right is reliably empty real estate.
   position: fixed;
-  bottom: var(--space-md);
+  top: calc(var(--topbar-height, 56px) + var(--space-sm));
   right: var(--space-md);
   z-index: var(--z-toast);
   display: flex;
@@ -99,7 +102,7 @@
 
 @keyframes slideIn {
   from {
-    transform: translateY(8px);
+    transform: translateY(-8px);
     opacity: 0;
   }
   to {
