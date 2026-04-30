@@ -26,13 +26,22 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 - **Pre-transcoding** -- movies are transcoded in the background ahead of playback for instant streaming
 - **Cache validation** -- detects and repairs broken or incomplete transcode caches on startup
 - **Graceful shutdown** -- running transcode jobs are cleanly interrupted and resumed on next start
+- **Encoder health banner** -- if hardware encoding breaks (NVENC DLL init failure, missing capable device, etc.) a dismissable banner appears in the corner with a "Retry GPU" button; the warning re-fires on each new failure but never re-pesters after dismissal
+- **Friendly job errors** -- FFmpeg failures are translated into plain-English explanations in the admin Jobs panel ("Source file appears corrupt — the Matroska/MKV header is missing or damaged", "Hardware encoder unavailable", etc.) instead of opaque exit codes
+- **Path-safe input** -- file paths containing FFmpeg-reserved characters (square brackets in scene-release tags, etc.) are wrapped in the `file:` protocol so they don't get parsed as filter syntax
 
 ### Player
 - **Persistent overlay player** -- video stays playing during navigation, with mini and full modes
 - **Resume playback** -- pick up where you left off, persisted across refreshes and restarts
 - **Subtitles** -- embedded and external subtitle support (SRT, VTT, ASS), online search via OpenSubtitles, upload, appearance customization (font size, color, shadow, background, line spacing, timing offset, vertical position)
-- **Audio engine** -- parametric EQ with saveable profiles, dynamic range compressor with dry/wet mix, per-movie audio settings
-- **Video effects** -- brightness, contrast, saturation, hue, sepia, grayscale with saveable presets
+- **Parametric EQ** -- 10-band graphic EQ + amp slider, lazy Web Audio attach (zero overhead until enabled), saveable profiles
+- **EQ Spectrum visualizer** -- real-time FFT analyser rendered behind the slider grid, log-spaced and aligned to band frequencies (toggle with the **Spectrum** pill)
+- **Auto-EQ** -- sample the live audio for 1–10 seconds, compute the average energy at each band, and drive every slider to its flattening offset; a 0.1–1.0 **Factor** scales the strength of the correction (default 0.5 — full strength tends to over-correct)
+- **Dynamic range compressor** -- threshold/ratio/knee/attack/release, parallel dry/wet mix, makeup gain, saveable profiles
+- **Compressor curve visualizer** -- live transfer-curve display behind the parameter sliders showing 1:1 reference, knee region, threshold, the static curve, a moving live-signal dot, and a real-time gain-reduction meter
+- **Auto-Compressor** -- measure peak / RMS / crest factor over a sample window and derive sensible threshold + ratio + makeup gain; the same **Factor** slider blends from "no compression" (neutral) to the computed values
+- **Video effects** -- brightness, contrast, saturation, hue, sepia, grayscale, plus gamma, black level (SVG `<feComponentTransfer>`), unsharp-mask sharpen (SVG blur+composite), uniform crop (zoom past letterbox), and vertical scale (correct squished/stretched aspect)
+- **Saveable effect profiles** -- name, save, load, clone, delete EQ / compressor / video presets independently, restored across refreshes
 - **Skip controls** -- configurable skip forward/backward times
 - **Keyboard shortcuts** -- full keyboard control for playback, seeking, volume, fullscreen
 
@@ -44,6 +53,8 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 
 ### Administration
 - **Admin dashboard** -- server stats, user management, media sources, log viewer, cache management
+- **Bulk movie operations** -- multi-select cards (Edit toggle in Library and Search), bulk re-scan, refresh metadata, clear metadata, hide/unhide, mark watched/unwatched, remove from library, delete from disk; per-movie failures are isolated so one bad row doesn't kill the batch
+- **Job history with friendly errors** -- the Admin → Jobs panel surfaces translated FFmpeg failure reasons (corrupt source, missing input, GPU unavailable, etc.) and offers a "Delete All" with confirm to clear history
 - **Plugin system** -- extensible architecture with API endpoint registration, client-side UI slots, settings management, and scaffolding tools
 
 ---
