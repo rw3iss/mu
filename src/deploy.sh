@@ -46,6 +46,20 @@ if $IS_WINDOWS && command -v nssm &>/dev/null && nssm status mu-server &>/dev/nu
         done
         echo "Killed orphaned FFmpeg processes"
     fi
+    # NSSM stop sometimes spawns a new node.exe before killing the old
+    # one — the previous server PID can survive the restart, end up as a
+    # zombie in Session 0, and keep enqueueing jobs that fail because
+    # its DLL state has degraded over time. Kill ALL node.exe in the
+    # Services session (Session 0) so only the fresh `nssm start` survives.
+    # tasklist /FI "SESSION eq 0" filters to background-services session.
+    node_pids=$(tasklist /FI "IMAGENAME eq node.exe" /FI "SESSION eq 0" /NH 2>/dev/null \
+                | awk 'NF { print $2 }' || true)
+    if [ -n "$node_pids" ]; then
+        for pid in $node_pids; do
+            taskkill //F //PID "$pid" 2>/dev/null || true
+        done
+        echo "Killed orphaned Session-0 node.exe processes"
+    fi
 else
     source "$SRC_DIR/stop.sh" 2>/dev/null || true
 fi
