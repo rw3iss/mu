@@ -103,7 +103,7 @@ function ServerInfoSection() {
 
 	const handleRecycle = useCallback(async () => {
 		setRecycling(true);
-		notifySuccess('Recycling hardware encoder…');
+		notifySuccess('Restarting hardware encoder…');
 		try {
 			const res = await api.post<{
 				ok: boolean;
@@ -112,16 +112,16 @@ function ServerInfoSection() {
 				probeStderr?: string;
 			}>('/admin/server/encoder/recycle');
 			if (res.ok) {
-				notifySuccess(res.message || 'Hardware encoder recycled successfully');
+				notifySuccess(res.message || 'Hardware encoder restarted successfully');
 			} else {
 				const detail = res.probeStderr
 					? `${res.message} — ${res.probeStderr.split('\n').pop()?.trim() ?? ''}`
-					: res.message || 'Hardware encoder recycle failed';
+					: res.message || 'Hardware encoder restart failed';
 				notifyError(detail);
 			}
 			await loadInfo();
 		} catch (err: any) {
-			notifyError(err?.message || 'Failed to recycle hardware encoder');
+			notifyError(err?.message || 'Failed to restart hardware encoder');
 		} finally {
 			setRecycling(false);
 		}
@@ -207,7 +207,7 @@ function ServerInfoSection() {
 						<button
 							class={styles.recycleBtn}
 							onClick={handleRecycle}
-							title={recycling ? 'Recycling…' : 'Recycle hardware encoder'}
+							title={recycling ? 'Restarting…' : 'Restart hardware encoder'}
 							disabled={recycling}
 						>
 							{recycling ? (
@@ -229,7 +229,7 @@ function ServerInfoSection() {
 									<path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
 								</svg>
 							)}
-							<span class={styles.recycleBtnLabel}>Recycle</span>
+							<span class={styles.recycleBtnLabel}>Restart</span>
 						</button>
 					)}
 				</span>
