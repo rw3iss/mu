@@ -100,6 +100,10 @@ export class ServerService {
 		this.transcoder.resetHwAccelBroken();
 	}
 
+	recycleHwAccel() {
+		return this.transcoder.recycleHwAccel();
+	}
+
 	getServerLogs(
 		lines = 200,
 		file = 'server',

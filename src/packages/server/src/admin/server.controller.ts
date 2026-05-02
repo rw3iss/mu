@@ -170,6 +170,13 @@ export class ServerController {
 		return { success: true };
 	}
 
+	@Post('encoder/recycle')
+	@Roles('admin')
+	async recycleEncoder() {
+		this.logger.warn('Hardware encoder recycle requested via API');
+		return this.serverService.recycleHwAccel();
+	}
+
 	@Post('jobs/:id/pause')
 	@Roles('admin')
 	pauseJob(@Param('id') id: string) {

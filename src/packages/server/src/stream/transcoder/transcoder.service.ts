@@ -1,4 +1,4 @@
-import { ChildProcess, execSync } from 'node:child_process';
+import { ChildProcess, execSync, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -51,6 +51,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	private ffmpegSpawnBrokenUntil = 0;
 	private ffmpegSpawnFailCount = 0;
 	private cacheDir: string;
+	/** Resolved FFmpeg binary path used for direct spawns (probes, etc.) */
+	private ffmpegPath = 'ffmpeg';
 
 	constructor(
 		private readonly config: ConfigService,
@@ -92,6 +94,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		// This avoids PATH issues on Windows (WinGet symlink permissions, Git Bash vs system PATH)
 		const ffmpegPath = this.config.get<string>('transcoding.ffmpegPath', 'ffmpeg');
 		const ffprobePath = this.config.get<string>('transcoding.ffprobePath', 'ffprobe');
+		this.ffmpegPath = ffmpegPath;
 		if (ffmpegPath !== 'ffmpeg') {
 			ffmpeg.setFfmpegPath(ffmpegPath);
 			this.logger.log(`Using ffmpeg at: ${ffmpegPath}`);
@@ -117,6 +120,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						ffmpeg.setFfmpegPath(candidate);
 						const probePath = candidate.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1');
 						ffmpeg.setFfprobePath(probePath);
+						this.ffmpegPath = candidate;
 						this.logger.log(`Auto-detected ffmpeg at: ${candidate}`);
 						break;
 					}
@@ -1668,6 +1672,186 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			type: 'encoder-degraded',
 			encoderDegraded: false,
 		});
+	}
+
+	/**
+	 * Map a configured `hwAccel` value to the FFmpeg encoder name we'd
+	 * use for it. Used by the encoder probe.
+	 */
+	private encoderForHwAccel(hwAccel: string): string {
+		switch (hwAccel) {
+			case 'nvenc':
+				return 'h264_nvenc';
+			case 'qsv':
+				return 'h264_qsv';
+			case 'vaapi':
+				return 'h264_vaapi';
+			default:
+				return 'libx264';
+		}
+	}
+
+	/**
+	 * Run a tiny test transcode through the configured hardware encoder
+	 * to verify it actually works. Generates a 0.1s null-source video
+	 * (`-f lavfi -i nullsrc`), pipes it through `h264_nvenc` (or qsv /
+	 * vaapi), and discards the output. If FFmpeg exits 0 the encoder
+	 * is operational; on failure we capture stderr so the caller can
+	 * surface the actual reason.
+	 */
+	private probeEncoder(
+		encoderName: string,
+	): Promise<{ ok: true } | { ok: false; stderr: string }> {
+		return new Promise((resolve) => {
+			const args = [
+				'-hide_banner',
+				'-y',
+				'-loglevel',
+				'error',
+				'-f',
+				'lavfi',
+				'-i',
+				'nullsrc=size=320x240:rate=24:duration=0.1',
+				'-c:v',
+				encoderName,
+				'-t',
+				'0.1',
+				'-f',
+				'null',
+				'-',
+			];
+			const ff = spawn(this.ffmpegPath, args, { windowsHide: true });
+			let stderr = '';
+			ff.stderr?.on('data', (d) => {
+				stderr += d.toString();
+			});
+			let resolved = false;
+			const finish = (result: { ok: true } | { ok: false; stderr: string }) => {
+				if (resolved) return;
+				resolved = true;
+				resolve(result);
+			};
+			ff.on('close', (code) => {
+				if (code === 0) finish({ ok: true });
+				else
+					finish({
+						ok: false,
+						stderr: stderr.trim() || `Probe exited with code ${code}`,
+					});
+			});
+			ff.on('error', (err) => finish({ ok: false, stderr: err.message }));
+			// Hard timeout — a 0.1s probe should finish in <1s; if it doesn't,
+			// FFmpeg is stuck and we treat that as a failure.
+			setTimeout(() => {
+				if (!resolved) {
+					try {
+						ff.kill('SIGKILL');
+					} catch {}
+					finish({ ok: false, stderr: 'Probe timed out after 10s' });
+				}
+			}, 10_000);
+		});
+	}
+
+	/**
+	 * Try to recover from a broken hardware-encoder state.
+	 *
+	 *   1. Kill orphan FFmpeg processes that may be holding NVENC
+	 *      sessions or DLL handles.
+	 *   2. Brief settle delay so the OS can reclaim resources.
+	 *   3. Reset all the broken-state flags (hwAccelBroken,
+	 *      ffmpegSpawnBroken, fail counters).
+	 *   4. Run a tiny probe transcode through the configured hardware
+	 *      encoder. If it succeeds → broadcast the all-clear and
+	 *      report success. If it fails → re-set the broken flag with
+	 *      the new probe stderr as the reason and return failure.
+	 *
+	 * Returns a structured report so callers can surface the action
+	 * log and probe stderr to the user.
+	 */
+	async recycleHwAccel(): Promise<{
+		ok: boolean;
+		message: string;
+		actions: string[];
+		probeStderr?: string;
+	}> {
+		const actions: string[] = [];
+		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as Record<
+			string,
+			unknown
+		>;
+		const configuredHwAccel = (enc?.hwAccel as string) || 'none';
+
+		if (configuredHwAccel === 'none') {
+			return {
+				ok: false,
+				message: 'No hardware encoder is configured (encoding.hwAccel is "none").',
+				actions,
+			};
+		}
+
+		// Step 1: kill orphan FFmpegs.
+		actions.push('Killing orphan FFmpeg processes…');
+		try {
+			if (process.platform === 'win32') {
+				execSync('taskkill /F /IM ffmpeg.exe /T', { timeout: 5000, stdio: 'pipe' });
+			} else {
+				execSync('pkill -9 ffmpeg || true', { timeout: 5000, stdio: 'pipe' });
+			}
+			actions.push('  ✓ ffmpeg processes terminated');
+		} catch {
+			// taskkill exits non-zero when no matching process exists — fine.
+			actions.push('  · no orphan ffmpeg processes to kill');
+		}
+
+		// Step 2: settle.
+		await new Promise<void>((r) => setTimeout(r, 1000));
+		actions.push('Settled for 1s');
+
+		// Step 3: clear broken-state flags so the chain rebuilds with hw on.
+		this.hwAccelBroken = false;
+		this.ffmpegSpawnBroken = false;
+		this.ffmpegSpawnFailCount = 0;
+		this.settings.delete('hwAccelBroken');
+		this.settings.delete('hwAccelBrokenSince');
+		this.settings.delete('hwAccelBrokenReason');
+		actions.push('Cleared broken-state flags (hwAccelBroken, spawn-broken, fail counters)');
+
+		// Step 4: probe.
+		const encoderName = this.encoderForHwAccel(configuredHwAccel);
+		actions.push(`Probing ${encoderName} with a 0.1s null-source transcode…`);
+		const result = await this.probeEncoder(encoderName);
+
+		if (result.ok) {
+			actions.push(`  ✓ Probe succeeded — ${configuredHwAccel} is operational`);
+			this.logger.log(`Hardware encoder recycle succeeded: ${configuredHwAccel} probe OK`);
+			this.events.emit(WsEvent.SERVER_STATUS, {
+				type: 'encoder-degraded',
+				encoderDegraded: false,
+			});
+			return {
+				ok: true,
+				message: `Hardware encoder (${configuredHwAccel}) recycled successfully and is operational.`,
+				actions,
+			};
+		}
+
+		actions.push(`  ✗ Probe failed: ${result.stderr.split('\n').pop() ?? 'unknown'}`);
+		this.logger.warn(
+			`Hardware encoder recycle: probe still failing for ${configuredHwAccel}: ${result.stderr}`,
+		);
+		// Re-flip the broken flag with the probe's actual reason so the
+		// banner reflects the post-recycle state.
+		this.setHwAccelBroken(
+			`Probe still failing after recycle: ${result.stderr.split('\n').pop()?.trim() ?? result.stderr}`,
+			configuredHwAccel,
+		);
+		return {
+			ok: false,
+			message: `Hardware encoder (${configuredHwAccel}) probe still failing after recycle.`,
+			actions,
+			probeStderr: result.stderr,
+		};
 	}
 
 	/**

@@ -71,6 +71,7 @@ function ServerInfoSection() {
 	const [info, setInfo] = useState<any>(null);
 	const [loading, setLoading] = useState(true);
 	const [restarting, setRestarting] = useState(false);
+	const [recycling, setRecycling] = useState(false);
 	const [showRestartConfirm, setShowRestartConfirm] = useState(false);
 
 	const loadInfo = useCallback(async () => {
@@ -99,6 +100,32 @@ function ServerInfoSection() {
 			setRestarting(false);
 		}
 	}, []);
+
+	const handleRecycle = useCallback(async () => {
+		setRecycling(true);
+		notifySuccess('Recycling hardware encoder…');
+		try {
+			const res = await api.post<{
+				ok: boolean;
+				message: string;
+				actions: string[];
+				probeStderr?: string;
+			}>('/admin/server/encoder/recycle');
+			if (res.ok) {
+				notifySuccess(res.message || 'Hardware encoder recycled successfully');
+			} else {
+				const detail = res.probeStderr
+					? `${res.message} — ${res.probeStderr.split('\n').pop()?.trim() ?? ''}`
+					: res.message || 'Hardware encoder recycle failed';
+				notifyError(detail);
+			}
+			await loadInfo();
+		} catch (err: any) {
+			notifyError(err?.message || 'Failed to recycle hardware encoder');
+		} finally {
+			setRecycling(false);
+		}
+	}, [loadInfo]);
 
 	if (loading) return <Spinner size="sm" />;
 	if (!info) return <div class={styles.emptyText}>Unable to load server info</div>;
@@ -176,6 +203,35 @@ function ServerInfoSection() {
 				<span class={styles.infoValue}>
 					{info.hwAccel}
 					{info.hwAccelBroken ? ' (broken — using software)' : ''}
+					{info.hwAccelBroken && (
+						<button
+							class={styles.recycleBtn}
+							onClick={handleRecycle}
+							title={recycling ? 'Recycling…' : 'Recycle hardware encoder'}
+							disabled={recycling}
+						>
+							{recycling ? (
+								<span class={styles.jobRetrySpinner} />
+							) : (
+								<svg
+									width="14"
+									height="14"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<polyline points="23 4 23 10 17 10" />
+									<polyline points="1 20 1 14 7 14" />
+									<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+									<path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+								</svg>
+							)}
+							<span class={styles.recycleBtnLabel}>Recycle</span>
+						</button>
+					)}
 				</span>
 			</div>
 			<div class={styles.infoRow}>
