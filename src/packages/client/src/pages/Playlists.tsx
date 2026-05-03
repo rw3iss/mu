@@ -9,6 +9,7 @@ import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
 import type { Playlist, PlaylistMovieSummary } from '@/services/playlists.service';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { invalidatePlaylists } from '@/state/playlists.state';
 import styles from './Playlists.module.scss';
 
 type PlaylistSortBy = 'updated' | 'created' | 'name' | 'movieCount' | 'lastPlayed';
@@ -238,6 +239,7 @@ export function Playlists(_props: PlaylistsProps) {
 					name: newName.trim(),
 					description: newDescription.trim(),
 				});
+				invalidatePlaylists();
 				notifySuccess('Playlist created');
 				setShowCreate(false);
 				setNewName('');

@@ -65,3 +65,12 @@ export function notifyWarning(message: string, duration?: number): string {
 export function notifyInfo(message: string, duration?: number): string {
 	return addNotification('info', message, duration);
 }
+
+// ============================================
+// Per-feature gates (read from localStorage; written from Settings page)
+// ============================================
+
+/** Whether playlist-membership change toasts are enabled. Default on. */
+export function shouldNotifyPlaylist(): boolean {
+	return localStorage.getItem('mu_notify_playlist') !== 'false';
+}

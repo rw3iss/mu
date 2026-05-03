@@ -1,9 +1,18 @@
-import { useCallback, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { moviesService } from '@/services/movies.service';
+import type { MoviePlaylistInfo, Playlist } from '@/services/playlists.service';
 import type { Movie } from '@/state/library.state';
-import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { notifyError, notifySuccess, shouldNotifyPlaylist } from '@/state/notifications.state';
+import {
+	addMovieToPlaylist,
+	ensurePlaylistsLoaded,
+	getCachedMembership,
+	getMembership,
+	playlists as playlistsSignal,
+	removeMovieFromPlaylist,
+} from '@/state/playlists.state';
 import { DeleteMovieModal } from './DeleteMovieModal';
 import styles from './MovieOptionsMenu.module.scss';
 import { useMenuOpen } from './useMenuOpen';
@@ -37,6 +46,23 @@ export function MovieOptionsMenu({
 	const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 	const [showClearMetaConfirm, setShowClearMetaConfirm] = useState(false);
 	const [showDeleteModal, setShowDeleteModal] = useState(false);
+	const [playlistsExpanded, setPlaylistsExpanded] = useState(false);
+	const [playlistsListing, setPlaylistsListing] = useState<Playlist[]>([]);
+	const [playlistsMembership, setPlaylistsMembership] = useState<MoviePlaylistInfo[]>(
+		() => getCachedMembership(movie.id) ?? [],
+	);
+	const [playlistsLoading, setPlaylistsLoading] = useState(false);
+	const [pendingPlaylistId, setPendingPlaylistId] = useState<string | null>(null);
+
+	// Subscribe to the cached playlists signal so the menu reflects
+	// updates from elsewhere (e.g. detail-page MoviePlaylists, CRUD page).
+	useEffect(() => {
+		setPlaylistsListing(playlistsSignal.value ?? []);
+		const unsub = playlistsSignal.subscribe((v) => {
+			setPlaylistsListing(v ?? []);
+		});
+		return unsub;
+	}, []);
 
 	const refreshMovie = useCallback(async () => {
 		try {
@@ -171,6 +197,63 @@ export function MovieOptionsMenu({
 		[open, setOpen],
 	);
 
+	// ── "Add to playlist" submenu ──────────────────────────────────────
+
+	const togglePlaylists = useCallback(
+		async (e: Event) => {
+			e.stopPropagation();
+			const next = !playlistsExpanded;
+			setPlaylistsExpanded(next);
+			if (!next) return;
+
+			setPlaylistsLoading(true);
+			try {
+				const [list, member] = await Promise.all([
+					ensurePlaylistsLoaded(),
+					getMembership(movie.id),
+				]);
+				setPlaylistsListing(list);
+				setPlaylistsMembership(member);
+			} catch {
+				notifyError('Failed to load playlists');
+			} finally {
+				setPlaylistsLoading(false);
+			}
+		},
+		[movie.id, playlistsExpanded],
+	);
+
+	const handleTogglePlaylistMembership = useCallback(
+		async (e: Event, playlist: Playlist) => {
+			e.stopPropagation();
+			if (pendingPlaylistId) return;
+
+			const isMember = playlistsMembership.some((m) => m.id === playlist.id);
+			setPendingPlaylistId(playlist.id);
+			try {
+				if (isMember) {
+					await removeMovieFromPlaylist(playlist.id, movie.id);
+					setPlaylistsMembership((prev) => prev.filter((m) => m.id !== playlist.id));
+					if (shouldNotifyPlaylist()) notifySuccess(`Removed from ${playlist.name}`);
+				} else {
+					await addMovieToPlaylist(playlist.id, movie.id);
+					setPlaylistsMembership((prev) => [
+						...prev,
+						{ id: playlist.id, name: playlist.name },
+					]);
+					if (shouldNotifyPlaylist()) notifySuccess(`Added to ${playlist.name}`);
+				}
+			} catch {
+				notifyError(
+					isMember ? 'Failed to remove from playlist' : 'Failed to add to playlist',
+				);
+			} finally {
+				setPendingPlaylistId(null);
+			}
+		},
+		[movie.id, pendingPlaylistId, playlistsMembership],
+	);
+
 	// Helper for the two async-feedback actions (rescan + refresh
 	// metadata). Their display label cycles through three values
 	// driven by the AsyncActionState; the ✓ glyph stands in for the
@@ -238,6 +321,57 @@ export function MovieOptionsMenu({
 						<span class={styles.menuIcon}>{'✕'}</span>
 						Clear Metadata
 					</button>
+					<div class={styles.menuDivider} />
+					<button
+						class={`${styles.menuItem} ${styles.submenuTrigger}`}
+						onClick={togglePlaylists}
+						aria-expanded={playlistsExpanded}
+					>
+						<span class={styles.menuIcon}>{'☰'}</span>
+						<span class={styles.submenuLabel}>Add to playlist</span>
+						<span
+							class={`${styles.submenuChevron} ${playlistsExpanded ? styles.submenuChevronOpen : ''}`}
+							aria-hidden="true"
+						>
+							{'›'}
+						</span>
+					</button>
+					{playlistsExpanded && (
+						<div class={styles.submenu}>
+							{playlistsLoading && playlistsListing.length === 0 ? (
+								<div class={styles.submenuEmpty}>Loading…</div>
+							) : playlistsListing.length === 0 ? (
+								<div class={styles.submenuEmpty}>No playlists yet</div>
+							) : (
+								playlistsListing.map((p) => {
+									const isMember = playlistsMembership.some((m) => m.id === p.id);
+									const pending = pendingPlaylistId === p.id;
+									return (
+										<button
+											key={p.id}
+											class={`${styles.menuItem} ${styles.submenuItem}`}
+											onClick={(e: Event) =>
+												handleTogglePlaylistMembership(e, p)
+											}
+											disabled={pending}
+											title={
+												isMember
+													? `Remove from ${p.name}`
+													: `Add to ${p.name}`
+											}
+										>
+											<span
+												class={`${styles.menuIcon} ${styles.submenuCheck}`}
+											>
+												{pending ? '…' : isMember ? '✓' : ''}
+											</span>
+											<span class={styles.submenuLabel}>{p.name}</span>
+										</button>
+									);
+								})
+							)}
+						</div>
+					)}
 					<div class={styles.menuDivider} />
 					<button class={styles.menuItem} onClick={handleHideToggle}>
 						<span class={styles.menuIcon}>{movie.hidden ? '👁' : '🚫'}</span>

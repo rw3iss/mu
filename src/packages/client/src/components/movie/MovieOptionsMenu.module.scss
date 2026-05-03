@@ -117,6 +117,56 @@
 	margin: 4px 0;
 }
 
+.submenuTrigger {
+	justify-content: flex-start;
+}
+
+.submenuLabel {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.submenuChevron {
+	margin-left: auto;
+	font-size: 14px;
+	line-height: 1;
+	color: var(--color-text-muted);
+	transition: transform 120ms ease;
+}
+
+.submenuChevronOpen {
+	transform: rotate(90deg);
+}
+
+.submenu {
+	max-height: 240px;
+	overflow-y: auto;
+	border-top: 1px solid var(--color-border);
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-bg-elevated);
+	animation: menuFadeIn 120ms ease;
+}
+
+.submenuItem {
+	padding-left: 20px;
+	font-size: var(--font-size-sm);
+}
+
+.submenuCheck {
+	color: var(--color-accent);
+	font-weight: 600;
+}
+
+.submenuEmpty {
+	padding: 8px 14px;
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+	font-style: italic;
+}
+
 // (Inline confirmRow / confirmYes / confirmNo styles removed —
 // destructive confirms now use the shared <ConfirmDialog>.)
 

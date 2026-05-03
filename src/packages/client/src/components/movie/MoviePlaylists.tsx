@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import type { MoviePlaylistInfo, Playlist } from '@/services/playlists.service';
-import { playlistsService } from '@/services/playlists.service';
-import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { notifyError, notifySuccess, shouldNotifyPlaylist } from '@/state/notifications.state';
+import {
+	addMovieToPlaylist,
+	ensurePlaylistsLoaded,
+	getMembership,
+	playlists as playlistsSignal,
+	removeMovieFromPlaylist,
+} from '@/state/playlists.state';
 import styles from './MoviePlaylists.module.scss';
-
-function shouldNotifyPlaylist(): boolean {
-	const stored = localStorage.getItem('mu_notify_playlist');
-	return stored !== 'false';
-}
 
 interface MoviePlaylistsProps {
 	movieId: string;
@@ -36,8 +37,8 @@ export function MoviePlaylists({
 			setIsLoading(true);
 			try {
 				const [all, member] = await Promise.all([
-					playlistsService.list(),
-					playlistsService.getByMovie(movieId),
+					ensurePlaylistsLoaded(),
+					getMembership(movieId),
 				]);
 				if (!cancelled) {
 					setAllPlaylists(all);
@@ -51,8 +52,15 @@ export function MoviePlaylists({
 		}
 
 		load();
+
+		// Mirror cache updates from elsewhere (options menu, CRUD page).
+		const unsub = playlistsSignal.subscribe((v) => {
+			if (!cancelled && v) setAllPlaylists(v);
+		});
+
 		return () => {
 			cancelled = true;
+			unsub();
 		};
 	}, [movieId]);
 
@@ -69,9 +77,9 @@ export function MoviePlaylists({
 		if (!playlistId) return;
 
 		select.value = '';
+		const playlist = allPlaylists.find((p) => p.id === playlistId);
 		try {
-			await playlistsService.addMovie(playlistId, movieId, remoteInfo);
-			const playlist = allPlaylists.find((p) => p.id === playlistId);
+			await addMovieToPlaylist(playlistId, movieId, remoteInfo);
 			if (playlist) {
 				setMemberPlaylists((prev) => [...prev, { id: playlist.id, name: playlist.name }]);
 			}
@@ -83,7 +91,7 @@ export function MoviePlaylists({
 
 	const handleRemove = async (playlistId: string, playlistName: string) => {
 		try {
-			await playlistsService.removeMovie(playlistId, movieId);
+			await removeMovieFromPlaylist(playlistId, movieId);
 			setMemberPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
 			if (shouldNotifyPlaylist()) notifySuccess(`Removed from ${playlistName}`);
 		} catch {
@@ -141,7 +149,7 @@ export function MoviePlaylists({
 								}}
 								aria-label={`Remove from ${p.name}`}
 							>
-								{'\u2715'}
+								{'✕'}
 							</button>
 						</a>
 					))}

@@ -7,6 +7,7 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { invalidatePlaylists } from '@/state/playlists.state';
 import styles from './PlaylistDetail.module.scss';
 
 // ============================================
@@ -91,6 +92,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 					name: editName.trim(),
 					description: editDescription.trim(),
 				});
+				invalidatePlaylists();
 				setShowEdit(false);
 				notifySuccess('Playlist updated');
 			} catch {
@@ -107,6 +109,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 
 		try {
 			await api.delete(`/playlists/${playlist.id}`);
+			invalidatePlaylists();
 			notifySuccess('Playlist deleted');
 			route('/playlists');
 		} catch {
@@ -125,6 +128,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 					...playlist,
 					movies: playlist.movies.filter((m) => m.movieId !== movieId),
 				});
+				invalidatePlaylists();
 				notifySuccess('Movie removed from playlist');
 			} catch {
 				notifyError('Failed to remove movie');
