@@ -46,23 +46,44 @@ export class ServerController {
 			);
 		}
 
-		// Spawn restart script as detached process, then exit
+		// On Windows with NSSM, prefer `nssm restart mu-server` so the
+		// service supervisor stays in charge of the lifecycle. Spawning
+		// restart.sh here would launch a second `nohup node` process that
+		// NSSM doesn't track — the previous tracked instance and the new
+		// nohup'd one then run side-by-side, both watching the media
+		// source, racing each other on inserts. nssm restart cleanly
+		// kills the tracked PID and starts a fresh one.
 		const scriptDir = path.resolve(import.meta.dirname, '..', '..', '..', '..');
 		const restartScript = path.join(scriptDir, 'restart.sh');
+		const isWindows = process.platform === 'win32';
+		const useNssm = isWindows && this.serverService.isNssmManaged();
 
 		setTimeout(() => {
 			try {
-				const child = spawn('bash', [restartScript], {
-					detached: true,
-					stdio: 'ignore',
-					cwd: scriptDir,
-				});
-				child.unref();
+				if (useNssm) {
+					// Detached so this process can exit cleanly while NSSM
+					// brings up the new instance.
+					const child = spawn('nssm', ['restart', 'mu-server'], {
+						detached: true,
+						stdio: 'ignore',
+						windowsHide: true,
+					});
+					child.unref();
+				} else {
+					const child = spawn('bash', [restartScript], {
+						detached: true,
+						stdio: 'ignore',
+						cwd: scriptDir,
+					});
+					child.unref();
+				}
 			} catch (err: any) {
-				this.logger.error(`Failed to spawn restart script: ${err.message}`);
+				this.logger.error(`Failed to spawn restart command: ${err.message}`);
 			}
 
-			// Give the script a moment to start, then exit this process
+			// Give the supervisor a moment to start the new instance,
+			// then exit this process so NSSM's "stop" sees us go cleanly
+			// (and doesn't escalate to taskkill).
 			setTimeout(() => process.exit(0), 500);
 		}, 1000);
 

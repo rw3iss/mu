@@ -19,6 +19,22 @@ export class ServerService {
 		private readonly transcoder: TranscoderService,
 	) {}
 
+	/**
+	 * Whether this server is being supervised by NSSM.
+	 * Used by the in-app Restart endpoint so it can call `nssm restart`
+	 * instead of spawning a parallel `nohup node` instance that NSSM
+	 * doesn't track.
+	 */
+	isNssmManaged(): boolean {
+		if (process.platform !== 'win32') return false;
+		try {
+			execSync('nssm status mu-server', { stdio: 'ignore', timeout: 2000 });
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
 	async getServerInfo() {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const hwAccelBroken = this.settings.get<boolean>('hwAccelBroken', false);
