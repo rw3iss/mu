@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -413,6 +413,18 @@ function StatsSection() {
 // Jobs Section
 // ============================================
 
+/** Canonical job types known at design-time. Any type seen on the wire that
+ *  isn't in this list still shows up in the filter dropdown automatically. */
+const KNOWN_JOB_TYPES = [
+	'scan',
+	'scan-all',
+	'metadata',
+	'thumbnail',
+	'sprite-sheet',
+	'pre-transcode',
+	'cleanup',
+] as const;
+
 function JobsSection() {
 	const [tab, setTab] = useState<'current' | 'history'>('current');
 	const [currentJobs, setCurrentJobs] = useState<any[]>([]);
@@ -424,7 +436,23 @@ function JobsSection() {
 	const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
 	const [clearingHistory, setClearingHistory] = useState(false);
 	const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
+	/** Types the user has explicitly deselected. Defaults empty = all on. */
+	const [disabledTypes, setDisabledTypes] = useState<Set<string>>(new Set());
+	const [filterOpen, setFilterOpen] = useState(false);
+	const filterRef = useRef<HTMLDivElement>(null);
 	const lastSelectedRef = useRef<string | null>(null);
+
+	// Outside-click closes the type-filter dropdown
+	useEffect(() => {
+		if (!filterOpen) return;
+		const onMouseDown = (e: MouseEvent) => {
+			if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+				setFilterOpen(false);
+			}
+		};
+		document.addEventListener('mousedown', onMouseDown);
+		return () => document.removeEventListener('mousedown', onMouseDown);
+	}, [filterOpen]);
 
 	useEffect(() => {
 		const load = async () => {
@@ -560,17 +588,41 @@ function JobsSection() {
 		cancelled: '#6b7280',
 	};
 
+	// Union of all job types we know about: hard-coded canonical list plus
+	// anything we've seen come back from the server. Sorted alphabetically
+	// for stable ordering in the dropdown.
+	const allTypes = useMemo(() => {
+		const types = new Set<string>(KNOWN_JOB_TYPES);
+		for (const j of currentJobs) if (j.type) types.add(j.type);
+		for (const j of historyJobs) if (j.type) types.add(j.type);
+		return [...types].sort();
+	}, [currentJobs, historyJobs]);
+
+	const allDeselected = disabledTypes.size > 0 && allTypes.every((t) => disabledTypes.has(t));
+	const noneDeselected = disabledTypes.size === 0;
+
+	const toggleType = useCallback((type: string) => {
+		setDisabledTypes((prev) => {
+			const next = new Set(prev);
+			if (next.has(type)) next.delete(type);
+			else next.add(type);
+			return next;
+		});
+	}, []);
+
 	// Filter jobs
 	const jobs = tab === 'current' ? currentJobs : historyJobs;
 	const q = searchQuery.toLowerCase().trim();
-	const filtered = q
-		? jobs.filter(
-				(job) =>
-					(job.label || '').toLowerCase().includes(q) ||
+	const byType = (job: any) => !disabledTypes.has(job.type);
+	const filtered = jobs
+		.filter(byType)
+		.filter((job) =>
+			!q
+				? true
+				: (job.label || '').toLowerCase().includes(q) ||
 					(job.type || '').toLowerCase().includes(q) ||
 					(job.payload?.filePath || '').toLowerCase().includes(q),
-			)
-		: jobs;
+		);
 
 	return (
 		<div class={styles.jobsContainer}>
@@ -591,47 +643,112 @@ function JobsSection() {
 							History
 						</button>
 					</div>
-					{tab === 'current' && selected.size > 0 && (
-						<div class={styles.bulkActions}>
-							<span class={styles.bulkCount}>{selected.size} selected</span>
-							<Button
-								variant="secondary"
-								size="sm"
-								onClick={() => handleBulkAction('prioritize')}
-								loading={cancellingBulk}
+					<div class={styles.toolbarRight}>
+						{tab === 'current' && selected.size > 0 && (
+							<div class={styles.bulkActions}>
+								<span class={styles.bulkCount}>{selected.size} selected</span>
+								<Button
+									variant="secondary"
+									size="sm"
+									onClick={() => handleBulkAction('prioritize')}
+									loading={cancellingBulk}
+								>
+									Prioritize
+								</Button>
+								<Button
+									variant="secondary"
+									size="sm"
+									onClick={() => handleBulkAction('pause')}
+									loading={cancellingBulk}
+								>
+									Pause
+								</Button>
+								<Button
+									variant="danger"
+									size="sm"
+									onClick={() => handleBulkAction('cancel')}
+									loading={cancellingBulk}
+								>
+									Cancel
+								</Button>
+							</div>
+						)}
+						{tab === 'history' && historyJobs.length > 0 && (
+							<div class={styles.bulkActions}>
+								<Button
+									variant="danger"
+									size="sm"
+									onClick={() => setShowClearHistoryConfirm(true)}
+									loading={clearingHistory}
+								>
+									Delete All
+								</Button>
+							</div>
+						)}
+						<div class={styles.typeFilter} ref={filterRef}>
+							<button
+								class={`${styles.typeFilterTrigger} ${
+									disabledTypes.size > 0 ? styles.typeFilterActive : ''
+								}`}
+								onClick={() => setFilterOpen((o) => !o)}
+								aria-haspopup="menu"
+								aria-expanded={filterOpen}
+								title="Filter by job type"
 							>
-								Prioritize
-							</Button>
-							<Button
-								variant="secondary"
-								size="sm"
-								onClick={() => handleBulkAction('pause')}
-								loading={cancellingBulk}
-							>
-								Pause
-							</Button>
-							<Button
-								variant="danger"
-								size="sm"
-								onClick={() => handleBulkAction('cancel')}
-								loading={cancellingBulk}
-							>
-								Cancel
-							</Button>
+								<svg
+									width="14"
+									height="14"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+								</svg>
+								<span>Types</span>
+								{disabledTypes.size > 0 && (
+									<span class={styles.typeFilterBadge}>
+										{allTypes.length - disabledTypes.size}/{allTypes.length}
+									</span>
+								)}
+								<span class={styles.typeFilterChevron} aria-hidden="true">
+									{'▾'}
+								</span>
+							</button>
+							{filterOpen && (
+								<div class={styles.typeFilterMenu} role="menu">
+									<button
+										class={styles.typeFilterAction}
+										onClick={() => setDisabledTypes(new Set())}
+										disabled={noneDeselected}
+									>
+										Select all
+									</button>
+									<button
+										class={styles.typeFilterAction}
+										onClick={() => setDisabledTypes(new Set(allTypes))}
+										disabled={allDeselected}
+									>
+										Deselect all
+									</button>
+									<div class={styles.typeFilterDivider} />
+									{allTypes.map((type) => {
+										const checked = !disabledTypes.has(type);
+										return (
+											<label key={type} class={styles.typeFilterItem}>
+												<input
+													type="checkbox"
+													checked={checked}
+													onChange={() => toggleType(type)}
+												/>
+												<span>{type}</span>
+											</label>
+										);
+									})}
+								</div>
+							)}
 						</div>
-					)}
-					{tab === 'history' && historyJobs.length > 0 && (
-						<div class={styles.bulkActions}>
-							<Button
-								variant="danger"
-								size="sm"
-								onClick={() => setShowClearHistoryConfirm(true)}
-								loading={clearingHistory}
-							>
-								Delete All
-							</Button>
-						</div>
-					)}
+					</div>
 				</div>
 				<div class={styles.jobsSearchRow}>
 					<div class={styles.jobsSearchWrap}>

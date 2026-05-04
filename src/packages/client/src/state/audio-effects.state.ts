@@ -54,9 +54,9 @@ export const spectrumEnabled = signal(false);
 export const autoEqOpen = signal(false);
 export const autoEqSampleSeconds = signal(2);
 // Factor multiplier applied to each band's correction. 1.0 = full
-// flatten, 0.5 = half-strength (default — full strength tends to
+// flatten, 0.3 = mild correction (default — full strength tends to
 // over-correct on dense source material), 0.1 = barely audible nudge.
-export const autoEqFactor = signal(0.5);
+export const autoEqFactor = signal(0.3);
 export const autoEqRunning = signal(false);
 
 // ============================================
@@ -72,10 +72,10 @@ export const compressorVisualizerEnabled = signal(false);
 // at the midpoint of peak/RMS, ratio scaled by crest factor, makeup
 // gain to compensate for the average loss). The factor multiplier
 // blends from "no compression" (neutral) to the computed values, so
-// 0.5 is a half-strength version of the auto-derived settings.
+// 0.8 is close to the full derived settings but slightly gentler.
 export const autoCompOpen = signal(false);
 export const autoCompSampleSeconds = signal(2);
-export const autoCompFactor = signal(0.5);
+export const autoCompFactor = signal(0.8);
 export const autoCompRunning = signal(false);
 
 // ============================================

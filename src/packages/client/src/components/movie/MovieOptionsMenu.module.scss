@@ -134,24 +134,39 @@
 	font-size: 14px;
 	line-height: 1;
 	color: var(--color-text-muted);
-	transition: transform 120ms ease;
 }
 
-.submenuChevronOpen {
-	transform: rotate(90deg);
+// Anchor sits in the parent menu's flow; flyout is positioned absolutely
+// to its right or left depending on space (right by default).
+.flyoutAnchor {
+	position: relative;
 }
 
-.submenu {
-	max-height: 240px;
-	overflow-y: auto;
-	border-top: 1px solid var(--color-border);
-	border-bottom: 1px solid var(--color-border);
-	background: var(--color-bg-elevated);
+// Outer flyout wrapper carries 10px invisible padding around the visible
+// inner panel so the mouse can traverse from the parent menu without
+// losing hover. Top and right are offset by the same 10px so the visible
+// inner panel still lines up flush against the parent menu's left edge.
+.flyoutWrapper {
+	position: absolute;
+	top: -10px;
+	right: calc(100% - 10px);
+	padding: 10px;
+	z-index: calc(var(--z-dropdown, 100) + 1);
 	animation: menuFadeIn 120ms ease;
 }
 
-.submenuItem {
-	padding-left: 20px;
+.flyoutInner {
+	min-width: 200px;
+	max-height: 280px;
+	overflow-y: auto;
+	background: var(--color-bg-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	padding: 4px 0;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.flyoutItem {
 	font-size: var(--font-size-sm);
 }
 
