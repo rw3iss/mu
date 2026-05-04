@@ -78,6 +78,14 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		// Resume after HTTP is fully listening so the site is immediately accessible.
 		// Long delay to let the HTTP server be fully accessible before heavy disk I/O.
 		setTimeout(() => this.resumeIncompleteTranscodes(), 60000);
+
+		// Sweep orphan movies (rows with no available file) created by past
+		// scanner/watcher races. Cheap query — runs once shortly after boot.
+		setTimeout(() => {
+			this.scanner.purgeOrphanedMovies().catch((err) => {
+				this.logger.warn(`Startup orphan purge failed: ${err.message}`);
+			});
+		}, 10000);
 	}
 
 	// ===========================================================

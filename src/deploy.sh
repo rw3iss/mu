@@ -51,14 +51,19 @@ if $IS_WINDOWS && command -v nssm &>/dev/null && nssm status mu-server &>/dev/nu
     # zombie in Session 0, and keep enqueueing jobs that fail because
     # its DLL state has degraded over time. Kill ALL node.exe in the
     # Services session (Session 0) so only the fresh `nssm start` survives.
-    # tasklist /FI "SESSION eq 0" filters to background-services session.
-    node_pids=$(tasklist /FI "IMAGENAME eq node.exe" /FI "SESSION eq 0" /NH 2>/dev/null \
-                | awk 'NF { print $2 }' || true)
+    #
+    # IMPORTANT: do NOT pass `/FI` flags to tasklist from Git Bash.
+    # MSYS rewrites any argv starting with `/` into a Windows path
+    # (`/FI` → `C:/Program Files/Git/FI`) and tasklist errors out
+    # silently — leaving zombies alive. Filter in awk instead.
+    node_pids=$(tasklist 2>/dev/null \
+                | awk '/^node\.exe/ && $3 == "Services" && $4 == "0" { print $2 }' \
+                | grep -E '^[0-9]+$' || true)
     if [ -n "$node_pids" ]; then
         for pid in $node_pids; do
             taskkill //F //PID "$pid" 2>/dev/null || true
         done
-        echo "Killed orphaned Session-0 node.exe processes"
+        echo "Killed orphaned Session-0 node.exe processes: $(echo $node_pids | tr '\n' ' ')"
     fi
 else
     source "$SRC_DIR/stop.sh" 2>/dev/null || true

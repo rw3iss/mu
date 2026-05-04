@@ -1,5 +1,5 @@
 import { basename, extname } from 'node:path';
-import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
+import { SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
 import {
 	forwardRef,
 	Inject,
@@ -138,61 +138,30 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 		const fileName = basename(filePath);
 		this.logger.log(`New file detected: ${fileName}`);
 
-		const existing = this.database.db
-			.select()
-			.from(movieFiles)
-			.where(eq(movieFiles.filePath, filePath))
-			.get();
+		// Delegate to the scanner's importFile helper so the watcher and
+		// the scanner apply the same rules (min file size, probe, atomic
+		// movies+movieFiles insert) to every file. See ScannerService.importFile.
+		const result = await this.scanner.importFile(sourceId, filePath);
 
-		if (existing) {
-			if (!existing.available) {
-				this.database.db
-					.update(movieFiles)
-					.set({ available: true })
-					.where(eq(movieFiles.id, existing.id))
-					.run();
-			}
-			return;
+		switch (result.status) {
+			case 'skipped-size':
+				this.logger.log(`Skipped (under min file size): ${fileName}`);
+				break;
+			case 'updated':
+				// Existing row touched — nothing else to do.
+				break;
+			case 'added':
+				this.logger.log(`Added movie from watcher: ${result.title}`);
+				break;
+			case 'race-skipped':
+				this.logger.warn(
+					`Skipped — another process already imported ${fileName} (duplicate server instance?)`,
+				);
+				break;
+			case 'error':
+				this.logger.error(`Failed to import ${fileName}: ${result.reason}`);
+				break;
 		}
-
-		// Trigger a scan for the source to properly add the file
-		const { stat: statFn } = await import('node:fs/promises');
-		const fileStat = await statFn(filePath);
-		const parsed = this.scanner.parseFilename(fileName);
-		const now = nowISO();
-
-		const { movies: moviesTable } = await import('../database/schema/index.js');
-		const movieId = crypto.randomUUID();
-
-		this.database.db
-			.insert(moviesTable)
-			.values({
-				id: movieId,
-				title: parsed.title,
-				year: parsed.year ?? null,
-				addedAt: now,
-				updatedAt: now,
-			})
-			.run();
-
-		this.database.db
-			.insert(movieFiles)
-			.values({
-				id: crypto.randomUUID(),
-				movieId,
-				sourceId,
-				filePath,
-				fileName,
-				fileSize: fileStat.size,
-				resolution: parsed.quality ?? null,
-				available: true,
-				addedAt: now,
-				fileModifiedAt: fileStat.mtime.toISOString(),
-			})
-			.run();
-
-		this.events.emit(WsEvent.LIBRARY_MOVIE_ADDED, { movieId, title: parsed.title });
-		this.logger.log(`Added movie from watcher: ${parsed.title}`);
 	}
 
 	private async handleFileRemoved(filePath: string) {

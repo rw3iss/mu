@@ -19,6 +19,13 @@ interface ParsedFilename {
 	quality?: string;
 }
 
+export type ImportFileResult =
+	| { status: 'skipped-size' }
+	| { status: 'updated' }
+	| { status: 'added'; movieId: string; title: string }
+	| { status: 'race-skipped' }
+	| { status: 'error'; reason: string };
+
 interface ProbeResult {
 	codecVideo?: string;
 	codecAudio?: string;
@@ -111,110 +118,14 @@ export class ScannerService {
 				foundPaths.add(filePath);
 
 				try {
-					const fileStat = await stat(filePath);
-					const fileName = basename(filePath);
-					const fileModifiedAt = fileStat.mtime.toISOString();
-					const fileSize = fileStat.size;
-
-					// Skip junk/promo files under the configured minimum size
-					const lib = this.settings.get<Record<string, unknown>>('library', {}) as any;
-					const minSizeMB = lib?.minFileSizeMB ?? 50;
-					if (minSizeMB > 0 && fileSize < minSizeMB * 1024 * 1024) {
-						continue;
-					}
-
-					const existing = this.database.db
-						.select()
-						.from(movieFiles)
-						.where(eq(movieFiles.filePath, filePath))
-						.get();
-
-					if (existing) {
-						if (
-							existing.fileModifiedAt !== fileModifiedAt ||
-							existing.fileSize !== fileSize
-						) {
-							this.database.db
-								.update(movieFiles)
-								.set({ fileSize, fileModifiedAt, available: true })
-								.where(eq(movieFiles.id, existing.id))
-								.run();
-							filesUpdated++;
-						} else if (!existing.available) {
-							this.database.db
-								.update(movieFiles)
-								.set({ available: true })
-								.where(eq(movieFiles.id, existing.id))
-								.run();
-						}
-					} else {
-						const parsed = this.parseFilename(fileName);
-						const movieId = crypto.randomUUID();
-						const movieNow = nowISO();
-
-						this.database.db
-							.insert(movies)
-							.values({
-								id: movieId,
-								title: parsed.title,
-								year: parsed.year ?? null,
-								addedAt: movieNow,
-								updatedAt: movieNow,
-							})
-							.run();
-
-						// Probe the file for codec/duration info
-						const probeInfo = await this.probeFile(filePath);
-
-						this.database.db
-							.insert(movieFiles)
-							.values({
-								id: crypto.randomUUID(),
-								movieId,
-								sourceId,
-								filePath,
-								fileName,
-								fileSize,
-								resolution: parsed.quality ?? probeInfo.resolution ?? null,
-								codecVideo: probeInfo.codecVideo ?? null,
-								codecAudio: probeInfo.codecAudio ?? null,
-								durationSeconds: probeInfo.durationSeconds ?? null,
-								bitrate: probeInfo.bitrate ?? null,
-								videoWidth: probeInfo.videoWidth ?? null,
-								videoHeight: probeInfo.videoHeight ?? null,
-								videoBitDepth: probeInfo.videoBitDepth ?? null,
-								videoFrameRate: probeInfo.videoFrameRate ?? null,
-								videoProfile: probeInfo.videoProfile ?? null,
-								videoColorSpace: probeInfo.videoColorSpace ?? null,
-								hdr: probeInfo.hdr ?? false,
-								containerFormat: probeInfo.containerFormat ?? null,
-								audioTracks: probeInfo.audioTracks
-									? JSON.stringify(probeInfo.audioTracks)
-									: '[]',
-								subtitleTracks: probeInfo.subtitleTracks
-									? JSON.stringify(probeInfo.subtitleTracks)
-									: '[]',
-								available: true,
-								addedAt: movieNow,
-								fileModifiedAt,
-							})
-							.run();
-
-						// Populate runtimeMinutes from probe duration
-						if (probeInfo.durationSeconds && probeInfo.durationSeconds > 0) {
-							this.database.db
-								.update(movies)
-								.set({ runtimeMinutes: Math.round(probeInfo.durationSeconds / 60) })
-								.where(eq(movies.id, movieId))
-								.run();
-						}
-
+					const result = await this.importFile(sourceId, filePath);
+					if (result.status === 'updated') {
+						filesUpdated++;
+					} else if (result.status === 'added') {
 						filesAdded++;
-						newMovieIds.push(movieId);
-						this.events.emit(WsEvent.LIBRARY_MOVIE_ADDED, {
-							movieId,
-							title: parsed.title,
-						});
+						newMovieIds.push(result.movieId);
+					} else if (result.status === 'error') {
+						errors.push(`Error processing ${filePath}: ${result.reason}`);
 					}
 				} catch (err: any) {
 					errors.push(`Error processing ${filePath}: ${err.message}`);
@@ -245,27 +156,7 @@ export class ScannerService {
 			}
 
 			// Clean up movies with no remaining available files
-			let moviesRemoved = 0;
-			const orphanedMovies = this.database.db
-				.select({ id: movies.id, title: movies.title })
-				.from(movies)
-				.leftJoin(
-					movieFiles,
-					and(eq(movieFiles.movieId, movies.id), eq(movieFiles.available, true)),
-				)
-				.where(isNull(movieFiles.id))
-				.all();
-
-			for (const orphan of orphanedMovies) {
-				await this.moviesService.purgeMovie(orphan.id);
-				moviesRemoved++;
-			}
-
-			if (moviesRemoved > 0) {
-				this.logger.log(
-					`Purged ${moviesRemoved} orphaned movie(s) with no available files`,
-				);
-			}
+			await this.purgeOrphanedMovies();
 
 			// Update source stats
 			this.database.db
@@ -333,6 +224,165 @@ export class ScannerService {
 		}
 
 		return { logId, filesFound, filesAdded, filesUpdated, filesRemoved };
+	}
+
+	/**
+	 * Import a single file into the library. Single source of truth for
+	 * scanner.scanSource and watcher.handleFileAdded — both must use this so
+	 * the min-file-size filter, probe step, and movies+movieFiles atomic
+	 * insert behave identically.
+	 *
+	 * Returns:
+	 *   - 'skipped-size'  — file is below the user's minFileSizeMB threshold
+	 *   - 'updated'       — existing movieFile row touched (size/mtime/available)
+	 *   - 'added'         — new movie + movieFile created
+	 *   - 'race-skipped'  — another process won the unique-filePath insert
+	 *   - 'error'         — unexpected failure, see reason
+	 *
+	 * On 'race-skipped' or any rollback, no movies-row orphan is left behind:
+	 * both inserts run inside a SQLite transaction, so a UNIQUE-constraint
+	 * failure on movie_files.file_path rolls back the movies-row insert too.
+	 */
+	async importFile(sourceId: string, filePath: string): Promise<ImportFileResult> {
+		const fileStat = await stat(filePath);
+		const fileName = basename(filePath);
+		const fileModifiedAt = fileStat.mtime.toISOString();
+		const fileSize = fileStat.size;
+
+		// 1. Skip junk/promo files under the configured minimum size.
+		const lib = this.settings.get<Record<string, unknown>>('library', {}) as any;
+		const minSizeMB = lib?.minFileSizeMB ?? 50;
+		if (minSizeMB > 0 && fileSize < minSizeMB * 1024 * 1024) {
+			return { status: 'skipped-size' };
+		}
+
+		// 2. If we already have a row for this exact path, just touch it.
+		const existing = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.filePath, filePath))
+			.get();
+
+		if (existing) {
+			if (existing.fileModifiedAt !== fileModifiedAt || existing.fileSize !== fileSize) {
+				this.database.db
+					.update(movieFiles)
+					.set({ fileSize, fileModifiedAt, available: true })
+					.where(eq(movieFiles.id, existing.id))
+					.run();
+			} else if (!existing.available) {
+				this.database.db
+					.update(movieFiles)
+					.set({ available: true })
+					.where(eq(movieFiles.id, existing.id))
+					.run();
+			}
+			return { status: 'updated' };
+		}
+
+		// 3. New file. Probe before opening the transaction so the FFprobe
+		//    work doesn't hold a write lock.
+		const parsed = this.parseFilename(fileName);
+		const probeInfo = await this.probeFile(filePath);
+		const movieId = crypto.randomUUID();
+		const movieNow = nowISO();
+
+		// 4. Insert movies + movieFiles atomically. If another process raced
+		//    us and won the UNIQUE(file_path) insert, the transaction throws
+		//    and BOTH inserts roll back — no orphan movies row.
+		try {
+			this.database.db.transaction((tx) => {
+				tx.insert(movies)
+					.values({
+						id: movieId,
+						title: parsed.title,
+						year: parsed.year ?? null,
+						runtimeMinutes:
+							probeInfo.durationSeconds && probeInfo.durationSeconds > 0
+								? Math.round(probeInfo.durationSeconds / 60)
+								: null,
+						addedAt: movieNow,
+						updatedAt: movieNow,
+					})
+					.run();
+
+				tx.insert(movieFiles)
+					.values({
+						id: crypto.randomUUID(),
+						movieId,
+						sourceId,
+						filePath,
+						fileName,
+						fileSize,
+						resolution: parsed.quality ?? probeInfo.resolution ?? null,
+						codecVideo: probeInfo.codecVideo ?? null,
+						codecAudio: probeInfo.codecAudio ?? null,
+						durationSeconds: probeInfo.durationSeconds ?? null,
+						bitrate: probeInfo.bitrate ?? null,
+						videoWidth: probeInfo.videoWidth ?? null,
+						videoHeight: probeInfo.videoHeight ?? null,
+						videoBitDepth: probeInfo.videoBitDepth ?? null,
+						videoFrameRate: probeInfo.videoFrameRate ?? null,
+						videoProfile: probeInfo.videoProfile ?? null,
+						videoColorSpace: probeInfo.videoColorSpace ?? null,
+						hdr: probeInfo.hdr ?? false,
+						containerFormat: probeInfo.containerFormat ?? null,
+						audioTracks: probeInfo.audioTracks
+							? JSON.stringify(probeInfo.audioTracks)
+							: '[]',
+						subtitleTracks: probeInfo.subtitleTracks
+							? JSON.stringify(probeInfo.subtitleTracks)
+							: '[]',
+						available: true,
+						addedAt: movieNow,
+						fileModifiedAt,
+					})
+					.run();
+			});
+		} catch (err: any) {
+			// UNIQUE constraint failure means another worker (this process or
+			// a duplicate server instance — see CLAUDE.md "multi-process") got
+			// to it first. Treat as a benign race; the winner's row is canonical.
+			const msg = String(err?.message ?? err);
+			if (msg.includes('UNIQUE constraint failed')) {
+				return { status: 'race-skipped' };
+			}
+			return { status: 'error', reason: msg };
+		}
+
+		this.events.emit(WsEvent.LIBRARY_MOVIE_ADDED, {
+			movieId,
+			title: parsed.title,
+		});
+		return { status: 'added', movieId, title: parsed.title };
+	}
+
+	/**
+	 * Delete every movies row that no longer has at least one available
+	 * file attached. Runs at the end of every scan AND on server startup
+	 * (see LibraryJobsService) to mop up orphans created by past races.
+	 */
+	async purgeOrphanedMovies(): Promise<number> {
+		const orphanedMovies = this.database.db
+			.select({ id: movies.id, title: movies.title })
+			.from(movies)
+			.leftJoin(
+				movieFiles,
+				and(eq(movieFiles.movieId, movies.id), eq(movieFiles.available, true)),
+			)
+			.where(isNull(movieFiles.id))
+			.all();
+
+		for (const orphan of orphanedMovies) {
+			await this.moviesService.purgeMovie(orphan.id);
+		}
+
+		if (orphanedMovies.length > 0) {
+			this.logger.log(
+				`Purged ${orphanedMovies.length} orphaned movie(s) with no available files`,
+			);
+		}
+		return orphanedMovies.length;
 	}
 
 	parseFilename(filename: string): ParsedFilename {
