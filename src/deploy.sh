@@ -37,34 +37,13 @@ echo "Platform: $($IS_WINDOWS && echo 'Windows' || echo 'Unix')"
 # ── 1. Stop server FIRST (before pull/build) ──
 echo "--- stopping server ---"
 if $IS_WINDOWS && command -v nssm &>/dev/null && nssm status mu-server &>/dev/null; then
+    # Tell NSSM to stop. The broader Session-0 node.exe orphan sweep
+    # runs AFTER `git pull` (see step 5) so that fixes to the kill
+    # logic apply on the same deploy that introduces them — bash caches
+    # the running script in memory and won't pick up pulled changes
+    # from this file mid-execution, but `bash scripts/kill-orphans.sh`
+    # is a fresh process that always reads the latest version.
     nssm stop mu-server 2>/dev/null || true
-    # Kill orphaned FFmpeg processes that NSSM doesn't clean up
-    ffmpeg_pids=$(tasklist 2>/dev/null | grep -i "ffmpeg" | awk '{print $2}' || true)
-    if [ -n "$ffmpeg_pids" ]; then
-        for pid in $ffmpeg_pids; do
-            taskkill //F //PID "$pid" 2>/dev/null || true
-        done
-        echo "Killed orphaned FFmpeg processes"
-    fi
-    # NSSM stop sometimes spawns a new node.exe before killing the old
-    # one — the previous server PID can survive the restart, end up as a
-    # zombie in Session 0, and keep enqueueing jobs that fail because
-    # its DLL state has degraded over time. Kill ALL node.exe in the
-    # Services session (Session 0) so only the fresh `nssm start` survives.
-    #
-    # IMPORTANT: do NOT pass `/FI` flags to tasklist from Git Bash.
-    # MSYS rewrites any argv starting with `/` into a Windows path
-    # (`/FI` → `C:/Program Files/Git/FI`) and tasklist errors out
-    # silently — leaving zombies alive. Filter in awk instead.
-    node_pids=$(tasklist 2>/dev/null \
-                | awk '/^node\.exe/ && $3 == "Services" && $4 == "0" { print $2 }' \
-                | grep -E '^[0-9]+$' || true)
-    if [ -n "$node_pids" ]; then
-        for pid in $node_pids; do
-            taskkill //F //PID "$pid" 2>/dev/null || true
-        done
-        echo "Killed orphaned Session-0 node.exe processes: $(echo $node_pids | tr '\n' ' ')"
-    fi
 else
     source "$SRC_DIR/stop.sh" 2>/dev/null || true
 fi
@@ -111,7 +90,14 @@ echo "--- database migrations ---"
 cd "$SRC_DIR"
 node scripts/migrate.js 2>/dev/null || echo "Migration script skipped"
 
-# ── 5. Start server ──
+# ── 5. Kill orphan FFmpeg / Session-0 node.exe ──
+# This runs as a fresh `bash` invocation so the just-pulled version of
+# kill-orphans.sh executes (the running deploy.sh is cached in memory
+# from before `git pull`).
+echo "--- killing orphans ---"
+bash "$SRC_DIR/scripts/kill-orphans.sh" || true
+
+# ── 6. Start server ──
 echo "--- starting server ---"
 if $IS_WINDOWS && command -v nssm &>/dev/null && nssm status mu-server &>/dev/null; then
     nssm start mu-server 2>/dev/null || true
