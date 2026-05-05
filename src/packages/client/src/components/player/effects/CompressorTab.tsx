@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { audioEngine } from '@/audio/audio-engine';
+import { audioEngine, type CompressorBand, type CompressorSettings } from '@/audio/audio-engine';
 import { ToggleButton } from '@/components/common/ToggleButton';
 import { useAnimationFrame } from '@/hooks/useAnimationFrame';
 import {
@@ -10,13 +10,22 @@ import {
 	compressorEnabled,
 	compressorSettings,
 	compressorVisualizerEnabled,
+	multiBandEnabled,
+	multiBandSettings,
 	resetCompressor,
+	resetMultiBand,
 	runAutoComp,
+	runAutoMultiBandComp,
+	selectedBand,
 	setAutoCompFactor,
 	setAutoCompSampleSeconds,
+	setBandCrossover,
+	setSelectedBand,
 	toggleAutoCompControls,
 	toggleCompressor,
 	toggleCompressorVisualizer,
+	toggleMultiBand,
+	updateBandCompressorParam,
 	updateCompressorParam,
 } from '@/state/audio-effects.state';
 import {
@@ -46,9 +55,53 @@ const COMP_PARAMS = [
 	},
 ];
 
+const BAND_TABS: { id: CompressorBand; label: string }[] = [
+	{ id: 'low', label: 'Low' },
+	{ id: 'mid', label: 'Mid' },
+	{ id: 'high', label: 'High' },
+];
+
+interface CompParamSlidersProps {
+	settings: CompressorSettings;
+	onChange: <K extends keyof CompressorSettings>(key: K, value: CompressorSettings[K]) => void;
+}
+function CompParamSliders({ settings, onChange }: CompParamSlidersProps) {
+	return (
+		<div class={styles.compParamsInner}>
+			{COMP_PARAMS.map((param) => (
+				<div class={styles.compParam} key={param.key}>
+					<div class={styles.compParamHeader}>
+						<span class={styles.compParamLabel}>{param.label}</span>
+						<span class={styles.compParamValue}>
+							{param.key === 'attack' || param.key === 'release'
+								? settings[param.key].toFixed(3)
+								: settings[param.key].toFixed(1)}
+							{param.unit}
+						</span>
+					</div>
+					<input
+						type="range"
+						class={styles.compSlider}
+						min={param.min}
+						max={param.max}
+						step={param.step}
+						value={settings[param.key]}
+						onInput={(e) =>
+							onChange(param.key, parseFloat((e.target as HTMLInputElement).value))
+						}
+					/>
+				</div>
+			))}
+		</div>
+	);
+}
+
 export function CompressorTab() {
 	const enabled = compressorEnabled.value;
+	const isMulti = multiBandEnabled.value;
 	const settings = compressorSettings.value;
+	const mb = multiBandSettings.value;
+	const band = selectedBand.value;
 	const activeId = activeCompProfileId.value;
 	const visualizerOn = compressorVisualizerEnabled.value;
 	const autoOpen = autoCompOpen.value;
@@ -58,11 +111,28 @@ export function CompressorTab() {
 	const [reduction, setReduction] = useState(0);
 
 	useAnimationFrame(() => {
-		setReduction(audioEngine.getCompressorReduction());
+		if (isMulti) {
+			setReduction(audioEngine.getBandReduction(band));
+		} else {
+			setReduction(audioEngine.getCompressorReduction());
+		}
 	}, enabled);
 	useEffect(() => {
 		if (!enabled) setReduction(0);
 	}, [enabled]);
+
+	const activeBandSettings = isMulti ? mb[band] : settings;
+
+	const onParamChange = <K extends keyof CompressorSettings>(
+		key: K,
+		value: CompressorSettings[K],
+	) => {
+		if (isMulti) {
+			updateBandCompressorParam(band, key, value);
+		} else {
+			updateCompressorParam(key, value);
+		}
+	};
 
 	return (
 		<div>
@@ -75,6 +145,23 @@ export function CompressorTab() {
 				/>
 			</div>
 
+			<div class={styles.toggleRow}>
+				<span class={styles.toggleLabel}>
+					Multi-band
+					<span
+						class={styles.autoHelp}
+						title="Splits the signal into Low / Mid / High bands and runs an independent compressor on each. Lets you tame harsh upper-mids without dulling bass, or tighten the low end without squashing dialogue. Slightly higher CPU; off by default."
+					>
+						?
+					</span>
+				</span>
+				<button
+					class={`${styles.toggle} ${isMulti ? styles.on : ''}`}
+					onClick={toggleMultiBand}
+					aria-label="Toggle Multi-band"
+				/>
+			</div>
+
 			<ProfileControls
 				type="compressor"
 				activeId={activeId}
@@ -84,43 +171,80 @@ export function CompressorTab() {
 			/>
 
 			<CollapsibleSettings settingKey="effects_comp_settings_open">
-				<div class={styles.compParamsWrap}>
-					{visualizerOn && <CompressorCurve />}
-					<div class={styles.compParamsInner}>
-						{COMP_PARAMS.map((param) => (
-							<div class={styles.compParam} key={param.key}>
+				{isMulti && (
+					<>
+						<div class={styles.bandTabs}>
+							{BAND_TABS.map((bt) => (
+								<button
+									key={bt.id}
+									type="button"
+									class={`${styles.bandTab} ${band === bt.id ? styles.bandTabActive : ''}`}
+									onClick={() => setSelectedBand(bt.id)}
+								>
+									{bt.label}
+								</button>
+							))}
+						</div>
+
+						<div class={styles.crossoverRow}>
+							<div class={styles.compParam}>
 								<div class={styles.compParamHeader}>
-									<span class={styles.compParamLabel}>{param.label}</span>
+									<span class={styles.compParamLabel}>Low/Mid Crossover</span>
 									<span class={styles.compParamValue}>
-										{param.key === 'attack' || param.key === 'release'
-											? settings[param.key].toFixed(3)
-											: settings[param.key].toFixed(1)}
-										{param.unit}
+										{Math.round(mb.lowCrossover)} Hz
 									</span>
 								</div>
 								<input
 									type="range"
 									class={styles.compSlider}
-									min={param.min}
-									max={param.max}
-									step={param.step}
-									value={settings[param.key]}
+									min={60}
+									max={1500}
+									step={10}
+									value={mb.lowCrossover}
 									onInput={(e) =>
-										updateCompressorParam(
-											param.key,
+										setBandCrossover(
+											'low',
 											parseFloat((e.target as HTMLInputElement).value),
 										)
 									}
 								/>
 							</div>
-						))}
-					</div>
+							<div class={styles.compParam}>
+								<div class={styles.compParamHeader}>
+									<span class={styles.compParamLabel}>Mid/High Crossover</span>
+									<span class={styles.compParamValue}>
+										{Math.round(mb.highCrossover)} Hz
+									</span>
+								</div>
+								<input
+									type="range"
+									class={styles.compSlider}
+									min={1500}
+									max={12000}
+									step={100}
+									value={mb.highCrossover}
+									onInput={(e) =>
+										setBandCrossover(
+											'high',
+											parseFloat((e.target as HTMLInputElement).value),
+										)
+									}
+								/>
+							</div>
+						</div>
+					</>
+				)}
+
+				<div class={styles.compParamsWrap}>
+					{visualizerOn && <CompressorCurve />}
+					<CompParamSliders settings={activeBandSettings} onChange={onParamChange} />
 				</div>
 
 				{enabled && (
 					<div class={styles.reductionMeter}>
 						<div class={styles.reductionLabel}>
-							Gain Reduction: {reduction.toFixed(1)} dB
+							{isMulti ? `Gain Reduction (${band}):` : 'Gain Reduction:'}{' '}
+							{reduction.toFixed(1)} dB
 						</div>
 						<div class={styles.reductionBar}>
 							<div
@@ -133,35 +257,39 @@ export function CompressorTab() {
 					</div>
 				)}
 
-				<div class={styles.compParam}>
-					<div class={styles.compParamHeader}>
-						<span class={styles.compParamLabel}>Mix</span>
-						<span class={styles.compParamValue}>
-							{Math.round((settings.mix ?? 1) * 100)}%
-						</span>
+				{!isMulti && (
+					<div class={styles.compParam}>
+						<div class={styles.compParamHeader}>
+							<span class={styles.compParamLabel}>Mix</span>
+							<span class={styles.compParamValue}>
+								{Math.round((settings.mix ?? 1) * 100)}%
+							</span>
+						</div>
+						<div class={styles.mixBar}>
+							<span class={styles.mixLabel}>Dry</span>
+							<input
+								type="range"
+								class={styles.compSlider}
+								min={0}
+								max={1}
+								step={0.01}
+								value={settings.mix ?? 1}
+								onInput={(e) =>
+									updateCompressorParam(
+										'mix',
+										parseFloat((e.target as HTMLInputElement).value),
+									)
+								}
+							/>
+							<span class={styles.mixLabel}>Wet</span>
+						</div>
 					</div>
-					<div class={styles.mixBar}>
-						<span class={styles.mixLabel}>Dry</span>
-						<input
-							type="range"
-							class={styles.compSlider}
-							min={0}
-							max={1}
-							step={0.01}
-							value={settings.mix ?? 1}
-							onInput={(e) =>
-								updateCompressorParam(
-									'mix',
-									parseFloat((e.target as HTMLInputElement).value),
-								)
-							}
-						/>
-						<span class={styles.mixLabel}>Wet</span>
-					</div>
-				</div>
+				)}
 
 				<div class={styles.eqActions}>
-					<ToggleButton onClick={resetCompressor}>Reset Compressor</ToggleButton>
+					<ToggleButton onClick={isMulti ? resetMultiBand : resetCompressor}>
+						Reset Compressor
+					</ToggleButton>
 					<ToggleButton pressed={visualizerOn} onClick={toggleCompressorVisualizer}>
 						Visualize
 					</ToggleButton>
@@ -205,7 +333,7 @@ export function CompressorTab() {
 								<span class={styles.autoValue}>{autoFactor.toFixed(1)}</span>
 								<span
 									class={styles.autoHelp}
-									title="Strength of the derived compression. 1.0 applies the full computed threshold/ratio/makeup; 0.5 blends halfway between no compression and the computed values; 0.1 is a barely-audible nudge. Default 0.5 — full strength can squash dynamics on already-loud sources."
+									title="Strength of the derived compression. 1.0 applies the full computed threshold/ratio/makeup; 0.5 blends halfway between no compression and the computed values; 0.1 is a barely-audible nudge."
 								>
 									?
 								</span>
@@ -232,13 +360,16 @@ export function CompressorTab() {
 								type="button"
 								class={styles.autoRunBtn}
 								onClick={() => {
-									runAutoComp();
+									if (isMulti) runAutoMultiBandComp();
+									else runAutoComp();
 								}}
 								disabled={autoRunning}
 								title={
 									autoRunning
 										? 'Sampling…'
-										: `Sample for ${autoSeconds}s and apply derived compressor settings at ${autoFactor.toFixed(1)}× strength`
+										: isMulti
+											? `Sample for ${autoSeconds}s and apply per-band derived settings at ${autoFactor.toFixed(1)}× strength`
+											: `Sample for ${autoSeconds}s and apply derived compressor settings at ${autoFactor.toFixed(1)}× strength`
 								}
 								aria-label="Run auto-Compressor sampler"
 							>

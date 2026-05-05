@@ -1,10 +1,13 @@
 import { batch, signal } from '@preact/signals';
 import {
 	audioEngine,
+	type CompressorBand,
 	type CompressorSettings,
 	DEFAULT_COMPRESSOR,
 	DEFAULT_EQ_BANDS,
+	DEFAULT_MULTIBAND,
 	type EqBand,
+	type MultiBandCompressorSettings,
 } from '@/audio/audio-engine';
 import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
 import {
@@ -35,7 +38,7 @@ import {
 // ============================================
 
 export const showEffectsPanel = signal(false);
-export const effectsTab = signal<'eq' | 'compressor' | 'video'>('eq');
+export const effectsTab = signal<'eq' | 'compressor' | 'enhance' | 'video'>('eq');
 
 // ============================================
 // EQ
@@ -67,6 +70,20 @@ export const compressorEnabled = signal(false);
 export const compressorSettings = signal<CompressorSettings>({ ...DEFAULT_COMPRESSOR });
 export const compressorVisualizerEnabled = signal(false);
 
+// Multi-band: when enabled, the compressor stage uses three bands
+// (low/mid/high) with their own compressors and crossover frequencies.
+// `selectedBand` is the UI focus only — the engine processes all bands
+// in parallel regardless.
+export const multiBandEnabled = signal(false);
+export const multiBandSettings = signal<MultiBandCompressorSettings>({
+	low: { ...DEFAULT_MULTIBAND.low },
+	mid: { ...DEFAULT_MULTIBAND.mid },
+	high: { ...DEFAULT_MULTIBAND.high },
+	lowCrossover: DEFAULT_MULTIBAND.lowCrossover,
+	highCrossover: DEFAULT_MULTIBAND.highCrossover,
+});
+export const selectedBand = signal<CompressorBand>('mid');
+
 // Auto-Compressor — sample the live signal for N seconds, measure peak
 // and RMS levels, then derive sensible compressor settings (threshold
 // at the midpoint of peak/RMS, ratio scaled by crest factor, makeup
@@ -95,13 +112,52 @@ export function initAudioEffects(): void {
 	const savedSpectrum = getUiSetting('audio_spectrum_enabled', false);
 	const savedCompVisualizer = getUiSetting('audio_compressor_visualizer', false);
 
+	// Enhancements
+	const savedStereoWidthEnabled = getUiSetting('audio_stereo_width_enabled', false);
+	const savedStereoWidthAmount = getUiSetting('audio_stereo_width_amount', 1.5);
+	const savedBassEnhanceEnabled = getUiSetting('audio_bass_enhance_enabled', false);
+	const savedBassEnhanceAmount = getUiSetting('audio_bass_enhance_amount', 0.4);
+	const savedHrtfEnabled = getUiSetting('audio_hrtf_enabled', false);
+	const savedHrtfAmount = getUiSetting('audio_hrtf_amount', 0.6);
+
+	// Multi-band compressor
+	const savedMultiBandEnabled = getUiSetting('audio_multiband_enabled', false);
+	const savedMultiBandSettings = getUiSetting<MultiBandCompressorSettings | null>(
+		'audio_multiband_settings',
+		null,
+	);
+	const savedSelectedBand = getUiSetting<CompressorBand>('audio_multiband_selected_band', 'mid');
+
 	// Apply to engine first
 	if (savedBands) audioEngine.setBands(savedBands);
 	if (savedCompSettings) audioEngine.setCompressorSettings(savedCompSettings);
 	audioEngine.setEqEnabled(savedEq);
 	audioEngine.setCompressorEnabled(savedComp);
 	audioEngine.setInputGain(savedInputGain);
-	if ((savedSpectrum || savedCompVisualizer) && !savedEq && !savedComp) {
+	audioEngine.setStereoWidthAmount(savedStereoWidthAmount);
+	audioEngine.setBassEnhanceAmount(savedBassEnhanceAmount);
+	audioEngine.setHrtfAmount(savedHrtfAmount);
+	audioEngine.setStereoWidthEnabled(savedStereoWidthEnabled);
+	audioEngine.setBassEnhanceEnabled(savedBassEnhanceEnabled);
+	audioEngine.setHrtfEnabled(savedHrtfEnabled);
+	if (savedMultiBandSettings) {
+		audioEngine.setBandCrossovers(
+			savedMultiBandSettings.lowCrossover,
+			savedMultiBandSettings.highCrossover,
+		);
+		audioEngine.setBandCompressorSettings('low', savedMultiBandSettings.low);
+		audioEngine.setBandCompressorSettings('mid', savedMultiBandSettings.mid);
+		audioEngine.setBandCompressorSettings('high', savedMultiBandSettings.high);
+	}
+	audioEngine.setMultiBandEnabled(savedMultiBandEnabled);
+	if (
+		(savedSpectrum || savedCompVisualizer) &&
+		!savedEq &&
+		!savedComp &&
+		!savedStereoWidthEnabled &&
+		!savedBassEnhanceEnabled &&
+		!savedHrtfEnabled
+	) {
 		// Visualizers need the audio graph attached even if no effect is on
 		// (the analyser node lives in the graph).
 		audioEngine.attach();
@@ -125,6 +181,15 @@ export function initAudioEffects(): void {
 		spectrumEnabled.value = savedSpectrum;
 		compressorEnabled.value = savedComp;
 		compressorVisualizerEnabled.value = savedCompVisualizer;
+		stereoWidthEnabled.value = savedStereoWidthEnabled;
+		stereoWidthAmount.value = savedStereoWidthAmount;
+		bassEnhanceEnabled.value = savedBassEnhanceEnabled;
+		bassEnhanceAmount.value = savedBassEnhanceAmount;
+		hrtfSurroundEnabled.value = savedHrtfEnabled;
+		hrtfSurroundAmount.value = savedHrtfAmount;
+		multiBandEnabled.value = savedMultiBandEnabled;
+		if (savedMultiBandSettings) multiBandSettings.value = savedMultiBandSettings;
+		selectedBand.value = savedSelectedBand;
 		if (savedBands) eqBands.value = savedBands;
 		if (savedCompSettings) compressorSettings.value = savedCompSettings;
 		videoEnabled.value = savedVideoEnabled;
@@ -151,8 +216,58 @@ export function closeEffectsPanel(): void {
 	showEffectsPanel.value = false;
 }
 
-export function setEffectsTab(tab: 'eq' | 'compressor' | 'video'): void {
+export function setEffectsTab(tab: 'eq' | 'compressor' | 'enhance' | 'video'): void {
 	effectsTab.value = tab;
+}
+
+// ============================================
+// Enhancements (stereo widening, bass enhance, HRTF surround)
+// ============================================
+
+export const stereoWidthEnabled = signal(false);
+export const stereoWidthAmount = signal(1.5);
+export const bassEnhanceEnabled = signal(false);
+export const bassEnhanceAmount = signal(0.4);
+export const hrtfSurroundEnabled = signal(false);
+export const hrtfSurroundAmount = signal(0.6);
+
+export function toggleStereoWidth(): void {
+	const next = !stereoWidthEnabled.value;
+	stereoWidthEnabled.value = next;
+	audioEngine.setStereoWidthEnabled(next);
+	setUiSetting('audio_stereo_width_enabled', next);
+}
+export function setStereoWidthAmount(amount: number): void {
+	const clamped = Math.max(0, Math.min(2, amount));
+	stereoWidthAmount.value = clamped;
+	audioEngine.setStereoWidthAmount(clamped);
+	setUiSetting('audio_stereo_width_amount', clamped);
+}
+
+export function toggleBassEnhance(): void {
+	const next = !bassEnhanceEnabled.value;
+	bassEnhanceEnabled.value = next;
+	audioEngine.setBassEnhanceEnabled(next);
+	setUiSetting('audio_bass_enhance_enabled', next);
+}
+export function setBassEnhanceAmount(amount: number): void {
+	const clamped = Math.max(0, Math.min(1, amount));
+	bassEnhanceAmount.value = clamped;
+	audioEngine.setBassEnhanceAmount(clamped);
+	setUiSetting('audio_bass_enhance_amount', clamped);
+}
+
+export function toggleHrtfSurround(): void {
+	const next = !hrtfSurroundEnabled.value;
+	hrtfSurroundEnabled.value = next;
+	audioEngine.setHrtfEnabled(next);
+	setUiSetting('audio_hrtf_enabled', next);
+}
+export function setHrtfSurroundAmount(amount: number): void {
+	const clamped = Math.max(0, Math.min(1, amount));
+	hrtfSurroundAmount.value = clamped;
+	audioEngine.setHrtfAmount(clamped);
+	setUiSetting('audio_hrtf_amount', clamped);
 }
 
 // ============================================
@@ -370,6 +485,188 @@ export function resetCompressor(): void {
 	audioEngine.setCompressorSettings(freshSettings);
 	compressorSettings.value = freshSettings;
 	setUiSetting('audio_compressor_settings', freshSettings);
+}
+
+// ============================================
+// Multi-band compressor actions
+// ============================================
+
+export function toggleMultiBand(): void {
+	const next = !multiBandEnabled.value;
+	multiBandEnabled.value = next;
+	audioEngine.setMultiBandEnabled(next);
+	setUiSetting('audio_multiband_enabled', next);
+}
+
+export function setSelectedBand(band: CompressorBand): void {
+	selectedBand.value = band;
+	setUiSetting('audio_multiband_selected_band', band);
+}
+
+export function updateBandCompressorParam<K extends keyof CompressorSettings>(
+	band: CompressorBand,
+	key: K,
+	value: CompressorSettings[K],
+): void {
+	const current = multiBandSettings.value;
+	const updatedBand = { ...current[band], [key]: value };
+	const next: MultiBandCompressorSettings = { ...current, [band]: updatedBand };
+	multiBandSettings.value = next;
+	audioEngine.setBandCompressorSettings(band, updatedBand);
+	setUiSetting('audio_multiband_settings', next);
+}
+
+export function setBandCrossover(which: 'low' | 'high', freq: number): void {
+	const current = multiBandSettings.value;
+	const next: MultiBandCompressorSettings = {
+		...current,
+		[which === 'low' ? 'lowCrossover' : 'highCrossover']: freq,
+	};
+	// Engine clamps + keeps low<high, so re-read after applying.
+	audioEngine.setBandCrossovers(next.lowCrossover, next.highCrossover);
+	const applied = audioEngine.getBandCrossovers();
+	const synced: MultiBandCompressorSettings = {
+		...next,
+		lowCrossover: applied.low,
+		highCrossover: applied.high,
+	};
+	multiBandSettings.value = synced;
+	setUiSetting('audio_multiband_settings', synced);
+}
+
+export function resetMultiBand(): void {
+	const fresh: MultiBandCompressorSettings = {
+		low: { ...DEFAULT_MULTIBAND.low },
+		mid: { ...DEFAULT_MULTIBAND.mid },
+		high: { ...DEFAULT_MULTIBAND.high },
+		lowCrossover: DEFAULT_MULTIBAND.lowCrossover,
+		highCrossover: DEFAULT_MULTIBAND.highCrossover,
+	};
+	multiBandSettings.value = fresh;
+	audioEngine.setBandCrossovers(fresh.lowCrossover, fresh.highCrossover);
+	audioEngine.setBandCompressorSettings('low', fresh.low);
+	audioEngine.setBandCompressorSettings('mid', fresh.mid);
+	audioEngine.setBandCompressorSettings('high', fresh.high);
+	setUiSetting('audio_multiband_settings', fresh);
+}
+
+/**
+ * Multi-band variant of runAutoComp. Samples the live signal for the
+ * configured duration, integrates time-domain energy within each
+ * band's frequency range from the FFT analyser, derives ideal
+ * threshold/ratio/makeup per-band, and applies factor-blended
+ * settings to all three bands at once.
+ */
+export async function runAutoMultiBandComp(): Promise<void> {
+	if (autoCompRunning.value) return;
+	autoCompRunning.value = true;
+	try {
+		const seconds = autoCompSampleSeconds.value;
+		const factor = autoCompFactor.value;
+		const settings = multiBandSettings.value;
+
+		audioEngine.attach();
+		await new Promise<void>((r) => setTimeout(r, 50));
+
+		const fftSize = audioEngine.getFftSize() || 8192;
+		const sampleRate = audioEngine.getSampleRate();
+		const binCount = fftSize / 2;
+		const binHz = sampleRate / fftSize;
+		const buf = new Uint8Array(binCount);
+
+		// FFT bin ranges for each band based on the configured crossovers.
+		const lo = settings.lowCrossover;
+		const hi = settings.highCrossover;
+		const ranges: Record<CompressorBand, { lo: number; hi: number }> = {
+			low: { lo: 0, hi: Math.min(binCount - 1, Math.round(lo / binHz)) },
+			mid: {
+				lo: Math.min(binCount - 1, Math.round(lo / binHz)),
+				hi: Math.min(binCount - 1, Math.round(hi / binHz)),
+			},
+			high: {
+				lo: Math.min(binCount - 1, Math.round(hi / binHz)),
+				hi: binCount - 1,
+			},
+		};
+
+		const sums: Record<CompressorBand, number> = { low: 0, mid: 0, high: 0 };
+		const peaks: Record<CompressorBand, number> = { low: 0, mid: 0, high: 0 };
+		let frames = 0;
+		await new Promise<void>((resolve) => {
+			const endTime = performance.now() + seconds * 1000;
+			const tick = () => {
+				if (performance.now() >= endTime) {
+					resolve();
+					return;
+				}
+				if (audioEngine.getFrequencyData(buf)) {
+					for (const band of ['low', 'mid', 'high'] as CompressorBand[]) {
+						const r = ranges[band];
+						let sum = 0;
+						let peak = 0;
+						for (let b = r.lo; b <= r.hi; b++) {
+							const v = buf[b]!;
+							sum += v;
+							if (v > peak) peak = v;
+						}
+						sums[band] += sum / Math.max(1, r.hi - r.lo + 1);
+						if (peak > peaks[band]) peaks[band] = peak;
+					}
+					frames++;
+				}
+				requestAnimationFrame(tick);
+			};
+			requestAnimationFrame(tick);
+		});
+
+		if (frames === 0) return;
+
+		const FLOOR_DB = -60;
+		const next: MultiBandCompressorSettings = {
+			...settings,
+		};
+		for (const band of ['low', 'mid', 'high'] as CompressorBand[]) {
+			// Convert byte (0..255) to approximate dBFS using the analyser's
+			// default scale: 0 → -100 dB, 255 → -30 dB.
+			const avgByte = sums[band] / frames;
+			const peakByte = peaks[band];
+			const rmsDb = Math.max(FLOOR_DB, (avgByte / 255) * 70 - 100);
+			const peakDb = Math.max(FLOOR_DB, (peakByte / 255) * 70 - 100);
+			const crest = peakDb - rmsDb;
+
+			const idealThreshold = (peakDb + rmsDb) / 2;
+			const idealRatio = crest < 6 ? 2 : crest < 10 ? 4 : crest < 15 ? 6 : 8;
+			const idealMakeup = Math.max(0, (peakDb - idealThreshold) * (1 - 1 / idealRatio));
+
+			const newThreshold = factor * idealThreshold;
+			const newRatio = 1 + factor * (idealRatio - 1);
+			const newMakeup = factor * idealMakeup;
+
+			const bandSettings: CompressorSettings = {
+				...settings[band],
+				threshold: Math.max(-100, Math.min(0, Math.round(newThreshold))),
+				knee: 30,
+				ratio: Math.max(1, Math.min(20, Math.round(newRatio * 2) / 2)),
+				attack: 0.005,
+				release: 0.2,
+				makeupGain: Math.max(0, Math.min(24, Math.round(newMakeup * 2) / 2)),
+				mix: settings[band].mix ?? 1,
+			};
+			next[band] = bandSettings;
+			audioEngine.setBandCompressorSettings(band, bandSettings);
+		}
+		multiBandSettings.value = next;
+		setUiSetting('audio_multiband_settings', next);
+
+		// Make sure the compressor stage is on so the user hears the result.
+		if (!compressorEnabled.value) {
+			compressorEnabled.value = true;
+			audioEngine.setCompressorEnabled(true);
+			setUiSetting('audio_compressor_enabled', true);
+		}
+	} finally {
+		autoCompRunning.value = false;
+	}
 }
 
 // ============================================

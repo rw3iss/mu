@@ -363,6 +363,68 @@
   margin-bottom: 10px;
 }
 
+.compParamDimmed {
+  opacity: 0.45;
+}
+
+// Multi-band compressor: per-band tabs (Low / Mid / High) + crossovers.
+.bandTabs {
+  display: flex;
+  gap: 4px;
+  margin: 8px 0 6px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+}
+
+.bandTab {
+  flex: 1;
+  padding: 5px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+.bandTabActive {
+  color: #fff;
+  background: var(--color-accent);
+
+  &:hover {
+    background: var(--color-accent);
+    color: #fff;
+  }
+}
+
+.crossoverRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.enhanceRow {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .toggleRow {
+    margin-bottom: 6px;
+  }
+}
+
 .compParamHeader {
   display: flex;
   align-items: center;

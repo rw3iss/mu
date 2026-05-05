@@ -1,10 +1,18 @@
 /**
  * Audio processing engine using Web Audio API.
  *
- * Chain: MediaElementSource → EQ Filters → Compressor → Gain → Destination
+ * Chain when fully active:
+ *   MediaElementSource
+ *     → InputGain
+ *     → EQ filters (10-band)
+ *     → Compressor (single- or multi-band, w/ dry/wet mix)
+ *     → Stereo Width (M/S processing)
+ *     → Bass Enhance (low-shelf + waveshaper saturation)
+ *     → HRTF Surround (Panner-based)
+ *     → Destination
  *
- * When both EQ and compressor are disabled, the source connects directly
- * to the destination (zero-overhead pass-through).
+ * Each stage is independently bypassable; when all are off the source
+ * connects directly to the destination (zero-overhead pass-through).
  */
 
 export interface EqBand {
@@ -48,6 +56,26 @@ export const DEFAULT_COMPRESSOR: CompressorSettings = {
 	mix: 1,
 };
 
+export type CompressorBand = 'low' | 'mid' | 'high';
+
+export interface MultiBandCompressorSettings {
+	low: CompressorSettings;
+	mid: CompressorSettings;
+	high: CompressorSettings;
+	/** Low/mid crossover frequency, in Hz. */
+	lowCrossover: number;
+	/** Mid/high crossover frequency, in Hz. */
+	highCrossover: number;
+}
+
+export const DEFAULT_MULTIBAND: MultiBandCompressorSettings = {
+	low: { ...DEFAULT_COMPRESSOR, threshold: -28, ratio: 4, makeupGain: 2 },
+	mid: { ...DEFAULT_COMPRESSOR, threshold: -22, ratio: 3, makeupGain: 0 },
+	high: { ...DEFAULT_COMPRESSOR, threshold: -22, ratio: 3, makeupGain: 0 },
+	lowCrossover: 250,
+	highCrossover: 4000,
+};
+
 /**
  * Minimum wet-gain when the compressor is enabled. Web Audio (Chrome) will
  * cull processing of upstream nodes whose output feeds only a 0-gain node,
@@ -57,6 +85,20 @@ export const DEFAULT_COMPRESSOR: CompressorSettings = {
  * so the Gain Reduction meter reflects reality at any mix setting.
  */
 const WET_GAIN_FLOOR = 0.0005;
+
+/** Pre-baked saturation curve for the bass enhancer. Soft-clip via tanh —
+ *  preserves the fundamental and adds even/odd harmonics so small speakers
+ *  *perceive* deeper bass without needing the actual low-frequency energy. */
+const BASS_SATURATION_CURVE = (() => {
+	const samples = 1024;
+	const curve = new Float32Array(samples);
+	const drive = 4;
+	for (let i = 0; i < samples; i++) {
+		const x = (i / (samples - 1)) * 2 - 1;
+		curve[i] = Math.tanh(x * drive) / Math.tanh(drive);
+	}
+	return curve;
+})();
 
 export class AudioEngine {
 	private ctx: AudioContext | null = null;
@@ -81,6 +123,70 @@ export class AudioEngine {
 	private attached = false;
 	private deviceChangeListener: (() => void) | null = null;
 	private interactionResumeListener: (() => void) | null = null;
+
+	// ── Stereo widening (M/S processing) ──
+	// width = 1 → no change. < 1 → narrower. > 1 → wider. 0 = mono.
+	//
+	// Implemented as a per-channel weighting matrix:
+	//   L_out = ((1+w)/2) * L + ((1-w)/2) * R
+	//   R_out = ((1-w)/2) * L + ((1+w)/2) * R
+	// (algebraically equivalent to mid/side decode-scale-encode but avoids
+	//  needing extra invert nodes for the right side.)
+	private stereoWidthEnabled = false;
+	private stereoWidthAmount = 1.5;
+	private stereoSplitter: ChannelSplitterNode | null = null;
+	private stereoSameL: GainNode | null = null; // L→L_out  (weight = (1+w)/2)
+	private stereoSameR: GainNode | null = null; // R→R_out  (weight = (1+w)/2)
+	private stereoOppL: GainNode | null = null; // R→L_out  (weight = (1-w)/2)
+	private stereoOppR: GainNode | null = null; // L→R_out  (weight = (1-w)/2)
+	private stereoMerger: ChannelMergerNode | null = null;
+
+	// ── Bass enhancer ──
+	// Splits low frequencies, runs them through soft-clip saturator to add
+	// harmonics that the ear interprets as more bass, mixes back at amount level.
+	private bassEnhanceEnabled = false;
+	private bassEnhanceAmount = 0.4;
+	private bassLowPass: BiquadFilterNode | null = null;
+	private bassShaper: WaveShaperNode | null = null;
+	private bassWetGain: GainNode | null = null;
+	private bassDryPath: GainNode | null = null;
+	private bassMerge: GainNode | null = null;
+
+	// ── HRTF virtual surround (headphones) ──
+	// Splits L/R, positions them as virtual speakers in 3D space using HRTF
+	// panning to give a more spacious "out-of-the-head" impression.
+	private hrtfEnabled = false;
+	private hrtfAmount = 0.6;
+	private hrtfSplitter: ChannelSplitterNode | null = null;
+	private hrtfLeftPanner: PannerNode | null = null;
+	private hrtfRightPanner: PannerNode | null = null;
+	private hrtfDryGain: GainNode | null = null;
+	private hrtfWetGain: GainNode | null = null;
+	private hrtfMerge: GainNode | null = null;
+
+	// ── Multi-band compressor ──
+	// When enabled, replaces the single-compressor stage with a 3-band
+	// split (low/mid/high) using crossover filters; each band has its own
+	// DynamicsCompressorNode + makeup gain, and the three outputs sum back.
+	private multiBandEnabled = false;
+	private multiBandSettings: MultiBandCompressorSettings = {
+		low: { ...DEFAULT_MULTIBAND.low },
+		mid: { ...DEFAULT_MULTIBAND.mid },
+		high: { ...DEFAULT_MULTIBAND.high },
+		lowCrossover: DEFAULT_MULTIBAND.lowCrossover,
+		highCrossover: DEFAULT_MULTIBAND.highCrossover,
+	};
+	private mbLowFilter: BiquadFilterNode | null = null;
+	private mbMidLowFilter: BiquadFilterNode | null = null;
+	private mbMidHighFilter: BiquadFilterNode | null = null;
+	private mbHighFilter: BiquadFilterNode | null = null;
+	private mbLowComp: DynamicsCompressorNode | null = null;
+	private mbMidComp: DynamicsCompressorNode | null = null;
+	private mbHighComp: DynamicsCompressorNode | null = null;
+	private mbLowMakeup: GainNode | null = null;
+	private mbMidMakeup: GainNode | null = null;
+	private mbHighMakeup: GainNode | null = null;
+	private mbMerge: GainNode | null = null;
 
 	/**
 	 * Register the media element for later lazy attachment. Does NOT create an
@@ -235,6 +341,80 @@ export class AudioEngine {
 		this.analyser.fftSize = 8192;
 		this.analyser.smoothingTimeConstant = 0.7;
 
+		// ── Stereo widening (per-channel weighting matrix) ──
+		this.stereoSplitter = this.ctx.createChannelSplitter(2);
+		this.stereoSameL = this.ctx.createGain();
+		this.stereoSameR = this.ctx.createGain();
+		this.stereoOppL = this.ctx.createGain();
+		this.stereoOppR = this.ctx.createGain();
+		this.stereoMerger = this.ctx.createChannelMerger(2);
+		this.applyStereoWidth(this.stereoWidthAmount);
+
+		// ── Bass enhancer ──
+		this.bassLowPass = this.ctx.createBiquadFilter();
+		this.bassLowPass.type = 'lowpass';
+		this.bassLowPass.frequency.value = 150;
+		this.bassLowPass.Q.value = 0.7;
+		this.bassShaper = this.ctx.createWaveShaper();
+		this.bassShaper.curve = BASS_SATURATION_CURVE;
+		this.bassShaper.oversample = '2x';
+		this.bassWetGain = this.ctx.createGain();
+		this.bassDryPath = this.ctx.createGain();
+		this.bassDryPath.gain.value = 1;
+		this.bassMerge = this.ctx.createGain();
+		this.applyBassEnhanceAmount(this.bassEnhanceAmount);
+
+		// ── HRTF virtual surround (headphones only) ──
+		// Position L and R as virtual front-left / front-right speakers
+		// at ~30° spread, ~1m forward — gives a small "out-of-the-head"
+		// effect with HRTF panning. Higher amount = wider virtual stage.
+		this.hrtfSplitter = this.ctx.createChannelSplitter(2);
+		this.hrtfLeftPanner = this.ctx.createPanner();
+		this.hrtfRightPanner = this.ctx.createPanner();
+		for (const p of [this.hrtfLeftPanner, this.hrtfRightPanner]) {
+			p.panningModel = 'HRTF';
+			p.distanceModel = 'inverse';
+			p.refDistance = 1;
+			p.maxDistance = 10000;
+			p.rolloffFactor = 0;
+		}
+		this.hrtfDryGain = this.ctx.createGain();
+		this.hrtfWetGain = this.ctx.createGain();
+		this.hrtfMerge = this.ctx.createGain();
+		this.applyHrtfAmount(this.hrtfAmount);
+
+		// ── Multi-band compressor ──
+		// Crossover filters: low band uses lowpass at `lowCrossover`,
+		// high band uses highpass at `highCrossover`, mid uses
+		// highpass→lowpass between the two crossovers. Q=0.7 gives a
+		// gentle (Butterworth-ish) slope that sums close to flat.
+		this.mbLowFilter = this.ctx.createBiquadFilter();
+		this.mbLowFilter.type = 'lowpass';
+		this.mbLowFilter.Q.value = 0.7;
+		this.mbMidLowFilter = this.ctx.createBiquadFilter();
+		this.mbMidLowFilter.type = 'highpass';
+		this.mbMidLowFilter.Q.value = 0.7;
+		this.mbMidHighFilter = this.ctx.createBiquadFilter();
+		this.mbMidHighFilter.type = 'lowpass';
+		this.mbMidHighFilter.Q.value = 0.7;
+		this.mbHighFilter = this.ctx.createBiquadFilter();
+		this.mbHighFilter.type = 'highpass';
+		this.mbHighFilter.Q.value = 0.7;
+		this.applyCrossovers(
+			this.multiBandSettings.lowCrossover,
+			this.multiBandSettings.highCrossover,
+		);
+		this.mbLowComp = this.ctx.createDynamicsCompressor();
+		this.mbMidComp = this.ctx.createDynamicsCompressor();
+		this.mbHighComp = this.ctx.createDynamicsCompressor();
+		this.mbLowMakeup = this.ctx.createGain();
+		this.mbMidMakeup = this.ctx.createGain();
+		this.mbHighMakeup = this.ctx.createGain();
+		this.applyBandSettings('low', this.multiBandSettings.low);
+		this.applyBandSettings('mid', this.multiBandSettings.mid);
+		this.applyBandSettings('high', this.multiBandSettings.high);
+		this.mbMerge = this.ctx.createGain();
+
 		this.attached = true;
 		this.rebuildChain();
 	}
@@ -277,6 +457,104 @@ export class AudioEngine {
 
 	getCompressorEnabled(): boolean {
 		return this.compressorEnabled;
+	}
+
+	// ── Multi-band compressor ──
+	setMultiBandEnabled(enabled: boolean): void {
+		this.multiBandEnabled = enabled;
+		if (enabled) {
+			this.attach();
+			this.ctx?.resume().catch(() => {});
+		}
+		this.rebuildChain();
+	}
+	getMultiBandEnabled(): boolean {
+		return this.multiBandEnabled;
+	}
+	setBandCompressorSettings(band: CompressorBand, s: CompressorSettings): void {
+		this.multiBandSettings[band] = { ...s };
+		this.applyBandSettings(band, s);
+	}
+	getBandCompressorSettings(band: CompressorBand): CompressorSettings {
+		return { ...this.multiBandSettings[band] };
+	}
+	setBandCrossovers(low: number, high: number): void {
+		const lo = Math.max(40, Math.min(2000, low));
+		const hi = Math.max(lo + 100, Math.min(16000, high));
+		this.multiBandSettings.lowCrossover = lo;
+		this.multiBandSettings.highCrossover = hi;
+		this.applyCrossovers(lo, hi);
+	}
+	getBandCrossovers(): { low: number; high: number } {
+		return {
+			low: this.multiBandSettings.lowCrossover,
+			high: this.multiBandSettings.highCrossover,
+		};
+	}
+	getBandReduction(band: CompressorBand): number {
+		const comp =
+			band === 'low' ? this.mbLowComp : band === 'mid' ? this.mbMidComp : this.mbHighComp;
+		return comp?.reduction ?? 0;
+	}
+
+	// ── Stereo width ──
+	setStereoWidthEnabled(enabled: boolean): void {
+		this.stereoWidthEnabled = enabled;
+		if (enabled) {
+			this.attach();
+			this.ctx?.resume().catch(() => {});
+		}
+		this.rebuildChain();
+	}
+	setStereoWidthAmount(amount: number): void {
+		this.stereoWidthAmount = Math.max(0, Math.min(2, amount));
+		this.applyStereoWidth(this.stereoWidthAmount);
+	}
+	getStereoWidthEnabled(): boolean {
+		return this.stereoWidthEnabled;
+	}
+	getStereoWidthAmount(): number {
+		return this.stereoWidthAmount;
+	}
+
+	// ── Bass enhancer ──
+	setBassEnhanceEnabled(enabled: boolean): void {
+		this.bassEnhanceEnabled = enabled;
+		if (enabled) {
+			this.attach();
+			this.ctx?.resume().catch(() => {});
+		}
+		this.rebuildChain();
+	}
+	setBassEnhanceAmount(amount: number): void {
+		this.bassEnhanceAmount = Math.max(0, Math.min(1, amount));
+		this.applyBassEnhanceAmount(this.bassEnhanceAmount);
+	}
+	getBassEnhanceEnabled(): boolean {
+		return this.bassEnhanceEnabled;
+	}
+	getBassEnhanceAmount(): number {
+		return this.bassEnhanceAmount;
+	}
+
+	// ── HRTF virtual surround ──
+	setHrtfEnabled(enabled: boolean): void {
+		this.hrtfEnabled = enabled;
+		if (enabled) {
+			this.attach();
+			this.ctx?.resume().catch(() => {});
+		}
+		this.rebuildChain();
+	}
+	setHrtfAmount(amount: number): void {
+		this.hrtfAmount = Math.max(0, Math.min(1, amount));
+		this.applyHrtfAmount(this.hrtfAmount);
+	}
+	getHrtfEnabled(): boolean {
+		return this.hrtfEnabled;
+	}
+	getHrtfAmount(): number {
+		return this.hrtfAmount;
 	}
 
 	setInputGain(db: number): void {
@@ -487,6 +765,34 @@ export class AudioEngine {
 		this.dryGainNode = null;
 		this.wetGainNode = null;
 		this.compMergeNode = null;
+		this.stereoSplitter = null;
+		this.stereoSameL = null;
+		this.stereoSameR = null;
+		this.stereoOppL = null;
+		this.stereoOppR = null;
+		this.stereoMerger = null;
+		this.bassLowPass = null;
+		this.bassShaper = null;
+		this.bassWetGain = null;
+		this.bassDryPath = null;
+		this.bassMerge = null;
+		this.hrtfSplitter = null;
+		this.hrtfLeftPanner = null;
+		this.hrtfRightPanner = null;
+		this.hrtfDryGain = null;
+		this.hrtfWetGain = null;
+		this.hrtfMerge = null;
+		this.mbLowFilter = null;
+		this.mbMidLowFilter = null;
+		this.mbMidHighFilter = null;
+		this.mbHighFilter = null;
+		this.mbLowComp = null;
+		this.mbMidComp = null;
+		this.mbHighComp = null;
+		this.mbLowMakeup = null;
+		this.mbMidMakeup = null;
+		this.mbHighMakeup = null;
+		this.mbMerge = null;
 		this.boundElement = null;
 		this.attached = false;
 	}
@@ -597,13 +903,48 @@ export class AudioEngine {
 		this.dryGainNode?.disconnect();
 		this.wetGainNode?.disconnect();
 		this.compMergeNode?.disconnect();
+		this.stereoSplitter?.disconnect();
+		this.stereoSameL?.disconnect();
+		this.stereoSameR?.disconnect();
+		this.stereoOppL?.disconnect();
+		this.stereoOppR?.disconnect();
+		this.stereoMerger?.disconnect();
+		this.bassLowPass?.disconnect();
+		this.bassShaper?.disconnect();
+		this.bassWetGain?.disconnect();
+		this.bassDryPath?.disconnect();
+		this.bassMerge?.disconnect();
+		this.hrtfSplitter?.disconnect();
+		this.hrtfLeftPanner?.disconnect();
+		this.hrtfRightPanner?.disconnect();
+		this.hrtfDryGain?.disconnect();
+		this.hrtfWetGain?.disconnect();
+		this.hrtfMerge?.disconnect();
+		this.mbLowFilter?.disconnect();
+		this.mbMidLowFilter?.disconnect();
+		this.mbMidHighFilter?.disconnect();
+		this.mbHighFilter?.disconnect();
+		this.mbLowComp?.disconnect();
+		this.mbMidComp?.disconnect();
+		this.mbHighComp?.disconnect();
+		this.mbLowMakeup?.disconnect();
+		this.mbMidMakeup?.disconnect();
+		this.mbHighMakeup?.disconnect();
+		this.mbMerge?.disconnect();
 
-		// Build chain: source → [Amp/inputGain] → [EQ] → [Compressor w/ dry/wet mix] → destination
+		// Build chain: source → [Amp] → [EQ] → [Compressor] → [Stereo Width] → [Bass] → [HRTF] → destination
 		let current: AudioNode = this.source;
 
-		// Amp / input-gain: apply whenever EITHER effect is active, so the Amp
-		// slider works independently of the EQ bands.
-		if ((this.eqEnabled || this.compressorEnabled) && this.inputGainNode) {
+		const anyEffectOn =
+			this.eqEnabled ||
+			this.compressorEnabled ||
+			this.stereoWidthEnabled ||
+			this.bassEnhanceEnabled ||
+			this.hrtfEnabled;
+
+		// Amp / input-gain: apply whenever ANY effect is active, so the Amp
+		// slider works independently of which effects are on.
+		if (anyEffectOn && this.inputGainNode) {
 			current.connect(this.inputGainNode);
 			current = this.inputGainNode;
 		}
@@ -620,25 +961,133 @@ export class AudioEngine {
 		// side-tap — connecting to it does not affect the main routing.
 		if (this.analyser) current.connect(this.analyser);
 
-		if (
-			this.compressorEnabled &&
-			this.compressor &&
-			this.makeupGainNode &&
-			this.dryGainNode &&
-			this.wetGainNode &&
-			this.compMergeNode
-		) {
-			// Parallel compression: split into dry + wet, merge at compMergeNode
-			// Dry path: current → dryGain → merge
-			current.connect(this.dryGainNode);
-			this.dryGainNode.connect(this.compMergeNode);
-			// Wet path: current → compressor → makeupGain → wetGain → merge
-			current.connect(this.compressor);
-			this.compressor.connect(this.makeupGainNode);
-			this.makeupGainNode.connect(this.wetGainNode);
-			this.wetGainNode.connect(this.compMergeNode);
+		if (this.compressorEnabled) {
+			if (
+				this.multiBandEnabled &&
+				this.mbLowFilter &&
+				this.mbMidLowFilter &&
+				this.mbMidHighFilter &&
+				this.mbHighFilter &&
+				this.mbLowComp &&
+				this.mbMidComp &&
+				this.mbHighComp &&
+				this.mbLowMakeup &&
+				this.mbMidMakeup &&
+				this.mbHighMakeup &&
+				this.mbMerge &&
+				this.dryGainNode &&
+				this.wetGainNode &&
+				this.compMergeNode
+			) {
+				// Multi-band: split into low/mid/high, compress each band
+				// independently, sum back to mbMerge. The whole multi-band
+				// stage then participates in the dry/wet mix exactly like
+				// the single compressor would, so the user's mix slider
+				// keeps working.
+				current.connect(this.dryGainNode);
+				this.dryGainNode.connect(this.compMergeNode);
+				// Low band: lowpass → comp → makeup → merge
+				current.connect(this.mbLowFilter);
+				this.mbLowFilter.connect(this.mbLowComp);
+				this.mbLowComp.connect(this.mbLowMakeup);
+				this.mbLowMakeup.connect(this.mbMerge);
+				// Mid band: highpass(low) → lowpass(high) → comp → makeup → merge
+				current.connect(this.mbMidLowFilter);
+				this.mbMidLowFilter.connect(this.mbMidHighFilter);
+				this.mbMidHighFilter.connect(this.mbMidComp);
+				this.mbMidComp.connect(this.mbMidMakeup);
+				this.mbMidMakeup.connect(this.mbMerge);
+				// High band: highpass → comp → makeup → merge
+				current.connect(this.mbHighFilter);
+				this.mbHighFilter.connect(this.mbHighComp);
+				this.mbHighComp.connect(this.mbHighMakeup);
+				this.mbHighMakeup.connect(this.mbMerge);
+				// Multi-band output through the wet path (so the existing
+				// mix slider still controls dry/wet on the whole thing)
+				this.mbMerge.connect(this.wetGainNode);
+				this.wetGainNode.connect(this.compMergeNode);
+				current = this.compMergeNode;
+			} else if (
+				this.compressor &&
+				this.makeupGainNode &&
+				this.dryGainNode &&
+				this.wetGainNode &&
+				this.compMergeNode
+			) {
+				// Single-band parallel compression (unchanged).
+				current.connect(this.dryGainNode);
+				this.dryGainNode.connect(this.compMergeNode);
+				current.connect(this.compressor);
+				this.compressor.connect(this.makeupGainNode);
+				this.makeupGainNode.connect(this.wetGainNode);
+				this.wetGainNode.connect(this.compMergeNode);
+				current = this.compMergeNode;
+			}
+		}
 
-			current = this.compMergeNode;
+		// Stereo widening via per-channel weighting (see member comment).
+		if (
+			this.stereoWidthEnabled &&
+			this.stereoSplitter &&
+			this.stereoMerger &&
+			this.stereoSameL &&
+			this.stereoSameR &&
+			this.stereoOppL &&
+			this.stereoOppR
+		) {
+			current.connect(this.stereoSplitter);
+			this.stereoSplitter.connect(this.stereoSameL, 0);
+			this.stereoSplitter.connect(this.stereoOppR, 0);
+			this.stereoSplitter.connect(this.stereoOppL, 1);
+			this.stereoSplitter.connect(this.stereoSameR, 1);
+			this.stereoSameL.connect(this.stereoMerger, 0, 0);
+			this.stereoOppL.connect(this.stereoMerger, 0, 0);
+			this.stereoOppR.connect(this.stereoMerger, 0, 1);
+			this.stereoSameR.connect(this.stereoMerger, 0, 1);
+			current = this.stereoMerger;
+		}
+
+		// Bass enhancer — parallel: dry passes through, low-pass + saturator
+		// adds harmonics, scaled wet portion sums back in.
+		if (
+			this.bassEnhanceEnabled &&
+			this.bassLowPass &&
+			this.bassShaper &&
+			this.bassWetGain &&
+			this.bassDryPath &&
+			this.bassMerge
+		) {
+			current.connect(this.bassDryPath);
+			this.bassDryPath.connect(this.bassMerge);
+			current.connect(this.bassLowPass);
+			this.bassLowPass.connect(this.bassShaper);
+			this.bassShaper.connect(this.bassWetGain);
+			this.bassWetGain.connect(this.bassMerge);
+			current = this.bassMerge;
+		}
+
+		// HRTF virtual surround — parallel: dry stereo + virtually-positioned
+		// L and R routed through HRTF panners.
+		if (
+			this.hrtfEnabled &&
+			this.hrtfSplitter &&
+			this.hrtfLeftPanner &&
+			this.hrtfRightPanner &&
+			this.hrtfDryGain &&
+			this.hrtfWetGain &&
+			this.hrtfMerge
+		) {
+			// Dry path
+			current.connect(this.hrtfDryGain);
+			this.hrtfDryGain.connect(this.hrtfMerge);
+			// Wet path — split, pan each channel separately
+			current.connect(this.hrtfSplitter);
+			this.hrtfSplitter.connect(this.hrtfLeftPanner, 0);
+			this.hrtfSplitter.connect(this.hrtfRightPanner, 1);
+			this.hrtfLeftPanner.connect(this.hrtfWetGain);
+			this.hrtfRightPanner.connect(this.hrtfWetGain);
+			this.hrtfWetGain.connect(this.hrtfMerge);
+			current = this.hrtfMerge;
 		}
 
 		// Route to streamDest (consumed by hidden <audio> element) when
@@ -654,6 +1103,68 @@ export class AudioEngine {
 		this.compressor.ratio.value = s.ratio;
 		this.compressor.attack.value = s.attack;
 		this.compressor.release.value = s.release;
+	}
+
+	private applyBandSettings(band: CompressorBand, s: CompressorSettings): void {
+		const comp =
+			band === 'low' ? this.mbLowComp : band === 'mid' ? this.mbMidComp : this.mbHighComp;
+		const makeup =
+			band === 'low'
+				? this.mbLowMakeup
+				: band === 'mid'
+					? this.mbMidMakeup
+					: this.mbHighMakeup;
+		if (comp) {
+			comp.threshold.value = s.threshold;
+			comp.knee.value = s.knee;
+			comp.ratio.value = s.ratio;
+			comp.attack.value = s.attack;
+			comp.release.value = s.release;
+		}
+		if (makeup) {
+			makeup.gain.value = this.dbToLinear(s.makeupGain);
+		}
+	}
+
+	private applyCrossovers(low: number, high: number): void {
+		if (this.mbLowFilter) this.mbLowFilter.frequency.value = low;
+		if (this.mbMidLowFilter) this.mbMidLowFilter.frequency.value = low;
+		if (this.mbMidHighFilter) this.mbMidHighFilter.frequency.value = high;
+		if (this.mbHighFilter) this.mbHighFilter.frequency.value = high;
+	}
+
+	private applyStereoWidth(width: number): void {
+		const same = (1 + width) / 2;
+		const opp = (1 - width) / 2;
+		if (this.stereoSameL) this.stereoSameL.gain.value = same;
+		if (this.stereoSameR) this.stereoSameR.gain.value = same;
+		if (this.stereoOppL) this.stereoOppL.gain.value = opp;
+		if (this.stereoOppR) this.stereoOppR.gain.value = opp;
+	}
+
+	private applyBassEnhanceAmount(amount: number): void {
+		// amount in 0..1 — wet gain controls how much of the saturated
+		// low-band gets summed back. Dry passes through unchanged.
+		if (this.bassWetGain) this.bassWetGain.gain.value = amount;
+	}
+
+	private applyHrtfAmount(amount: number): void {
+		// amount in 0..1 — controls dry/wet between the original stereo
+		// signal and the virtually-positioned HRTF version.
+		if (this.hrtfDryGain) this.hrtfDryGain.gain.value = 1 - amount;
+		if (this.hrtfWetGain) this.hrtfWetGain.gain.value = amount;
+		// Spread the virtual speakers wider as amount increases.
+		const spread = 0.3 + amount * 0.7; // 0.3 → 1.0
+		if (this.hrtfLeftPanner) {
+			this.hrtfLeftPanner.positionX.value = -spread;
+			this.hrtfLeftPanner.positionY.value = 0;
+			this.hrtfLeftPanner.positionZ.value = -1;
+		}
+		if (this.hrtfRightPanner) {
+			this.hrtfRightPanner.positionX.value = spread;
+			this.hrtfRightPanner.positionY.value = 0;
+			this.hrtfRightPanner.positionZ.value = -1;
+		}
 	}
 
 	private applyMix(mix: number): void {

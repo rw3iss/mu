@@ -320,6 +320,12 @@
 		width: 24px;
 		height: 24px;
 		pointer-events: none;
+		// Soft dark drop-shadow keeps white icon outlines readable on
+		// bright/white video frames (e.g. snowy scenes, white intros).
+		// `drop-shadow` paints around the actual SVG outline, not the
+		// bounding box, so it doesn't pollute dark backgrounds.
+		filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.55))
+			drop-shadow(0 0 3px rgba(0, 0, 0, 0.4));
 	}
 }
 

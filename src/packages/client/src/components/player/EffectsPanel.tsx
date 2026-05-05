@@ -1,10 +1,13 @@
 import type { AudioProfile } from '@/services/audio-profiles.service';
 import {
+	bassEnhanceEnabled,
 	compressorEnabled,
 	effectsTab,
 	eqEnabled,
+	hrtfSurroundEnabled,
 	setEffectsTab,
 	showEffectsPanel,
+	stereoWidthEnabled,
 	toggleEffectsPanel,
 } from '@/state/audio-effects.state';
 import {
@@ -16,6 +19,7 @@ import {
 import { videoEnabled } from '@/state/video-effects.state';
 import styles from './EffectsPanel.module.scss';
 import { CompressorTab } from './effects/CompressorTab';
+import { EnhanceTab } from './effects/EnhanceTab';
 import { EqTab } from './effects/EqTab';
 import { VideoTab } from './effects/VideoTab';
 
@@ -42,6 +46,8 @@ export function EffectsPanel() {
 	const isEqEnabled = eqEnabled.value;
 	const isCompEnabled = compressorEnabled.value;
 	const isVideoEnabled = videoEnabled.value;
+	const isAnyEnhanceOn =
+		stereoWidthEnabled.value || bassEnhanceEnabled.value || hrtfSurroundEnabled.value;
 	const eqProfileName = getActiveProfileName(allProfiles, activeEqProfileId.value);
 	const compProfileName = getActiveProfileName(allProfiles, activeCompProfileId.value);
 	const videoProfileName = getActiveProfileName(allProfiles, activeVideoProfileId.value);
@@ -88,6 +94,15 @@ export function EffectsPanel() {
 					)}
 				</button>
 				<button
+					class={`${styles.tab} ${tab === 'enhance' ? styles.active : ''}`}
+					onClick={() => setEffectsTab('enhance')}
+				>
+					<span>
+						Enhance
+						{isAnyEnhanceOn && <span class={styles.onBadge}>ON</span>}
+					</span>
+				</button>
+				<button
 					class={`${styles.tab} ${tab === 'video' ? styles.active : ''}`}
 					onClick={() => setEffectsTab('video')}
 				>
@@ -101,6 +116,7 @@ export function EffectsPanel() {
 			<div class={styles.body}>
 				{tab === 'eq' && <EqTab />}
 				{tab === 'compressor' && <CompressorTab />}
+				{tab === 'enhance' && <EnhanceTab />}
 				{tab === 'video' && <VideoTab />}
 			</div>
 		</div>

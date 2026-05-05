@@ -1,5 +1,10 @@
 import { batch, signal } from '@preact/signals';
-import { audioEngine, type CompressorSettings, type EqBand } from '@/audio/audio-engine';
+import {
+	audioEngine,
+	type CompressorSettings,
+	type EqBand,
+	type MultiBandCompressorSettings,
+} from '@/audio/audio-engine';
 import { setUiSetting } from '@/hooks/useUiSetting';
 import { type AudioProfile, audioProfilesService } from '@/services/audio-profiles.service';
 import {
@@ -8,6 +13,8 @@ import {
 	eqBands,
 	eqEnabled,
 	eqInputGain,
+	multiBandEnabled,
+	multiBandSettings,
 } from './audio-effects.state';
 import {
 	DEFAULT_VIDEO_EFFECTS,
@@ -89,10 +96,25 @@ export function loadCompProfile(id: string): void {
 	const compSettings: CompressorSettings | null = config.compressorSettings
 		? { ...config.compressorSettings }
 		: null;
+	const mbSettings: MultiBandCompressorSettings | null = config.multiBandSettings
+		? { ...config.multiBandSettings }
+		: null;
+	const mbEnabled: boolean | undefined = config.multiBandEnabled;
 
 	if (compSettings) {
 		audioEngine.setCompressorSettings(compSettings);
 		setUiSetting('audio_compressor_settings', compSettings);
+	}
+	if (mbSettings) {
+		audioEngine.setBandCrossovers(mbSettings.lowCrossover, mbSettings.highCrossover);
+		audioEngine.setBandCompressorSettings('low', mbSettings.low);
+		audioEngine.setBandCompressorSettings('mid', mbSettings.mid);
+		audioEngine.setBandCompressorSettings('high', mbSettings.high);
+		setUiSetting('audio_multiband_settings', mbSettings);
+	}
+	if (mbEnabled !== undefined) {
+		audioEngine.setMultiBandEnabled(mbEnabled);
+		setUiSetting('audio_multiband_enabled', mbEnabled);
 	}
 	if (config.compressorEnabled !== undefined) {
 		audioEngine.setCompressorEnabled(config.compressorEnabled);
@@ -102,6 +124,8 @@ export function loadCompProfile(id: string): void {
 	batch(() => {
 		activeCompProfileId.value = id;
 		if (compSettings) compressorSettings.value = compSettings;
+		if (mbSettings) multiBandSettings.value = mbSettings;
+		if (mbEnabled !== undefined) multiBandEnabled.value = mbEnabled;
 		if (config.compressorEnabled !== undefined)
 			compressorEnabled.value = config.compressorEnabled;
 	});
@@ -138,6 +162,8 @@ function buildCompConfigJson(): string {
 	return JSON.stringify({
 		compressorEnabled: compressorEnabled.value,
 		compressorSettings: compressorSettings.value,
+		multiBandEnabled: multiBandEnabled.value,
+		multiBandSettings: multiBandSettings.value,
 	});
 }
 

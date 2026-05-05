@@ -1,6 +1,11 @@
 import { audioEngine } from '@/audio/audio-engine';
 import { useCanvasAnimator } from '@/hooks/useCanvasAnimator';
-import { compressorSettings } from '@/state/audio-effects.state';
+import {
+	compressorSettings,
+	multiBandEnabled,
+	multiBandSettings,
+	selectedBand,
+} from '@/state/audio-effects.state';
 import styles from './CompressorCurve.module.scss';
 
 /**
@@ -65,7 +70,11 @@ export function CompressorCurve() {
 		return (ctx, w, h) => {
 			ctx.clearRect(0, 0, w, h);
 
-			const s = compressorSettings.value;
+			// In multi-band mode, draw the curve for the *selected* band
+			// rather than the legacy single compressor settings.
+			const s = multiBandEnabled.value
+				? multiBandSettings.value[selectedBand.value]
+				: compressorSettings.value;
 			const T = s.threshold;
 			const R = Math.max(1, s.ratio);
 			const K = Math.max(0, s.knee);
@@ -180,7 +189,9 @@ export function CompressorCurve() {
 
 			// --- gain reduction bar (right edge) ---------------------------------
 			// reduction is negative dB (0 = none, -10 = -10dB of GR).
-			const reduction = audioEngine.getCompressorReduction();
+			const reduction = multiBandEnabled.value
+				? audioEngine.getBandReduction(selectedBand.value)
+				: audioEngine.getCompressorReduction();
 			const grPx = Math.min(h, (Math.abs(reduction) / 24) * h);
 			if (grPx > 0.5) {
 				const barW = 6;
