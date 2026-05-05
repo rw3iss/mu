@@ -50,26 +50,13 @@ import { InfoPanel } from './InfoPanel';
 import { PlayerControls } from './PlayerControls';
 import { useVideoEngine } from './useVideoEngine';
 
-/** Shift all VTT timestamp cues by the given offset in milliseconds. */
-function offsetVttTimings(vtt: string, offsetMs: number): string {
-	if (offsetMs === 0) return vtt;
-	// Match VTT timestamps: HH:MM:SS.mmm or MM:SS.mmm
-	return vtt.replace(/(\d{2}:)?(\d{2}):(\d{2})\.(\d{3})/g, (_match, hours, mins, secs, ms) => {
-		const h = hours ? parseInt(hours, 10) : 0;
-		const totalMs =
-			h * 3600000 +
-			parseInt(mins, 10) * 60000 +
-			parseInt(secs, 10) * 1000 +
-			parseInt(ms, 10) +
-			offsetMs;
-		const clamped = Math.max(0, totalMs);
-		const hh = String(Math.floor(clamped / 3600000)).padStart(2, '0');
-		const mm = String(Math.floor((clamped % 3600000) / 60000)).padStart(2, '0');
-		const ss = String(Math.floor((clamped % 60000) / 1000)).padStart(2, '0');
-		const mmm = String(clamped % 1000).padStart(3, '0');
-		return `${hh}:${mm}:${ss}.${mmm}`;
-	});
-}
+// Subtitle timing-offset is applied at runtime by mutating each loaded
+// cue's startTime/endTime directly (see Effect B below). The cue's
+// original times are snapshotted on track load so subsequent offset
+// changes shift relative to the source, not relative to the previously
+// shifted state. This makes offset changes instant and live — the
+// currently-displayed cue moves immediately rather than waiting for the
+// next cue boundary.
 
 let splitWidthSaveTimer: ReturnType<typeof setTimeout> | null = null;
 function setSplitWidth(w: number) {
@@ -465,13 +452,43 @@ export function GlobalPlayer() {
 		video.style.transform = parts.join(' ');
 	}, [videoEnabled.value, videoEffects.value]);
 
-	// Apply selected subtitle track to the video element
+	// ── Subtitles: load track + apply timing offset live ──────────────
+	//
+	// Effect A loads the track when the source changes (track or session).
+	// Effect B applies the timing offset by mutating each cue's start/end
+	// time directly — no re-fetch, no track replacement. The active cue
+	// moves immediately, which is what makes the offset feel live.
+
+	const cueOriginalsRef = useRef<WeakMap<TextTrackCue, { start: number; end: number }>>(
+		new WeakMap(),
+	);
+	const cueListRef = useRef<TextTrackCue[]>([]);
+	const currentOffsetMsRef = useRef<number>(subSettings.timingOffsetMs);
+
+	const applySubtitleOffset = useCallback((offsetMs: number) => {
+		currentOffsetMsRef.current = offsetMs;
+		const offsetSec = offsetMs / 1000;
+		for (const cue of cueListRef.current) {
+			const orig = cueOriginalsRef.current.get(cue);
+			if (!orig) continue;
+			const newStart = Math.max(0, orig.start + offsetSec);
+			// Keep at least 1ms of duration so the browser still considers
+			// the cue valid — clamping start to 0 must not collapse end too.
+			const newEnd = Math.max(newStart + 0.001, orig.end + offsetSec);
+			if (cue.startTime !== newStart) cue.startTime = newStart;
+			if (cue.endTime !== newEnd) cue.endTime = newEnd;
+		}
+	}, []);
+
+	// Effect A — load the selected subtitle track
 	useEffect(() => {
+		cueOriginalsRef.current = new WeakMap();
+		cueListRef.current = [];
+
 		const video = engine.videoRef.current;
 		const session = currentSession.value;
 		let cancelled = false;
 
-		// Always clean up existing tracks first
 		if (video) {
 			for (const t of video.querySelectorAll('track')) {
 				if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
@@ -508,7 +525,6 @@ export function GlobalPlayer() {
 			}
 		}
 
-		// Fetch VTT and create blob URL
 		fetch(subtitleUrl)
 			.then((res) => {
 				if (!res.ok) throw new Error(`Subtitle fetch failed: ${res.status}`);
@@ -517,13 +533,7 @@ export function GlobalPlayer() {
 			.then((vttText) => {
 				if (cancelled) return;
 
-				const timingOffset = subSettings.timingOffsetMs;
-				let processedVtt = vttText;
-				if (timingOffset !== 0) {
-					processedVtt = offsetVttTimings(vttText, timingOffset);
-				}
-
-				const blob = new Blob([processedVtt], { type: 'text/vtt' });
+				const blob = new Blob([vttText], { type: 'text/vtt' });
 				const blobUrl = URL.createObjectURL(blob);
 
 				if (cancelled) {
@@ -531,7 +541,6 @@ export function GlobalPlayer() {
 					return;
 				}
 
-				// Remove any tracks that snuck in while we were fetching
 				for (const t of video.querySelectorAll('track')) {
 					if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
 					video.removeChild(t);
@@ -543,6 +552,28 @@ export function GlobalPlayer() {
 				trackEl.srclang = track.language;
 				trackEl.src = blobUrl;
 				trackEl.default = true;
+
+				// When the cue list is parsed, snapshot original times and
+				// apply the latest offset (read from the ref so a change
+				// made while the fetch was in flight isn't lost).
+				const onTrackLoad = () => {
+					if (cancelled) return;
+					const cues = trackEl.track.cues;
+					if (!cues) return;
+					cueOriginalsRef.current = new WeakMap();
+					cueListRef.current = [];
+					for (let i = 0; i < cues.length; i++) {
+						const c = cues[i]!;
+						cueOriginalsRef.current.set(c, {
+							start: c.startTime,
+							end: c.endTime,
+						});
+						cueListRef.current.push(c);
+					}
+					applySubtitleOffset(currentOffsetMsRef.current);
+				};
+				trackEl.addEventListener('load', onTrackLoad, { once: true });
+
 				video.appendChild(trackEl);
 				trackEl.track.mode = 'showing';
 			})
@@ -552,6 +583,8 @@ export function GlobalPlayer() {
 
 		return () => {
 			cancelled = true;
+			cueOriginalsRef.current = new WeakMap();
+			cueListRef.current = [];
 			if (video) {
 				for (const t of video.querySelectorAll('track')) {
 					if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
@@ -562,7 +595,13 @@ export function GlobalPlayer() {
 				}
 			}
 		};
-	}, [subtitleTrack.value, currentSession.value?.sessionId, subSettings.timingOffsetMs]);
+	}, [subtitleTrack.value, currentSession.value?.sessionId, applySubtitleOffset]);
+
+	// Effect B — apply timing offset live whenever the user changes it.
+	// No fetch, no track rebuild — just shift the existing cues.
+	useEffect(() => {
+		applySubtitleOffset(subSettings.timingOffsetMs);
+	}, [subSettings.timingOffsetMs, applySubtitleOffset]);
 
 	// Fullscreen toggle — always enters full mode for true fullscreen
 	const handleToggleFullscreen = useCallback(async () => {

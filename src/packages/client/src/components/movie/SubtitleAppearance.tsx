@@ -1,4 +1,4 @@
-import { useUiSetting } from '@/hooks/useUiSetting';
+import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
 import styles from './SubtitleAppearance.module.scss';
 
 export interface SubtitleSettings {
@@ -39,8 +39,11 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 	const [settings, setSettings] = useSubtitleSettings();
 
 	const update = <K extends keyof SubtitleSettings>(key: K, value: SubtitleSettings[K]) => {
-		const next = { ...settings, [key]: value };
-		// Reset line spacing to default when font size changes
+		// Read the live signal so rapid clicks (e.g. +100, +100) merge
+		// against the freshest state instead of the render-captured
+		// snapshot — otherwise the second click overwrites the first.
+		const fresh = getUiSetting('subtitle_appearance', DEFAULT_SUBTITLE_SETTINGS);
+		const next = { ...fresh, [key]: value };
 		if (key === 'fontSize') {
 			next.lineSpacing = DEFAULT_SUBTITLE_SETTINGS.lineSpacing;
 		}
@@ -248,17 +251,23 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 					<span class={styles.unit}>ms</span>
 					<button
 						class={styles.offsetBtn}
-						onClick={() =>
-							update('timingOffsetMs', (settings.timingOffsetMs || 0) - 100)
-						}
+						onClick={() => {
+							const cur =
+								getUiSetting('subtitle_appearance', DEFAULT_SUBTITLE_SETTINGS)
+									.timingOffsetMs || 0;
+							update('timingOffsetMs', cur - 100);
+						}}
 					>
 						-100
 					</button>
 					<button
 						class={styles.offsetBtn}
-						onClick={() =>
-							update('timingOffsetMs', (settings.timingOffsetMs || 0) + 100)
-						}
+						onClick={() => {
+							const cur =
+								getUiSetting('subtitle_appearance', DEFAULT_SUBTITLE_SETTINGS)
+									.timingOffsetMs || 0;
+							update('timingOffsetMs', cur + 100);
+						}}
 					>
 						+100
 					</button>
