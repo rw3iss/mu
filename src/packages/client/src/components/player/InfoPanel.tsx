@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { CastPhoto } from '@/components/movie/CastPhoto';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
@@ -175,17 +176,14 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									<div class={styles.castList}>
 										{movie.cast.slice(0, 8).map((member) => (
 											<div key={member.name} class={styles.castMember}>
-												<div class={styles.castPhoto}>
-													{member.profileUrl ? (
-														<img
-															src={member.profileUrl}
-															alt={member.name}
-															loading="lazy"
-														/>
-													) : (
-														<div class={styles.castPhotoPlaceholder} />
-													)}
-												</div>
+												<CastPhoto
+													name={member.name}
+													profileUrl={member.profileUrl}
+													character={member.character}
+													size={32}
+													expandedSize={180}
+													thumbClass={styles.castPhoto}
+												/>
 												<div class={styles.castInfo}>
 													<span class={styles.castName}>
 														{member.name}
@@ -327,17 +325,14 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								<div class={styles.castList}>
 									{movie.cast.slice(0, 8).map((member) => (
 										<div key={member.name} class={styles.castMember}>
-											<div class={styles.castPhoto}>
-												{member.profileUrl ? (
-													<img
-														src={member.profileUrl}
-														alt={member.name}
-														loading="lazy"
-													/>
-												) : (
-													<div class={styles.castPhotoPlaceholder} />
-												)}
-											</div>
+											<CastPhoto
+												name={member.name}
+												profileUrl={member.profileUrl}
+												character={member.character}
+												size={32}
+												expandedSize={180}
+												thumbClass={styles.castPhoto}
+											/>
 											<div class={styles.castInfo}>
 												<span class={styles.castName}>{member.name}</span>
 												{member.character && (

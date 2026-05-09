@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { Spinner } from '@/components/common/Spinner';
+import { CastPhoto } from '@/components/movie/CastPhoto';
 import { ExternalRatings } from '@/components/movie/ExternalRatings';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
 import { MovieOptionsMenu } from '@/components/movie/MovieOptionsMenu';
@@ -650,16 +651,14 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								<div class={styles.castGrid}>
 									{movie.cast.slice(0, 12).map((member) => (
 										<div key={member.name} class={styles.castMember}>
-											<div class={styles.castAvatar}>
-												{member.profileUrl ? (
-													<img
-														src={member.profileUrl}
-														alt={member.name}
-													/>
-												) : (
-													<span>{member.name.charAt(0)}</span>
-												)}
-											</div>
+											<CastPhoto
+												name={member.name}
+												profileUrl={member.profileUrl}
+												character={member.character}
+												size={48}
+												expandedSize={220}
+												thumbClass={styles.castAvatar}
+											/>
 											<div class={styles.castInfo}>
 												<span class={styles.castName}>{member.name}</span>
 												<span class={styles.castCharacter}>

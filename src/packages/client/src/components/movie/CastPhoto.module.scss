@@ -1,0 +1,94 @@
+.wrap {
+	position: relative;
+	flex-shrink: 0;
+	display: inline-block;
+}
+
+.thumb {
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	overflow: hidden;
+	background: rgba(255, 255, 255, 0.08);
+	border: none;
+	padding: 0;
+	margin: 0;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform 120ms ease, box-shadow 120ms ease;
+
+	&:hover {
+		transform: scale(1.05);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+}
+
+.fallback {
+	font-size: 0.85em;
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-text-muted);
+	user-select: none;
+}
+
+// Popout — absolutely positioned over the thumb. Scales up from the
+// thumbnail's footprint (var(--cast-popout-close-scale)) so the entry
+// reads as the small thumb growing organically. Position: absolute
+// keeps it from causing relayout of the surrounding cast list.
+.popout {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	z-index: 200;
+	border-radius: 50%;
+	overflow: hidden;
+	background: var(--color-bg-elevated, #1a1a22);
+	border: 2px solid rgba(255, 255, 255, 0.15);
+	box-shadow:
+		0 16px 48px rgba(0, 0, 0, 0.55),
+		0 0 0 1px rgba(0, 0, 0, 0.4);
+	pointer-events: auto;
+	transform-origin: center center;
+	animation: castPopoutEnter 220ms cubic-bezier(0.32, 0.72, 0.32, 1) forwards;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+}
+
+.popoutFallback {
+	display: flex;
+	width: 100%;
+	height: 100%;
+	align-items: center;
+	justify-content: center;
+	font-size: 64px;
+	font-weight: var(--font-weight-bold);
+	color: var(--color-text-muted);
+}
+
+@keyframes castPopoutEnter {
+	from {
+		transform: translate(-50%, -50%) scale(var(--cast-popout-close-scale, 0.2));
+		opacity: 0;
+	}
+	to {
+		transform: translate(-50%, -50%) scale(1);
+		opacity: 1;
+	}
+}
