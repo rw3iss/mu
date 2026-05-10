@@ -1066,26 +1066,6 @@ export function GlobalPlayer() {
 					{!shareMode.value && (
 						<button
 							class={styles.topBtn}
-							onClick={minimizePlayer}
-							aria-label="Minimize player"
-						>
-							<svg
-								width="20"
-								height="20"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="white"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-							>
-								<polyline points="6 9 12 15 18 9" />
-							</svg>
-						</button>
-					)}
-					{!shareMode.value && (
-						<button
-							class={styles.topBtn}
 							onClick={splitPlayer}
 							aria-label="Split view"
 							title="Split view"
@@ -1106,25 +1086,55 @@ export function GlobalPlayer() {
 						</button>
 					)}
 					{!shareMode.value && (
-						<button
-							class={styles.topBtn}
-							onClick={closePlayer}
-							aria-label="Close player"
+						<div
+							class={styles.topRightGroup}
+							onMouseEnter={() => {
+								isHoveringControls.value = true;
+							}}
+							onMouseLeave={() => {
+								isHoveringControls.value = false;
+							}}
 						>
-							<svg
-								width="20"
-								height="20"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="white"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
+							<button
+								class={styles.topBtn}
+								onClick={minimizePlayer}
+								aria-label="Minimize player"
+								title="Minimize"
 							>
-								<line x1="18" y1="6" x2="6" y2="18" />
-								<line x1="6" y1="6" x2="18" y2="18" />
-							</svg>
-						</button>
+								<svg
+									width="20"
+									height="20"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="white"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<polyline points="6 9 12 15 18 9" />
+								</svg>
+							</button>
+							<button
+								class={`${styles.topBtn} ${styles.topCloseRevealed}`}
+								onClick={closePlayer}
+								aria-label="Close player"
+								title="Close"
+							>
+								<svg
+									width="20"
+									height="20"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="white"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<line x1="18" y1="6" x2="6" y2="18" />
+									<line x1="6" y1="6" x2="18" y2="18" />
+								</svg>
+							</button>
+						</div>
 					)}
 				</div>
 			)}

@@ -139,6 +139,43 @@
   }
 }
 
+// Right-side stack: minimize is always visible; close slides down on hover.
+// Absolutely positioned so its hover-grown hit area does not expand the
+// topHeader's flex height (which controls the gradient).
+.topRightGroup {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--topbar-height);
+  height: var(--topbar-height);
+  z-index: 1;
+  // When hovered, extend the hit area down to cover the revealed close
+  // button so the cursor stays inside the wrapper while transitioning
+  // from minimize → close (otherwise :hover would drop mid-traverse).
+  &:hover {
+    height: calc(var(--topbar-height) * 2);
+  }
+}
+
+.topCloseRevealed {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.25) 100%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+  transition: opacity 180ms ease, transform 180ms ease, background 120ms ease;
+}
+
+.topRightGroup:hover .topCloseRevealed,
+.topCloseRevealed:hover,
+.topCloseRevealed:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 // ============================================
 // Player Bar — fixed bottom bar (both full + mini modes)
 // ============================================
