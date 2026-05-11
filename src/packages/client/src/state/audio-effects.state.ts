@@ -634,9 +634,14 @@ export async function runAutoMultiBandComp(): Promise<void> {
 			const peakDb = Math.max(FLOOR_DB, (peakByte / 255) * 70 - 100);
 			const crest = peakDb - rmsDb;
 
-			const idealThreshold = (peakDb + rmsDb) / 2;
-			const idealRatio = crest < 6 ? 2 : crest < 10 ? 4 : crest < 15 ? 6 : 8;
-			const idealMakeup = Math.max(0, (peakDb - idealThreshold) * (1 - 1 / idealRatio));
+			// Bias threshold toward RMS so more of the signal lands above it.
+			// Ratio table is steeper than a 4-stop comp because we're going
+			// for perceived loudness, not transparent dynamics. Makeup adds
+			// 1.5× the peak-loss to compensate for the bulk of the signal
+			// (which sits near RMS, not at the peaks).
+			const idealThreshold = rmsDb + (peakDb - rmsDb) * 0.25;
+			const idealRatio = crest < 6 ? 3 : crest < 10 ? 6 : crest < 15 ? 10 : 14;
+			const idealMakeup = Math.max(0, (peakDb - idealThreshold) * (1 - 1 / idealRatio) * 1.5);
 
 			const newThreshold = factor * idealThreshold;
 			const newRatio = 1 + factor * (idealRatio - 1);
@@ -760,10 +765,15 @@ export async function runAutoComp(): Promise<void> {
 		const rmsDb = rms > 0 ? Math.max(FLOOR_DB, 20 * Math.log10(rms)) : FLOOR_DB;
 		const crest = peakDb - rmsDb;
 
-		// Ideal settings derived from the measured dynamics.
-		const idealThreshold = (peakDb + rmsDb) / 2;
-		const idealRatio = crest < 6 ? 2 : crest < 10 ? 4 : crest < 15 ? 6 : 8;
-		const idealMakeup = Math.max(0, (peakDb - idealThreshold) * (1 - 1 / idealRatio));
+		// Ideal settings derived from the measured dynamics. Biased
+		// toward perceived loudness (vs transparent dynamics): threshold
+		// is pulled toward RMS so more of the signal compresses, the
+		// ratio table is steeper, and makeup is 1.5× the peak-loss to
+		// compensate for the bulk of the signal sitting at RMS — not
+		// just at the peaks.
+		const idealThreshold = rmsDb + (peakDb - rmsDb) * 0.25;
+		const idealRatio = crest < 6 ? 3 : crest < 10 ? 6 : crest < 15 ? 10 : 14;
+		const idealMakeup = Math.max(0, (peakDb - idealThreshold) * (1 - 1 / idealRatio) * 1.5);
 
 		// Linear interpolate from neutral (no compression) to the ideal
 		// values by the factor multiplier.
