@@ -138,9 +138,28 @@ export class VideoEnhanceEngine {
 		if (!VideoEnhanceEngine.isSupported()) return false;
 
 		try {
-			const adapter = await navigator.gpu.requestAdapter();
+			// requestAdapter() defaults to "core" adapters. On Linux +
+			// NVIDIA with Vulkan disabled (Wayland), Chromium's only
+			// WebGPU backend is Dawn's OpenGLES path, which advertises
+			// itself as a "compatibility" adapter — invisible to the
+			// default call. Try core first, then fall back to compat.
+			let adapter = await navigator.gpu.requestAdapter();
 			if (!adapter) {
-				this.reportError('No WebGPU adapter');
+				adapter = await navigator.gpu.requestAdapter({
+					// `featureLevel` is a recent addition to the WebGPU spec;
+					// cast away the type until @webgpu/types catches up.
+					featureLevel: 'compatibility',
+				} as GPURequestAdapterOptions);
+			}
+			if (!adapter) {
+				adapter = await navigator.gpu.requestAdapter({
+					powerPreference: 'low-power',
+				});
+			}
+			if (!adapter) {
+				this.reportError(
+					'No WebGPU adapter (tried default, compatibility, low-power)',
+				);
 				return false;
 			}
 			const device = await adapter.requestDevice();
