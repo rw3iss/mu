@@ -77,13 +77,14 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 				{inline ? (
 					/* Inline: two-column layout — poster left, ALL content right */
 					<div class={styles.inlineLayout}>
-						<SmartImage
-							src={movie.posterUrl}
-							alt={`${movie.title} poster`}
-							class={styles.inlinePoster}
-							imgClass={styles.inlinePosterImg}
-							fallbackLabel={movie.title}
-						/>
+						<div class={styles.inlinePoster}>
+							<SmartImage
+								src={movie.posterUrl}
+								alt={`${movie.title} poster`}
+								imgClass={styles.inlinePosterImg}
+								fallbackLabel={movie.title}
+							/>
+						</div>
 						<div class={styles.inlineContent}>
 							{shareMode.value ? (
 								<h2 class={styles.title}>{movie.title}</h2>
@@ -225,13 +226,14 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 					</div>
 				) : (
 					<>
-						<SmartImage
-							src={movie.posterUrl}
-							alt={`${movie.title} poster`}
-							class={styles.poster}
-							imgClass={styles.posterImg}
-							fallbackLabel={movie.title}
-						/>
+						<div class={styles.poster}>
+							<SmartImage
+								src={movie.posterUrl}
+								alt={`${movie.title} poster`}
+								imgClass={styles.posterImg}
+								fallbackLabel={movie.title}
+							/>
+						</div>
 
 						{shareMode.value ? (
 							<h2 class={styles.title}>{movie.title}</h2>

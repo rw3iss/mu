@@ -335,13 +335,14 @@ export function MovieDetail({ id }: MovieDetailProps) {
 				<div class={styles.content}>
 					{/* Poster */}
 					<div class={styles.posterColumn}>
-						<SmartImage
-							src={movie.posterUrl}
-							alt={`${movie.title} poster`}
-							class={styles.poster}
-							imgClass={styles.posterImg}
-							fallbackLabel={movie.title}
-						/>
+						<div class={styles.poster}>
+							<SmartImage
+								src={movie.posterUrl}
+								alt={`${movie.title} poster`}
+								imgClass={styles.posterImg}
+								fallbackLabel={movie.title}
+							/>
+						</div>
 					</div>
 
 					{/* Info */}
