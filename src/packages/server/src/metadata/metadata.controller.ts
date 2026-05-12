@@ -1,9 +1,7 @@
 import { existsSync, statSync } from 'node:fs';
-import { basename } from 'node:path';
 import { nowISO, WsEvent } from '@mu/shared';
 import { Controller, Logger, Param, Post } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import ffmpeg from 'fluent-ffmpeg';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -11,6 +9,7 @@ import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { LibraryJobsService } from '../library/library-jobs.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
+import { FileProbeService } from './file-probe.service.js';
 import { MetadataService } from './metadata.service.js';
 
 @Controller()
@@ -24,6 +23,7 @@ export class MetadataController {
 		private readonly events: EventsService,
 		private readonly libraryJobs: LibraryJobsService,
 		private readonly guidResolver: GuidResolverService,
+		private readonly fileProbe: FileProbeService,
 	) {}
 
 	@Post('movies/refresh-all')
@@ -155,7 +155,7 @@ export class MetadataController {
 				continue;
 			}
 
-			const probeResult = await this.probeFileFull(file.filePath);
+			const probeResult = await this.fileProbe.probe(file.filePath);
 
 			if (!probeResult) {
 				results.push({
@@ -296,179 +296,5 @@ export class MetadataController {
 		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'rescan' });
 
 		return { files: results, thumbnailUrl, transcoding };
-	}
-
-	/**
-	 * Full FFprobe extraction — returns both structured codec info and the
-	 * raw metadata (format tags, stream tags) that serve as the "exif" data.
-	 */
-	private probeFileFull(filePath: string): Promise<{
-		codecInfo: {
-			codecVideo?: string;
-			codecAudio?: string;
-			resolution?: string;
-			durationSeconds?: number;
-			bitrate?: number;
-			videoWidth?: number;
-			videoHeight?: number;
-			videoBitDepth?: number;
-			videoFrameRate?: string;
-			videoProfile?: string;
-			videoColorSpace?: string;
-			hdr?: boolean;
-			containerFormat?: string;
-			audioTracks?: any[];
-			subtitleTracks?: any[];
-		};
-		fileMetadata: {
-			formatTags: Record<string, string>;
-			streams: {
-				index: number;
-				codecType?: string;
-				codecName?: string;
-				width?: number;
-				height?: number;
-				tags?: Record<string, string>;
-			}[];
-			format: {
-				formatName?: string;
-				duration?: number;
-				size?: number;
-				bitRate?: number;
-			};
-		};
-	} | null> {
-		return new Promise((resolve) => {
-			ffmpeg.ffprobe(filePath, (err, metadata) => {
-				if (err) {
-					this.logger.warn(`FFprobe failed for ${basename(filePath)}: ${err.message}`);
-					resolve(null);
-					return;
-				}
-
-				const videoStream = metadata.streams?.find((s) => s.codec_type === 'video');
-				const audioStream = metadata.streams?.find((s) => s.codec_type === 'audio');
-
-				const width = videoStream?.width;
-				const height = videoStream?.height;
-				let resolution: string | undefined;
-				if (height) {
-					if (height >= 2160) resolution = '2160p';
-					else if (height >= 1080) resolution = '1080p';
-					else if (height >= 720) resolution = '720p';
-					else if (height >= 480) resolution = '480p';
-					else resolution = `${height}p`;
-				}
-
-				// HDR detection
-				const colorTransfer = (videoStream as any)?.color_transfer ?? '';
-				const colorSpace = (videoStream as any)?.color_space ?? '';
-				const hdr =
-					colorTransfer === 'smpte2084' ||
-					colorTransfer === 'arib-std-b67' ||
-					colorSpace === 'bt2020nc' ||
-					colorSpace === 'bt2020c';
-
-				// Frame rate
-				const rFrameRate = (videoStream as any)?.r_frame_rate;
-				let videoFrameRate: string | undefined;
-				if (rFrameRate) {
-					const parts = rFrameRate.split('/');
-					if (parts.length === 2 && Number(parts[1])) {
-						videoFrameRate = (Number(parts[0]) / Number(parts[1])).toFixed(3);
-					} else {
-						videoFrameRate = rFrameRate;
-					}
-				}
-
-				// Audio tracks
-				const audioStreams = (metadata.streams ?? []).filter(
-					(s) => s.codec_type === 'audio',
-				);
-				const audioTracks = audioStreams.map((s: any, i: number) => ({
-					index: i,
-					codec: s.codec_name ?? 'unknown',
-					language: s.tags?.language ?? 'und',
-					title: s.tags?.title ?? `Track ${i + 1}`,
-					channels: s.channels ?? 0,
-					channelLayout: s.channel_layout ?? '',
-					sampleRate: s.sample_rate ? Number(s.sample_rate) : undefined,
-					bitDepth: s.bits_per_raw_sample
-						? parseInt(s.bits_per_raw_sample, 10)
-						: undefined,
-				}));
-
-				// Subtitle tracks
-				const subtitleStreams = (metadata.streams ?? []).filter(
-					(s) => s.codec_type === 'subtitle',
-				);
-				const subtitleTracks = subtitleStreams.map((s: any, i: number) => ({
-					index: i,
-					codec: s.codec_name ?? 'unknown',
-					language: s.tags?.language ?? 'und',
-					title: s.tags?.title ?? `Track ${i + 1}`,
-					forced: s.disposition?.forced === 1,
-					external: false,
-				}));
-
-				const codecInfo = {
-					codecVideo: videoStream?.codec_name ?? undefined,
-					codecAudio: audioStream?.codec_name ?? undefined,
-					resolution,
-					durationSeconds: metadata.format?.duration
-						? Math.round(metadata.format.duration)
-						: undefined,
-					bitrate: metadata.format?.bit_rate
-						? Math.round(Number(metadata.format.bit_rate))
-						: undefined,
-					videoWidth: width,
-					videoHeight: height,
-					videoBitDepth: (videoStream as any)?.bits_per_raw_sample
-						? parseInt((videoStream as any).bits_per_raw_sample, 10)
-						: undefined,
-					videoFrameRate,
-					videoProfile:
-						videoStream?.profile != null ? String(videoStream.profile) : undefined,
-					videoColorSpace: colorSpace || undefined,
-					hdr,
-					containerFormat: metadata.format?.format_name ?? undefined,
-					audioTracks,
-					subtitleTracks,
-				};
-
-				// Raw metadata blob
-				const formatTags: Record<string, string> = {};
-				if (metadata.format?.tags) {
-					for (const [key, value] of Object.entries(metadata.format.tags)) {
-						if (value != null) formatTags[key] = String(value);
-					}
-				}
-
-				const streams = (metadata.streams ?? []).map((s) => ({
-					index: s.index,
-					codecType: s.codec_type,
-					codecName: s.codec_name,
-					width: s.width,
-					height: s.height,
-					tags: s.tags
-						? Object.fromEntries(Object.entries(s.tags).map(([k, v]) => [k, String(v)]))
-						: undefined,
-				}));
-
-				const format = {
-					formatName: metadata.format?.format_name,
-					duration: metadata.format?.duration,
-					size: metadata.format?.size,
-					bitRate: metadata.format?.bit_rate
-						? Number(metadata.format.bit_rate)
-						: undefined,
-				};
-
-				resolve({
-					codecInfo,
-					fileMetadata: { formatTags, streams, format },
-				});
-			});
-		});
 	}
 }

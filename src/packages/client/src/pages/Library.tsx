@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
+import { Icon } from '@/components/common/Icon';
 import type { BulkAction } from '@/components/movie/BulkActionsBar';
 import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
 import { MovieGrid } from '@/components/movie/MovieGrid';
@@ -332,7 +333,8 @@ export function Library(_props: LibraryProps) {
 					onClick={toggleShowHidden}
 					title={showHidden.value ? 'Showing all movies' : 'Show hidden movies'}
 				>
-					{showHidden.value ? '\u{1F441} Hidden' : '\u{1F441} Hidden'}
+					<Icon name={showHidden.value ? 'eye' : 'eye-off'} />
+					<span>Hidden</span>
 				</button>
 
 				<button
@@ -340,7 +342,8 @@ export function Library(_props: LibraryProps) {
 					onClick={toggleHideWatched}
 					title={hideWatched.value ? 'Showing unwatched only' : 'Hide watched movies'}
 				>
-					{hideWatched.value ? '\u2713 Unwatched' : '\u{1F441} Unwatched'}
+					<Icon name={hideWatched.value ? 'eye-off' : 'eye'} />
+					<span>Unwatched</span>
 				</button>
 
 				<div class={styles.toolbarActions}>
@@ -363,7 +366,7 @@ export function Library(_props: LibraryProps) {
 						aria-label={`Sort ${filters.value.sortOrder === 'asc' ? 'ascending' : 'descending'}`}
 						title={filters.value.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
 					>
-						{filters.value.sortOrder === 'asc' ? '\u2191' : '\u2193'}
+						<Icon name={filters.value.sortOrder === 'asc' ? 'arrow-up' : 'arrow-down'} />
 					</button>
 
 					<div class={styles.viewToggle}>
@@ -373,7 +376,7 @@ export function Library(_props: LibraryProps) {
 							aria-label="Large card view"
 							title="Large cards"
 						>
-							{'\u2B1C'}
+							<Icon name="view-large" />
 						</button>
 						<button
 							class={`${styles.viewButton} ${viewMode.value === 'grid' ? styles.active : ''}`}
@@ -381,7 +384,7 @@ export function Library(_props: LibraryProps) {
 							aria-label="Grid view"
 							title="Grid"
 						>
-							{'\u25A6'}
+							<Icon name="view-grid" />
 						</button>
 						<button
 							class={`${styles.viewButton} ${viewMode.value === 'list' ? styles.active : ''}`}
@@ -389,7 +392,7 @@ export function Library(_props: LibraryProps) {
 							aria-label="List view"
 							title="List"
 						>
-							{'\u2630'}
+							<Icon name="view-list" />
 						</button>
 					</div>
 
@@ -406,7 +409,7 @@ export function Library(_props: LibraryProps) {
 						aria-label="Toggle edit mode"
 						title="Select movies for bulk actions"
 					>
-						{'\u270E'}
+						<Icon name="edit" />
 					</button>
 
 					<Button variant="ghost" size="sm" onClick={() => setShowFilters(!showFilters)}>

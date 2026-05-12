@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { Icon } from '@/components/common/Icon';
 import { useDebounce } from '@/hooks/useDebounce';
 import { theme, toggleTheme } from '@/state/theme.state';
 
@@ -10,8 +11,16 @@ export function TopBar() {
 	const debouncedSearch = useDebounce(searchValue, 300);
 
 	useEffect(() => {
-		if (debouncedSearch) {
-			route(`/search?q=${encodeURIComponent(debouncedSearch)}`);
+		const trimmed = debouncedSearch.trim();
+		if (trimmed) {
+			route(`/search?q=${encodeURIComponent(trimmed)}`);
+			return;
+		}
+		// Input is now empty — if the user is on the /search route, take
+		// them back to /library so they see all movies instead of stale
+		// results from the previous query.
+		if (window.location.pathname.startsWith('/search')) {
+			route('/library');
 		}
 	}, [debouncedSearch]);
 
@@ -61,7 +70,7 @@ export function TopBar() {
 					</svg>
 				</span>
 				<input
-					type="search"
+					type="text"
 					class={styles.searchInput}
 					placeholder="Search movies..."
 					value={searchValue}
@@ -73,24 +82,11 @@ export function TopBar() {
 					<button
 						type="button"
 						class={styles.searchClear}
-						onClick={() => {
-							setSearchValue('');
-							route('/library');
-						}}
+						onClick={() => setSearchValue('')}
+						aria-label="Clear search"
 						title="Clear search"
 					>
-						<svg
-							width="18"
-							height="18"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2.5"
-							stroke-linecap="round"
-						>
-							<line x1="18" y1="6" x2="6" y2="18" />
-							<line x1="6" y1="6" x2="18" y2="18" />
-						</svg>
+						<Icon name="x" size={14} />
 					</button>
 				)}
 			</form>
@@ -102,11 +98,15 @@ export function TopBar() {
 					title={`Theme: ${themeLabel}`}
 					aria-label={`Toggle theme (currently ${themeLabel})`}
 				>
-					{theme.value === 'dark'
-						? '\u{1F319}'
-						: theme.value === 'light'
-							? '\u2600'
-							: '\u{1F500}'}
+					<Icon
+						name={
+							theme.value === 'dark'
+								? 'moon'
+								: theme.value === 'light'
+									? 'sun'
+									: 'monitor'
+						}
+					/>
 				</button>
 			</div>
 		</header>

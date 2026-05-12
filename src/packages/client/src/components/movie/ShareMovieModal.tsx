@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
+import { Icon } from '@/components/common/Icon';
 import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
 import { shareLinksService } from '@/services/share-links.service';
@@ -114,7 +115,13 @@ export function ShareMovieModal({ movieId, movieTitle, isOpen, onClose }: ShareM
 								Close
 							</Button>
 							<Button variant="primary" onClick={handleCopy}>
-								{copied ? '\u2713 Copied!' : 'Copy link'}
+								{copied ? (
+									<>
+										<Icon name="check" size={14} /> Copied!
+									</>
+								) : (
+									'Copy link'
+								)}
 							</Button>
 						</div>
 					</>

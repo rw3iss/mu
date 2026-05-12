@@ -46,6 +46,8 @@
   border-radius: var(--radius-full);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
+
+  svg { width: 18px; height: 18px; }
 }
 
 .message {

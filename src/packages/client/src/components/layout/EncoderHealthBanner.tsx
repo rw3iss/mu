@@ -1,5 +1,6 @@
 import { signal } from '@preact/signals';
 import { useEffect } from 'preact/hooks';
+import { Icon } from '@/components/common/Icon';
 import { api } from '@/services/api';
 import { wsService } from '@/services/websocket.service';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
@@ -108,7 +109,7 @@ export function EncoderHealthBanner() {
 	return (
 		<div class={styles.banner} role="status">
 			<div class={styles.icon} aria-hidden="true">
-				⚠
+				<Icon name="warning" size={20} />
 			</div>
 			<div class={styles.body}>
 				<div class={styles.title}>Hardware video encoding is unavailable</div>
@@ -136,7 +137,7 @@ export function EncoderHealthBanner() {
 					onClick={() => dismiss(s.since)}
 					aria-label="Dismiss"
 				>
-					✕
+					<Icon name="x" size={14} />
 				</button>
 			</div>
 		</div>

@@ -61,6 +61,8 @@
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 
+  svg { width: 16px; height: 16px; }
+
   &:hover {
     background: var(--color-bg-elevated);
     border-color: var(--color-accent);
@@ -88,6 +90,8 @@
   font-size: var(--font-size-md);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
+
+  svg { width: 18px; height: 18px; }
 
   & + & {
     border-left: 1px solid var(--color-border);
@@ -126,7 +130,7 @@
   transition: transform 200ms ease;
 
   &:hover {
-    z-index: 250; // above sidebar (--z-sticky: 200) so tooltip isn't clipped
+    z-index: var(--z-overlay); // above sidebar so tooltip isn't clipped
   }
 }
 

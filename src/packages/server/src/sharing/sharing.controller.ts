@@ -1,4 +1,3 @@
-import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { MovieListQuery, MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
 import {
@@ -24,6 +23,10 @@ import { MoviesService } from '../movies/movies.service.js';
 import { DirectPlayService } from '../stream/direct-play/direct-play.service.js';
 import { StreamService } from '../stream/stream.service.js';
 import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
+import {
+	SUBTITLE_EXTS,
+	SubtitleIngestionService,
+} from '../stream/subtitles/subtitle-ingestion.service.js';
 import { SubtitleSearchService } from '../stream/subtitles/subtitle-search.service.js';
 import { HlsGeneratorService } from '../stream/transcoder/hls-generator.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
@@ -42,6 +45,7 @@ export class SharingController {
 		private readonly directPlayService: DirectPlayService,
 		private readonly subtitleService: SubtitleService,
 		private readonly subtitleSearch: SubtitleSearchService,
+		private readonly subtitleIngestion: SubtitleIngestionService,
 		private readonly db: DatabaseService,
 	) {}
 
@@ -256,81 +260,32 @@ export class SharingController {
 
 		const originalName = data.filename as string;
 		const ext = path.extname(originalName).toLowerCase();
-		const validExts = ['.srt', '.vtt', '.ass', '.ssa', '.sub'];
-		if (!validExts.includes(ext)) {
+		if (!SUBTITLE_EXTS.includes(ext as (typeof SUBTITLE_EXTS)[number])) {
 			throw new BadRequestException(`Unsupported subtitle format "${ext}"`);
 		}
 
-		const chunks: Buffer[] = [];
-		for await (const chunk of data.file) {
-			chunks.push(chunk);
-		}
-		const fileBuffer = Buffer.concat(chunks);
-
+		const fileBuffer = await this.subtitleIngestion.readMultipart(data.file);
 		const parsed = this.subtitleService.parseSubtitleFilename(originalName);
 		const lang = parsed.language !== 'und' ? parsed.language : 'en';
 
-		const movieDir = path.dirname(file.filePath);
-		const baseName = path.basename(file.filePath, path.extname(file.filePath));
-		const subFileName = `${baseName}.${lang}${ext}`;
-		const subFilePath = path.join(movieDir, subFileName);
-
-		await writeFile(subFilePath, fileBuffer);
-
-		await this.subtitleService.clearCache(file.id);
-		const tracks = await this.subtitleService.extractSubtitles(file.filePath, file.id);
-
-		if (tracks.length > 0) {
-			this.db.db
-				.update(movieFiles)
-				.set({
-					subtitleTracks: JSON.stringify(
-						tracks.map((t) => ({
-							index: t.index,
-							language: t.language,
-							title: t.title,
-							external: t.external ?? false,
-						})),
-					),
-				})
-				.where(eq(movieFiles.id, file.id))
-				.run();
-		} else {
-			const existing = parseJsonArray<Record<string, unknown>>(file.subtitleTracks);
-			const newIdx = existing.length;
-			existing.push({
-				index: newIdx,
-				language: lang,
-				title: `${lang.toUpperCase()} (Uploaded)`,
-				external: true,
-			});
-			this.db.db
-				.update(movieFiles)
-				.set({ subtitleTracks: JSON.stringify(existing) })
-				.where(eq(movieFiles.id, file.id))
-				.run();
-			tracks.push({
-				index: newIdx,
-				language: lang,
-				title: `${lang.toUpperCase()} (Uploaded)`,
-				external: true,
-			});
-
-			const outputDir = path.join('data', 'cache', 'subtitles', file.id);
-			const { mkdir: mkdirP } = await import('node:fs/promises');
-			await mkdirP(outputDir, { recursive: true });
-			await this.subtitleService.convertToVtt(
-				subFilePath,
-				path.join(outputDir, `${newIdx}.vtt`),
-			);
-		}
-
-		const newTrack = tracks[tracks.length - 1];
+		const subFilePath = await this.subtitleIngestion.writeSidecar(
+			file.filePath,
+			lang,
+			ext,
+			fileBuffer,
+		);
+		const newTrack = await this.subtitleIngestion.registerExternal({
+			fileId: file.id,
+			filePath: file.filePath,
+			subFilePath,
+			lang,
+			labelSuffix: 'Uploaded',
+		});
 		return {
 			subtitle: {
-				index: newTrack?.index ?? 0,
+				index: newTrack.index,
 				language: lang,
-				label: newTrack?.title || `${lang.toUpperCase()} (Uploaded)`,
+				label: newTrack.title || `${lang.toUpperCase()} (Uploaded)`,
 				external: true,
 			},
 		};
@@ -355,68 +310,25 @@ export class SharingController {
 			body.fileId,
 		);
 
-		const movieDir = path.dirname(file.filePath);
-		const baseName = path.basename(file.filePath, path.extname(file.filePath));
 		const lang = body.language || 'en';
-		const subFileName = `${baseName}.${lang}.${format}`;
-		const subFilePath = path.join(movieDir, subFileName);
-
-		await writeFile(subFilePath, data);
-
-		await this.subtitleService.clearCache(file.id);
-		const tracks = await this.subtitleService.extractSubtitles(file.filePath, file.id);
-
-		if (tracks.length > 0) {
-			this.db.db
-				.update(movieFiles)
-				.set({
-					subtitleTracks: JSON.stringify(
-						tracks.map((t) => ({
-							index: t.index,
-							language: t.language,
-							title: t.title,
-							external: t.external ?? false,
-						})),
-					),
-				})
-				.where(eq(movieFiles.id, file.id))
-				.run();
-		} else {
-			const existing = parseJsonArray<Record<string, unknown>>(file.subtitleTracks);
-			const newIdx = existing.length;
-			existing.push({
-				index: newIdx,
-				language: lang,
-				title: `${lang.toUpperCase()} (Downloaded)`,
-				external: true,
-			});
-			this.db.db
-				.update(movieFiles)
-				.set({ subtitleTracks: JSON.stringify(existing) })
-				.where(eq(movieFiles.id, file.id))
-				.run();
-			tracks.push({
-				index: newIdx,
-				language: lang,
-				title: `${lang.toUpperCase()} (Downloaded)`,
-				external: true,
-			});
-
-			const outputDir = path.join('data', 'cache', 'subtitles', file.id);
-			const { mkdir: mkdirP } = await import('node:fs/promises');
-			await mkdirP(outputDir, { recursive: true });
-			await this.subtitleService.convertToVtt(
-				subFilePath,
-				path.join(outputDir, `${newIdx}.vtt`),
-			);
-		}
-
-		const newTrack = tracks[tracks.length - 1];
+		const subFilePath = await this.subtitleIngestion.writeSidecar(
+			file.filePath,
+			lang,
+			`.${format}`,
+			data,
+		);
+		const newTrack = await this.subtitleIngestion.registerExternal({
+			fileId: file.id,
+			filePath: file.filePath,
+			subFilePath,
+			lang,
+			labelSuffix: 'Downloaded',
+		});
 		return {
 			subtitle: {
-				index: newTrack?.index ?? 0,
+				index: newTrack.index,
 				language: lang,
-				label: newTrack?.title || `${lang.toUpperCase()} (Downloaded)`,
+				label: newTrack.title || `${lang.toUpperCase()} (Downloaded)`,
 				external: true,
 			},
 		};

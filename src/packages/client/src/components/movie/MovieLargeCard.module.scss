@@ -195,7 +195,7 @@
   white-space: normal;
   word-break: break-word;
   max-width: 220px;
-  z-index: 100;
+  z-index: var(--z-overlay);
   box-shadow: var(--shadow-md);
   pointer-events: none;
 }

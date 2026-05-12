@@ -85,6 +85,9 @@
 }
 
 .showHiddenBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
   padding: var(--space-sm) var(--space-md);
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
@@ -94,6 +97,8 @@
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
   white-space: nowrap;
+
+  svg { width: 16px; height: 16px; }
 
   &:hover {
     border-color: var(--color-accent);
@@ -161,12 +166,17 @@
 }
 
 .viewButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: var(--space-sm) var(--space-sm);
   background: var(--color-bg-surface);
   color: var(--color-text-muted);
   font-size: var(--font-size-md);
   transition: all var(--transition-fast);
   min-width: 36px;
+
+  svg { width: 18px; height: 18px; }
 
   &.active {
     background: var(--color-accent);
@@ -180,6 +190,9 @@
 }
 
 .editBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: var(--space-sm);
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
@@ -188,6 +201,8 @@
   font-size: var(--font-size-md);
   min-width: 36px;
   transition: all var(--transition-fast);
+
+  svg { width: 16px; height: 16px; }
 
   &.active {
     background: var(--color-accent);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { Icon } from '@/components/common/Icon';
 import type { MoviePlaylistInfo, Playlist } from '@/services/playlists.service';
 import { notifyError, notifySuccess, shouldNotifyPlaylist } from '@/state/notifications.state';
 import {
@@ -149,7 +150,7 @@ export function MoviePlaylists({
 								}}
 								aria-label={`Remove from ${p.name}`}
 							>
-								{'✕'}
+								<Icon name="x" size={12} />
 							</button>
 						</a>
 					))}

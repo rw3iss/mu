@@ -1,5 +1,6 @@
 import { ComponentChildren, createPortal } from 'preact/compat';
 import { useCallback, useEffect, useRef } from 'preact/hooks';
+import { Icon } from './Icon';
 import styles from './Modal.module.scss';
 
 interface ModalProps {
@@ -56,7 +57,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 					<div class={styles.header}>
 						<h2 class={styles.title}>{title}</h2>
 						<button class={styles.close} onClick={onClose} aria-label="Close modal">
-							{'\u2715'}
+							<Icon name="x" size={16} />
 						</button>
 					</div>
 				)}

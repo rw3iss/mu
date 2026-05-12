@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { Icon } from '@/components/common/Icon';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
@@ -25,7 +26,9 @@ function Section({
 		<div class={styles.section}>
 			<button class={styles.sectionHeader} onClick={() => setOpen(!open)}>
 				<h3 class={styles.sectionTitle}>{title}</h3>
-				<span class={styles.sectionArrow}>{open ? '\u25B2' : '\u25BC'}</span>
+				<span class={styles.sectionArrow}>
+					<Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} />
+				</span>
 			</button>
 			{open && <div class={styles.sectionContent}>{children}</div>}
 		</div>

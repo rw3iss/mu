@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { Icon } from '@/components/common/Icon';
 import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
 import { PluginSlot } from '@/plugins/PluginSlot';
@@ -173,7 +174,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 			<div class={styles.header}>
 				<div class={styles.headerInfo}>
 					<button class={styles.backLink} onClick={() => route('/playlists')}>
-						{'\u2190'} Playlists
+						<Icon name="arrow-left" size={14} /> Playlists
 					</button>
 					<h1 class={styles.title}>{playlist.name}</h1>
 					{playlist.description && (
@@ -247,7 +248,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 								onClick={() => handleRemoveMovie(movie.movieId)}
 								aria-label={`Remove ${movie.movieTitle}`}
 							>
-								{'\u2715'}
+								<Icon name="x" size={12} />
 							</Button>
 						</div>
 					))}

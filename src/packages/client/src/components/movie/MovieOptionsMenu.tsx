@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { Icon } from '@/components/common/Icon';
 import { moviesService } from '@/services/movies.service';
 import type { MoviePlaylistInfo, Playlist } from '@/services/playlists.service';
 import type { Movie } from '@/state/library.state';
@@ -364,7 +365,7 @@ export function MovieOptionsMenu({
 						disabled={rescanState !== 'idle'}
 					>
 						<span class={styles.menuIcon}>
-							{rescanState === 'complete' ? '✓' : '🔍'}
+							<Icon name={rescanState === 'complete' ? 'check' : 'search'} />
 						</span>
 						{asyncLabel(rescanState, {
 							idle: 'Re-scan File',
@@ -378,7 +379,7 @@ export function MovieOptionsMenu({
 						disabled={refreshState !== 'idle'}
 					>
 						<span class={styles.menuIcon}>
-							{refreshState === 'complete' ? '✓' : '↻'}
+							<Icon name={refreshState === 'complete' ? 'check' : 'refresh'} />
 						</span>
 						{asyncLabel(refreshState, {
 							idle: 'Refresh Metadata',
@@ -394,7 +395,9 @@ export function MovieOptionsMenu({
 							setShowClearMetaConfirm(true);
 						}}
 					>
-						<span class={styles.menuIcon}>{'✕'}</span>
+						<span class={styles.menuIcon}>
+							<Icon name="x" />
+						</span>
 						Clear Metadata
 					</button>
 					<div class={styles.menuDivider} />
@@ -409,10 +412,12 @@ export function MovieOptionsMenu({
 							aria-haspopup="menu"
 							aria-expanded={playlistFlyoutOpen}
 						>
-							<span class={styles.menuIcon}>{'☰'}</span>
+							<span class={styles.menuIcon}>
+								<Icon name="list-plus" />
+							</span>
 							<span class={styles.submenuLabel}>Add to playlist</span>
 							<span class={styles.submenuChevron} aria-hidden="true">
-								{'›'}
+								<Icon name="chevron-right" />
 							</span>
 						</button>
 						{playlistFlyoutOpen && (
@@ -451,7 +456,11 @@ export function MovieOptionsMenu({
 													<span
 														class={`${styles.menuIcon} ${styles.submenuCheck}`}
 													>
-														{pending ? '…' : isMember ? '✓' : ''}
+														{pending ? (
+															'…'
+														) : isMember ? (
+															<Icon name="check" />
+														) : null}
 													</span>
 													<span class={styles.submenuLabel}>
 														{p.name}
@@ -469,16 +478,22 @@ export function MovieOptionsMenu({
 						onClick={handleWatchlistToggle}
 						disabled={watchlistPending}
 					>
-						<span class={styles.menuIcon}>{inWatchlist ? '★' : '☆'}</span>
+						<span class={styles.menuIcon}>
+							<Icon name={inWatchlist ? 'star-filled' : 'star'} />
+						</span>
 						{inWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}
 					</button>
 					<div class={styles.menuDivider} />
 					<button class={styles.menuItem} onClick={handleHideToggle}>
-						<span class={styles.menuIcon}>{movie.hidden ? '👁' : '🚫'}</span>
+						<span class={styles.menuIcon}>
+							<Icon name={movie.hidden ? 'eye' : 'eye-off'} />
+						</span>
 						{movie.hidden ? 'Unhide from Library' : 'Hide from Library'}
 					</button>
 					<button class={styles.menuItem} onClick={handleWatchedToggle}>
-						<span class={styles.menuIcon}>{movie.watched ? '↩' : '✓'}</span>
+						<span class={styles.menuIcon}>
+							<Icon name={movie.watched ? 'refresh' : 'check'} />
+						</span>
 						{movie.watched ? 'Mark as Unwatched' : 'Mark as Watched'}
 					</button>
 					<button
@@ -489,7 +504,9 @@ export function MovieOptionsMenu({
 							setShowRemoveConfirm(true);
 						}}
 					>
-						<span class={styles.menuIcon}>{'✕'}</span>
+						<span class={styles.menuIcon}>
+							<Icon name="x-circle" />
+						</span>
 						Remove from Library
 					</button>
 					<button
@@ -499,7 +516,9 @@ export function MovieOptionsMenu({
 							setShowDeleteModal(true);
 						}}
 					>
-						<span class={styles.menuIcon}>{'🗑'}</span>
+						<span class={styles.menuIcon}>
+							<Icon name="trash" />
+						</span>
 						Delete from Disk
 					</button>
 				</div>

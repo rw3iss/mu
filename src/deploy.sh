@@ -85,6 +85,29 @@ pnpm install --frozen-lockfile 2>/dev/null || pnpm install
 echo "--- pnpm build ---"
 pnpm build
 
+# ── 3a. Verify the client SPA actually got written ──
+# Turbo's cache occasionally restores a partial dist/ that contains only
+# the public-folder assets (PNGs, favicon) but is missing index.html and
+# the assets/ bundle. When that happens the server returns
+# `{"message":"Cannot GET /"}` because the SPA fallback hook in main.ts
+# has no index.html to read.
+#
+# Detect that case and force a fresh rebuild of just the client package,
+# bypassing turbo's cache.
+CLIENT_DIST="$SRC_DIR/packages/client/dist"
+if [ ! -s "$CLIENT_DIST/index.html" ] || [ ! -d "$CLIENT_DIST/assets" ]; then
+    echo "WARNING: client/dist is missing index.html or assets/ — forcing fresh rebuild"
+    rm -rf "$CLIENT_DIST"
+    # --force bypasses turbo cache for this run; the client package alone
+    # rebuilds in 1-3s on this hardware, so the cost is negligible.
+    pnpm --filter @mu/client build --force 2>&1 | tail -10 || pnpm --filter @mu/client build
+    if [ ! -s "$CLIENT_DIST/index.html" ] || [ ! -d "$CLIENT_DIST/assets" ]; then
+        echo "ERROR: client/dist still missing index.html or assets/ after rebuild — aborting deploy"
+        exit 1
+    fi
+    echo "client/dist rebuilt OK"
+fi
+
 # ── 4. Run database migrations ──
 echo "--- database migrations ---"
 cd "$SRC_DIR"

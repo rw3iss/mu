@@ -1,6 +1,7 @@
 import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
 import { useCallback, useRef, useState } from 'preact/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { Icon } from '@/components/common/Icon';
 import { subtitlesService } from '@/services/subtitles.service';
 import { globalMovie } from '@/state/globalPlayer.state';
 import styles from './SubtitlePanel.module.scss';
@@ -199,7 +200,7 @@ export function SubtitlePanel({
 				<span class={styles.sectionTitle}>
 					Subtitles{tracks.length > 0 ? ` (${tracks.length})` : ''}
 				</span>
-				<span class={styles.arrow}>{tracksOpen ? '\u25B2' : '\u25BC'}</span>
+				<span class={styles.arrow}><Icon name={tracksOpen ? 'chevron-up' : 'chevron-down'} size={12} /></span>
 			</button>
 
 			{tracksOpen && (
@@ -314,7 +315,7 @@ export function SubtitlePanel({
 								)}
 							</button>
 						)}
-						<span class={styles.arrow}>{searchOpen ? '\u25B2' : '\u25BC'}</span>
+						<span class={styles.arrow}><Icon name={searchOpen ? 'chevron-up' : 'chevron-down'} size={12} /></span>
 					</span>
 				</button>
 
@@ -337,7 +338,7 @@ export function SubtitlePanel({
 									onClick={() => setFilterQuery('')}
 									title="Clear filter"
 								>
-									{'\u2715'}
+									<Icon name="x" size={12} />
 								</button>
 							)}
 						</div>

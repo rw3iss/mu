@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { Icon } from '@/components/common/Icon';
 import type { Movie } from '@/state/library.state';
 import { removeMovieFromList, updateMovieInList } from '@/state/library.state';
 import { MovieCard } from './MovieCard';
@@ -76,7 +77,7 @@ export function MovieCarousel({
 						onClick={() => scroll('left')}
 						aria-label="Scroll left"
 					>
-						{'\u276E'}
+						<Icon name="chevron-left" size={18} />
 					</button>
 				)}
 
@@ -98,7 +99,7 @@ export function MovieCarousel({
 						onClick={() => scroll('right')}
 						aria-label="Scroll right"
 					>
-						{'\u276F'}
+						<Icon name="chevron-right" size={18} />
 					</button>
 				)}
 			</div>

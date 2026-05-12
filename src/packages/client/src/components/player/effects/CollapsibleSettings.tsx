@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import { Icon } from '@/components/common/Icon';
 import { useUiSetting } from '@/hooks/useUiSetting';
 import styles from '../EffectsPanel.module.scss';
 
@@ -20,7 +21,9 @@ export function CollapsibleSettings({ settingKey, children }: CollapsibleSetting
 		<div class={styles.collapsible}>
 			<button class={styles.collapsibleToggle} onClick={() => setOpen(!open)}>
 				<span>Settings</span>
-				<span class={styles.collapsibleArrow}>{open ? '▲' : '▼'}</span>
+				<span class={styles.collapsibleArrow}>
+					<Icon name={open ? 'chevron-up' : 'chevron-down'} size={12} />
+				</span>
 			</button>
 			{open && <div class={styles.collapsibleContent}>{children}</div>}
 		</div>

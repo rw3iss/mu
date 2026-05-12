@@ -1,12 +1,13 @@
+import { Icon, type IconName } from '@/components/common/Icon';
 import type { NotificationType } from '@/state/notifications.state';
 import { notifications, removeNotification } from '@/state/notifications.state';
 import styles from './Toast.module.scss';
 
-const typeIcons: Record<NotificationType, string> = {
-	success: '\u2713',
-	error: '\u2717',
-	warning: '\u26A0',
-	info: '\u2139',
+const typeIcons: Record<NotificationType, IconName> = {
+	success: 'check-circle',
+	error: 'x-circle',
+	warning: 'warning',
+	info: 'info',
 };
 
 export function Toast() {
@@ -22,14 +23,16 @@ export function Toast() {
 					class={`${styles.toast} ${styles[notification.type]}`}
 					role="alert"
 				>
-					<span class={styles.icon}>{typeIcons[notification.type]}</span>
+					<span class={styles.icon}>
+						<Icon name={typeIcons[notification.type]} />
+					</span>
 					<span class={styles.message}>{notification.message}</span>
 					<button
 						class={styles.close}
 						onClick={() => removeNotification(notification.id)}
 						aria-label="Dismiss notification"
 					>
-						{'\u2715'}
+						<Icon name="x" size={14} />
 					</button>
 				</div>
 			))}

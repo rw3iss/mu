@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { Icon } from '@/components/common/Icon';
 import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
 import { useUiSetting } from '@/hooks/useUiSetting';
@@ -158,7 +159,7 @@ function MovieStrip({ movies }: { movies: PlaylistMovieSummary[] }) {
 					}}
 					aria-label="Scroll left"
 				>
-					{'\u2039'}
+					<Icon name="chevron-left" />
 				</button>
 			)}
 			<div
@@ -179,7 +180,7 @@ function MovieStrip({ movies }: { movies: PlaylistMovieSummary[] }) {
 					}}
 					aria-label="Scroll right"
 				>
-					{'\u203A'}
+					<Icon name="chevron-right" />
 				</button>
 			)}
 		</div>
@@ -278,7 +279,7 @@ export function Playlists(_props: PlaylistsProps) {
 						aria-label={sortOrder === 'desc' ? 'Sort descending' : 'Sort ascending'}
 						title={sortOrder === 'desc' ? 'Descending' : 'Ascending'}
 					>
-						{sortOrder === 'desc' ? '\u2193' : '\u2191'}
+						<Icon name={sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'} />
 					</button>
 					<div class={styles.viewToggle}>
 						<button
@@ -287,7 +288,7 @@ export function Playlists(_props: PlaylistsProps) {
 							aria-label="Grid view"
 							title="Grid"
 						>
-							{'\u25A6'}
+							<Icon name="view-grid" />
 						</button>
 						<button
 							class={`${styles.viewButton} ${viewMode === 'list' ? styles.active : ''}`}
@@ -295,7 +296,7 @@ export function Playlists(_props: PlaylistsProps) {
 							aria-label="List view"
 							title="List"
 						>
-							{'\u2630'}
+							<Icon name="view-list" />
 						</button>
 					</div>
 					<Button variant="primary" onClick={() => setShowCreate(true)}>

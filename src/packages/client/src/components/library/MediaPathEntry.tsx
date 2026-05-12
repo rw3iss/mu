@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { FolderBrowser } from '@/components/common/FolderBrowser';
+import { Icon } from '@/components/common/Icon';
 import type { MediaSourceDto, ScanResult } from '@/services/sources.service';
 import { sourcesService } from '@/services/sources.service';
 import styles from './MediaPathEntry.module.scss';
@@ -72,7 +73,7 @@ export function MediaPathEntry({
 					</Button>
 				)}
 				<button class={styles.removeBtn} onClick={onRemove} aria-label="Remove path">
-					{'\u2715'}
+					<Icon name="x" size={14} />
 				</button>
 			</div>
 

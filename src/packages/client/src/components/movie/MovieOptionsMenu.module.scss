@@ -75,6 +75,9 @@
 	margin-right: var(--space-xs);
 	font-size: 14px;
 	text-align: center;
+	color: currentColor;
+
+	svg { width: 16px; height: 16px; }
 }
 
 .menuItem {

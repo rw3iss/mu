@@ -1,8 +1,6 @@
-import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
 import {
-	BadGatewayException,
 	BadRequestException,
 	Body,
 	Controller,
@@ -14,13 +12,15 @@ import {
 	Post,
 	Req,
 } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
-import { DatabaseService } from '../../database/database.service.js';
-import { movieFiles, movies } from '../../database/schema/index.js';
-import { RemoteService } from '../../remote/remote.service.js';
 import { SubtitleService } from './subtitle.service.js';
+import {
+	SUBTITLE_EXTS,
+	SubtitleIngestionService,
+} from './subtitle-ingestion.service.js';
+import { SubtitleRemoteProxyService } from './subtitle-remote-proxy.service.js';
 import { SubtitleSearchService } from './subtitle-search.service.js';
+import { SubtitleTracksRepository } from './subtitle-tracks.repository.js';
 
 @Controller('subtitles')
 export class SubtitleManageController {
@@ -29,29 +29,25 @@ export class SubtitleManageController {
 	constructor(
 		private readonly subtitleSearch: SubtitleSearchService,
 		private readonly subtitleService: SubtitleService,
-		private readonly database: DatabaseService,
-		private readonly remoteService: RemoteService,
+		private readonly tracksRepo: SubtitleTracksRepository,
+		private readonly remoteProxy: SubtitleRemoteProxyService,
+		private readonly ingestion: SubtitleIngestionService,
 	) {}
 
-	/**
-	 * GET /subtitles/:movieId — List existing subtitle tracks for a movie
-	 */
+	/** GET /subtitles/:movieId — List existing subtitle tracks for a movie */
 	@Get(':movieId')
 	async listSubtitles(
 		@Param('movieId') movieId: string,
 	): Promise<{ subtitles: MovieSubtitleInfo[] }> {
-		const remote = this.parseRemoteId(movieId);
+		const remote = this.remoteProxy.parseRemoteId(movieId);
 		if (remote) {
-			return this.proxyRemoteGet(
-				remote.serverId,
-				`/shared/subtitles/${remote.remoteMovieId}`,
-			);
+			return this.remoteProxy.get(remote.serverId, `/shared/subtitles/${remote.remoteMovieId}`);
 		}
 
-		const file = await this.getMovieFile(movieId);
-		const tracks = this.parseSubtitleTracks(file.subtitleTracks);
+		const file = await this.tracksRepo.getAvailableMovieFile(movieId);
+		const tracks = this.tracksRepo.parseTracks(file.subtitleTracks);
 		return {
-			subtitles: tracks.map((t: any) => ({
+			subtitles: tracks.map((t) => ({
 				index: t.index,
 				language: t.language || 'und',
 				label: t.title || t.language || `Track ${t.index}`,
@@ -62,25 +58,23 @@ export class SubtitleManageController {
 		};
 	}
 
-	/**
-	 * POST /subtitles/:movieId/search — Search third-party APIs for subtitles
-	 */
+	/** POST /subtitles/:movieId/search — Search third-party APIs for subtitles */
 	@Post(':movieId/search')
 	async searchSubtitles(
 		@Param('movieId') movieId: string,
 		@Body() body: { language?: string },
 	): Promise<{ results: SubtitleSearchResult[] }> {
-		const remote = this.parseRemoteId(movieId);
+		const remote = this.remoteProxy.parseRemoteId(movieId);
 		if (remote) {
-			return this.proxyRemotePost(
+			return this.remoteProxy.post(
 				remote.serverId,
 				`/shared/subtitles/${remote.remoteMovieId}/search`,
 				body,
 			);
 		}
 
-		const movie = await this.getMovie(movieId);
-		const file = await this.getMovieFile(movieId);
+		const movie = await this.tracksRepo.getMovie(movieId);
+		const file = await this.tracksRepo.getAvailableMovieFile(movieId);
 
 		const results = await this.subtitleSearch.search({
 			title: movie.title,
@@ -94,9 +88,7 @@ export class SubtitleManageController {
 		return { results };
 	}
 
-	/**
-	 * POST /subtitles/:movieId/download — Download a subtitle from a provider and save it
-	 */
+	/** POST /subtitles/:movieId/download — Download from a provider and save it */
 	@Post(':movieId/download')
 	async downloadSubtitle(
 		@Param('movieId') movieId: string,
@@ -106,78 +98,42 @@ export class SubtitleManageController {
 			throw new BadRequestException('provider and fileId are required');
 		}
 
-		const remote = this.parseRemoteId(movieId);
+		const remote = this.remoteProxy.parseRemoteId(movieId);
 		if (remote) {
-			return this.proxyRemotePost(
+			return this.remoteProxy.post(
 				remote.serverId,
 				`/shared/subtitles/${remote.remoteMovieId}/download`,
 				body,
 			);
 		}
 
-		const file = await this.getMovieFile(movieId);
-
-		// Download from the provider
+		const file = await this.tracksRepo.getAvailableMovieFile(movieId);
 		const { data, format } = await this.subtitleSearch.downloadFromProvider(
 			body.provider,
 			body.fileId,
 		);
 
-		// Save to movie directory
-		const movieDir = path.dirname(file.filePath);
-		const baseName = path.basename(file.filePath, path.extname(file.filePath));
 		const lang = body.language || 'en';
-		const subFileName = `${baseName}.${lang}.${format}`;
-		const subFilePath = path.join(movieDir, subFileName);
-
-		await writeFile(subFilePath, data);
+		const subFilePath = await this.ingestion.writeSidecar(
+			file.filePath,
+			lang,
+			`.${format}`,
+			data,
+		);
 		this.logger.log(`Saved subtitle: ${subFilePath} (${data.length} bytes)`);
 
-		// Re-extract subtitles to pick up the new file
-		await this.subtitleService.clearCache(file.id);
-		const tracks = await this.subtitleService.extractSubtitles(file.filePath, file.id);
-
-		// Update the DB with the new tracks
-		if (tracks.length > 0) {
-			await this.updateSubtitleTracks(file.id, tracks);
-		} else {
-			// extractSubtitles returned empty (ffprobe/ffmpeg unavailable) —
-			// manually register the downloaded file in the DB
-			const existing = this.parseSubtitleTracks(
-				this.database.db.select().from(movieFiles).where(eq(movieFiles.id, file.id)).get()
-					?.subtitleTracks ?? null,
-			);
-			const newIdx = existing.length;
-			existing.push({
-				index: newIdx,
-				language: lang,
-				title: `${lang.toUpperCase()} (Downloaded)`,
-				external: true,
-			});
-			await this.updateSubtitleTracks(file.id, existing);
-			tracks.push({
-				index: newIdx,
-				language: lang,
-				title: `${lang.toUpperCase()} (Downloaded)`,
-				external: true,
-			});
-
-			// Also convert to VTT manually so it's serveable
-			const outputDir = path.join('data', 'cache', 'subtitles', file.id);
-			const { mkdir: mkdirP } = await import('node:fs/promises');
-			await mkdirP(outputDir, { recursive: true });
-			await this.subtitleService.convertToVtt(
-				subFilePath,
-				path.join(outputDir, `${newIdx}.vtt`),
-			);
-		}
-
-		const newTrack = tracks[tracks.length - 1];
+		const newTrack = await this.ingestion.registerExternal({
+			fileId: file.id,
+			filePath: file.filePath,
+			subFilePath,
+			lang,
+			labelSuffix: 'Downloaded',
+		});
 		return {
 			subtitle: {
-				index: newTrack?.index ?? 0,
+				index: newTrack.index,
 				language: lang,
-				label: newTrack?.title || `${lang.toUpperCase()} (Downloaded)`,
+				label: newTrack.title || `${lang.toUpperCase()} (Downloaded)`,
 				external: true,
 			},
 		};
@@ -192,19 +148,13 @@ export class SubtitleManageController {
 		@Param('movieId') movieId: string,
 		@Req() req: FastifyRequest,
 	): Promise<{ subtitle: MovieSubtitleInfo }> {
-		const remote = this.parseRemoteId(movieId);
+		const remote = this.remoteProxy.parseRemoteId(movieId);
 		if (remote) {
-			// Parse the multipart upload, then proxy it to the remote server
 			const data = await (req as any).file();
 			if (!data) throw new BadRequestException('No file uploaded');
 
-			const chunks: Buffer[] = [];
-			for await (const chunk of data.file) {
-				chunks.push(chunk);
-			}
-			const fileBuffer = Buffer.concat(chunks);
-
-			return this.proxyRemoteUpload(
+			const fileBuffer = await this.ingestion.readMultipart(data.file);
+			return this.remoteProxy.upload(
 				remote.serverId,
 				`/shared/subtitles/${remote.remoteMovieId}/upload`,
 				fileBuffer,
@@ -212,93 +162,43 @@ export class SubtitleManageController {
 			);
 		}
 
-		const file = await this.getMovieFile(movieId);
-
-		// Parse multipart data
+		const file = await this.tracksRepo.getAvailableMovieFile(movieId);
 		const data = await (req as any).file();
-		if (!data) {
-			throw new BadRequestException('No file uploaded');
-		}
+		if (!data) throw new BadRequestException('No file uploaded');
 
 		const originalName = data.filename as string;
 		const ext = path.extname(originalName).toLowerCase();
-		const validExts = ['.srt', '.vtt', '.ass', '.ssa', '.sub'];
-		if (!validExts.includes(ext)) {
+		if (!SUBTITLE_EXTS.includes(ext as (typeof SUBTITLE_EXTS)[number])) {
 			throw new BadRequestException(
-				`Unsupported subtitle format "${ext}". Supported: ${validExts.join(', ')}`,
+				`Unsupported subtitle format "${ext}". Supported: ${SUBTITLE_EXTS.join(', ')}`,
 			);
 		}
 
-		// Read file buffer
-		const chunks: Buffer[] = [];
-		for await (const chunk of data.file) {
-			chunks.push(chunk);
-		}
-		const fileBuffer = Buffer.concat(chunks);
-
-		// Determine language from filename or default to 'en'
+		const fileBuffer = await this.ingestion.readMultipart(data.file);
 		const parsed = this.subtitleService.parseSubtitleFilename(originalName);
 		const lang = parsed.language !== 'und' ? parsed.language : 'en';
 
-		// Save next to the movie file
-		const movieDir = path.dirname(file.filePath);
-		const baseName = path.basename(file.filePath, path.extname(file.filePath));
-		const subFileName = `${baseName}.${lang}${ext}`;
-		const subFilePath = path.join(movieDir, subFileName);
-
-		await writeFile(subFilePath, fileBuffer);
+		const subFilePath = await this.ingestion.writeSidecar(file.filePath, lang, ext, fileBuffer);
 		this.logger.log(`Uploaded subtitle: ${subFilePath} (${fileBuffer.length} bytes)`);
 
-		// Re-extract subtitles
-		await this.subtitleService.clearCache(file.id);
-		const tracks = await this.subtitleService.extractSubtitles(file.filePath, file.id);
-
-		if (tracks.length > 0) {
-			await this.updateSubtitleTracks(file.id, tracks);
-		} else {
-			// Fallback: manually register the uploaded file
-			const existing = this.parseSubtitleTracks(
-				this.database.db.select().from(movieFiles).where(eq(movieFiles.id, file.id)).get()
-					?.subtitleTracks ?? null,
-			);
-			const newIdx = existing.length;
-			existing.push({
-				index: newIdx,
-				language: lang,
-				title: `${lang.toUpperCase()} (Uploaded)`,
-				external: true,
-			});
-			await this.updateSubtitleTracks(file.id, existing);
-			tracks.push({
-				index: newIdx,
-				language: lang,
-				title: `${lang.toUpperCase()} (Uploaded)`,
-				external: true,
-			});
-
-			const outputDir = path.join('data', 'cache', 'subtitles', file.id);
-			const { mkdir: mkdirP } = await import('node:fs/promises');
-			await mkdirP(outputDir, { recursive: true });
-			await this.subtitleService.convertToVtt(
-				subFilePath,
-				path.join(outputDir, `${newIdx}.vtt`),
-			);
-		}
-
-		const newTrack = tracks[tracks.length - 1];
+		const newTrack = await this.ingestion.registerExternal({
+			fileId: file.id,
+			filePath: file.filePath,
+			subFilePath,
+			lang,
+			labelSuffix: 'Uploaded',
+		});
 		return {
 			subtitle: {
-				index: newTrack?.index ?? 0,
+				index: newTrack.index,
 				language: lang,
-				label: newTrack?.title || `${lang.toUpperCase()} (Uploaded)`,
+				label: newTrack.title || `${lang.toUpperCase()} (Uploaded)`,
 				external: true,
 			},
 		};
 	}
 
-	/**
-	 * DELETE /subtitles/:movieId/:trackIndex — Delete a subtitle track
-	 */
+	/** DELETE /subtitles/:movieId/:trackIndex — Delete a subtitle track */
 	@Delete(':movieId/:trackIndex')
 	async deleteSubtitle(
 		@Param('movieId') movieId: string,
@@ -309,199 +209,66 @@ export class SubtitleManageController {
 			throw new BadRequestException('Invalid track index');
 		}
 
-		const remote = this.parseRemoteId(movieId);
+		const remote = this.remoteProxy.parseRemoteId(movieId);
 		if (remote) {
-			return this.proxyRemoteDelete(
+			return this.remoteProxy.delete(
 				remote.serverId,
 				`/shared/subtitles/${remote.remoteMovieId}/${trackIndex}`,
 			);
 		}
 
-		// Use any file for this movie (even unavailable ones) since we're just deleting subtitles
-		const file = this.database.db
-			.select()
-			.from(movieFiles)
-			.where(eq(movieFiles.movieId, movieId))
-			.get();
+		const file = this.tracksRepo.getAnyMovieFile(movieId);
 		if (!file) throw new NotFoundException(`No file found for movie ${movieId}`);
 
-		const tracks = this.parseSubtitleTracks(file.subtitleTracks);
-		const track = tracks.find((t: any) => t.index === idx);
+		const tracks = this.tracksRepo.parseTracks(file.subtitleTracks);
+		const track = tracks.find((t) => t.index === idx);
 		if (!track) throw new NotFoundException(`Track ${idx} not found`);
 
 		// Delete the cached VTT file
 		const vttPath = this.subtitleService.getSubtitleFile(file.id, idx);
-		try {
-			const { unlink } = await import('node:fs/promises');
-			await unlink(vttPath);
-		} catch {
-			/* file may not exist */
-		}
+		await this.unlinkQuietly(vttPath);
 
-		// If it's an external subtitle, also delete the source file
+		// External tracks own a sidecar file on disk — clean it up too
 		if (track.external) {
-			const movieDir = path.dirname(file.filePath);
-			const baseName = path.basename(file.filePath, path.extname(file.filePath));
-			const lang = track.language || 'en';
-			const exts = ['.srt', '.vtt', '.ass', '.ssa', '.sub'];
-			for (const ext of exts) {
-				for (const pattern of [`${baseName}.${lang}${ext}`, `${baseName}.${lang}.${ext}`]) {
-					try {
-						const { unlink } = await import('node:fs/promises');
-						await unlink(path.join(movieDir, pattern));
-						this.logger.log(`Deleted subtitle file: ${pattern}`);
-					} catch {
-						/* file doesn't match this pattern */
-					}
-				}
-			}
+			await this.deleteExternalSidecars(file.filePath, track.language || 'en');
 		}
 
-		// Remove from DB tracks and re-index
-		const remaining = tracks.filter((t: any) => t.index !== idx);
-		remaining.forEach((t: any, i: number) => {
-			t.index = i;
-		});
-		await this.updateSubtitleTracks(file.id, remaining);
+		// Remove the row and re-index remaining tracks contiguously
+		const remaining = tracks
+			.filter((t) => t.index !== idx)
+			.map((t, i) => ({ ...t, index: i }));
+		await this.tracksRepo.setTracks(file.id, remaining);
 
 		// Re-extract to rebuild VTT cache with correct indices
 		await this.subtitleService.clearCache(file.id);
 		await this.subtitleService.extractSubtitles(file.filePath, file.id).catch(() => {
-			// If ffprobe unavailable, just keep the DB state we already set
+			// If ffprobe unavailable, keep the DB state we already set
 		});
 
 		return { success: true };
 	}
 
-	// ── Remote helpers ──
+	// ── Private helpers ──────────────────────────────────────────────
 
-	private parseRemoteId(movieId: string): { serverId: string; remoteMovieId: string } | null {
-		const match = movieId.match(/^remote:([^:]+):(.+)$/);
-		if (!match) return null;
-		return { serverId: match[1]!, remoteMovieId: match[2]! };
-	}
-
-	private getRemoteAuth(serverId: string): { baseUrl: string; headers: Record<string, string> } {
-		const auth = this.remoteService.getServerAuth(serverId);
-		if (!auth) throw new NotFoundException(`Remote server ${serverId} not found`);
-		return auth;
-	}
-
-	private async proxyRemoteGet<T>(serverId: string, path: string): Promise<T> {
-		const { baseUrl, headers } = this.getRemoteAuth(serverId);
-		const response = await fetch(`${baseUrl}/api/v1${path}`, {
-			headers,
-			signal: AbortSignal.timeout(15000),
-		});
-		if (!response.ok) {
-			const body = await response.text().catch(() => '');
-			throw new BadGatewayException(`Remote server error ${response.status}: ${body}`);
+	private async deleteExternalSidecars(moviePath: string, lang: string): Promise<void> {
+		const dir = path.dirname(moviePath);
+		const base = path.basename(moviePath, path.extname(moviePath));
+		for (const ext of SUBTITLE_EXTS) {
+			for (const pattern of [`${base}.${lang}${ext}`, `${base}.${lang}.${ext}`]) {
+				if (await this.unlinkQuietly(path.join(dir, pattern))) {
+					this.logger.log(`Deleted subtitle file: ${pattern}`);
+				}
+			}
 		}
-		return (await response.json()) as T;
 	}
 
-	private async proxyRemotePost<T>(serverId: string, path: string, body: unknown): Promise<T> {
-		const { baseUrl, headers } = this.getRemoteAuth(serverId);
-		const response = await fetch(`${baseUrl}/api/v1${path}`, {
-			method: 'POST',
-			headers: { ...headers, 'Content-Type': 'application/json' },
-			body: JSON.stringify(body),
-			signal: AbortSignal.timeout(30000),
-		});
-		if (!response.ok) {
-			const text = await response.text().catch(() => '');
-			throw new BadGatewayException(`Remote server error ${response.status}: ${text}`);
-		}
-		return (await response.json()) as T;
-	}
-
-	private async proxyRemoteUpload<T>(
-		serverId: string,
-		path: string,
-		fileBuffer: Buffer,
-		fileName: string,
-	): Promise<T> {
-		const { baseUrl, headers } = this.getRemoteAuth(serverId);
-		const boundary = `----CineHostBoundary${Date.now()}`;
-		const parts = [
-			`--${boundary}\r\n`,
-			`Content-Disposition: form-data; name="subtitle"; filename="${fileName}"\r\n`,
-			'Content-Type: application/octet-stream\r\n\r\n',
-		];
-		const header = Buffer.from(parts.join(''));
-		const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
-		const body = Buffer.concat([header, fileBuffer, footer]);
-
-		const response = await fetch(`${baseUrl}/api/v1${path}`, {
-			method: 'POST',
-			headers: {
-				...headers,
-				'Content-Type': `multipart/form-data; boundary=${boundary}`,
-			},
-			body,
-			signal: AbortSignal.timeout(30000),
-		});
-		if (!response.ok) {
-			const text = await response.text().catch(() => '');
-			throw new BadGatewayException(`Remote server error ${response.status}: ${text}`);
-		}
-		return (await response.json()) as T;
-	}
-
-	private async proxyRemoteDelete<T>(serverId: string, remotePath: string): Promise<T> {
-		const { baseUrl, headers } = this.getRemoteAuth(serverId);
-		const response = await fetch(`${baseUrl}/api/v1${remotePath}`, {
-			method: 'DELETE',
-			headers,
-			signal: AbortSignal.timeout(15000),
-		});
-		if (!response.ok) {
-			const body = await response.text().catch(() => '');
-			throw new BadGatewayException(`Remote server error ${response.status}: ${body}`);
-		}
-		return (await response.json()) as T;
-	}
-
-	// ── Helpers ──
-
-	private async getMovie(movieId: string) {
-		const result = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
-		if (!result) throw new NotFoundException(`Movie ${movieId} not found`);
-		return result;
-	}
-
-	private async getMovieFile(movieId: string) {
-		const result = this.database.db
-			.select()
-			.from(movieFiles)
-			.where(and(eq(movieFiles.movieId, movieId), eq(movieFiles.available, true)))
-			.get();
-		if (!result) throw new NotFoundException(`No available file for movie ${movieId}`);
-		return result;
-	}
-
-	private parseSubtitleTracks(json: string | null): any[] {
-		if (!json) return [];
+	private async unlinkQuietly(filePath: string): Promise<boolean> {
 		try {
-			return JSON.parse(json);
+			const { unlink } = await import('node:fs/promises');
+			await unlink(filePath);
+			return true;
 		} catch {
-			return [];
+			return false;
 		}
-	}
-
-	private async updateSubtitleTracks(fileId: string, tracks: any[]) {
-		await this.database.db
-			.update(movieFiles)
-			.set({
-				subtitleTracks: JSON.stringify(
-					tracks.map((t) => ({
-						index: t.index,
-						language: t.language,
-						title: t.title,
-						external: t.external ?? false,
-					})),
-				),
-			})
-			.where(eq(movieFiles.id, fileId));
 	}
 }

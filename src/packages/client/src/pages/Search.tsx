@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
+import { Icon } from '@/components/common/Icon';
 import type { BulkAction } from '@/components/movie/BulkActionsBar';
 import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
 import { MovieGrid } from '@/components/movie/MovieGrid';
@@ -124,7 +125,7 @@ export function Search({ q }: SearchProps) {
 							aria-label="Large card view"
 							title="Large cards"
 						>
-							{'\u2B1C'}
+							<Icon name="view-large" />
 						</button>
 						<button
 							class={`${styles.viewButton} ${viewMode.value === 'grid' ? styles.active : ''}`}
@@ -132,7 +133,7 @@ export function Search({ q }: SearchProps) {
 							aria-label="Grid view"
 							title="Grid"
 						>
-							{'\u25A6'}
+							<Icon name="view-grid" />
 						</button>
 						<button
 							class={`${styles.viewButton} ${viewMode.value === 'list' ? styles.active : ''}`}
@@ -140,7 +141,7 @@ export function Search({ q }: SearchProps) {
 							aria-label="List view"
 							title="List"
 						>
-							{'\u2630'}
+							<Icon name="view-list" />
 						</button>
 					</div>
 					<button
@@ -156,7 +157,7 @@ export function Search({ q }: SearchProps) {
 						aria-label="Toggle edit mode"
 						title="Select movies for bulk actions"
 					>
-						{'\u270E'}
+						<Icon name="edit" />
 					</button>
 				</div>
 			</div>

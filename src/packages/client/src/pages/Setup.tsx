@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { Icon } from '@/components/common/Icon';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { setup } from '@/state/auth.state';
@@ -250,7 +251,9 @@ export function Setup(_props: SetupProps) {
 				{/* Step 3: Complete */}
 				{step === 'complete' && (
 					<div class={styles.complete}>
-						<div class={styles.checkmark}>{'\u2713'}</div>
+						<div class={styles.checkmark}>
+							<Icon name="check-circle" size={48} />
+						</div>
 						<p class={styles.completeText}>
 							Everything is set up and ready to go.
 							{mediaPaths.some((e) => e.path.trim())

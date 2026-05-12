@@ -4,6 +4,7 @@ import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
 import { FolderBrowser } from '@/components/common/FolderBrowser';
+import { Icon } from '@/components/common/Icon';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
@@ -173,8 +174,8 @@ function CollapsibleSubtitleSettings() {
 				>
 					Subtitles
 				</span>
-				<span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
-					{open ? '\u25B2' : '\u25BC'}
+				<span style={{ display: 'inline-flex', color: 'var(--color-text-muted)' }}>
+					<Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} />
 				</span>
 			</button>
 			{open && (
@@ -2319,7 +2320,7 @@ export function Settings(props: SettingsProps) {
 													)
 												}
 											>
-												{'\u2699'}
+												<Icon name="settings" size={14} />
 											</button>
 											<button
 												class={styles.iconBtn}
@@ -2353,7 +2354,7 @@ export function Settings(props: SettingsProps) {
 													}
 												}}
 											>
-												{testingServer === server.id ? '...' : '\u21BB'}
+												{testingServer === server.id ? '…' : <Icon name="refresh" size={14} />}
 											</button>
 											<button
 												class={styles.iconBtn}
@@ -2372,7 +2373,7 @@ export function Settings(props: SettingsProps) {
 													}
 												}}
 											>
-												{'\u2715'}
+												<Icon name="x" size={14} />
 											</button>
 										</div>
 										{editingServer === server.id && (
@@ -2463,7 +2464,7 @@ export function Settings(props: SettingsProps) {
 												setShowNewServerConfig(!showNewServerConfig)
 											}
 										>
-											{'\u2699'}
+											<Icon name="settings" size={14} />
 										</button>
 										{showNewServerConfig && (
 											<div class={styles.serverEditRow}>

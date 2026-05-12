@@ -123,14 +123,8 @@ export class StreamController {
 	async getManifest(@Param('sessionId') sessionId: string, @Res() reply: FastifyReply) {
 		const requestStart = Date.now();
 
-		// Check if FFmpeg has crashed for this session
-		const state = this.transcoderService.getTranscodeState(sessionId);
-		if (state?.state === 'failed') {
-			this.logger.error(
-				`Manifest requested for failed session ${this.guidResolver.resolve(sessionId)}: ${state.error}`,
-			);
-			return reply.status(500).send({ message: `Transcoding failed: ${state.error}` });
-		}
+		const failed = this.failedSessionReply(sessionId, reply);
+		if (failed) return failed;
 
 		// Check for chunk-based virtual manifest first
 		const sessionInfo = this.streamService.getSessionInfo(sessionId);
@@ -151,26 +145,14 @@ export class StreamController {
 		const manifest = await this.hlsGenerator.getManifest(sessionId, dir);
 
 		if (!manifest) {
-			this.transcodeDebugger.recordClientRequest(
-				sessionId,
-				'manifest',
-				undefined,
-				503,
-				Date.now() - requestStart,
-			);
+			this.recordReply(sessionId, 'manifest', undefined, 503, requestStart);
 			return reply
 				.status(503)
 				.header('Retry-After', '1')
 				.send({ message: 'Manifest not yet available, transcoding in progress' });
 		}
 
-		this.transcodeDebugger.recordClientRequest(
-			sessionId,
-			'manifest',
-			undefined,
-			200,
-			Date.now() - requestStart,
-		);
+		this.recordReply(sessionId, 'manifest', undefined, 200, requestStart);
 		return reply
 			.header('Content-Type', 'application/vnd.apple.mpegurl')
 			.header('Cache-Control', 'no-cache')
@@ -194,11 +176,8 @@ export class StreamController {
 			return reply.status(404).send({ message: 'Invalid segment path' });
 		}
 
-		// Check if FFmpeg has crashed for this session
-		const state = this.transcoderService.getTranscodeState(sessionId);
-		if (state?.state === 'failed') {
-			return reply.status(500).send({ message: `Transcoding failed: ${state.error}` });
-		}
+		const failed = this.failedSessionReply(sessionId, reply);
+		if (failed) return failed;
 
 		const segmentNumber = parseInt(match[1]!, 10);
 		const dir = this.streamService.getSessionCacheDir(sessionId);
@@ -219,13 +198,7 @@ export class StreamController {
 						`Corrupt cache: segment ${segmentNumber} missing from complete cache for ${this.guidResolver.resolve(sessionInfo.movieFileId)}. Clearing and restarting.`,
 					);
 					await this.transcoderService.clearCache(sessionInfo.movieFileId);
-					this.transcodeDebugger.recordClientRequest(
-						sessionId,
-						'segment',
-						segmentNumber,
-						410,
-						Date.now() - requestStart,
-					);
+					this.recordReply(sessionId, 'segment', segmentNumber, 410, requestStart);
 					return reply
 						.status(410)
 						.send({ message: 'Cache corrupted, please restart stream' });
@@ -249,26 +222,14 @@ export class StreamController {
 				}
 			}
 
-			this.transcodeDebugger.recordClientRequest(
-				sessionId,
-				'segment',
-				segmentNumber,
-				503,
-				Date.now() - requestStart,
-			);
+			this.recordReply(sessionId, 'segment', segmentNumber, 503, requestStart);
 			return reply
 				.status(503)
 				.header('Retry-After', '2')
 				.send({ message: 'Segment not yet available, encoding triggered' });
 		}
 
-		this.transcodeDebugger.recordClientRequest(
-			sessionId,
-			'segment',
-			segmentNumber,
-			200,
-			Date.now() - requestStart,
-		);
+		this.recordReply(sessionId, 'segment', segmentNumber, 200, requestStart);
 		this.transcodeDebugger.recordSegmentReady(sessionId, segmentNumber, segment.length);
 		if (segmentNumber === 0) {
 			this.transcodeDebugger.recordMilestone(sessionId, 'firstSegmentServed');
@@ -377,5 +338,45 @@ export class StreamController {
 			`Deleted cached version ${quality} for ${this.guidResolver.resolve(movieId)}`,
 		);
 		return { success: true };
+	}
+
+	// ── Private helpers ──────────────────────────────────────────────
+
+	/**
+	 * Shared early-return for manifest/segment handlers: if the transcoder
+	 * has marked this session as failed, send a 500 with the recorded
+	 * error and stop. Returns the reply when failed, null when the caller
+	 * should continue normal processing.
+	 */
+	private failedSessionReply(sessionId: string, reply: FastifyReply): FastifyReply | null {
+		const state = this.transcoderService.getTranscodeState(sessionId);
+		if (state?.state === 'failed') {
+			this.logger.error(
+				`Stream session ${this.guidResolver.resolve(sessionId)} failed: ${state.error}`,
+			);
+			return reply.status(500).send({ message: `Transcoding failed: ${state.error}` });
+		}
+		return null;
+	}
+
+	/**
+	 * Shorthand for the 5-arg `transcodeDebugger.recordClientRequest`
+	 * call repeated 6× in this controller — handles the `Date.now() - startMs`
+	 * elapsed-time math so callers just pass the start timestamp.
+	 */
+	private recordReply(
+		sessionId: string,
+		kind: 'manifest' | 'segment',
+		segNum: number | undefined,
+		status: number,
+		startMs: number,
+	): void {
+		this.transcodeDebugger.recordClientRequest(
+			sessionId,
+			kind,
+			segNum,
+			status,
+			Date.now() - startMs,
+		);
 	}
 }

@@ -1,10 +1,12 @@
+import { SmartImage } from '@/components/common/SmartImage';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { getRatingColor } from '@/utils/rating-color';
-import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
+import { hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieListItem.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
-
+import { RatingBadge } from './RatingBadge';
+import { WatchProgressBar } from './WatchProgressBar';
 import type { MovieDisplayProps } from './types';
 import { useMovieCardBehavior } from './useMovieCardBehavior';
 
@@ -52,26 +54,18 @@ export function MovieListItem({
 				</div>
 			)}
 			<div class={styles.poster}>
-				{movie.posterUrl ? (
-					<img
-						src={movie.posterUrl}
-						alt={`${movie.title} poster`}
-						loading="lazy"
-						class={styles.posterImage}
-					/>
-				) : (
-					<div class={styles.posterPlaceholder}>
-						<span>{(movie.title ?? '?').charAt(0)}</span>
-					</div>
-				)}
-				{hasWatchProgress(movie) && (
-					<div class={styles.progressBar}>
-						<div
-							class={styles.progressFill}
-							style={{ width: `${getWatchPercent(movie)}%` }}
-						/>
-					</div>
-				)}
+				<SmartImage
+					src={movie.posterUrl}
+					alt={`${movie.title} poster`}
+					imgClass={styles.posterImage}
+					fallbackLabel={movie.title}
+					iconOnly
+				/>
+				<WatchProgressBar
+					movie={movie}
+					class={styles.progressBar}
+					fillClass={styles.progressFill}
+				/>
 			</div>
 
 			<div class={styles.info}>
@@ -92,11 +86,8 @@ export function MovieListItem({
 			</div>
 
 			<div class={styles.actions}>
-				{rating > 0 && (
-					<span class={styles.ratingBadge} style={{ background: ratingColor }}>
-						{rating.toFixed(1)}
-					</span>
-				)}
+				<RatingBadge value={rating} class={styles.ratingBadge} />
+
 				<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
 				{!selectionMode && (
 					<>

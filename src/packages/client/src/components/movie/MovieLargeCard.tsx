@@ -1,11 +1,13 @@
 import { useCallback, useRef, useState } from 'preact/hooks';
+import { SmartImage } from '@/components/common/SmartImage';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { getRatingColor } from '@/utils/rating-color';
-import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
+import { hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieLargeCard.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
-
+import { RatingBadge } from './RatingBadge';
+import { WatchProgressBar } from './WatchProgressBar';
 import type { MovieDisplayProps } from './types';
 import { useMovieCardBehavior } from './useMovieCardBehavior';
 
@@ -69,18 +71,12 @@ export function MovieLargeCard({
 			)}
 			{movie.hidden && <span class={styles.hiddenLabel}>Hidden</span>}
 			<div class={styles.thumbnail}>
-				{imageUrl ? (
-					<img
-						src={imageUrl}
-						alt={`${movie.title}`}
-						loading="lazy"
-						class={styles.thumbnailImage}
-					/>
-				) : (
-					<div class={styles.thumbnailPlaceholder}>
-						<span>{(movie.title ?? '?').charAt(0)}</span>
-					</div>
-				)}
+				<SmartImage
+					src={imageUrl}
+					alt={`${movie.title}`}
+					imgClass={styles.thumbnailImage}
+					fallbackLabel={movie.title}
+				/>
 
 				{!selectionMode && (
 					<div class={styles.overlay}>
@@ -104,14 +100,11 @@ export function MovieLargeCard({
 				)}
 			</div>
 
-			{hasWatchProgress(movie) && (
-				<div class={styles.progressBar}>
-					<div
-						class={styles.progressFill}
-						style={{ width: `${getWatchPercent(movie)}%` }}
-					/>
-				</div>
-			)}
+			<WatchProgressBar
+				movie={movie}
+				class={styles.progressBar}
+				fillClass={styles.progressFill}
+			/>
 
 			<div class={styles.info}>
 				<div class={styles.infoTop}>
@@ -124,11 +117,8 @@ export function MovieLargeCard({
 						{tooltipVisible && <span class={styles.titleTooltip}>{movie.title}</span>}
 					</h3>
 					<div class={styles.infoRight}>
-						{rating > 0 && (
-							<span class={styles.ratingBadge} style={{ background: ratingColor }}>
-								{rating.toFixed(1)}
-							</span>
-						)}
+						<RatingBadge value={rating} class={styles.ratingBadge} />
+
 						<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
 						{!selectionMode && !movie.remoteOrigin && (
 							<MovieOptionsMenu

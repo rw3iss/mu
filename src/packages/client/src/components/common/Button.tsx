@@ -1,4 +1,4 @@
-import { ComponentChildren } from 'preact';
+import { ComponentChildren, JSX } from 'preact';
 import styles from './Button.module.scss';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -13,6 +13,8 @@ interface ButtonProps {
 	fullWidth?: boolean;
 	type?: 'button' | 'submit' | 'reset';
 	class?: string;
+	style?: JSX.CSSProperties;
+	title?: string;
 	onClick?: (e: Event) => void;
 	'aria-label'?: string;
 }
@@ -26,6 +28,8 @@ export function Button({
 	fullWidth = false,
 	type = 'button',
 	class: className,
+	style,
+	title,
 	onClick,
 	...rest
 }: ButtonProps) {
@@ -44,6 +48,8 @@ export function Button({
 		<button
 			type={type}
 			class={classes}
+			style={style}
+			title={title}
 			disabled={disabled || loading}
 			onClick={onClick}
 			{...rest}

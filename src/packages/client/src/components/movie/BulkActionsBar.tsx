@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
+import { Icon } from '@/components/common/Icon';
 import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
 import type { Movie } from '@/state/library.state';
@@ -77,7 +78,7 @@ export function BulkActionsBar({
 			<div class={styles.bar}>
 				<div class={styles.left}>
 					<button class={styles.exitBtn} onClick={onExitEditMode} title="Exit edit mode">
-						{'\u2715'}
+						<Icon name="x" />
 					</button>
 					{count > 0 ? (
 						<span class={styles.countLabel}>
@@ -102,7 +103,7 @@ export function BulkActionsBar({
 								disabled={isLoading}
 								title="Re-Scan selected movies"
 							>
-								{'\u{1F50D}'} Re-Scan
+								<Icon name="search" /> Re-Scan
 							</button>
 							<button
 								class={styles.actionBtn}
@@ -110,7 +111,7 @@ export function BulkActionsBar({
 								disabled={isLoading}
 								title="Refresh metadata for selected movies"
 							>
-								{'\u21BB'} Refresh Metadata
+								<Icon name="refresh" /> Refresh Metadata
 							</button>
 							<button
 								class={styles.actionBtn}
@@ -118,7 +119,7 @@ export function BulkActionsBar({
 								disabled={isLoading}
 								title="Clear metadata for selected movies"
 							>
-								{'\u2715'} Clear Metadata
+								<Icon name="x" /> Clear Metadata
 							</button>
 							<div class={styles.divider} />
 							<button
@@ -127,7 +128,7 @@ export function BulkActionsBar({
 								disabled={isLoading}
 								title="Hide selected movies from library"
 							>
-								{'\u{1F6AB}'} Hide
+								<Icon name="eye-off" /> Hide
 							</button>
 							<button
 								class={styles.actionBtn}
@@ -135,7 +136,7 @@ export function BulkActionsBar({
 								disabled={isLoading}
 								title="Mark selected movies as watched"
 							>
-								{'\u2713'} Mark Watched
+								<Icon name="check" /> Mark Watched
 							</button>
 							<div class={styles.divider} />
 							<button
@@ -152,7 +153,7 @@ export function BulkActionsBar({
 								disabled={isLoading}
 								title="Delete selected movies from disk"
 							>
-								{'\u{1F5D1}'} Delete from Disk
+								<Icon name="trash" /> Delete from Disk
 							</button>
 						</>
 					)}

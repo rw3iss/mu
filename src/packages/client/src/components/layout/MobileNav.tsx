@@ -1,20 +1,21 @@
 import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import { currentPath } from '@/app';
+import { Icon, type IconName } from '@/components/common/Icon';
 import styles from './MobileNav.module.scss';
 
 interface NavTab {
 	label: string;
 	path: string;
-	icon: string;
+	icon: IconName;
 }
 
 const tabs: NavTab[] = [
-	{ label: 'Home', path: '/', icon: '\u2302' },
-	{ label: 'Library', path: '/library', icon: '\uD83C\uDFAC' },
-	{ label: 'Search', path: '/search', icon: '\uD83D\uDD0D' },
-	{ label: 'Playlists', path: '/playlists', icon: '\uD83D\uDCCB' },
-	{ label: 'Profile', path: '/settings', icon: '\u2699' },
+	{ label: 'Home', path: '/', icon: 'home' },
+	{ label: 'Library', path: '/library', icon: 'film' },
+	{ label: 'Search', path: '/search', icon: 'search' },
+	{ label: 'Playlists', path: '/playlists', icon: 'list-plus' },
+	{ label: 'Profile', path: '/settings', icon: 'settings' },
 ];
 
 export function MobileNav() {
@@ -34,7 +35,9 @@ export function MobileNav() {
 					aria-label={tab.label}
 					aria-current={activePath === tab.path ? 'page' : undefined}
 				>
-					<span class={styles.icon}>{tab.icon}</span>
+					<span class={styles.icon}>
+						<Icon name={tab.icon} />
+					</span>
 					<span class={styles.label}>{tab.label}</span>
 				</button>
 			))}

@@ -2,6 +2,7 @@ import { JSX } from 'preact';
 import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import { currentPath } from '@/app';
+import { Icon } from '@/components/common/Icon';
 import { currentUser, logout } from '@/state/auth.state';
 import { isPlayerActive, playerMode } from '@/state/globalPlayer.state';
 import { fetchMovies } from '@/state/library.state';
@@ -184,7 +185,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 					onClick={onToggle}
 					aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
 				>
-					{collapsed ? '\u276F' : '\u276E'}
+					<Icon name={collapsed ? 'chevron-right' : 'chevron-left'} />
 				</button>
 			</div>
 

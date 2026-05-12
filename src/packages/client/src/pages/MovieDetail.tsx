@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { Icon } from '@/components/common/Icon';
+import { SmartImage } from '@/components/common/SmartImage';
 import { Spinner } from '@/components/common/Spinner';
 import { CastPhoto } from '@/components/movie/CastPhoto';
 import { ExternalRatings } from '@/components/movie/ExternalRatings';
@@ -326,24 +328,19 @@ export function MovieDetail({ id }: MovieDetailProps) {
 					onClick={() => route('/library')}
 					aria-label="Back to Library"
 				>
-					{'\u2190'} Library
+					<Icon name="arrow-left" size={14} /> Library
 				</button>
 
 				{/* Content */}
 				<div class={styles.content}>
 					{/* Poster */}
 					<div class={styles.posterColumn}>
-						{movie.posterUrl ? (
-							<img
-								src={movie.posterUrl}
-								alt={`${movie.title} poster`}
-								class={styles.poster}
-							/>
-						) : (
-							<div class={styles.posterPlaceholder}>
-								{(movie.title ?? '?').charAt(0)}
-							</div>
-						)}
+						<SmartImage
+							src={movie.posterUrl}
+							alt={`${movie.title} poster`}
+							imgClass={styles.poster}
+							fallbackLabel={movie.title}
+						/>
 					</div>
 
 					{/* Info */}
@@ -368,7 +365,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									disabled={isSavingTitle}
 									aria-label="Save title"
 								>
-									{isSavingTitle ? '\u2026' : '\u2713'}
+									{isSavingTitle ? '…' : <Icon name="check" size={14} />}
 								</button>
 								<button
 									class={styles.titleCancelBtn}
@@ -376,7 +373,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									disabled={isSavingTitle}
 									aria-label="Cancel editing"
 								>
-									{'\u2715'}
+									<Icon name="x" size={14} />
 								</button>
 							</div>
 						) : isRemote ? (
@@ -384,7 +381,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						) : (
 							<div class={styles.titleRow} onClick={startEditingTitle}>
 								<h1 class={styles.title}>{movie.title}</h1>
-								<span class={styles.titleEditIcon}>{'\u270E'}</span>
+								<span class={styles.titleEditIcon}><Icon name="edit" size={12} /></span>
 							</div>
 						)}
 
@@ -448,7 +445,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								<div class={styles.processingStatus}>
 									{movie.status === 'processing_playable' && (
 										<Button variant="primary" size="lg" onClick={handlePlay}>
-											{'\u25B6'} Play
+											<Icon name="play" size={14} /> Play
 										</Button>
 									)}
 									<div class={styles.transcodeInfo}>
@@ -478,7 +475,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 										size="lg"
 										onClick={handleCancelProcessing}
 									>
-										{'\u2715'} Cancel
+										<Icon name="x" size={14} /> Cancel
 									</Button>
 								</div>
 							) : hasWatchProgress(movie) ? (
@@ -489,7 +486,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											onClick={handlePlay}
 											aria-label="Play from beginning"
 										>
-											{'\u25B6'}
+											<Icon name="play" size={14} />
 										</button>
 										<button class={styles.hybridResume} onClick={handleResume}>
 											Resume
@@ -504,7 +501,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								</div>
 							) : (
 								<Button variant="primary" size="lg" onClick={handlePlay}>
-									{'\u25B6'} Play
+									<Icon name="play" size={14} /> Play
 								</Button>
 							)}
 							{!isRemote && (
@@ -513,7 +510,15 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									size="lg"
 									onClick={handleWatchlistToggle}
 								>
-									{inWatchlist ? '\u2713 In Watchlist' : '\u2606 Watchlist'}
+									{inWatchlist ? (
+										<>
+											<Icon name="check" size={14} /> In Watchlist
+										</>
+									) : (
+										<>
+											<Icon name="star" size={14} /> Watchlist
+										</>
+									)}
 								</Button>
 							)}
 							{!isRemote && (
@@ -523,7 +528,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									onClick={() => setShowShareModal(true)}
 									title="Share this movie"
 								>
-									{'\u2197'} Share
+									<Icon name="share" size={14} /> Share
 								</Button>
 							)}
 							{!isRemote && (
@@ -681,7 +686,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									Playlists{playlistCount > 0 ? ` (${playlistCount})` : ''}
 								</h2>
 								<span class={styles.fileInfoArrow}>
-									{showPlaylists ? '\u25B2' : '\u25BC'}
+									<Icon name={showPlaylists ? 'chevron-up' : 'chevron-down'} size={14} />
 								</span>
 							</button>
 							{showPlaylists && (
@@ -711,7 +716,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								>
 									<h2 class={styles.sectionTitle}>Play Settings</h2>
 									<span class={styles.fileInfoArrow}>
-										{showPlaySettings ? '\u25B2' : '\u25BC'}
+										<Icon name={showPlaySettings ? 'chevron-up' : 'chevron-down'} size={14} />
 									</span>
 								</button>
 
@@ -816,7 +821,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								>
 									<h2 class={styles.sectionTitle}>File Info</h2>
 									<span class={styles.fileInfoArrow}>
-										{showFileInfo ? '\u25B2' : '\u25BC'}
+										<Icon name={showFileInfo ? 'chevron-up' : 'chevron-down'} size={14} />
 									</span>
 								</button>
 
@@ -842,7 +847,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 													? `${movie.fileInfo.subtitleTracks.length} subtitle${movie.fileInfo.subtitleTracks.length === 1 ? '' : 's'} found`
 													: 'No subtitles found'}
 												<span class={styles.fileInfoArrow}>
-													{showSubtitles ? '\u25B2' : '\u25BC'}
+													<Icon name={showSubtitles ? 'chevron-up' : 'chevron-down'} size={14} />
 												</span>
 											</button>
 											{showSubtitles && (
