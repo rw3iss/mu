@@ -9,6 +9,7 @@ import { Discover } from '@/pages/Discover';
 import { History } from '@/pages/History';
 import { Library } from '@/pages/Library';
 import { Login } from '@/pages/Login';
+import { GroupDetail } from '@/pages/GroupDetail';
 import { MovieDetail } from '@/pages/MovieDetail';
 import { NotFound } from '@/pages/NotFound';
 import { PersonDetail } from '@/pages/PersonDetail';
@@ -166,6 +167,7 @@ export function App() {
 						<Dashboard path="/" />
 						<Library path="/library" />
 						<MovieDetail path="/movie/:id" />
+						<GroupDetail path="/group/:id" />
 						<Playlists path="/playlists" />
 						<PlaylistDetail path="/playlists/:id" />
 						<Watchlist path="/watchlist" />

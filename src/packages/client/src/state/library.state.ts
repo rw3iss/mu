@@ -92,6 +92,9 @@ export interface Movie {
 			external?: boolean;
 		}[];
 	};
+	/** Subgroup FK — set when the movie has been grouped into a TV season / collection / etc. */
+	groupId?: string | null;
+	groupEpisodeOrdinal?: number | null;
 }
 
 export interface LibraryFilters {

@@ -46,6 +46,7 @@ export type IconName =
 	| 'share'
 	| 'play'
 	| 'pause'
+	| 'layers'
 	// app surfaces
 	| 'home'
 	| 'film'
@@ -234,6 +235,13 @@ const PATHS: Record<IconName, JSX.Element> = {
 		<>
 			<rect x="6" y="4" width="4" height="16" />
 			<rect x="14" y="4" width="4" height="16" />
+		</>
+	),
+	layers: (
+		<>
+			<polygon points="12 2 2 7 12 12 22 7 12 2" />
+			<polyline points="2 17 12 22 22 17" />
+			<polyline points="2 12 12 17 22 12" />
 		</>
 	),
 

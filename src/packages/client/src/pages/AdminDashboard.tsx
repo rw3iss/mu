@@ -3,6 +3,7 @@ import { Button } from '@/components/common/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
+import { groupsService } from '@/services/groups.service';
 import type { ActiveSession, SessionHistoryEntry } from '@/services/stream.service';
 import { streamService } from '@/services/stream.service';
 import { fetchMovies } from '@/state/library.state';
@@ -32,6 +33,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	const [showFixThumbnailsConfirm, setShowFixThumbnailsConfirm] = useState(false);
 	const [generatingSprites, setGeneratingSprites] = useState(false);
 	const [removingBroken, setRemovingBroken] = useState(false);
+	const [groupingItems, setGroupingItems] = useState(false);
 	const [showRemoveBrokenConfirm, setShowRemoveBrokenConfirm] = useState(false);
 	const [clearingWatched, setClearingWatched] = useState(false);
 	const [showClearWatchedConfirm, setShowClearWatchedConfirm] = useState(false);
@@ -112,6 +114,20 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 			notifyError('Failed to fix broken thumbnails');
 		} finally {
 			setFixingThumbnails(false);
+		}
+	}, []);
+
+	const handleGroupSimilarItems = useCallback(async () => {
+		setGroupingItems(true);
+		try {
+			const result = await groupsService.rebuild();
+			notifySuccess(
+				`Grouped ${result.grouped} of ${result.scanned} movies. Open any item's group page to review.`,
+			);
+		} catch {
+			notifyError('Group detection failed');
+		} finally {
+			setGroupingItems(false);
 		}
 	}, []);
 
@@ -312,6 +328,13 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						loading={clearingWatched}
 					>
 						Clear Watched History
+					</Button>
+					<Button
+						variant="secondary"
+						onClick={handleGroupSimilarItems}
+						loading={groupingItems}
+					>
+						Group Similar Items
 					</Button>
 				</div>
 				<ConfirmDialog

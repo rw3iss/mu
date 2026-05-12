@@ -23,12 +23,21 @@ export const movies = sqliteTable(
 		contentRating: text('content_rating'),
 		hidden: integer('hidden', { mode: 'boolean' }).default(false),
 		playSettings: text('play_settings'),
+		/**
+		 * Subgroup FK (nullable). When set, the movie is a member of the
+		 * referenced subgroup; the parent group is reached via
+		 * movie_groups.parent_group_id.
+		 */
+		groupId: text('group_id'),
+		/** Episode/part ordinal within the subgroup (e.g. 12 for E12). */
+		groupEpisodeOrdinal: integer('group_episode_ordinal'),
 		addedAt: text('added_at').notNull(),
 		updatedAt: text('updated_at').notNull(),
 	},
 	(table) => ({
 		imdbIdIdx: index('movies_imdb_id_idx').on(table.imdbId),
 		tmdbIdIdx: index('movies_tmdb_id_idx').on(table.tmdbId),
+		groupIdIdx: index('movies_group_id_idx').on(table.groupId),
 	}),
 );
 

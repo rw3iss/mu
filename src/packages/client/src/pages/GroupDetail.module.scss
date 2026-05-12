@@ -1,0 +1,241 @@
+.page {
+	padding: var(--space-lg);
+	max-width: 1200px;
+	margin: 0 auto;
+}
+
+.loadingWrap,
+.errorWrap {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-md);
+	align-items: center;
+	justify-content: center;
+	min-height: 40vh;
+}
+
+.header {
+	margin-bottom: var(--space-xl);
+}
+
+.backLink {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-xs);
+	color: var(--color-text-secondary);
+	font-size: var(--font-size-sm);
+	background: none;
+	border: none;
+	padding: 0;
+	margin-bottom: var(--space-md);
+	cursor: pointer;
+
+	&:hover {
+		color: var(--color-text-primary);
+	}
+}
+
+.heroRow {
+	display: flex;
+	gap: var(--space-xl);
+	align-items: flex-start;
+
+	@include mobile {
+		flex-direction: column;
+	}
+}
+
+.posterColumn {
+	flex-shrink: 0;
+	width: 220px;
+
+	@include mobile {
+		width: 160px;
+		align-self: center;
+	}
+}
+
+.poster {
+	width: 100%;
+	aspect-ratio: 2 / 3;
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-xl);
+	overflow: hidden;
+	background: var(--color-bg-tertiary);
+}
+
+.posterImg {
+	object-fit: contain;
+}
+
+.infoColumn {
+	flex: 1;
+	min-width: 0;
+}
+
+.titleRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-sm);
+	margin-bottom: var(--space-sm);
+}
+
+.title {
+	font-size: var(--font-size-3xl);
+	font-weight: var(--font-weight-bold);
+	color: var(--color-text-primary);
+	margin: 0;
+	line-height: var(--line-height-tight);
+}
+
+.groupTypeBadge,
+.confirmedBadge,
+.autoBadge,
+.unsurePill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	border-radius: var(--radius-full);
+	font-size: var(--font-size-xs);
+	font-weight: var(--font-weight-semibold);
+	text-transform: capitalize;
+}
+
+.groupTypeBadge {
+	background: var(--surface-overlay-2);
+	color: var(--color-text-secondary);
+}
+
+.confirmedBadge {
+	background: var(--color-success);
+	color: var(--color-text-inverse);
+}
+
+.autoBadge {
+	background: var(--surface-overlay-1);
+	color: var(--color-text-muted);
+}
+
+.unsurePill {
+	background: var(--color-warning);
+	color: var(--color-text-inverse);
+}
+
+.meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-md);
+	color: var(--color-text-secondary);
+	font-size: var(--font-size-sm);
+	margin-bottom: var(--space-md);
+}
+
+.metaMuted {
+	color: var(--color-text-muted);
+}
+
+.overview {
+	color: var(--color-text-secondary);
+	font-size: var(--font-size-md);
+	line-height: var(--line-height-normal);
+	margin: 0 0 var(--space-md);
+}
+
+.actions {
+	display: flex;
+	gap: var(--space-sm);
+	flex-wrap: wrap;
+}
+
+.unsureBanner {
+	margin-top: var(--space-lg);
+	padding: var(--space-md);
+	background: var(--color-accent-subtle);
+	border-left: 3px solid var(--color-warning);
+	border-radius: var(--radius-md);
+	font-size: var(--font-size-sm);
+	color: var(--color-text-secondary);
+	line-height: var(--line-height-normal);
+}
+
+.altPill a {
+	color: var(--color-accent);
+	text-decoration: underline;
+}
+
+.altScore {
+	color: var(--color-text-muted);
+}
+
+// ── Seasons list ─────────────────────────────────
+
+.seasonsList {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-sm);
+}
+
+.seasonCard {
+	background: var(--color-bg-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	overflow: hidden;
+}
+
+.seasonHeader {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	width: 100%;
+	padding: var(--space-md);
+	background: transparent;
+	border: none;
+	color: var(--color-text-primary);
+	text-align: left;
+	cursor: pointer;
+	transition: background var(--transition-fast);
+
+	&:hover {
+		background: var(--surface-overlay-1);
+	}
+}
+
+.seasonName {
+	flex: 1;
+	font-weight: var(--font-weight-semibold);
+	font-size: var(--font-size-md);
+}
+
+.seasonConfidence {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-xs);
+}
+
+.episodes {
+	padding: var(--space-sm) var(--space-md) var(--space-md);
+	border-top: 1px solid var(--color-border);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+}
+
+.subgroupActions {
+	display: flex;
+	gap: var(--space-xs);
+	margin-top: var(--space-sm);
+}
+
+.episodesFlat {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+}
+
+.empty {
+	padding: var(--space-md);
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+	font-style: italic;
+}

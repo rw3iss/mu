@@ -11,6 +11,7 @@ import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EventsModule } from './events/events.module.js';
 import { FilesystemModule } from './filesystem/filesystem.module.js';
+import { GroupingModule } from './grouping/grouping.module.js';
 import { HealthModule } from './health/health.module.js';
 import { JobModule } from './jobs/job.module.js';
 import { LibraryModule } from './library/library.module.js';
@@ -55,6 +56,7 @@ import { UsersModule } from './users/users.module.js';
 		AdminModule,
 		AudioProfilesModule,
 		ThemesModule,
+		GroupingModule,
 	],
 	providers: [
 		{

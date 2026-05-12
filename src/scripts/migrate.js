@@ -105,6 +105,28 @@ const tables = [
 		file_path TEXT,
 		quality TEXT
 	)`,
+	`CREATE TABLE IF NOT EXISTS movie_groups (
+		id TEXT PRIMARY KEY,
+		type TEXT NOT NULL,
+		group_type TEXT NOT NULL DEFAULT 'series',
+		name TEXT NOT NULL,
+		parent_group_id TEXT,
+		ordinal INTEGER,
+		tmdb_tv_id INTEGER,
+		imdb_id TEXT,
+		poster_url TEXT,
+		backdrop_url TEXT,
+		overview TEXT,
+		status TEXT NOT NULL DEFAULT 'auto',
+		confidence REAL,
+		alt_parents TEXT,
+		detection_source TEXT,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS movie_groups_parent_idx ON movie_groups(parent_group_id)`,
+	`CREATE INDEX IF NOT EXISTS movie_groups_type_idx ON movie_groups(type)`,
+	`CREATE INDEX IF NOT EXISTS movie_groups_status_idx ON movie_groups(status)`,
 ];
 
 for (const sql of tables) {
@@ -134,6 +156,9 @@ const alters = [
 	'ALTER TABLE playlist_movies ADD COLUMN remote_title TEXT',
 	'ALTER TABLE playlist_movies ADD COLUMN remote_poster_url TEXT',
 	'ALTER TABLE playlist_movies ADD COLUMN remote_server_id TEXT',
+	'ALTER TABLE movies ADD COLUMN group_id TEXT',
+	'ALTER TABLE movies ADD COLUMN group_episode_ordinal INTEGER',
+	'CREATE INDEX IF NOT EXISTS movies_group_id_idx ON movies(group_id)',
 ];
 
 for (const sql of alters) {

@@ -139,6 +139,8 @@ export class MoviesService {
 			tmdbId: movies.tmdbId,
 			contentRating: movies.contentRating,
 			hidden: movies.hidden,
+			groupId: movies.groupId,
+			groupEpisodeOrdinal: movies.groupEpisodeOrdinal,
 			addedAt: movies.addedAt,
 			updatedAt: movies.updatedAt,
 			rating: userRatings.rating,
@@ -476,6 +478,8 @@ export class MoviesService {
 				tmdbId: movies.tmdbId,
 				contentRating: movies.contentRating,
 				hidden: movies.hidden,
+				groupId: movies.groupId,
+				groupEpisodeOrdinal: movies.groupEpisodeOrdinal,
 				addedAt: movies.addedAt,
 				rating: userRatings.rating,
 			})

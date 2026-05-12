@@ -10,6 +10,13 @@ export type { MediaSource, NewMediaSource } from './media-sources.ts';
 export { mediaSources } from './media-sources.ts';
 export type { MovieFile, NewMovieFile } from './movie-files.ts';
 export { movieFiles } from './movie-files.ts';
+export type {
+	MovieGroup,
+	MovieGroupStatus,
+	MovieGroupTypeRole,
+	NewMovieGroup,
+} from './movie-groups.ts';
+export { movieGroups } from './movie-groups.ts';
 export type { MovieMetadata, NewMovieMetadata } from './movie-metadata.ts';
 export { movieMetadata } from './movie-metadata.ts';
 export type { Movie, NewMovie } from './movies.ts';

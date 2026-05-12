@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
+import { groupViewEnabled, toggleGroupView } from '@/state/groups.state';
 import type { BulkAction } from '@/components/movie/BulkActionsBar';
 import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
 import { MovieGrid } from '@/components/movie/MovieGrid';
@@ -395,6 +396,19 @@ export function Library(_props: LibraryProps) {
 							<Icon name="view-list" />
 						</button>
 					</div>
+
+					<button
+						class={`${styles.editBtn} ${groupViewEnabled.value ? styles.active : ''}`}
+						onClick={toggleGroupView}
+						aria-label="Toggle group view"
+						title={
+							groupViewEnabled.value
+								? 'Collapsing groups — click to show every item individually'
+								: 'Showing items individually — click to collapse groups'
+						}
+					>
+						<Icon name="layers" />
+					</button>
 
 					<button
 						class={`${styles.editBtn} ${editMode ? styles.active : ''}`}
