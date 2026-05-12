@@ -1,0 +1,13 @@
+.canvas {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 1; // above the <video> sibling, below the player chrome.
+	pointer-events: none;
+	background: #000;
+	// The canvas backing-store is sized in JS to videoWidth * scale.
+	// CSS scales it to fit the wrapper without any object-fit weirdness;
+	// the player's wrapper already enforces aspect ratio.
+	object-fit: contain;
+}

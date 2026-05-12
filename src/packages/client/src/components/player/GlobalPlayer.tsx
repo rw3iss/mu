@@ -49,6 +49,7 @@ import styles from './GlobalPlayer.module.scss';
 import { InfoPanel } from './InfoPanel';
 import { PlayerControls } from './PlayerControls';
 import { useVideoEngine } from './useVideoEngine';
+import { VideoEnhancer } from './VideoEnhancer';
 
 // Subtitle timing-offset is applied at runtime by mutating each loaded
 // cue's startTime/endTime directly (see Effect B below). The cue's
@@ -984,6 +985,12 @@ export function GlobalPlayer() {
 				onClick={isMini ? maximizePlayer : undefined}
 				onMouseMove={!isMini && (!isSplit || isExclusive) ? resetControlsTimer : undefined}
 			>
+				{/* GPU video enhancement overlay. Renders nothing unless the
+				    user has enabled it in the Effects panel and WebGPU is
+				    available. When active it covers the underlying <video>
+				    (which keeps playing for audio/seek/HLS). */}
+				<VideoEnhancer />
+
 				{/* Mini mode overlays */}
 				{isMini && (
 					<>

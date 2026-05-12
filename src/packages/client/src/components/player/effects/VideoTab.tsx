@@ -12,6 +12,15 @@ import {
 	videoEffects,
 	videoEnabled,
 } from '@/state/video-effects.state';
+import {
+	setVideoEnhanceScale,
+	setVideoEnhanceStrength,
+	toggleVideoEnhance,
+	videoEnhanceEnabled,
+	videoEnhanceScale,
+	videoEnhanceStrength,
+	videoEnhanceSupported,
+} from '@/state/video-enhance.state';
 import styles from '../EffectsPanel.module.scss';
 import { CollapsibleSettings } from './CollapsibleSettings';
 import { ProfileControls } from './ProfileControls';
@@ -66,9 +75,96 @@ export function VideoTab() {
 	const enabled = videoEnabled.value;
 	const settings = videoEffects.value;
 	const activeId = activeVideoProfileId.value;
+	const enhanceOn = videoEnhanceEnabled.value;
+	const enhanceStrength = videoEnhanceStrength.value;
+	const enhanceScale = videoEnhanceScale.value;
+	const gpuAvailable = videoEnhanceSupported.value;
 
 	return (
 		<div>
+			{/* ── GPU Enhance (real-time upscaler) ── */}
+			<div class={styles.toggleRow}>
+				<span class={styles.toggleLabel}>
+					GPU Enhance
+					<span
+						class={styles.autoHelp}
+						title={
+							gpuAvailable
+								? 'Runs the playing video through a GPU shader: bilinear upsample + 5-tap unsharp mask. Restores edge crispness on low-bitrate sources and makes 720p source look meaningfully better at 1080p+ output. Cost is per-frame GPU work — higher Output Resolution = more pixels = more work (quadratic). 1.5× at 1080p is safe on integrated GPUs; 2.0× wants a discrete GPU. Replaces the standard <video> rendering while active; the colour-grading sliders below do not apply.'
+								: "Your browser doesn't expose WebGPU, which this effect needs. Try a current Chromium / Edge / Safari 17+ build."
+						}
+					>
+						?
+					</span>
+				</span>
+				<button
+					class={`${styles.toggle} ${enhanceOn ? styles.on : ''}`}
+					onClick={toggleVideoEnhance}
+					disabled={!gpuAvailable}
+					aria-label="Toggle GPU video enhancement"
+				/>
+			</div>
+
+			{enhanceOn && gpuAvailable && (
+				<CollapsibleSettings settingKey="effects_enhance_video_open">
+					<div class={styles.compParam}>
+						<div class={styles.compParamHeader}>
+							<span class={styles.compParamLabel}>Sharpness</span>
+							<span class={styles.compParamValue}>
+								{Math.round(enhanceStrength * 100)}%
+							</span>
+						</div>
+						<input
+							type="range"
+							class={styles.compSlider}
+							min={0}
+							max={1}
+							step={0.01}
+							value={enhanceStrength}
+							onInput={(e) =>
+								setVideoEnhanceStrength(
+									parseFloat((e.target as HTMLInputElement).value),
+								)
+							}
+						/>
+					</div>
+
+					<div class={styles.compParam}>
+						<div class={styles.compParamHeader}>
+							<span class={styles.compParamLabel}>
+								Output Resolution
+								<span
+									class={styles.autoHelp}
+									title="Multiplier on the source's native pixel count. 1.0× = same resolution (sharpen only). 1.5× = render to 1.5× width and height = 2.25× total pixels. 2.0× = 4× pixels = 4× GPU work. The shader still does the sharpening regardless of scale."
+								>
+									?
+								</span>
+							</span>
+							<span class={styles.compParamValue}>{enhanceScale.toFixed(2)}×</span>
+						</div>
+						<input
+							type="range"
+							class={styles.compSlider}
+							min={1}
+							max={2.5}
+							step={0.05}
+							value={enhanceScale}
+							onInput={(e) =>
+								setVideoEnhanceScale(
+									parseFloat((e.target as HTMLInputElement).value),
+								)
+							}
+						/>
+					</div>
+				</CollapsibleSettings>
+			)}
+
+			{!gpuAvailable && (
+				<div class={styles.emptyText}>
+					Your browser doesn't support WebGPU. This effect is disabled.
+				</div>
+			)}
+
 			<div class={styles.toggleRow}>
 				<span class={styles.toggleLabel}>Video Effects</span>
 				<button
