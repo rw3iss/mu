@@ -4,34 +4,35 @@
  * The pipeline:
  *   1. <video> element plays through HLS.js as normal — audio + DRM +
  *      seek + fullscreen all stay on the underlying element.
- *   2. `copyExternalImageToTexture(video)` uploads each new frame to a
- *      GPU texture at the video's native resolution. The browser uses
- *      the hardware decoder's existing GPU surface; no CPU readback.
- *   3. A single fragment-shader pass samples that texture with the GPU's
- *      bilinear sampler (= free linear upscaling) and applies a 5-tap
- *      unsharp mask to restore edge definition.
- *   4. The shader output goes to a canvas at backing-store size
- *      (videoWidth * scale) × (videoHeight * scale). CSS scales the
- *      canvas to fill the video's display box, so the perceived
- *      resolution stays consistent regardless of the player size.
+ *   2. `importExternalTexture({ source: video })` per frame: WebGPU's
+ *      zero-copy primitive for sampling a hardware-decoded video frame.
+ *      Handles YUV→RGB conversion internally, works correctly across
+ *      Dawn backends (Vulkan, Metal, D3D12, OpenGLES via ANGLE).
+ *   3. A single fragment-shader pass samples the external texture via
+ *      `textureSampleBaseClampToEdge` (the function GPU-side for sampling
+ *      external textures) using the GPU's bilinear sampler — free linear
+ *      upscaling — and applies a 5-tap unsharp mask.
+ *   4. Output goes to a canvas at backing-store size (videoWidth * scale)
+ *      × (videoHeight * scale). CSS scales the canvas to fill the
+ *      wrapper.
  *
  * What it is NOT:
- *   - A neural-net super-resolver. We're doing a deterministic linear
- *     resample + edge-enhancement, not learned detail synthesis. It
- *     makes low-bitrate 720p source look meaningfully crisper at 1080p
- *     output, but it can't invent texture that isn't there.
+ *   - A neural-net super-resolver. Deterministic linear resample + edge
+ *     enhancement, not learned detail synthesis. Makes low-bitrate 720p
+ *     source look meaningfully crisper at 1080p output but can't invent
+ *     texture that isn't there.
  *   - A replacement for the existing CSS-filter colour grading on the
- *     Video tab. Those operate on the <video> element which is hidden
- *     while this engine runs. To run both, the shader would need to
- *     accept the same params as uniforms — left as a future extension.
+ *     Video tab — that operates on the <video> element which is hidden
+ *     behind our canvas. To run both, the shader would need to accept
+ *     the same params as uniforms.
  *
  * Lifecycle:
  *   const engine = new VideoEnhanceEngine();
- *   await engine.init(canvas, video);     // async — adapter + device
+ *   await engine.init(canvas, video);
  *   engine.setParams({ strength: 0.5, scale: 1.5 });
- *   engine.start();                        // requestVideoFrameCallback loop
+ *   engine.start();
  *   ...
- *   engine.destroy();                      // cancels loop, releases GPU
+ *   engine.destroy();
  */
 
 const SHADER_WGSL = /* wgsl */ `
@@ -42,7 +43,7 @@ struct Params {
 	_pad: f32,
 }
 
-@group(0) @binding(0) var src: texture_2d<f32>;
+@group(0) @binding(0) var src: texture_external;
 @group(0) @binding(1) var src_sampler: sampler;
 @group(0) @binding(2) var<uniform> params: Params;
 
@@ -51,8 +52,8 @@ struct VsOut {
 	@location(0) uv: vec2f,
 }
 
-// Fullscreen triangle: covers the whole NDC quad with one primitive,
-// no vertex buffer required. Vertex indices 0,1,2 → three corners.
+// Fullscreen triangle: covers the whole NDC quad with one primitive, no
+// vertex buffer required.
 @vertex
 fn vs(@builtin(vertex_index) vid: u32) -> VsOut {
 	var positions = array<vec2f, 3>(
@@ -72,24 +73,22 @@ fn vs(@builtin(vertex_index) vid: u32) -> VsOut {
 }
 
 // 5-tap unsharp mask: center + strength * (center - cross_blur).
-// At strength 0 this collapses to a passthrough; at strength 1 you get
-// aggressive edge enhancement with visible ringing near high contrast.
+// textureSampleBaseClampToEdge is the only sampling function valid for
+// external textures (the spec doesn't expose mipmaps for these).
 @fragment
 fn fs(in: VsOut) -> @location(0) vec4f {
 	let uv = in.uv;
-	let tx = params.texel_x;
-	let ty = params.texel_y;
+	let c = textureSampleBaseClampToEdge(src, src_sampler, uv);
 	let s = params.strength;
-
-	let c = textureSample(src, src_sampler, uv);
 	if (s <= 0.001) {
 		return c;
 	}
-	let n = textureSample(src, src_sampler, uv + vec2f(0.0, -ty));
-	let so = textureSample(src, src_sampler, uv + vec2f(0.0, ty));
-	let e = textureSample(src, src_sampler, uv + vec2f(tx, 0.0));
-	let w = textureSample(src, src_sampler, uv + vec2f(-tx, 0.0));
-
+	let tx = params.texel_x;
+	let ty = params.texel_y;
+	let n = textureSampleBaseClampToEdge(src, src_sampler, uv + vec2f(0.0, -ty));
+	let so = textureSampleBaseClampToEdge(src, src_sampler, uv + vec2f(0.0, ty));
+	let e = textureSampleBaseClampToEdge(src, src_sampler, uv + vec2f(tx, 0.0));
+	let w = textureSampleBaseClampToEdge(src, src_sampler, uv + vec2f(-tx, 0.0));
 	let blur = (n + so + e + w) * 0.25;
 	let enhanced = c + s * (c - blur);
 	return vec4f(clamp(enhanced.rgb, vec3f(0.0), vec3f(1.0)), 1.0);
@@ -111,11 +110,8 @@ interface ResolvedSurface {
 	sampler: GPUSampler;
 	paramsBuffer: GPUBuffer;
 	bindGroupLayout: GPUBindGroupLayout;
-	/** Recreated whenever the source video size changes. */
-	srcTexture: GPUTexture | null;
 	srcWidth: number;
 	srcHeight: number;
-	bindGroup: GPUBindGroup | null;
 }
 
 export class VideoEnhanceEngine {
@@ -123,11 +119,12 @@ export class VideoEnhanceEngine {
 	private canvas: HTMLCanvasElement | null = null;
 	private video: HTMLVideoElement | null = null;
 	private rVFCHandle = 0;
+	private rAFHandle = 0;
 	private destroyed = false;
 	private params: VideoEnhanceParams = { strength: 0.5, scale: 1.5 };
-	/** Set true when an unrecoverable error occurs; we stop pumping frames. */
 	private errored = false;
 	private onErrorCallback: ((err: Error) => void) | null = null;
+	private firstFrameLogged = false;
 
 	static isSupported(): boolean {
 		return typeof navigator !== 'undefined' && 'gpu' in navigator;
@@ -137,13 +134,15 @@ export class VideoEnhanceEngine {
 		this.onErrorCallback = cb;
 	}
 
-	/** Async — needs to request GPU adapter + device. Returns false if WebGPU isn't available. */
 	async init(canvas: HTMLCanvasElement, video: HTMLVideoElement): Promise<boolean> {
 		if (!VideoEnhanceEngine.isSupported()) return false;
 
 		try {
 			const adapter = await navigator.gpu.requestAdapter();
-			if (!adapter) return false;
+			if (!adapter) {
+				this.reportError('No WebGPU adapter');
+				return false;
+			}
 			const device = await adapter.requestDevice();
 			if (this.destroyed) {
 				device.destroy();
@@ -151,16 +150,22 @@ export class VideoEnhanceEngine {
 			}
 
 			device.lost.then((info) => {
-				// 'destroyed' is the normal teardown reason — ignore.
 				if (info.reason !== 'destroyed') {
 					this.errored = true;
-					this.onErrorCallback?.(new Error(`WebGPU device lost: ${info.message}`));
+					this.reportError(`WebGPU device lost: ${info.message}`);
 				}
 			});
+
+			// Surface async validation errors that would otherwise be silent.
+			device.onuncapturederror = (event) => {
+				this.errored = true;
+				this.reportError(`WebGPU uncaptured error: ${event.error.message}`);
+			};
 
 			const context = canvas.getContext('webgpu');
 			if (!context) {
 				device.destroy();
+				this.reportError('Failed to get webgpu canvas context');
 				return false;
 			}
 
@@ -178,7 +183,7 @@ export class VideoEnhanceEngine {
 					{
 						binding: 0,
 						visibility: GPUShaderStage.FRAGMENT,
-						texture: { sampleType: 'float' },
+						externalTexture: {},
 					},
 					{
 						binding: 1,
@@ -211,7 +216,6 @@ export class VideoEnhanceEngine {
 				addressModeV: 'clamp-to-edge',
 			});
 
-			// 4 floats × 4 bytes = 16 bytes, aligned to UBO minimum.
 			const paramsBuffer = device.createBuffer({
 				size: 16,
 				usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -227,16 +231,14 @@ export class VideoEnhanceEngine {
 				sampler,
 				paramsBuffer,
 				bindGroupLayout,
-				srcTexture: null,
 				srcWidth: 0,
 				srcHeight: 0,
-				bindGroup: null,
 			};
 
 			this.writeParams();
 			return true;
 		} catch (err) {
-			this.onErrorCallback?.(err instanceof Error ? err : new Error(String(err)));
+			this.reportError(err instanceof Error ? err.message : String(err));
 			return false;
 		}
 	}
@@ -247,36 +249,22 @@ export class VideoEnhanceEngine {
 		this.writeParams();
 	}
 
-	/** Begin requesting frames. No-op if init failed. */
 	start(): void {
 		if (!this.surface || !this.video || this.destroyed || this.errored) return;
-		// Resize the canvas backing store + ensure src texture exists for current video.
 		this.maybeResize();
-
-		const tick = () => {
-			if (this.destroyed || this.errored) return;
-			this.renderFrame();
-			const v = this.video;
-			if (v && 'requestVideoFrameCallback' in v) {
-				this.rVFCHandle = (v as any).requestVideoFrameCallback(tick);
-			} else if (v) {
-				// Fallback: rAF if rVFC isn't supported (mostly older Safari).
-				this.rVFCHandle = window.requestAnimationFrame(tick);
-			}
-		};
-		tick();
+		this.pump();
 	}
 
 	stop(): void {
 		const v = this.video;
-		if (v && this.rVFCHandle) {
-			if ('cancelVideoFrameCallback' in v) {
-				(v as any).cancelVideoFrameCallback(this.rVFCHandle);
-			} else {
-				window.cancelAnimationFrame(this.rVFCHandle);
-			}
+		if (v && this.rVFCHandle && 'cancelVideoFrameCallback' in v) {
+			(v as any).cancelVideoFrameCallback(this.rVFCHandle);
+		}
+		if (this.rAFHandle) {
+			window.cancelAnimationFrame(this.rAFHandle);
 		}
 		this.rVFCHandle = 0;
+		this.rAFHandle = 0;
 	}
 
 	destroy(): void {
@@ -284,7 +272,6 @@ export class VideoEnhanceEngine {
 		this.destroyed = true;
 		this.stop();
 		if (this.surface) {
-			this.surface.srcTexture?.destroy();
 			this.surface.paramsBuffer.destroy();
 			this.surface.device.destroy();
 			this.surface = null;
@@ -293,20 +280,21 @@ export class VideoEnhanceEngine {
 		this.video = null;
 	}
 
+	private reportError(msg: string): void {
+		// eslint-disable-next-line no-console -- intentional, surface video-enhance failures
+		console.warn('[VideoEnhanceEngine]', msg);
+		this.onErrorCallback?.(new Error(msg));
+	}
+
 	private writeParams(): void {
 		const s = this.surface;
 		if (!s) return;
 		const texelX = s.srcWidth > 0 ? 1 / s.srcWidth : 1 / 1920;
 		const texelY = s.srcHeight > 0 ? 1 / s.srcHeight : 1 / 1080;
-		// Layout matches the `Params` struct in WGSL — 4 floats.
 		const data = new Float32Array([texelX, texelY, this.params.strength, 0]);
 		s.device.queue.writeBuffer(s.paramsBuffer, 0, data);
 	}
 
-	/**
-	 * Ensure the canvas backing store matches `videoWidth * scale`, and
-	 * recreate the source texture if the video's native size changed.
-	 */
 	private maybeResize(): void {
 		const s = this.surface;
 		const canvas = this.canvas;
@@ -317,66 +305,85 @@ export class VideoEnhanceEngine {
 		const vh = video.videoHeight || 0;
 		if (vw === 0 || vh === 0) return;
 
-		// Backing store size — capped to a sane ceiling so absurd scale
-		// values don't try to render an 8K texture.
 		const targetW = Math.min(7680, Math.round(vw * this.params.scale));
 		const targetH = Math.min(4320, Math.round(vh * this.params.scale));
 		if (canvas.width !== targetW) canvas.width = targetW;
 		if (canvas.height !== targetH) canvas.height = targetH;
 
-		// Source texture: only resize when the video's native size changes.
-		if (s.srcTexture === null || s.srcWidth !== vw || s.srcHeight !== vh) {
-			s.srcTexture?.destroy();
-			s.srcTexture = s.device.createTexture({
-				size: [vw, vh, 1],
-				format: 'rgba8unorm',
-				usage:
-					GPUTextureUsage.TEXTURE_BINDING |
-					GPUTextureUsage.COPY_DST |
-					GPUTextureUsage.RENDER_ATTACHMENT,
-			});
+		if (s.srcWidth !== vw || s.srcHeight !== vh) {
 			s.srcWidth = vw;
 			s.srcHeight = vh;
-			s.bindGroup = s.device.createBindGroup({
-				layout: s.bindGroupLayout,
-				entries: [
-					{ binding: 0, resource: s.srcTexture.createView() },
-					{ binding: 1, resource: s.sampler },
-					{ binding: 2, resource: { buffer: s.paramsBuffer } },
-				],
+			this.writeParams(); // texel sizes depend on source dimensions
+		}
+	}
+
+	/**
+	 * Render loop driver. Uses requestVideoFrameCallback when available so
+	 * we tick exactly once per presented video frame; falls back to rAF for
+	 * the case where rVFC isn't firing (rare browser quirks). A single
+	 * rAF loop also guarantees the very first frame renders, in case
+	 * rVFC has a slow startup before the first paint.
+	 */
+	private pump(): void {
+		const v = this.video;
+		if (!v || this.destroyed || this.errored) return;
+
+		const tick = () => {
+			if (this.destroyed || this.errored) return;
+			this.renderFrame();
+			this.scheduleNext();
+		};
+		this.scheduleNext(tick);
+	}
+
+	private scheduleNext(fn?: () => void): void {
+		const v = this.video;
+		if (!v || this.destroyed || this.errored) return;
+		const cb =
+			fn ??
+			(() => {
+				if (this.destroyed || this.errored) return;
+				this.renderFrame();
+				this.scheduleNext();
 			});
-			this.writeParams(); // texel size depends on srcWidth/srcHeight
+		if ('requestVideoFrameCallback' in v) {
+			this.rVFCHandle = (v as any).requestVideoFrameCallback(cb);
+		} else {
+			this.rAFHandle = window.requestAnimationFrame(cb);
 		}
 	}
 
 	private renderFrame(): void {
 		const s = this.surface;
 		const video = this.video;
-		if (!s || !video || video.readyState < 2) return;
+		if (!s || !video) return;
+		if (video.readyState < 2 || !video.videoWidth) return;
 
 		this.maybeResize();
-		if (!s.srcTexture || !s.bindGroup) return;
 
-		// Upload the current video frame to the source texture. On Chromium
-		// + GPU-decoded video this is a zero-copy texture-share; on
-		// software decode it's a fast GPU upload from a CPU surface.
+		let extTex: GPUExternalTexture;
 		try {
-			s.device.queue.copyExternalImageToTexture(
-				{ source: video },
-				{ texture: s.srcTexture },
-				[s.srcWidth, s.srcHeight],
-			);
+			// importExternalTexture is the zero-copy WebGPU path for video.
+			// The resulting handle is only valid for this submit; we re-import
+			// every frame.
+			extTex = s.device.importExternalTexture({ source: video });
 		} catch (err) {
-			// `copyExternalImageToTexture` throws on tainted or DRM-protected
-			// frames. Disable to avoid spamming errors per-frame.
 			this.errored = true;
-			this.onErrorCallback?.(
-				err instanceof Error ? err : new Error('copyExternalImageToTexture failed'),
+			this.reportError(
+				err instanceof Error ? `importExternalTexture: ${err.message}` : 'import failed',
 			);
 			return;
 		}
 
-		// Single-pass render: src texture → canvas, through unsharp shader.
+		const bindGroup = s.device.createBindGroup({
+			layout: s.bindGroupLayout,
+			entries: [
+				{ binding: 0, resource: extTex },
+				{ binding: 1, resource: s.sampler },
+				{ binding: 2, resource: { buffer: s.paramsBuffer } },
+			],
+		});
+
 		const encoder = s.device.createCommandEncoder();
 		const pass = encoder.beginRenderPass({
 			colorAttachments: [
@@ -389,9 +396,17 @@ export class VideoEnhanceEngine {
 			],
 		});
 		pass.setPipeline(s.pipeline);
-		pass.setBindGroup(0, s.bindGroup);
+		pass.setBindGroup(0, bindGroup);
 		pass.draw(3, 1, 0, 0);
 		pass.end();
 		s.device.queue.submit([encoder.finish()]);
+
+		if (!this.firstFrameLogged) {
+			this.firstFrameLogged = true;
+			// eslint-disable-next-line no-console -- one-time confirmation that the path is working
+			console.info(
+				`[VideoEnhanceEngine] first frame rendered (${s.srcWidth}×${s.srcHeight} → ${this.canvas?.width}×${this.canvas?.height})`,
+			);
+		}
 	}
 }

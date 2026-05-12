@@ -38,11 +38,11 @@ export function VideoEnhancer() {
 		const video = sharedVideoEngine.value?.videoRef.current ?? null;
 		if (!canvas || !video) return undefined;
 
-		// Hide the underlying <video> visually so only our enhanced canvas
-		// shows. We must NOT use `display: none` — that would pause audio
-		// and break HLS / DRM / fullscreen. opacity:0 keeps it fully alive.
-		const previousOpacity = video.style.opacity;
-		video.style.opacity = '0';
+		// We do NOT hide the underlying <video>. The canvas (z-index:1,
+		// opaque background) naturally overlays it once frames render, and
+		// `opacity: 0` on the video has been observed to suppress
+		// requestVideoFrameCallback on some Chromium builds — without rVFC
+		// firing the canvas never resizes or draws.
 
 		let cancelled = false;
 		const engine = new VideoEnhanceEngine();
@@ -80,7 +80,6 @@ export function VideoEnhancer() {
 			dispose();
 			engineRef.current?.destroy();
 			engineRef.current = null;
-			video.style.opacity = previousOpacity;
 		};
 		// We deliberately depend only on `enabled` and the resolved video
 		// element. Strength/scale changes are handled by the inner effect.
