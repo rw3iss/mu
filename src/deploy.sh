@@ -92,15 +92,21 @@ pnpm build
 # `{"message":"Cannot GET /"}` because the SPA fallback hook in main.ts
 # has no index.html to read.
 #
-# Detect that case and force a fresh rebuild of just the client package,
-# bypassing turbo's cache.
+# Detect that case and rebuild by invoking `vite build` directly —
+# bypassing both turbo's cache and pnpm's filter machinery, so we get
+# a guaranteed-fresh build every time.
 CLIENT_DIST="$SRC_DIR/packages/client/dist"
 if [ ! -s "$CLIENT_DIST/index.html" ] || [ ! -d "$CLIENT_DIST/assets" ]; then
-    echo "WARNING: client/dist is missing index.html or assets/ — forcing fresh rebuild"
+    echo "WARNING: client/dist is missing index.html or assets/ — forcing fresh vite build"
     rm -rf "$CLIENT_DIST"
-    # --force bypasses turbo cache for this run; the client package alone
-    # rebuilds in 1-3s on this hardware, so the cost is negligible.
-    pnpm --filter @mu/client build --force 2>&1 | tail -10 || pnpm --filter @mu/client build
+    # Run vite directly (no turbo, no pnpm filter). Earlier attempts to
+    # pass `--force` to `pnpm --filter @mu/client build` just forwarded
+    # the flag to vite (which ignores it) while turbo still happily
+    # restored the same partial dist/ from its cache.
+    (cd "$SRC_DIR/packages/client" && pnpm exec vite build) || {
+        echo "ERROR: vite build failed"
+        exit 1
+    }
     if [ ! -s "$CLIENT_DIST/index.html" ] || [ ! -d "$CLIENT_DIST/assets" ]; then
         echo "ERROR: client/dist still missing index.html or assets/ after rebuild — aborting deploy"
         exit 1
