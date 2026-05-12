@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { Icon } from '@/components/common/Icon';
+import { SmartImage } from '@/components/common/SmartImage';
 import { CastPhoto } from '@/components/movie/CastPhoto';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
 import { PluginSlot } from '@/plugins/PluginSlot';
@@ -9,6 +11,7 @@ import { wsService } from '@/services/websocket.service';
 import { globalMovie, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { showInfoPanel } from '@/state/player.state';
+import { shareMode } from '@/state/share.state';
 import styles from './InfoPanel.module.scss';
 
 interface InfoPanelProps {
@@ -67,27 +70,30 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 			>
 				{!inline && (
 					<button class={styles.closeBtn} onClick={onClose} aria-label="Close info">
-						{'\u2715'}
+						<Icon name="x" />
 					</button>
 				)}
 
 				{inline ? (
 					/* Inline: two-column layout — poster left, ALL content right */
 					<div class={styles.inlineLayout}>
-						{movie.posterUrl && (
-							<img
-								src={movie.posterUrl}
-								alt={`${movie.title} poster`}
-								class={styles.inlinePoster}
-							/>
-						)}
+						<SmartImage
+							src={movie.posterUrl}
+							alt={`${movie.title} poster`}
+							class={styles.inlinePoster}
+							fallbackLabel={movie.title}
+						/>
 						<div class={styles.inlineContent}>
-							<h2
-								class={`${styles.title} ${styles.titleLink}`}
-								onClick={() => route(`/movie/${movie.id}`)}
-							>
-								{movie.title}
-							</h2>
+							{shareMode.value ? (
+								<h2 class={styles.title}>{movie.title}</h2>
+							) : (
+								<h2
+									class={`${styles.title} ${styles.titleLink}`}
+									onClick={() => route(`/movie/${movie.id}`)}
+								>
+									{movie.title}
+								</h2>
+							)}
 							<div class={styles.meta}>
 								{movie.year > 0 && <span>{movie.year}</span>}
 								{runtimeText && <span>{runtimeText}</span>}
@@ -208,7 +214,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									>
 										<h3 class={styles.sectionTitle}>File Info</h3>
 										<span class={styles.fileInfoArrow}>
-											{showFileInfo ? '\u25B2' : '\u25BC'}
+											<Icon name={showFileInfo ? 'chevron-up' : 'chevron-down'} size={14} />
 										</span>
 									</button>
 									{showFileInfo && <FileInfoGrid movie={movie} dark />}
@@ -218,26 +224,29 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 					</div>
 				) : (
 					<>
-						{movie.posterUrl && (
-							<img
-								src={movie.posterUrl}
-								alt={`${movie.title} poster`}
-								class={styles.poster}
-							/>
-						)}
+						<SmartImage
+							src={movie.posterUrl}
+							alt={`${movie.title} poster`}
+							class={styles.poster}
+							fallbackLabel={movie.title}
+						/>
 
-						<h2
-							class={`${styles.title} ${styles.titleLink}`}
-							onClick={() => {
-								route(`/movie/${movie.id}`);
-								if (playerMode.value === 'full') {
-									minimizePlayer();
-								}
-								showInfoPanel.value = false;
-							}}
-						>
-							{movie.title}
-						</h2>
+						{shareMode.value ? (
+							<h2 class={styles.title}>{movie.title}</h2>
+						) : (
+							<h2
+								class={`${styles.title} ${styles.titleLink}`}
+								onClick={() => {
+									route(`/movie/${movie.id}`);
+									if (playerMode.value === 'full') {
+										minimizePlayer();
+									}
+									showInfoPanel.value = false;
+								}}
+							>
+								{movie.title}
+							</h2>
+						)}
 
 						<div class={styles.meta}>
 							{movie.year > 0 && <span>{movie.year}</span>}
@@ -355,7 +364,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								>
 									<h3 class={styles.sectionTitle}>File Info</h3>
 									<span class={styles.fileInfoArrow}>
-										{showFileInfo ? '\u25B2' : '\u25BC'}
+										<Icon name={showFileInfo ? 'chevron-up' : 'chevron-down'} size={14} />
 									</span>
 								</button>
 								{showFileInfo && <FileInfoGrid movie={movie} dark />}

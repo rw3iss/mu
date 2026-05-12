@@ -1,6 +1,7 @@
 import type { VNode } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { Icon } from '@/components/common/Icon';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
@@ -16,6 +17,7 @@ import {
 } from '@/state/audio-effects.state';
 import { globalMovie, globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import type { StreamSession } from '@/state/player.state';
+import { shareMode } from '@/state/share.state';
 import {
 	audioTrack,
 	currentSession,
@@ -61,8 +63,8 @@ function SubtitleSettingsCollapsible() {
 				style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
 			>
 				<span>Settings</span>
-				<span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
-					{open ? '\u25B2' : '\u25BC'}
+				<span style={{ display: 'inline-flex', color: 'rgba(255,255,255,0.5)' }}>
+					<Icon name={open ? 'chevron-up' : 'chevron-down'} size={12} />
 				</span>
 			</button>
 			{open && (
@@ -466,10 +468,18 @@ export function PlayerControls({
 						<div class={styles.leftSection}>
 							{title && globalMovieId.value && (
 								<a
-									href={`/movie/${globalMovieId.value}`}
+									// In share-watch mode the recipient can't reach
+									// /movie/:id, so the title acts as an "open info"
+									// affordance instead — same behaviour as the info
+									// button in the player toolbar.
+									href={shareMode.value ? undefined : `/movie/${globalMovieId.value}`}
 									class={styles.titleText}
 									onClick={(e) => {
 										e.preventDefault();
+										if (shareMode.value) {
+											onToggleInfo();
+											return;
+										}
 										if (playerMode.value !== 'mini') {
 											minimizePlayer();
 										}
@@ -780,7 +790,7 @@ export function PlayerControls({
 														: quality.value}
 												</span>
 												<span class={styles.menuRowChevron}>
-													{'\u203A'}
+													<Icon name="chevron-right" size={14} />
 												</span>
 											</button>
 
@@ -797,7 +807,7 @@ export function PlayerControls({
 														: 'Off'}
 												</span>
 												<span class={styles.menuRowChevron}>
-													{'\u203A'}
+													<Icon name="chevron-right" size={14} />
 												</span>
 											</button>
 
@@ -829,7 +839,7 @@ export function PlayerControls({
 																'Default')}
 													</span>
 													<span class={styles.menuRowChevron}>
-														{'\u203A'}
+														<Icon name="chevron-right" size={14} />
 													</span>
 												</button>
 											)}
@@ -842,7 +852,7 @@ export function PlayerControls({
 												class={styles.menuBack}
 												onClick={() => setSettingsPanel('main')}
 											>
-												{'\u2039'} Quality
+												<Icon name="chevron-left" size={14} /> Quality
 											</button>
 											<button
 												class={`${styles.menuItem} ${quality.value === 'auto' ? styles.selected : ''}`}
@@ -872,7 +882,7 @@ export function PlayerControls({
 												class={styles.menuBack}
 												onClick={() => setSettingsPanel('main')}
 											>
-												{'\u2039'} Subtitles
+												<Icon name="chevron-left" size={14} /> Subtitles
 											</button>
 											<button
 												class={`${styles.menuItem} ${subtitleTrack.value === null ? styles.selected : ''}`}
@@ -898,7 +908,7 @@ export function PlayerControls({
 												class={styles.menuItem}
 												onClick={() => setSettingsPanel('subtitle-manage')}
 											>
-												Manage Subtitles {'\u203A'}
+												Manage Subtitles <Icon name="chevron-right" size={14} />
 											</button>
 										</>
 									)}
@@ -909,7 +919,7 @@ export function PlayerControls({
 												class={styles.menuBack}
 												onClick={() => setSettingsPanel('subtitles')}
 											>
-												{'\u2039'} Manage Subtitles
+												<Icon name="chevron-left" size={14} /> Manage Subtitles
 											</button>
 											<div class={styles.menuPanelContent}>
 												<SubtitleSettingsCollapsible />
@@ -1039,7 +1049,7 @@ export function PlayerControls({
 												class={styles.menuBack}
 												onClick={() => setSettingsPanel('main')}
 											>
-												{'\u2039'} Audio Track
+												<Icon name="chevron-left" size={14} /> Audio Track
 											</button>
 											{(session?.audioTracks ?? []).map((track) => {
 												const trackId = String(track.id);
