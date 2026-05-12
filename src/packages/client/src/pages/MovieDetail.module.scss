@@ -97,8 +97,19 @@
 
 .poster {
   width: 100%;
+  // Lock to standard 2:3 poster aspect so off-aspect sources (TMDB
+  // sometimes returns landscape thumbnails) don't squish or stretch the
+  // box. The image itself uses object-fit: contain via .posterImg so
+  // weird-aspect sources letterbox cleanly inside the box.
+  aspect-ratio: 2 / 3;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  background: var(--color-bg-tertiary);
+}
+
+.posterImg {
+  object-fit: contain;
 }
 
 .posterPlaceholder {

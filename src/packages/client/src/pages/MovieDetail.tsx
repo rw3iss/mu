@@ -338,7 +338,8 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						<SmartImage
 							src={movie.posterUrl}
 							alt={`${movie.title} poster`}
-							imgClass={styles.poster}
+							class={styles.poster}
+							imgClass={styles.posterImg}
 							fallbackLabel={movie.title}
 						/>
 					</div>

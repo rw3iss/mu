@@ -81,6 +81,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							src={movie.posterUrl}
 							alt={`${movie.title} poster`}
 							class={styles.inlinePoster}
+							imgClass={styles.inlinePosterImg}
 							fallbackLabel={movie.title}
 						/>
 						<div class={styles.inlineContent}>
@@ -228,6 +229,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							src={movie.posterUrl}
 							alt={`${movie.title} poster`}
 							class={styles.poster}
+							imgClass={styles.posterImg}
 							fallbackLabel={movie.title}
 						/>
 
