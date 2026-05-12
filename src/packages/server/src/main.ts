@@ -115,6 +115,11 @@ async function bootstrap() {
 						: undefined,
 			},
 			trustProxy: true,
+			// Fastify's router defaults to 100 chars per :param. Share-link
+			// tokens (JWTs) are ~200+ chars; without this they silently 404.
+			// Allow up to 4 KB so any future long-id routes (UUIDs, tokens)
+			// also work without surprise.
+			maxParamLength: 4096,
 		}),
 	);
 
