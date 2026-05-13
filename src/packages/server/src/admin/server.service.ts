@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Injectable } from '@nestjs/common';
@@ -124,7 +124,10 @@ export class ServerService {
 		lines = 200,
 		file = 'server',
 	): { content: string; path: string; sizeBytes: number } {
-		const logDir = path.resolve('./data/logs');
+		// Anchor to PROJECT_ROOT (matches database.service.ts) so cwd
+		// drift doesn't send us looking for the wrong file.
+		const projectRoot = path.resolve(import.meta.dirname, '..', '..', '..', '..', '..');
+		const logDir = path.resolve(projectRoot, 'data', 'logs');
 		const fileName = file === 'transcode-debug' ? 'transcode-debug.log' : 'server.log';
 		const logPath = path.join(logDir, fileName);
 
@@ -133,12 +136,9 @@ export class ServerService {
 		}
 
 		const stat = statSync(logPath);
-		const content = readFileSync(logPath, 'utf-8');
-		const allLines = content.split('\n');
-		const lastLines = allLines.slice(-lines).join('\n');
-
+		const content = tailFile(logPath, lines, stat.size);
 		return {
-			content: lastLines,
+			content,
 			path: logPath,
 			sizeBytes: stat.size,
 		};
@@ -167,5 +167,37 @@ export class ServerService {
 		} catch {
 			return null;
 		}
+	}
+}
+
+/**
+ * Stream-tail the last N lines of a file without reading the whole
+ * thing. Reads 64 KB chunks from the tail until we have enough
+ * newlines or hit the start of the file. Keeps memory bounded so a
+ * multi-gigabyte log doesn't OOM the server.
+ */
+function tailFile(filePath: string, lines: number, fileSize: number): string {
+	if (fileSize === 0) return '';
+	const CHUNK = 64 * 1024;
+	const fd = openSync(filePath, 'r');
+	try {
+		const buf = Buffer.alloc(CHUNK);
+		let position = fileSize;
+		let collected = '';
+		let newlines = 0;
+		while (position > 0 && newlines <= lines) {
+			const readBytes = Math.min(CHUNK, position);
+			position -= readBytes;
+			readSync(fd, buf, 0, readBytes, position);
+			const chunk = buf.subarray(0, readBytes).toString('utf-8');
+			collected = chunk + collected;
+			for (let i = 0; i < chunk.length; i++) {
+				if (chunk.charCodeAt(i) === 10) newlines++;
+			}
+		}
+		const allLines = collected.split('\n');
+		return allLines.slice(-lines).join('\n');
+	} finally {
+		closeSync(fd);
 	}
 }

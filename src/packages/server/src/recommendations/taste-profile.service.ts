@@ -137,11 +137,28 @@ export class TasteProfileService {
 	}
 }
 
+/**
+ * Some `movie_metadata` JSON columns store objects rather than bare
+ * strings — notably `cast` is `{name, character, profileUrl, tmdbId}[]`.
+ * This helper accepts either shape and returns clean string names, so
+ * downstream Map keys / Set membership work consistently. Anything
+ * with no extractable string name is dropped.
+ */
 function parseArr(value: string | null | undefined): string[] {
 	if (!value) return [];
 	try {
-		const p = JSON.parse(value);
-		return Array.isArray(p) ? p : [];
+		const parsed = JSON.parse(value);
+		if (!Array.isArray(parsed)) return [];
+		const out: string[] = [];
+		for (const item of parsed) {
+			if (typeof item === 'string') {
+				if (item.trim()) out.push(item);
+			} else if (item && typeof item === 'object') {
+				const name = (item as { name?: unknown }).name;
+				if (typeof name === 'string' && name.trim()) out.push(name);
+			}
+		}
+		return out;
 	} catch {
 		return [];
 	}
@@ -149,6 +166,7 @@ function parseArr(value: string | null | undefined): string[] {
 
 function accumulate(map: Map<string, number>, items: string[], weight: number): void {
 	for (const item of items) {
+		if (!item) continue;
 		map.set(item, (map.get(item) ?? 0) + weight);
 	}
 }

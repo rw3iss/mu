@@ -113,11 +113,26 @@ export function hydrate(
 	movie: Movie,
 	metadata: MovieMetadata | null | undefined,
 ): MovieWithMetadata {
+	// movie_metadata stores some columns as JSON arrays of strings
+	// (genres, directors, keywords, companies) and others as arrays of
+	// objects (`cast` is `{name, character, profileUrl, tmdbId}[]`).
+	// This helper extracts a flat string array from either shape so the
+	// strategies / scorer can treat them uniformly.
 	const parseArr = (v: string | null | undefined): string[] => {
 		if (!v) return [];
 		try {
-			const p = JSON.parse(v);
-			return Array.isArray(p) ? p.map((x) => String(x)) : [];
+			const parsed = JSON.parse(v);
+			if (!Array.isArray(parsed)) return [];
+			const out: string[] = [];
+			for (const item of parsed) {
+				if (typeof item === 'string') {
+					if (item.trim()) out.push(item);
+				} else if (item && typeof item === 'object') {
+					const name = (item as { name?: unknown }).name;
+					if (typeof name === 'string' && name.trim()) out.push(name);
+				}
+			}
+			return out;
 		} catch {
 			return [];
 		}
