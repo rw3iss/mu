@@ -523,6 +523,10 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 			progress: job.progress,
 			error: job.error,
 			payload: job.payload,
+			// Carry the result on terminal events so subscribers can
+			// react with the handler's return value (grouping summary,
+			// transcode result, etc.) without a follow-up GET.
+			result: job.result,
 		});
 	}
 

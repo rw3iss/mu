@@ -7,6 +7,8 @@ import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { type Movie, movieFiles, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
+import { JobManagerService } from '../jobs/job-manager.service.js';
+import type { JobHelpers } from '../jobs/job.interface.js';
 import { SettingsService } from '../settings/settings.service.js';
 import {
 	DEFAULT_THRESHOLDS,
@@ -49,6 +51,7 @@ export class GroupingService implements OnModuleInit {
 		private readonly database: DatabaseService,
 		private readonly settings: SettingsService,
 		private readonly events: EventsService,
+		private readonly jobs: JobManagerService,
 		sxxexx: SxxExxDetector,
 		folderTree: FolderTreeDetector,
 		multiFile: MultiFileDetector,
@@ -72,6 +75,13 @@ export class GroupingService implements OnModuleInit {
 				this.logger.warn(`Grouping detection failed for ${ev.movieId}: ${err?.message}`);
 			});
 		});
+
+		// Register the async rebuild handler so callers can enqueue a
+		// background pass and stream progress over the existing WS job
+		// channel (JOB_STARTED / JOB_PROGRESS / JOB_COMPLETED).
+		this.jobs.registerHandler('grouping-rebuild', async (_job, helpers) =>
+			this.rebuildAllWithProgress(helpers),
+		);
 	}
 
 	// ── Public API ────────────────────────────────────────────
@@ -150,27 +160,72 @@ export class GroupingService implements OnModuleInit {
 	}
 
 	async rebuildAll(): Promise<{ scanned: number; grouped: number; pruned: number }> {
+		return this.rebuildAllWithProgress(null);
+	}
+
+	/**
+	 * Enqueue a background rebuild and return immediately. Caller gets
+	 * the jobId + total-movie count up-front; progress streams over the
+	 * existing `JOB_PROGRESS` WebSocket channel; final summary lands in
+	 * `JOB_COMPLETED`.
+	 *
+	 * Used by the admin "Group Similar Items" button so a library of
+	 * thousands of movies doesn't time out the request.
+	 */
+	enqueueRebuild(): { jobId: string; totalMovies: number } {
+		const totalMovies = this.database.db
+			.select({ id: movies.id })
+			.from(movies)
+			.all().length;
+		const jobId = this.jobs.enqueue({
+			type: 'grouping-rebuild',
+			label: `Group similar items (${totalMovies} movies)`,
+			payload: { totalMovies },
+			priority: 30,
+		});
+		return { jobId, totalMovies };
+	}
+
+	private async rebuildAllWithProgress(
+		helpers: JobHelpers | null,
+	): Promise<{ scanned: number; grouped: number; pruned: number }> {
 		// Wipe non-confirmed groups + detach those movies.
 		const wipe = this.repo.wipeAutoAndUnsure();
 		this.logger.log(
 			`Rebuild: wiped ${wipe.groupsDeleted} auto/unsure groups, detached ${wipe.moviesDetached} movies`,
 		);
+		helpers?.log(
+			`Wiped ${wipe.groupsDeleted} auto/unsure groups, detached ${wipe.moviesDetached} movies`,
+		);
 
 		const allMovies = this.database.db.select({ id: movies.id }).from(movies).all();
+		const total = allMovies.length;
 		let grouped = 0;
-		for (const m of allMovies) {
+		// 90% of the progress bar goes to detection; the final 10% is
+		// the prune sweep so the UI doesn't stall at 100% before it's
+		// truly done.
+		for (let i = 0; i < allMovies.length; i++) {
+			const m = allMovies[i]!;
 			const sg = await this.detectAndAttach(m.id);
 			if (sg) grouped++;
+			if (helpers && total > 0 && (i % 25 === 0 || i === total - 1)) {
+				helpers.reportProgress(((i + 1) / total) * 90);
+			}
 		}
 		// Prune single-member subgroups — a "group" of one movie is just
 		// a movie. The detectors fire incrementally and can't know
 		// upfront whether more siblings will land in the same subgroup,
 		// so we sweep here once the full pass is done.
+		helpers?.reportProgress(95);
 		const pruned = this.pruneSingleMemberSubgroups();
+		helpers?.reportProgress(100);
 		this.logger.log(
 			`Rebuild complete: ${grouped} grouped initially, ${pruned} singleton subgroup(s) pruned`,
 		);
-		return { scanned: allMovies.length, grouped: grouped - pruned, pruned };
+		helpers?.log(
+			`Done. Scanned ${total}, grouped ${grouped - pruned}, pruned ${pruned} singletons.`,
+		);
+		return { scanned: total, grouped: grouped - pruned, pruned };
 	}
 
 	/**

@@ -124,8 +124,17 @@ export class GroupingController {
 	@Post('admin/rebuild')
 	@Roles('admin')
 	async rebuild() {
-		const result = await this.groupingService.rebuildAll();
-		return result;
+		// Returns immediately with a jobId; progress + final summary
+		// stream over the existing JOB_PROGRESS / JOB_COMPLETED WS
+		// channel so the UI can show a live progress bar instead of
+		// blocking the HTTP request for a multi-minute scan.
+		const { jobId, totalMovies } = this.groupingService.enqueueRebuild();
+		return {
+			ok: true,
+			jobId,
+			totalMovies,
+			message: `Started analysing ${totalMovies} movies in the background. Subscribe to job ${jobId} for progress.`,
+		};
 	}
 
 	@Post('admin/detect/:movieId')

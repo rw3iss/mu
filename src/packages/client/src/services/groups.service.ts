@@ -77,7 +77,18 @@ export const groupsService = {
 		return api.patch(`/groups/${id}`, body);
 	},
 
-	rebuild(): Promise<{ scanned: number; grouped: number; pruned?: number }> {
+	/**
+	 * Kick off the grouping rebuild in the background. Returns
+	 * immediately with the jobId + total-movie count; the caller
+	 * subscribes to `JOB_PROGRESS` / `JOB_COMPLETED` on the existing
+	 * WebSocket channel for live progress + the final summary.
+	 */
+	rebuild(): Promise<{
+		ok: boolean;
+		jobId: string;
+		totalMovies: number;
+		message: string;
+	}> {
 		return api.post('/groups/admin/rebuild', {});
 	},
 };

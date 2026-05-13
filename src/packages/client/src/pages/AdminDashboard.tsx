@@ -6,8 +6,14 @@ import { api } from '@/services/api';
 import { groupsService } from '@/services/groups.service';
 import type { ActiveSession, SessionHistoryEntry } from '@/services/stream.service';
 import { streamService } from '@/services/stream.service';
+import { wsService } from '@/services/websocket.service';
 import { fetchMovies } from '@/state/library.state';
-import { notifyError, notifySuccess } from '@/state/notifications.state';
+import {
+	notifyError,
+	notifyInfo,
+	notifySuccess,
+	removeNotification,
+} from '@/state/notifications.state';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -121,18 +127,76 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 
 	const handleGroupSimilarItems = useCallback(async () => {
 		setGroupingItems(true);
+		let progressToastId: string | null = null;
+		let cleanup: (() => void) | null = null;
 		try {
-			const result = await groupsService.rebuild();
-			const prunedNote =
-				typeof result.pruned === 'number' && result.pruned > 0
-					? `, pruned ${result.pruned} single-member group(s)`
-					: '';
-			notifySuccess(
-				`Grouped ${result.grouped} of ${result.scanned} movies${prunedNote}. Open any item's group page to review.`,
+			const queued = await groupsService.rebuild();
+			progressToastId = notifyInfo(
+				`Grouping started: analysing ${queued.totalMovies} movies… 0%`,
+				/* persistent until we dismiss */ 0,
 			);
+
+			// Subscribe to the existing JOB_PROGRESS / COMPLETED / FAILED
+			// WS channel; gate on jobId so other jobs don't update us.
+			let lastPct = 0;
+			const onProgress = (data: unknown) => {
+				const d = data as { id?: string; progress?: number };
+				if (d?.id !== queued.jobId) return;
+				const pct = Math.max(0, Math.min(100, Math.round(d.progress ?? 0)));
+				if (pct === lastPct) return;
+				lastPct = pct;
+				if (progressToastId) {
+					// Replace by removing + re-adding under the same id is
+					// awkward; cheap path is to remove + add a new one.
+					removeNotification(progressToastId);
+					progressToastId = notifyInfo(
+						`Grouping: ${pct}% (${queued.totalMovies} movies)`,
+						0,
+					);
+				}
+			};
+			const onComplete = (data: unknown) => {
+				const d = data as {
+					id?: string;
+					result?: { scanned?: number; grouped?: number; pruned?: number };
+				};
+				if (d?.id !== queued.jobId) return;
+				if (progressToastId) {
+					removeNotification(progressToastId);
+					progressToastId = null;
+				}
+				const r = d.result ?? {};
+				const pruned = r.pruned ?? 0;
+				const prunedNote =
+					pruned > 0 ? `, pruned ${pruned} single-member group(s)` : '';
+				notifySuccess(
+					`Grouped ${r.grouped ?? 0} of ${r.scanned ?? 0} movies${prunedNote}.`,
+				);
+				cleanup?.();
+				setGroupingItems(false);
+			};
+			const onFailed = (data: unknown) => {
+				const d = data as { id?: string; error?: string };
+				if (d?.id !== queued.jobId) return;
+				if (progressToastId) {
+					removeNotification(progressToastId);
+					progressToastId = null;
+				}
+				notifyError(`Grouping failed: ${d.error ?? 'unknown error'}`);
+				cleanup?.();
+				setGroupingItems(false);
+			};
+			wsService.on('job:progress', onProgress);
+			wsService.on('job:completed', onComplete);
+			wsService.on('job:failed', onFailed);
+			cleanup = () => {
+				wsService.off('job:progress', onProgress);
+				wsService.off('job:completed', onComplete);
+				wsService.off('job:failed', onFailed);
+			};
 		} catch {
-			notifyError('Group detection failed');
-		} finally {
+			if (progressToastId) removeNotification(progressToastId);
+			notifyError('Failed to start grouping');
 			setGroupingItems(false);
 		}
 	}, []);

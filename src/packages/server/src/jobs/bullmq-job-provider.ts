@@ -520,6 +520,7 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 			progress: job.progress,
 			error: job.error,
 			payload: job.payload,
+			result: job.result,
 		});
 	}
 
