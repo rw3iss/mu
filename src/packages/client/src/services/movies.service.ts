@@ -81,6 +81,23 @@ export const moviesService = {
 	},
 
 	/**
+	 * Run the title sanitiser on a single movie. Returns the updated
+	 * movie record plus { changed, from, to } so the caller can
+	 * surface the rename in a toast and refresh the page without a
+	 * follow-up GET.
+	 */
+	sanitizeTitle(
+		movieId: string,
+	): Promise<{
+		movie: Movie;
+		changed: boolean;
+		from: string | null;
+		to: string | null;
+	}> {
+		return api.post(`/movies/${movieId}/sanitize-title`);
+	},
+
+	/**
 	 * Get recently added movies
 	 */
 	getRecentlyAdded(limit = 20): Promise<MovieListResponse> {

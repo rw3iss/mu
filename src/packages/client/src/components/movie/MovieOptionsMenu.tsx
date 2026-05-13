@@ -207,6 +207,21 @@ export function MovieOptionsMenu({
 		}
 	}, [movie.id, refreshMovie]);
 
+	const handleSanitizeTitle = useCallback(async () => {
+		setOpen(false);
+		try {
+			const result = await moviesService.sanitizeTitle(movie.id);
+			await refreshMovie();
+			if (result.changed) {
+				notifySuccess(`Renamed: "${result.from}" → "${result.to}"`);
+			} else {
+				notifySuccess('Title already clean — no change');
+			}
+		} catch {
+			notifyError('Failed to sanitize title');
+		}
+	}, [movie.id, refreshMovie, setOpen]);
+
 	const handleRemove = useCallback(async () => {
 		setShowRemoveConfirm(false);
 		try {
@@ -399,6 +414,12 @@ export function MovieOptionsMenu({
 							<Icon name="x" />
 						</span>
 						Clear Metadata
+					</button>
+					<button class={styles.menuItem} onClick={handleSanitizeTitle}>
+						<span class={styles.menuIcon}>
+							<Icon name="edit" />
+						</span>
+						Sanitize Title Name
 					</button>
 					<div class={styles.menuDivider} />
 					<div

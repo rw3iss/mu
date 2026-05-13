@@ -727,35 +727,11 @@ export class MoviesService {
 		const sample: Array<{ from: string; to: string }> = [];
 		let updated = 0;
 		for (const row of candidates) {
-			const raw = row.title;
-			if (!raw) continue;
-			// If the DB title is already clean, leave it alone — cleaning
-			// the filename can produce worse output (e.g. DB "1917" vs
-			// filename "1917.2019.1080p.WEBRip.x264.AAC5.1-[YTS.MX]"
-			// where the boundary slice might miss).
-			const dbIsDirty = isDirtyTitle(raw);
-			const fileBase = row.filePath
-				? path.basename(row.filePath, path.extname(row.filePath))
-				: null;
-			// Pick the source: filename when DB title is dirty (richer),
-			// otherwise the DB title in place.
-			const source = dbIsDirty && fileBase ? fileBase : raw;
-			const cleaned = buildPrettyTitle(source);
-			if (!cleaned || cleaned.length < 2 || cleaned === raw) continue;
-
-			// Only overwrite when there's a genuine upgrade — either the
-			// raw is dirty, or the cleaned version surfaces SExx info
-			// the raw lacked (TV episode discovery path).
-			const cleanedHasSE = /[\s-]S\d{2}E\d{2,3}\b/.test(cleaned);
-			const rawHasSE = /[\s-]S\d{2}E\d{2,3}\b/i.test(raw);
-			if (!dbIsDirty && !(cleanedHasSE && !rawHasSE)) continue;
-
-			this.database.db
-				.update(movies)
-				.set({ title: cleaned, updatedAt: nowISO() })
-				.where(eq(movies.id, row.id))
-				.run();
-			if (sample.length < 10) sample.push({ from: raw, to: cleaned });
+			// Default mode: only overwrite when raw is dirty or filename
+			// surfaces new SE info — protects already-clean titles.
+			const r = this.applyTitleSanitiser(row.id, row.title, row.filePath, false);
+			if (!r) continue;
+			if (sample.length < 10) sample.push({ from: r.from, to: r.to });
 			updated++;
 		}
 
@@ -764,5 +740,69 @@ export class MoviesService {
 			this.logger.log(`Sanitized ${updated} of ${candidates.length} unmatched titles`);
 		}
 		return { scanned: candidates.length, updated, sample };
+	}
+
+	/**
+	 * Sanitise a single movie's title and return the updated row. Used
+	 * by the MovieDetail page's "Sanitize Title Name" action. Unlike the
+	 * bulk sweep this is `force=true` — the user explicitly opted in,
+	 * so we'll overwrite even already-clean-looking titles if the
+	 * sanitiser thinks it can produce something cleaner. We still skip
+	 * the write when the result equals the existing title.
+	 */
+	sanitizeMovieTitle(movieId: string): { from: string; to: string } | null {
+		const row = this.database.db
+			.select({
+				id: movies.id,
+				title: movies.title,
+				filePath: movieFiles.filePath,
+			})
+			.from(movies)
+			.leftJoin(movieFiles, eq(movieFiles.movieId, movies.id))
+			.where(eq(movies.id, movieId))
+			.get();
+		if (!row) throw new NotFoundException(`Movie ${movieId} not found`);
+		const result = this.applyTitleSanitiser(row.id, row.title, row.filePath, true);
+		if (result) {
+			this.invalidateListCache();
+		}
+		return result;
+	}
+
+	private applyTitleSanitiser(
+		id: string,
+		rawTitle: string,
+		filePath: string | null,
+		force: boolean,
+	): { from: string; to: string } | null {
+		const raw = rawTitle;
+		if (!raw) return null;
+		// If the DB title is already clean, leave it alone in non-force
+		// mode — cleaning the filename can produce worse output than the
+		// existing clean DB title.
+		const dbIsDirty = isDirtyTitle(raw);
+		const fileBase = filePath ? path.basename(filePath, path.extname(filePath)) : null;
+		// Choose source: filename when dirty (richer), otherwise the
+		// DB title in place. In force mode prefer the filename when
+		// available, so the user can rescue movies whose dirty filename
+		// was already crammed into a partly-clean title field.
+		const source = (dbIsDirty || force) && fileBase ? fileBase : raw;
+		const cleaned = buildPrettyTitle(source);
+		if (!cleaned || cleaned.length < 2 || cleaned === raw) return null;
+
+		if (!force) {
+			// Only overwrite on genuine upgrade — either dirty raw, or
+			// filename surfaces SE info the raw lacked.
+			const cleanedHasSE = /[\s-]S\d{2}E\d{2,3}\b/.test(cleaned);
+			const rawHasSE = /[\s-]S\d{2}E\d{2,3}\b/i.test(raw);
+			if (!dbIsDirty && !(cleanedHasSE && !rawHasSE)) return null;
+		}
+
+		this.database.db
+			.update(movies)
+			.set({ title: cleaned, updatedAt: nowISO() })
+			.where(eq(movies.id, id))
+			.run();
+		return { from: raw, to: cleaned };
 	}
 }
