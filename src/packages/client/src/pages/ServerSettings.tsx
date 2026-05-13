@@ -1155,7 +1155,7 @@ function LogsSection() {
 export function ServerSettings() {
 	return (
 		<div class={styles.container}>
-			<Section title="Server Info" defaultOpen>
+			<Section title="Server Info">
 				<ServerInfoSection />
 			</Section>
 			<Section title="Statistics">

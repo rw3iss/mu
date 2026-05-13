@@ -10,6 +10,8 @@ export interface DiscoverFilters {
 	language?: string;
 }
 
+export type IncludeMode = 'owned' | 'notOwned' | 'all';
+
 export interface ScoredMovie {
 	movieId: string;
 	title: string;
@@ -18,12 +20,17 @@ export interface ScoredMovie {
 	explanation: string[];
 	posterUrl: string | null;
 	usedSources: string[];
+	source?: 'library' | 'external' | 'bookmark';
+	inLibrary?: boolean;
+	tmdbId?: number | null;
+	enriching?: boolean;
 }
 
 export interface DiscoverResponse {
 	results: ScoredMovie[];
 	usedSources: string[];
 	reason?: string;
+	enrichmentsQueued?: number;
 }
 
 export interface DiscoverRequest {
@@ -31,6 +38,7 @@ export interface DiscoverRequest {
 	seedMovieIds?: string[];
 	limit?: number;
 	filters?: DiscoverFilters;
+	include?: IncludeMode;
 }
 
 function toQueryParams(req: DiscoverRequest): Record<string, string> {
@@ -39,6 +47,7 @@ function toQueryParams(req: DiscoverRequest): Record<string, string> {
 	if (req.seedMovieIds && req.seedMovieIds.length > 0)
 		p.seedMovieIds = req.seedMovieIds.join(',');
 	if (req.limit) p.limit = String(req.limit);
+	if (req.include && req.include !== 'owned') p.include = req.include;
 	const f = req.filters;
 	if (f) {
 		if (f.minRating != null) p.minRating = String(f.minRating);

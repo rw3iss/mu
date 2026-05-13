@@ -8,8 +8,10 @@ import { moviesService } from '@/services/movies.service';
 import {
 	clearFilters,
 	clearSeeds,
+	enrichmentsQueued,
 	errorMessage,
 	filters,
+	includeMode,
 	isLoading,
 	removeSeed,
 	results,
@@ -17,13 +19,48 @@ import {
 	seedLabels,
 	seedMovieIds,
 	setFilters,
+	setIncludeMode,
 	setSeed,
 	usedSources,
 } from '@/state/discover.state';
+import type { IncludeMode } from '@/services/discover.service';
 import styles from './Discover.module.scss';
 
 interface DiscoverProps {
 	path?: string;
+}
+
+function IncludeToggle({
+	value,
+	onChange,
+}: {
+	value: IncludeMode;
+	onChange: (m: IncludeMode) => void;
+}) {
+	const options: { id: IncludeMode; label: string; title: string }[] = [
+		{ id: 'owned', label: 'Owned', title: 'Only movies in your library' },
+		{ id: 'all', label: 'All', title: 'Library + not-owned suggestions' },
+		{
+			id: 'notOwned',
+			label: 'Not owned',
+			title: 'Only movies you don’t have yet — bookmark to remember',
+		},
+	];
+	return (
+		<div class={styles.includeToggle} role="radiogroup" aria-label="Include">
+			{options.map((o) => (
+				<button
+					key={o.id}
+					type="button"
+					title={o.title}
+					class={`${styles.includeBtn} ${value === o.id ? styles.includeActive : ''}`}
+					onClick={() => onChange(o.id)}
+				>
+					{o.label}
+				</button>
+			))}
+		</div>
+	);
 }
 
 /**
@@ -60,13 +97,15 @@ export function Discover(_props: DiscoverProps) {
 		runDiscover();
 	}, []);
 
-	// Re-fetch whenever seeds or filters change.
+	// Re-fetch whenever seeds, filters, or include mode change.
 	useEffect(() => {
 		const dispose = seedMovieIds.subscribe(() => runDiscover());
 		const dispose2 = filters.subscribe(() => runDiscover());
+		const dispose3 = includeMode.subscribe(() => runDiscover());
 		return () => {
 			dispose();
 			dispose2();
+			dispose3();
 		};
 	}, []);
 
@@ -97,6 +136,7 @@ export function Discover(_props: DiscoverProps) {
 					<p class={styles.subtitle}>{headerSubtitle}</p>
 				</div>
 				<div class={styles.headerActions}>
+					<IncludeToggle value={includeMode.value} onChange={setIncludeMode} />
 					{usedSources.value.length > 0 && (
 						<span class={styles.sourcesBadge} title="Active recommendation sources">
 							{usedSources.value.join(' · ')}
@@ -111,6 +151,14 @@ export function Discover(_props: DiscoverProps) {
 					</Button>
 				</div>
 			</header>
+
+			{enrichmentsQueued.value > 0 && (
+				<div class={styles.enrichBanner}>
+					Enriching {enrichmentsQueued.value} new candidate
+					{enrichmentsQueued.value === 1 ? '' : 's'} in the background. Refresh in a few seconds
+					for sharper rankings.
+				</div>
+			)}
 
 			{seeds.length > 0 && (
 				<div class={styles.seedRow}>

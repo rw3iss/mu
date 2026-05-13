@@ -18,6 +18,7 @@ export interface MovieWithMetadata {
 	imdbId: string | null;
 	hidden: boolean | null;
 	groupId: string | null;
+	source: 'library' | 'external' | 'bookmark';
 	addedAt: string;
 	genres: string[];
 	cast: string[];
@@ -51,7 +52,16 @@ export interface ScoredMovie {
 	explanation: string[];
 	posterUrl: string | null;
 	usedSources: string[];
+	/** 'library' = playable; 'bookmark'/'external' = not owned. */
+	source?: 'library' | 'bookmark' | 'external';
+	/** Convenience: true when source === 'library'. */
+	inLibrary?: boolean;
+	tmdbId?: number | null;
+	/** True when the row is still a stub (no metadata yet). */
+	enriching?: boolean;
 }
+
+export type IncludeMode = 'owned' | 'notOwned' | 'all';
 
 /** User-facing post-filters applied after scoring. */
 export interface DiscoverFilters {
@@ -77,6 +87,8 @@ export interface RecommendOptions {
 	excludeMovieIds?: ReadonlySet<string>;
 	/** User-facing filters applied to results. */
 	filters?: DiscoverFilters;
+	/** owned (default) | notOwned | all. Controls source-set of candidates. */
+	include?: IncludeMode;
 }
 
 export interface MultiRecommendOptions extends RecommendOptions {
@@ -84,7 +96,7 @@ export interface MultiRecommendOptions extends RecommendOptions {
 }
 
 export const DEFAULT_RECOMMEND_OPTIONS: Required<
-	Omit<RecommendOptions, 'weights' | 'excludeMovieIds' | 'filters'>
+	Omit<RecommendOptions, 'weights' | 'excludeMovieIds' | 'filters' | 'include'>
 > & {
 	weights: Record<string, number>;
 	excludeMovieIds: ReadonlySet<string>;
@@ -148,6 +160,12 @@ export function hydrate(
 		imdbId: movie.imdbId ?? null,
 		hidden: movie.hidden ?? null,
 		groupId: movie.groupId ?? null,
+		source:
+			movie.source === 'bookmark'
+				? 'bookmark'
+				: movie.source === 'external'
+					? 'external'
+					: 'library',
 		addedAt: movie.addedAt,
 		genres: parseArr(metadata?.genres),
 		cast: parseArr(metadata?.cast),

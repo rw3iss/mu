@@ -55,7 +55,16 @@ export class BookmarksService {
 	async addBookmark(userId: string, input: BookmarkInput): Promise<string> {
 		let movieId = this.findExistingMovieId(input);
 
-		if (!movieId) {
+		if (movieId) {
+			// If the row exists as an 'external' stub (created by the
+			// orchestrator while harvesting recommendations), promote it
+			// to 'bookmark' so the eviction job won't delete it later.
+			this.database.db
+				.update(movies)
+				.set({ source: 'bookmark', updatedAt: nowISO() })
+				.where(and(eq(movies.id, movieId), eq(movies.source, 'external')))
+				.run();
+		} else {
 			movieId = await this.createBookmarkMovie(input);
 		}
 

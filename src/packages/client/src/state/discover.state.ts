@@ -2,6 +2,7 @@ import { signal } from '@preact/signals';
 import {
 	discoverService,
 	type DiscoverFilters,
+	type IncludeMode,
 	type ScoredMovie,
 } from '@/services/discover.service';
 
@@ -13,10 +14,16 @@ import {
 export const seedMovieIds = signal<string[]>([]);
 export const seedLabels = signal<Record<string, string>>({});
 export const filters = signal<DiscoverFilters>({});
+export const includeMode = signal<IncludeMode>('owned');
 export const results = signal<ScoredMovie[]>([]);
 export const isLoading = signal<boolean>(false);
 export const errorMessage = signal<string | null>(null);
 export const usedSources = signal<string[]>([]);
+export const enrichmentsQueued = signal<number>(0);
+
+export function setIncludeMode(mode: IncludeMode): void {
+	includeMode.value = mode;
+}
 
 export function setSeed(movieId: string | null, label?: string): void {
 	if (!movieId) {
@@ -63,13 +70,16 @@ export async function runDiscover(): Promise<void> {
 			seedMovieIds: seeds.length > 0 ? seeds : undefined,
 			filters: filters.value,
 			limit: 36,
+			include: includeMode.value,
 		});
 		results.value = response.results;
 		usedSources.value = response.usedSources;
+		enrichmentsQueued.value = response.enrichmentsQueued ?? 0;
 	} catch (err: any) {
 		errorMessage.value = err?.message ?? 'Failed to fetch recommendations';
 		results.value = [];
 		usedSources.value = [];
+		enrichmentsQueued.value = 0;
 	} finally {
 		isLoading.value = false;
 	}

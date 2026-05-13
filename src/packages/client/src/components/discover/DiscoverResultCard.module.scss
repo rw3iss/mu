@@ -56,28 +56,80 @@
 	z-index: 2;
 }
 
-.seedBtn {
+.hoverBar {
 	position: absolute;
 	bottom: 0;
 	left: 0;
 	right: 0;
-	background: rgba(0, 0, 0, 0.75);
+	display: flex;
+	gap: 1px;
+	opacity: 0;
+	transform: translateY(100%);
+	transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.card:hover .hoverBar,
+.card:focus-within .hoverBar {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.seedBtn,
+.bookmarkBtn {
+	flex: 1;
+	background: rgba(0, 0, 0, 0.78);
 	color: white;
 	border: none;
 	padding: 0.4rem 0.6rem;
 	font-size: 0.7rem;
 	font-weight: var(--font-weight-medium);
 	cursor: pointer;
-	text-align: left;
-	opacity: 0;
-	transform: translateY(100%);
-	transition: opacity 150ms ease, transform 150ms ease;
+	text-align: center;
+
+	&:hover {
+		background: rgba(0, 0, 0, 0.9);
+	}
+
+	&[disabled] {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
 }
 
-.card:hover .seedBtn,
-.card:focus-within .seedBtn {
-	opacity: 1;
-	transform: translateY(0);
+.bookmarkBtnActive {
+	background: rgba(245, 158, 11, 0.85);
+	color: white;
+}
+
+.notOwnedBadge {
+	position: absolute;
+	top: 0.4rem;
+	right: 0.4rem;
+	padding: 0.15rem 0.4rem;
+	background: rgba(245, 158, 11, 0.85);
+	color: rgba(0, 0, 0, 0.85);
+	font-size: 0.65rem;
+	font-weight: var(--font-weight-semibold);
+	border-radius: 4px;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	z-index: 2;
+}
+
+.enrichingBadge {
+	position: absolute;
+	top: 2rem;
+	right: 0.4rem;
+	padding: 0.1rem 0.4rem;
+	background: rgba(6, 182, 212, 0.75);
+	color: white;
+	font-size: 0.6rem;
+	border-radius: 4px;
+	z-index: 2;
+}
+
+.notOwned {
+	border-color: rgba(245, 158, 11, 0.35);
 }
 
 .body {

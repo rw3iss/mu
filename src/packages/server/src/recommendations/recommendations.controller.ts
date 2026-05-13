@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RecommendationsService } from './recommendations.service.js';
 import { TasteProfileService } from './taste-profile.service.js';
-import type { DiscoverFilters } from './types.js';
+import type { DiscoverFilters, IncludeMode } from './types.js';
 
 /**
  * URLs preserved from the previous implementation for backwards
@@ -52,6 +52,7 @@ export class RecommendationsController {
 		@Query('seedMovieId') seedMovieId?: string,
 		@Query('seedMovieIds') seedMovieIds?: string,
 		@Query('limit') limit?: string,
+		@Query('include') include?: string,
 		@Query('minRating') minRating?: string,
 		@Query('minVotes') minVotes?: string,
 		@Query('genres') genres?: string,
@@ -70,20 +71,21 @@ export class RecommendationsController {
 			language,
 		});
 		const k = parseLimit(limit);
+		const inc = parseInclude(include);
 
 		if (seedMovieIds) {
 			const ids = seedMovieIds.split(',').filter(Boolean);
 			if (ids.length === 1) {
-				return this.recs.getSimilarMovies(ids[0]!, { k, filters });
+				return this.recs.getSimilarMovies(ids[0]!, { k, filters, include: inc });
 			}
 			if (ids.length > 1) {
-				return this.recs.getMultiInput(ids, { k, filters });
+				return this.recs.getMultiInput(ids, { k, filters, include: inc });
 			}
 		}
 		if (seedMovieId) {
-			return this.recs.getSimilarMovies(seedMovieId, { k, filters });
+			return this.recs.getSimilarMovies(seedMovieId, { k, filters, include: inc });
 		}
-		const results = await this.recs.getPersonalized(user.sub, k, filters);
+		const results = await this.recs.getPersonalized(user.sub, k, filters, inc);
 		return {
 			results,
 			usedSources: ['taste-profile'],
@@ -134,6 +136,11 @@ function parseLimit(input?: string): number {
 	const n = parseInt(input, 10);
 	if (Number.isNaN(n) || n < 1) return 24;
 	return Math.min(n, 100);
+}
+
+function parseInclude(input?: string): IncludeMode {
+	if (input === 'notOwned' || input === 'all') return input;
+	return 'owned';
 }
 
 function parseFilters(raw: {

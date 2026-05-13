@@ -10,6 +10,8 @@ import {
 	userWatchHistory,
 } from '../database/schema/index.js';
 import { EmbeddingsService } from '../embeddings/embeddings.service.js';
+import { ExternalCandidatesService } from './external-candidates.service.js';
+import { ExternalEnrichmentService } from './external-enrichment.service.js';
 import { applyDiscoverFilters } from './scoring/discover-filters.js';
 import { applyFilters, type FilterContext } from './scoring/filters.js';
 import { composite } from './scoring/composite-scorer.js';
@@ -28,6 +30,7 @@ import { TasteProfileService } from './taste-profile.service.js';
 import {
 	DEFAULT_RECOMMEND_OPTIONS,
 	hydrate,
+	type IncludeMode,
 	type MovieWithMetadata,
 	type MultiRecommendOptions,
 	type RecommendOptions,
@@ -41,6 +44,8 @@ export interface RecommendResponse {
 	results: ScoredMovie[];
 	usedSources: string[];
 	reason?: string;
+	/** Count of background enrichment jobs we just queued. */
+	enrichmentsQueued?: number;
 }
 
 /**
@@ -68,6 +73,8 @@ export class RecommendationsService {
 		private readonly llmRerank: LlmRerankStrategy,
 		private readonly tasteProfile: TasteProfileService,
 		private readonly embeddings: EmbeddingsService,
+		private readonly externalCandidates: ExternalCandidatesService,
+		private readonly externalEnrichment: ExternalEnrichmentService,
 	) {
 		// LLM rerank lives after the cheap strategies in the array but
 		// the orchestrator filters it back to a post-rank pass (see
@@ -81,26 +88,39 @@ export class RecommendationsService {
 	 */
 	async getSimilarMovies(movieId: string, opts: RecommendOptions = {}): Promise<RecommendResponse> {
 		const k = opts.k ?? DEFAULT_RECOMMEND_OPTIONS.k;
-		const cacheKey = `similar:${movieId}:${k}:${JSON.stringify(opts.weights ?? {})}`;
+		const include = opts.include ?? 'owned';
+		const cacheKey = `similar:${movieId}:${k}:${include}:${JSON.stringify(opts.weights ?? {})}:${JSON.stringify(opts.filters ?? {})}`;
 		const cached = await this.cache.get<RecommendResponse>(
 			CACHE_NAMESPACES.RECOMMENDATIONS,
 			cacheKey,
 		);
 		if (cached) return cached;
 
-		const { seed, candidates } = this.loadSeedAndCandidates(movieId);
+		const { seed } = this.loadSeedAndCandidates(movieId);
 		if (!seed) {
 			return { results: [], usedSources: [], reason: 'seed_not_found' };
 		}
 
+		// External harvest happens only when the caller actually wants
+		// not-owned results — avoids paying the harvest cost in the
+		// default "owned" mode.
+		let enrichmentsQueued = 0;
+		if (include !== 'owned') {
+			const harvested = this.harvestExternalCandidates([movieId]);
+			enrichmentsQueued = harvested.enrichmentsQueued;
+		}
+
+		const candidates = this.loadAllCandidates(include);
 		const response = await this.scoreAndRank([seed], candidates, opts);
-		await this.cache.set(
-			CACHE_NAMESPACES.RECOMMENDATIONS,
-			cacheKey,
-			response,
-			SIMILAR_CACHE_TTL,
-		);
-		return response;
+		const annotated: RecommendResponse = {
+			...response,
+			enrichmentsQueued,
+		};
+		// Shorter TTL when externals are involved — their scores can
+		// shift quickly as enrichments land.
+		const ttl = include === 'owned' ? SIMILAR_CACHE_TTL : 5 * 60;
+		await this.cache.set(CACHE_NAMESPACES.RECOMMENDATIONS, cacheKey, annotated, ttl);
+		return annotated;
 	}
 
 	/**
@@ -121,6 +141,7 @@ export class RecommendationsService {
 		opts: MultiRecommendOptions = {},
 	): Promise<RecommendResponse> {
 		const k = opts.k ?? DEFAULT_RECOMMEND_OPTIONS.k;
+		const include = opts.include ?? 'owned';
 		const seeds = movieIds
 			.map((id) => this.loadSeedAndCandidates(id).seed)
 			.filter((s): s is MovieWithMetadata => s !== null);
@@ -128,7 +149,12 @@ export class RecommendationsService {
 			return { results: [], usedSources: [], reason: 'no_seeds_found' };
 		}
 		const seedIds = new Set(seeds.map((s) => s.id));
-		const candidates = this.loadAllCandidates().filter((c) => !seedIds.has(c.id));
+		let enrichmentsQueued = 0;
+		if (include !== 'owned') {
+			const harvested = this.harvestExternalCandidates(movieIds);
+			enrichmentsQueued = harvested.enrichmentsQueued;
+		}
+		const candidates = this.loadAllCandidates(include).filter((c) => !seedIds.has(c.id));
 
 		const store = this.embeddings.getStore();
 		const requestedPolicy = opts.policy ?? 'auto';
@@ -137,12 +163,11 @@ export class RecommendationsService {
 			requestedPolicy === 'auto' ? analysis.policy : requestedPolicy;
 
 		// Centroid path needs all seeds embedded for it to be meaningful.
-		if (effectivePolicy === 'centroid' && analysis.embeddedSeeds === seeds.length) {
-			return this.centroidRank(seeds, candidates, opts, k, analysis.variance);
-		}
-
-		// Union policy or fallback when centroid isn't viable.
-		return this.unionRank(seeds, candidates, opts, k, analysis.variance);
+		const ranked =
+			effectivePolicy === 'centroid' && analysis.embeddedSeeds === seeds.length
+				? await this.centroidRank(seeds, candidates, opts, k, analysis.variance)
+				: await this.unionRank(seeds, candidates, opts, k, analysis.variance);
+		return enrichmentsQueued > 0 ? { ...ranked, enrichmentsQueued } : ranked;
 	}
 
 	private async centroidRank(
@@ -293,9 +318,10 @@ export class RecommendationsService {
 		userId: string,
 		limit = 24,
 		filters?: import('./types.js').DiscoverFilters,
+		include: IncludeMode = 'owned',
 	): Promise<ScoredMovie[]> {
 		const filterKey = filters ? JSON.stringify(filters) : '';
-		const cacheKey = `personalized:${userId}:${limit}:${filterKey}`;
+		const cacheKey = `personalized:${userId}:${limit}:${include}:${filterKey}`;
 		const cached = await this.cache.get<ScoredMovie[]>(
 			CACHE_NAMESPACES.RECOMMENDATIONS,
 			cacheKey,
@@ -304,7 +330,7 @@ export class RecommendationsService {
 
 		const profile = await this.tasteProfile.buildProfile(userId);
 		const watched = this.getUserMovieIds(userId);
-		const all = this.loadAllCandidates();
+		const all = this.loadAllCandidates(include);
 
 		const genres = new Map(profile.favoriteGenres.map((g) => [g.name.toLowerCase(), g.weight]));
 		const directors = new Map(
@@ -623,13 +649,28 @@ export class RecommendationsService {
 		const userFiltered = applyDiscoverFilters(filtered, moviesById, opts.filters);
 		const diversified = mmr(userFiltered, moviesById, lambda, k);
 
+		// Annotate each result with library/external metadata so the UI
+		// can render badges + bookmark CTA without a second round-trip.
+		// `source` is already on MovieWithMetadata — no extra query.
+		const annotated: ScoredMovie[] = diversified.map((r) => {
+			const m = moviesById.get(r.movieId);
+			const src = m?.source ?? 'library';
+			return {
+				...r,
+				source: src,
+				inLibrary: src === 'library',
+				tmdbId: m?.tmdbId ?? null,
+				enriching: src !== 'library' && !m?.overview,
+			};
+		});
+
 		const usedSources = new Set<string>();
-		for (const r of diversified) for (const s of r.usedSources) usedSources.add(s);
+		for (const r of annotated) for (const s of r.usedSources) usedSources.add(s);
 
 		return {
-			results: diversified,
+			results: annotated,
 			usedSources: Array.from(usedSources),
-			reason: diversified.length === 0 ? 'no_signal' : undefined,
+			reason: annotated.length === 0 ? 'no_signal' : undefined,
 		};
 	}
 
@@ -649,13 +690,38 @@ export class RecommendationsService {
 		return { seed, candidates };
 	}
 
-	private loadAllCandidates(): MovieWithMetadata[] {
-		const rows = this.database.db
+	private loadAllCandidates(include: IncludeMode = 'owned'): MovieWithMetadata[] {
+		// owned    → library only (default; safe for personalised / sources unset)
+		// notOwned → external + bookmark only
+		// all      → everything
+		const whereSrc = (() => {
+			if (include === 'notOwned') return sql`${movies.source} IN ('external', 'bookmark')`;
+			if (include === 'all') return undefined;
+			return sql`(${movies.source} IS NULL OR ${movies.source} = 'library')`;
+		})();
+		const query = this.database.db
 			.select()
 			.from(movies)
-			.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
-			.all();
+			.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId));
+		const rows = whereSrc ? query.where(whereSrc).all() : query.all();
 		return rows.map((r) => hydrate(r.movies, r.movie_metadata));
+	}
+
+	/**
+	 * Harvest not-owned candidates from `movie_external_recs` and ensure
+	 * they have a stub row in `movies`. Enqueue enrichment jobs for any
+	 * stubs that haven't been enriched yet (Strategy B — async). Returns
+	 * the set of movieIds suitable for inclusion in the candidate pool.
+	 */
+	private harvestExternalCandidates(seedMovieIds: readonly string[]): {
+		movieIds: Set<string>;
+		enrichmentsQueued: number;
+	} {
+		const candidates = this.externalCandidates.collectForSeeds(seedMovieIds);
+		const ids = candidates.map((c) => c.movieId);
+		const needEnrichment = this.externalCandidates.listIdsNeedingEnrichment(ids);
+		const enrichmentsQueued = this.externalEnrichment.enqueueBulk(needEnrichment);
+		return { movieIds: new Set(ids), enrichmentsQueued };
 	}
 
 	private getUserMovieIds(userId: string): Set<string> {

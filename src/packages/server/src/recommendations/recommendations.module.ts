@@ -6,8 +6,12 @@ import { EventsModule } from '../events/events.module.js';
 import { LlmModule } from '../llm/llm.module.js';
 import { MetadataModule } from '../metadata/metadata.module.js';
 import { TraktModule } from '../providers/sources/trakt/trakt.module.js';
+import { SettingsModule } from '../settings/settings.module.js';
 import { EmbeddingListenerService } from './embedding-listener.service.js';
 import { ExplanationsService } from './explanations.service.js';
+import { ExternalCandidatesService } from './external-candidates.service.js';
+import { ExternalEnrichmentService } from './external-enrichment.service.js';
+import { ExternalEvictionService } from './external-eviction.service.js';
 import { ExternalRecsListenerService } from './external-recs-listener.service.js';
 import { ExternalRecsRepository } from './external-recs.repository.js';
 import { LlmFeaturesListenerService } from './llm-features-listener.service.js';
@@ -38,11 +42,15 @@ import { TasteProfileService } from './taste-profile.service.js';
 		TraktModule,
 		EmbeddingsModule,
 		LlmModule,
+		SettingsModule,
 	],
 	controllers: [RecommendationsController],
 	providers: [
 		// Repositories + services
 		ExternalRecsRepository,
+		ExternalCandidatesService,
+		ExternalEnrichmentService,
+		ExternalEvictionService,
 		ExplanationsService,
 		// Strategies
 		ContentVectorStrategy,
