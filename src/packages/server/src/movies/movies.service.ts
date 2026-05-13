@@ -729,18 +729,27 @@ export class MoviesService {
 		for (const row of candidates) {
 			const raw = row.title;
 			if (!raw) continue;
-			// Prefer the filename as the source-of-truth for sanitisation
-			// when available — DB titles can already be partially-clean.
-			const base = row.filePath
+			// If the DB title is already clean, leave it alone — cleaning
+			// the filename can produce worse output (e.g. DB "1917" vs
+			// filename "1917.2019.1080p.WEBRip.x264.AAC5.1-[YTS.MX]"
+			// where the boundary slice might miss).
+			const dbIsDirty = isDirtyTitle(raw);
+			const fileBase = row.filePath
 				? path.basename(row.filePath, path.extname(row.filePath))
-				: raw;
-			const cleaned = buildPrettyTitle(base);
-			if (!cleaned || cleaned === raw) continue;
-			// Only overwrite when the existing title actually looks dirty
-			// OR the cleaned version is meaningfully different in shape
-			// (catches "alien earth s01e01 ..." → "Alien Earth - S01E01"
-			// where the original has no quality tokens but does have SE).
-			if (!isDirtyTitle(raw) && cleaned.toLowerCase() === raw.toLowerCase()) continue;
+				: null;
+			// Pick the source: filename when DB title is dirty (richer),
+			// otherwise the DB title in place.
+			const source = dbIsDirty && fileBase ? fileBase : raw;
+			const cleaned = buildPrettyTitle(source);
+			if (!cleaned || cleaned.length < 2 || cleaned === raw) continue;
+
+			// Only overwrite when there's a genuine upgrade — either the
+			// raw is dirty, or the cleaned version surfaces SExx info
+			// the raw lacked (TV episode discovery path).
+			const cleanedHasSE = /[\s-]S\d{2}E\d{2,3}\b/.test(cleaned);
+			const rawHasSE = /[\s-]S\d{2}E\d{2,3}\b/i.test(raw);
+			if (!dbIsDirty && !(cleanedHasSE && !rawHasSE)) continue;
+
 			this.database.db
 				.update(movies)
 				.set({ title: cleaned, updatedAt: nowISO() })

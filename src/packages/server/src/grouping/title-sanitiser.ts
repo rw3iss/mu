@@ -344,16 +344,37 @@ export function buildPrettyTitle(rawInput: string): string {
 	if (!rawInput) return rawInput;
 	const stripped = stripExtension(rawInput);
 	const se = parseSeasonEpisode(stripped);
-	if (se) {
-		const showRaw = se.prefix || stripped;
-		const showClean = titleCase(sanitiseRawTitle(showRaw));
-		if (!showClean) return rawInput;
-		const sePart = `S${pad2(se.season)}E${pad2(se.episode)}`;
-		return `${showClean} - ${sePart}`;
-	}
-	const clean = sanitiseRawTitle(stripped);
+	const boundary = findTitleBoundary(stripped);
+	const titleSource = boundary > 0 ? stripped.slice(0, boundary) : stripped;
+
+	const clean = sanitiseRawTitle(titleSource);
 	if (!clean) return rawInput;
-	return titleCase(clean);
+	const pretty = titleCase(clean);
+	if (se) return `${pretty} - S${pad2(se.season)}E${pad2(se.episode)}`;
+	return pretty;
+}
+
+/**
+ * Find the earliest "title boundary" in a filename — the position past
+ * which everything is metadata. Boundaries: SxxExx marker, year
+ * (1900-2099), or quality token (1080p, BluRay, x264, etc.). Caller
+ * slices [0, boundary) to get the title prefix.
+ */
+function findTitleBoundary(input: string): number {
+	let earliest = input.length;
+	const yearMatch = /\b(?:19\d{2}|20\d{2})\b/.exec(input);
+	if (yearMatch && yearMatch.index > 0 && yearMatch.index < earliest) {
+		earliest = yearMatch.index;
+	}
+	const se = parseSeasonEpisode(input);
+	if (se && se.startIndex > 0 && se.startIndex < earliest) {
+		earliest = se.startIndex;
+	}
+	const quality = new RegExp(QUALITY_REGEX.source, 'i').exec(input);
+	if (quality && quality.index > 0 && quality.index < earliest) {
+		earliest = quality.index;
+	}
+	return earliest;
 }
 
 /**
