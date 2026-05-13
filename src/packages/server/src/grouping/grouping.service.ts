@@ -3,7 +3,7 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { WsEvent } from '@mu/shared';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { type Movie, movieFiles, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -189,43 +189,167 @@ export class GroupingService implements OnModuleInit {
 	private async rebuildAllWithProgress(
 		helpers: JobHelpers | null,
 	): Promise<{ scanned: number; grouped: number; pruned: number }> {
+		const tStart = Date.now();
 		// Wipe non-confirmed groups + detach those movies.
 		const wipe = this.repo.wipeAutoAndUnsure();
 		this.logger.log(
-			`Rebuild: wiped ${wipe.groupsDeleted} auto/unsure groups, detached ${wipe.moviesDetached} movies`,
+			`Rebuild start: wiped ${wipe.groupsDeleted} auto/unsure groups, detached ${wipe.moviesDetached} movies`,
 		);
 		helpers?.log(
 			`Wiped ${wipe.groupsDeleted} auto/unsure groups, detached ${wipe.moviesDetached} movies`,
 		);
 
-		const allMovies = this.database.db.select({ id: movies.id }).from(movies).all();
+		// Only library movies should be grouped — bookmarks/externals
+		// have no local file path, so detection would always early-out
+		// anyway, but iterating over them inflates the scanned count
+		// and pollutes the progress percentage.
+		const allMovies = this.database.db
+			.select({ id: movies.id })
+			.from(movies)
+			.where(sql`(${movies.source} IS NULL OR ${movies.source} = 'library')`)
+			.all();
 		const total = allMovies.length;
-		let grouped = 0;
+		// Per-detector counters so we can spot which strategies are
+		// actually firing (or all silently no-op'ing).
+		const stats = {
+			noMovie: 0,
+			noFile: 0,
+			noDetection: 0,
+			belowThreshold: 0,
+			attached: 0,
+			errors: 0,
+			bySource: {} as Record<string, number>,
+		};
+
+		this.logger.log(`Rebuild: scanning ${total} library movies`);
+		helpers?.log(`Scanning ${total} library movies`);
+
 		// 90% of the progress bar goes to detection; the final 10% is
 		// the prune sweep so the UI doesn't stall at 100% before it's
 		// truly done.
 		for (let i = 0; i < allMovies.length; i++) {
 			const m = allMovies[i]!;
-			const sg = await this.detectAndAttach(m.id);
-			if (sg) grouped++;
+			try {
+				const detail = await this.detectAndAttachWithDiagnostics(m.id);
+				if (detail.outcome === 'attached') {
+					stats.attached++;
+					stats.bySource[detail.source!] = (stats.bySource[detail.source!] ?? 0) + 1;
+				} else if (detail.outcome === 'no-movie') {
+					stats.noMovie++;
+				} else if (detail.outcome === 'no-file') {
+					stats.noFile++;
+				} else if (detail.outcome === 'below-threshold') {
+					stats.belowThreshold++;
+				} else {
+					stats.noDetection++;
+				}
+			} catch (err: any) {
+				stats.errors++;
+				this.logger.warn(`detectAndAttach error for ${m.id}: ${err?.message ?? err}`);
+			}
 			if (helpers && total > 0 && (i % 25 === 0 || i === total - 1)) {
 				helpers.reportProgress(((i + 1) / total) * 90);
 			}
 		}
-		// Prune single-member subgroups — a "group" of one movie is just
-		// a movie. The detectors fire incrementally and can't know
-		// upfront whether more siblings will land in the same subgroup,
-		// so we sweep here once the full pass is done.
-		helpers?.reportProgress(95);
-		const pruned = this.pruneSingleMemberSubgroups();
-		helpers?.reportProgress(100);
+
+		// Snapshot the population BEFORE prune so the log makes it
+		// obvious what got created vs. what got swept.
+		const beforePrune = this.repo.listSubgroupsWithMemberCounts();
+		const beforeBuckets = bucketByCount(beforePrune);
 		this.logger.log(
-			`Rebuild complete: ${grouped} grouped initially, ${pruned} singleton subgroup(s) pruned`,
+			`Detection done in ${Date.now() - tStart}ms. ` +
+				`Outcomes: attached=${stats.attached} noFile=${stats.noFile} ` +
+				`noDetection=${stats.noDetection} belowThreshold=${stats.belowThreshold} ` +
+				`noMovie=${stats.noMovie} errors=${stats.errors}. ` +
+				`Subgroups before prune: ${beforePrune.length} ` +
+				`(singletons=${beforeBuckets.singletons}, pairs=${beforeBuckets.pairs}, ` +
+				`3-5=${beforeBuckets.small}, 6+=${beforeBuckets.large}). ` +
+				`Detector breakdown: ${JSON.stringify(stats.bySource)}`,
 		);
 		helpers?.log(
-			`Done. Scanned ${total}, grouped ${grouped - pruned}, pruned ${pruned} singletons.`,
+			`Detection: ${stats.attached}/${total} attached, ${stats.noFile} skipped (no file), ` +
+				`${stats.noDetection + stats.belowThreshold} no detector matched.`,
 		);
-		return { scanned: total, grouped: grouped - pruned, pruned };
+		helpers?.reportProgress(95);
+
+		const pruned = this.pruneSingleMemberSubgroups();
+		const remainingSubgroups = this.repo.listSubgroupsWithMemberCounts();
+		this.logger.log(
+			`Rebuild complete in ${Date.now() - tStart}ms. ` +
+				`Pruned ${pruned} singleton subgroup(s). ` +
+				`Final state: ${remainingSubgroups.length} subgroup(s) containing ` +
+				`${remainingSubgroups.reduce((a, s) => a + s.memberCount, 0)} movies.`,
+		);
+		helpers?.log(
+			`Done. ${stats.attached} attached → ${remainingSubgroups.length} subgroup(s) survived ` +
+				`(${pruned} singletons pruned).`,
+		);
+		helpers?.reportProgress(100);
+
+		return {
+			scanned: total,
+			grouped: remainingSubgroups.reduce((a, s) => a + s.memberCount, 0),
+			pruned,
+		};
+	}
+
+	/**
+	 * Like detectAndAttach() but returns a structured outcome so the
+	 * rebuild loop can tally per-stage skip reasons. Kept private —
+	 * external callers should use detectAndAttach().
+	 */
+	private async detectAndAttachWithDiagnostics(movieId: string): Promise<{
+		outcome: 'attached' | 'no-movie' | 'no-file' | 'no-detection' | 'below-threshold';
+		source?: string;
+	}> {
+		if (!this.isEnabled()) return { outcome: 'no-detection' };
+		const movie = this.database.db
+			.select()
+			.from(movies)
+			.where(eq(movies.id, movieId))
+			.get();
+		if (!movie) return { outcome: 'no-movie' };
+
+		const file = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, movieId))
+			.get();
+		if (!file?.filePath) return { outcome: 'no-file' };
+
+		const filePath = file.filePath;
+		const fileName = path.basename(filePath);
+		const siblingPaths = await this.readSiblings(filePath);
+		const existingParents = this.repo.listParents();
+
+		const input: DetectionInput = {
+			movieId: movie.id,
+			movieTitle: movie.title,
+			filePath,
+			fileName,
+			existingParents,
+			siblingPaths,
+		};
+
+		const thresholds = this.getThresholds();
+		let bestResult: DetectionResult | null = null;
+		let belowThreshold = false;
+		for (const det of this.detectors) {
+			const result = det.detect(input);
+			if (!result) continue;
+			if (result.confidence < thresholds.unsureMin) {
+				belowThreshold = true;
+				continue;
+			}
+			bestResult = result;
+			break;
+		}
+		if (!bestResult) {
+			return { outcome: belowThreshold ? 'below-threshold' : 'no-detection' };
+		}
+
+		this.persistDetection(movie, bestResult, thresholds);
+		return { outcome: 'attached', source: bestResult.source };
 	}
 
 	/**
@@ -366,4 +490,20 @@ export class GroupingService implements OnModuleInit {
 
 		return subgroup.id;
 	}
+}
+
+function bucketByCount(
+	subgroups: Array<{ memberCount: number }>,
+): { singletons: number; pairs: number; small: number; large: number } {
+	let singletons = 0;
+	let pairs = 0;
+	let small = 0;
+	let large = 0;
+	for (const s of subgroups) {
+		if (s.memberCount <= 1) singletons++;
+		else if (s.memberCount === 2) pairs++;
+		else if (s.memberCount <= 5) small++;
+		else large++;
+	}
+	return { singletons, pairs, small, large };
 }

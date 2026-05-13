@@ -204,21 +204,55 @@ export class GroupsRepository {
 	 * Find every subgroup that has fewer than `minMembers` movies in
 	 * it. Used by the pruning sweep after a full rebuild — a TV "show"
 	 * with only one episode isn't a group, just a movie.
+	 *
+	 * Uses LEFT JOIN + GROUP BY rather than a correlated subquery:
+	 * Drizzle's `sql` template can interpolate column refs inside
+	 * subqueries inconsistently across versions, which caused the
+	 * member count to come back as 0 for every row and led to the
+	 * prune sweep wiping every subgroup regardless of size.
 	 */
-	findUnderfilledSubgroups(minMembers: number): { id: string; parentGroupId: string | null }[] {
+	findUnderfilledSubgroups(minMembers: number): {
+		id: string;
+		parentGroupId: string | null;
+		memberCount: number;
+	}[] {
 		const rows = this.database.db
 			.select({
 				id: movieGroups.id,
 				parentGroupId: movieGroups.parentGroupId,
-				memberCount: sql<number>`(SELECT COUNT(*) FROM movies WHERE movies.group_id = ${movieGroups.id})`,
+				memberCount: sql<number>`COUNT(${movies.id})`,
 			})
 			.from(movieGroups)
+			.leftJoin(movies, eq(movies.groupId, movieGroups.id))
 			.where(eq(movieGroups.type, 'subgroup'))
+			.groupBy(movieGroups.id, movieGroups.parentGroupId)
 			.all();
-		return rows.filter((r) => r.memberCount < minMembers).map((r) => ({
-			id: r.id,
-			parentGroupId: r.parentGroupId,
-		}));
+		return rows.filter((r) => r.memberCount < minMembers);
+	}
+
+	/**
+	 * Snapshot of every subgroup with its current membership count.
+	 * Used by the rebuild's diagnostics so we can see what got created
+	 * and at what populations.
+	 */
+	listSubgroupsWithMemberCounts(): {
+		id: string;
+		name: string;
+		parentGroupId: string | null;
+		memberCount: number;
+	}[] {
+		return this.database.db
+			.select({
+				id: movieGroups.id,
+				name: movieGroups.name,
+				parentGroupId: movieGroups.parentGroupId,
+				memberCount: sql<number>`COUNT(${movies.id})`,
+			})
+			.from(movieGroups)
+			.leftJoin(movies, eq(movies.groupId, movieGroups.id))
+			.where(eq(movieGroups.type, 'subgroup'))
+			.groupBy(movieGroups.id, movieGroups.name, movieGroups.parentGroupId)
+			.all();
 	}
 
 	parseAltParents(json: string | null): AltParent[] {
