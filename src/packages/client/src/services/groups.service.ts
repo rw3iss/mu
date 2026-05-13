@@ -77,7 +77,7 @@ export const groupsService = {
 		return api.patch(`/groups/${id}`, body);
 	},
 
-	rebuild(): Promise<{ scanned: number; grouped: number }> {
+	rebuild(): Promise<{ scanned: number; grouped: number; pruned?: number }> {
 		return api.post('/groups/admin/rebuild', {});
 	},
 };

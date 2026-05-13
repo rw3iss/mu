@@ -149,7 +149,7 @@ export class GroupingService implements OnModuleInit {
 		return this.persistDetection(movie, bestResult, thresholds);
 	}
 
-	async rebuildAll(): Promise<{ scanned: number; grouped: number }> {
+	async rebuildAll(): Promise<{ scanned: number; grouped: number; pruned: number }> {
 		// Wipe non-confirmed groups + detach those movies.
 		const wipe = this.repo.wipeAutoAndUnsure();
 		this.logger.log(
@@ -162,7 +162,36 @@ export class GroupingService implements OnModuleInit {
 			const sg = await this.detectAndAttach(m.id);
 			if (sg) grouped++;
 		}
-		return { scanned: allMovies.length, grouped };
+		// Prune single-member subgroups — a "group" of one movie is just
+		// a movie. The detectors fire incrementally and can't know
+		// upfront whether more siblings will land in the same subgroup,
+		// so we sweep here once the full pass is done.
+		const pruned = this.pruneSingleMemberSubgroups();
+		this.logger.log(
+			`Rebuild complete: ${grouped} grouped initially, ${pruned} singleton subgroup(s) pruned`,
+		);
+		return { scanned: allMovies.length, grouped: grouped - pruned, pruned };
+	}
+
+	/**
+	 * Remove subgroups with fewer than 2 movies. Detaches each movie,
+	 * deletes the subgroup, prunes empty parents. Skips confirmed
+	 * subgroups (user explicitly OK'd those). Returns count removed.
+	 */
+	pruneSingleMemberSubgroups(): number {
+		const underfilled = this.repo.findUnderfilledSubgroups(2);
+		let removed = 0;
+		for (const u of underfilled) {
+			const sg = this.repo.get(u.id);
+			if (!sg) continue;
+			if (sg.status === 'confirmed') continue;
+			const members = this.repo.listMoviesInSubgroup(u.id);
+			for (const m of members) this.repo.detachMovie(m.id);
+			this.repo.delete(u.id);
+			if (u.parentGroupId) this.repo.deleteIfEmpty(u.parentGroupId);
+			removed++;
+		}
+		return removed;
 	}
 
 	confirmGroup(id: string): void {

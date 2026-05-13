@@ -35,6 +35,19 @@ export class AdminController {
 	) {}
 
 	/**
+	 * Rewrite titles for every movie without remote (TMDB) metadata by
+	 * running them through the title sanitiser. Cleans up filename-
+	 * derived titles like
+	 *   "alien earth s01e01 1080p web h264-successfulcrab[EZTVx to]"
+	 * into "Alien Earth - S01E01".
+	 */
+	@Post('sanitize-titles')
+	@Roles('admin')
+	sanitizeTitles() {
+		return this.moviesService.sanitizeUnmatchedTitles();
+	}
+
+	/**
 	 * Generate thumbnails for all movies that don't have one.
 	 */
 	@Post('generate-missing-thumbnails')

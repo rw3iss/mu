@@ -200,6 +200,27 @@ export class GroupsRepository {
 		);
 	}
 
+	/**
+	 * Find every subgroup that has fewer than `minMembers` movies in
+	 * it. Used by the pruning sweep after a full rebuild — a TV "show"
+	 * with only one episode isn't a group, just a movie.
+	 */
+	findUnderfilledSubgroups(minMembers: number): { id: string; parentGroupId: string | null }[] {
+		const rows = this.database.db
+			.select({
+				id: movieGroups.id,
+				parentGroupId: movieGroups.parentGroupId,
+				memberCount: sql<number>`(SELECT COUNT(*) FROM movies WHERE movies.group_id = ${movieGroups.id})`,
+			})
+			.from(movieGroups)
+			.where(eq(movieGroups.type, 'subgroup'))
+			.all();
+		return rows.filter((r) => r.memberCount < minMembers).map((r) => ({
+			id: r.id,
+			parentGroupId: r.parentGroupId,
+		}));
+	}
+
 	parseAltParents(json: string | null): AltParent[] {
 		if (!json) return [];
 		try {

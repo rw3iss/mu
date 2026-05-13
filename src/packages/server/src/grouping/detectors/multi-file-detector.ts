@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { titleSimilarity, DEFAULT_THRESHOLDS } from '../confidence.js';
-import { normaliseTitle } from '../title-normaliser.js';
+import { GENERIC_FOLDER_NAMES, sanitiseRawTitle } from '../title-sanitiser.js';
 import { Detector, DetectionInput, DetectionResult } from './types.js';
 
 /**
@@ -44,8 +44,17 @@ export class MultiFileDetector implements Detector {
 		const folder = path.basename(path.dirname(input.filePath));
 		if (/^(?:season|series|s)[\s._-]?\d/i.test(folder)) return null;
 
-		const normalised = normaliseTitle(folder);
+		const normalised = sanitiseRawTitle(folder);
 		if (!normalised) return null;
+
+		// Never group on top-level library roots like "Movies" / "TV" /
+		// "Shows" — that produces a 60+-member "Movies" pseudo-group
+		// for every loose file in the user's library root.
+		if (GENERIC_FOLDER_NAMES.has(normalised)) return null;
+		// Also bail on a normalised one-token name that's too short to
+		// be a real title (e.g. a single letter or digit folder).
+		if (normalised.length < 3) return null;
+
 		const folderName = titleCase(normalised);
 
 		// Fuzzy match against existing parents.

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { titleSimilarity, DEFAULT_THRESHOLDS } from '../confidence.js';
-import { normaliseTitle } from '../title-normaliser.js';
+import { GENERIC_FOLDER_NAMES, sanitiseRawTitle } from '../title-sanitiser.js';
 import { Detector, DetectionInput, DetectionResult } from './types.js';
 
 /**
@@ -41,8 +41,10 @@ export class FolderTreeDetector implements Detector {
 		if (!showFolder) return null;
 
 		const rawShowName = showFolder;
-		const normalised = normaliseTitle(rawShowName);
+		const normalised = sanitiseRawTitle(rawShowName);
 		if (!normalised) return null;
+		// Don't make a group whose parent is a generic library root.
+		if (GENERIC_FOLDER_NAMES.has(normalised)) return null;
 		const showName = titleCase(normalised);
 
 		const episode = this.parseEpisodeFromFilename(input.fileName);

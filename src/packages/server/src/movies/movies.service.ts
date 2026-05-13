@@ -17,6 +17,7 @@ import {
 	userWatchHistory,
 	userWatchlist,
 } from '../database/schema/index.js';
+import { buildPrettyTitle, isDirtyTitle } from '../grouping/title-sanitiser.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from '../library/library.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
@@ -701,5 +702,58 @@ export class MoviesService {
 		}
 
 		return results;
+	}
+
+	/**
+	 * Sweep every movie that has no remote metadata (tmdbId is null —
+	 * the filename was the title and nothing ever overwrote it) and
+	 * rewrite its title using the title-sanitiser. Idempotent: if the
+	 * resulting title equals the current title, no UPDATE issued.
+	 *
+	 * Backs the Admin → Sanitize Title Names action.
+	 */
+	sanitizeUnmatchedTitles(): { scanned: number; updated: number; sample: Array<{ from: string; to: string }> } {
+		const candidates = this.database.db
+			.select({
+				id: movies.id,
+				title: movies.title,
+				filePath: movieFiles.filePath,
+			})
+			.from(movies)
+			.leftJoin(movieFiles, eq(movieFiles.movieId, movies.id))
+			.where(sql`${movies.tmdbId} IS NULL`)
+			.all();
+
+		const sample: Array<{ from: string; to: string }> = [];
+		let updated = 0;
+		for (const row of candidates) {
+			const raw = row.title;
+			if (!raw) continue;
+			// Prefer the filename as the source-of-truth for sanitisation
+			// when available — DB titles can already be partially-clean.
+			const base = row.filePath
+				? path.basename(row.filePath, path.extname(row.filePath))
+				: raw;
+			const cleaned = buildPrettyTitle(base);
+			if (!cleaned || cleaned === raw) continue;
+			// Only overwrite when the existing title actually looks dirty
+			// OR the cleaned version is meaningfully different in shape
+			// (catches "alien earth s01e01 ..." → "Alien Earth - S01E01"
+			// where the original has no quality tokens but does have SE).
+			if (!isDirtyTitle(raw) && cleaned.toLowerCase() === raw.toLowerCase()) continue;
+			this.database.db
+				.update(movies)
+				.set({ title: cleaned, updatedAt: nowISO() })
+				.where(eq(movies.id, row.id))
+				.run();
+			if (sample.length < 10) sample.push({ from: raw, to: cleaned });
+			updated++;
+		}
+
+		if (updated > 0) {
+			this.invalidateListCache();
+			this.logger.log(`Sanitized ${updated} of ${candidates.length} unmatched titles`);
+		}
+		return { scanned: candidates.length, updated, sample };
 	}
 }

@@ -34,6 +34,8 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	const [generatingSprites, setGeneratingSprites] = useState(false);
 	const [removingBroken, setRemovingBroken] = useState(false);
 	const [groupingItems, setGroupingItems] = useState(false);
+	const [sanitizingTitles, setSanitizingTitles] = useState(false);
+	const [showSanitizeConfirm, setShowSanitizeConfirm] = useState(false);
 	const [showRemoveBrokenConfirm, setShowRemoveBrokenConfirm] = useState(false);
 	const [clearingWatched, setClearingWatched] = useState(false);
 	const [showClearWatchedConfirm, setShowClearWatchedConfirm] = useState(false);
@@ -121,13 +123,44 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 		setGroupingItems(true);
 		try {
 			const result = await groupsService.rebuild();
+			const prunedNote =
+				typeof result.pruned === 'number' && result.pruned > 0
+					? `, pruned ${result.pruned} single-member group(s)`
+					: '';
 			notifySuccess(
-				`Grouped ${result.grouped} of ${result.scanned} movies. Open any item's group page to review.`,
+				`Grouped ${result.grouped} of ${result.scanned} movies${prunedNote}. Open any item's group page to review.`,
 			);
 		} catch {
 			notifyError('Group detection failed');
 		} finally {
 			setGroupingItems(false);
+		}
+	}, []);
+
+	const handleSanitizeTitles = useCallback(async () => {
+		setSanitizingTitles(true);
+		try {
+			const result = await api.post<{
+				scanned: number;
+				updated: number;
+				sample: Array<{ from: string; to: string }>;
+			}>('/admin/sanitize-titles');
+			if (result.updated > 0) {
+				notifySuccess(
+					`Cleaned ${result.updated} of ${result.scanned} unmatched titles. Sample: ${result.sample
+						.slice(0, 2)
+						.map((s) => `"${s.from}" → "${s.to}"`)
+						.join(', ')}`,
+				);
+			} else {
+				notifySuccess(
+					`No dirty titles found among ${result.scanned} unmatched movies.`,
+				);
+			}
+		} catch {
+			notifyError('Title sanitisation failed');
+		} finally {
+			setSanitizingTitles(false);
 		}
 	}, []);
 
@@ -336,7 +369,23 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					>
 						Group Similar Items
 					</Button>
+					<Button
+						variant="secondary"
+						onClick={() => setShowSanitizeConfirm(true)}
+						loading={sanitizingTitles}
+					>
+						Sanitize Title Names
+					</Button>
 				</div>
+				<ConfirmDialog
+					isOpen={showSanitizeConfirm}
+					onClose={() => setShowSanitizeConfirm(false)}
+					onConfirm={handleSanitizeTitles}
+					title="Sanitize Title Names"
+					message="Goes through every movie that has NO remote (TMDB) metadata and rewrites its title using the filename — stripping quality, codec, release-group, year, and bracketed metadata. TV episodes keep their SxxExx marker. Movies with refreshed metadata are untouched. Safe to re-run."
+					confirmLabel="Sanitize Titles"
+					variant="primary"
+				/>
 				<ConfirmDialog
 					isOpen={showFixThumbnailsConfirm}
 					onClose={() => setShowFixThumbnailsConfirm(false)}
