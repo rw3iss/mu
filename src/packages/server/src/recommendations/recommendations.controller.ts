@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RecommendationsService } from './recommendations.service.js';
 import { TasteProfileService } from './taste-profile.service.js';
+import type { DiscoverFilters } from './types.js';
 
 /**
  * URLs preserved from the previous implementation for backwards
@@ -37,6 +38,57 @@ export class RecommendationsController {
 		@Query('limit') limit?: string,
 	) {
 		return this.recs.getSimilarMovies(movieId, { k: parseLimit(limit) });
+	}
+
+	/**
+	 * Unified Discover endpoint. Optionally takes a seed (movieId or
+	 * movieIds CSV for a collection) and a filter set. Without a seed,
+	 * returns personalised recommendations from the user's taste
+	 * profile.
+	 */
+	@Get('discover')
+	async discover(
+		@CurrentUser() user: { sub: string },
+		@Query('seedMovieId') seedMovieId?: string,
+		@Query('seedMovieIds') seedMovieIds?: string,
+		@Query('limit') limit?: string,
+		@Query('minRating') minRating?: string,
+		@Query('minVotes') minVotes?: string,
+		@Query('genres') genres?: string,
+		@Query('yearFrom') yearFrom?: string,
+		@Query('yearTo') yearTo?: string,
+		@Query('person') person?: string,
+		@Query('language') language?: string,
+	) {
+		const filters = parseFilters({
+			minRating,
+			minVotes,
+			genres,
+			yearFrom,
+			yearTo,
+			person,
+			language,
+		});
+		const k = parseLimit(limit);
+
+		if (seedMovieIds) {
+			const ids = seedMovieIds.split(',').filter(Boolean);
+			if (ids.length === 1) {
+				return this.recs.getSimilarMovies(ids[0]!, { k, filters });
+			}
+			if (ids.length > 1) {
+				return this.recs.getMultiInput(ids, { k, filters });
+			}
+		}
+		if (seedMovieId) {
+			return this.recs.getSimilarMovies(seedMovieId, { k, filters });
+		}
+		const results = await this.recs.getPersonalized(user.sub, k, filters);
+		return {
+			results,
+			usedSources: ['taste-profile'],
+			reason: results.length === 0 ? 'no_signal' : undefined,
+		};
 	}
 
 	@Post('multi')
@@ -82,4 +134,35 @@ function parseLimit(input?: string): number {
 	const n = parseInt(input, 10);
 	if (Number.isNaN(n) || n < 1) return 24;
 	return Math.min(n, 100);
+}
+
+function parseFilters(raw: {
+	minRating?: string;
+	minVotes?: string;
+	genres?: string;
+	yearFrom?: string;
+	yearTo?: string;
+	person?: string;
+	language?: string;
+}): DiscoverFilters | undefined {
+	const out: DiscoverFilters = {};
+	const num = (s: string | undefined) => {
+		if (!s) return undefined;
+		const n = Number(s);
+		return Number.isFinite(n) ? n : undefined;
+	};
+	const r = num(raw.minRating);
+	if (r != null) out.minRating = r;
+	const v = num(raw.minVotes);
+	if (v != null) out.minVotes = v;
+	if (raw.genres) {
+		out.genres = raw.genres.split(',').map((g) => g.trim()).filter(Boolean);
+	}
+	const yf = num(raw.yearFrom);
+	if (yf != null) out.yearFrom = yf;
+	const yt = num(raw.yearTo);
+	if (yt != null) out.yearTo = yt;
+	if (raw.person?.trim()) out.person = raw.person.trim();
+	if (raw.language?.trim()) out.language = raw.language.trim();
+	return Object.keys(out).length > 0 ? out : undefined;
 }

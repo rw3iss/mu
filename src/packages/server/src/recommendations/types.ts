@@ -53,6 +53,17 @@ export interface ScoredMovie {
 	usedSources: string[];
 }
 
+/** User-facing post-filters applied after scoring. */
+export interface DiscoverFilters {
+	minRating?: number;
+	minVotes?: number;
+	genres?: string[];
+	yearFrom?: number;
+	yearTo?: number;
+	person?: string;
+	language?: string;
+}
+
 /** Knobs the admin / caller can pass into a recommendation call. */
 export interface RecommendOptions {
 	k?: number;
@@ -64,6 +75,8 @@ export interface RecommendOptions {
 	weights?: Record<string, number>;
 	/** Movie IDs the caller already knows about — never returned. */
 	excludeMovieIds?: ReadonlySet<string>;
+	/** User-facing filters applied to results. */
+	filters?: DiscoverFilters;
 }
 
 export interface MultiRecommendOptions extends RecommendOptions {
@@ -71,7 +84,7 @@ export interface MultiRecommendOptions extends RecommendOptions {
 }
 
 export const DEFAULT_RECOMMEND_OPTIONS: Required<
-	Omit<RecommendOptions, 'weights' | 'excludeMovieIds'>
+	Omit<RecommendOptions, 'weights' | 'excludeMovieIds' | 'filters'>
 > & {
 	weights: Record<string, number>;
 	excludeMovieIds: ReadonlySet<string>;

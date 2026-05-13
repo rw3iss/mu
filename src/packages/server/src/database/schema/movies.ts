@@ -31,6 +31,13 @@ export const movies = sqliteTable(
 		groupId: text('group_id'),
 		/** Episode/part ordinal within the subgroup (e.g. 12 for E12). */
 		groupEpisodeOrdinal: integer('group_episode_ordinal'),
+		/**
+		 * 'library' = movie has files / can be played. 'bookmark' = user
+		 * saved an external recommendation they don't own. Bookmarks
+		 * share the schema (so all the metadata, ratings, cast, etc.
+		 * work the same) but are filtered out of normal library queries.
+		 */
+		source: text('source').notNull().default('library'),
 		addedAt: text('added_at').notNull(),
 		updatedAt: text('updated_at').notNull(),
 	},
@@ -38,6 +45,7 @@ export const movies = sqliteTable(
 		imdbIdIdx: index('movies_imdb_id_idx').on(table.imdbId),
 		tmdbIdIdx: index('movies_tmdb_id_idx').on(table.tmdbId),
 		groupIdIdx: index('movies_group_id_idx').on(table.groupId),
+		sourceIdx: index('movies_source_idx').on(table.source),
 	}),
 );
 

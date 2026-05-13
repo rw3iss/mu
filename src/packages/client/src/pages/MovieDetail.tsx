@@ -533,6 +533,19 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									<Icon name="share" size={14} /> Share
 								</Button>
 							)}
+							<Button
+								variant="ghost"
+								size="lg"
+								onClick={() => {
+									const label = encodeURIComponent(movie.title);
+									route(
+										`/discover?seedMovieId=${encodeURIComponent(movie.id)}&seedLabel=${label}`,
+									);
+								}}
+								title="Find similar movies"
+							>
+								<Icon name="search" size={14} /> See Similar
+							</Button>
 							{!isRemote && (
 								<MovieOptionsMenu movie={movie} onMovieUpdate={handleMovieUpdate} />
 							)}

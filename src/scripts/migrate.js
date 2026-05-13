@@ -293,6 +293,8 @@ const alters = [
 	'ALTER TABLE movies ADD COLUMN group_id TEXT',
 	'ALTER TABLE movies ADD COLUMN group_episode_ordinal INTEGER',
 	'CREATE INDEX IF NOT EXISTS movies_group_id_idx ON movies(group_id)',
+	"ALTER TABLE movies ADD COLUMN source TEXT NOT NULL DEFAULT 'library'",
+	'CREATE INDEX IF NOT EXISTS movies_source_idx ON movies(source)',
 ];
 
 for (const sql of alters) {

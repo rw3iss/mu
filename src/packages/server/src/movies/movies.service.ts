@@ -62,6 +62,10 @@ export class MoviesService {
 
 		const conditions = [];
 
+		// Exclude bookmarks from library views — they live in their own
+		// section, accessed via the watchlist / Discover page.
+		conditions.push(sql`(${movies.source} IS NULL OR ${movies.source} = 'library')`);
+
 		// By default, hide hidden movies unless showHidden is explicitly set
 		if (String(query.showHidden) !== 'true') {
 			conditions.push(sql`(${movies.hidden} IS NULL OR ${movies.hidden} = 0)`);
@@ -459,6 +463,7 @@ export class MoviesService {
 		return this.database.db
 			.select()
 			.from(movies)
+			.where(sql`(${movies.source} IS NULL OR ${movies.source} = 'library')`)
 			.orderBy(desc(movies.addedAt))
 			.limit(limit)
 			.all()

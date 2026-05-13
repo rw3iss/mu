@@ -1,0 +1,76 @@
+import { signal } from '@preact/signals';
+import {
+	discoverService,
+	type DiscoverFilters,
+	type ScoredMovie,
+} from '@/services/discover.service';
+
+/**
+ * Persistent client state for the Discover page. Multiple seeds
+ * are supported (collection / multi-select) — empty array = no
+ * seed = personalised recommendations.
+ */
+export const seedMovieIds = signal<string[]>([]);
+export const seedLabels = signal<Record<string, string>>({});
+export const filters = signal<DiscoverFilters>({});
+export const results = signal<ScoredMovie[]>([]);
+export const isLoading = signal<boolean>(false);
+export const errorMessage = signal<string | null>(null);
+export const usedSources = signal<string[]>([]);
+
+export function setSeed(movieId: string | null, label?: string): void {
+	if (!movieId) {
+		seedMovieIds.value = [];
+		seedLabels.value = {};
+	} else {
+		seedMovieIds.value = [movieId];
+		seedLabels.value = label ? { [movieId]: label } : {};
+	}
+}
+
+export function addSeed(movieId: string, label?: string): void {
+	if (seedMovieIds.value.includes(movieId)) return;
+	seedMovieIds.value = [...seedMovieIds.value, movieId];
+	if (label) seedLabels.value = { ...seedLabels.value, [movieId]: label };
+}
+
+export function removeSeed(movieId: string): void {
+	seedMovieIds.value = seedMovieIds.value.filter((id) => id !== movieId);
+	const next = { ...seedLabels.value };
+	delete next[movieId];
+	seedLabels.value = next;
+}
+
+export function clearSeeds(): void {
+	seedMovieIds.value = [];
+	seedLabels.value = {};
+}
+
+export function setFilters(next: DiscoverFilters): void {
+	filters.value = next;
+}
+
+export function clearFilters(): void {
+	filters.value = {};
+}
+
+export async function runDiscover(): Promise<void> {
+	isLoading.value = true;
+	errorMessage.value = null;
+	try {
+		const seeds = seedMovieIds.value;
+		const response = await discoverService.fetch({
+			seedMovieIds: seeds.length > 0 ? seeds : undefined,
+			filters: filters.value,
+			limit: 36,
+		});
+		results.value = response.results;
+		usedSources.value = response.usedSources;
+	} catch (err: any) {
+		errorMessage.value = err?.message ?? 'Failed to fetch recommendations';
+		results.value = [];
+		usedSources.value = [];
+	} finally {
+		isLoading.value = false;
+	}
+}

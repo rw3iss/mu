@@ -10,6 +10,7 @@ import {
 	userWatchHistory,
 } from '../database/schema/index.js';
 import { EmbeddingsService } from '../embeddings/embeddings.service.js';
+import { applyDiscoverFilters } from './scoring/discover-filters.js';
 import { applyFilters, type FilterContext } from './scoring/filters.js';
 import { composite } from './scoring/composite-scorer.js';
 import { mmr } from './scoring/mmr.js';
@@ -288,8 +289,13 @@ export class RecommendationsService {
 	 * haven't watched yet. Falls back to popular content-vector
 	 * neighbours if the profile is too thin.
 	 */
-	async getPersonalized(userId: string, limit = 24): Promise<ScoredMovie[]> {
-		const cacheKey = `personalized:${userId}:${limit}`;
+	async getPersonalized(
+		userId: string,
+		limit = 24,
+		filters?: import('./types.js').DiscoverFilters,
+	): Promise<ScoredMovie[]> {
+		const filterKey = filters ? JSON.stringify(filters) : '';
+		const cacheKey = `personalized:${userId}:${limit}:${filterKey}`;
 		const cached = await this.cache.get<ScoredMovie[]>(
 			CACHE_NAMESPACES.RECOMMENDATIONS,
 			cacheKey,
@@ -385,7 +391,9 @@ export class RecommendationsService {
 			}
 		}
 		scored.sort((a, b) => b.score - a.score);
-		const results = scored.slice(0, limit);
+		const allHydrated = new Map(all.map((m) => [m.id, m]));
+		const userFiltered = applyDiscoverFilters(scored, allHydrated, filters);
+		const results = userFiltered.slice(0, limit);
 		await this.cache.set(
 			CACHE_NAMESPACES.RECOMMENDATIONS,
 			cacheKey,
@@ -612,7 +620,8 @@ export class RecommendationsService {
 			perDirectorCap: opts.perDirectorCap ?? DEFAULT_RECOMMEND_OPTIONS.perDirectorCap,
 		};
 		const filtered = applyFilters(blended, filterCtx);
-		const diversified = mmr(filtered, moviesById, lambda, k);
+		const userFiltered = applyDiscoverFilters(filtered, moviesById, opts.filters);
+		const diversified = mmr(userFiltered, moviesById, lambda, k);
 
 		const usedSources = new Set<string>();
 		for (const r of diversified) for (const s of r.usedSources) usedSources.add(s);
