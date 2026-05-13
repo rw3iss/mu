@@ -1,0 +1,71 @@
+.card {
+	background: var(--color-bg-panel, rgba(255, 255, 255, 0.02));
+	border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+	border-radius: 6px;
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.625rem;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.title {
+	font-weight: var(--font-weight-semibold);
+	font-size: 0.95rem;
+}
+
+.status {
+	font-size: 0.7rem;
+	padding: 0.125rem 0.5rem;
+	border-radius: 999px;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+
+	&.active {
+		background: rgba(34, 197, 94, 0.18);
+		color: rgb(134, 239, 172);
+	}
+
+	&.idle {
+		background: rgba(148, 163, 184, 0.18);
+		color: var(--color-text-muted);
+	}
+
+	&.error {
+		background: rgba(239, 68, 68, 0.18);
+		color: rgb(252, 165, 165);
+	}
+}
+
+.description {
+	font-size: 0.8rem;
+	color: var(--color-text-muted);
+	line-height: 1.4;
+}
+
+.capabilities {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3rem;
+}
+
+.cap {
+	font-size: 0.7rem;
+	padding: 0.1rem 0.45rem;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 3px;
+	color: var(--color-text-muted);
+}
+
+.actions {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: 0.25rem;
+}

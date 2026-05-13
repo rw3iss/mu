@@ -33,6 +33,8 @@ import {
 } from '@/state/themes.state';
 import { AdminDashboard } from './AdminDashboard';
 import { Plugins } from './Plugins';
+import { Connections } from './settings/Connections';
+import { Matching } from './settings/Matching';
 import styles from './Settings.module.scss';
 
 function OverlayTimeoutSetting() {
@@ -200,6 +202,8 @@ type SettingsTab =
 	| 'notifications'
 	| 'plugins'
 	| 'admin'
+	| 'connections'
+	| 'matching'
 	| 'server'
 	| 'about';
 
@@ -211,6 +215,8 @@ const VALID_TABS: SettingsTab[] = [
 	'notifications',
 	'plugins',
 	'admin',
+	'connections',
+	'matching',
 	'server',
 	'about',
 ];
@@ -664,6 +670,8 @@ export function Settings(props: SettingsProps) {
 			? [
 					{ id: 'plugins' as SettingsTab, label: 'Plugins' },
 					{ id: 'admin' as SettingsTab, label: 'Admin' },
+					{ id: 'connections' as SettingsTab, label: 'Connections' },
+					{ id: 'matching' as SettingsTab, label: 'Matching' },
 					{ id: 'server' as SettingsTab, label: 'Server' },
 				]
 			: []),
@@ -2623,6 +2631,20 @@ export function Settings(props: SettingsProps) {
 					{activeTab === 'admin' && isAdmin && (
 						<div class={styles.panel}>
 							<AdminDashboard />
+						</div>
+					)}
+
+					{/* Connections Tab (admin only) */}
+					{activeTab === 'connections' && isAdmin && (
+						<div class={styles.panel}>
+							<Connections />
+						</div>
+					)}
+
+					{/* Matching Tab (admin only) */}
+					{activeTab === 'matching' && isAdmin && (
+						<div class={styles.panel}>
+							<Matching />
 						</div>
 					)}
 

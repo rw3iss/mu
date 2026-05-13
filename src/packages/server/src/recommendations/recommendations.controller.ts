@@ -1,89 +1,85 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RecommendationsService } from './recommendations.service.js';
 import { TasteProfileService } from './taste-profile.service.js';
 
+/**
+ * URLs preserved from the previous implementation for backwards
+ * compat with the existing client. New endpoint `/multi` is stubbed
+ * here and powered by the same orchestrator for multi-seed input.
+ */
 @Controller('recommendations')
 export class RecommendationsController {
 	constructor(
-		private readonly recommendations: RecommendationsService,
+		private readonly recs: RecommendationsService,
 		private readonly tasteProfile: TasteProfileService,
 	) {}
 
-	/**
-	 * GET /recommendations
-	 * Personalized recommendations for the current user.
-	 */
 	@Get()
-	async getRecommendations(
-		@CurrentUser() user: { sub: string; role: string },
+	async personalized(
+		@CurrentUser() user: { sub: string },
 		@Query('limit') limit?: string,
 	) {
-		const parsedLimit = this.parseLimit(limit);
-		return this.recommendations.getRecommendations(user.sub, parsedLimit);
+		return this.recs.getPersonalized(user.sub, parseLimit(limit));
 	}
 
-	/**
-	 * GET /recommendations/similar/:movieId
-	 * Find movies similar to the given movie.
-	 */
 	@Get('similar/:movieId')
-	async getSimilarMovies(@Param('movieId') movieId: string, @Query('limit') limit?: string) {
-		const parsedLimit = this.parseLimit(limit);
-		return this.recommendations.getSimilarMovies(movieId, parsedLimit);
+	async similar(@Param('movieId') movieId: string, @Query('limit') limit?: string) {
+		const response = await this.recs.getSimilarMovies(movieId, { k: parseLimit(limit) });
+		// Preserve the historical response shape (a plain array of
+		// scored movies) so existing clients keep working.
+		return response.results;
 	}
 
-	/**
-	 * GET /recommendations/genre/:genre
-	 * Top movies in a genre the user hasn't seen.
-	 */
+	@Get('similar/:movieId/detail')
+	async similarDetailed(
+		@Param('movieId') movieId: string,
+		@Query('limit') limit?: string,
+	) {
+		return this.recs.getSimilarMovies(movieId, { k: parseLimit(limit) });
+	}
+
+	@Post('multi')
+	async multi(
+		@Body() body: { movieIds: string[]; limit?: number; mmrLambda?: number },
+	) {
+		if (!body?.movieIds || !Array.isArray(body.movieIds) || body.movieIds.length === 0) {
+			return { results: [], usedSources: [], reason: 'no_seeds_provided' };
+		}
+		return this.recs.getMultiInput(body.movieIds, {
+			k: body.limit ? Math.min(Math.max(1, body.limit), 100) : 24,
+			mmrLambda: body.mmrLambda,
+		});
+	}
+
 	@Get('genre/:genre')
-	async getGenreRecommendations(
-		@CurrentUser() user: { sub: string; role: string },
+	async byGenre(
+		@CurrentUser() user: { sub: string },
 		@Param('genre') genre: string,
 		@Query('limit') limit?: string,
 	) {
-		const parsedLimit = this.parseLimit(limit);
-		return this.recommendations.getGenreRecommendations(genre, user.sub, parsedLimit);
+		return this.recs.getByGenre(genre, user.sub, parseLimit(limit));
 	}
 
-	/**
-	 * GET /recommendations/trending
-	 * Trending movies (most watched/rated in last 30 days).
-	 */
 	@Get('trending')
-	async getTrendingMovies(@Query('limit') limit?: string) {
-		const parsedLimit = this.parseLimit(limit);
-		return this.recommendations.getTrendingMovies(parsedLimit);
+	async trending(@Query('limit') limit?: string) {
+		return this.recs.getTrending(parseLimit(limit));
 	}
 
-	/**
-	 * GET /recommendations/recently-added
-	 * Recently added movies.
-	 */
 	@Get('recently-added')
-	async getRecentlyAdded(@Query('limit') limit?: string) {
-		const parsedLimit = this.parseLimit(limit);
-		return this.recommendations.getRecentlyAdded(parsedLimit);
+	async recentlyAdded(@Query('limit') limit?: string) {
+		return this.recs.getRecentlyAdded(parseLimit(limit));
 	}
 
-	/**
-	 * GET /recommendations/profile
-	 * The current user's taste profile.
-	 */
 	@Get('profile')
-	async getTasteProfile(@CurrentUser() user: { sub: string; role: string }) {
+	async profile(@CurrentUser() user: { sub: string }) {
 		return this.tasteProfile.buildProfile(user.sub);
 	}
+}
 
-	/**
-	 * Parse the limit query parameter with a default of 24 and
-	 * a maximum of 100.
-	 */
-	private parseLimit(limit?: string): number {
-		if (!limit) return 24;
-		const parsed = parseInt(limit, 10);
-		if (Number.isNaN(parsed) || parsed < 1) return 24;
-		return Math.min(parsed, 100);
-	}
+function parseLimit(input?: string): number {
+	if (!input) return 24;
+	const n = parseInt(input, 10);
+	if (Number.isNaN(n) || n < 1) return 24;
+	return Math.min(n, 100);
 }

@@ -3,6 +3,7 @@ import { MovieGrid } from '@/components/movie/MovieGrid';
 import { api } from '@/services/api';
 import { moviesService } from '@/services/movies.service';
 import type { Movie } from '@/state/library.state';
+import { watchlistIds } from '@/state/watchlist.state';
 import styles from './Watchlist.module.scss';
 
 interface WatchlistProps {
@@ -77,12 +78,22 @@ export function Watchlist(_props: WatchlistProps) {
 			});
 	}, [viewingUnwatched]);
 
+	// Keep the rendered list in sync with the shared `watchlistIds` signal:
+	// when the user removes a movie via MovieOptionsMenu, the signal updates
+	// and we reactively drop the row from the displayed list — no refresh
+	// needed. Accessing `.value` here subscribes the component to changes.
+	const live = watchlistIds.value;
+	const visibleMovies =
+		viewingUnwatched || live === null
+			? movies
+			: movies.filter((m) => live.has(m.id));
+
 	return (
 		<div class={styles.watchlist}>
 			<div class={styles.header}>
 				<h1 class={styles.title}>{viewingUnwatched ? 'Unwatched Movies' : 'Watchlist'}</h1>
 				<span class={styles.count}>
-					{movies.length} {movies.length === 1 ? 'movie' : 'movies'}
+					{visibleMovies.length} {visibleMovies.length === 1 ? 'movie' : 'movies'}
 				</span>
 				<button
 					onClick={() => setViewingUnwatched(!viewingUnwatched)}
@@ -104,7 +115,7 @@ export function Watchlist(_props: WatchlistProps) {
 			</div>
 
 			<MovieGrid
-				movies={movies}
+				movies={visibleMovies}
 				isLoading={isLoading}
 				emptyMessage={
 					viewingUnwatched

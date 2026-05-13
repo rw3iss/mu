@@ -64,4 +64,7 @@ VOLUME ["/app/data", "/media"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:8080/api/v1/health || exit 1
 
+# Default CMD runs the HTTP server. To run as a BullMQ worker only,
+# override with `command: ["node", "packages/server/dist/worker.js"]`
+# (see docker-compose.yml for an example).
 CMD ["node", "packages/server/dist/main.js"]

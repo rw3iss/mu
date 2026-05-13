@@ -169,6 +169,15 @@ thirdParty:
     apiKey: ""                  # recommended - IMDb, RT, Metacritic ratings
   opensubtitles:
     apiKey: ""                  # optional - online subtitle search
+
+jobs:
+  backend: in-memory            # in-memory | bullmq
+  # BullMQ-only (ignored for in-memory backend):
+  redis:
+    url: redis://localhost:6379
+  bullmq:
+    queueName: mu-jobs
+    concurrency: 2
 ```
 
 **Required:** `auth.jwtSecret` and `auth.cookieSecret` are the only required settings -- both are auto-generated on first run.
@@ -189,6 +198,43 @@ Override any config value with `MU_` prefixed env vars. Use double underscores f
 | `MU_THIRD_PARTY__OPENSUBTITLES__API_KEY` | -- | OpenSubtitles API key |
 | `MU_DATA_DIR` | `./data` | Data directory path |
 | `MU_CACHE__STREAMDIR` | `./data/cache/streams` | Transcode cache directory |
+| `MU_JOBS__BACKEND` | `in-memory` | Job queue: `in-memory` (default) or `bullmq` (Redis) |
+| `MU_JOBS__REDIS__URL` | `redis://localhost:6379` | Redis URL (BullMQ only) |
+| `MU_JOBS__BULLMQ__QUEUE_NAME` | `mu-jobs` | BullMQ queue name |
+| `MU_JOBS__BULLMQ__CONCURRENCY` | `2` | Worker concurrency |
+
+### Job Backends
+
+Mu's job runner (scan, metadata, transcode, embedding, ...) is pluggable via `jobs.backend`:
+
+| Backend | Pros | Cons | When to use |
+|---|---|---|---|
+| **`in-memory`** (default) | Zero deps, single binary, simple ops | Jobs lost on restart; single worker; no horizontal scaling | Standard self-hosted single-server install |
+| **`bullmq`** | Redis-persisted; survives restarts; multiple worker processes / machines; native delayed retries | Requires Redis; extra infra to operate | Multi-instance setups, heavy rate-limited workloads, anywhere you need durable / distributed queueing |
+
+Switching backends is non-destructive — the same `JobManagerService` interface is used everywhere, so handlers (scan, metadata, etc.) work identically across both. State is *not* migrated between backends though; in-flight jobs are lost when you flip.
+
+### Standalone Workers (BullMQ only)
+
+With BullMQ active, you can run additional worker processes that pull jobs off the same queue — useful for CPU-heavy work (transcoding, embeddings) or to keep the HTTP server responsive under load.
+
+```bash
+# from src/
+cd packages/server
+pnpm worker:prod         # runs dist/worker.js — no HTTP, just pulls jobs
+```
+
+Or via Docker:
+
+```bash
+# in docker-compose.yml, uncomment the redis + mu-worker services, then:
+docker compose --profile workers up
+
+# scale workers horizontally
+docker compose --profile workers up --scale mu-worker=3
+```
+
+Workers boot the same NestJS DI graph as the main server, so handlers and configuration stay in lockstep. Just run them against the same Redis + database.
 
 ---
 

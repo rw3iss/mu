@@ -65,15 +65,26 @@ pnpm format            # biome format --write
 
 ## Database
 
-SQLite via Drizzle ORM. Schema files in `packages/server/src/database/schema/`.
+SQLite via Drizzle ORM. Single canonical DB at **`<projectRoot>/data/db/mu.db`** — relative paths in `.env` / config anchor to project root, not cwd, so the file is invariant to which command starts the server.
+
+Schema files in `packages/server/src/database/schema/`.
 
 ```bash
 cd src
-pnpm db:migrate        # Push schema changes (drizzle-kit push --force)
+pnpm db:migrate        # Apply schema (node scripts/migrate.js — RELIABLE)
+pnpm db:push           # drizzle-kit push --force (introspection workflow only)
+pnpm db:generate       # drizzle-kit generate migration SQL
 pnpm db:seed           # Seed initial data
 pnpm db:studio         # Open Drizzle Studio GUI
-pnpm db:reset          # Delete DB files (then run migrate + seed)
+pnpm db:reset          # Delete canonical DB files (then run migrate + seed)
 ```
+
+**Use `pnpm db:migrate` for ordinary schema changes.** It runs the inline migration script (`scripts/migrate.js`) which:
+- Resolves the canonical DB path from `PROJECT_ROOT` (invariant to cwd).
+- Applies `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ADD COLUMN` against that single DB.
+- Warns if it spots stray DB files left over from the old cwd-dependent setup (`src/data/db/mu.db`, `src/packages/server/data/db/mu.db`).
+
+`pnpm db:push` (drizzle-kit) is kept for the introspection workflow but isn't the primary path — drizzle-kit can silently no-op for additive column changes on SQLite, which is what burned us originally.
 
 ## Server Architecture
 
@@ -88,11 +99,39 @@ NestJS modules in `packages/server/src/`:
 | `metadata` | TMDB/OMDB metadata fetching |
 | `stream` | HLS transcoding, direct play, subtitle management |
 | `plugins` | Plugin system (load, enable, API registry) |
-| `jobs` | Background job queue (pre-transcode, scans) |
+| `jobs` | Background job queue (pre-transcode, scans). Pluggable backend: `in-memory` (default) or `bullmq` (Redis). |
+| `providers` | Provider platform — registry, credentials, rate limiter, audit log. Powers Connections settings page. |
+| `recommendations` | Strategy-based similar-movies / personalised / trending. Uses provider platform for external sources. |
 | `admin` | Admin-only endpoints |
 | `remote` | Remote server federation |
 | `settings` | App-wide settings |
 | `media` | Poster/backdrop image proxying |
+
+### Job Backend (pluggable)
+
+`JobManagerService` is an abstract class. Concrete implementations:
+
+- `InMemoryJobProvider` (`jobs/in-memory-job-provider.ts`) — default. Single-process priority queue + toad-scheduler. Zero external deps.
+- `BullMqJobProvider` (`jobs/bullmq-job-provider.ts`) — Redis-backed via [BullMQ](https://docs.bullmq.io). Persistent, supports horizontal scaling.
+
+Selected at bootstrap via `jobs.backend` in `config.yml` (`in-memory` or `bullmq`). The factory in `JobModule` instantiates the chosen backend; callers always inject `JobManagerService` and never know which one is active.
+
+To run additional worker processes (BullMQ only):
+```bash
+cd packages/server && pnpm worker:prod    # local
+docker compose --profile workers up        # docker
+```
+
+### Provider Platform (`providers` module)
+
+Cross-cutting framework for external integrations (TMDB, Trakt, OpenAI, Anthropic, …). Key pieces:
+
+- `ProviderRegistry` — lookup by capability (`recommend`, `enrich`, `embed`, `rerank`, `explain`).
+- `ProviderCredentialsService` — DB-backed credential storage with masking. **Secrets never live in config.yml or this repo.** Managed via `Settings → Connections`.
+- `RateLimitService` — declarative `RateLimitSpec` per provider, persisted token-bucket state, monthly USD budget enforcement.
+- `ProviderEventsService` — append-only audit log (call/error/rate_limit/budget_exhausted). Powers dashboard sparklines.
+
+Adding a new external source = one class implementing `Recommender` / `Enricher` / `Embedder` / `LLMClient` + `@RegisterProvider()` decorator. Registry pickup + admin UI form generation is automatic.
 
 ## Client Architecture
 

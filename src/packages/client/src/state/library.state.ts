@@ -1,5 +1,6 @@
 import { computed, signal } from '@preact/signals';
 import { moviesService } from '@/services/movies.service';
+import { groupedOnly } from './groups.state';
 
 // ============================================
 // Types
@@ -178,6 +179,10 @@ export async function fetchMovies(page = 1): Promise<void> {
 
 		if (hideWatched.value) {
 			params.hideWatched = 'true';
+		}
+
+		if (groupedOnly.value) {
+			params.groupedOnly = 'true';
 		}
 
 		const sf = serverFilter.value;

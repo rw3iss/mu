@@ -1,11 +1,25 @@
 import { existsSync, mkdirSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Database from 'better-sqlite3';
 import { BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { ConfigService } from '../config/config.service.js';
 import * as schema from './schema/index.js';
+
+/**
+ * Project root — anchors every relative path used by this service
+ * so the resolved DB location is invariant to `process.cwd()`. This
+ * file lives at `<root>/src/packages/server/{src,dist}/database/`
+ * in both dev and prod, so 5 levels up is the project root in either
+ * case.
+ *
+ * Without this anchor, running `pnpm dev:server` from `src/` and
+ * `nest build && node dist/main.js` from `packages/server/` would
+ * resolve `./data/db/mu.db` to two different absolute paths — the
+ * old "why are there two DBs?" footgun.
+ */
+const PROJECT_ROOT = resolve(import.meta.dirname, '..', '..', '..', '..', '..');
 
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
@@ -20,15 +34,26 @@ export class DatabaseService implements OnModuleDestroy {
 	}
 
 	async initialize() {
-		// Resolve DB path: explicit database.path > dataDir/db/mu.db > ./data/db/mu.db
-		// Check both camelCase and lowercase (env vars are lowercased by config loader)
+		// Resolve DB path. Precedence:
+		//   1. `database.path` config / MU_DATABASE_SQLITE_PATH env
+		//   2. `<dataDir>/db/mu.db`
+		// Relative paths anchor to PROJECT_ROOT, never to cwd.
 		const explicitPath = this.config.get<string>('database.path');
-		const dataDir = resolve(
-			this.config.get<string>('dataDir') ||
-				this.config.get<string>('datadir') ||
-				'../../data',
-		);
-		const dbPath = resolve(explicitPath || join(dataDir, 'db', 'mu.db'));
+		const configuredDataDir =
+			this.config.get<string>('dataDir') || this.config.get<string>('datadir');
+
+		const dataDir = configuredDataDir
+			? isAbsolute(configuredDataDir)
+				? configuredDataDir
+				: resolve(PROJECT_ROOT, configuredDataDir)
+			: resolve(PROJECT_ROOT, 'data');
+
+		const dbPath = explicitPath
+			? isAbsolute(explicitPath)
+				? explicitPath
+				: resolve(PROJECT_ROOT, explicitPath)
+			: join(dataDir, 'db', 'mu.db');
+
 		const dbDir = dirname(dbPath);
 
 		if (!existsSync(dbDir)) {

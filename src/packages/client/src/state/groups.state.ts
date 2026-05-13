@@ -19,6 +19,25 @@ export function toggleGroupView(): void {
 }
 
 /**
+ * Filter the Library to ONLY items that belong to a group — i.e.
+ * series, seasons, collections. Combines with `groupViewEnabled`:
+ *   - groupedOnly + groupViewEnabled  → show only group tiles
+ *   - groupedOnly + !groupViewEnabled → show every episode/member
+ *     of every group, flat
+ *   - !groupedOnly                    → show everything (default)
+ */
+export const groupedOnly = signal<boolean>(getUiSetting('library_grouped_only', false));
+
+export function setGroupedOnly(v: boolean): void {
+	groupedOnly.value = v;
+	setUiSetting('library_grouped_only', v);
+}
+
+export function toggleGroupedOnly(): void {
+	setGroupedOnly(!groupedOnly.value);
+}
+
+/**
  * Cache of parent groups for the library page. Populated on demand —
  * we don't auto-fetch on app boot since most users won't open the
  * Library page first.

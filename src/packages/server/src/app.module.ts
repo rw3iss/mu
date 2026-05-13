@@ -9,7 +9,9 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { EmbeddingsModule } from './embeddings/embeddings.module.js';
 import { EventsModule } from './events/events.module.js';
+import { LlmModule } from './llm/llm.module.js';
 import { FilesystemModule } from './filesystem/filesystem.module.js';
 import { GroupingModule } from './grouping/grouping.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -19,6 +21,7 @@ import { MediaModule } from './media/media.module.js';
 import { MetadataModule } from './metadata/metadata.module.js';
 import { MoviesModule } from './movies/movies.module.js';
 import { PluginModule } from './plugins/plugin.module.js';
+import { ProvidersModule } from './providers/providers.module.js';
 import { RecommendationsModule } from './recommendations/recommendations.module.js';
 import { RemoteModule } from './remote/remote.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
@@ -47,6 +50,9 @@ import { UsersModule } from './users/users.module.js';
 		MediaModule,
 		StreamModule,
 		PluginModule,
+		ProvidersModule,
+		EmbeddingsModule,
+		LlmModule,
 		RecommendationsModule,
 		RemoteModule,
 		SettingsModule,

@@ -43,6 +43,7 @@ interface TmdbMovieDetails {
 		crew: { id: number; name: string; job: string; department: string }[];
 	};
 	similar?: { results: TmdbSearchResult[] };
+	recommendations?: { results: TmdbSearchResult[] };
 	images?: {
 		posters: { file_path: string }[];
 		backdrops: { file_path: string }[];
@@ -119,7 +120,7 @@ export class TmdbProvider {
 
 		const params = new URLSearchParams({
 			api_key: this.apiKey,
-			append_to_response: 'credits,similar,images,videos,keywords,release_dates',
+			append_to_response: 'credits,similar,recommendations,images,videos,keywords,release_dates',
 		});
 
 		try {

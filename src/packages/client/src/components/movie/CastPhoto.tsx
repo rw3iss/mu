@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import styles from './CastPhoto.module.scss';
 
 interface CastPhotoProps {
@@ -14,17 +15,19 @@ interface CastPhotoProps {
 	thumbClass?: string;
 }
 
+interface PopoutPos {
+	left: number;
+	top: number;
+	originX: number;
+	originY: number;
+}
+
 /**
  * Cast member photo with a click-to-expand popout. The popout is
- * absolutely positioned over the thumbnail (no parent relayout) and
- * organically scales up from the thumbnail's footprint via CSS. It
- * stays open until the cursor leaves the popout for ~300ms; hovering
- * back over cancels the close.
- *
- * Designed to be a drop-in replacement for the existing 32–48 px
- * circular cast avatars in InfoPanel / MovieDetail / split-mode
- * panel — the thumbClass prop lets each surface keep its own border
- * + background while CastPhoto owns the click + popout behaviour.
+ * rendered through a portal at document.body with `position: fixed`,
+ * so it escapes any ancestor with `overflow: hidden|auto` (e.g. the
+ * scrolling InfoPanel flyout). The scale-up entry animation is
+ * anchored to the original thumb center via dynamic transform-origin.
  */
 export function CastPhoto({
 	name,
@@ -35,8 +38,10 @@ export function CastPhoto({
 	thumbClass,
 }: CastPhotoProps) {
 	const [open, setOpen] = useState(false);
+	const [pos, setPos] = useState<PopoutPos | null>(null);
 	const closeTimerRef = useRef<number | null>(null);
-	const wrapRef = useRef<HTMLDivElement>(null);
+	const thumbRef = useRef<HTMLButtonElement>(null);
+	const popoutRef = useRef<HTMLDivElement>(null);
 
 	const cancelClose = () => {
 		if (closeTimerRef.current !== null) {
@@ -55,34 +60,67 @@ export function CastPhoto({
 
 	useEffect(() => () => cancelClose(), []);
 
-	// Outside-click closes immediately (skip the 300ms grace).
 	useEffect(() => {
 		if (!open) return;
 		const handler = (e: MouseEvent) => {
-			if (!wrapRef.current?.contains(e.target as Node)) {
-				cancelClose();
-				setOpen(false);
-			}
+			const t = e.target as Node;
+			if (thumbRef.current?.contains(t)) return;
+			if (popoutRef.current?.contains(t)) return;
+			cancelClose();
+			setOpen(false);
 		};
 		document.addEventListener('mousedown', handler);
 		return () => document.removeEventListener('mousedown', handler);
 	}, [open]);
 
+	// Close on viewport changes — the popout is positioned off a
+	// snapshot of the thumb's rect, so any scroll/resize would
+	// desync it from the source thumb.
+	useEffect(() => {
+		if (!open) return;
+		const close = () => setOpen(false);
+		window.addEventListener('scroll', close, true);
+		window.addEventListener('resize', close);
+		return () => {
+			window.removeEventListener('scroll', close, true);
+			window.removeEventListener('resize', close);
+		};
+	}, [open]);
+
+	const computePos = (): PopoutPos | null => {
+		if (!thumbRef.current) return null;
+		const r = thumbRef.current.getBoundingClientRect();
+		const cx = r.left + r.width / 2;
+		const cy = r.top + r.height / 2;
+		const margin = 8;
+		const left = Math.max(
+			margin,
+			Math.min(window.innerWidth - expandedSize - margin, cx - expandedSize / 2),
+		);
+		const top = Math.max(
+			margin,
+			Math.min(window.innerHeight - expandedSize - margin, cy - expandedSize / 2),
+		);
+		return { left, top, originX: cx - left, originY: cy - top };
+	};
+
 	const handleThumbClick = (e: MouseEvent) => {
 		e.stopPropagation();
-		// Toggle: clicking the thumb a second time before the timeout
-		// expires should close it cleanly.
-		setOpen((o) => !o);
+		if (open) {
+			setOpen(false);
+			return;
+		}
+		setPos(computePos());
+		setOpen(true);
 	};
 
 	const fallback = name?.trim().charAt(0).toUpperCase() || '?';
-	// Initial CSS scale for the popout — sized so the popout enters from
-	// roughly the thumbnail's footprint, then expands to its full size.
 	const closedScale = size / expandedSize;
 
 	return (
-		<div ref={wrapRef} class={styles.wrap} style={{ width: `${size}px`, height: `${size}px` }}>
+		<div class={styles.wrap} style={{ width: `${size}px`, height: `${size}px` }}>
 			<button
+				ref={thumbRef}
 				type="button"
 				class={`${styles.thumb} ${thumbClass ?? ''}`}
 				onClick={handleThumbClick}
@@ -94,29 +132,34 @@ export function CastPhoto({
 					<span class={styles.fallback}>{fallback}</span>
 				)}
 			</button>
-			{open && (
-				<div
-					class={styles.popout}
-					style={{
-						width: `${expandedSize}px`,
-						height: `${expandedSize}px`,
-						// Used by the entry keyframe so the popout grows
-						// from the thumbnail's footprint instead of from 0.
-						['--cast-popout-close-scale' as string]: String(closedScale),
-					}}
-					onMouseEnter={cancelClose}
-					onMouseLeave={scheduleClose}
-					onClick={(e: Event) => e.stopPropagation()}
-					role="dialog"
-					aria-label={`${name}'s photo`}
-				>
-					{profileUrl ? (
-						<img src={profileUrl} alt={name} />
-					) : (
-						<span class={styles.popoutFallback}>{fallback}</span>
-					)}
-				</div>
-			)}
+			{open &&
+				pos &&
+				createPortal(
+					<div
+						ref={popoutRef}
+						class={styles.popout}
+						style={{
+							width: `${expandedSize}px`,
+							height: `${expandedSize}px`,
+							left: `${pos.left}px`,
+							top: `${pos.top}px`,
+							transformOrigin: `${pos.originX}px ${pos.originY}px`,
+							['--cast-popout-close-scale' as string]: String(closedScale),
+						}}
+						onMouseEnter={cancelClose}
+						onMouseLeave={scheduleClose}
+						onClick={(e: Event) => e.stopPropagation()}
+						role="dialog"
+						aria-label={`${name}'s photo`}
+					>
+						{profileUrl ? (
+							<img src={profileUrl} alt={name} />
+						) : (
+							<span class={styles.popoutFallback}>{fallback}</span>
+						)}
+					</div>,
+					document.body,
+				)}
 		</div>
 	);
 }

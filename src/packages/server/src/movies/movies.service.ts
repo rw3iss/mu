@@ -95,6 +95,12 @@ export class MoviesService {
 			conditions.push(sql`${movies.year} <= ${query.yearTo}`);
 		}
 
+		// "Grouped only" filter — restrict to movies that belong to a
+		// subgroup (i.e. members of a series / collection / etc).
+		if (String((query as { groupedOnly?: string }).groupedOnly) === 'true') {
+			conditions.push(sql`${movies.groupId} IS NOT NULL`);
+		}
+
 		const where = conditions.length > 0 ? and(...conditions) : undefined;
 
 		// Determine sort

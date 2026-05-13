@@ -1,3 +1,18 @@
+# Mu — self-hosted movie streaming.
+#
+# Default `docker compose up` runs Mu with the in-memory job backend
+# (no external services required). To switch to the BullMQ backend
+# for persistent jobs + horizontal scaling:
+#
+#   1. Uncomment the `redis` service and the `MU_JOBS_BACKEND=bullmq`
+#      env var on the `mu` service.
+#   2. Optionally start the `mu-worker` service for additional worker
+#      capacity (`docker compose --profile workers up`).
+#
+# The worker service runs the same image as the server but boots the
+# headless `worker.js` entrypoint — no HTTP listener, just job
+# processing. Multiple workers can run in parallel.
+
 services:
   mu:
     build:
@@ -19,6 +34,13 @@ services:
       - MU_MEDIA_DIRECTORIES=/media
       - MU_TMDB_API_KEY=${MU_TMDB_API_KEY:-}
       - MU_OMDB_API_KEY=${MU_OMDB_API_KEY:-}
+      # ─── BullMQ backend (optional) ───────────────────────────
+      # Uncomment to switch from in-memory to Redis-backed jobs.
+      # - MU_JOBS_BACKEND=bullmq
+      # - MU_JOBS_REDIS_URL=redis://redis:6379
+    # depends_on:
+    #   redis:
+    #     condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/health"]
       interval: 30s
@@ -26,6 +48,51 @@ services:
       retries: 3
       start_period: 10s
 
+  # ─── Optional Redis for BullMQ ──────────────────────────────────
+  # Uncomment + uncomment the bullmq env on `mu` above to enable.
+  #
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: mu-redis
+  #   restart: unless-stopped
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - mu-redis:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 5
+
+  # ─── Optional standalone worker(s) ──────────────────────────────
+  # Run with: docker compose --profile workers up
+  # Scale with: docker compose --profile workers up --scale mu-worker=3
+  #
+  # mu-worker:
+  #   build:
+  #     context: ..
+  #     dockerfile: Dockerfile
+  #   restart: unless-stopped
+  #   command: ["node", "packages/server/dist/worker.js"]
+  #   profiles: ["workers"]
+  #   volumes:
+  #     - mu-data:/app/data
+  #     - ${MEDIA_DIR:-/media}:/media:ro
+  #   environment:
+  #     - NODE_ENV=production
+  #     - MU_DATA_DIR=/app/data
+  #     - MU_DATABASE_SQLITE_PATH=/app/data/db/mu.db
+  #     - MU_MEDIA_DIRECTORIES=/media
+  #     - MU_TMDB_API_KEY=${MU_TMDB_API_KEY:-}
+  #     - MU_OMDB_API_KEY=${MU_OMDB_API_KEY:-}
+  #     - MU_JOBS_BACKEND=bullmq
+  #     - MU_JOBS_REDIS_URL=redis://redis:6379
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+
 volumes:
   mu-data:
     driver: local
+  # mu-redis:
+  #   driver: local

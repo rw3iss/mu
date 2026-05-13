@@ -1,371 +1,482 @@
 import { CACHE_NAMESPACES } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
-import { desc, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { movieMetadata, movies, userRatings, userWatchHistory } from '../database/schema/index.js';
-import { TasteProfile, TasteProfileService } from './taste-profile.service.js';
+import {
+	movieMetadata,
+	movies,
+	userRatings,
+	userWatchHistory,
+} from '../database/schema/index.js';
+import { EmbeddingsService } from '../embeddings/embeddings.service.js';
+import { applyFilters, type FilterContext } from './scoring/filters.js';
+import { composite } from './scoring/composite-scorer.js';
+import { mmr } from './scoring/mmr.js';
+import {
+	analyseMultiInputSet,
+	centroid,
+	reciprocalRankFusion,
+} from './scoring/multi-input.js';
+import { ContentVectorStrategy } from './strategies/content-vector.strategy.js';
+import { EmbeddingSimilarityStrategy } from './strategies/embedding.strategy.js';
+import { ExternalCacheStrategy } from './strategies/external-cache.strategy.js';
+import { LlmRerankStrategy } from './strategies/llm-rerank.strategy.js';
+import type { SimilarityStrategy } from './strategies/strategy.interface.js';
+import { TasteProfileService } from './taste-profile.service.js';
+import {
+	DEFAULT_RECOMMEND_OPTIONS,
+	hydrate,
+	type MovieWithMetadata,
+	type MultiRecommendOptions,
+	type RecommendOptions,
+	type ScoredMovie,
+} from './types.js';
 
-export interface ScoredMovie {
-	movieId: string;
-	title: string;
-	year: number | null;
-	score: number;
-	explanation: string[];
-	posterUrl?: string | null;
+const SIMILAR_CACHE_TTL = 60 * 60; // 1 hour
+const PERSONAL_CACHE_TTL = 30 * 60;
+
+export interface RecommendResponse {
+	results: ScoredMovie[];
+	usedSources: string[];
+	reason?: string;
 }
 
-const RECOMMENDATIONS_CACHE_TTL = 60 * 60; // 1 hour in seconds
-
-// Scoring weights
-const WEIGHT_GENRE = 0.4;
-const WEIGHT_PEOPLE = 0.25;
-const WEIGHT_YEAR = 0.1;
-const WEIGHT_RATING_SIMILARITY = 0.15;
-const WEIGHT_POPULARITY = 0.1;
-
+/**
+ * Orchestrator for the recommendation pipeline. Fans out to every
+ * available `SimilarityStrategy`, composites their outputs with
+ * configurable weights, applies filters (same-group exclude, quality
+ * floor, per-director cap), re-ranks with MMR for diversity.
+ *
+ * Strategy list grows over phases — this service stays small; new
+ * sources land as new strategy classes injected via the module's
+ * providers. The personalized + genre + trending + recently-added
+ * endpoints reuse the same hydration helpers and per-user filters.
+ */
 @Injectable()
 export class RecommendationsService {
-	private readonly logger = new Logger(RecommendationsService.name);
+	private readonly logger = new Logger('RecommendationsService');
+	private readonly strategies: SimilarityStrategy[];
 
 	constructor(
 		private readonly database: DatabaseService,
 		private readonly cache: CacheService,
+		private readonly contentVector: ContentVectorStrategy,
+		private readonly externalCache: ExternalCacheStrategy,
+		private readonly embedding: EmbeddingSimilarityStrategy,
+		private readonly llmRerank: LlmRerankStrategy,
 		private readonly tasteProfile: TasteProfileService,
-	) {}
-
-	/**
-	 * Get personalized movie recommendations for a user.
-	 * Uses a content-based scoring algorithm weighted across
-	 * genre, director/actor, year, rating similarity, and popularity.
-	 */
-	async getRecommendations(userId: string, limit: number = 24): Promise<ScoredMovie[]> {
-		const cacheKey = `recs:${userId}:${limit}`;
-		const cached = await this.cache.get<ScoredMovie[]>(
-			CACHE_NAMESPACES.RECOMMENDATIONS,
-			cacheKey,
-		);
-		if (cached) {
-			return cached;
-		}
-
-		this.logger.log(`Generating recommendations for user ${userId}`);
-
-		// 1. Build the user's taste profile
-		const profile = await this.tasteProfile.buildProfile(userId);
-
-		// 2. Get movies the user has already rated or watched (to exclude)
-		const ratedMovieIds = await this.getUserRatedMovieIds(userId);
-		const watchedMovieIds = await this.getUserWatchedMovieIds(userId);
-		const excludeIds = new Set([...ratedMovieIds, ...watchedMovieIds]);
-
-		// 3. Get all candidate movies with their metadata
-		const candidates = await this.database.db
-			.select({
-				id: movies.id,
-				title: movies.title,
-				year: movies.year,
-				posterUrl: movies.posterUrl,
-				metaGenres: movieMetadata.genres,
-				metaDirectors: movieMetadata.directors,
-				metaCast: movieMetadata.cast,
-				metaRating: movieMetadata.tmdbRating,
-			})
-			.from(movies)
-			.leftJoin(movieMetadata, eq(movieMetadata.movieId, movies.id))
-			.all();
-
-		// 4. Score each candidate
-		const scored: ScoredMovie[] = [];
-
-		for (const candidate of candidates) {
-			if (excludeIds.has(candidate.id)) continue;
-
-			const { score, explanation } = this.scoreMovie(candidate, profile);
-
-			if (score > 0) {
-				scored.push({
-					movieId: candidate.id,
-					title: candidate.title,
-					year: candidate.year,
-					score: Math.round(score * 1000) / 1000,
-					explanation,
-					posterUrl: candidate.posterUrl,
-				});
-			}
-		}
-
-		// 5. Sort by score descending and take top N
-		scored.sort((a, b) => b.score - a.score);
-		const results = scored.slice(0, limit);
-
-		// 6. Cache results
-		await this.cache.set(
-			CACHE_NAMESPACES.RECOMMENDATIONS,
-			cacheKey,
-			results,
-			RECOMMENDATIONS_CACHE_TTL,
-		);
-
-		this.logger.log(`Generated ${results.length} recommendations for user ${userId}`);
-
-		return results;
+		private readonly embeddings: EmbeddingsService,
+	) {
+		// LLM rerank lives after the cheap strategies in the array but
+		// the orchestrator filters it back to a post-rank pass (see
+		// scoreAndRank). Listed here so the registry stays a single
+		// source of truth.
+		this.strategies = [this.contentVector, this.externalCache, this.embedding, this.llmRerank];
 	}
 
 	/**
-	 * Find movies similar to a given movie based on shared genres,
-	 * directors, and cast members.
+	 * Find movies similar to a single seed movie.
 	 */
-	async getSimilarMovies(movieId: string, limit: number = 24): Promise<ScoredMovie[]> {
-		const cacheKey = `similar:${movieId}:${limit}`;
-		const cached = await this.cache.get<ScoredMovie[]>(
+	async getSimilarMovies(movieId: string, opts: RecommendOptions = {}): Promise<RecommendResponse> {
+		const k = opts.k ?? DEFAULT_RECOMMEND_OPTIONS.k;
+		const cacheKey = `similar:${movieId}:${k}:${JSON.stringify(opts.weights ?? {})}`;
+		const cached = await this.cache.get<RecommendResponse>(
 			CACHE_NAMESPACES.RECOMMENDATIONS,
 			cacheKey,
 		);
-		if (cached) {
-			return cached;
+		if (cached) return cached;
+
+		const { seed, candidates } = this.loadSeedAndCandidates(movieId);
+		if (!seed) {
+			return { results: [], usedSources: [], reason: 'seed_not_found' };
 		}
 
-		// 1. Get the source movie's metadata
-		const sourceMetadata = await this.database.db
-			.select({
-				movieId: movieMetadata.movieId,
-				genres: movieMetadata.genres,
-				directors: movieMetadata.directors,
-				cast: movieMetadata.cast,
-			})
-			.from(movieMetadata)
-			.where(eq(movieMetadata.movieId, movieId))
-			.get();
+		const response = await this.scoreAndRank([seed], candidates, opts);
+		await this.cache.set(
+			CACHE_NAMESPACES.RECOMMENDATIONS,
+			cacheKey,
+			response,
+			SIMILAR_CACHE_TTL,
+		);
+		return response;
+	}
 
-		if (!sourceMetadata) {
-			return [];
+	/**
+	 * Find movies similar to a set of seeds (playlist, multi-select).
+	 * Variance-aware policy:
+	 *   - homogeneous input (low intra-set variance) → centroid +
+	 *     single KNN against the mean embedding, then orchestrator
+	 *     blend for content + cache strategies.
+	 *   - heterogeneous input → union-of-neighbours with reciprocal-
+	 *     rank fusion across per-seed neighbours.
+	 *   - explicit `policy` override wins over auto-detection.
+	 *
+	 * Falls back to the simple averaged per-seed score from Phase 1
+	 * when embeddings aren't yet available for ≥2 seeds.
+	 */
+	async getMultiInput(
+		movieIds: string[],
+		opts: MultiRecommendOptions = {},
+	): Promise<RecommendResponse> {
+		const k = opts.k ?? DEFAULT_RECOMMEND_OPTIONS.k;
+		const seeds = movieIds
+			.map((id) => this.loadSeedAndCandidates(id).seed)
+			.filter((s): s is MovieWithMetadata => s !== null);
+		if (seeds.length === 0) {
+			return { results: [], usedSources: [], reason: 'no_seeds_found' };
+		}
+		const seedIds = new Set(seeds.map((s) => s.id));
+		const candidates = this.loadAllCandidates().filter((c) => !seedIds.has(c.id));
+
+		const store = this.embeddings.getStore();
+		const requestedPolicy = opts.policy ?? 'auto';
+		const analysis = await analyseMultiInputSet(seeds, store);
+		const effectivePolicy =
+			requestedPolicy === 'auto' ? analysis.policy : requestedPolicy;
+
+		// Centroid path needs all seeds embedded for it to be meaningful.
+		if (effectivePolicy === 'centroid' && analysis.embeddedSeeds === seeds.length) {
+			return this.centroidRank(seeds, candidates, opts, k, analysis.variance);
 		}
 
-		const sourceGenres = this.parseJsonColumn(sourceMetadata.genres);
-		const sourceDirectors = this.parseJsonColumn(sourceMetadata.directors);
-		const sourceCast = this.parseJsonColumn(sourceMetadata.cast);
+		// Union policy or fallback when centroid isn't viable.
+		return this.unionRank(seeds, candidates, opts, k, analysis.variance);
+	}
 
-		const sourceGenreSet = new Set(sourceGenres);
-		const sourceDirectorSet = new Set(sourceDirectors);
-		const sourceCastSet = new Set(sourceCast);
-
-		// 2. Get all other movies with metadata
-		const candidates = await this.database.db
-			.select({
-				id: movies.id,
-				title: movies.title,
-				year: movies.year,
-				posterUrl: movies.posterUrl,
-				metaGenres: movieMetadata.genres,
-				metaDirectors: movieMetadata.directors,
-				metaCast: movieMetadata.cast,
+	private async centroidRank(
+		seeds: MovieWithMetadata[],
+		candidates: MovieWithMetadata[],
+		opts: MultiRecommendOptions,
+		k: number,
+		variance: number,
+	): Promise<RecommendResponse> {
+		const store = this.embeddings.getStore();
+		const vecs: Float32Array[] = [];
+		for (const s of seeds) {
+			const v = await store.get(s.id);
+			if (v) vecs.push(v);
+		}
+		if (vecs.length === 0) {
+			// Defensive — shouldn't happen since caller checked embeddedSeeds.
+			return this.unionRank(seeds, candidates, opts, k, variance);
+		}
+		const c = centroid(vecs);
+		const candidateIds = new Set(candidates.map((x) => x.id));
+		const seedIds = new Set(seeds.map((x) => x.id));
+		const hits = await store.knn(c, Math.max(k * 4, 100), {
+			include: candidateIds,
+			exclude: seedIds,
+		});
+		const moviesById = new Map(candidates.map((x) => [x.id, x] as const));
+		const scored = hits
+			.map((h) => {
+				const m = moviesById.get(h.movieId);
+				if (!m) return null;
+				return {
+					movieId: h.movieId,
+					title: m.title,
+					year: m.year,
+					score: Math.round(h.score * 1000) / 1000,
+					explanation: [`Centroid of ${seeds.length} seeds (variance ${variance.toFixed(2)})`],
+					posterUrl: m.posterUrl,
+					usedSources: ['centroid'],
+				};
 			})
-			.from(movies)
-			.leftJoin(movieMetadata, eq(movieMetadata.movieId, movies.id))
-			.all();
+			.filter((x): x is NonNullable<typeof x> => x !== null);
 
-		// 3. Score by overlap
+		// MMR for diversity on top of the centroid ranking.
+		const lambda = opts.mmrLambda ?? DEFAULT_RECOMMEND_OPTIONS.mmrLambda;
+		const filterCtx: FilterContext = {
+			seed: seeds[0]!,
+			moviesById,
+			excludeMovieIds: union(opts.excludeMovieIds, seedIds),
+			watchedMovieIds: new Set(),
+			excludeWatched: opts.excludeWatched ?? DEFAULT_RECOMMEND_OPTIONS.excludeWatched,
+			excludeSameGroup: opts.excludeSameGroup ?? DEFAULT_RECOMMEND_OPTIONS.excludeSameGroup,
+			qualityFloor: opts.qualityFloor ?? DEFAULT_RECOMMEND_OPTIONS.qualityFloor,
+			perDirectorCap: opts.perDirectorCap ?? DEFAULT_RECOMMEND_OPTIONS.perDirectorCap,
+		};
+		const filtered = applyFilters(scored, filterCtx);
+		const diversified = mmr(filtered, moviesById, lambda, k);
+		return {
+			results: diversified,
+			usedSources: ['centroid', 'embedding'],
+			reason: diversified.length === 0 ? 'no_signal' : undefined,
+		};
+	}
+
+	private async unionRank(
+		seeds: MovieWithMetadata[],
+		candidates: MovieWithMetadata[],
+		opts: MultiRecommendOptions,
+		k: number,
+		variance: number,
+	): Promise<RecommendResponse> {
+		// Run scoreAndRank against each seed, then fuse with RRF.
+		const seedIds = new Set(seeds.map((s) => s.id));
+		const perSeedLists: Array<Array<{ movieId: string; score: number }>> = [];
+		const moviesById = new Map(candidates.map((m) => [m.id, m]));
+		const allExplanations = new Map<string, string[]>();
+		const allUsedSources = new Set<string>();
+
+		for (const seed of seeds) {
+			const response = await this.scoreAndRank([seed], candidates, {
+				...opts,
+				k: Math.max(k * 3, 60),
+				excludeMovieIds: union(opts.excludeMovieIds, seedIds),
+			});
+			perSeedLists.push(
+				response.results.map((r) => ({ movieId: r.movieId, score: r.score })),
+			);
+			for (const r of response.results) {
+				const existing = allExplanations.get(r.movieId);
+				if (existing) {
+					for (const e of r.explanation) existing.push(e);
+				} else {
+					allExplanations.set(r.movieId, [...r.explanation]);
+				}
+			}
+			for (const src of response.usedSources) allUsedSources.add(src);
+		}
+
+		const fused = reciprocalRankFusion(perSeedLists);
 		const scored: ScoredMovie[] = [];
-
-		for (const candidate of candidates) {
-			if (candidate.id === movieId) continue;
-
-			const candidateGenres = this.parseJsonColumn(candidate.metaGenres);
-			const candidateDirectors = this.parseJsonColumn(candidate.metaDirectors);
-			const candidateCast = this.parseJsonColumn(candidate.metaCast);
-
-			const genreOverlap = candidateGenres.filter((g) => sourceGenreSet.has(g)).length;
-			const directorOverlap = candidateDirectors.filter((d) =>
-				sourceDirectorSet.has(d),
-			).length;
-			const castOverlap = candidateCast.filter((a) => sourceCastSet.has(a)).length;
-
-			const totalOverlap = genreOverlap * 3 + directorOverlap * 5 + castOverlap * 2;
-
-			if (totalOverlap === 0) continue;
-
-			const explanation: string[] = [];
-			if (genreOverlap > 0) {
-				const sharedGenres = candidateGenres.filter((g) => sourceGenreSet.has(g));
-				explanation.push(`Shared genres: ${sharedGenres.join(', ')}`);
-			}
-			if (directorOverlap > 0) {
-				const sharedDirectors = candidateDirectors.filter((d) => sourceDirectorSet.has(d));
-				explanation.push(`Same director: ${sharedDirectors.join(', ')}`);
-			}
-			if (castOverlap > 0) {
-				const sharedCast = candidateCast.filter((a) => sourceCastSet.has(a));
-				explanation.push(`Shared cast: ${sharedCast.slice(0, 3).join(', ')}`);
-			}
-
+		const maxFused = Math.max(...fused.map((f) => f.score), 0) || 1;
+		for (const f of fused) {
+			const m = moviesById.get(f.movieId);
+			if (!m) continue;
 			scored.push({
-				movieId: candidate.id,
-				title: candidate.title,
-				year: candidate.year,
-				score: totalOverlap,
-				explanation,
-				posterUrl: candidate.posterUrl,
+				movieId: f.movieId,
+				title: m.title,
+				year: m.year,
+				score: Math.round((f.score / maxFused) * 1000) / 1000,
+				explanation: dedupe(
+					allExplanations.get(f.movieId) ?? [
+						`Union of neighbours (variance ${variance.toFixed(2)})`,
+					],
+				),
+				posterUrl: m.posterUrl,
+				usedSources: Array.from(allUsedSources),
 			});
 		}
 
+		const lambda = opts.mmrLambda ?? DEFAULT_RECOMMEND_OPTIONS.mmrLambda;
+		const filterCtx: FilterContext = {
+			seed: seeds[0]!,
+			moviesById,
+			excludeMovieIds: union(opts.excludeMovieIds, seedIds),
+			watchedMovieIds: new Set(),
+			excludeWatched: opts.excludeWatched ?? DEFAULT_RECOMMEND_OPTIONS.excludeWatched,
+			excludeSameGroup: opts.excludeSameGroup ?? DEFAULT_RECOMMEND_OPTIONS.excludeSameGroup,
+			qualityFloor: opts.qualityFloor ?? DEFAULT_RECOMMEND_OPTIONS.qualityFloor,
+			perDirectorCap: opts.perDirectorCap ?? DEFAULT_RECOMMEND_OPTIONS.perDirectorCap,
+		};
+		const filtered = applyFilters(scored, filterCtx);
+		const diversified = mmr(filtered, moviesById, lambda, k);
+
+		return {
+			results: diversified,
+			usedSources: ['union-of-neighbours', ...allUsedSources],
+			reason: diversified.length === 0 ? 'no_signal' : undefined,
+		};
+	}
+
+	/**
+	 * Personalised recommendations for the current user — uses their
+	 * taste profile as a "synthetic seed" against every movie they
+	 * haven't watched yet. Falls back to popular content-vector
+	 * neighbours if the profile is too thin.
+	 */
+	async getPersonalized(userId: string, limit = 24): Promise<ScoredMovie[]> {
+		const cacheKey = `personalized:${userId}:${limit}`;
+		const cached = await this.cache.get<ScoredMovie[]>(
+			CACHE_NAMESPACES.RECOMMENDATIONS,
+			cacheKey,
+		);
+		if (cached) return cached;
+
+		const profile = await this.tasteProfile.buildProfile(userId);
+		const watched = this.getUserMovieIds(userId);
+		const all = this.loadAllCandidates();
+
+		const genres = new Map(profile.favoriteGenres.map((g) => [g.name.toLowerCase(), g.weight]));
+		const directors = new Map(
+			profile.favoriteDirectors.map((d) => [d.name.toLowerCase(), d.weight]),
+		);
+		const actors = new Map(
+			profile.favoriteActors.map((a) => [a.name.toLowerCase(), a.weight]),
+		);
+		const decades = new Map(profile.preferredDecades.map((d) => [d.decade, d.weight]));
+
+		const scored: ScoredMovie[] = [];
+		for (const m of all) {
+			if (watched.has(m.id)) continue;
+			if (m.hidden) continue;
+
+			let score = 0;
+			const reasons: string[] = [];
+
+			let genreMatch = 0;
+			const matchedGenres: string[] = [];
+			for (const g of m.genres) {
+				const w = genres.get(g.toLowerCase());
+				if (w) {
+					genreMatch += w;
+					matchedGenres.push(g);
+				}
+			}
+			if (m.genres.length > 0 && matchedGenres.length > 0) {
+				score += (genreMatch / m.genres.length) * 0.4;
+				reasons.push(`Matches your favourite genres: ${matchedGenres.slice(0, 3).join(', ')}`);
+			}
+
+			let dirMatch = 0;
+			const matchedDirs: string[] = [];
+			for (const d of m.directors) {
+				const w = directors.get(d.toLowerCase());
+				if (w) {
+					dirMatch += w;
+					matchedDirs.push(d);
+				}
+			}
+			if (matchedDirs.length > 0) {
+				score += Math.min(dirMatch, 1) * 0.25;
+				reasons.push(`Directed by ${matchedDirs.join(', ')}`);
+			}
+
+			let actMatch = 0;
+			const matchedActors: string[] = [];
+			for (const a of m.cast.slice(0, 8)) {
+				const w = actors.get(a.toLowerCase());
+				if (w) {
+					actMatch += w;
+					matchedActors.push(a);
+				}
+			}
+			if (matchedActors.length > 0) {
+				score += Math.min(actMatch, 1) * 0.15;
+				reasons.push(`Stars ${matchedActors.slice(0, 3).join(', ')}`);
+			}
+
+			if (m.year != null) {
+				const d = decadeOf(m.year);
+				const w = decades.get(d);
+				if (w) {
+					score += w * 0.1;
+					reasons.push(`From a decade you enjoy (${d}s)`);
+				}
+			}
+
+			if (m.tmdbRating != null) {
+				score += Math.min(m.tmdbRating / 10, 1) * 0.1;
+			}
+
+			if (score > 0) {
+				scored.push({
+					movieId: m.id,
+					title: m.title,
+					year: m.year,
+					score: Math.round(score * 1000) / 1000,
+					explanation: reasons,
+					posterUrl: m.posterUrl,
+					usedSources: ['taste-profile'],
+				});
+			}
+		}
 		scored.sort((a, b) => b.score - a.score);
 		const results = scored.slice(0, limit);
-
 		await this.cache.set(
 			CACHE_NAMESPACES.RECOMMENDATIONS,
 			cacheKey,
 			results,
-			RECOMMENDATIONS_CACHE_TTL,
+			PERSONAL_CACHE_TTL,
 		);
-
 		return results;
 	}
 
-	/**
-	 * Get top movies in a specific genre that the user hasn't seen.
-	 */
-	async getGenreRecommendations(
-		genre: string,
-		userId: string,
-		limit: number = 24,
-	): Promise<ScoredMovie[]> {
+	/** Top-rated unseen movies in a genre. */
+	async getByGenre(genre: string, userId: string, limit = 24): Promise<ScoredMovie[]> {
 		const cacheKey = `genre:${genre}:${userId}:${limit}`;
 		const cached = await this.cache.get<ScoredMovie[]>(
 			CACHE_NAMESPACES.RECOMMENDATIONS,
 			cacheKey,
 		);
-		if (cached) {
-			return cached;
-		}
+		if (cached) return cached;
 
-		// Get movies the user has already seen
-		const ratedMovieIds = await this.getUserRatedMovieIds(userId);
-		const watchedMovieIds = await this.getUserWatchedMovieIds(userId);
-		const excludeIds = new Set([...ratedMovieIds, ...watchedMovieIds]);
+		const watched = this.getUserMovieIds(userId);
+		const all = this.loadAllCandidates();
+		const g = genre.toLowerCase();
 
-		// Get all movies with metadata
-		const candidates = await this.database.db
-			.select({
-				id: movies.id,
-				title: movies.title,
-				year: movies.year,
-				posterUrl: movies.posterUrl,
-				metaGenres: movieMetadata.genres,
-				metaRating: movieMetadata.tmdbRating,
-			})
-			.from(movies)
-			.leftJoin(movieMetadata, eq(movieMetadata.movieId, movies.id))
-			.all();
-
-		const genreLower = genre.toLowerCase();
 		const scored: ScoredMovie[] = [];
-
-		for (const candidate of candidates) {
-			if (excludeIds.has(candidate.id)) continue;
-
-			const genres = this.parseJsonColumn(candidate.metaGenres);
-			const hasGenre = genres.some((g) => g.toLowerCase() === genreLower);
-			if (!hasGenre) continue;
-
-			// Score by vote average (popularity/quality)
-			const rating = candidate.metaRating ?? 0;
-
+		for (const m of all) {
+			if (watched.has(m.id) || m.hidden) continue;
+			if (!m.genres.some((x) => x.toLowerCase() === g)) continue;
+			const rating = m.tmdbRating ?? 0;
 			scored.push({
-				movieId: candidate.id,
-				title: candidate.title,
-				year: candidate.year,
+				movieId: m.id,
+				title: m.title,
+				year: m.year,
 				score: rating,
-				explanation: [`Top rated in ${genre}`],
-				posterUrl: candidate.posterUrl,
+				explanation: [`Top-rated in ${genre}`],
+				posterUrl: m.posterUrl,
+				usedSources: ['genre'],
 			});
 		}
-
 		scored.sort((a, b) => b.score - a.score);
 		const results = scored.slice(0, limit);
-
 		await this.cache.set(
 			CACHE_NAMESPACES.RECOMMENDATIONS,
 			cacheKey,
 			results,
-			RECOMMENDATIONS_CACHE_TTL,
+			SIMILAR_CACHE_TTL,
 		);
-
 		return results;
 	}
 
-	/**
-	 * Get trending movies based on most watched and rated in the last 30 days.
-	 */
-	async getTrendingMovies(limit: number = 24): Promise<ScoredMovie[]> {
+	/** Most watched + rated in the last 30 days. */
+	async getTrending(limit = 24): Promise<ScoredMovie[]> {
 		const cacheKey = `trending:${limit}`;
 		const cached = await this.cache.get<ScoredMovie[]>(
 			CACHE_NAMESPACES.RECOMMENDATIONS,
 			cacheKey,
 		);
-		if (cached) {
-			return cached;
-		}
+		if (cached) return cached;
 
-		const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-		// Count recent ratings per movie
-		const recentRatings = await this.database.db
+		const thirty = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+		const ratings = this.database.db
 			.select({
 				movieId: userRatings.movieId,
-				ratingCount: sql<number>`count(*)`.as('rating_count'),
-				avgRating: sql<number>`avg(${userRatings.rating})`.as('avg_rating'),
+				count: sql<number>`count(*)`.as('c'),
+				avg: sql<number>`avg(${userRatings.rating})`.as('a'),
 			})
 			.from(userRatings)
-			.where(gt(userRatings.createdAt, thirtyDaysAgo))
+			.where(gt(userRatings.createdAt, thirty))
 			.groupBy(userRatings.movieId)
 			.all();
-
-		// Count recent watches per movie
-		const recentWatches = await this.database.db
+		const watches = this.database.db
 			.select({
 				movieId: userWatchHistory.movieId,
-				watchCount: sql<number>`count(*)`.as('watch_count'),
+				count: sql<number>`count(*)`.as('c'),
 			})
 			.from(userWatchHistory)
-			.where(gt(userWatchHistory.watchedAt, thirtyDaysAgo))
+			.where(gt(userWatchHistory.watchedAt, thirty))
 			.groupBy(userWatchHistory.movieId)
 			.all();
 
-		// Combine into a trending score
-		const trendingScores = new Map<
-			string,
-			{ ratingCount: number; avgRating: number; watchCount: number }
-		>();
-
-		for (const r of recentRatings) {
-			trendingScores.set(r.movieId, {
-				ratingCount: r.ratingCount,
-				avgRating: r.avgRating,
-				watchCount: 0,
-			});
+		const map = new Map<string, { ratingCount: number; avg: number; watchCount: number }>();
+		for (const r of ratings) {
+			map.set(r.movieId, { ratingCount: r.count, avg: r.avg, watchCount: 0 });
 		}
-
-		for (const w of recentWatches) {
-			const existing = trendingScores.get(w.movieId);
-			if (existing) {
-				existing.watchCount = w.watchCount;
-			} else {
-				trendingScores.set(w.movieId, {
-					ratingCount: 0,
-					avgRating: 0,
-					watchCount: w.watchCount,
-				});
-			}
+		for (const w of watches) {
+			const cur = map.get(w.movieId) ?? { ratingCount: 0, avg: 0, watchCount: 0 };
+			cur.watchCount = w.count;
+			map.set(w.movieId, cur);
 		}
+		if (map.size === 0) return [];
 
-		if (trendingScores.size === 0) {
-			return [];
-		}
-
-		// Get movie details for trending movies
-		const trendingMovieIds = Array.from(trendingScores.keys());
-		const movieDetails = await this.database.db
+		const ids = Array.from(map.keys());
+		const rows = this.database.db
 			.select({
 				id: movies.id,
 				title: movies.title,
@@ -373,65 +484,40 @@ export class RecommendationsService {
 				posterUrl: movies.posterUrl,
 			})
 			.from(movies)
-			.where(inArray(movies.id, trendingMovieIds))
+			.where(inArray(movies.id, ids))
 			.all();
 
 		const scored: ScoredMovie[] = [];
-
-		for (const movie of movieDetails) {
-			const trending = trendingScores.get(movie.id);
-			if (!trending) continue;
-
-			// Trending score: combination of watch count, rating count, and avg rating
-			const score = trending.watchCount * 2 + trending.ratingCount * 3 + trending.avgRating;
-
-			const explanation: string[] = [];
-			if (trending.watchCount > 0) {
-				explanation.push(`Watched ${trending.watchCount} times recently`);
-			}
-			if (trending.ratingCount > 0) {
-				explanation.push(
-					`Rated ${trending.ratingCount} times (avg: ${Math.round(trending.avgRating * 10) / 10})`,
-				);
-			}
-
+		for (const row of rows) {
+			const t = map.get(row.id)!;
+			const score = t.watchCount * 2 + t.ratingCount * 3 + t.avg;
+			const reasons: string[] = [];
+			if (t.watchCount > 0) reasons.push(`Watched ${t.watchCount} times recently`);
+			if (t.ratingCount > 0)
+				reasons.push(`Rated ${t.ratingCount}× (avg: ${Math.round(t.avg * 10) / 10})`);
 			scored.push({
-				movieId: movie.id,
-				title: movie.title,
-				year: movie.year,
+				movieId: row.id,
+				title: row.title,
+				year: row.year,
 				score,
-				explanation,
-				posterUrl: movie.posterUrl,
+				explanation: reasons,
+				posterUrl: row.posterUrl,
+				usedSources: ['trending'],
 			});
 		}
-
 		scored.sort((a, b) => b.score - a.score);
 		const results = scored.slice(0, limit);
-
 		await this.cache.set(
 			CACHE_NAMESPACES.RECOMMENDATIONS,
 			cacheKey,
 			results,
-			RECOMMENDATIONS_CACHE_TTL,
+			SIMILAR_CACHE_TTL,
 		);
-
 		return results;
 	}
 
-	/**
-	 * Get recently added movies.
-	 */
-	async getRecentlyAdded(limit: number = 24): Promise<ScoredMovie[]> {
-		const cacheKey = `recent:${limit}`;
-		const cached = await this.cache.get<ScoredMovie[]>(
-			CACHE_NAMESPACES.RECOMMENDATIONS,
-			cacheKey,
-		);
-		if (cached) {
-			return cached;
-		}
-
-		const recentMovies = await this.database.db
+	async getRecentlyAdded(limit = 24): Promise<ScoredMovie[]> {
+		const rows = this.database.db
 			.select({
 				id: movies.id,
 				title: movies.title,
@@ -443,192 +529,161 @@ export class RecommendationsService {
 			.orderBy(desc(movies.addedAt))
 			.limit(limit)
 			.all();
+		return rows.map((m, i) => ({
+			movieId: m.id,
+			title: m.title,
+			year: m.year,
+			score: rows.length - i,
+			explanation: [`Added ${m.addedAt}`],
+			posterUrl: m.posterUrl,
+			usedSources: ['recently-added'],
+		}));
+	}
 
-		const results: ScoredMovie[] = recentMovies.map((movie, index) => ({
-			movieId: movie.id,
-			title: movie.title,
-			year: movie.year,
-			score: recentMovies.length - index, // Higher score for more recent
-			explanation: [`Added ${movie.addedAt}`],
-			posterUrl: movie.posterUrl,
+	/** Manually invalidate cached responses for a movie (e.g. after metadata refresh). */
+	invalidateMovie(movieId: string): void {
+		// CacheService doesn't expose prefix deletion; we punt to TTL for v1.
+		void this.cache.delete(CACHE_NAMESPACES.RECOMMENDATIONS, `similar:${movieId}`);
+	}
+
+	// =====================================================================
+	// Internals
+	// =====================================================================
+
+	private async scoreAndRank(
+		seeds: MovieWithMetadata[],
+		candidates: MovieWithMetadata[],
+		opts: RecommendOptions,
+	): Promise<RecommendResponse> {
+		const k = opts.k ?? DEFAULT_RECOMMEND_OPTIONS.k;
+		const lambda = opts.mmrLambda ?? DEFAULT_RECOMMEND_OPTIONS.mmrLambda;
+		const weights = { ...DEFAULT_RECOMMEND_OPTIONS.weights, ...(opts.weights ?? {}) };
+
+		// Per-seed candidate pool minus the seed itself.
+		const seedIds = new Set(seeds.map((s) => s.id));
+		const pool = candidates.filter((c) => !seedIds.has(c.id));
+		const moviesById = new Map(pool.map((m) => [m.id, m]));
+
+		// Run each strategy against each seed; aggregate per-strategy.
+		const activeStrategies = this.strategies.filter((s) => s.available());
+		const perStrategyAccum = new Map<string, Map<string, { score: number; reasons: string[] }>>();
+		for (const seed of seeds) {
+			for (const strat of activeStrategies) {
+				const out = await strat.score(seed, pool);
+				let bucket = perStrategyAccum.get(out.strategy);
+				if (!bucket) {
+					bucket = new Map();
+					perStrategyAccum.set(out.strategy, bucket);
+				}
+				for (const s of out.scores) {
+					const cur = bucket.get(s.movieId);
+					const reasons = s.reasons ?? [];
+					if (cur) {
+						cur.score += s.score;
+						for (const r of reasons) cur.reasons.push(r);
+					} else {
+						bucket.set(s.movieId, { score: s.score, reasons: [...reasons] });
+					}
+				}
+			}
+		}
+
+		const results = Array.from(perStrategyAccum.entries()).map(([strategy, bucket]) => ({
+			strategy,
+			scores: Array.from(bucket.entries()).map(([movieId, v]) => ({
+				movieId,
+				score: v.score / seeds.length,
+				reasons: v.reasons,
+			})),
 		}));
 
-		await this.cache.set(
-			CACHE_NAMESPACES.RECOMMENDATIONS,
-			cacheKey,
-			results,
-			RECOMMENDATIONS_CACHE_TTL,
-		);
+		const blended = composite(results, weights, moviesById);
+		const seed = seeds[0]!;
+		const watched = new Set<string>();
 
-		return results;
+		const filterCtx: FilterContext = {
+			seed,
+			moviesById,
+			excludeMovieIds: opts.excludeMovieIds ?? DEFAULT_RECOMMEND_OPTIONS.excludeMovieIds,
+			watchedMovieIds: watched,
+			excludeWatched: opts.excludeWatched ?? DEFAULT_RECOMMEND_OPTIONS.excludeWatched,
+			excludeSameGroup: opts.excludeSameGroup ?? DEFAULT_RECOMMEND_OPTIONS.excludeSameGroup,
+			qualityFloor: opts.qualityFloor ?? DEFAULT_RECOMMEND_OPTIONS.qualityFloor,
+			perDirectorCap: opts.perDirectorCap ?? DEFAULT_RECOMMEND_OPTIONS.perDirectorCap,
+		};
+		const filtered = applyFilters(blended, filterCtx);
+		const diversified = mmr(filtered, moviesById, lambda, k);
+
+		const usedSources = new Set<string>();
+		for (const r of diversified) for (const s of r.usedSources) usedSources.add(s);
+
+		return {
+			results: diversified,
+			usedSources: Array.from(usedSources),
+			reason: diversified.length === 0 ? 'no_signal' : undefined,
+		};
 	}
 
-	// ---------------------------------------------------------------------------
-	// Private helpers
-	// ---------------------------------------------------------------------------
-
-	/**
-	 * Score a candidate movie against the user's taste profile using
-	 * a weighted sum of content-based signals.
-	 */
-	private scoreMovie(
-		candidate: {
-			id: string;
-			title: string;
-			year: number | null;
-			metaGenres: string | null;
-			metaDirectors: string | null;
-			metaCast: string | null;
-			metaRating: number | null;
-		},
-		profile: TasteProfile,
-	): { score: number; explanation: string[] } {
-		const explanation: string[] = [];
-
-		const genres = this.parseJsonColumn(candidate.metaGenres);
-		const directors = this.parseJsonColumn(candidate.metaDirectors);
-		const cast = this.parseJsonColumn(candidate.metaCast);
-
-		// --- Genre overlap (40%) ---
-		let genreScore = 0;
-		if (genres.length > 0 && profile.favoriteGenres.length > 0) {
-			const profileGenreMap = new Map(
-				profile.favoriteGenres.map((g) => [g.name.toLowerCase(), g.weight]),
-			);
-			let genreMatchWeight = 0;
-			const matchedGenres: string[] = [];
-
-			for (const genre of genres) {
-				const weight = profileGenreMap.get(genre.toLowerCase());
-				if (weight !== undefined) {
-					genreMatchWeight += weight;
-					matchedGenres.push(genre);
-				}
-			}
-
-			genreScore = Math.min(genreMatchWeight / genres.length, 1);
-			if (matchedGenres.length > 0) {
-				explanation.push(`Matches your favorite genres: ${matchedGenres.join(', ')}`);
-			}
-		}
-
-		// --- Director/Actor match (25%) ---
-		let peopleScore = 0;
-		if (profile.favoriteDirectors.length > 0 || profile.favoriteActors.length > 0) {
-			const directorMap = new Map(
-				profile.favoriteDirectors.map((d) => [d.name.toLowerCase(), d.weight]),
-			);
-			const actorMap = new Map(
-				profile.favoriteActors.map((a) => [a.name.toLowerCase(), a.weight]),
-			);
-
-			let directorMatchWeight = 0;
-			const matchedDirectors: string[] = [];
-			for (const director of directors) {
-				const weight = directorMap.get(director.toLowerCase());
-				if (weight !== undefined) {
-					directorMatchWeight += weight;
-					matchedDirectors.push(director);
-				}
-			}
-
-			let actorMatchWeight = 0;
-			const matchedActors: string[] = [];
-			for (const actor of cast) {
-				const weight = actorMap.get(actor.toLowerCase());
-				if (weight !== undefined) {
-					actorMatchWeight += weight;
-					matchedActors.push(actor);
-				}
-			}
-
-			// Directors weighted more heavily than actors
-			peopleScore = Math.min(directorMatchWeight * 0.6 + actorMatchWeight * 0.4, 1);
-
-			if (matchedDirectors.length > 0) {
-				explanation.push(`Directed by ${matchedDirectors.join(', ')}`);
-			}
-			if (matchedActors.length > 0) {
-				explanation.push(`Stars ${matchedActors.slice(0, 3).join(', ')}`);
-			}
-		}
-
-		// --- Year range preference (10%) ---
-		let yearScore = 0;
-		if (candidate.year && profile.preferredDecades.length > 0) {
-			const movieDecade = Math.floor(candidate.year / 10) * 10;
-			const decadeMatch = profile.preferredDecades.find((d) => d.decade === movieDecade);
-			if (decadeMatch) {
-				yearScore = decadeMatch.weight;
-				explanation.push(`From a decade you enjoy (${movieDecade}s)`);
-			}
-		}
-
-		// --- Rating similarity (15%) ---
-		let ratingScore = 0;
-		if (candidate.metaRating && profile.averageRating > 0) {
-			// Movies with ratings close to what the user typically rates highly
-			// get a boost. We compare the movie's public rating to the user's
-			// average and reward proximity.
-			const metaRatingNormalized = candidate.metaRating / 10; // Normalize to 0-1
-			const userAvgNormalized = profile.averageRating / 10;
-
-			// How close is this movie's rating to the user's average?
-			const ratingDiff = Math.abs(metaRatingNormalized - userAvgNormalized);
-			ratingScore = Math.max(0, 1 - ratingDiff * 2);
-		}
-
-		// --- Popularity factor (10%) ---
-		let popularityScore = 0;
-		if (candidate.metaRating) {
-			popularityScore = Math.min(candidate.metaRating / 10, 1);
-		}
-
-		// --- Weighted sum ---
-		const totalScore =
-			genreScore * WEIGHT_GENRE +
-			peopleScore * WEIGHT_PEOPLE +
-			yearScore * WEIGHT_YEAR +
-			ratingScore * WEIGHT_RATING_SIMILARITY +
-			popularityScore * WEIGHT_POPULARITY;
-
-		return { score: totalScore, explanation };
+	private loadSeedAndCandidates(movieId: string): {
+		seed: MovieWithMetadata | null;
+		candidates: MovieWithMetadata[];
+	} {
+		const seedRow = this.database.db
+			.select()
+			.from(movies)
+			.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
+			.where(eq(movies.id, movieId))
+			.get();
+		if (!seedRow) return { seed: null, candidates: [] };
+		const seed = hydrate(seedRow.movies, seedRow.movie_metadata);
+		const candidates = this.loadAllCandidates();
+		return { seed, candidates };
 	}
 
-	/**
-	 * Get IDs of all movies a user has rated.
-	 */
-	private async getUserRatedMovieIds(userId: string): Promise<string[]> {
-		const ratings = await this.database.db
+	private loadAllCandidates(): MovieWithMetadata[] {
+		const rows = this.database.db
+			.select()
+			.from(movies)
+			.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
+			.all();
+		return rows.map((r) => hydrate(r.movies, r.movie_metadata));
+	}
+
+	private getUserMovieIds(userId: string): Set<string> {
+		const r = this.database.db
 			.select({ movieId: userRatings.movieId })
 			.from(userRatings)
 			.where(eq(userRatings.userId, userId))
 			.all();
-		return ratings.map((r) => r.movieId);
-	}
-
-	/**
-	 * Get IDs of all movies a user has watched.
-	 */
-	private async getUserWatchedMovieIds(userId: string): Promise<string[]> {
-		const history = await this.database.db
+		const h = this.database.db
 			.select({ movieId: userWatchHistory.movieId })
 			.from(userWatchHistory)
 			.where(eq(userWatchHistory.userId, userId))
 			.all();
-		return history.map((h) => h.movieId);
-	}
-
-	/**
-	 * Parse a JSON text column into a string array.
-	 */
-	private parseJsonColumn(value: string | null | undefined): string[] {
-		if (!value) return [];
-		try {
-			const parsed = JSON.parse(value);
-			return Array.isArray(parsed) ? parsed : [];
-		} catch {
-			return [];
-		}
+		return new Set([...r.map((x) => x.movieId), ...h.map((x) => x.movieId)]);
 	}
 }
+
+function decadeOf(year: number): number {
+	return Math.floor(year / 10) * 10;
+}
+
+function union<T>(a: ReadonlySet<T> | undefined, b: Set<T>): Set<T> {
+	const out = new Set(b);
+	if (a) for (const x of a) out.add(x);
+	return out;
+}
+
+function dedupe(arr: string[]): string[] {
+	const seen = new Set<string>();
+	const out: string[] = [];
+	for (const x of arr) {
+		if (seen.has(x)) continue;
+		seen.add(x);
+		out.push(x);
+	}
+	return out;
+}
+
+// Silence unused-import linter for `and` / future filter expansion.
+void and;

@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
-import { groupViewEnabled, toggleGroupView } from '@/state/groups.state';
+import {
+	groupedOnly,
+	groupViewEnabled,
+	toggleGroupedOnly,
+	toggleGroupView,
+} from '@/state/groups.state';
 import type { BulkAction } from '@/components/movie/BulkActionsBar';
 import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
 import { MovieGrid } from '@/components/movie/MovieGrid';
@@ -408,6 +413,23 @@ export function Library(_props: LibraryProps) {
 						}
 					>
 						<Icon name="layers" />
+					</button>
+
+					<button
+						class={`${styles.editBtn} ${groupedOnly.value ? styles.active : ''}`}
+						onClick={() => {
+							toggleGroupedOnly();
+							// Filter is server-side; re-fetch from page 1.
+							fetchMovies(1);
+						}}
+						aria-label="Show only grouped items"
+						title={
+							groupedOnly.value
+								? 'Showing only series / collections — click to show everything'
+								: 'Click to show only series / collections'
+						}
+					>
+						<Icon name="film" />
 					</button>
 
 					<button

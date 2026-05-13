@@ -32,26 +32,92 @@ for (const envPath of [
 	}
 }
 
-const dataDir = process.env.MU_DATA_DIR || process.env.MU_DATADIR;
-const dbPaths = [
-	// Env var / explicit data dir
-	...(dataDir ? [path.resolve(dataDir, 'db', 'mu.db')] : []),
-	// Standard locations
-	path.resolve(__dirname, '..', 'data', 'db', 'mu.db'),
-	path.resolve(__dirname, '..', '..', 'data', 'db', 'mu.db'),
-	path.resolve(__dirname, '..', 'packages', 'server', 'data', 'db', 'mu.db'),
-	path.resolve(__dirname, '..', 'packages', 'server', '..', '..', '..', 'data', 'db', 'mu.db'),
-];
+// Project root — this file lives at <root>/src/scripts/migrate.js,
+// so two levels up is the project root. Anchor all path resolution
+// here so `MU_DATA_DIR=./data` resolves to `<root>/data` regardless
+// of which cwd ran us.
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
-const dbPath = dbPaths.find(fs.existsSync);
-if (!dbPath) {
-	console.log('No database found, skipping migrations');
-	process.exit(0);
+const explicitDbPath = process.env.MU_DATABASE_SQLITE_PATH
+	? (path.isAbsolute(process.env.MU_DATABASE_SQLITE_PATH)
+		? process.env.MU_DATABASE_SQLITE_PATH
+		: path.resolve(PROJECT_ROOT, process.env.MU_DATABASE_SQLITE_PATH))
+	: null;
+
+const dataDirRaw = process.env.MU_DATA_DIR || process.env.MU_DATADIR;
+const dataDir = dataDirRaw
+	? (path.isAbsolute(dataDirRaw) ? dataDirRaw : path.resolve(PROJECT_ROOT, dataDirRaw))
+	: path.resolve(PROJECT_ROOT, 'data');
+
+const dbPath = explicitDbPath || path.resolve(dataDir, 'db', 'mu.db');
+
+// Defensive: detect strays from the old, cwd-dependent setup. We
+// won't auto-delete them (data loss risk) but we'll warn loudly so
+// the developer can reconcile and remove them.
+const knownStrayPaths = [
+	path.resolve(PROJECT_ROOT, 'src', 'data', 'db', 'mu.db'),
+	path.resolve(PROJECT_ROOT, 'src', 'packages', 'server', 'data', 'db', 'mu.db'),
+].filter((p) => p !== dbPath && fs.existsSync(p));
+
+// One-shot consolidation: if the canonical DB doesn't exist yet but
+// a stray does, copy the *largest* stray (most likely the one with
+// real data) to canonical. WAL/SHM go along for the ride so any
+// pending writes survive. Strays are NEVER auto-deleted — the dev
+// reviews and removes them once they've confirmed canonical works.
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+	fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const canonicalExists = fs.existsSync(dbPath);
+const canonicalSize = canonicalExists ? fs.statSync(dbPath).size : 0;
+const SUSPICIOUSLY_SMALL = 64 * 1024; // < 64 KB → likely a fresh empty DB
+
+if ((!canonicalExists || canonicalSize < SUSPICIOUSLY_SMALL) && knownStrayPaths.length > 0) {
+	const sortedStrays = knownStrayPaths
+		.map((p) => ({ path: p, size: fs.statSync(p).size }))
+		.sort((a, b) => b.size - a.size);
+	const winner = sortedStrays[0];
+	if (winner.size > canonicalSize) {
+		console.log('\n🔁 One-shot DB consolidation:');
+		console.log(`   Source : ${winner.path} (${(winner.size / 1024).toFixed(1)} KB)`);
+		console.log(`   Target : ${dbPath}`);
+		// Wipe any stub canonical first.
+		for (const ext of ['', '-shm', '-wal']) {
+			try {
+				fs.unlinkSync(dbPath + ext);
+			} catch {}
+		}
+		fs.copyFileSync(winner.path, dbPath);
+		for (const ext of ['-shm', '-wal']) {
+			if (fs.existsSync(winner.path + ext)) {
+				fs.copyFileSync(winner.path + ext, dbPath + ext);
+			}
+		}
+		console.log(`   Copied. Original kept at source — remove manually once verified.\n`);
+		// Refresh stray list for the warning below.
+		knownStrayPaths.splice(0, knownStrayPaths.length, ...knownStrayPaths.filter((p) => p !== winner.path));
+	}
+}
+
+if (knownStrayPaths.length > 0) {
+	console.warn('\n⚠️  STRAY DATABASE FILES DETECTED — these are leftovers from the old');
+	console.warn('   cwd-dependent path resolution and may contain real data:');
+	for (const p of knownStrayPaths) {
+		const stat = fs.statSync(p);
+		console.warn(`     ${p}  (${(stat.size / 1024).toFixed(1)} KB)`);
+	}
+	console.warn(`   Canonical DB: ${dbPath}`);
+	console.warn('   Verify the canonical file has your data, then remove the strays.\n');
 }
 
 const Database = require('better-sqlite3');
-const db = new Database(dbPath);
-console.log('Database:', dbPath);
+console.log(`=== Migrating: ${dbPath} ===`);
+migrateOne(dbPath);
+process.exit(0);
+
+function migrateOne(dbPath) {
+	const db = new Database(dbPath);
 
 // Create missing tables
 const tables = [
@@ -127,6 +193,74 @@ const tables = [
 	`CREATE INDEX IF NOT EXISTS movie_groups_parent_idx ON movie_groups(parent_group_id)`,
 	`CREATE INDEX IF NOT EXISTS movie_groups_type_idx ON movie_groups(type)`,
 	`CREATE INDEX IF NOT EXISTS movie_groups_status_idx ON movie_groups(status)`,
+	`CREATE TABLE IF NOT EXISTS provider_credentials (
+		provider_id TEXT PRIMARY KEY,
+		config TEXT NOT NULL,
+		enabled INTEGER NOT NULL DEFAULT 1,
+		encrypted INTEGER NOT NULL DEFAULT 0,
+		added_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
+	`CREATE TABLE IF NOT EXISTS provider_usage (
+		provider_id TEXT NOT NULL,
+		window TEXT NOT NULL,
+		bucket_key TEXT NOT NULL,
+		count INTEGER NOT NULL DEFAULT 0,
+		cost_usd REAL DEFAULT 0,
+		PRIMARY KEY (provider_id, window, bucket_key)
+	)`,
+	`CREATE TABLE IF NOT EXISTS provider_events (
+		id TEXT PRIMARY KEY,
+		provider_id TEXT NOT NULL,
+		event_type TEXT NOT NULL,
+		status_code INTEGER,
+		duration_ms INTEGER,
+		cost_usd REAL,
+		payload TEXT,
+		occurred_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS provider_events_provider_idx ON provider_events(provider_id, occurred_at)`,
+	`CREATE TABLE IF NOT EXISTS movie_external_recs (
+		movie_id TEXT NOT NULL,
+		source TEXT NOT NULL,
+		rank INTEGER NOT NULL,
+		target_movie_id TEXT,
+		target_tmdb INTEGER,
+		target_imdb TEXT,
+		target_title TEXT NOT NULL,
+		target_year INTEGER,
+		raw TEXT,
+		fetched_at TEXT NOT NULL,
+		PRIMARY KEY (movie_id, source, rank)
+	)`,
+	`CREATE INDEX IF NOT EXISTS movie_external_recs_target_idx ON movie_external_recs(target_movie_id)`,
+	`CREATE INDEX IF NOT EXISTS movie_external_recs_target_tmdb_idx ON movie_external_recs(target_tmdb)`,
+	`CREATE TABLE IF NOT EXISTS movie_embeddings (
+		movie_id TEXT NOT NULL,
+		model TEXT NOT NULL,
+		dim INTEGER NOT NULL,
+		vector BLOB NOT NULL,
+		source_text_hash TEXT,
+		updated_at TEXT NOT NULL,
+		PRIMARY KEY (movie_id, model)
+	)`,
+	`CREATE TABLE IF NOT EXISTS movie_llm_features (
+		movie_id TEXT NOT NULL,
+		model TEXT NOT NULL,
+		features TEXT NOT NULL,
+		cost_usd REAL,
+		generated_at TEXT NOT NULL,
+		PRIMARY KEY (movie_id, model)
+	)`,
+	`CREATE TABLE IF NOT EXISTS movie_rec_explanations (
+		seed_id TEXT NOT NULL,
+		target_id TEXT NOT NULL,
+		model TEXT NOT NULL,
+		explanation TEXT NOT NULL,
+		cost_usd REAL,
+		generated_at TEXT NOT NULL,
+		PRIMARY KEY (seed_id, target_id, model)
+	)`,
 ];
 
 for (const sql of tables) {
@@ -199,12 +333,15 @@ if (themeCount.c === 0) {
 	console.log('Seeded default themes');
 }
 
-// Verify
-const tableList = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all();
-console.log('Tables:', tableList.map(t => t.name).join(', '));
+	// Verify
+	const tableList = db
+		.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+		.all();
+	console.log('Tables:', tableList.map((t) => t.name).join(', '));
 
-const cacheCount = db.prepare('SELECT COUNT(*) as c FROM transcode_cache').get();
-console.log('Cache entries:', cacheCount.c);
+	const cacheCount = db.prepare('SELECT COUNT(*) as c FROM transcode_cache').get();
+	console.log('Cache entries:', cacheCount.c);
 
-db.close();
-console.log('Migrations applied successfully');
+	db.close();
+	console.log('Migrations applied successfully');
+}
