@@ -45,6 +45,13 @@ export interface Movie {
 	budget?: number;
 	revenue?: number;
 	hidden?: boolean;
+	/**
+	 * 'library' = file on disk, playable.
+	 * 'bookmark' = user saved an external rec, no file.
+	 * 'external' = stub fetched for ranking, evictable.
+	 * Undefined = legacy row (treat as 'library').
+	 */
+	source?: 'library' | 'bookmark' | 'external';
 	addedAt: string;
 	watchProgress?: number;
 	watchPosition?: number;

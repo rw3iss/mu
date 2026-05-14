@@ -24,6 +24,7 @@ function m(over: Partial<MovieWithMetadata> & { id: string; title: string }): Mo
 		companies: over.companies ?? [],
 		tmdbRating: over.tmdbRating ?? null,
 		imdbRating: over.imdbRating ?? null,
+		tmdbVotes: null,
 	};
 }
 

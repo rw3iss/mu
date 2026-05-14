@@ -24,6 +24,11 @@ export interface ScoredMovie {
 	inLibrary?: boolean;
 	tmdbId?: number | null;
 	enriching?: boolean;
+	/** Best-available rating, IMDB preferred, TMDB fallback. */
+	rating?: number | null;
+	ratingSource?: 'imdb' | 'tmdb' | null;
+	/** Vote count from whichever rating source was used. */
+	votes?: number | null;
 }
 
 export interface DiscoverResponse {

@@ -649,18 +649,35 @@ export class RecommendationsService {
 		const userFiltered = applyDiscoverFilters(filtered, moviesById, opts.filters);
 		const diversified = mmr(userFiltered, moviesById, lambda, k);
 
-		// Annotate each result with library/external metadata so the UI
-		// can render badges + bookmark CTA without a second round-trip.
-		// `source` is already on MovieWithMetadata — no extra query.
+		// Annotate each result with library/external metadata + ratings
+		// so the UI can render badges, bookmark CTA, and rating chips
+		// without a second round-trip. `source` is already on
+		// MovieWithMetadata — no extra query.
 		const annotated: ScoredMovie[] = diversified.map((r) => {
 			const m = moviesById.get(r.movieId);
 			const src = m?.source ?? 'library';
+			// Prefer IMDB rating, fall back to TMDB. Carry the source so
+			// the badge can show "IMDB 7.4" vs "TMDB 7.4".
+			let rating: number | null = null;
+			let ratingSource: 'imdb' | 'tmdb' | null = null;
+			if (m?.imdbRating != null && m.imdbRating > 0) {
+				rating = m.imdbRating;
+				ratingSource = 'imdb';
+			} else if (m?.tmdbRating != null && m.tmdbRating > 0) {
+				rating = m.tmdbRating;
+				ratingSource = 'tmdb';
+			}
 			return {
 				...r,
 				source: src,
 				inLibrary: src === 'library',
 				tmdbId: m?.tmdbId ?? null,
 				enriching: src !== 'library' && !m?.overview,
+				rating,
+				ratingSource,
+				// Votes only available from TMDB right now; OMDB IMDB
+				// vote counts aren't surfaced on MovieWithMetadata.
+				votes: m?.tmdbVotes ?? null,
 			};
 		});
 

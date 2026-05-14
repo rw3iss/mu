@@ -15,6 +15,7 @@ import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { type AudioProfile, audioProfilesService } from '@/services/audio-profiles.service';
+import { bookmarksService } from '@/services/discover.service';
 import { moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
 import { playMovie } from '@/state/globalPlayer.state';
@@ -299,6 +300,13 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	}
 
 	const isRemote = !!movie.remoteOrigin;
+	// Preview mode: movies that aren't playable from this server (a
+	// Discover-page "Not in library" external candidate, or a user's
+	// saved bookmark). Detail page becomes read-only — cast, plot,
+	// ratings, trailer, See Similar — with Bookmark replacing Play /
+	// Watchlist / Share. Falls through to normal behaviour for
+	// undefined source (legacy rows, treat as library).
+	const isPreview = movie.source != null && movie.source !== 'library';
 
 	const hours = Math.floor(movie.runtime / 60);
 	const mins = movie.runtime % 60;
@@ -440,10 +448,12 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 						{/* Actions */}
 						<div class={styles.actions}>
-							{(movie.status === 'processing' ||
-								movie.status === 'processing_playable' ||
-								processingMovieIds.value.has(movie.id)) &&
-							!isRemote ? (
+							{isPreview ? (
+								<PreviewActions movie={movie} />
+							) : (movie.status === 'processing' ||
+									movie.status === 'processing_playable' ||
+									processingMovieIds.value.has(movie.id)) &&
+								!isRemote ? (
 								<div class={styles.processingStatus}>
 									{movie.status === 'processing_playable' && (
 										<Button variant="primary" size="lg" onClick={handlePlay}>
@@ -506,7 +516,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									<Icon name="play" size={14} /> Play
 								</Button>
 							)}
-							{!isRemote && (
+							{!isRemote && !isPreview && (
 								<Button
 									variant={inWatchlist ? 'secondary' : 'ghost'}
 									size="lg"
@@ -523,7 +533,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									)}
 								</Button>
 							)}
-							{!isRemote && (
+							{!isRemote && !isPreview && (
 								<Button
 									variant="ghost"
 									size="lg"
@@ -546,7 +556,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 							>
 								<Icon name="search" size={14} /> See Similar
 							</Button>
-							{!isRemote && (
+							{!isRemote && !isPreview && (
 								<MovieOptionsMenu movie={movie} onMovieUpdate={handleMovieUpdate} />
 							)}
 						</div>
@@ -913,5 +923,65 @@ export function MovieDetail({ id }: MovieDetailProps) {
 				/>
 			)}
 		</div>
+	);
+}
+
+/**
+ * Preview-mode action bar shown when the movie isn't playable from
+ * this server (source = 'external' or 'bookmark'). Replaces the Play
+ * / Watchlist / Share trio with a Bookmark toggle.
+ */
+function PreviewActions({ movie }: { movie: Movie }) {
+	const initialBookmarked = movie.source === 'bookmark';
+	const [bookmarked, setBookmarked] = useState<boolean>(initialBookmarked);
+	const [busy, setBusy] = useState(false);
+
+	const toggle = useCallback(async () => {
+		if (busy) return;
+		setBusy(true);
+		try {
+			if (bookmarked) {
+				await bookmarksService.remove(movie.id);
+				setBookmarked(false);
+				notifySuccess(`Removed bookmark: ${movie.title}`);
+			} else {
+				await bookmarksService.add({
+					tmdbId: movie.tmdbId ?? null,
+					imdbId: movie.imdbId ?? null,
+					title: movie.title,
+					year: movie.year ?? null,
+				});
+				setBookmarked(true);
+				notifySuccess(`Bookmarked: ${movie.title}`);
+			}
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed');
+		} finally {
+			setBusy(false);
+		}
+	}, [bookmarked, busy, movie]);
+
+	return (
+		<>
+			<span class={styles.previewBadge}>
+				<Icon name="search" size={12} /> Preview · Not in library
+			</span>
+			<Button
+				variant={bookmarked ? 'secondary' : 'primary'}
+				size="lg"
+				onClick={toggle}
+				disabled={busy}
+			>
+				{bookmarked ? (
+					<>
+						<Icon name="check" size={14} /> Bookmarked
+					</>
+				) : (
+					<>
+						<Icon name="star" size={14} /> Bookmark for later
+					</>
+				)}
+			</Button>
+		</>
 	);
 }

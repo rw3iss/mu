@@ -24,7 +24,9 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 	const [busy, setBusy] = useState(false);
 
 	const goToDetail = () => {
-		if (!isOwned) return;
+		// Library + not-owned movies share /movie/:id. The detail page
+		// renders in "preview" mode (no Play button, Bookmark instead
+		// of Watchlist, etc.) when the movie's source isn't 'library'.
 		route(`/movie/${movie.movieId}`);
 	};
 	const handleSeed = (e: MouseEvent) => {
@@ -59,6 +61,10 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 
 	const scorePct = Math.round(movie.score * 100);
 	const reason = movie.explanation[0];
+	const ratingLabel = movie.rating != null && movie.rating > 0
+		? `${movie.ratingSource === 'imdb' ? 'IMDB' : 'TMDB'} ${movie.rating.toFixed(1)}`
+		: null;
+	const votesLabel = movie.votes != null && movie.votes > 0 ? formatVotes(movie.votes) : null;
 
 	return (
 		<div
@@ -69,6 +75,11 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 		>
 			<div class={styles.posterWrap}>
 				{scorePct > 0 && <span class={styles.scoreBadge}>{scorePct}%</span>}
+				{ratingLabel && (
+					<span class={styles.ratingBadge} title={`${ratingLabel}${votesLabel ? ` · ${votesLabel} votes` : ''}`}>
+						★ {movie.rating!.toFixed(1)}
+					</span>
+				)}
 				{!isOwned && <span class={styles.notOwnedBadge}>Not in library</span>}
 				{movie.enriching && <span class={styles.enrichingBadge}>Enriching…</span>}
 				<SmartImage
@@ -97,6 +108,8 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 				<div class={styles.title}>{movie.title}</div>
 				<div class={styles.meta}>
 					{movie.year ?? '—'}
+					{ratingLabel && <span class={styles.metaPill}>{ratingLabel}</span>}
+					{votesLabel && <span class={styles.metaPillMuted}>{votesLabel} votes</span>}
 					{movie.usedSources.length > 0 && (
 						<span class={styles.sources}>{movie.usedSources.slice(0, 2).join(' · ')}</span>
 					)}
@@ -105,4 +118,10 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 			</div>
 		</div>
 	);
+}
+
+function formatVotes(n: number): string {
+	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+	if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+	return String(n);
 }

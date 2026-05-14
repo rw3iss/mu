@@ -27,6 +27,7 @@ export interface MovieWithMetadata {
 	companies: string[];
 	tmdbRating: number | null;
 	imdbRating: number | null;
+	tmdbVotes: number | null;
 }
 
 /** Per-strategy raw score for one candidate. */
@@ -59,6 +60,12 @@ export interface ScoredMovie {
 	tmdbId?: number | null;
 	/** True when the row is still a stub (no metadata yet). */
 	enriching?: boolean;
+	/** Best-available popularity signal. IMDB preferred, TMDB fallback. */
+	rating?: number | null;
+	/** Whether the rating is from IMDB or TMDB (for the badge label). */
+	ratingSource?: 'imdb' | 'tmdb' | null;
+	/** Vote count from whichever rating source we used. */
+	votes?: number | null;
 }
 
 export type IncludeMode = 'owned' | 'notOwned' | 'all';
@@ -174,5 +181,6 @@ export function hydrate(
 		companies: parseArr(metadata?.productionCompanies),
 		tmdbRating: metadata?.tmdbRating ?? null,
 		imdbRating: metadata?.imdbRating ?? null,
+		tmdbVotes: metadata?.tmdbVotes ?? null,
 	};
 }

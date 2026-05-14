@@ -432,6 +432,7 @@ export class MoviesService {
 			contentRating: movie.contentRating ?? undefined,
 			language: movie.language ?? undefined,
 			country: movie.country ?? undefined,
+			source: movie.source ?? 'library',
 			imdbId: movie.imdbId ?? undefined,
 			tmdbId: movie.tmdbId ?? undefined,
 			hidden: movie.hidden ?? false,

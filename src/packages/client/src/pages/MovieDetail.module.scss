@@ -318,6 +318,21 @@
   letter-spacing: 0.5px;
 }
 
+.previewBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  background: rgba(245, 158, 11, 0.18);
+  color: rgb(252, 211, 77);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 .actions {
   display: flex;
   align-items: center;
