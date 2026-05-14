@@ -33,10 +33,18 @@ export class GroupingController {
 	listParents() {
 		const parents = this.repo.listParents();
 		return {
-			groups: parents.map((p) => ({
-				...p,
-				subgroupCount: this.repo.listChildren(p.id).length,
-			})),
+			groups: parents.map((p) => {
+				const summary = this.repo.getParentSummary(p.id);
+				return {
+					...p,
+					subgroupCount: this.repo.listChildren(p.id).length,
+					totalMembers: summary.totalMembers,
+					// Use the group's own poster if set, otherwise borrow
+					// one from a member movie so the Library tile grid
+					// has something to show.
+					posterUrl: p.posterUrl ?? summary.representativePosterUrl,
+				};
+			}),
 		};
 	}
 

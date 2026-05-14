@@ -41,6 +41,37 @@ export class GroupsRepository {
 			.all();
 	}
 
+	/**
+	 * For a single parent group, return:
+	 *   - totalMembers: sum of movies across every subgroup
+	 *   - representativePosterUrl: the first non-null poster URL from
+	 *     any member movie (preferring earliest ordinal)
+	 *
+	 * Used by the Library "Collections" tile grid so each parent tile
+	 * has a real poster even though we don't populate group.posterUrl
+	 * directly.
+	 */
+	getParentSummary(parentId: string): {
+		totalMembers: number;
+		representativePosterUrl: string | null;
+	} {
+		const row = this.database.db
+			.select({
+				totalMembers: sql<number>`COUNT(${movies.id})`,
+				poster: sql<
+					string | null
+				>`(SELECT poster_url FROM movies WHERE group_id IN (SELECT id FROM movie_groups WHERE parent_group_id = ${parentId}) AND poster_url IS NOT NULL ORDER BY group_episode_ordinal LIMIT 1)`,
+			})
+			.from(movies)
+			.innerJoin(movieGroups, eq(movieGroups.id, movies.groupId))
+			.where(eq(movieGroups.parentGroupId, parentId))
+			.get();
+		return {
+			totalMembers: row?.totalMembers ?? 0,
+			representativePosterUrl: row?.poster ?? null,
+		};
+	}
+
 	listUnsure(): MovieGroup[] {
 		return this.database.db
 			.select()

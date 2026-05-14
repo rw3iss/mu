@@ -2,6 +2,25 @@
   animation: fadeIn 300ms ease;
 }
 
+.groupTileGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.groupsLoading,
+.groupsEmpty {
+  margin-top: 1rem;
+  padding: 3rem 1rem;
+  text-align: center;
+  background: var(--color-bg-panel, rgba(255, 255, 255, 0.02));
+  border: 1px dashed var(--color-border, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
 .header {
   display: flex;
   align-items: center;

@@ -2,13 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import {
+	fetchParentGroups,
 	groupedOnly,
+	groupsLoaded,
 	groupViewEnabled,
+	invalidateGroups,
+	parentGroups,
 	toggleGroupedOnly,
 	toggleGroupView,
 } from '@/state/groups.state';
 import type { BulkAction } from '@/components/movie/BulkActionsBar';
 import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
+import { GroupTile } from '@/components/movie/GroupTile';
 import { MovieGrid } from '@/components/movie/MovieGrid';
 import { useDebounce } from '@/hooks/useDebounce';
 import { PluginSlot } from '@/plugins/PluginSlot';
@@ -160,6 +165,13 @@ export function Library(_props: LibraryProps) {
 			}
 		});
 		loadGenres();
+
+		// If the user persisted "collections only" in their localStorage,
+		// load the parent groups right away so the tile grid has data on
+		// first paint rather than the spinner.
+		if (groupedOnly.value) {
+			void fetchParentGroups();
+		}
 
 		// Subscribe to live library events so new movies appear automatically
 		libraryEvents.start();
@@ -419,14 +431,22 @@ export function Library(_props: LibraryProps) {
 						class={`${styles.editBtn} ${groupedOnly.value ? styles.active : ''}`}
 						onClick={() => {
 							toggleGroupedOnly();
-							// Filter is server-side; re-fetch from page 1.
-							fetchMovies(1);
+							if (groupedOnly.value) {
+								// Switching into collections view — fetch parents
+								// (or refresh if stale) so the tile grid renders
+								// straight away.
+								invalidateGroups();
+								void fetchParentGroups();
+							} else {
+								// Back to normal library: refetch movies.
+								fetchMovies(1);
+							}
 						}}
 						aria-label="Show only grouped items"
 						title={
 							groupedOnly.value
-								? 'Showing only series / collections — click to show everything'
-								: 'Click to show only series / collections'
+								? 'Showing series / collections — click to show every item individually'
+								: 'Click to show series / collections as tiles'
 						}
 					>
 						<Icon name="film" />
@@ -492,20 +512,35 @@ export function Library(_props: LibraryProps) {
 				/>
 			)}
 
-			{/* Movie Grid */}
-			<MovieGrid
-				movies={movies.value}
-				isLoading={isLoading.value}
-				viewMode={viewMode.value}
-				selectionMode={editMode}
-				selectedIds={selectedIds}
-				onToggleSelect={handleToggleSelect}
-				emptyMessage={
-					searchQuery.value
-						? `No results for "${searchQuery.value}"`
-						: 'Your library is empty'
-				}
-			/>
+			{/* Movie Grid OR Group tiles, depending on the mode toggle. */}
+			{groupedOnly.value ? (
+				<div class={styles.groupTileGrid}>
+					{!groupsLoaded.value && parentGroups.value.length === 0 ? (
+						<div class={styles.groupsLoading}>Loading collections…</div>
+					) : parentGroups.value.length === 0 ? (
+						<div class={styles.groupsEmpty}>
+							No collections yet. Run <strong>Settings → Admin → Group Similar
+							Items</strong> to detect series + collections from your library.
+						</div>
+					) : (
+						parentGroups.value.map((g) => <GroupTile key={g.id} group={g} />)
+					)}
+				</div>
+			) : (
+				<MovieGrid
+					movies={movies.value}
+					isLoading={isLoading.value}
+					viewMode={viewMode.value}
+					selectionMode={editMode}
+					selectedIds={selectedIds}
+					onToggleSelect={handleToggleSelect}
+					emptyMessage={
+						searchQuery.value
+							? `No results for "${searchQuery.value}"`
+							: 'Your library is empty'
+					}
+				/>
+			)}
 
 			{/* Pagination */}
 			{totalPages.value > 1 && (

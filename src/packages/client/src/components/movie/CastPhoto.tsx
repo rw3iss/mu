@@ -148,9 +148,17 @@ export function CastPhoto({
 						}}
 						onMouseEnter={cancelClose}
 						onMouseLeave={scheduleClose}
-						onClick={(e: Event) => e.stopPropagation()}
+						onClick={(e: MouseEvent) => {
+							// Click on the popout closes it — same effect as the
+							// hover-out grace timer firing. Swallow propagation so
+							// the InfoPanel / MovieDetail underneath stays open.
+							e.stopPropagation();
+							e.preventDefault();
+							cancelClose();
+							setOpen(false);
+						}}
 						role="dialog"
-						aria-label={`${name}'s photo`}
+						aria-label={`${name}'s photo — click to close`}
 					>
 						{profileUrl ? (
 							<img src={profileUrl} alt={name} />

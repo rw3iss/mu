@@ -24,6 +24,8 @@ export interface MovieGroup {
 	updatedAt: string;
 	/** Optional, populated by /groups list endpoint. */
 	subgroupCount?: number;
+	/** Total movie count across every subgroup under this parent. */
+	totalMembers?: number;
 }
 
 export interface AltParent {
