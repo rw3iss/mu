@@ -14,8 +14,10 @@ import {
 	includeMode,
 	isLoading,
 	removeSeed,
+	restoreDiscoverScroll,
 	results,
 	runDiscover,
+	saveDiscoverScroll,
 	seedLabels,
 	seedMovieIds,
 	setFilters,
@@ -94,7 +96,24 @@ export function Discover(_props: DiscoverProps) {
 		}
 
 		moviesService.getGenres().then(setGenres).catch(() => setGenres([]));
-		runDiscover();
+		// Re-fetch then restore scroll once results have rendered. We
+		// look at the in-memory results length too — if the user is
+		// returning from a movie detail with state already populated,
+		// no network call is needed before restoring.
+		const restore = restoreDiscoverScroll();
+		runDiscover().then(() => {
+			if (restore != null) {
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => window.scrollTo(0, restore));
+				});
+			}
+		});
+
+		// Save scroll position on unmount so the next /discover mount
+		// can put us back where we were.
+		return () => {
+			saveDiscoverScroll();
+		};
 	}, []);
 
 	// Re-fetch whenever seeds, filters, or include mode change.

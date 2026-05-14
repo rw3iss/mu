@@ -21,6 +21,43 @@ export const errorMessage = signal<string | null>(null);
 export const usedSources = signal<string[]>([]);
 export const enrichmentsQueued = signal<number>(0);
 
+/**
+ * Save the scroll position the next time the user navigates away
+ * from /discover — and restore it on mount. Mirrors the Library
+ * page's saveLibraryScroll / restoreLibraryScroll pattern but uses
+ * sessionStorage so the position only sticks for the current tab.
+ */
+const SCROLL_KEY = 'mu_discover_scroll';
+
+export function saveDiscoverScroll(): void {
+	try {
+		sessionStorage.setItem(
+			SCROLL_KEY,
+			JSON.stringify({ scrollY: window.scrollY, savedAt: Date.now() }),
+		);
+	} catch {}
+}
+
+export function restoreDiscoverScroll(): number | null {
+	try {
+		const raw = sessionStorage.getItem(SCROLL_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as { scrollY?: number; savedAt?: number };
+		if (typeof parsed.scrollY !== 'number') return null;
+		// Stale scroll (older than 30 min) → ignore.
+		if (parsed.savedAt && Date.now() - parsed.savedAt > 30 * 60 * 1000) return null;
+		return parsed.scrollY;
+	} catch {
+		return null;
+	}
+}
+
+export function clearDiscoverScroll(): void {
+	try {
+		sessionStorage.removeItem(SCROLL_KEY);
+	} catch {}
+}
+
 export function setIncludeMode(mode: IncludeMode): void {
 	includeMode.value = mode;
 }

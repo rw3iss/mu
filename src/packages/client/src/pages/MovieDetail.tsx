@@ -12,6 +12,7 @@ import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { RatingWidget } from '@/components/movie/RatingWidget';
 import { ShareMovieModal } from '@/components/movie/ShareMovieModal';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
+import { TrailerSection } from '@/components/movie/TrailerSection';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { type AudioProfile, audioProfilesService } from '@/services/audio-profiles.service';
@@ -569,6 +570,12 @@ export function MovieDetail({ id }: MovieDetailProps) {
 							</div>
 						)}
 
+						{/* Trailer (collapsible, lazy-loaded iframe) */}
+						<TrailerSection
+							trailerUrl={movie.trailerUrl}
+							posterUrl={movie.backdropUrl || movie.posterUrl}
+						/>
+
 						{/* Details */}
 						{(movie.writers?.length ||
 							movie.productionCompanies?.length ||
@@ -642,21 +649,9 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											</span>
 										</>
 									)}
-									{movie.trailerUrl && (
-										<>
-											<span class={styles.detailLabel}>Trailer</span>
-											<span class={styles.detailValue}>
-												<a
-													href={movie.trailerUrl}
-													target="_blank"
-													rel="noopener noreferrer"
-													class={styles.trailerLink}
-												>
-													Watch on YouTube
-												</a>
-											</span>
-										</>
-									)}
+									{/* Trailer moved out to a dedicated collapsible
+										section above. Detail grid keeps its other
+										rows. */}
 								</div>
 							</div>
 						)}

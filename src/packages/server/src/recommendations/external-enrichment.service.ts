@@ -6,6 +6,7 @@ import { movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import type { JobRecord } from '../jobs/job.interface.js';
+import { OmdbProvider } from '../metadata/providers/omdb.provider.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { BudgetExhausted, RateLimitExceeded } from '../providers/exceptions.js';
 import { RateLimitService } from '../providers/rate-limit.service.js';
@@ -36,6 +37,7 @@ export class ExternalEnrichmentService implements OnModuleInit {
 		private readonly events: EventsService,
 		private readonly jobs: JobManagerService,
 		private readonly tmdb: TmdbProvider,
+		private readonly omdb: OmdbProvider,
 		private readonly rateLimit: RateLimitService,
 	) {}
 
@@ -133,6 +135,36 @@ export class ExternalEnrichmentService implements OnModuleInit {
 			.where(eq(movies.id, movieId))
 			.run();
 
+		// Optional OMDB augmentation — adds IMDB rating + RT + Metacritic
+		// when:
+		//   - TMDB returned an imdb_id we can query by
+		//   - OMDB key is configured (provider returns null otherwise)
+		//   - the call itself doesn't fail (any error is swallowed; we
+		//     still ship TMDB-only metadata).
+		let omdbAugment: {
+			imdbRating: number | null;
+			imdbVotes: number | null;
+			rottenTomatoesScore: number | null;
+			metacriticScore: number | null;
+		} | null = null;
+		if (details.imdb_id) {
+			try {
+				const omdbData = await this.omdb.getByImdbId(details.imdb_id);
+				if (omdbData) {
+					omdbAugment = {
+						imdbRating: omdbData.imdbRating,
+						imdbVotes: omdbData.imdbVotes,
+						rottenTomatoesScore: omdbData.rottenTomatoesScore,
+						metacriticScore: omdbData.metacriticScore,
+					};
+				}
+			} catch (err: any) {
+				this.logger.debug(
+					`OMDB augment failed for ${details.imdb_id} (non-fatal): ${err?.message}`,
+				);
+			}
+		}
+
 		const metaValues = {
 			id: crypto.randomUUID(),
 			movieId,
@@ -162,7 +194,12 @@ export class ExternalEnrichmentService implements OnModuleInit {
 			revenue: details.revenue ?? null,
 			tmdbRating: details.vote_average ?? null,
 			tmdbVotes: details.vote_count ?? null,
-			source: 'tmdb',
+			// OMDB augment — null when OMDB isn't configured / unavailable.
+			imdbRating: omdbAugment?.imdbRating ?? null,
+			imdbVotes: omdbAugment?.imdbVotes ?? null,
+			rottenTomatoesScore: omdbAugment?.rottenTomatoesScore ?? null,
+			metacriticScore: omdbAugment?.metacriticScore ?? null,
+			source: omdbAugment ? 'tmdb+omdb' : 'tmdb',
 			fetchedAt: now,
 			updatedAt: now,
 		};
