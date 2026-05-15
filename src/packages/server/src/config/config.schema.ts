@@ -39,6 +39,18 @@ export const configSchema = z.object({
 		})
 		.default(() => ({}) as any),
 
+	logs: z
+		.object({
+			/**
+			 * Directory containing server log files. Defaults to
+			 * `<dataDir>/logs`. Override on platforms where the supervisor
+			 * (NSSM, systemd, …) writes logs to a fixed path that doesn't
+			 * follow dataDir — set MU_LOGS_DIR or `logs.dir` in config.yml.
+			 */
+			dir: z.string().default(''),
+		})
+		.default(() => ({}) as any),
+
 	auth: z.object({
 		jwtSecret: z.string().min(32),
 		jwtExpiresIn: z.string().default('7d'),

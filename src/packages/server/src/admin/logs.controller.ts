@@ -64,7 +64,9 @@ export class LogsController {
 		);
 
 		const dataDir = this.config.get<string>('dataDir', './data');
-		const filePath = path.resolve(dataDir, 'logs', fileName);
+		const logsDirOverride = this.config.get<string>('logs.dir', '') || null;
+		const logsDir = logsDirOverride ?? path.resolve(dataDir, 'logs');
+		const filePath = path.resolve(logsDir, fileName);
 
 		try {
 			const stat = await fs.stat(filePath);
@@ -125,7 +127,8 @@ export class LogsController {
 	async list(@Req() req: FastifyRequest) {
 		this.authenticate(req);
 		const dataDir = this.config.get<string>('dataDir', './data');
-		const dir = path.resolve(dataDir, 'logs');
+		const logsDirOverride = this.config.get<string>('logs.dir', '') || null;
+		const dir = logsDirOverride ?? path.resolve(dataDir, 'logs');
 		const sources: Array<{ key: string; fileName: string; bytes: number; exists: boolean }> = [];
 		for (const [key, fileName] of Object.entries(LOG_SOURCES)) {
 			const p = path.resolve(dir, fileName);

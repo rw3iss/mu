@@ -186,6 +186,14 @@ export function loadConfig(): MuConfig {
 		(merged.auth as Record<string, unknown>).apiToken = envAuthApiToken;
 	}
 
+	// logs.dir env override — for platforms (NSSM, systemd) that redirect
+	// stdout/stderr to a path not under <dataDir>/logs.
+	const envLogsDir = process.env.MU_LOGS_DIR ?? process.env.MU_LOGS__DIR;
+	if (envLogsDir) {
+		if (!merged.logs || typeof merged.logs !== 'object') merged.logs = {};
+		(merged.logs as Record<string, unknown>).dir = envLogsDir;
+	}
+
 	// Validate against the schema.
 	const parsed = configSchema.parse(merged);
 
