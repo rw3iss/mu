@@ -50,6 +50,12 @@ export const configSchema = z.object({
 			.default(7 * 24 * 60 * 60 * 1000),
 		bcryptRounds: z.coerce.number().int().min(4).max(31).default(12),
 		allowRegistration: z.boolean().default(true),
+		/**
+		 * Opaque token consumed by unattended internal services
+		 * (e.g. the scheduled-debugger remote routine) to hit
+		 * `/admin/logs/*`. Empty disables the endpoint entirely.
+		 */
+		apiToken: z.string().default(''),
 	}),
 
 	media: z
