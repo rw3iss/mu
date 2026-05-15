@@ -41,6 +41,21 @@ export interface TmdbCollectionSearchResult {
 	backdrop_path: string | null;
 }
 
+export interface TmdbEpisodeDetails {
+	id: number;
+	name: string;
+	overview: string;
+	air_date: string | null;
+	episode_number: number;
+	season_number: number;
+	runtime: number | null;
+	still_path: string | null;
+	vote_average: number;
+	vote_count: number;
+	crew?: { id: number; name: string; job: string; department: string }[];
+	guest_stars?: { id: number; name: string; character: string; profile_path: string | null }[];
+}
+
 export interface TmdbTvDetails {
 	id: number;
 	name: string;
@@ -266,6 +281,50 @@ export class TmdbProvider {
 			return data;
 		} catch (err: any) {
 			this.logger.error(`TMDB TV details error: ${err.message}`);
+			return null;
+		}
+	}
+
+	/**
+	 * Fetch full details for a single TV episode. Used when a movie row
+	 * is actually a TV episode (SxxEyy detected in the filename) — we
+	 * pull the episode's name, overview, runtime, and still image to
+	 * apply onto the row.
+	 */
+	async getTvEpisodeDetails(
+		tmdbTvId: number,
+		seasonNumber: number,
+		episodeNumber: number,
+	): Promise<TmdbEpisodeDetails | null> {
+		if (!this.apiKey) return null;
+
+		const cacheKey = `tv:episode:${tmdbTvId}:${seasonNumber}:${episodeNumber}`;
+		const cached = await this.cache.get<TmdbEpisodeDetails>(
+			CACHE_NAMESPACES.METADATA,
+			cacheKey,
+		);
+		if (cached) return cached;
+
+		const params = new URLSearchParams({
+			api_key: this.apiKey,
+			append_to_response: 'credits',
+		});
+
+		try {
+			const response = await fetch(
+				`${TMDB_BASE_URL}/tv/${tmdbTvId}/season/${seasonNumber}/episode/${episodeNumber}?${params}`,
+			);
+			if (!response.ok) {
+				this.logger.warn(
+					`TMDB episode details failed for ${tmdbTvId} S${seasonNumber}E${episodeNumber}: ${response.status}`,
+				);
+				return null;
+			}
+			const data = (await response.json()) as TmdbEpisodeDetails;
+			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, data, CACHE_TTL.METADATA);
+			return data;
+		} catch (err: any) {
+			this.logger.error(`TMDB episode details error: ${err.message}`);
 			return null;
 		}
 	}

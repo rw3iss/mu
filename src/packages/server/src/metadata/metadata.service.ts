@@ -1,5 +1,4 @@
 import { existsSync, statSync } from 'node:fs';
-import path from 'node:path';
 import { CACHE_NAMESPACES, nowISO, WsEvent } from '@mu/shared';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
@@ -10,19 +9,16 @@ import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { MatchCandidatesRepository } from './match-candidates.repository.js';
 import {
-	extractYear,
+	buildTitleQuery,
 	type MatchCandidate,
 	resolveMatch,
+	type TitleQuery,
 } from './matching/index.js';
 import { OmdbProvider, OmdbSearchResult } from './providers/omdb.provider.js';
-import {
-	type TmdbCollectionSearchResult,
-	type TmdbTvSearchResult,
-	TmdbProvider,
-} from './providers/tmdb.provider.js';
+import { TmdbProvider } from './providers/tmdb.provider.js';
 
 /** Provenance tags used in `metadata_match_candidates.provider`. */
-type ProviderTag = 'tmdb' | 'omdb';
+type ProviderTag = 'tmdb' | 'omdb' | 'tmdb-tv-episode';
 
 interface MovieCandidate extends MatchCandidate {
 	provider: ProviderTag;
@@ -70,17 +66,20 @@ export class MetadataService {
 			.from(movieFiles)
 			.where(eq(movieFiles.movieId, movieId))
 			.get();
-		const fileDurationMinutes = file?.durationSeconds
-			? Math.round(file.durationSeconds / 60)
-			: null;
 
-		// Best-effort year recovery: stored → filename → folder name.
-		const resolvedYear =
-			extractYear({
-				storedYear: movie.year,
-				filePath: file?.filePath,
-				folderPath: file?.filePath ? path.dirname(file.filePath) : null,
-			}) ?? null;
+		// Classify: is this row actually a TV episode (SxxEyy in
+		// title/filename) or a regular movie? Drives which providers
+		// we hit below.
+		const query = buildTitleQuery({
+			storedTitle: movie.title,
+			storedYear: movie.year,
+			filePath: file?.filePath ?? null,
+			fileName: file?.fileName ?? null,
+			durationSeconds: file?.durationSeconds ?? null,
+		});
+		const resolvedYear = query.year;
+		const fileDurationMinutes =
+			query.kind === 'movie' ? query.durationMinutes : null;
 
 		// --- 1. Fast path: known IDs --------------------------------------
 		if (movie.tmdbId || movie.imdbId) {
@@ -105,10 +104,22 @@ export class MetadataService {
 			return result;
 		}
 
-		// --- 2. Parallel title search across providers --------------------
+		// --- 2a. TV-episode branch: SxxEyy detected in filename/title ----
+		// Try the TV-episode path first when the preprocessor classified
+		// this row that way. If the show search yields nothing, fall
+		// through to the movie path — some genuine movies coincidentally
+		// embed "S01" in their release names.
+		if (query.kind === 'tv-episode') {
+			const tvOutcome = await this.resolveAsTvEpisode(movieId, movie.title, query);
+			if (tvOutcome !== 'fall-through') return tvOutcome;
+		}
+
+		// --- 2b. Parallel title search across providers (movie path) ------
+		const searchTitle =
+			query.kind === 'movie' ? query.sanitisedTitle || query.title : movie.title;
 		const [tmdbSearch, omdbSearch] = await Promise.allSettled([
-			this.tmdb.searchMovie(movie.title, resolvedYear ?? undefined),
-			this.omdb.searchByTitle(movie.title, resolvedYear ?? undefined),
+			this.tmdb.searchMovie(searchTitle, resolvedYear ?? undefined),
+			this.omdb.searchByTitle(searchTitle, resolvedYear ?? undefined),
 		]);
 		const tmdbResults =
 			tmdbSearch.status === 'fulfilled' ? (tmdbSearch.value ?? []) : [];
@@ -195,6 +206,219 @@ export class MetadataService {
 	}
 
 	/**
+	 * TV-episode resolution path. Search TMDB TV for the show prefix,
+	 * run the matcher, then on confident match fetch the specific
+	 * episode and apply its fields onto the movie row.
+	 *
+	 * Returns:
+	 *   - The applied metadata row on success.
+	 *   - `null` for ambiguous (candidates persisted) or no-match.
+	 *   - `'fall-through'` so the caller knows to try the movie path
+	 *     when TMDB had zero TV hits — a SxxEyy-shaped string in a
+	 *     genuine movie filename shouldn't black-hole the whole refresh.
+	 */
+	private async resolveAsTvEpisode(
+		movieId: string,
+		entityLabel: string,
+		query: Extract<TitleQuery, { kind: 'tv-episode' }>,
+	): Promise<any | 'fall-through'> {
+		const tvResults = await this.tmdb.searchTv(
+			query.showTitle,
+			query.year ?? undefined,
+		);
+		if (!tvResults || tvResults.length === 0) {
+			this.logger.debug(
+				`TV search for "${query.showTitle}" returned no hits — falling back to movie path`,
+			);
+			return 'fall-through';
+		}
+
+		const candidates: MovieCandidate[] = tvResults.map((r) => {
+			const candYear = r.first_air_date
+				? parseInt(r.first_air_date.slice(0, 4), 10)
+				: null;
+			return {
+				provider: 'tmdb-tv-episode',
+				externalId: r.id,
+				title: r.name,
+				year: Number.isFinite(candYear) ? candYear : null,
+				runtimeMinutes: null,
+				popularity: r.popularity ?? null,
+				posterUrl: this.tmdb.getImageUrl(r.poster_path),
+				overview: r.overview,
+				tmdbId: r.id,
+			};
+		});
+
+		const outcome = await resolveMatch<MovieCandidate, any>({
+			entityType: 'movie',
+			entityId: movieId,
+			entityLabel: `${entityLabel} (TV)`,
+			candidates,
+			query: {
+				title: query.showTitle,
+				year: query.year,
+				// Single-episode runtime doesn't help match a SHOW — leave null.
+				durationMinutes: null,
+			},
+			repository: this.matchCandidates,
+			logger: this.logger,
+			overviewOf: (c) => c.overview,
+			onAmbiguous: () => {
+				this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+					movieId,
+					source: 'metadata-candidates',
+				});
+			},
+			onConfident: async (winner) => {
+				return this.applyTvEpisodeToMovie(movieId, Number(winner.externalId), query);
+			},
+		});
+
+		return outcome.kind === 'applied' ? outcome.result : null;
+	}
+
+	/**
+	 * Fetch TMDB show + episode details and write the episode's fields
+	 * onto the movie row. Show-level fields (cast, IMDB ID for the show
+	 * itself, posters) go into movie_metadata under a tv-episode source
+	 * tag so the UI gets the full picture.
+	 */
+	private async applyTvEpisodeToMovie(
+		movieId: string,
+		tmdbTvId: number,
+		query: Extract<TitleQuery, { kind: 'tv-episode' }>,
+	): Promise<any | null> {
+		const [tvDetails, episode] = await Promise.all([
+			this.tmdb.getTvDetails(tmdbTvId),
+			this.tmdb.getTvEpisodeDetails(tmdbTvId, query.season, query.episode),
+		]);
+		if (!tvDetails || !episode) {
+			this.logger.warn(
+				`TV episode resolve: tvDetails=${!!tvDetails} episode=${!!episode} tmdbTvId=${tmdbTvId} S${query.season}E${query.episode}`,
+			);
+			return null;
+		}
+
+		const now = nowISO();
+		const episodeTitle =
+			`${tvDetails.name} - S${pad2(query.season)}E${pad2(query.episode)} - ${episode.name}`;
+		const showImdbId = tvDetails.external_ids?.imdb_id ?? null;
+		const stillUrl = this.tmdb.getImageUrl(episode.still_path, 'w500');
+		const backdropUrl = this.tmdb.getImageUrl(tvDetails.backdrop_path, 'w1280');
+		const releaseDate = episode.air_date || tvDetails.first_air_date || null;
+		const year = releaseDate ? parseInt(releaseDate.slice(0, 4), 10) : null;
+
+		this.database.db
+			.update(movies)
+			.set({
+				title: episodeTitle,
+				originalTitle:
+					tvDetails.original_name && tvDetails.original_name !== tvDetails.name
+						? tvDetails.original_name
+						: null,
+				overview: episode.overview || tvDetails.overview || null,
+				tagline: tvDetails.tagline || null,
+				runtimeMinutes:
+					episode.runtime ||
+					tvDetails.episode_run_time?.[0] ||
+					null,
+				releaseDate,
+				year: year && !Number.isNaN(year) ? year : null,
+				// Use the still as poster; TV show backdrop as backdrop.
+				// Falls back to the show's own poster if the episode has no still.
+				posterUrl: stillUrl || this.tmdb.getImageUrl(tvDetails.poster_path),
+				backdropUrl,
+				thumbnailUrl: stillUrl,
+				tmdbId: tmdbTvId,
+				imdbId: showImdbId,
+				language: null,
+				country: null,
+				contentRating: null,
+				updatedAt: now,
+			})
+			.where(eq(movies.id, movieId))
+			.run();
+
+		const directors = (episode.crew ?? [])
+			.filter((c) => c.job === 'Director')
+			.map((c) => c.name);
+		const writers = (episode.crew ?? [])
+			.filter((c) => c.department === 'Writing')
+			.map((c) => c.name);
+		const cast = (tvDetails.credits?.cast ?? []).slice(0, 20).map((c) => ({
+			name: c.name,
+			character: c.character,
+			profileUrl: this.tmdb.getImageUrl(c.profile_path, 'w185'),
+			tmdbId: c.id,
+		}));
+
+		const metaValues = {
+			movieId,
+			genres: JSON.stringify(tvDetails.genres?.map((g) => g.name) ?? []),
+			cast: JSON.stringify(cast),
+			directors: JSON.stringify(directors),
+			writers: JSON.stringify(writers),
+			keywords: JSON.stringify(tvDetails.keywords?.results?.map((k) => k.name) ?? []),
+			productionCompanies: JSON.stringify(
+				tvDetails.networks?.map((n) => n.name) ?? [],
+			),
+			budget: null,
+			revenue: null,
+			tmdbRating: episode.vote_average || tvDetails.vote_average || null,
+			tmdbVotes: episode.vote_count || tvDetails.vote_count || null,
+			imdbRating: null,
+			imdbVotes: null,
+			rottenTomatoesScore: null,
+			metacriticScore: null,
+			extendedData: JSON.stringify({
+				kind: 'tv-episode',
+				tmdbTvId,
+				season: query.season,
+				episode: query.episode,
+				episodeTitle: episode.name,
+				airDate: episode.air_date,
+			}),
+			source: 'tmdb-tv-episode',
+			fetchedAt: now,
+			updatedAt: now,
+		};
+
+		const existingMeta = this.database.db
+			.select()
+			.from(movieMetadata)
+			.where(eq(movieMetadata.movieId, movieId))
+			.get();
+
+		if (existingMeta) {
+			this.database.db
+				.update(movieMetadata)
+				.set(metaValues)
+				.where(eq(movieMetadata.id, existingMeta.id))
+				.run();
+		} else {
+			this.database.db
+				.insert(movieMetadata)
+				.values({ id: crypto.randomUUID(), ...metaValues })
+				.run();
+		}
+
+		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+			movieId,
+			source: 'metadata-refresh',
+		});
+		this.logger.log(
+			`Metadata applied for ${movieId}: ${tvDetails.name} S${query.season}E${query.episode} — ${episode.name}`,
+		);
+
+		return this.database.db
+			.select()
+			.from(movieMetadata)
+			.where(eq(movieMetadata.movieId, movieId))
+			.get();
+	}
+
+	/**
 	 * Apply a user-picked candidate. Looks up the row in the candidate
 	 * table, clears all candidates, then runs the regular merge fetch
 	 * with the picked IDs.
@@ -212,6 +436,36 @@ export class MetadataService {
 		}
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
 		if (!movie) throw new NotFoundException(`Movie ${movieId} not found`);
+
+		// TV-episode candidates were saved with provider='tmdb-tv-episode'
+		// and the show's TMDB id. Re-derive the season/episode from the
+		// row's file so the apply hits the right episode.
+		if (provider === 'tmdb-tv-episode') {
+			const file = this.database.db
+				.select()
+				.from(movieFiles)
+				.where(eq(movieFiles.movieId, movieId))
+				.get();
+			const query = buildTitleQuery({
+				storedTitle: movie.title,
+				storedYear: movie.year,
+				filePath: file?.filePath ?? null,
+				fileName: file?.fileName ?? null,
+				durationSeconds: file?.durationSeconds ?? null,
+			});
+			if (query.kind !== 'tv-episode') {
+				throw new NotFoundException(
+					`Candidate is tagged tv-episode but file no longer parses as one (movieId=${movieId})`,
+				);
+			}
+			const result = await this.applyTvEpisodeToMovie(movieId, Number(externalId), query);
+			this.matchCandidates.clear('movie', movieId);
+			this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+				movieId,
+				source: 'metadata-candidate-applied',
+			});
+			return result;
+		}
 
 		const tmdbId = provider === 'tmdb' ? Number(externalId) : null;
 		const imdbId = provider === 'omdb' ? externalId : null;
@@ -700,4 +954,9 @@ function firstNonEmpty(...values: (string | null | undefined)[]): string | null 
 		if (typeof v === 'string' && v.trim().length > 0) return v;
 	}
 	return null;
+}
+
+/** Zero-pad to two digits (1 → "01"). Used for episode titles. */
+function pad2(n: number): string {
+	return n.toString().padStart(2, '0');
 }
