@@ -458,6 +458,8 @@ export class MoviesService {
 			metacriticRating: metadata?.metacriticScore ?? undefined,
 			rating: userRating,
 			inWatchlist,
+			groupId: movie.groupId ?? null,
+			groupEpisodeOrdinal: movie.groupEpisodeOrdinal ?? null,
 		};
 	}
 
