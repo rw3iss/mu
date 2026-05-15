@@ -177,6 +177,15 @@ export function loadConfig(): MuConfig {
 		(merged.cache as Record<string, unknown>).streamDir = envCacheDir;
 	}
 
+	// Inject auth.apiToken from MU_AUTH_API_TOKEN (env parser would
+	// lowercase to auth.api.token which doesn't match the camelCase
+	// schema key). Used by the unattended log-tail endpoint.
+	const envAuthApiToken = process.env.MU_AUTH_API_TOKEN ?? process.env.MU_AUTH__APITOKEN;
+	if (envAuthApiToken) {
+		if (!merged.auth || typeof merged.auth !== 'object') merged.auth = {};
+		(merged.auth as Record<string, unknown>).apiToken = envAuthApiToken;
+	}
+
 	// Validate against the schema.
 	const parsed = configSchema.parse(merged);
 
