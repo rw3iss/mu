@@ -166,10 +166,11 @@ export function Library(_props: LibraryProps) {
 		});
 		loadGenres();
 
-		// If the user persisted "collections only" in their localStorage,
-		// load the parent groups right away so the tile grid has data on
-		// first paint rather than the spinner.
-		if (groupedOnly.value) {
+		// Any view that renders group tiles needs the parent list — that's
+		// both the collections-only mode and the mixed mode (tiles above
+		// ungrouped movies). Skip the fetch only when groups are hidden
+		// entirely (groupViewEnabled=false).
+		if (groupViewEnabled.value) {
 			void fetchParentGroups();
 		}
 
@@ -418,17 +419,20 @@ export function Library(_props: LibraryProps) {
 						class={`${styles.editBtn} ${groupViewEnabled.value ? styles.active : ''}`}
 						onClick={() => {
 							toggleGroupView();
-							// If we're in "collections only" mode, flipping this
-							// toggle switches between the tile grid and the
-							// flattened movie grid — both need a fetch.
-							if (groupedOnly.value) {
-								if (groupViewEnabled.value) {
-									invalidateGroups();
-									void fetchParentGroups();
-								} else {
-									fetchMovies(1);
-								}
+							// The "collapse groups" toggle changes what gets
+							// rendered in BOTH groupedOnly modes:
+							//   - groupedOnly=true:  flips tile grid ⇄ flat movies
+							//   - groupedOnly=false: flips mixed (tiles + ungrouped)
+							//                        ⇄ all-individual
+							// Each shape needs its own fetch.
+							if (groupViewEnabled.value) {
+								invalidateGroups();
+								void fetchParentGroups();
 							}
+							// Movies always refetch — the server filter
+							// (groupedOnly vs excludeGrouped vs nothing) changes
+							// with this toggle.
+							fetchMovies(1);
 						}}
 						aria-label="Toggle group view"
 						title={
@@ -529,54 +533,74 @@ export function Library(_props: LibraryProps) {
 				/>
 			)}
 
-			{/* Three rendering modes:
+			{/* Four rendering modes — driven by the two independent toggles:
 			    1. groupedOnly=true  + groupViewEnabled=true  → tile grid of parent groups
-			       (client-side name filter applies the search query)
 			    2. groupedOnly=true  + groupViewEnabled=false → flat MovieGrid of every
-			       group member; server filters via ?groupedOnly=true and ?search=
-			    3. groupedOnly=false                          → normal full-library MovieGrid */}
-			{groupedOnly.value && groupViewEnabled.value ? (
-				(() => {
-					const q = searchQuery.value.trim().toLowerCase();
-					const visibleParents = q
-						? parentGroups.value.filter((g) => g.name.toLowerCase().includes(q))
-						: parentGroups.value;
-					return (
-						<div class={styles.groupTileGrid}>
-							{!groupsLoaded.value && parentGroups.value.length === 0 ? (
-								<div class={styles.groupsLoading}>Loading collections…</div>
-							) : parentGroups.value.length === 0 ? (
-								<div class={styles.groupsEmpty}>
-									No collections yet. Run <strong>Settings → Admin → Group Similar
-									Items</strong> to detect series + collections from your library.
-								</div>
-							) : visibleParents.length === 0 ? (
-								<div class={styles.groupsEmpty}>
-									No collections match &ldquo;{searchQuery.value}&rdquo;.
-								</div>
-							) : (
-								visibleParents.map((g) => <GroupTile key={g.id} group={g} />)
-							)}
-						</div>
-					);
-				})()
-			) : (
-				<MovieGrid
-					movies={movies.value}
-					isLoading={isLoading.value}
-					viewMode={viewMode.value}
-					selectionMode={editMode}
-					selectedIds={selectedIds}
-					onToggleSelect={handleToggleSelect}
-					emptyMessage={
-						searchQuery.value
-							? `No results for "${searchQuery.value}"`
-							: groupedOnly.value
-								? 'No movies belong to a collection yet.'
-								: 'Your library is empty'
-					}
-				/>
-			)}
+			       group member; server filters via ?groupedOnly=true
+			    3. groupedOnly=false + groupViewEnabled=true  → MIXED: parent tiles ABOVE
+			       ungrouped-movie grid (server hides grouped movies via ?excludeGrouped=true
+			       so we don't render the same content twice)
+			    4. groupedOnly=false + groupViewEnabled=false → full library, every movie
+			       individually (grouped + ungrouped) */}
+			{(() => {
+				const q = searchQuery.value.trim().toLowerCase();
+				const visibleParents = q
+					? parentGroups.value.filter((g) => g.name.toLowerCase().includes(q))
+					: parentGroups.value;
+				const showTiles = groupViewEnabled.value;
+				const showMovies = !(groupedOnly.value && groupViewEnabled.value);
+				const mixed = !groupedOnly.value && groupViewEnabled.value;
+
+				return (
+					<>
+						{showTiles && (
+							<div class={styles.groupTileGrid}>
+								{!groupsLoaded.value && parentGroups.value.length === 0 ? (
+									<div class={styles.groupsLoading}>Loading collections…</div>
+								) : parentGroups.value.length === 0 ? (
+									!mixed && (
+										<div class={styles.groupsEmpty}>
+											No collections yet. Run <strong>Settings → Admin → Group
+											Similar Items</strong> to detect series + collections from
+											your library.
+										</div>
+									)
+								) : visibleParents.length === 0 ? (
+									!mixed && (
+										<div class={styles.groupsEmpty}>
+											No collections match &ldquo;{searchQuery.value}&rdquo;.
+										</div>
+									)
+								) : (
+									visibleParents.map((g) => <GroupTile key={g.id} group={g} />)
+								)}
+							</div>
+						)}
+
+						{showMovies && (
+							<MovieGrid
+								movies={movies.value}
+								isLoading={isLoading.value}
+								viewMode={viewMode.value}
+								selectionMode={editMode}
+								selectedIds={selectedIds}
+								onToggleSelect={handleToggleSelect}
+								emptyMessage={
+									searchQuery.value
+										? mixed && visibleParents.length > 0
+											? '' // tiles above carried the result; don't double up with "no results"
+											: `No results for "${searchQuery.value}"`
+										: groupedOnly.value
+											? 'No movies belong to a collection yet.'
+											: mixed
+												? '' // tiles may carry the library; empty movie grid is fine
+												: 'Your library is empty'
+								}
+							/>
+						)}
+					</>
+				);
+			})()}
 
 			{/* Pagination */}
 			{totalPages.value > 1 && (

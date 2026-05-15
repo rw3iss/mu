@@ -106,6 +106,13 @@ export class MoviesService {
 			conditions.push(sql`${movies.groupId} IS NOT NULL`);
 		}
 
+		// Inverse filter — hide every movie that belongs to a group.
+		// Used by the Library "mixed" view, which renders ungrouped
+		// movies plus collapsed group tiles alongside each other.
+		if (String((query as { excludeGrouped?: string }).excludeGrouped) === 'true') {
+			conditions.push(sql`${movies.groupId} IS NULL`);
+		}
+
 		const where = conditions.length > 0 ? and(...conditions) : undefined;
 
 		// Determine sort

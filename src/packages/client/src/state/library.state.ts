@@ -1,6 +1,6 @@
 import { computed, signal } from '@preact/signals';
 import { moviesService } from '@/services/movies.service';
-import { groupedOnly } from './groups.state';
+import { groupedOnly, groupViewEnabled } from './groups.state';
 
 // ============================================
 // Types
@@ -190,6 +190,11 @@ export async function fetchMovies(page = 1): Promise<void> {
 
 		if (groupedOnly.value) {
 			params.groupedOnly = 'true';
+		} else if (groupViewEnabled.value) {
+			// Mixed view: ungrouped movies live in MovieGrid, parent groups
+			// render as tiles above. Server hides anything in a group so
+			// we don't duplicate items already represented by a tile.
+			params.excludeGrouped = 'true';
 		}
 
 		const sf = serverFilter.value;
