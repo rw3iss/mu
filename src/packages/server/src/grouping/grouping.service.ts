@@ -2,13 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { WsEvent } from '@mu/shared';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { type Movie, movieFiles, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
-import type { JobHelpers } from '../jobs/job.interface.js';
+import type { JobHelpers, JobRecord } from '../jobs/job.interface.js';
+import {
+	GROUP_METADATA_JOB,
+	GroupMetadataService,
+	type ResolvedGroupMetadata,
+} from '../metadata/group-metadata.service.js';
+import { MatchCandidatesRepository } from '../metadata/match-candidates.repository.js';
 import { SettingsService } from '../settings/settings.service.js';
 import {
 	DEFAULT_THRESHOLDS,
@@ -52,6 +58,8 @@ export class GroupingService implements OnModuleInit {
 		private readonly settings: SettingsService,
 		private readonly events: EventsService,
 		private readonly jobs: JobManagerService,
+		private readonly groupMetadata: GroupMetadataService,
+		private readonly matchCandidates: MatchCandidatesRepository,
 		sxxexx: SxxExxDetector,
 		folderTree: FolderTreeDetector,
 		multiFile: MultiFileDetector,
@@ -82,6 +90,61 @@ export class GroupingService implements OnModuleInit {
 		this.jobs.registerHandler('grouping-rebuild', async (_job, helpers) =>
 			this.rebuildAllWithProgress(helpers),
 		);
+
+		// Auto-trigger enrichment for newly-created parent groups. The
+		// metadata module is a pure resolver — this orchestrator owns
+		// the write back to movie_groups, so the module direction is
+		// `grouping → metadata`, never the reverse.
+		this.jobs.registerHandler(GROUP_METADATA_JOB, async (job: JobRecord) => {
+			const groupId = job.payload?.groupId as string | undefined;
+			if (!groupId) return { skipped: true };
+			return this.refreshGroupMetadata(groupId).catch((err: any) => {
+				this.logger.warn(`group-metadata job ${groupId} failed: ${err?.message}`);
+				return { groupId, error: err?.message };
+			});
+		});
+	}
+
+	/**
+	 * Resolve TMDB metadata for a parent group and write the resulting
+	 * patch onto the row. Used by the `group-metadata` job auto-trigger
+	 * and by the manual refresh endpoint.
+	 */
+	async refreshGroupMetadata(groupId: string) {
+		const group = this.repo.get(groupId);
+		if (!group) throw new NotFoundException(`Group ${groupId} not found`);
+		const patch = await this.groupMetadata.resolveForGroup(group);
+		if (!patch) return null;
+		this.applyMetadataPatch(groupId, patch);
+		return this.repo.get(groupId);
+	}
+
+	/**
+	 * Apply a user-picked candidate row. Clears the candidate dropdown,
+	 * resolves the picked provider's details, writes the patch.
+	 */
+	async applyGroupMatchCandidate(groupId: string, provider: string, externalId: string) {
+		const row = this.matchCandidates.find('group', groupId, provider, externalId);
+		if (!row) {
+			throw new NotFoundException(
+				`Candidate not found: group=${groupId} provider=${provider} externalId=${externalId}`,
+			);
+		}
+		const patch = await this.groupMetadata.resolveByCandidate(provider, externalId);
+		this.matchCandidates.clear('group', groupId);
+		if (!patch) return null;
+		this.applyMetadataPatch(groupId, patch);
+		return this.repo.get(groupId);
+	}
+
+	private applyMetadataPatch(groupId: string, patch: ResolvedGroupMetadata): void {
+		this.repo.update(groupId, {
+			tmdbTvId: patch.tmdbTvId ?? null,
+			imdbId: patch.imdbId ?? null,
+			posterUrl: patch.posterUrl ?? null,
+			backdropUrl: patch.backdropUrl ?? null,
+			overview: patch.overview ?? null,
+		});
 	}
 
 	// ── Public API ────────────────────────────────────────────

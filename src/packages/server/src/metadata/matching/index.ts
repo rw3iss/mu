@@ -7,5 +7,6 @@ export {
 	type MatcherConfig,
 	type ScoredCandidate,
 } from './matcher.js';
+export { resolveMatch, type ResolveOutcome } from './resolve.js';
 export { normalizeTitle, titleSimilarity } from './title-normalizer.js';
 export { extractYear, extractYearFromString } from './year-extractor.js';

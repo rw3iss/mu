@@ -1,5 +1,4 @@
 import { forwardRef, Module } from '@nestjs/common';
-import { GroupingModule } from '../grouping/grouping.module.js';
 import { LibraryModule } from '../library/library.module.js';
 import { MediaModule } from '../media/media.module.js';
 import { FileProbeService } from './file-probe.service.js';
@@ -13,7 +12,7 @@ import { OmdbProvider } from './providers/omdb.provider.js';
 import { TmdbProvider } from './providers/tmdb.provider.js';
 
 @Module({
-	imports: [MediaModule, forwardRef(() => LibraryModule), GroupingModule],
+	imports: [MediaModule, forwardRef(() => LibraryModule)],
 	controllers: [MetadataController, ImageController],
 	providers: [
 		TmdbProvider,

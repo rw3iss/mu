@@ -269,14 +269,12 @@ export function GroupDetail({ id }: GroupDetailProps) {
 					</div>
 				</div>
 
-				{candidates.length > 0 && (
-					<MatchCandidatesPanel
-						candidates={candidates}
-						onApply={handleApplyCandidate}
-						onDismiss={handleDismissCandidates}
-						heading="We weren't sure which TMDB entry this group maps to — pick one:"
-					/>
-				)}
+				<MatchCandidatesPanel
+					candidates={candidates}
+					onApply={handleApplyCandidate}
+					onDismiss={handleDismissCandidates}
+					heading="We weren't sure which TMDB entry this group maps to — pick one:"
+				/>
 
 				{isUnsure && data.altParents.length > 0 && (
 					<div class={styles.unsureBanner}>

@@ -454,13 +454,11 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 						{movie.tagline && <p class={styles.tagline}>{movie.tagline}</p>}
 
-						{candidates.length > 0 && (
-							<MatchCandidatesPanel
-								candidates={candidates}
-								onApply={handleApplyCandidate}
-								onDismiss={handleDismissCandidates}
-							/>
-						)}
+						<MatchCandidatesPanel
+							candidates={candidates}
+							onApply={handleApplyCandidate}
+							onDismiss={handleDismissCandidates}
+						/>
 
 						<div class={styles.meta}>
 							{movie.contentRating && (

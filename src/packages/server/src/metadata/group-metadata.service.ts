@@ -1,22 +1,13 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movieGroups, movies } from '../database/schema/index.js';
-import { GroupsRepository } from '../grouping/groups.repository.js';
-import { JobManagerService } from '../jobs/job-manager.service.js';
-import type { JobRecord } from '../jobs/job.interface.js';
-import { MatchCandidatesRepository, NewCandidate } from './match-candidates.repository.js';
-import {
-	DEFAULT_MATCHER_CONFIG,
-	findBestMatch,
-	type MatchCandidate,
-} from './matching/index.js';
+import { type MovieGroup, movieGroups, movies } from '../database/schema/index.js';
+import { MatchCandidatesRepository } from './match-candidates.repository.js';
+import { type MatchCandidate, resolveMatch } from './matching/index.js';
 import { TmdbProvider } from './providers/tmdb.provider.js';
 
-/** Job type the GroupingService enqueues to trigger this service. */
+/** Job type used by the grouping module to enqueue a metadata pass. */
 export const GROUP_METADATA_JOB = 'group-metadata';
-
-const MAX_PERSISTED_CANDIDATES = 8;
 
 /** Group-types that should hit TMDB's TV-search endpoint. */
 const TV_GROUP_TYPES = new Set(['series', 'show', 'tv', 'season']);
@@ -32,75 +23,78 @@ interface GroupCandidate extends MatchCandidate {
 }
 
 /**
- * Metadata enrichment for parent groups (TV shows, movie collections).
+ * Patch the resolver returns when it decides on a winner. The grouping
+ * module applies this to its own `movie_groups` row — this service
+ * never writes to that table directly.
+ */
+export interface ResolvedGroupMetadata {
+	tmdbTvId?: number | null;
+	imdbId?: string | null;
+	posterUrl?: string | null;
+	backdropUrl?: string | null;
+	overview?: string | null;
+}
+
+/**
+ * Minimum slice of a `MovieGroup` the resolver needs to do its job.
+ * Callers don't have to hand over the whole row — passing this is
+ * enough to keep the resolver provider-agnostic and module-boundary
+ * clean (no GroupsRepository injection here).
+ */
+export type GroupForMetadata = Pick<
+	MovieGroup,
+	'id' | 'name' | 'type' | 'groupType' | 'tmdbTvId' | 'imdbId'
+>;
+
+/**
+ * Pure metadata resolver for parent groups (TV shows, movie
+ * collections). Returns the patch that the *grouping* module then
+ * writes onto its own row.
  *
- * Picks the right TMDB endpoint based on `group.groupType`; if the hint
- * is ambiguous (e.g. groupType='series' but it's really a film series)
- * both endpoints are searched and the matcher picks the winner.
+ * This service:
+ *   - Reads no group-owned state (the caller passes the group in).
+ *   - Writes only to its own `metadata_match_candidates` table.
+ *   - Has zero dependency on `GroupsRepository` — the dependency
+ *     direction is `grouping → metadata`, never the reverse.
  *
- * Auto-triggers from GroupingService via a `group-metadata` job —
- * decoupled so the orchestrator doesn't have to depend on this service
- * directly.
+ * The job-queue handler that turns this into an auto-trigger lives in
+ * `GroupingService.onModuleInit`, not here.
  */
 @Injectable()
-export class GroupMetadataService implements OnModuleInit {
+export class GroupMetadataService {
 	private readonly logger = new Logger(GroupMetadataService.name);
 
 	constructor(
 		private readonly database: DatabaseService,
-		private readonly groups: GroupsRepository,
 		private readonly tmdb: TmdbProvider,
 		private readonly matchCandidates: MatchCandidatesRepository,
-		private readonly jobs: JobManagerService,
 	) {}
 
-	onModuleInit(): void {
-		this.jobs.registerHandler(GROUP_METADATA_JOB, async (job: JobRecord) => {
-			const groupId = job.payload?.groupId as string | undefined;
-			if (!groupId) {
-				this.logger.warn(`group-metadata job ${job.id} has no groupId payload — skipping`);
-				return { skipped: true };
-			}
-			try {
-				const result = await this.fetchForGroup(groupId);
-				return { groupId, applied: !!result };
-			} catch (err: any) {
-				this.logger.warn(`fetchForGroup(${groupId}) failed: ${err?.message}`);
-				return { groupId, error: err?.message };
-			}
-		});
-	}
-
 	/**
-	 * Resolve & persist metadata for a parent group. Subgroups are
-	 * skipped — the parent owns the show / collection identity.
+	 * Resolve metadata for a parent group. Subgroups are skipped — the
+	 * parent owns the show/collection identity.
 	 *
 	 *   1. Fast-path: if group already has tmdbTvId or imdbId, fetch by
-	 *      ID and write missing fields.
-	 *   2. Otherwise build candidate list from TMDB TV and/or Collection
+	 *      ID and return the patch.
+	 *   2. Otherwise build candidates from TMDB TV and/or Collection
 	 *      search (filtered by group.groupType hint).
 	 *   3. Score with the shared matcher (year = earliest member year).
-	 *   4. Confident → apply; ambiguous → persist candidates; no-match → bail.
+	 *   4. Confident → return patch; ambiguous → persist candidates +
+	 *      return null; no-match → return null.
 	 */
-	async fetchForGroup(groupId: string): Promise<any> {
-		const group = this.groups.get(groupId);
-		if (!group) throw new NotFoundException(`Group ${groupId} not found`);
+	async resolveForGroup(group: GroupForMetadata): Promise<ResolvedGroupMetadata | null> {
 		if (group.type !== 'parent') {
-			this.logger.debug(`Skipping non-parent group ${groupId}`);
+			this.logger.debug(`Skipping non-parent group ${group.id}`);
 			return null;
 		}
 
 		// Fast-path: known IDs.
 		if (group.tmdbTvId || group.imdbId) {
-			const applied = await this.applyTvDetails(group.id, group.tmdbTvId ?? null);
-			if (applied) this.matchCandidates.clear('group', group.id);
-			return applied;
+			return this.resolveTvDetails(group.tmdbTvId ?? null);
 		}
 
-		// Aggregate member context (earliest year, average runtime).
-		const memberAgg = this.aggregateMembers(groupId);
+		const memberAgg = this.aggregateMembers(group.id);
 
-		// Search providers per the groupType hint.
 		const groupType = (group.groupType ?? 'series').toLowerCase();
 		const wantTv = TV_GROUP_TYPES.has(groupType) || !COLLECTION_GROUP_TYPES.has(groupType);
 		const wantCollection =
@@ -121,9 +115,7 @@ export class GroupMetadataService implements OnModuleInit {
 
 		const candidates: GroupCandidate[] = [];
 		for (const r of tvResults) {
-			const year = r.first_air_date
-				? parseInt(r.first_air_date.slice(0, 4), 10)
-				: null;
+			const year = r.first_air_date ? parseInt(r.first_air_date.slice(0, 4), 10) : null;
 			candidates.push({
 				provider: 'tmdb-tv',
 				externalId: r.id,
@@ -148,96 +140,42 @@ export class GroupMetadataService implements OnModuleInit {
 			});
 		}
 
-		if (candidates.length === 0) {
-			this.matchCandidates.clear('group', groupId);
-			this.logger.debug(`No TMDB candidates for group "${group.name}"`);
-			return null;
-		}
-
-		const match = findBestMatch(
-			{
+		const outcome = await resolveMatch<GroupCandidate, ResolvedGroupMetadata>({
+			entityType: 'group',
+			entityId: group.id,
+			entityLabel: group.name,
+			candidates,
+			query: {
 				title: group.name,
 				year: memberAgg.earliestYear,
 				durationMinutes: null,
 			},
-			candidates,
-			DEFAULT_MATCHER_CONFIG,
-		);
+			repository: this.matchCandidates,
+			logger: this.logger,
+			overviewOf: (c) => c.overview,
+			onConfident: async (winner) => this.resolveByProvider(winner.provider, Number(winner.externalId)),
+		});
 
-		if (match.noMatch || !match.best) {
-			this.matchCandidates.clear('group', groupId);
-			this.logger.debug(`No confident group match for "${group.name}"`);
-			return null;
-		}
-
-		if (match.ambiguous) {
-			const persisted: NewCandidate[] = match.ranked
-				.slice(0, MAX_PERSISTED_CANDIDATES)
-				.map((s) => ({
-					provider: s.candidate.provider,
-					externalId: s.candidate.externalId,
-					title: s.candidate.title,
-					year: s.candidate.year ?? null,
-					runtimeMinutes: s.candidate.runtimeMinutes ?? null,
-					posterUrl: s.candidate.posterUrl ?? null,
-					overview: (s.candidate as GroupCandidate).overview ?? null,
-					confidence: s.confidence,
-				}));
-			this.matchCandidates.replace('group', groupId, persisted);
-			this.logger.log(
-				`Ambiguous group match for "${group.name}" — saved ${persisted.length} candidates (best: ${match.best.confidence.toFixed(2)})`,
-			);
-			return null;
-		}
-
-		// Confident pick → apply.
-		this.matchCandidates.clear('group', groupId);
-		const winner = match.best.candidate as GroupCandidate;
-		if (winner.provider === 'tmdb-tv') {
-			const result = await this.applyTvDetails(groupId, Number(winner.externalId));
-			this.logger.log(
-				`Group "${group.name}" matched TMDB-TV id=${winner.externalId} confidence=${match.best.confidence.toFixed(2)}`,
-			);
-			return result;
-		}
-		// tmdb-collection
-		const result = await this.applyCollectionDetails(groupId, Number(winner.externalId));
-		this.logger.log(
-			`Group "${group.name}" matched TMDB-Collection id=${winner.externalId} confidence=${match.best.confidence.toFixed(2)}`,
-		);
-		return result;
+		return outcome.kind === 'applied' ? outcome.result : null;
 	}
 
 	/**
-	 * Apply a user-picked candidate from the dropdown (entityType=group).
+	 * Resolve a user-picked candidate (entity_type='group'). Used by the
+	 * grouping module's POST /:id/match-candidates/apply endpoint. The
+	 * caller is responsible for clearing the candidate rows + writing
+	 * the patch onto the group.
 	 */
-	async applyCandidate(
-		groupId: string,
+	async resolveByCandidate(
 		provider: string,
 		externalId: string,
-	): Promise<any> {
-		const row = this.matchCandidates.find('group', groupId, provider, externalId);
-		if (!row) {
-			throw new NotFoundException(
-				`Candidate not found: group=${groupId} provider=${provider} externalId=${externalId}`,
-			);
-		}
-		const result =
-			provider === 'tmdb-tv'
-				? await this.applyTvDetails(groupId, Number(externalId))
-				: provider === 'tmdb-collection'
-					? await this.applyCollectionDetails(groupId, Number(externalId))
-					: null;
-		this.matchCandidates.clear('group', groupId);
-		return result;
+	): Promise<ResolvedGroupMetadata | null> {
+		if (provider !== 'tmdb-tv' && provider !== 'tmdb-collection') return null;
+		return this.resolveByProvider(provider, Number(externalId));
 	}
 
 	// ── internals ─────────────────────────────────────────────────
 
-	private aggregateMembers(parentGroupId: string): {
-		earliestYear: number | null;
-	} {
-		// All movies under any subgroup of this parent.
+	private aggregateMembers(parentGroupId: string): { earliestYear: number | null } {
 		const row = this.database.db
 			.select({ minYear: sql<number | null>`MIN(${movies.year})` })
 			.from(movies)
@@ -247,34 +185,38 @@ export class GroupMetadataService implements OnModuleInit {
 		return { earliestYear: row?.minYear ?? null };
 	}
 
-	private async applyTvDetails(groupId: string, tmdbTvId: number | null): Promise<any> {
+	private async resolveByProvider(
+		provider: ProviderTag,
+		externalId: number,
+	): Promise<ResolvedGroupMetadata | null> {
+		return provider === 'tmdb-tv'
+			? this.resolveTvDetails(externalId)
+			: this.resolveCollectionDetails(externalId);
+	}
+
+	private async resolveTvDetails(tmdbTvId: number | null): Promise<ResolvedGroupMetadata | null> {
 		if (!tmdbTvId) return null;
 		const details = await this.tmdb.getTvDetails(tmdbTvId);
 		if (!details) return null;
-		const imdbId = details.external_ids?.imdb_id ?? null;
-		this.groups.update(groupId, {
+		return {
 			tmdbTvId: details.id,
-			imdbId,
+			imdbId: details.external_ids?.imdb_id ?? null,
 			posterUrl: this.tmdb.getImageUrl(details.poster_path),
 			backdropUrl: this.tmdb.getImageUrl(details.backdrop_path, 'w1280'),
 			overview: details.overview || null,
-		});
-		return this.groups.get(groupId);
+		};
 	}
 
-	private async applyCollectionDetails(
-		groupId: string,
+	private async resolveCollectionDetails(
 		collectionId: number,
-	): Promise<any> {
+	): Promise<ResolvedGroupMetadata | null> {
 		const details = await this.tmdb.getCollectionDetails(collectionId);
 		if (!details) return null;
-		this.groups.update(groupId, {
-			// Collections have no IMDB id; tmdbTvId is left null (it's not a TV
-			// show). The cosmetic poster/backdrop/overview are what users see.
+		return {
+			// Collections have no IMDB id; tmdbTvId stays null on the group row.
 			posterUrl: this.tmdb.getImageUrl(details.poster_path),
 			backdropUrl: this.tmdb.getImageUrl(details.backdrop_path, 'w1280'),
 			overview: details.overview || null,
-		});
-		return this.groups.get(groupId);
+		};
 	}
 }

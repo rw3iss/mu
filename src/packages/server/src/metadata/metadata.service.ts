@@ -8,12 +8,11 @@ import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
-import { MatchCandidatesRepository, NewCandidate } from './match-candidates.repository.js';
+import { MatchCandidatesRepository } from './match-candidates.repository.js';
 import {
-	DEFAULT_MATCHER_CONFIG,
 	extractYear,
-	findBestMatch,
 	type MatchCandidate,
+	resolveMatch,
 } from './matching/index.js';
 import { OmdbProvider, OmdbSearchResult } from './providers/omdb.provider.js';
 import {
@@ -21,12 +20,6 @@ import {
 	type TmdbTvSearchResult,
 	TmdbProvider,
 } from './providers/tmdb.provider.js';
-
-/**
- * Number of top candidates to persist when the matcher couldn't pick a
- * single winner confidently. The UI surfaces these as a dropdown.
- */
-const MAX_PERSISTED_CANDIDATES = 8;
 
 /** Provenance tags used in `metadata_match_candidates.provider`. */
 type ProviderTag = 'tmdb' | 'omdb';
@@ -161,77 +154,44 @@ export class MetadataService {
 			});
 		}
 
-		if (candidates.length === 0) {
-			this.matchCandidates.clear('movie', movieId);
-			this.logger.warn(
-				`No metadata candidates for "${movie.title}" (${resolvedYear ?? '?'})`,
-			);
-			return null;
-		}
-
-		const match = findBestMatch(
-			{
+		// --- 3. Resolve the match (apply / ambiguous / no-match) ----------
+		const outcome = await resolveMatch<MovieCandidate, any>({
+			entityType: 'movie',
+			entityId: movieId,
+			entityLabel: movie.title,
+			candidates,
+			query: {
 				title: movie.title,
 				year: resolvedYear,
 				durationMinutes: fileDurationMinutes,
 			},
-			candidates,
-			DEFAULT_MATCHER_CONFIG,
-		);
-
-		// --- 3. Decision: apply / ambiguous / no-match --------------------
-		if (match.noMatch || !match.best) {
-			this.matchCandidates.clear('movie', movieId);
-			this.logger.warn(
-				`No confident metadata match for "${movie.title}" — best confidence ${match.best?.confidence.toFixed(2) ?? 'n/a'}`,
-			);
-			return null;
-		}
-
-		if (match.ambiguous) {
-			const persisted: NewCandidate[] = match.ranked
-				.slice(0, MAX_PERSISTED_CANDIDATES)
-				.map((s) => ({
-					provider: s.candidate.provider,
-					externalId: s.candidate.externalId,
-					title: s.candidate.title,
-					year: s.candidate.year ?? null,
-					runtimeMinutes: s.candidate.runtimeMinutes ?? null,
-					posterUrl: s.candidate.posterUrl ?? null,
-					overview: (s.candidate as MovieCandidate).overview ?? null,
-					confidence: s.confidence,
-				}));
-			this.matchCandidates.replace('movie', movieId, persisted);
-			this.logger.log(
-				`Ambiguous metadata for "${movie.title}" — saved ${persisted.length} candidates (top confidence: ${match.best.confidence.toFixed(2)})`,
-			);
-			this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
-				movieId,
-				source: 'metadata-candidates',
-			});
-			return null;
-		}
-
-		// Confident match — pull provider IDs and let fetchAndMerge do the rest.
-		const winning = match.best.candidate as MovieCandidate;
-		this.matchCandidates.clear('movie', movieId);
-
-		const result = await this.fetchAndMerge({
-			movieId,
-			tmdbId: winning.tmdbId ?? null,
-			imdbId: winning.imdbId ?? null,
-			priorYear: resolvedYear,
+			repository: this.matchCandidates,
+			logger: this.logger,
+			overviewOf: (c) => c.overview,
+			onAmbiguous: () => {
+				this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+					movieId,
+					source: 'metadata-candidates',
+				});
+			},
+			onConfident: async (winner) => {
+				const result = await this.fetchAndMerge({
+					movieId,
+					tmdbId: winner.tmdbId ?? null,
+					imdbId: winner.imdbId ?? null,
+					priorYear: resolvedYear,
+				});
+				if (result) {
+					this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+						movieId,
+						source: 'metadata-refresh',
+					});
+				}
+				return result;
+			},
 		});
-		if (result) {
-			this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
-				movieId,
-				source: 'metadata-refresh',
-			});
-		}
-		this.logger.log(
-			`Metadata matched "${movie.title}" via ${winning.provider} → ${winning.title}${winning.year ? ` (${winning.year})` : ''} confidence=${match.best.confidence.toFixed(2)}`,
-		);
-		return result;
+
+		return outcome.kind === 'applied' ? outcome.result : null;
 	}
 
 	/**

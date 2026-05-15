@@ -19,7 +19,6 @@ import { EventsService } from '../events/events.service.js';
 import { LibraryJobsService } from '../library/library-jobs.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { FileProbeService } from './file-probe.service.js';
-import { GroupMetadataService } from './group-metadata.service.js';
 import { MatchCandidatesRepository } from './match-candidates.repository.js';
 import { MetadataService } from './metadata.service.js';
 
@@ -41,7 +40,6 @@ export class MetadataController {
 		private readonly guidResolver: GuidResolverService,
 		private readonly fileProbe: FileProbeService,
 		private readonly matchCandidates: MatchCandidatesRepository,
-		private readonly groupMetadata: GroupMetadataService,
 	) {}
 
 	@Get('movies/:id/match-candidates')
@@ -73,41 +71,6 @@ export class MetadataController {
 		return { ok: true };
 	}
 
-	@Get('groups/:id/match-candidates')
-	listGroupCandidates(@Param('id') groupId: string) {
-		return { candidates: this.matchCandidates.list('group', groupId) };
-	}
-
-	@Post('groups/:id/match-candidates/apply')
-	@Roles('admin')
-	async applyGroupCandidate(
-		@Param('id') groupId: string,
-		@Body() body: ApplyCandidateBody,
-	) {
-		if (!body?.provider || !body?.externalId) {
-			throw new BadRequestException('provider and externalId required');
-		}
-		const result = await this.groupMetadata.applyCandidate(
-			groupId,
-			body.provider,
-			body.externalId,
-		);
-		return result ?? { message: 'Candidate applied (no details returned)' };
-	}
-
-	@Delete('groups/:id/match-candidates')
-	@Roles('admin')
-	clearGroupCandidates(@Param('id') groupId: string) {
-		this.matchCandidates.clear('group', groupId);
-		return { ok: true };
-	}
-
-	@Post('groups/:id/refresh-metadata')
-	@Roles('admin')
-	async refreshGroupMetadata(@Param('id') groupId: string) {
-		const result = await this.groupMetadata.fetchForGroup(groupId);
-		return result ?? { message: 'No metadata found' };
-	}
 
 	@Post('movies/refresh-all')
 	@Roles('admin')

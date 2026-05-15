@@ -1,3 +1,4 @@
+import type { JSX } from 'preact';
 import { useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import type { MatchCandidate } from '@/services/movies.service';
@@ -12,18 +13,41 @@ interface MatchCandidatesPanelProps {
 	onDismiss: () => Promise<void> | void;
 	/** Heading shown above the list. Defaults to a generic prompt. */
 	heading?: string;
+	/** Label on the per-row "apply" button. Defaults to "This one". */
+	applyLabel?: string;
+	/** Label on the bulk dismiss button. Defaults to "None of these". */
+	dismissLabel?: string;
+	/** Override how the confidence number is rendered. Defaults to a
+	 *  rounded percentage. */
+	confidenceFormatter?: (value: number) => string;
+	/** Pass-through class merged onto the outer panel — keeps the
+	 *  component composable with surrounding layout containers. */
+	class?: string;
+	style?: JSX.CSSProperties;
 }
+
+const defaultConfidence = (v: number) => `${Math.round(v * 100)}%`;
 
 /**
  * Surfaced when the auto-matcher couldn't pick a winner — shows the
- * persisted candidate rows and lets the user commit one. Reused by both
- * the movie detail page and the group detail page.
+ * persisted candidate rows and lets the user commit one. Reused by
+ * the movie detail page, group detail page, and any future
+ * "needs review" surfaces.
+ *
+ * Renders nothing when the candidate list is empty, so consumers can
+ * include it unconditionally and let the panel manage its own
+ * visibility.
  */
 export function MatchCandidatesPanel({
 	candidates,
 	onApply,
 	onDismiss,
 	heading = "We weren't sure which one this is — pick a match:",
+	applyLabel = 'This one',
+	dismissLabel = 'None of these',
+	confidenceFormatter = defaultConfidence,
+	class: className,
+	style,
 }: MatchCandidatesPanelProps) {
 	const [applyingId, setApplyingId] = useState<string | null>(null);
 	const [dismissing, setDismissing] = useState(false);
@@ -48,8 +72,10 @@ export function MatchCandidatesPanel({
 		}
 	}
 
+	const panelClass = className ? `${styles.panel} ${className}` : styles.panel;
+
 	return (
-		<div class={styles.panel} role="region" aria-label="Match candidates">
+		<div class={panelClass} style={style} role="region" aria-label="Match candidates">
 			<div class={styles.header}>
 				<h3 class={styles.heading}>{heading}</h3>
 				<span class={styles.hint}>
@@ -78,7 +104,7 @@ export function MatchCandidatesPanel({
 								{c.runtimeMinutes && <span>{c.runtimeMinutes} min</span>}
 								<span>{c.provider}</span>
 								<span class={styles.confidence}>
-									{Math.round(c.confidence * 100)}%
+									{confidenceFormatter(c.confidence)}
 								</span>
 							</div>
 							{c.overview && <p class={styles.overview}>{c.overview}</p>}
@@ -91,7 +117,7 @@ export function MatchCandidatesPanel({
 							disabled={applyingId !== null}
 							loading={applyingId === c.id}
 						>
-							{applyingId === c.id ? 'Applying…' : 'This one'}
+							{applyingId === c.id ? 'Applying…' : applyLabel}
 						</Button>
 					</li>
 				))}
@@ -104,7 +130,7 @@ export function MatchCandidatesPanel({
 					onClick={handleDismiss}
 					disabled={dismissing}
 				>
-					{dismissing ? 'Dismissing…' : 'None of these'}
+					{dismissing ? 'Dismissing…' : dismissLabel}
 				</Button>
 			</div>
 		</div>

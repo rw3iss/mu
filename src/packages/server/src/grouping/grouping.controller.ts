@@ -10,8 +10,14 @@ import {
 	Post,
 } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { MatchCandidatesRepository } from '../metadata/match-candidates.repository.js';
 import { GroupingService } from './grouping.service.js';
 import { GroupsRepository } from './groups.repository.js';
+
+interface ApplyCandidateBody {
+	provider: string;
+	externalId: string;
+}
 
 interface PatchGroupBody {
 	name?: string;
@@ -27,6 +33,7 @@ export class GroupingController {
 	constructor(
 		private readonly groupingService: GroupingService,
 		private readonly repo: GroupsRepository,
+		private readonly matchCandidates: MatchCandidatesRepository,
 	) {}
 
 	@Get()
@@ -151,5 +158,46 @@ export class GroupingController {
 		if (!movieId) throw new BadRequestException('movieId required');
 		const subgroupId = await this.groupingService.detectAndAttach(movieId);
 		return { subgroupId };
+	}
+
+	// ── Metadata-candidate endpoints (group entity) ───────────────────
+	// Routed via the grouping controller because *writes* to movie_groups
+	// belong to this module. The metadata module is a pure resolver and
+	// doesn't reach into this table.
+
+	@Get(':id/match-candidates')
+	listMatchCandidates(@Param('id') groupId: string) {
+		return { candidates: this.matchCandidates.list('group', groupId) };
+	}
+
+	@Post(':id/match-candidates/apply')
+	@Roles('admin')
+	async applyMatchCandidate(
+		@Param('id') groupId: string,
+		@Body() body: ApplyCandidateBody,
+	) {
+		if (!body?.provider || !body?.externalId) {
+			throw new BadRequestException('provider and externalId required');
+		}
+		const result = await this.groupingService.applyGroupMatchCandidate(
+			groupId,
+			body.provider,
+			body.externalId,
+		);
+		return result ?? { message: 'Candidate applied (no details returned)' };
+	}
+
+	@Delete(':id/match-candidates')
+	@Roles('admin')
+	clearMatchCandidates(@Param('id') groupId: string) {
+		this.matchCandidates.clear('group', groupId);
+		return { ok: true };
+	}
+
+	@Post(':id/refresh-metadata')
+	@Roles('admin')
+	async refreshMetadata(@Param('id') groupId: string) {
+		const result = await this.groupingService.refreshGroupMetadata(groupId);
+		return result ?? { message: 'No metadata found' };
 	}
 }
