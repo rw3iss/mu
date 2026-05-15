@@ -416,7 +416,20 @@ export function Library(_props: LibraryProps) {
 
 					<button
 						class={`${styles.editBtn} ${groupViewEnabled.value ? styles.active : ''}`}
-						onClick={toggleGroupView}
+						onClick={() => {
+							toggleGroupView();
+							// If we're in "collections only" mode, flipping this
+							// toggle switches between the tile grid and the
+							// flattened movie grid — both need a fetch.
+							if (groupedOnly.value) {
+								if (groupViewEnabled.value) {
+									invalidateGroups();
+									void fetchParentGroups();
+								} else {
+									fetchMovies(1);
+								}
+							}
+						}}
 						aria-label="Toggle group view"
 						title={
 							groupViewEnabled.value
@@ -432,11 +445,15 @@ export function Library(_props: LibraryProps) {
 						onClick={() => {
 							toggleGroupedOnly();
 							if (groupedOnly.value) {
-								// Switching into collections view — fetch parents
-								// (or refresh if stale) so the tile grid renders
-								// straight away.
-								invalidateGroups();
-								void fetchParentGroups();
+								// Switching into collections-only mode. If grouped
+								// view is on we want the tile grid; otherwise we
+								// want a flat MovieGrid of every group member.
+								if (groupViewEnabled.value) {
+									invalidateGroups();
+									void fetchParentGroups();
+								} else {
+									fetchMovies(1);
+								}
 							} else {
 								// Back to normal library: refetch movies.
 								fetchMovies(1);
@@ -512,20 +529,37 @@ export function Library(_props: LibraryProps) {
 				/>
 			)}
 
-			{/* Movie Grid OR Group tiles, depending on the mode toggle. */}
-			{groupedOnly.value ? (
-				<div class={styles.groupTileGrid}>
-					{!groupsLoaded.value && parentGroups.value.length === 0 ? (
-						<div class={styles.groupsLoading}>Loading collections…</div>
-					) : parentGroups.value.length === 0 ? (
-						<div class={styles.groupsEmpty}>
-							No collections yet. Run <strong>Settings → Admin → Group Similar
-							Items</strong> to detect series + collections from your library.
+			{/* Three rendering modes:
+			    1. groupedOnly=true  + groupViewEnabled=true  → tile grid of parent groups
+			       (client-side name filter applies the search query)
+			    2. groupedOnly=true  + groupViewEnabled=false → flat MovieGrid of every
+			       group member; server filters via ?groupedOnly=true and ?search=
+			    3. groupedOnly=false                          → normal full-library MovieGrid */}
+			{groupedOnly.value && groupViewEnabled.value ? (
+				(() => {
+					const q = searchQuery.value.trim().toLowerCase();
+					const visibleParents = q
+						? parentGroups.value.filter((g) => g.name.toLowerCase().includes(q))
+						: parentGroups.value;
+					return (
+						<div class={styles.groupTileGrid}>
+							{!groupsLoaded.value && parentGroups.value.length === 0 ? (
+								<div class={styles.groupsLoading}>Loading collections…</div>
+							) : parentGroups.value.length === 0 ? (
+								<div class={styles.groupsEmpty}>
+									No collections yet. Run <strong>Settings → Admin → Group Similar
+									Items</strong> to detect series + collections from your library.
+								</div>
+							) : visibleParents.length === 0 ? (
+								<div class={styles.groupsEmpty}>
+									No collections match &ldquo;{searchQuery.value}&rdquo;.
+								</div>
+							) : (
+								visibleParents.map((g) => <GroupTile key={g.id} group={g} />)
+							)}
 						</div>
-					) : (
-						parentGroups.value.map((g) => <GroupTile key={g.id} group={g} />)
-					)}
-				</div>
+					);
+				})()
 			) : (
 				<MovieGrid
 					movies={movies.value}
@@ -537,7 +571,9 @@ export function Library(_props: LibraryProps) {
 					emptyMessage={
 						searchQuery.value
 							? `No results for "${searchQuery.value}"`
-							: 'Your library is empty'
+							: groupedOnly.value
+								? 'No movies belong to a collection yet.'
+								: 'Your library is empty'
 					}
 				/>
 			)}
