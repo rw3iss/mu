@@ -1,4 +1,5 @@
 .page {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8,9 +9,25 @@
   background-image:
     radial-gradient(ellipse at 30% 20%, rgba(255, 245, 220, 0.04) 0%, transparent 50%),
     radial-gradient(ellipse at 70% 80%, rgba(37, 99, 235, 0.03) 0%, transparent 50%);
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url('/mu_logo_large.png');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: min(70vmin, 720px) auto;
+    opacity: 0.08;
+    pointer-events: none;
+    z-index: 0;
+  }
 }
 
 .card {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 400px;
   background: var(--color-bg-surface);
