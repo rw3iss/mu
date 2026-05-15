@@ -1,6 +1,15 @@
 import { existsSync, statSync } from 'node:fs';
 import { nowISO, WsEvent } from '@mu/shared';
-import { Controller, Logger, Param, Post } from '@nestjs/common';
+import {
+	BadRequestException,
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Logger,
+	Param,
+	Post,
+} from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
@@ -10,7 +19,14 @@ import { EventsService } from '../events/events.service.js';
 import { LibraryJobsService } from '../library/library-jobs.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { FileProbeService } from './file-probe.service.js';
+import { GroupMetadataService } from './group-metadata.service.js';
+import { MatchCandidatesRepository } from './match-candidates.repository.js';
 import { MetadataService } from './metadata.service.js';
+
+interface ApplyCandidateBody {
+	provider: string;
+	externalId: string;
+}
 
 @Controller()
 export class MetadataController {
@@ -24,7 +40,74 @@ export class MetadataController {
 		private readonly libraryJobs: LibraryJobsService,
 		private readonly guidResolver: GuidResolverService,
 		private readonly fileProbe: FileProbeService,
+		private readonly matchCandidates: MatchCandidatesRepository,
+		private readonly groupMetadata: GroupMetadataService,
 	) {}
+
+	@Get('movies/:id/match-candidates')
+	listCandidates(@Param('id') movieId: string) {
+		return { candidates: this.matchCandidates.list('movie', movieId) };
+	}
+
+	@Post('movies/:id/match-candidates/apply')
+	@Roles('admin')
+	async applyCandidate(
+		@Param('id') movieId: string,
+		@Body() body: ApplyCandidateBody,
+	) {
+		if (!body?.provider || !body?.externalId) {
+			throw new BadRequestException('provider and externalId required');
+		}
+		const result = await this.metadataService.applyCandidate(
+			movieId,
+			body.provider,
+			body.externalId,
+		);
+		return result ?? { message: 'Candidate applied (no details returned)' };
+	}
+
+	@Delete('movies/:id/match-candidates')
+	@Roles('admin')
+	clearCandidates(@Param('id') movieId: string) {
+		this.matchCandidates.clear('movie', movieId);
+		return { ok: true };
+	}
+
+	@Get('groups/:id/match-candidates')
+	listGroupCandidates(@Param('id') groupId: string) {
+		return { candidates: this.matchCandidates.list('group', groupId) };
+	}
+
+	@Post('groups/:id/match-candidates/apply')
+	@Roles('admin')
+	async applyGroupCandidate(
+		@Param('id') groupId: string,
+		@Body() body: ApplyCandidateBody,
+	) {
+		if (!body?.provider || !body?.externalId) {
+			throw new BadRequestException('provider and externalId required');
+		}
+		const result = await this.groupMetadata.applyCandidate(
+			groupId,
+			body.provider,
+			body.externalId,
+		);
+		return result ?? { message: 'Candidate applied (no details returned)' };
+	}
+
+	@Delete('groups/:id/match-candidates')
+	@Roles('admin')
+	clearGroupCandidates(@Param('id') groupId: string) {
+		this.matchCandidates.clear('group', groupId);
+		return { ok: true };
+	}
+
+	@Post('groups/:id/refresh-metadata')
+	@Roles('admin')
+	async refreshGroupMetadata(@Param('id') groupId: string) {
+		const result = await this.groupMetadata.fetchForGroup(groupId);
+		return result ?? { message: 'No metadata found' };
+	}
 
 	@Post('movies/refresh-all')
 	@Roles('admin')

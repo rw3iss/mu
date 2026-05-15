@@ -42,13 +42,13 @@ export interface OmdbData {
 	language: string | null;
 	country: string | null;
 	awards: string | null;
+	runtimeMinutes: number | null;
+	year: number | null;
 }
 
 export interface OmdbSearchResult extends OmdbData {
 	imdbId: string;
 	title: string;
-	year: number | null;
-	runtimeMinutes: number | null;
 }
 
 @Injectable()
@@ -94,30 +94,7 @@ export class OmdbProvider {
 				return null;
 			}
 
-			const rtRating = raw.Ratings?.find((r) => r.Source === 'Rotten Tomatoes');
-			const rtScore = rtRating ? parseInt(rtRating.Value, 10) : null;
-
-			const result: OmdbData = {
-				imdbRating:
-					raw.imdbRating && raw.imdbRating !== 'N/A' ? parseFloat(raw.imdbRating) : null,
-				imdbVotes:
-					raw.imdbVotes && raw.imdbVotes !== 'N/A'
-						? parseInt(raw.imdbVotes.replace(/,/g, ''), 10)
-						: null,
-				rottenTomatoesScore: !Number.isNaN(rtScore as number) ? rtScore : null,
-				metacriticScore:
-					raw.Metascore && raw.Metascore !== 'N/A' ? parseInt(raw.Metascore, 10) : null,
-				plot: raw.Plot && raw.Plot !== 'N/A' ? raw.Plot : null,
-				director: raw.Director && raw.Director !== 'N/A' ? raw.Director : null,
-				writer: raw.Writer && raw.Writer !== 'N/A' ? raw.Writer : null,
-				actors: raw.Actors && raw.Actors !== 'N/A' ? raw.Actors : null,
-				genre: raw.Genre && raw.Genre !== 'N/A' ? raw.Genre : null,
-				rated: raw.Rated && raw.Rated !== 'N/A' ? raw.Rated : null,
-				language: raw.Language && raw.Language !== 'N/A' ? raw.Language : null,
-				country: raw.Country && raw.Country !== 'N/A' ? raw.Country : null,
-				awards: raw.Awards && raw.Awards !== 'N/A' ? raw.Awards : null,
-			};
-
+			const result: OmdbData = parseOmdbResult(raw);
 			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, result, CACHE_TTL.METADATA);
 			return result;
 		} catch (err: any) {
@@ -154,39 +131,12 @@ export class OmdbProvider {
 				return null;
 			}
 
-			const rtRating = raw.Ratings?.find((r) => r.Source === 'Rotten Tomatoes');
-			const rtScore = rtRating ? parseInt(rtRating.Value, 10) : null;
-
-			const runtimeMatch = raw.Runtime?.match(/(\d+)/);
-			const runtimeMinutes = runtimeMatch ? parseInt(runtimeMatch[1]!, 10) : null;
-
-			const yearParsed = raw.Year ? parseInt(raw.Year, 10) : null;
-
+			const base = parseOmdbResult(raw);
 			const result: OmdbSearchResult = {
+				...base,
 				imdbId: raw.imdbID,
 				title: raw.Title,
-				year: !Number.isNaN(yearParsed as number) ? yearParsed : null,
-				runtimeMinutes,
-				imdbRating:
-					raw.imdbRating && raw.imdbRating !== 'N/A' ? parseFloat(raw.imdbRating) : null,
-				imdbVotes:
-					raw.imdbVotes && raw.imdbVotes !== 'N/A'
-						? parseInt(raw.imdbVotes.replace(/,/g, ''), 10)
-						: null,
-				rottenTomatoesScore: !Number.isNaN(rtScore as number) ? rtScore : null,
-				metacriticScore:
-					raw.Metascore && raw.Metascore !== 'N/A' ? parseInt(raw.Metascore, 10) : null,
-				plot: raw.Plot && raw.Plot !== 'N/A' ? raw.Plot : null,
-				director: raw.Director && raw.Director !== 'N/A' ? raw.Director : null,
-				writer: raw.Writer && raw.Writer !== 'N/A' ? raw.Writer : null,
-				actors: raw.Actors && raw.Actors !== 'N/A' ? raw.Actors : null,
-				genre: raw.Genre && raw.Genre !== 'N/A' ? raw.Genre : null,
-				rated: raw.Rated && raw.Rated !== 'N/A' ? raw.Rated : null,
-				language: raw.Language && raw.Language !== 'N/A' ? raw.Language : null,
-				country: raw.Country && raw.Country !== 'N/A' ? raw.Country : null,
-				awards: raw.Awards && raw.Awards !== 'N/A' ? raw.Awards : null,
 			};
-
 			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, result, CACHE_TTL.METADATA);
 			return result;
 		} catch (err: any) {
@@ -194,4 +144,41 @@ export class OmdbProvider {
 			return null;
 		}
 	}
+}
+
+/**
+ * Map OMDB's raw response shape to our trimmed OmdbData. Centralised so
+ * the by-imdbId and by-title paths populate every field identically —
+ * previously `runtimeMinutes` / `year` were only parsed in the title
+ * path, so cross-lookups from TMDB silently lost OMDB's runtime.
+ */
+function parseOmdbResult(raw: OmdbResult): OmdbData {
+	const rtRating = raw.Ratings?.find((r) => r.Source === 'Rotten Tomatoes');
+	const rtScore = rtRating ? parseInt(rtRating.Value, 10) : null;
+	const runtimeMatch = raw.Runtime?.match(/(\d+)/);
+	const runtimeMinutes = runtimeMatch ? parseInt(runtimeMatch[1]!, 10) : null;
+	const yearParsed = raw.Year ? parseInt(raw.Year, 10) : null;
+
+	return {
+		imdbRating:
+			raw.imdbRating && raw.imdbRating !== 'N/A' ? parseFloat(raw.imdbRating) : null,
+		imdbVotes:
+			raw.imdbVotes && raw.imdbVotes !== 'N/A'
+				? parseInt(raw.imdbVotes.replace(/,/g, ''), 10)
+				: null,
+		rottenTomatoesScore: rtScore != null && !Number.isNaN(rtScore) ? rtScore : null,
+		metacriticScore:
+			raw.Metascore && raw.Metascore !== 'N/A' ? parseInt(raw.Metascore, 10) : null,
+		plot: raw.Plot && raw.Plot !== 'N/A' ? raw.Plot : null,
+		director: raw.Director && raw.Director !== 'N/A' ? raw.Director : null,
+		writer: raw.Writer && raw.Writer !== 'N/A' ? raw.Writer : null,
+		actors: raw.Actors && raw.Actors !== 'N/A' ? raw.Actors : null,
+		genre: raw.Genre && raw.Genre !== 'N/A' ? raw.Genre : null,
+		rated: raw.Rated && raw.Rated !== 'N/A' ? raw.Rated : null,
+		language: raw.Language && raw.Language !== 'N/A' ? raw.Language : null,
+		country: raw.Country && raw.Country !== 'N/A' ? raw.Country : null,
+		awards: raw.Awards && raw.Awards !== 'N/A' ? raw.Awards : null,
+		runtimeMinutes,
+		year: yearParsed != null && !Number.isNaN(yearParsed) ? yearParsed : null,
+	};
 }

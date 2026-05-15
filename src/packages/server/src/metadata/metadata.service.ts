@@ -1,5 +1,6 @@
 import { existsSync, statSync } from 'node:fs';
-import { nowISO, WsEvent } from '@mu/shared';
+import path from 'node:path';
+import { CACHE_NAMESPACES, nowISO, WsEvent } from '@mu/shared';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
@@ -7,8 +8,35 @@ import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
+import { MatchCandidatesRepository, NewCandidate } from './match-candidates.repository.js';
+import {
+	DEFAULT_MATCHER_CONFIG,
+	extractYear,
+	findBestMatch,
+	type MatchCandidate,
+} from './matching/index.js';
 import { OmdbProvider, OmdbSearchResult } from './providers/omdb.provider.js';
-import { TmdbProvider } from './providers/tmdb.provider.js';
+import {
+	type TmdbCollectionSearchResult,
+	type TmdbTvSearchResult,
+	TmdbProvider,
+} from './providers/tmdb.provider.js';
+
+/**
+ * Number of top candidates to persist when the matcher couldn't pick a
+ * single winner confidently. The UI surfaces these as a dropdown.
+ */
+const MAX_PERSISTED_CANDIDATES = 8;
+
+/** Provenance tags used in `metadata_match_candidates.provider`. */
+type ProviderTag = 'tmdb' | 'omdb';
+
+interface MovieCandidate extends MatchCandidate {
+	provider: ProviderTag;
+	overview?: string | null;
+	tmdbId?: number;
+	imdbId?: string;
+}
 
 @Injectable()
 export class MetadataService {
@@ -20,235 +48,441 @@ export class MetadataService {
 		private readonly omdb: OmdbProvider,
 		private readonly cache: CacheService,
 		private readonly events: EventsService,
+		private readonly matchCandidates: MatchCandidatesRepository,
 	) {}
 
+	/**
+	 * Resolve and persist metadata for a movie. Strategy:
+	 *   1. Fast-path: if movie already has tmdbId/imdbId, skip search and
+	 *      go straight to details (with cross-provider enrichment).
+	 *   2. Otherwise, parallel title search on TMDB + OMDB; score all
+	 *      candidates with the shared matcher.
+	 *   3. If best match clears the auto-apply threshold → apply + clear
+	 *      candidates. If ambiguous → persist top candidates + bail. If
+	 *      no match → clear candidates + bail.
+	 *   4. After a confident match, fetch full details from BOTH
+	 *      providers (cross-looking up by IMDB ID where one side was
+	 *      missed) and merge field-by-field with IMDB-backed sources
+	 *      preferred for ratings / IMDB ID, TMDB preferred for structured
+	 *      data (cast, posters, trailers, keywords).
+	 */
 	async fetchForMovie(movieId: string): Promise<any> {
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
-
 		if (!movie) {
 			throw new NotFoundException(`Movie ${movieId} not found`);
 		}
 
-		const title = movie.title;
-		const year = movie.year ?? undefined;
-
-		// Get file duration for confidence matching
 		const file = this.database.db
 			.select()
 			.from(movieFiles)
 			.where(eq(movieFiles.movieId, movieId))
 			.get();
-		const fileDurationSeconds = file?.durationSeconds ?? undefined;
+		const fileDurationMinutes = file?.durationSeconds
+			? Math.round(file.durationSeconds / 60)
+			: null;
 
-		// Step 1: Parallel search — TMDB + OMDB
-		const [tmdbResult, omdbResult] = await Promise.allSettled([
-			this.tmdb.searchMovie(title, year),
-			this.omdb.searchByTitle(title, year),
+		// Best-effort year recovery: stored → filename → folder name.
+		const resolvedYear =
+			extractYear({
+				storedYear: movie.year,
+				filePath: file?.filePath,
+				folderPath: file?.filePath ? path.dirname(file.filePath) : null,
+			}) ?? null;
+
+		// --- 1. Fast path: known IDs --------------------------------------
+		if (movie.tmdbId || movie.imdbId) {
+			this.logger.log(
+				`Fast-path: movie ${movieId} has ${movie.tmdbId ? `tmdbId=${movie.tmdbId}` : ''}${
+					movie.tmdbId && movie.imdbId ? ' ' : ''
+				}${movie.imdbId ? `imdbId=${movie.imdbId}` : ''}`,
+			);
+			const result = await this.fetchAndMerge({
+				movieId,
+				tmdbId: movie.tmdbId ?? null,
+				imdbId: movie.imdbId ?? null,
+				priorYear: resolvedYear,
+			});
+			if (result) {
+				this.matchCandidates.clear('movie', movieId);
+				this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+					movieId,
+					source: 'metadata-refresh',
+				});
+			}
+			return result;
+		}
+
+		// --- 2. Parallel title search across providers --------------------
+		const [tmdbSearch, omdbSearch] = await Promise.allSettled([
+			this.tmdb.searchMovie(movie.title, resolvedYear ?? undefined),
+			this.omdb.searchByTitle(movie.title, resolvedYear ?? undefined),
 		]);
-
-		const tmdbSearchResults = tmdbResult.status === 'fulfilled' ? tmdbResult.value : null;
-		const omdbData: OmdbSearchResult | null =
-			omdbResult.status === 'fulfilled' ? omdbResult.value : null;
-
-		if (tmdbResult.status === 'rejected') {
-			this.logger.warn(`TMDB search failed: ${tmdbResult.reason}`);
+		const tmdbResults =
+			tmdbSearch.status === 'fulfilled' ? (tmdbSearch.value ?? []) : [];
+		const omdbResult: OmdbSearchResult | null =
+			omdbSearch.status === 'fulfilled' ? omdbSearch.value : null;
+		if (tmdbSearch.status === 'rejected') {
+			this.logger.warn(`TMDB search failed: ${tmdbSearch.reason}`);
 		}
-		if (omdbResult.status === 'rejected') {
-			this.logger.warn(`OMDB search failed: ${omdbResult.reason}`);
-		}
-
-		// Step 2: Confidence matching for TMDB results
-		let bestTmdbMatch: NonNullable<typeof tmdbSearchResults>[number] | null = null;
-		let bestConfidence = 0;
-
-		if (tmdbSearchResults && tmdbSearchResults.length > 0) {
-			for (const candidate of tmdbSearchResults) {
-				const candidateYear = candidate.release_date
-					? parseInt(candidate.release_date.slice(0, 4), 10)
-					: undefined;
-				const score = this.computeConfidence(
-					title,
-					year,
-					fileDurationSeconds,
-					candidate.title,
-					candidateYear,
-					undefined, // TMDB search results don't include runtime
-				);
-				if (score > bestConfidence) {
-					bestConfidence = score;
-					bestTmdbMatch = candidate;
-				}
-			}
-
-			if (bestConfidence < 40) {
-				this.logger.warn(
-					`Best TMDB match for "${title}" scored ${bestConfidence} (below threshold 40), skipping TMDB`,
-				);
-				bestTmdbMatch = null;
-			}
+		if (omdbSearch.status === 'rejected') {
+			this.logger.warn(`OMDB search failed: ${omdbSearch.reason}`);
 		}
 
-		// If neither found anything, return null
-		if (!bestTmdbMatch && !omdbData) {
-			this.logger.warn(`No results from TMDB or OMDB for "${title}" (${year})`);
+		// Build unified candidate list. OMDB tends to return one strong
+		// match; TMDB returns many — the matcher dedupes by score.
+		const candidates: MovieCandidate[] = [];
+		for (const r of tmdbResults) {
+			const candYear = r.release_date
+				? parseInt(r.release_date.slice(0, 4), 10)
+				: null;
+			candidates.push({
+				provider: 'tmdb',
+				externalId: r.id,
+				title: r.title,
+				year: Number.isFinite(candYear) ? candYear : null,
+				runtimeMinutes: null,
+				popularity: r.popularity ?? null,
+				posterUrl: this.tmdb.getImageUrl(r.poster_path),
+				overview: r.overview,
+				tmdbId: r.id,
+			});
+		}
+		if (omdbResult) {
+			candidates.push({
+				provider: 'omdb',
+				externalId: omdbResult.imdbId,
+				title: omdbResult.title,
+				year: omdbResult.year ?? null,
+				runtimeMinutes: omdbResult.runtimeMinutes ?? null,
+				popularity: null,
+				posterUrl: null,
+				overview: omdbResult.plot,
+				imdbId: omdbResult.imdbId,
+			});
+		}
+
+		if (candidates.length === 0) {
+			this.matchCandidates.clear('movie', movieId);
+			this.logger.warn(
+				`No metadata candidates for "${movie.title}" (${resolvedYear ?? '?'})`,
+			);
 			return null;
 		}
+
+		const match = findBestMatch(
+			{
+				title: movie.title,
+				year: resolvedYear,
+				durationMinutes: fileDurationMinutes,
+			},
+			candidates,
+			DEFAULT_MATCHER_CONFIG,
+		);
+
+		// --- 3. Decision: apply / ambiguous / no-match --------------------
+		if (match.noMatch || !match.best) {
+			this.matchCandidates.clear('movie', movieId);
+			this.logger.warn(
+				`No confident metadata match for "${movie.title}" — best confidence ${match.best?.confidence.toFixed(2) ?? 'n/a'}`,
+			);
+			return null;
+		}
+
+		if (match.ambiguous) {
+			const persisted: NewCandidate[] = match.ranked
+				.slice(0, MAX_PERSISTED_CANDIDATES)
+				.map((s) => ({
+					provider: s.candidate.provider,
+					externalId: s.candidate.externalId,
+					title: s.candidate.title,
+					year: s.candidate.year ?? null,
+					runtimeMinutes: s.candidate.runtimeMinutes ?? null,
+					posterUrl: s.candidate.posterUrl ?? null,
+					overview: (s.candidate as MovieCandidate).overview ?? null,
+					confidence: s.confidence,
+				}));
+			this.matchCandidates.replace('movie', movieId, persisted);
+			this.logger.log(
+				`Ambiguous metadata for "${movie.title}" — saved ${persisted.length} candidates (top confidence: ${match.best.confidence.toFixed(2)})`,
+			);
+			this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+				movieId,
+				source: 'metadata-candidates',
+			});
+			return null;
+		}
+
+		// Confident match — pull provider IDs and let fetchAndMerge do the rest.
+		const winning = match.best.candidate as MovieCandidate;
+		this.matchCandidates.clear('movie', movieId);
+
+		const result = await this.fetchAndMerge({
+			movieId,
+			tmdbId: winning.tmdbId ?? null,
+			imdbId: winning.imdbId ?? null,
+			priorYear: resolvedYear,
+		});
+		if (result) {
+			this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+				movieId,
+				source: 'metadata-refresh',
+			});
+		}
+		this.logger.log(
+			`Metadata matched "${movie.title}" via ${winning.provider} → ${winning.title}${winning.year ? ` (${winning.year})` : ''} confidence=${match.best.confidence.toFixed(2)}`,
+		);
+		return result;
+	}
+
+	/**
+	 * Apply a user-picked candidate. Looks up the row in the candidate
+	 * table, clears all candidates, then runs the regular merge fetch
+	 * with the picked IDs.
+	 */
+	async applyCandidate(
+		movieId: string,
+		provider: string,
+		externalId: string,
+	): Promise<any> {
+		const row = this.matchCandidates.find('movie', movieId, provider, externalId);
+		if (!row) {
+			throw new NotFoundException(
+				`Candidate not found: movie=${movieId} provider=${provider} externalId=${externalId}`,
+			);
+		}
+		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
+		if (!movie) throw new NotFoundException(`Movie ${movieId} not found`);
+
+		const tmdbId = provider === 'tmdb' ? Number(externalId) : null;
+		const imdbId = provider === 'omdb' ? externalId : null;
+
+		const result = await this.fetchAndMerge({
+			movieId,
+			tmdbId,
+			imdbId,
+			priorYear: row.year ?? movie.year ?? null,
+		});
+		this.matchCandidates.clear('movie', movieId);
+		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+			movieId,
+			source: 'metadata-candidate-applied',
+		});
+		return result;
+	}
+
+	/**
+	 * Fetch full details from both providers (cross-looking up via IMDB
+	 * ID where one side is missing) and merge into the movies +
+	 * movie_metadata rows. Per-field priority:
+	 *   - imdbId, ratings (imdb / RT / metacritic), rated → OMDB
+	 *   - cast, posters, backdrops, trailers, keywords, budget, revenue,
+	 *     production_companies → TMDB
+	 *   - overview, plot: prefer OMDB (IMDB-backed) when non-empty, else
+	 *     TMDB
+	 *   - runtime: prefer OMDB when present (IMDB runtime), else TMDB,
+	 *     else file probe
+	 *   - genres, director, writer: TMDB structured > OMDB string-split
+	 */
+	private async fetchAndMerge(opts: {
+		movieId: string;
+		tmdbId: number | null;
+		imdbId: string | null;
+		priorYear: number | null;
+	}): Promise<any> {
+		const { movieId, priorYear } = opts;
+		let { tmdbId, imdbId } = opts;
+
+		// Cross-lookup: fill in the missing ID via the provider that has it.
+		if (!tmdbId && imdbId) {
+			const found = await this.tmdb.findByImdbId(imdbId);
+			if (found?.movie?.id) {
+				tmdbId = found.movie.id;
+			}
+		}
+
+		// Parallel fetch — both calls hit cache when warm.
+		const [tmdbDetailsRes, omdbByIdRes] = await Promise.allSettled([
+			tmdbId ? this.tmdb.getMovieDetails(tmdbId) : Promise.resolve(null),
+			imdbId ? this.omdb.getByImdbId(imdbId) : Promise.resolve(null),
+		]);
+		const tmdbDetails =
+			tmdbDetailsRes.status === 'fulfilled' ? tmdbDetailsRes.value : null;
+		let omdbData = omdbByIdRes.status === 'fulfilled' ? omdbByIdRes.value : null;
+
+		// If TMDB filled in the IMDB ID, fetch OMDB now to enrich.
+		if (!omdbData && tmdbDetails?.imdb_id) {
+			imdbId = tmdbDetails.imdb_id;
+			omdbData = await this.omdb.getByImdbId(tmdbDetails.imdb_id);
+		}
+
+		if (!tmdbDetails && !omdbData) {
+			this.logger.warn(`No details from any provider for movie ${movieId}`);
+			return null;
+		}
+
+		// IMDB ID resolution: prefer OMDB (always authoritative), else TMDB.
+		// OMDB getByImdbId doesn't echo the ID back in its trimmed shape, so
+		// fall back to the `imdbId` we used to query it.
+		const resolvedImdbId = imdbId ?? tmdbDetails?.imdb_id ?? null;
+		const resolvedTmdbId = tmdbDetails?.id ?? tmdbId ?? null;
 
 		const now = nowISO();
-
-		// Step 3: Fetch TMDB details if we have a confident match
-		let details: Awaited<ReturnType<TmdbProvider['getMovieDetails']>> = null;
-		if (bestTmdbMatch) {
-			details = await this.tmdb.getMovieDetails(bestTmdbMatch.id);
-			if (!details) {
-				this.logger.warn(`Could not fetch TMDB details for ${bestTmdbMatch.id}`);
-			}
-		}
-
-		// If TMDB details fetch failed and no OMDB data, return null
-		if (!details && !omdbData) {
-			return null;
-		}
-
-		// Step 4: If we have TMDB details but no OMDB data yet, try OMDB by IMDB ID
-		let omdbSupplementary: Awaited<ReturnType<OmdbProvider['getByImdbId']>> = null;
-		if (details?.imdb_id && !omdbData) {
-			omdbSupplementary = await this.omdb.getByImdbId(details.imdb_id);
-			if (omdbSupplementary) {
-				this.logger.log(`Supplementing with OMDB data via IMDB ID ${details.imdb_id}`);
-			}
-		}
-
-		// Step 5: Determine authoritative IDs
-		// OMDB imdbId takes precedence over TMDB's imdb_id
-		const imdbId = omdbData?.imdbId ?? details?.imdb_id ?? null;
-		const tmdbId = details?.id ?? null;
-
-		// Step 6: Update movies table
-		const trailerVideo = details?.videos?.results?.find(
+		const trailerVideo = tmdbDetails?.videos?.results?.find(
 			(v) => v.site === 'YouTube' && v.type === 'Trailer',
 		);
 		const trailerUrl = trailerVideo
 			? `https://www.youtube.com/watch?v=${trailerVideo.key}`
 			: null;
 
+		const usRelease = tmdbDetails?.release_dates?.results?.find(
+			(r) => r.iso_3166_1 === 'US',
+		);
+		const tmdbCertification = usRelease?.release_dates
+			?.map((rd) => rd.certification)
+			.find((c) => c && c.length > 0);
+
+		// Per-field merge.
+		const overview = firstNonEmpty(tmdbDetails?.overview, omdbData?.plot);
+		const tagline = tmdbDetails?.tagline || null;
+		const originalTitle =
+			tmdbDetails?.original_title && tmdbDetails.original_title !== tmdbDetails.title
+				? tmdbDetails.original_title
+				: null;
+		// Runtime preference: OMDB (IMDB-sourced) → TMDB. File-probe duration
+		// already lives on movie_files.duration_seconds, no need to merge it
+		// here.
+		const runtimeMinutes = omdbData?.runtimeMinutes || tmdbDetails?.runtime || null;
+		const releaseDate = tmdbDetails?.release_date || null;
+		const year = releaseDate
+			? parseInt(releaseDate.slice(0, 4), 10)
+			: priorYear;
+		const language = tmdbDetails?.spoken_languages?.[0]?.iso_639_1 ?? null;
+		const country = tmdbDetails?.production_countries?.[0]?.iso_3166_1 ?? null;
+		const posterUrl = this.tmdb.getImageUrl(tmdbDetails?.poster_path ?? null);
+		const backdropUrl = this.tmdb.getImageUrl(
+			tmdbDetails?.backdrop_path ?? null,
+			'w1280',
+		);
+		const contentRating = firstNonEmpty(omdbData?.rated, tmdbCertification);
+
 		const movieUpdate: Record<string, unknown> = {
-			tmdbId,
-			imdbId,
+			tmdbId: resolvedTmdbId,
+			imdbId: resolvedImdbId,
 			updatedAt: now,
 		};
-
-		if (details) {
-			movieUpdate.overview = details.overview || (omdbData?.plot ?? null);
-			movieUpdate.tagline = details.tagline || null;
-			movieUpdate.originalTitle =
-				details.original_title !== details.title ? details.original_title : null;
-			movieUpdate.runtimeMinutes = details.runtime || (omdbData?.runtimeMinutes ?? null);
-			movieUpdate.releaseDate = details.release_date || null;
-			movieUpdate.language = details.spoken_languages?.[0]?.iso_639_1 ?? null;
-			movieUpdate.country = details.production_countries?.[0]?.iso_3166_1 ?? null;
-			movieUpdate.posterUrl = this.tmdb.getImageUrl(details.poster_path);
-			movieUpdate.backdropUrl = this.tmdb.getImageUrl(details.backdrop_path, 'w1280');
-			movieUpdate.trailerUrl = trailerUrl;
-			movieUpdate.year = details.release_date
-				? parseInt(details.release_date.slice(0, 4), 10)
-				: movie.year;
-
-			// Content rating from TMDB release_dates (US certification) or OMDB Rated
-			const usRelease = details.release_dates?.results?.find((r) => r.iso_3166_1 === 'US');
-			const certification = usRelease?.release_dates
-				?.map((rd) => rd.certification)
-				.find((c) => c && c.length > 0);
-			movieUpdate.contentRating =
-				certification || omdbData?.rated || omdbSupplementary?.rated || null;
-		} else if (omdbData) {
-			// OMDB-only path
-			movieUpdate.overview = omdbData.plot;
-			movieUpdate.runtimeMinutes = omdbData.runtimeMinutes;
-			movieUpdate.contentRating = omdbData.rated;
-			if (omdbData.year) movieUpdate.year = omdbData.year;
-		}
+		if (overview) movieUpdate.overview = overview;
+		if (tagline) movieUpdate.tagline = tagline;
+		if (originalTitle) movieUpdate.originalTitle = originalTitle;
+		if (runtimeMinutes) movieUpdate.runtimeMinutes = runtimeMinutes;
+		if (releaseDate) movieUpdate.releaseDate = releaseDate;
+		if (year) movieUpdate.year = year;
+		if (language) movieUpdate.language = language;
+		if (country) movieUpdate.country = country;
+		if (posterUrl) movieUpdate.posterUrl = posterUrl;
+		if (backdropUrl) movieUpdate.backdropUrl = backdropUrl;
+		if (trailerUrl) movieUpdate.trailerUrl = trailerUrl;
+		if (contentRating) movieUpdate.contentRating = contentRating;
 
 		this.database.db.update(movies).set(movieUpdate).where(eq(movies.id, movieId)).run();
 
-		// Step 7: Create/update movie_metadata
-		const genres = details
-			? JSON.stringify(details.genres.map((g) => g.name))
+		// Genres / cast / crew. Prefer TMDB structured arrays; OMDB
+		// strings are split on ", " as fallback.
+		const genres = tmdbDetails?.genres?.length
+			? tmdbDetails.genres.map((g) => g.name)
 			: omdbData?.genre
-				? JSON.stringify(omdbData.genre.split(', '))
-				: JSON.stringify([]);
+				? omdbData.genre.split(',').map((g) => g.trim()).filter(Boolean)
+				: [];
 
-		const castMembers = details
-			? JSON.stringify(
-					(details.credits?.cast ?? []).slice(0, 20).map((c) => ({
-						name: c.name,
-						character: c.character,
-						profileUrl: this.tmdb.getImageUrl(c.profile_path, 'w185'),
-						tmdbId: c.id,
-					})),
-				)
-			: JSON.stringify([]);
+		const castMembers = tmdbDetails?.credits?.cast
+			? tmdbDetails.credits.cast.slice(0, 20).map((c) => ({
+					name: c.name,
+					character: c.character,
+					profileUrl: this.tmdb.getImageUrl(c.profile_path, 'w185'),
+					tmdbId: c.id,
+				}))
+			: [];
 
-		const directors = details
-			? JSON.stringify(
-					(details.credits?.crew ?? [])
-						.filter((c) => c.job === 'Director')
-						.map((c) => c.name),
+		const directors = tmdbDetails?.credits?.crew
+			? Array.from(
+					new Set(
+						tmdbDetails.credits.crew
+							.filter((c) => c.job === 'Director')
+							.map((c) => c.name),
+					),
 				)
 			: omdbData?.director
-				? JSON.stringify(omdbData.director.split(', '))
-				: JSON.stringify([]);
+				? omdbData.director.split(',').map((d) => d.trim()).filter(Boolean)
+				: [];
 
-		const writers = details
-			? JSON.stringify(
-					(details.credits?.crew ?? [])
-						.filter((c) => c.department === 'Writing')
-						.map((c) => c.name),
+		const writers = tmdbDetails?.credits?.crew
+			? Array.from(
+					new Set(
+						tmdbDetails.credits.crew
+							.filter((c) => c.department === 'Writing')
+							.map((c) => c.name),
+					),
 				)
 			: omdbData?.writer
-				? JSON.stringify(omdbData.writer.split(', '))
-				: JSON.stringify([]);
+				? omdbData.writer.split(',').map((w) => w.trim()).filter(Boolean)
+				: [];
 
-		const keywords = details?.keywords?.keywords
-			? JSON.stringify(details.keywords.keywords.map((k) => k.name))
-			: JSON.stringify([]);
-		const productionCompanies = details
-			? JSON.stringify(details.production_companies.map((c) => c.name))
-			: JSON.stringify([]);
+		const keywords = tmdbDetails?.keywords?.keywords
+			? tmdbDetails.keywords.keywords.map((k) => k.name)
+			: [];
+		const productionCompanies = tmdbDetails?.production_companies?.map((c) => c.name) ?? [];
 
-		// Get OMDB ratings — either from title search or by IMDB ID lookup
-		const omdbRatingsSource = omdbData ?? omdbSupplementary;
-		const imdbRating = omdbRatingsSource?.imdbRating ?? null;
-		const imdbVotes = omdbRatingsSource?.imdbVotes ?? null;
-		const rottenTomatoesScore = omdbRatingsSource?.rottenTomatoesScore ?? null;
-		const metacriticScore = omdbRatingsSource?.metacriticScore ?? null;
+		// IMDB-backed signals (always from OMDB).
+		const imdbRating = omdbData?.imdbRating ?? null;
+		const imdbVotes = omdbData?.imdbVotes ?? null;
+		const rottenTomatoesScore = omdbData?.rottenTomatoesScore ?? null;
+		const metacriticScore = omdbData?.metacriticScore ?? null;
+
+		// Anything that doesn't fit a column → extendedData JSON.
+		const extendedData: Record<string, unknown> = {};
+		if (omdbData?.awards) extendedData.omdbAwards = omdbData.awards;
+		if (omdbData?.actors) extendedData.omdbActorsRaw = omdbData.actors;
+		if (omdbData?.country) extendedData.omdbCountry = omdbData.country;
+		if (omdbData?.language) extendedData.omdbLanguage = omdbData.language;
+		if (tmdbDetails?.spoken_languages?.length) {
+			extendedData.spokenLanguages = tmdbDetails.spoken_languages;
+		}
+		if (tmdbDetails?.production_countries?.length) {
+			extendedData.productionCountries = tmdbDetails.production_countries;
+		}
+
+		const sources = [tmdbDetails ? 'tmdb' : null, omdbData ? 'omdb' : null]
+			.filter(Boolean)
+			.join('+');
+
+		const metaValues = {
+			movieId,
+			genres: JSON.stringify(genres),
+			cast: JSON.stringify(castMembers),
+			directors: JSON.stringify(directors),
+			writers: JSON.stringify(writers),
+			keywords: JSON.stringify(keywords),
+			productionCompanies: JSON.stringify(productionCompanies),
+			budget: tmdbDetails?.budget || null,
+			revenue: tmdbDetails?.revenue || null,
+			tmdbRating: tmdbDetails?.vote_average || null,
+			tmdbVotes: tmdbDetails?.vote_count || null,
+			imdbRating,
+			imdbVotes,
+			rottenTomatoesScore,
+			metacriticScore,
+			extendedData: Object.keys(extendedData).length
+				? JSON.stringify(extendedData)
+				: null,
+			source: sources,
+			fetchedAt: now,
+			updatedAt: now,
+		};
 
 		const existingMeta = this.database.db
 			.select()
 			.from(movieMetadata)
 			.where(eq(movieMetadata.movieId, movieId))
 			.get();
-
-		const metaValues = {
-			movieId,
-			genres,
-			cast: castMembers,
-			directors,
-			writers,
-			keywords,
-			productionCompanies,
-			budget: details?.budget || null,
-			revenue: details?.revenue || null,
-			tmdbRating: details?.vote_average || null,
-			tmdbVotes: details?.vote_count || null,
-			imdbRating,
-			imdbVotes,
-			rottenTomatoesScore,
-			metacriticScore,
-			source: details && omdbData ? 'tmdb+omdb' : details ? 'tmdb' : 'omdb',
-			fetchedAt: now,
-			updatedAt: now,
-		};
 
 		if (existingMeta) {
 			this.database.db
@@ -259,22 +493,11 @@ export class MetadataService {
 		} else {
 			this.database.db
 				.insert(movieMetadata)
-				.values({
-					id: crypto.randomUUID(),
-					...metaValues,
-				})
+				.values({ id: crypto.randomUUID(), ...metaValues })
 				.run();
 		}
 
-		const sources = [details ? 'TMDB' : null, omdbData ? 'OMDB' : null]
-			.filter(Boolean)
-			.join('+');
-		this.logger.log(
-			`Metadata fetched for "${movie.title}" (${sources}, confidence: ${bestConfidence})`,
-		);
-
-		// Emit WebSocket event
-		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'metadata-refresh' });
+		this.logger.log(`Metadata merged for ${movieId} from ${sources}`);
 
 		return this.database.db
 			.select()
@@ -285,20 +508,26 @@ export class MetadataService {
 
 	async refreshMetadata(movieId: string) {
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
-
 		if (!movie) {
 			throw new NotFoundException(`Movie ${movieId} not found`);
 		}
 
-		// Clear TMDB cache
+		// Invalidate provider caches so a refresh fetches fresh upstream data.
 		if (movie.tmdbId) {
-			await this.cache.delete('metadata', `details:${movie.tmdbId}`);
+			await this.cache.delete(CACHE_NAMESPACES.METADATA, `details:${movie.tmdbId}`);
 		}
-		await this.cache.delete('metadata', `search:${movie.title}:${movie.year ?? ''}`);
-
-		// Clear OMDB cache
-		await this.cache.delete('metadata', `omdb:${movie.imdbId ?? ''}`);
-		await this.cache.delete('metadata', `omdb:search:${movie.title}:${movie.year ?? ''}`);
+		if (movie.imdbId) {
+			await this.cache.delete(CACHE_NAMESPACES.METADATA, `omdb:${movie.imdbId}`);
+			await this.cache.delete(CACHE_NAMESPACES.METADATA, `find:imdb:${movie.imdbId}`);
+		}
+		await this.cache.delete(
+			CACHE_NAMESPACES.METADATA,
+			`search:${movie.title}:${movie.year ?? ''}`,
+		);
+		await this.cache.delete(
+			CACHE_NAMESPACES.METADATA,
+			`omdb:search:${movie.title}:${movie.year ?? ''}`,
+		);
 
 		return this.fetchForMovie(movieId);
 	}
@@ -376,6 +605,7 @@ export class MetadataService {
 			.run();
 
 		this.database.db.delete(movieMetadata).where(eq(movieMetadata.movieId, movieId)).run();
+		this.matchCandidates.clear('movie', movieId);
 		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'clear-metadata' });
 	}
 
@@ -502,78 +732,12 @@ export class MetadataService {
 		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'rescan' });
 		return { updated, missing, errors };
 	}
+}
 
-	/**
-	 * Compute confidence score for a candidate match.
-	 * - Title similarity: 0-40 points
-	 * - Year match: 0-30 points
-	 * - Duration match: 0-25 points
-	 */
-	private computeConfidence(
-		searchTitle: string,
-		searchYear: number | undefined,
-		fileDurationSeconds: number | undefined,
-		candidateTitle: string,
-		candidateYear: number | undefined,
-		candidateRuntimeMinutes: number | undefined,
-	): number {
-		let score = 0;
-
-		// Title similarity (0-40 points)
-		const normSearch = this.normalizeTitle(searchTitle);
-		const normCandidate = this.normalizeTitle(candidateTitle);
-		if (normSearch === normCandidate) {
-			score += 40;
-		} else if (normSearch.includes(normCandidate) || normCandidate.includes(normSearch)) {
-			score += 25;
-		} else {
-			// Simple character overlap ratio
-			const longer = normSearch.length > normCandidate.length ? normSearch : normCandidate;
-			const shorter = normSearch.length > normCandidate.length ? normCandidate : normSearch;
-			if (longer.length > 0) {
-				let matches = 0;
-				const longerChars = longer.split('');
-				const shorterChars = shorter.split('');
-				for (const ch of shorterChars) {
-					const idx = longerChars.indexOf(ch);
-					if (idx !== -1) {
-						matches++;
-						longerChars.splice(idx, 1);
-					}
-				}
-				const ratio = matches / longer.length;
-				score += Math.round(ratio * 40);
-			}
-		}
-
-		// Year match (0-30 points)
-		if (searchYear && candidateYear) {
-			const diff = Math.abs(searchYear - candidateYear);
-			if (diff === 0) score += 30;
-			else if (diff === 1) score += 15;
-			else if (diff === 2) score += 5;
-		}
-
-		// Duration match (0-25 points)
-		if (fileDurationSeconds && candidateRuntimeMinutes) {
-			const fileMins = fileDurationSeconds / 60;
-			const diff = Math.abs(fileMins - candidateRuntimeMinutes);
-			if (diff <= 5) score += 25;
-			else if (diff <= 10) score += 10;
-		}
-
-		return score;
+/** Returns the first argument that is a non-empty string. */
+function firstNonEmpty(...values: (string | null | undefined)[]): string | null {
+	for (const v of values) {
+		if (typeof v === 'string' && v.trim().length > 0) return v;
 	}
-
-	/**
-	 * Normalize a title for comparison: lowercase, strip articles, remove punctuation.
-	 */
-	private normalizeTitle(title: string): string {
-		return title
-			.toLowerCase()
-			.replace(/^(the|a|an)\s+/i, '')
-			.replace(/[^\w\s]/g, '')
-			.replace(/\s+/g, ' ')
-			.trim();
-	}
+	return null;
 }

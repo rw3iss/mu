@@ -444,6 +444,7 @@ export class GroupingService implements OnModuleInit {
 
 		// 1. Ensure parent exists.
 		let parentId = result.parentGroupId;
+		let createdParent = false;
 		if (!parentId) {
 			const existing = this.repo.getByNameAndType(result.parentName, 'parent');
 			if (existing) {
@@ -463,6 +464,23 @@ export class GroupingService implements OnModuleInit {
 					updatedAt: now,
 				});
 				parentId = newParent.id;
+				createdParent = true;
+			}
+		}
+
+		// Brand-new parent → kick off metadata enrichment in the
+		// background. Decoupled via the job queue so we don't drag
+		// MetadataModule into the grouping critical path.
+		if (createdParent && parentId) {
+			try {
+				this.jobs.enqueue({
+					type: 'group-metadata',
+					label: `Enrich group "${result.parentName}"`,
+					payload: { groupId: parentId },
+					priority: 40,
+				});
+			} catch (err: any) {
+				this.logger.warn(`Could not enqueue group-metadata job: ${err?.message}`);
 			}
 		}
 

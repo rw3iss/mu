@@ -261,6 +261,24 @@ const tables = [
 		generated_at TEXT NOT NULL,
 		PRIMARY KEY (seed_id, target_id, model)
 	)`,
+	`CREATE TABLE IF NOT EXISTS metadata_match_candidates (
+		id TEXT PRIMARY KEY,
+		entity_type TEXT NOT NULL,
+		entity_id TEXT NOT NULL,
+		provider TEXT NOT NULL,
+		external_id TEXT NOT NULL,
+		title TEXT NOT NULL,
+		year INTEGER,
+		runtime_minutes INTEGER,
+		poster_url TEXT,
+		overview TEXT,
+		confidence REAL NOT NULL,
+		rank INTEGER NOT NULL,
+		is_best INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS mmc_entity_idx ON metadata_match_candidates(entity_type, entity_id)`,
+	`CREATE INDEX IF NOT EXISTS mmc_rank_idx ON metadata_match_candidates(entity_type, entity_id, rank)`,
 ];
 
 for (const sql of tables) {

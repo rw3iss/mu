@@ -1,5 +1,6 @@
 import type { Movie } from '@/state/library.state';
 import { api } from './api';
+import type { MatchCandidate } from './movies.service';
 
 export type GroupRole = 'parent' | 'subgroup';
 export type GroupStatus = 'auto' | 'unsure' | 'confirmed' | 'rejected';
@@ -92,5 +93,30 @@ export const groupsService = {
 		message: string;
 	}> {
 		return api.post('/groups/admin/rebuild', {});
+	},
+
+	listMatchCandidates(
+		groupId: string,
+	): Promise<{ candidates: MatchCandidate[] }> {
+		return api.get(`/groups/${groupId}/match-candidates`);
+	},
+
+	applyMatchCandidate(
+		groupId: string,
+		provider: string,
+		externalId: string,
+	): Promise<unknown> {
+		return api.post(`/groups/${groupId}/match-candidates/apply`, {
+			provider,
+			externalId,
+		});
+	},
+
+	clearMatchCandidates(groupId: string): Promise<{ ok: boolean }> {
+		return api.delete(`/groups/${groupId}/match-candidates`);
+	},
+
+	refreshMetadata(groupId: string): Promise<unknown> {
+		return api.post(`/groups/${groupId}/refresh-metadata`, {});
 	},
 };

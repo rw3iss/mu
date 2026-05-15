@@ -14,6 +14,23 @@ export interface MovieListResponse {
 	pageSize: number;
 }
 
+export interface MatchCandidate {
+	id: string;
+	entityType: 'movie' | 'group';
+	entityId: string;
+	provider: string;
+	externalId: string;
+	title: string;
+	year: number | null;
+	runtimeMinutes: number | null;
+	posterUrl: string | null;
+	overview: string | null;
+	confidence: number;
+	rank: number;
+	isBest: boolean;
+	createdAt: string;
+}
+
 export interface MovieFile {
 	id: string;
 	filename: string;
@@ -78,6 +95,35 @@ export const moviesService = {
 
 	clearMetadata(movieId: string): Promise<void> {
 		return api.post<void>(`/movies/${movieId}/clear-metadata`);
+	},
+
+	/**
+	 * List ambiguous match candidates persisted when the auto-matcher
+	 * couldn't pick a single winner.
+	 */
+	listMatchCandidates(
+		movieId: string,
+	): Promise<{ candidates: MatchCandidate[] }> {
+		return api.get(`/movies/${movieId}/match-candidates`);
+	},
+
+	/**
+	 * Apply a user-chosen candidate. Server clears the dropdown and
+	 * re-runs the merge fetch using the picked provider+externalId.
+	 */
+	applyMatchCandidate(
+		movieId: string,
+		provider: string,
+		externalId: string,
+	): Promise<unknown> {
+		return api.post(`/movies/${movieId}/match-candidates/apply`, {
+			provider,
+			externalId,
+		});
+	},
+
+	clearMatchCandidates(movieId: string): Promise<{ ok: boolean }> {
+		return api.delete(`/movies/${movieId}/match-candidates`);
 	},
 
 	/**

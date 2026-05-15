@@ -4,8 +4,10 @@ import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { Spinner } from '@/components/common/Spinner';
+import { MatchCandidatesPanel } from '@/components/movie/MatchCandidatesPanel';
 import { MovieListItem } from '@/components/movie/MovieListItem';
 import { type GroupDetailResponse, groupsService, type MovieGroup } from '@/services/groups.service';
+import type { MatchCandidate } from '@/services/movies.service';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './GroupDetail.module.scss';
 
@@ -31,6 +33,7 @@ export function GroupDetail({ id }: GroupDetailProps) {
 	// Per-subgroup episode lists, lazy-loaded on expand.
 	const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 	const [childMovies, setChildMovies] = useState<Record<string, GroupDetailResponse['movies']>>({});
+	const [candidates, setCandidates] = useState<MatchCandidate[]>([]);
 
 	useEffect(() => {
 		if (!id) return;
@@ -46,6 +49,60 @@ export function GroupDetail({ id }: GroupDetailProps) {
 			})
 			.finally(() => setLoading(false));
 	}, [id]);
+
+	useEffect(() => {
+		if (!id) return;
+		let cancelled = false;
+		groupsService
+			.listMatchCandidates(id)
+			.then((res) => {
+				if (!cancelled) setCandidates(res.candidates ?? []);
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, [id]);
+
+	async function handleApplyCandidate(c: MatchCandidate) {
+		if (!id) return;
+		try {
+			await groupsService.applyMatchCandidate(id, c.provider, c.externalId);
+			setCandidates([]);
+			const fresh = await groupsService.get(id);
+			setData(fresh);
+			notifySuccess(`Applied "${c.title}" as the match.`);
+		} catch (err: any) {
+			notifyError(`Could not apply candidate: ${err?.message ?? 'unknown error'}`);
+		}
+	}
+
+	async function handleDismissCandidates() {
+		if (!id) return;
+		try {
+			await groupsService.clearMatchCandidates(id);
+			setCandidates([]);
+		} catch (err: any) {
+			notifyError(`Could not clear candidates: ${err?.message ?? 'unknown error'}`);
+		}
+	}
+
+	async function handleRefreshGroupMetadata() {
+		if (!id) return;
+		setBusy(true);
+		try {
+			await groupsService.refreshMetadata(id);
+			const fresh = await groupsService.get(id);
+			setData(fresh);
+			const res = await groupsService.listMatchCandidates(id);
+			setCandidates(res.candidates ?? []);
+			notifySuccess('Group metadata refreshed.');
+		} catch (err: any) {
+			notifyError(`Refresh failed: ${err?.message ?? 'unknown error'}`);
+		} finally {
+			setBusy(false);
+		}
+	}
 
 	async function expandChild(child: MovieGroup) {
 		if (expanded[child.id]) {
@@ -191,6 +248,16 @@ export function GroupDetail({ id }: GroupDetailProps) {
 									<Icon name="check" size={14} /> Confirm grouping
 								</Button>
 							)}
+							{data.group.type === 'parent' && (
+								<Button
+									variant="ghost"
+									onClick={handleRefreshGroupMetadata}
+									disabled={busy}
+									title="Re-fetch poster / overview / IDs from TMDB"
+								>
+									<Icon name="refresh" size={14} /> Refresh metadata
+								</Button>
+							)}
 							<Button
 								variant="ghost"
 								onClick={() => handleReject(data.group)}
@@ -201,6 +268,15 @@ export function GroupDetail({ id }: GroupDetailProps) {
 						</div>
 					</div>
 				</div>
+
+				{candidates.length > 0 && (
+					<MatchCandidatesPanel
+						candidates={candidates}
+						onApply={handleApplyCandidate}
+						onDismiss={handleDismissCandidates}
+						heading="We weren't sure which TMDB entry this group maps to — pick one:"
+					/>
+				)}
 
 				{isUnsure && data.altParents.length > 0 && (
 					<div class={styles.unsureBanner}>

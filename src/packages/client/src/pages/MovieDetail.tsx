@@ -7,6 +7,7 @@ import { Spinner } from '@/components/common/Spinner';
 import { CastPhoto } from '@/components/movie/CastPhoto';
 import { ExternalRatings } from '@/components/movie/ExternalRatings';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
+import { MatchCandidatesPanel } from '@/components/movie/MatchCandidatesPanel';
 import { MovieOptionsMenu } from '@/components/movie/MovieOptionsMenu';
 import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { RatingWidget } from '@/components/movie/RatingWidget';
@@ -17,7 +18,7 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { type AudioProfile, audioProfilesService } from '@/services/audio-profiles.service';
 import { bookmarksService } from '@/services/discover.service';
-import { moviesService } from '@/services/movies.service';
+import { type MatchCandidate, moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
 import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
@@ -46,6 +47,9 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	const [isSavingTitle, setIsSavingTitle] = useState(false);
 	const titleInputRef = useRef<HTMLInputElement>(null);
 
+	// Ambiguous-match candidates persisted by the matcher
+	const [candidates, setCandidates] = useState<MatchCandidate[]>([]);
+
 	useEffect(() => {
 		if (!id) return;
 
@@ -68,6 +72,50 @@ export function MovieDetail({ id }: MovieDetailProps) {
 		fetchProcessingMovies();
 	}, [id]);
 
+	// Load any persisted match candidates for this movie.
+	useEffect(() => {
+		if (!id) return;
+		let cancelled = false;
+		moviesService
+			.listMatchCandidates(id)
+			.then((res) => {
+				if (!cancelled) setCandidates(res.candidates ?? []);
+			})
+			.catch(() => {
+				// Non-fatal — candidates table may not exist on older deploys.
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [id]);
+
+	const handleApplyCandidate = useCallback(
+		async (c: MatchCandidate) => {
+			if (!id) return;
+			try {
+				await moviesService.applyMatchCandidate(id, c.provider, c.externalId);
+				setCandidates([]);
+				// Re-fetch the movie so the new metadata shows up.
+				const updated = await moviesService.get(id);
+				setMovie(updated);
+				notifySuccess(`Applied "${c.title}" as the match.`);
+			} catch (err: any) {
+				notifyError(`Could not apply candidate: ${err?.message ?? 'unknown error'}`);
+			}
+		},
+		[id],
+	);
+
+	const handleDismissCandidates = useCallback(async () => {
+		if (!id) return;
+		try {
+			await moviesService.clearMatchCandidates(id);
+			setCandidates([]);
+		} catch (err: any) {
+			notifyError(`Could not clear candidates: ${err?.message ?? 'unknown error'}`);
+		}
+	}, [id]);
+
 	// Re-fetch movie when the server notifies us of an update
 	// (e.g. after re-scan, pre-transcode completion, metadata refresh)
 	useEffect(() => {
@@ -76,6 +124,14 @@ export function MovieDetail({ id }: MovieDetailProps) {
 		const handler = (data: unknown) => {
 			const event = data as { movieId?: string; source?: string };
 			if (event.movieId === id) {
+				// Server emits this whenever metadata moves — including the
+				// 'metadata-candidates' case where ambiguous candidates were
+				// freshly persisted. Refresh both the movie and the candidate
+				// list so the dropdown appears/clears live.
+				moviesService
+					.listMatchCandidates(id)
+					.then((res) => setCandidates(res.candidates ?? []))
+					.catch(() => {});
 				moviesService
 					.get(id)
 					.then((updated) => setMovie(updated))
@@ -397,6 +453,14 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						)}
 
 						{movie.tagline && <p class={styles.tagline}>{movie.tagline}</p>}
+
+						{candidates.length > 0 && (
+							<MatchCandidatesPanel
+								candidates={candidates}
+								onApply={handleApplyCandidate}
+								onDismiss={handleDismissCandidates}
+							/>
+						)}
 
 						<div class={styles.meta}>
 							{movie.contentRating && (

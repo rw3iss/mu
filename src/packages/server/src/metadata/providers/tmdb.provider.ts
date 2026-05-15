@@ -17,6 +17,72 @@ interface TmdbSearchResult {
 	vote_average: number;
 	vote_count: number;
 	genre_ids: number[];
+	popularity?: number;
+}
+
+export interface TmdbTvSearchResult {
+	id: number;
+	name: string;
+	original_name: string;
+	overview: string;
+	first_air_date: string;
+	poster_path: string | null;
+	backdrop_path: string | null;
+	vote_average: number;
+	vote_count: number;
+	popularity?: number;
+}
+
+export interface TmdbCollectionSearchResult {
+	id: number;
+	name: string;
+	overview: string;
+	poster_path: string | null;
+	backdrop_path: string | null;
+}
+
+export interface TmdbTvDetails {
+	id: number;
+	name: string;
+	original_name: string;
+	overview: string;
+	tagline: string;
+	first_air_date: string;
+	last_air_date: string | null;
+	number_of_seasons: number;
+	number_of_episodes: number;
+	episode_run_time: number[];
+	poster_path: string | null;
+	backdrop_path: string | null;
+	vote_average: number;
+	vote_count: number;
+	popularity: number;
+	genres: { id: number; name: string }[];
+	networks: { id: number; name: string }[];
+	external_ids?: { imdb_id: string | null; tvdb_id: number | null };
+	credits?: {
+		cast: { id: number; name: string; character: string; profile_path: string | null }[];
+		crew: { id: number; name: string; job: string; department: string }[];
+	};
+	videos?: {
+		results: { key: string; site: string; type: string }[];
+	};
+	images?: {
+		posters: { file_path: string }[];
+		backdrops: { file_path: string }[];
+	};
+	keywords?: {
+		results: { id: number; name: string }[];
+	};
+}
+
+export interface TmdbCollectionDetails {
+	id: number;
+	name: string;
+	overview: string;
+	poster_path: string | null;
+	backdrop_path: string | null;
+	parts: TmdbSearchResult[];
 }
 
 interface TmdbMovieDetails {
@@ -142,5 +208,160 @@ export class TmdbProvider {
 	getImageUrl(path: string | null, size: string = 'w500'): string | null {
 		if (!path) return null;
 		return `${TMDB_IMAGE_BASE}/${size}${path}`;
+	}
+
+	async searchTv(name: string, year?: number): Promise<TmdbTvSearchResult[] | null> {
+		if (!this.apiKey) return null;
+
+		const cacheKey = `tv:search:${name}:${year ?? ''}`;
+		const cached = await this.cache.get<TmdbTvSearchResult[]>(
+			CACHE_NAMESPACES.METADATA,
+			cacheKey,
+		);
+		if (cached) return cached;
+
+		const params = new URLSearchParams({
+			api_key: this.apiKey,
+			query: name,
+			include_adult: 'false',
+		});
+		if (year) params.set('first_air_date_year', String(year));
+
+		try {
+			const response = await fetch(`${TMDB_BASE_URL}/search/tv?${params}`);
+			if (!response.ok) {
+				this.logger.warn(`TMDB TV search failed: ${response.status}`);
+				return null;
+			}
+			const data = (await response.json()) as { results: TmdbTvSearchResult[] };
+			const results = data.results ?? [];
+			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, results, CACHE_TTL.METADATA);
+			return results;
+		} catch (err: any) {
+			this.logger.error(`TMDB TV search error: ${err.message}`);
+			return null;
+		}
+	}
+
+	async getTvDetails(tmdbTvId: number): Promise<TmdbTvDetails | null> {
+		if (!this.apiKey) return null;
+
+		const cacheKey = `tv:details:${tmdbTvId}`;
+		const cached = await this.cache.get<TmdbTvDetails>(CACHE_NAMESPACES.METADATA, cacheKey);
+		if (cached) return cached;
+
+		const params = new URLSearchParams({
+			api_key: this.apiKey,
+			append_to_response: 'credits,videos,images,keywords,external_ids',
+		});
+
+		try {
+			const response = await fetch(`${TMDB_BASE_URL}/tv/${tmdbTvId}?${params}`);
+			if (!response.ok) {
+				this.logger.warn(`TMDB TV details failed for ${tmdbTvId}: ${response.status}`);
+				return null;
+			}
+			const data = (await response.json()) as TmdbTvDetails;
+			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, data, CACHE_TTL.METADATA);
+			return data;
+		} catch (err: any) {
+			this.logger.error(`TMDB TV details error: ${err.message}`);
+			return null;
+		}
+	}
+
+	async searchCollection(name: string): Promise<TmdbCollectionSearchResult[] | null> {
+		if (!this.apiKey) return null;
+
+		const cacheKey = `collection:search:${name}`;
+		const cached = await this.cache.get<TmdbCollectionSearchResult[]>(
+			CACHE_NAMESPACES.METADATA,
+			cacheKey,
+		);
+		if (cached) return cached;
+
+		const params = new URLSearchParams({
+			api_key: this.apiKey,
+			query: name,
+		});
+
+		try {
+			const response = await fetch(`${TMDB_BASE_URL}/search/collection?${params}`);
+			if (!response.ok) return null;
+			const data = (await response.json()) as { results: TmdbCollectionSearchResult[] };
+			const results = data.results ?? [];
+			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, results, CACHE_TTL.METADATA);
+			return results;
+		} catch (err: any) {
+			this.logger.error(`TMDB collection search error: ${err.message}`);
+			return null;
+		}
+	}
+
+	async getCollectionDetails(collectionId: number): Promise<TmdbCollectionDetails | null> {
+		if (!this.apiKey) return null;
+
+		const cacheKey = `collection:details:${collectionId}`;
+		const cached = await this.cache.get<TmdbCollectionDetails>(
+			CACHE_NAMESPACES.METADATA,
+			cacheKey,
+		);
+		if (cached) return cached;
+
+		const params = new URLSearchParams({ api_key: this.apiKey });
+
+		try {
+			const response = await fetch(
+				`${TMDB_BASE_URL}/collection/${collectionId}?${params}`,
+			);
+			if (!response.ok) return null;
+			const data = (await response.json()) as TmdbCollectionDetails;
+			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, data, CACHE_TTL.METADATA);
+			return data;
+		} catch (err: any) {
+			this.logger.error(`TMDB collection details error: ${err.message}`);
+			return null;
+		}
+	}
+
+	/**
+	 * Reverse lookup from IMDB ID. Useful when OMDB returned an imdbId
+	 * but our title-based TMDB search missed.
+	 */
+	async findByImdbId(imdbId: string): Promise<{
+		movie?: TmdbSearchResult;
+		tv?: TmdbTvSearchResult;
+	} | null> {
+		if (!this.apiKey) return null;
+
+		const cacheKey = `find:imdb:${imdbId}`;
+		const cached = await this.cache.get<{
+			movie?: TmdbSearchResult;
+			tv?: TmdbTvSearchResult;
+		}>(CACHE_NAMESPACES.METADATA, cacheKey);
+		if (cached) return cached;
+
+		const params = new URLSearchParams({
+			api_key: this.apiKey,
+			external_source: 'imdb_id',
+		});
+
+		try {
+			const response = await fetch(`${TMDB_BASE_URL}/find/${imdbId}?${params}`);
+			if (!response.ok) return null;
+			const data = (await response.json()) as {
+				movie_results: TmdbSearchResult[];
+				tv_results: TmdbTvSearchResult[];
+			};
+			const result = {
+				movie: data.movie_results?.[0],
+				tv: data.tv_results?.[0],
+			};
+			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, result, CACHE_TTL.METADATA);
+			return result;
+		} catch (err: any) {
+			this.logger.error(`TMDB find error: ${err.message}`);
+			return null;
+		}
 	}
 }

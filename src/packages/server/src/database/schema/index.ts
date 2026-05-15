@@ -37,6 +37,11 @@ export type {
 export { movieExternalRecs } from './movie-external-recs.ts';
 export type { MovieMetadata, NewMovieMetadata } from './movie-metadata.ts';
 export { movieMetadata } from './movie-metadata.ts';
+export type {
+	MetadataMatchCandidate,
+	NewMetadataMatchCandidate,
+} from './metadata-match-candidates.ts';
+export { metadataMatchCandidates } from './metadata-match-candidates.ts';
 export type { Movie, NewMovie } from './movies.ts';
 export { movies } from './movies.ts';
 export type { NewPlaylistMovie, PlaylistMovie } from './playlist-movies.ts';
