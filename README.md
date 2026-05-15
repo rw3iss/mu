@@ -195,11 +195,19 @@ The server listens on port **4000** by default. Open `http://localhost:4000` and
 
 ## Configuration
 
-Mu is configured through (in priority order):
+**You almost certainly don't need this section.** Mu is designed to be configured through the web UI after install — open `http://localhost:4000`, create your admin account, and head to **Settings**. From there you can:
 
-1. **Environment variables** (prefixed with `MU_`)
-2. **Config file** (`data/config/config.yml`, auto-generated on first run)
-3. **Settings UI** in the web interface
+- Add a media folder and scan it (Settings → Library).
+- Paste TMDB / OMDB / OpenSubtitles / Trakt / Anthropic API keys (Settings → Connections — keys are stored encrypted in the database, never on disk).
+- Tune the player, transcoder, scanning behavior, job concurrency, recommendation matching, and access controls.
+- Add or remove users and roles (Settings → Users).
+
+The installer auto-generates the only two required values (the JWT and cookie secrets) on first start, so a fresh install boots with zero manual config. **Everything below is for advanced or scripted setups** — running headless, baking config into containers, or overriding values before the UI is reachable.
+
+<details>
+<summary><strong>Show advanced configuration (config file + env vars)</strong></summary>
+
+Mu resolves settings in this priority order: **environment variables → `data/config/config.yml` → Settings UI values stored in the database**. The UI is the source of truth for anything a human would normally change — file and env-var configuration is mainly useful for bootstrap and immutable infrastructure.
 
 ### Config File
 
@@ -292,6 +300,8 @@ docker compose --profile workers up --scale mu-worker=3
 ```
 
 Workers boot the same NestJS DI graph as the main server, so handlers and configuration stay in lockstep. Just run them against the same Redis + database.
+
+</details>
 
 ---
 
