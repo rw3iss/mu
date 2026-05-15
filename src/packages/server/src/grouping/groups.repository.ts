@@ -54,6 +54,10 @@ export class GroupsRepository {
 	getParentSummary(parentId: string): {
 		totalMembers: number;
 		representativePosterUrl: string | null;
+		/** Latest `addedAt` across every member — drives the mixed view's sort. */
+		latestMemberAddedAt: string | null;
+		/** Earliest year across every member — used for year-sort in the mixed view. */
+		earliestYear: number | null;
 	} {
 		const row = this.database.db
 			.select({
@@ -61,6 +65,8 @@ export class GroupsRepository {
 				poster: sql<
 					string | null
 				>`(SELECT poster_url FROM movies WHERE group_id IN (SELECT id FROM movie_groups WHERE parent_group_id = ${parentId}) AND poster_url IS NOT NULL ORDER BY group_episode_ordinal LIMIT 1)`,
+				latestAdded: sql<string | null>`MAX(${movies.addedAt})`,
+				earliestYear: sql<number | null>`MIN(${movies.year})`,
 			})
 			.from(movies)
 			.innerJoin(movieGroups, eq(movieGroups.id, movies.groupId))
@@ -69,6 +75,8 @@ export class GroupsRepository {
 		return {
 			totalMembers: row?.totalMembers ?? 0,
 			representativePosterUrl: row?.poster ?? null,
+			latestMemberAddedAt: row?.latestAdded ?? null,
+			earliestYear: row?.earliestYear ?? null,
 		};
 	}
 

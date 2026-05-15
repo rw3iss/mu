@@ -50,6 +50,11 @@ export class GroupingController {
 					// one from a member movie so the Library tile grid
 					// has something to show.
 					posterUrl: p.posterUrl ?? summary.representativePosterUrl,
+					// Sort-relevant fields for the mixed-library view —
+					// lets the client slot the group at the right position
+					// among regular movies.
+					latestMemberAddedAt: summary.latestMemberAddedAt,
+					earliestYear: summary.earliestYear,
 				};
 			}),
 		};

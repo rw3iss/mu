@@ -27,6 +27,10 @@ export interface MovieGroup {
 	subgroupCount?: number;
 	/** Total movie count across every subgroup under this parent. */
 	totalMembers?: number;
+	/** Latest `addedAt` across all members — drives library mixed-view sort. */
+	latestMemberAddedAt?: string | null;
+	/** Earliest member year — used for year-sort in the mixed view. */
+	earliestYear?: number | null;
 }
 
 export interface AltParent {

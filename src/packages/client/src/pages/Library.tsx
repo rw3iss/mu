@@ -13,7 +13,6 @@ import {
 } from '@/state/groups.state';
 import type { BulkAction } from '@/components/movie/BulkActionsBar';
 import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
-import { GroupTile } from '@/components/movie/GroupTile';
 import { MovieGrid } from '@/components/movie/MovieGrid';
 import { useDebounce } from '@/hooks/useDebounce';
 import { PluginSlot } from '@/plugins/PluginSlot';
@@ -534,71 +533,83 @@ export function Library(_props: LibraryProps) {
 			)}
 
 			{/* Four rendering modes — driven by the two independent toggles:
-			    1. groupedOnly=true  + groupViewEnabled=true  → tile grid of parent groups
+			    1. groupedOnly=true  + groupViewEnabled=true  → tile-only grid of parent
+			       groups (collections-only view, collapsed)
 			    2. groupedOnly=true  + groupViewEnabled=false → flat MovieGrid of every
 			       group member; server filters via ?groupedOnly=true
-			    3. groupedOnly=false + groupViewEnabled=true  → MIXED: parent tiles ABOVE
-			       ungrouped-movie grid (server hides grouped movies via ?excludeGrouped=true
-			       so we don't render the same content twice)
+			    3. groupedOnly=false + groupViewEnabled=true  → MIXED: parent groups
+			       interleaved with ungrouped movies in one sorted grid. Groups render
+			       as cards that match MovieCard dimensions, sorted by their latest
+			       member's addedAt (or whichever sort key is active). Server hides
+			       grouped movies via ?excludeGrouped=true so we don't double-render
+			       members already represented by their group card.
 			    4. groupedOnly=false + groupViewEnabled=false → full library, every movie
-			       individually (grouped + ungrouped) */}
+			       individually (grouped + ungrouped). No group cards. */}
 			{(() => {
 				const q = searchQuery.value.trim().toLowerCase();
 				const visibleParents = q
 					? parentGroups.value.filter((g) => g.name.toLowerCase().includes(q))
 					: parentGroups.value;
-				const showTiles = groupViewEnabled.value;
-				const showMovies = !(groupedOnly.value && groupViewEnabled.value);
+				const tilesOnly = groupedOnly.value && groupViewEnabled.value;
 				const mixed = !groupedOnly.value && groupViewEnabled.value;
 
-				return (
-					<>
-						{showTiles && (
-							<div class={styles.groupTileGrid}>
-								{!groupsLoaded.value && parentGroups.value.length === 0 ? (
-									<div class={styles.groupsLoading}>Loading collections…</div>
-								) : parentGroups.value.length === 0 ? (
-									!mixed && (
-										<div class={styles.groupsEmpty}>
-											No collections yet. Run <strong>Settings → Admin → Group
-											Similar Items</strong> to detect series + collections from
-											your library.
-										</div>
-									)
-								) : visibleParents.length === 0 ? (
-									!mixed && (
-										<div class={styles.groupsEmpty}>
-											No collections match &ldquo;{searchQuery.value}&rdquo;.
-										</div>
-									)
-								) : (
-									visibleParents.map((g) => <GroupTile key={g.id} group={g} />)
-								)}
+				if (tilesOnly) {
+					if (!groupsLoaded.value && parentGroups.value.length === 0) {
+						return <div class={styles.groupsLoading}>Loading collections…</div>;
+					}
+					if (parentGroups.value.length === 0) {
+						return (
+							<div class={styles.groupsEmpty}>
+								No collections yet. Run <strong>Settings → Admin → Group
+								Similar Items</strong> to detect series + collections from
+								your library.
 							</div>
-						)}
+						);
+					}
+					if (visibleParents.length === 0) {
+						return (
+							<div class={styles.groupsEmpty}>
+								No collections match &ldquo;{searchQuery.value}&rdquo;.
+							</div>
+						);
+					}
+					// Reuse MovieGrid layout for the tile-only view so the grid
+					// dimensions match. Movies array stays empty.
+					return (
+						<MovieGrid
+							movies={[]}
+							groups={visibleParents}
+							sortBy={filters.value.sortBy}
+							sortOrder={filters.value.sortOrder}
+							isLoading={false}
+							viewMode={viewMode.value}
+							selectionMode={editMode}
+							selectedIds={selectedIds}
+							onToggleSelect={handleToggleSelect}
+							emptyMessage=""
+						/>
+					);
+				}
 
-						{showMovies && (
-							<MovieGrid
-								movies={movies.value}
-								isLoading={isLoading.value}
-								viewMode={viewMode.value}
-								selectionMode={editMode}
-								selectedIds={selectedIds}
-								onToggleSelect={handleToggleSelect}
-								emptyMessage={
-									searchQuery.value
-										? mixed && visibleParents.length > 0
-											? '' // tiles above carried the result; don't double up with "no results"
-											: `No results for "${searchQuery.value}"`
-										: groupedOnly.value
-											? 'No movies belong to a collection yet.'
-											: mixed
-												? '' // tiles may carry the library; empty movie grid is fine
-												: 'Your library is empty'
-								}
-							/>
-						)}
-					</>
+				return (
+					<MovieGrid
+						movies={movies.value}
+						groups={mixed ? visibleParents : undefined}
+						sortBy={filters.value.sortBy}
+						sortOrder={filters.value.sortOrder}
+						isLoading={isLoading.value}
+						viewMode={viewMode.value}
+						selectionMode={editMode}
+						selectedIds={selectedIds}
+						onToggleSelect={handleToggleSelect}
+						emptyMessage={
+							searchQuery.value
+								? `No results for "${searchQuery.value}"`
+								: groupedOnly.value
+									? 'No movies belong to a collection yet.'
+									: 'Your library is empty'
+						}
+					/>
 				);
 			})()}
 
