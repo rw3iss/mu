@@ -100,39 +100,96 @@ The server auto-detects FFmpeg at `C:/ffmpeg/ffmpeg.exe` on Windows. Restart aft
 
 ## Installation
 
-### Interactive Installer (Linux / macOS / Windows Git Bash)
+### One-line install
+
+| OS | Command |
+|---|---|
+| **Linux** (Fedora, Ubuntu, Debian, Arch, Alpine, openSUSE) | `curl -fsSL https://raw.githubusercontent.com/rw3iss/mu/main/install.sh \| bash` |
+| **macOS** (Intel / Apple Silicon) | `curl -fsSL https://raw.githubusercontent.com/rw3iss/mu/main/install.sh \| bash` |
+| **Windows 10 / 11** (PowerShell) | `iwr -useb https://raw.githubusercontent.com/rw3iss/mu/main/install.ps1 \| iex` |
+| **Docker** | `docker compose -f docker/docker-compose.yml up -d` |
+
+The installer is interactive — it asks for your data directory, initial movies folder, port, max concurrent jobs, and whether to set up a system service. It auto-installs Node 20+, pnpm, FFmpeg, and build tools as needed. After install it prints the URL to open and (on Linux/macOS) shows the LAN IP + port-forwarding instructions for opening Mu to the wider internet.
+
+<details>
+<summary><strong>Reinstall / update in place</strong></summary>
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rw3iss/mu/main/src/scripts/install.sh -o install.sh
-bash install.sh
+# Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/rw3iss/mu/main/install.sh | bash -s -- --reinstall
+
+# Windows
+iwr -useb https://raw.githubusercontent.com/rw3iss/mu/main/install.ps1 -OutFile $env:TEMP\mu-install.ps1
+& $env:TEMP\mu-install.ps1 -Reinstall
 ```
 
-The installer checks prerequisites, lets you pick a release, configures API keys, and optionally sets up a systemd service (Linux).
+Pulls the latest source, re-installs dependencies, rebuilds, applies any new migrations, and restarts the service if one is installed. Your config, database, and cache are preserved.
+</details>
 
-### Interactive Installer (Windows PowerShell)
+<details>
+<summary><strong>Uninstall</strong></summary>
 
-```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/rw3iss/mu/main/src/scripts/install.ps1" -OutFile install.ps1
-.\install.ps1
+```bash
+# Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/rw3iss/mu/main/install.sh | bash -s -- --uninstall
+
+# Windows
+iwr -useb https://raw.githubusercontent.com/rw3iss/mu/main/install.ps1 -OutFile $env:TEMP\mu-install.ps1
+& $env:TEMP\mu-install.ps1 -Uninstall
 ```
 
-### Manual Install
+Stops + removes the service, then asks per-item whether to keep the database, cache, and install directory. Preserved data is moved to `~/mu-preserved-<timestamp>/` so nothing is lost by accident.
+</details>
+
+<details>
+<summary><strong>Non-interactive install (CI / scripted)</strong></summary>
+
+```bash
+# Linux / macOS — accept all defaults
+curl -fsSL https://raw.githubusercontent.com/rw3iss/mu/main/install.sh | bash -s -- --yes
+
+# Custom install dir + branch
+curl -fsSL https://raw.githubusercontent.com/rw3iss/mu/main/install.sh | bash -s -- \
+  --yes --dir /opt/mu --branch main
+
+# Windows
+iwr -useb https://raw.githubusercontent.com/rw3iss/mu/main/install.ps1 -OutFile $env:TEMP\mu-install.ps1
+& $env:TEMP\mu-install.ps1 -Yes -InstallDir C:\mu
+```
+</details>
+
+<details>
+<summary><strong>Manual install (git clone)</strong></summary>
+
+If you'd rather drive the steps yourself:
 
 ```bash
 git clone https://github.com/rw3iss/mu.git
 cd mu/src
 pnpm install
 pnpm build
+pnpm db:migrate
 pnpm start
 ```
 
-The server starts on port **4000** by default. Open `http://localhost:4000` to create your admin account.
+You'll need **Node 20+**, **pnpm 9+**, and **FFmpeg** on PATH (Windows: `C:\ffmpeg\ffmpeg.exe` works too).
 
-### Docker
+The server listens on port **4000** by default. Open `http://localhost:4000` and create your admin account.
+</details>
 
-```bash
-docker compose -f docker/docker-compose.yml up -d
-```
+<details>
+<summary><strong>What the installer does</strong></summary>
+
+1. **Detects your OS and package manager** (dnf / apt / pacman / apk / zypper on Linux, brew on macOS, winget on Windows). Installs Homebrew if it's missing on macOS.
+2. **Installs prerequisites**: git, Node 20+ (via NodeSource on Debian/Ubuntu so the default repo's old version isn't used), pnpm (via corepack), FFmpeg, and a C++ toolchain (`better-sqlite3` needs one).
+3. **Asks for** install directory, data directory, initial media folder, HTTP port, max concurrent jobs, whether to set up a service (systemd / launchd / nssm), and whether to start immediately.
+4. **Clones** the repo to your install dir (or pulls latest if `--reinstall`).
+5. **Builds** the workspace (`pnpm install` + `pnpm build`).
+6. **Writes** `data/config/config.yml` with generated JWT + cookie secrets and your answers. If a config already exists, it's preserved untouched.
+7. **Applies the database schema** via the inline migration script.
+8. **Installs the service** if you asked — `systemd` unit on Linux, `launchd` agent on macOS, `nssm` service on Windows.
+9. **Starts the server** and prints: the localhost URL, the LAN URL, useful commands, and how to port-forward your router for outside-LAN access.
+</details>
 
 ---
 
