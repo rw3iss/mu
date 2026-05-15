@@ -319,38 +319,76 @@ for (const sql of alters) {
 	try { db.exec(sql); } catch (e) { /* column already exists */ }
 }
 
-// Seed default themes if none exist
-const themeCount = db.prepare('SELECT COUNT(*) as c FROM themes WHERE is_default = 1').get();
-if (themeCount.c === 0) {
-	const crypto = require('crypto');
-	const now = new Date().toISOString();
-	const darkConfig = JSON.stringify({
-		accentColor: '#06b6d4',
-		pageBg: '#050709',
-		panelBg: '#090b12',
-		itemSpacing: 'normal',
-		itemRadius: 3,
-		cardBorder: { width: 1, color: '#788cb4', opacity: 0.07 },
-		disableHover: false,
-		textScale: 1.0,
-	});
-	const lightConfig = JSON.stringify({
-		accentColor: '#0891b2',
-		pageBg: '#f8fafc',
-		panelBg: '#ffffff',
-		itemSpacing: 'normal',
-		itemRadius: 3,
-		cardBorder: { width: 1, color: '#94a3b8', opacity: 0.15 },
-		disableHover: false,
-		textScale: 1.0,
-	});
-	db.prepare(
-		'INSERT INTO themes (id, name, mode, config, is_default, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-	).run(crypto.randomUUID(), 'Default (Dark)', 'dark', darkConfig, 1, null, now, now);
-	db.prepare(
-		'INSERT INTO themes (id, name, mode, config, is_default, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-	).run(crypto.randomUUID(), 'Default (Light)', 'light', lightConfig, 1, null, now, now);
-	console.log('Seeded default themes');
+// Seed built-in curated themes from the canonical catalogue.
+// Idempotent: inserts only entries whose `name` doesn't already exist,
+// so re-runs never duplicate and existing user customisations to a
+// built-in theme of the same name are preserved.
+// Catalogue path: src/packages/client/src/styles/themes/catalogue.json
+{
+	const cataloguePath = path.resolve(
+		__dirname,
+		'..',
+		'packages',
+		'client',
+		'src',
+		'styles',
+		'themes',
+		'catalogue.json',
+	);
+	let cat = null;
+	try {
+		cat = JSON.parse(fs.readFileSync(cataloguePath, 'utf-8'));
+	} catch (e) {
+		console.warn(`Theme catalogue not readable at ${cataloguePath}: ${e.message}`);
+	}
+
+	// Back-compat: rename the old "Default (Dark)" / "Default (Light)"
+	// rows to the new catalogue names ("Midnight Reel" / "Daylight") so
+	// users keep their saved selection across the rename. Skip if a row
+	// with the new name already exists (idempotent re-run safety).
+	const renames = [
+		{ old: 'Default (Dark)', next: 'Midnight Reel' },
+		{ old: 'Default Dark', next: 'Midnight Reel' },
+		{ old: 'Default (Light)', next: 'Daylight' },
+		{ old: 'Default Light', next: 'Daylight' },
+	];
+	for (const r of renames) {
+		const existsNew = db.prepare('SELECT id FROM themes WHERE name = ?').get(r.next);
+		const existsOld = db.prepare('SELECT id FROM themes WHERE name = ?').get(r.old);
+		if (existsOld && !existsNew) {
+			db.prepare('UPDATE themes SET name = ?, updated_at = ? WHERE name = ?').run(
+				r.next,
+				new Date().toISOString(),
+				r.old,
+			);
+		}
+	}
+
+	if (cat && Array.isArray(cat.themes)) {
+		const crypto = require('crypto');
+		const selectByName = db.prepare('SELECT id FROM themes WHERE name = ?');
+		const insertTheme = db.prepare(
+			'INSERT INTO themes (id, name, mode, config, is_default, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+		);
+		let inserted = 0;
+		for (const t of cat.themes) {
+			if (!t || !t.name || !t.mode || !t.config) continue;
+			if (selectByName.get(t.name)) continue;
+			const now = new Date().toISOString();
+			insertTheme.run(
+				crypto.randomUUID(),
+				t.name,
+				t.mode,
+				JSON.stringify(t.config),
+				t.isDefault ? 1 : 0,
+				null,
+				now,
+				now,
+			);
+			inserted++;
+		}
+		if (inserted > 0) console.log(`Seeded ${inserted} curated theme(s)`);
+	}
 }
 
 	// Verify

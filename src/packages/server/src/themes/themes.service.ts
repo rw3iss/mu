@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
 	DEFAULT_DARK_CONFIG,
 	DEFAULT_LIGHT_CONFIG,
@@ -16,6 +18,43 @@ import {
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { type Theme, themes } from '../database/schema/index.js';
+
+interface CatalogueEntry {
+	name: string;
+	mode: 'dark' | 'light';
+	description?: string;
+	isDefault?: boolean;
+	config: ThemeConfig;
+}
+
+/**
+ * Attempt to load the curated theme catalogue. Tries a few candidate
+ * paths to handle both dev (running from source) and production (built
+ * dist next to compiled JS). Returns null if no catalogue is found —
+ * caller falls back to the minimal two-theme seed.
+ */
+function loadCatalogue(logger: Logger): CatalogueEntry[] | null {
+	const candidates = [
+		// Dev: server cwd -> ../client/src/styles/themes/catalogue.json
+		resolve(process.cwd(), '../client/src/styles/themes/catalogue.json'),
+		// Monorepo root: <root>/src/packages/client/src/styles/themes/catalogue.json
+		resolve(process.cwd(), 'src/packages/client/src/styles/themes/catalogue.json'),
+		resolve(process.cwd(), 'packages/client/src/styles/themes/catalogue.json'),
+		// From a built server dist nearby
+		resolve(process.cwd(), '../../client/src/styles/themes/catalogue.json'),
+	];
+	for (const p of candidates) {
+		try {
+			const raw = readFileSync(p, 'utf-8');
+			const json = JSON.parse(raw);
+			if (Array.isArray(json?.themes)) return json.themes as CatalogueEntry[];
+		} catch {
+			// try next
+		}
+	}
+	logger.debug('Curated theme catalogue not found; falling back to defaults');
+	return null;
+}
 
 @Injectable()
 export class ThemesService implements OnModuleInit {
@@ -155,18 +194,75 @@ export class ThemesService implements OnModuleInit {
 	}
 
 	private async seedDefaults() {
-		const existing = this.database.db.select().from(themes).all();
-		if (existing.length > 0) return;
+		// Back-compat: rename legacy "Default Dark/Light" rows to their
+		// new catalogue names so users keep their saved selection. Skip
+		// if a row with the new name already exists (idempotent).
+		const renames: Array<{ from: string; to: string }> = [
+			{ from: 'Default (Dark)', to: 'Midnight Reel' },
+			{ from: 'Default Dark', to: 'Midnight Reel' },
+			{ from: 'Default (Light)', to: 'Daylight' },
+			{ from: 'Default Light', to: 'Daylight' },
+		];
+		for (const r of renames) {
+			const hasNew = this.database.db
+				.select()
+				.from(themes)
+				.where(eq(themes.name, r.to))
+				.all();
+			if (hasNew.length > 0) continue;
+			const hasOld = this.database.db
+				.select()
+				.from(themes)
+				.where(eq(themes.name, r.from))
+				.all();
+			if (hasOld.length === 0) continue;
+			this.database.db
+				.update(themes)
+				.set({ name: r.to, updatedAt: nowISO() })
+				.where(eq(themes.name, r.from))
+				.run();
+		}
 
-		this.logger.log('Seeding default themes');
+		// Idempotent: insert any catalogue entry whose name isn't in the
+		// DB yet. Re-runs are safe; user edits to a same-named row are
+		// preserved (we never overwrite existing rows).
+		const existingRows = this.database.db.select().from(themes).all();
+		const existingNames = new Set(existingRows.map((r) => r.name));
+
+		const catalogue = loadCatalogue(this.logger);
+		if (catalogue && catalogue.length > 0) {
+			const toInsert = catalogue.filter((t) => !existingNames.has(t.name));
+			if (toInsert.length === 0) return;
+			this.logger.log(`Seeding ${toInsert.length} curated theme(s)`);
+			const now = nowISO();
+			this.database.db
+				.insert(themes)
+				.values(
+					toInsert.map((t) => ({
+						id: crypto.randomUUID(),
+						name: t.name,
+						mode: t.mode,
+						config: JSON.stringify(t.config),
+						isDefault: t.isDefault ? 1 : 0,
+						createdBy: null,
+						createdAt: now,
+						updatedAt: now,
+					})),
+				)
+				.run();
+			return;
+		}
+
+		// No catalogue available — minimal fallback (fresh boot, no client tree).
+		if (existingRows.length > 0) return;
+		this.logger.log('Seeding minimal default themes');
 		const now = nowISO();
-
 		this.database.db
 			.insert(themes)
 			.values([
 				{
 					id: crypto.randomUUID(),
-					name: 'Default Dark',
+					name: 'Midnight Reel',
 					mode: 'dark',
 					config: JSON.stringify(DEFAULT_DARK_CONFIG),
 					isDefault: 1,
@@ -176,7 +272,7 @@ export class ThemesService implements OnModuleInit {
 				},
 				{
 					id: crypto.randomUUID(),
-					name: 'Default Light',
+					name: 'Daylight',
 					mode: 'light',
 					config: JSON.stringify(DEFAULT_LIGHT_CONFIG),
 					isDefault: 1,

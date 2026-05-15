@@ -46,8 +46,34 @@ export function getResolvedMode(): 'dark' | 'light' {
 	return t;
 }
 
+// Tracks rich `tokens` keys we applied last time, so the next apply can
+// clear any token the new theme doesn't override (prevents the previous
+// theme's palette from leaking through on switch).
+let previousTokenKeys: string[] = [];
+
 export function applyThemeConfig(config: ThemeConfig): void {
 	const root = document.documentElement;
+
+	// Clear any rich tokens from the previous theme that the new theme
+	// doesn't set — otherwise switching from a richly-themed entry back
+	// to a minimal one would leave stale CSS variables behind.
+	const nextTokenKeys = config.tokens ? Object.keys(config.tokens) : [];
+	for (const key of previousTokenKeys) {
+		if (!nextTokenKeys.includes(key)) {
+			root.style.removeProperty(`--${key}`);
+		}
+	}
+	previousTokenKeys = nextTokenKeys;
+
+	// Apply rich tokens FIRST so the narrow base fields below win for
+	// the few keys they overlap with (accent / bg / panel) — those
+	// always reflect the user-editable color pickers, even if the
+	// theme also lists them in `tokens`.
+	if (config.tokens) {
+		for (const [key, value] of Object.entries(config.tokens)) {
+			if (value) root.style.setProperty(`--${key}`, value);
+		}
+	}
 
 	root.style.setProperty('--color-accent', config.accentColor);
 	root.style.setProperty('--color-bg-primary', config.pageBg);
