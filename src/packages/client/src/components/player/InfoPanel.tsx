@@ -4,6 +4,7 @@ import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { CastPhoto } from '@/components/movie/CastPhoto';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
+import { MovieBreadcrumbs } from '@/components/movie/MovieBreadcrumbs';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
@@ -100,6 +101,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								{movie.year > 0 && <span>{movie.year}</span>}
 								{runtimeText && <span>{runtimeText}</span>}
 								{movie.director && <span>Dir. {movie.director}</span>}
+								{movie.groupId && <MovieBreadcrumbs movie={movie} />}
 							</div>
 
 							{movie.genres && movie.genres.length > 0 && (

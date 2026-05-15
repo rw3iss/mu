@@ -14,6 +14,7 @@ import styles from './GroupDetail.module.scss';
 interface GroupDetailProps {
 	path?: string;
 	id?: string;
+	matches?: { subgroup?: string };
 }
 
 /**
@@ -25,7 +26,8 @@ interface GroupDetailProps {
  * Shows confirmation banners for `unsure` groups with a "Mu thinks this
  * belongs under <other>" prompt and Move / Keep / Reject affordances.
  */
-export function GroupDetail({ id }: GroupDetailProps) {
+export function GroupDetail({ id, matches }: GroupDetailProps) {
+	const deepLinkSubgroupId = matches?.subgroup ?? null;
 	const [data, setData] = useState<GroupDetailResponse | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -119,6 +121,27 @@ export function GroupDetail({ id }: GroupDetailProps) {
 			}
 		}
 	}
+
+	// Deep-link auto-expand: when arriving via /group/:id?subgroup=<sid>,
+	// open that subgroup and scroll it into view once data is loaded.
+	useEffect(() => {
+		if (!deepLinkSubgroupId || !data) return;
+		const child = data.children.find((c) => c.id === deepLinkSubgroupId);
+		if (!child) return;
+		if (!expanded[deepLinkSubgroupId]) {
+			void expandChild(child);
+		}
+		// Defer the scroll until after the expand re-render paints.
+		requestAnimationFrame(() => {
+			const el = document.querySelector<HTMLElement>(
+				`[data-subgroup-id="${deepLinkSubgroupId}"]`,
+			);
+			el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		});
+		// Intentional: react only to id/data changes — the expand call itself
+		// mutates `expanded`, which we don't want to re-trigger from.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [deepLinkSubgroupId, data]);
 
 	async function handleConfirm(target: MovieGroup) {
 		setBusy(true);
@@ -305,7 +328,11 @@ export function GroupDetail({ id }: GroupDetailProps) {
 							.slice()
 							.sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
 							.map((child) => (
-								<div key={child.id} class={styles.seasonCard}>
+								<div
+									key={child.id}
+									class={styles.seasonCard}
+									data-subgroup-id={child.id}
+								>
 									<button
 										class={styles.seasonHeader}
 										onClick={() => expandChild(child)}

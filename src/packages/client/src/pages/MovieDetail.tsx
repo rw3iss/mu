@@ -8,6 +8,7 @@ import { CastPhoto } from '@/components/movie/CastPhoto';
 import { ExternalRatings } from '@/components/movie/ExternalRatings';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
 import { MatchCandidatesPanel } from '@/components/movie/MatchCandidatesPanel';
+import { MovieBreadcrumbs } from '@/components/movie/MovieBreadcrumbs';
 import { MovieOptionsMenu } from '@/components/movie/MovieOptionsMenu';
 import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { RatingWidget } from '@/components/movie/RatingWidget';
@@ -473,6 +474,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 							)}
 							{runtimeText && <span>{runtimeText}</span>}
 							{movie.director && <span>Dir. {movie.director}</span>}
+							{movie.groupId && <MovieBreadcrumbs movie={movie} />}
 						</div>
 
 						{/* Genres */}
