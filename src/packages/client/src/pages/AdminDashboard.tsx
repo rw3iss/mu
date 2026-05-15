@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
+import { route } from 'preact-router';
+import { jobAction, jobListAction } from '@/components/admin/JobBadge';
 import { Button } from '@/components/common/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Spinner } from '@/components/common/Spinner';
@@ -78,29 +80,74 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	}
 
 	const handleScanLibrary = useCallback(async () => {
+		const startedId = notifyInfo('Scanning library…', 0);
 		try {
-			await api.post('/sources/scan');
-			notifySuccess('Library scan started');
+			const result = await api.post<{
+				message: string;
+				sourceCount: number;
+				filesFound: number;
+				filesAdded: number;
+				filesUpdated: number;
+				filesRemoved: number;
+			}>('/sources/scan');
+			removeNotification(startedId);
+			const parts = [
+				`${result.filesFound} file${result.filesFound === 1 ? '' : 's'} scanned`,
+				`${result.filesAdded} added`,
+			];
+			if (result.filesUpdated > 0) parts.push(`${result.filesUpdated} updated`);
+			if (result.filesRemoved > 0) parts.push(`${result.filesRemoved} removed`);
+			notifySuccess(`Library scan complete: ${parts.join(', ')}.`);
+			fetchMovies(1);
 		} catch {
-			notifyError('Failed to start library scan');
+			removeNotification(startedId);
+			notifyError('Failed to scan library');
 		}
 	}, []);
 
 	const handleRefreshMetadata = useCallback(async () => {
+		const startedId = notifyInfo('Starting metadata refresh…', 0);
 		try {
-			await api.post('/movies/refresh-all');
-			notifySuccess('Metadata refresh started for all movies');
+			const result = await api.post<{ message: string; movieCount: number }>(
+				'/movies/refresh-all',
+			);
+			removeNotification(startedId);
+			if (result.movieCount === 0) {
+				notifySuccess('All movies already have metadata — nothing to refresh.');
+				return;
+			}
+			notifySuccess(
+				`Refreshing metadata for ${result.movieCount} movie${
+					result.movieCount === 1 ? '' : 's'
+				} in the background.`,
+				undefined,
+				[jobListAction('metadata')],
+			);
 		} catch {
+			removeNotification(startedId);
 			notifyError('Failed to start metadata refresh');
 		}
 	}, []);
 
 	const handleGenerateThumbnails = useCallback(async () => {
 		setGeneratingThumbnails(true);
+		const startedId = notifyInfo('Looking for movies without thumbnails…', 0);
 		try {
 			const result = await streamService.generateMissingThumbnails();
-			notifySuccess(`Thumbnail generation started for ${result.movieCount} movies`);
+			removeNotification(startedId);
+			if (result.movieCount === 0) {
+				notifySuccess('All movies already have thumbnails.');
+				return;
+			}
+			notifySuccess(
+				`Enqueued thumbnail generation for ${result.movieCount} movie${
+					result.movieCount === 1 ? '' : 's'
+				}.`,
+				undefined,
+				[jobListAction('thumbnail')],
+			);
 		} catch {
+			removeNotification(startedId);
 			notifyError('Failed to start thumbnail generation');
 		} finally {
 			setGeneratingThumbnails(false);
@@ -109,16 +156,25 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 
 	const handleFixBrokenThumbnails = useCallback(async () => {
 		setFixingThumbnails(true);
+		const startedId = notifyInfo('Scanning for broken thumbnails…', 0);
 		try {
 			const result = await api.post<{ movieCount: number; message: string }>(
 				'/admin/fix-broken-thumbnails',
 			);
-			if (result.movieCount > 0) {
-				notifySuccess(`Regenerating ${result.movieCount} broken thumbnail(s)`);
-			} else {
-				notifySuccess('No broken thumbnails found');
+			removeNotification(startedId);
+			if (result.movieCount === 0) {
+				notifySuccess('No broken thumbnails found.');
+				return;
 			}
+			notifySuccess(
+				`Regenerating ${result.movieCount} broken thumbnail${
+					result.movieCount === 1 ? '' : 's'
+				}.`,
+				undefined,
+				[jobListAction('thumbnail')],
+			);
 		} catch {
+			removeNotification(startedId);
 			notifyError('Failed to fix broken thumbnails');
 		} finally {
 			setFixingThumbnails(false);
@@ -134,6 +190,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 			progressToastId = notifyInfo(
 				`Grouping started: analysing ${queued.totalMovies} movies… 0%`,
 				/* persistent until we dismiss */ 0,
+				[jobAction(queued.jobId)],
 			);
 
 			// Subscribe to the existing JOB_PROGRESS / COMPLETED / FAILED
@@ -152,6 +209,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					progressToastId = notifyInfo(
 						`Grouping: ${pct}% (${queued.totalMovies} movies)`,
 						0,
+						[jobAction(queued.jobId)],
 					);
 				}
 			};
@@ -171,6 +229,8 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					pruned > 0 ? `, pruned ${pruned} single-member group(s)` : '';
 				notifySuccess(
 					`Grouped ${r.grouped ?? 0} of ${r.scanned ?? 0} movies${prunedNote}.`,
+					undefined,
+					[jobAction(queued.jobId)],
 				);
 				cleanup?.();
 				setGroupingItems(false);
@@ -203,12 +263,14 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 
 	const handleSanitizeTitles = useCallback(async () => {
 		setSanitizingTitles(true);
+		const startedId = notifyInfo('Sanitising unmatched titles…', 0);
 		try {
 			const result = await api.post<{
 				scanned: number;
 				updated: number;
 				sample: Array<{ from: string; to: string }>;
 			}>('/admin/sanitize-titles');
+			removeNotification(startedId);
 			if (result.updated > 0) {
 				notifySuccess(
 					`Cleaned ${result.updated} of ${result.scanned} unmatched titles. Sample: ${result.sample
@@ -222,6 +284,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 				);
 			}
 		} catch {
+			removeNotification(startedId);
 			notifyError('Title sanitisation failed');
 		} finally {
 			setSanitizingTitles(false);
@@ -230,16 +293,25 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 
 	const handleGenerateSprites = useCallback(async () => {
 		setGeneratingSprites(true);
+		const startedId = notifyInfo('Looking for movies without seek sprites…', 0);
 		try {
 			const result = await api.post<{ movieCount: number; message: string }>(
 				'/admin/generate-sprites',
 			);
-			if (result.movieCount > 0) {
-				notifySuccess(`Enqueued sprite generation for ${result.movieCount} movies`);
-			} else {
-				notifySuccess('All movies already have sprite sheets');
+			removeNotification(startedId);
+			if (result.movieCount === 0) {
+				notifySuccess('All movies already have sprite sheets.');
+				return;
 			}
+			notifySuccess(
+				`Enqueued sprite generation for ${result.movieCount} movie${
+					result.movieCount === 1 ? '' : 's'
+				}.`,
+				undefined,
+				[jobListAction('sprite-sheet')],
+			);
 		} catch {
+			removeNotification(startedId);
 			notifyError('Failed to start sprite generation');
 		} finally {
 			setGeneratingSprites(false);
@@ -248,18 +320,24 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 
 	const handleRemoveBroken = useCallback(async () => {
 		setRemovingBroken(true);
+		const startedId = notifyInfo('Scanning for broken movies…', 0);
 		try {
 			const result = await api.post<{ removedCount: number; message: string }>(
 				'/admin/remove-broken-movies',
 			);
+			removeNotification(startedId);
 			if (result.removedCount > 0) {
-				notifySuccess(`Removed ${result.removedCount} broken movie(s)`);
-				// Refresh library state so the list is up to date
+				notifySuccess(
+					`Removed ${result.removedCount} broken movie${
+						result.removedCount === 1 ? '' : 's'
+					}.`,
+				);
 				fetchMovies(1);
 			} else {
-				notifySuccess('No broken movies found');
+				notifySuccess('No broken movies found.');
 			}
 		} catch {
+			removeNotification(startedId);
 			notifyError('Failed to remove broken movies');
 		} finally {
 			setRemovingBroken(false);
@@ -268,12 +346,19 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 
 	const handleClearWatched = useCallback(async () => {
 		setClearingWatched(true);
+		const startedId = notifyInfo('Clearing watched history…', 0);
 		try {
 			const result = await api.delete<{ clearedCount: number }>('/history/watched');
-			notifySuccess(`Cleared watched status for ${result.clearedCount} movie(s)`);
+			removeNotification(startedId);
+			notifySuccess(
+				`Cleared watched status for ${result.clearedCount} movie${
+					result.clearedCount === 1 ? '' : 's'
+				}.`,
+			);
 			setWatchedMovieCount(0);
 			fetchMovies(1);
 		} catch {
+			removeNotification(startedId);
 			notifyError('Failed to clear watched history');
 		} finally {
 			setClearingWatched(false);
@@ -383,7 +468,19 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 
 			{/* Quick Actions */}
 			<section class={styles.section}>
-				<h2 class={styles.sectionTitle}>Quick Actions</h2>
+				<div class={styles.sectionHeader}>
+					<h2 class={styles.sectionTitle}>Quick Actions</h2>
+					<a
+						class={styles.sectionLink}
+						href="/admin/jobs"
+						onClick={(e) => {
+							e.preventDefault();
+							route('/admin/jobs');
+						}}
+					>
+						View all jobs →
+					</a>
+				</div>
 				<div class={styles.actions}>
 					<Button variant="secondary" onClick={handleScanLibrary}>
 						Scan Library

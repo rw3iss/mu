@@ -74,6 +74,17 @@
   margin-top: calc(-1 * var(--space-sm));
 }
 
+.sectionLink {
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+
+  &:hover {
+    color: var(--color-accent-hover);
+  }
+}
+
 .actions {
   display: flex;
   gap: var(--space-md);

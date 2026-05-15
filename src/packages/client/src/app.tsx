@@ -7,6 +7,8 @@ import { Changelog } from '@/pages/Changelog';
 import { Dashboard } from '@/pages/Dashboard';
 import { Discover } from '@/pages/Discover';
 import { History } from '@/pages/History';
+import { JobDetails } from '@/pages/JobDetails';
+import { JobList } from '@/pages/JobList';
 import { Library } from '@/pages/Library';
 import { Login } from '@/pages/Login';
 import { GroupDetail } from '@/pages/GroupDetail';
@@ -178,6 +180,8 @@ export function App() {
 						<Changelog path="/changelog" />
 						<Redirect path="/plugins" to="/settings/plugins" />
 						<Redirect path="/admin" to="/settings/admin" />
+						<JobList path="/admin/jobs" />
+						<JobDetails path="/admin/jobs/:id" />
 						<PersonDetail path="/person/:id" />
 						<Login path="/login" />
 						<Setup path="/setup" />
