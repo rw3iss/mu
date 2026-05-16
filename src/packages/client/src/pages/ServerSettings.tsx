@@ -3,6 +3,7 @@ import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Icon } from '@/components/common/Icon';
+import { Select } from '@/components/common/Select';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
@@ -1115,24 +1116,24 @@ function LogsSection() {
 	return (
 		<div>
 			<div class={styles.logsToolbar}>
-				<select
-					class={styles.select}
+				<Select
 					value={logFile}
-					onChange={(e) => setLogFile((e.target as HTMLSelectElement).value)}
-				>
-					<option value="server">server.log</option>
-					<option value="transcode-debug">transcode-debug.log</option>
-				</select>
-				<select
-					class={styles.select}
+					onChange={setLogFile}
+					options={[
+						{ value: 'server', label: 'server.log' },
+						{ value: 'transcode-debug', label: 'transcode-debug.log' },
+					]}
+				/>
+				<Select
 					value={lines}
-					onChange={(e) => setLines((e.target as HTMLSelectElement).value)}
-				>
-					<option value="100">100 lines</option>
-					<option value="200">200 lines</option>
-					<option value="500">500 lines</option>
-					<option value="1000">1000 lines</option>
-				</select>
+					onChange={setLines}
+					options={[
+						{ value: '100', label: '100 lines' },
+						{ value: '200', label: '200 lines' },
+						{ value: '500', label: '500 lines' },
+						{ value: '1000', label: '1000 lines' },
+					]}
+				/>
 				<span class={styles.logSize}>{formatBytes(logSize)}</span>
 				<div class={styles.logsActions}>
 					<Button variant="ghost" size="sm" onClick={loadLogs} loading={loading}>

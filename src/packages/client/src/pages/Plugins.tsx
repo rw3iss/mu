@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Modal } from '@/components/common/Modal';
+import { Select } from '@/components/common/Select';
 import { Spinner } from '@/components/common/Spinner';
 import { Tabs } from '@/components/common/Tabs';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
@@ -371,22 +372,14 @@ export function Plugins(_props: PluginsProps) {
 											<span class={styles.toggleTrack} />
 										</label>
 									) : sv.definition.type === 'select' ? (
-										<select
+										<Select
 											value={sv.value as string}
-											onChange={(e) =>
-												handleSettingChange(
-													sv.definition.key,
-													(e.target as HTMLSelectElement).value,
-												)
-											}
-											class={styles.settingInput}
-										>
-											{(sv.definition.options || []).map((opt) => (
-												<option key={opt.value} value={opt.value}>
-													{opt.label}
-												</option>
-											))}
-										</select>
+											onChange={(v) => handleSettingChange(sv.definition.key, v)}
+											options={(sv.definition.options || []).map((opt) => ({
+												value: opt.value,
+												label: opt.label,
+											}))}
+										/>
 									) : sv.definition.type === 'number' ? (
 										<input
 											type="number"

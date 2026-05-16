@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
+import { Select } from '@/components/common/Select';
 import { Spinner } from '@/components/common/Spinner';
 import { abbreviateJobId } from '@/components/admin/JobBadge';
 import { type Job, type JobStatus, jobsService } from '@/services/jobs.service';
@@ -146,17 +147,11 @@ export function JobList({ matches }: JobListProps) {
 				</label>
 				<label class={styles.filter}>
 					<span>Status</span>
-					<select
-						class={styles.filterSelect}
+					<Select
 						value={statusFilter}
-						onChange={(e) => setFilter('status', (e.target as HTMLSelectElement).value)}
-					>
-						{STATUS_OPTIONS.map((o) => (
-							<option key={o.value} value={o.value}>
-								{o.label}
-							</option>
-						))}
-					</select>
+						onChange={(v) => setFilter('status', v)}
+						options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+					/>
 				</label>
 			</div>
 

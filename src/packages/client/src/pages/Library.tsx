@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
+import { Select } from '@/components/common/Select';
 import {
 	fetchParentGroups,
 	groupedOnly,
@@ -221,8 +222,7 @@ export function Library(_props: LibraryProps) {
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}, []);
 
-	const handlePageSizeChange = useCallback((e: Event) => {
-		const size = parseInt((e.target as HTMLSelectElement).value, 10);
+	const handlePageSizeChange = useCallback((size: number) => {
 		setPageSize(size);
 		syncUrlParams(1, size);
 		window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -236,8 +236,7 @@ export function Library(_props: LibraryProps) {
 		setFilters({ genres: newGenres });
 	}, []);
 
-	const handleSortChange = useCallback((e: Event) => {
-		const value = (e.target as HTMLSelectElement).value as LibraryFilters['sortBy'];
+	const handleSortChange = useCallback((value: LibraryFilters['sortBy']) => {
 		setFilters({ sortBy: value });
 	}, []);
 
@@ -331,19 +330,15 @@ export function Library(_props: LibraryProps) {
 				</div>
 
 				{(hasRemoteServers.value || remoteServerList.value.length > 0) && (
-					<select
-						class={styles.librarySelect}
+					<Select
 						value={serverFilter.value}
-						onChange={(e) => setServerFilter((e.target as HTMLSelectElement).value)}
-					>
-						<option value="all">All Libraries</option>
-						<option value="local">My Library</option>
-						{remoteServerList.value.map((s) => (
-							<option key={s.id} value={s.id}>
-								{s.name}
-							</option>
-						))}
-					</select>
+						onChange={setServerFilter}
+						options={[
+							{ value: 'all', label: 'All Libraries' },
+							{ value: 'local', label: 'My Library' },
+							...remoteServerList.value.map((s) => ({ value: s.id, label: s.name })),
+						]}
+					/>
 				)}
 
 				<button
@@ -365,18 +360,18 @@ export function Library(_props: LibraryProps) {
 				</button>
 
 				<div class={styles.toolbarActions}>
-					<select
-						class={styles.sortSelect}
+					<Select<LibraryFilters['sortBy']>
 						value={filters.value.sortBy}
 						onChange={handleSortChange}
-					>
-						<option value="addedAt">Recently Added</option>
-						<option value="title">Title</option>
-						<option value="year">Year</option>
-						<option value="rating">Rating</option>
-						<option value="runtime">Runtime</option>
-						<option value="fileSize">File Size</option>
-					</select>
+						options={[
+							{ value: 'addedAt', label: 'Recently Added' },
+							{ value: 'title', label: 'Title' },
+							{ value: 'year', label: 'Year' },
+							{ value: 'rating', label: 'Rating' },
+							{ value: 'runtime', label: 'Runtime' },
+							{ value: 'fileSize', label: 'File Size' },
+						]}
+					/>
 
 					<button
 						class={styles.sortDirection}
@@ -672,18 +667,13 @@ export function Library(_props: LibraryProps) {
 					<span class={styles.pageInfo}>
 						Page {currentPage.value} of {totalPages.value}
 					</span>
-					<select
-						class={styles.pageSizeSelect}
+					<Select<number>
 						value={pageSize.value}
 						onChange={handlePageSizeChange}
-						title="Movies per page"
-					>
-						{PAGE_SIZE_OPTIONS.map((n) => (
-							<option key={n} value={n}>
-								{n} per page
-							</option>
-						))}
-					</select>
+						size="sm"
+						menuAlign="end"
+						options={PAGE_SIZE_OPTIONS.map((n) => ({ value: n, label: `${n} per page` }))}
+					/>
 				</div>
 			)}
 			<PluginSlot name={UI.LIBRARY_BOTTOM} context={{}} />

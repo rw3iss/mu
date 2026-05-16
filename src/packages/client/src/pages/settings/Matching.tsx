@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { Select } from '@/components/common/Select';
 import { settingsService } from '@/services/settings.service';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './Matching.module.scss';
@@ -79,22 +80,13 @@ export function Matching() {
 					<label class={styles.controlLabel} for="retention-select">
 						Keep external candidates for
 					</label>
-					<select
+					<Select<number>
 						id="retention-select"
-						class={styles.select}
 						value={retention}
 						disabled={!loaded || saving}
-						onChange={(e) => {
-							const v = parseInt((e.target as HTMLSelectElement).value, 10);
-							if (Number.isFinite(v)) update(v);
-						}}
-					>
-						{RETENTION_OPTIONS.map((opt) => (
-							<option key={opt.value} value={opt.value}>
-								{opt.label}
-							</option>
-						))}
-					</select>
+						options={RETENTION_OPTIONS}
+						onChange={(v) => update(v)}
+					/>
 				</div>
 			</section>
 

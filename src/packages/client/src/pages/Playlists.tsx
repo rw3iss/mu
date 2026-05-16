@@ -3,6 +3,7 @@ import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { Modal } from '@/components/common/Modal';
+import { Select } from '@/components/common/Select';
 import { Spinner } from '@/components/common/Spinner';
 import { useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
@@ -222,8 +223,8 @@ export function Playlists(_props: PlaylistsProps) {
 		}
 	}
 
-	const handleSortChange = useCallback((e: Event) => {
-		setSortBy((e.target as HTMLSelectElement).value as PlaylistSortBy);
+	const handleSortChange = useCallback((value: PlaylistSortBy) => {
+		setSortBy(value);
 	}, []);
 
 	const toggleSortOrder = useCallback(() => {
@@ -266,13 +267,17 @@ export function Playlists(_props: PlaylistsProps) {
 			<div class={styles.header}>
 				<h1 class={styles.title}>Playlists</h1>
 				<div class={styles.headerActions}>
-					<select class={styles.sortSelect} value={sortBy} onChange={handleSortChange}>
-						<option value="updated">Date Updated</option>
-						<option value="created">Date Created</option>
-						<option value="name">Name</option>
-						<option value="movieCount">Number of Items</option>
-						<option value="lastPlayed">Last Played</option>
-					</select>
+					<Select<PlaylistSortBy>
+						value={sortBy}
+						onChange={handleSortChange}
+						options={[
+							{ value: 'updated', label: 'Date Updated' },
+							{ value: 'created', label: 'Date Created' },
+							{ value: 'name', label: 'Name' },
+							{ value: 'movieCount', label: 'Number of Items' },
+							{ value: 'lastPlayed', label: 'Last Played' },
+						]}
+					/>
 					<button
 						class={styles.sortOrderBtn}
 						onClick={toggleSortOrder}

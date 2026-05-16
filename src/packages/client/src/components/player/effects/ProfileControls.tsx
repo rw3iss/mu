@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
+import { Select } from '@/components/common/Select';
 import { setUiSetting } from '@/hooks/useUiSetting';
 import type { AudioProfile } from '@/services/audio-profiles.service';
 import { resetCompressor, resetEq } from '@/state/audio-effects.state';
@@ -73,11 +74,9 @@ export function ProfileControls({
 			{/* Profile select + clone/delete */}
 			<div class={styles.profileRow}>
 				<span class={styles.profileLabel}>Profile</span>
-				<select
-					class={styles.profileSelect}
+				<Select
 					value={activeId ?? ''}
-					onChange={(e) => {
-						const val = (e.target as HTMLSelectElement).value;
+					onChange={(val) => {
 						if (val) onLoad(val);
 						else {
 							if (type === 'eq') {
@@ -95,14 +94,11 @@ export function ProfileControls({
 							}
 						}
 					}}
-				>
-					<option value="">-- None --</option>
-					{allProfiles.map((p) => (
-						<option key={p.id} value={p.id}>
-							{p.name}
-						</option>
-					))}
-				</select>
+					options={[
+						{ value: '', label: '— None —' },
+						...allProfiles.map((p) => ({ value: p.id, label: p.name })),
+					]}
+				/>
 				{activeId && (
 					<>
 						<button

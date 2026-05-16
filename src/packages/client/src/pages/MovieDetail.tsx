@@ -7,6 +7,7 @@ import { Spinner } from '@/components/common/Spinner';
 import { CastPhoto } from '@/components/movie/CastPhoto';
 import { ExternalRatings } from '@/components/movie/ExternalRatings';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
+import { Select } from '@/components/common/Select';
 import { MatchCandidatesPanel } from '@/components/movie/MatchCandidatesPanel';
 import { MovieBreadcrumbs } from '@/components/movie/MovieBreadcrumbs';
 import { MovieOptionsMenu } from '@/components/movie/MovieOptionsMenu';
@@ -813,83 +814,55 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											<label class={styles.playSettingsLabel}>
 												EQ Profile
 											</label>
-											<select
-												class={styles.playSettingsSelect}
+											<Select
 												value={selectedEqProfile}
-												onChange={(e) => {
-													const val = (e.target as HTMLSelectElement)
-														.value;
+												onChange={(val) => {
 													setSelectedEqProfile(val);
 													updatePlaySetting('eqProfileId', val || null);
 												}}
-											>
-												<option value="">None (use default)</option>
-												{audioProfiles
-													.filter(
-														(p) => p.type === 'eq' || p.type === 'full',
-													)
-													.map((p) => (
-														<option key={p.id} value={p.id}>
-															{p.name}
-														</option>
-													))}
-											</select>
+												options={[
+													{ value: '', label: 'None (use default)' },
+													...audioProfiles
+														.filter((p) => p.type === 'eq' || p.type === 'full')
+														.map((p) => ({ value: p.id, label: p.name })),
+												]}
+											/>
 
 											<label class={styles.playSettingsLabel}>
 												Compressor Profile
 											</label>
-											<select
-												class={styles.playSettingsSelect}
+											<Select
 												value={selectedCompProfile}
-												onChange={(e) => {
-													const val = (e.target as HTMLSelectElement)
-														.value;
+												onChange={(val) => {
 													setSelectedCompProfile(val);
-													updatePlaySetting(
-														'compressorProfileId',
-														val || null,
-													);
+													updatePlaySetting('compressorProfileId', val || null);
 												}}
-											>
-												<option value="">None (use default)</option>
-												{audioProfiles
-													.filter(
-														(p) =>
-															p.type === 'compressor' ||
-															p.type === 'full',
-													)
-													.map((p) => (
-														<option key={p.id} value={p.id}>
-															{p.name}
-														</option>
-													))}
-											</select>
+												options={[
+													{ value: '', label: 'None (use default)' },
+													...audioProfiles
+														.filter(
+															(p) => p.type === 'compressor' || p.type === 'full',
+														)
+														.map((p) => ({ value: p.id, label: p.name })),
+												]}
+											/>
 
 											<label class={styles.playSettingsLabel}>
 												Video Profile
 											</label>
-											<select
-												class={styles.playSettingsSelect}
+											<Select
 												value={selectedVideoProfile}
-												onChange={(e) => {
-													const val = (e.target as HTMLSelectElement)
-														.value;
+												onChange={(val) => {
 													setSelectedVideoProfile(val);
-													updatePlaySetting(
-														'videoProfileId',
-														val || null,
-													);
+													updatePlaySetting('videoProfileId', val || null);
 												}}
-											>
-												<option value="">None (use default)</option>
-												{audioProfiles
-													.filter((p) => p.type === 'video')
-													.map((p) => (
-														<option key={p.id} value={p.id}>
-															{p.name}
-														</option>
-													))}
-											</select>
+												options={[
+													{ value: '', label: 'None (use default)' },
+													...audioProfiles
+														.filter((p) => p.type === 'video')
+														.map((p) => ({ value: p.id, label: p.name })),
+												]}
+											/>
 										</div>
 									</div>
 								)}

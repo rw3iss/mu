@@ -5,6 +5,7 @@ import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
 import { FolderBrowser } from '@/components/common/FolderBrowser';
 import { Icon } from '@/components/common/Icon';
+import { Select } from '@/components/common/Select';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
@@ -710,9 +711,11 @@ export function Settings(props: SettingsProps) {
 										Display language for the interface
 									</span>
 								</div>
-								<select class={styles.select}>
-									<option value="en">English</option>
-								</select>
+								<Select
+									value="en"
+									onChange={() => {}}
+									options={[{ value: 'en', label: 'English' }]}
+								/>
 							</div>
 
 							<h3 class={styles.sectionTitle}>Rating</h3>
@@ -849,21 +852,13 @@ export function Settings(props: SettingsProps) {
 									</span>
 								</div>
 								<div class={styles.settingControl}>
-									<select
-										class={styles.select}
+									<Select
 										value={selectedDarkId.value}
-										onChange={(e) =>
-											setSelectedDarkId((e.target as HTMLSelectElement).value)
-										}
-									>
-										{themesList.value
+										onChange={(v) => setSelectedDarkId(v)}
+										options={themesList.value
 											.filter((t) => t.mode === 'dark')
-											.map((t) => (
-												<option key={t.id} value={t.id}>
-													{t.name}
-												</option>
-											))}
-									</select>
+											.map((t) => ({ value: t.id, label: t.name }))}
+									/>
 									<button
 										class={styles.themeActionBtn}
 										onClick={() => {
@@ -922,23 +917,13 @@ export function Settings(props: SettingsProps) {
 									</span>
 								</div>
 								<div class={styles.settingControl}>
-									<select
-										class={styles.select}
+									<Select
 										value={selectedLightId.value}
-										onChange={(e) =>
-											setSelectedLightId(
-												(e.target as HTMLSelectElement).value,
-											)
-										}
-									>
-										{themesList.value
+										onChange={(v) => setSelectedLightId(v)}
+										options={themesList.value
 											.filter((t) => t.mode === 'light')
-											.map((t) => (
-												<option key={t.id} value={t.id}>
-													{t.name}
-												</option>
-											))}
-									</select>
+											.map((t) => ({ value: t.id, label: t.name }))}
+									/>
 									<button
 										class={styles.themeActionBtn}
 										onClick={() => {
@@ -1146,26 +1131,18 @@ export function Settings(props: SettingsProps) {
 													</span>
 												</div>
 												<div class={styles.settingControl}>
-													<select
-														class={styles.select}
+													<Select<ItemSpacing>
 														value={editConfig.itemSpacing}
-														onChange={(e) =>
-															updateEditConfig({
-																itemSpacing: (
-																	e.target as HTMLSelectElement
-																).value as ItemSpacing,
-															})
-														}
-													>
-														<option value="none">None</option>
-														<option value="minimal">Minimal</option>
-														<option value="compact">Compact</option>
-														<option value="normal">Normal</option>
-														<option value="comfortable">
-															Comfortable
-														</option>
-														<option value="spaced">Spaced</option>
-													</select>
+														onChange={(v) => updateEditConfig({ itemSpacing: v })}
+														options={[
+															{ value: 'none', label: 'None' },
+															{ value: 'minimal', label: 'Minimal' },
+															{ value: 'compact', label: 'Compact' },
+															{ value: 'normal', label: 'Normal' },
+															{ value: 'comfortable', label: 'Comfortable' },
+															{ value: 'spaced', label: 'Spaced' },
+														]}
+													/>
 												</div>
 											</div>
 
@@ -1479,19 +1456,17 @@ export function Settings(props: SettingsProps) {
 										Preferred streaming quality
 									</span>
 								</div>
-								<select
-									class={styles.select}
+								<Select
 									value={defaultQuality}
-									onChange={(e) =>
-										setDefaultQuality((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="auto">Auto</option>
-									<option value="1080p">1080p</option>
-									<option value="720p">720p</option>
-									<option value="480p">480p</option>
-									<option value="original">Original</option>
-								</select>
+									onChange={setDefaultQuality}
+									options={[
+										{ value: 'auto', label: 'Auto' },
+										{ value: '1080p', label: '1080p' },
+										{ value: '720p', label: '720p' },
+										{ value: '480p', label: '480p' },
+										{ value: 'original', label: 'Original' },
+									]}
+								/>
 							</div>
 
 							<div class={styles.settingRow}>
@@ -1503,38 +1478,34 @@ export function Settings(props: SettingsProps) {
 										Default audio track language for transcoded streams
 									</span>
 								</div>
-								<select
-									class={styles.select}
+								<Select
 									value={preferredAudioLanguage}
-									onChange={(e) =>
-										setPreferredAudioLanguage(
-											(e.target as HTMLSelectElement).value,
-										)
-									}
-								>
-									<option value="eng">English</option>
-									<option value="spa">Spanish</option>
-									<option value="fra">French</option>
-									<option value="deu">German</option>
-									<option value="ita">Italian</option>
-									<option value="por">Portuguese</option>
-									<option value="rus">Russian</option>
-									<option value="jpn">Japanese</option>
-									<option value="kor">Korean</option>
-									<option value="zho">Chinese</option>
-									<option value="hin">Hindi</option>
-									<option value="ara">Arabic</option>
-									<option value="tha">Thai</option>
-									<option value="vie">Vietnamese</option>
-									<option value="pol">Polish</option>
-									<option value="nld">Dutch</option>
-									<option value="swe">Swedish</option>
-									<option value="nor">Norwegian</option>
-									<option value="dan">Danish</option>
-									<option value="fin">Finnish</option>
-									<option value="tur">Turkish</option>
-									<option value="und">Undetermined</option>
-								</select>
+									onChange={setPreferredAudioLanguage}
+									options={[
+										{ value: 'eng', label: 'English' },
+										{ value: 'spa', label: 'Spanish' },
+										{ value: 'fra', label: 'French' },
+										{ value: 'deu', label: 'German' },
+										{ value: 'ita', label: 'Italian' },
+										{ value: 'por', label: 'Portuguese' },
+										{ value: 'rus', label: 'Russian' },
+										{ value: 'jpn', label: 'Japanese' },
+										{ value: 'kor', label: 'Korean' },
+										{ value: 'zho', label: 'Chinese' },
+										{ value: 'hin', label: 'Hindi' },
+										{ value: 'ara', label: 'Arabic' },
+										{ value: 'tha', label: 'Thai' },
+										{ value: 'vie', label: 'Vietnamese' },
+										{ value: 'pol', label: 'Polish' },
+										{ value: 'nld', label: 'Dutch' },
+										{ value: 'swe', label: 'Swedish' },
+										{ value: 'nor', label: 'Norwegian' },
+										{ value: 'dan', label: 'Danish' },
+										{ value: 'fin', label: 'Finnish' },
+										{ value: 'tur', label: 'Turkish' },
+										{ value: 'und', label: 'Undetermined' },
+									]}
+								/>
 							</div>
 
 							<div class={styles.settingRow}>
@@ -1564,18 +1535,16 @@ export function Settings(props: SettingsProps) {
 										stability on slow connections.
 									</span>
 								</div>
-								<select
-									class={styles.select}
+								<Select
 									value={bufferSize}
-									onChange={(e) =>
-										setBufferSizeSetting((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="small">Small (10s)</option>
-									<option value="normal">Normal (30s)</option>
-									<option value="large">Large (60s)</option>
-									<option value="max">Maximum (120s)</option>
-								</select>
+									onChange={setBufferSizeSetting}
+									options={[
+										{ value: 'small', label: 'Small (10s)' },
+										{ value: 'normal', label: 'Normal (30s)' },
+										{ value: 'large', label: 'Large (60s)' },
+										{ value: 'max', label: 'Maximum (120s)' },
+									]}
+								/>
 							</div>
 
 							<div class={styles.settingRow}>
@@ -1628,19 +1597,17 @@ export function Settings(props: SettingsProps) {
 										Use GPU hardware for faster encoding when available
 									</span>
 								</div>
-								<select
-									class={styles.select}
+								<Select
 									value={hwAccel}
-									onChange={(e) =>
-										setHwAccel((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="none">Software</option>
-									<option value="nvenc">NVIDIA GPU (NVENC)</option>
-									<option value="vaapi">Intel/AMD Linux (VAAPI)</option>
-									<option value="qsv">Intel Quick Sync (QSV)</option>
-									<option value="videotoolbox">macOS (VideoToolbox)</option>
-								</select>
+									onChange={setHwAccel}
+									options={[
+										{ value: 'none', label: 'Software' },
+										{ value: 'nvenc', label: 'NVIDIA GPU (NVENC)' },
+										{ value: 'vaapi', label: 'Intel/AMD Linux (VAAPI)' },
+										{ value: 'qsv', label: 'Intel Quick Sync (QSV)' },
+										{ value: 'videotoolbox', label: 'macOS (VideoToolbox)' },
+									]}
+								/>
 							</div>
 
 							<div class={styles.settingRow}>
@@ -1650,21 +1617,19 @@ export function Settings(props: SettingsProps) {
 										Slower presets produce better quality but take longer
 									</span>
 								</div>
-								<select
-									class={styles.select}
+								<Select
 									value={encodingPreset}
-									onChange={(e) =>
-										setEncodingPreset((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="ultrafast">Ultra Fast</option>
-									<option value="superfast">Super Fast</option>
-									<option value="veryfast">Very Fast</option>
-									<option value="faster">Faster</option>
-									<option value="fast">Fast</option>
-									<option value="medium">Medium</option>
-									<option value="slow">Slow</option>
-								</select>
+									onChange={setEncodingPreset}
+									options={[
+										{ value: 'ultrafast', label: 'Ultra Fast' },
+										{ value: 'superfast', label: 'Super Fast' },
+										{ value: 'veryfast', label: 'Very Fast' },
+										{ value: 'faster', label: 'Faster' },
+										{ value: 'fast', label: 'Fast' },
+										{ value: 'medium', label: 'Medium' },
+										{ value: 'slow', label: 'Slow' },
+									]}
+								/>
 							</div>
 
 							<div class={styles.settingRow}>
@@ -1676,18 +1641,16 @@ export function Settings(props: SettingsProps) {
 										Resolution used for background transcoding
 									</span>
 								</div>
-								<select
-									class={styles.select}
+								<Select
 									value={encodeQuality}
-									onChange={(e) =>
-										setEncodeQuality((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="480p">480p</option>
-									<option value="720p">720p</option>
-									<option value="1080p">1080p</option>
-									<option value="4k">4K</option>
-								</select>
+									onChange={setEncodeQuality}
+									options={[
+										{ value: '480p', label: '480p' },
+										{ value: '720p', label: '720p' },
+										{ value: '1080p', label: '1080p' },
+										{ value: '4k', label: '4K' },
+									]}
+								/>
 							</div>
 
 							<div class={styles.settingRow}>
@@ -1746,16 +1709,14 @@ export function Settings(props: SettingsProps) {
 										CRF adapts bitrate to scene complexity for better quality
 									</span>
 								</div>
-								<select
-									class={styles.select}
+								<Select
 									value={rateControl}
-									onChange={(e) =>
-										setRateControl((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="cbr">Constant Bitrate (CBR)</option>
-									<option value="crf">Constant Quality (CRF)</option>
-								</select>
+									onChange={setRateControl}
+									options={[
+										{ value: 'cbr', label: 'Constant Bitrate (CBR)' },
+										{ value: 'crf', label: 'Constant Quality (CRF)' },
+									]}
+								/>
 							</div>
 
 							{rateControl === 'crf' && (
@@ -1766,19 +1727,17 @@ export function Settings(props: SettingsProps) {
 											Lower values produce higher quality but larger files
 										</span>
 									</div>
-									<select
-										class={styles.select}
+									<Select
 										value={crfValue}
-										onChange={(e) =>
-											setCrfValue((e.target as HTMLSelectElement).value)
-										}
-									>
-										<option value="18">18 — Near Lossless</option>
-										<option value="20">20 — High Quality</option>
-										<option value="23">23 — Balanced</option>
-										<option value="26">26 — Smaller Files</option>
-										<option value="28">28 — Low Quality</option>
-									</select>
+										onChange={setCrfValue}
+										options={[
+											{ value: '18', label: '18 — Near Lossless' },
+											{ value: '20', label: '20 — High Quality' },
+											{ value: '23', label: '23 — Balanced' },
+											{ value: '26', label: '26 — Smaller Files' },
+											{ value: '28', label: '28 — Low Quality' },
+										]}
+									/>
 								</div>
 							)}
 
@@ -1789,20 +1748,18 @@ export function Settings(props: SettingsProps) {
 										Background encoding jobs that can run simultaneously
 									</span>
 								</div>
-								<select
-									class={styles.select}
+								<Select
 									value={maxConcurrentJobs}
-									onChange={(e) =>
-										setMaxConcurrentJobs((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="1">1</option>
-									<option value="2">2</option>
-									<option value="3">3</option>
-									<option value="4">4</option>
-									<option value="6">6</option>
-									<option value="8">8</option>
-								</select>
+									onChange={setMaxConcurrentJobs}
+									options={[
+										{ value: '1', label: '1' },
+										{ value: '2', label: '2' },
+										{ value: '3', label: '3' },
+										{ value: '4', label: '4' },
+										{ value: '6', label: '6' },
+										{ value: '8', label: '8' },
+									]}
+								/>
 							</div>
 
 							<div class={styles.settingRow}>
@@ -1813,18 +1770,16 @@ export function Settings(props: SettingsProps) {
 										overhead
 									</span>
 								</div>
-								<select
-									class={styles.select}
+								<Select
 									value={segmentDuration}
-									onChange={(e) =>
-										setSegmentDuration((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="2">2s (Fast start)</option>
-									<option value="4">4s (Balanced)</option>
-									<option value="6">6s (Efficient)</option>
-									<option value="10">10s (Maximum efficiency)</option>
-								</select>
+									onChange={setSegmentDuration}
+									options={[
+										{ value: '2', label: '2s (Fast start)' },
+										{ value: '4', label: '4s (Balanced)' },
+										{ value: '6', label: '6s (Efficient)' },
+										{ value: '10', label: '10s (Maximum efficiency)' },
+									]}
+								/>
 							</div>
 
 							{/* Chunked Transcoding */}
@@ -1995,20 +1950,18 @@ export function Settings(props: SettingsProps) {
 										)}
 									</span>
 								</div>
-								<select
-									class={styles.select}
+								<Select
 									value={scanInterval}
 									disabled={!autoScanEnabled}
-									onChange={(e) =>
-										setScanInterval((e.target as HTMLSelectElement).value)
-									}
-								>
-									<option value="1">Every hour</option>
-									<option value="3">Every 3 hours</option>
-									<option value="6">Every 6 hours</option>
-									<option value="12">Every 12 hours</option>
-									<option value="24">Daily</option>
-								</select>
+									onChange={setScanInterval}
+									options={[
+										{ value: '1', label: 'Every hour' },
+										{ value: '3', label: 'Every 3 hours' },
+										{ value: '6', label: 'Every 6 hours' },
+										{ value: '12', label: 'Every 12 hours' },
+										{ value: '24', label: 'Daily' },
+									]}
+								/>
 							</div>
 
 							<div class={styles.settingRow}>

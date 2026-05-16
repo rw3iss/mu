@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Icon } from '@/components/common/Icon';
+import { Select } from '@/components/common/Select';
 import type { MoviePlaylistInfo, Playlist } from '@/services/playlists.service';
 import { notifyError, notifySuccess, shouldNotifyPlaylist } from '@/state/notifications.state';
 import {
@@ -72,12 +73,8 @@ export function MoviePlaylists({
 	const memberIds = new Set(memberPlaylists.map((p) => p.id));
 	const availablePlaylists = allPlaylists.filter((p) => !memberIds.has(p.id));
 
-	const handleAdd = async (e: Event) => {
-		const select = e.target as HTMLSelectElement;
-		const playlistId = select.value;
+	const handleAdd = async (playlistId: string) => {
 		if (!playlistId) return;
-
-		select.value = '';
 		const playlist = allPlaylists.find((p) => p.id === playlistId);
 		try {
 			await addMovieToPlaylist(playlistId, movieId, remoteInfo);
@@ -109,23 +106,17 @@ export function MoviePlaylists({
 			{allPlaylists.length === 0 ? (
 				<span class={styles.noPlaylists}>No playlists yet</span>
 			) : (
-				<select
-					class={styles.playlistSelect}
-					onChange={handleAdd}
+				<Select
 					value=""
+					onChange={handleAdd}
 					disabled={availablePlaylists.length === 0}
-				>
-					<option value="" disabled>
-						{availablePlaylists.length === 0
+					placeholder={
+						availablePlaylists.length === 0
 							? 'In all playlists'
-							: 'Add to playlist...'}
-					</option>
-					{availablePlaylists.map((p) => (
-						<option key={p.id} value={p.id}>
-							{p.name}
-						</option>
-					))}
-				</select>
+							: 'Add to playlist…'
+					}
+					options={availablePlaylists.map((p) => ({ value: p.id, label: p.name }))}
+				/>
 			)}
 
 			{memberPlaylists.length > 0 && (
