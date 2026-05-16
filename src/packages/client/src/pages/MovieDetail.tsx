@@ -229,7 +229,14 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	const [showFileInfo, setShowFileInfo] = useState(false);
 	const [showPlaySettings, setShowPlaySettings] = useState(false);
 	const [showSubtitles, setShowSubtitles] = useState(false);
-	const [showPlaylists, setShowPlaylists] = useState(true);
+	const [showPlaylists, setShowPlaylists] = useState(false);
+	// Cast is expanded on desktop, collapsed on mobile. Track explicit
+	// state so the user toggle works on both; the initial value flips
+	// based on viewport width at mount.
+	const [showCast, setShowCast] = useState(() => {
+		if (typeof window === 'undefined') return true;
+		return window.matchMedia('(min-width: 768px)').matches;
+	});
 	const [playlistCount, setPlaylistCount] = useState(0);
 	const [audioProfiles, setAudioProfiles] = useState<AudioProfile[]>([]);
 	const [selectedEqProfile, setSelectedEqProfile] = useState<string>('');
@@ -736,11 +743,32 @@ export function MovieDetail({ id }: MovieDetailProps) {
 							</div>
 						)}
 
-						{/* Cast */}
+						{/* Cast — plain heading on desktop, mobile-only
+						    collapsible. The toggle button + chevron are
+						    hidden on desktop by CSS so the section reads as a
+						    normal h2; on mobile they reveal the same layout
+						    used by the other collapsibles (Playlists, etc). */}
 						{movie.cast && movie.cast.length > 0 && (
 							<div class={styles.castSection}>
-								<h2 class={styles.sectionTitle}>Cast</h2>
-								<div class={styles.castGrid}>
+								<button
+									class={`${styles.fileInfoToggle} ${styles.castToggle}`}
+									onClick={() => setShowCast(!showCast)}
+									type="button"
+									aria-expanded={showCast}
+								>
+									<h2 class={styles.sectionTitle}>Cast</h2>
+									<span class={`${styles.fileInfoArrow} ${styles.castArrow}`}>
+										<Icon
+											name={showCast ? 'chevron-up' : 'chevron-down'}
+											size={14}
+										/>
+									</span>
+								</button>
+								<div
+									class={`${styles.castGrid} ${
+										!showCast ? styles.castGridCollapsed : ''
+									}`}
+								>
 									{movie.cast.slice(0, 12).map((member) => (
 										<div key={member.name} class={styles.castMember}>
 											<CastPhoto

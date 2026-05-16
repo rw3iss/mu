@@ -49,7 +49,11 @@
   top: calc(-1 * var(--space-lg));
   left: calc(-1 * var(--space-lg) + 8px);
   right: calc(-1 * var(--space-lg) + 8px);
-  height: 420px;
+  // Extended so the gradient finishes well below the action button
+  // row (Play / Watchlist / Share / etc), instead of cutting off
+  // flush against it. Approximates the title + ratings + actions
+  // block + a section-padding worth of breathing room beneath.
+  height: 600px;
   overflow: hidden;
   z-index: -1;
 
@@ -371,6 +375,28 @@
   gap: var(--space-md);
   margin-bottom: var(--space-2xl);
   flex-wrap: wrap;
+
+  @include mobile {
+    gap: var(--space-sm);
+    row-gap: var(--space-md);
+
+    // Play + Watchlist (always the first two visual items) share
+    // row 1 at 50% each; Share / See Similar / options menu flow
+    // onto subsequent rows naturally.
+    > :nth-child(1),
+    > :nth-child(2) {
+      flex: 1 1 calc(50% - var(--space-sm) / 2);
+      min-width: 0;
+    }
+
+    // When Play is the simple <Button> (no progress), it renders as
+    // a direct <button> child — make its content fill its slot so
+    // the visual stays a 50/50 split.
+    > button:nth-child(1),
+    > button:nth-child(2) {
+      width: 100%;
+    }
+  }
 }
 
 .playGroup {
@@ -534,10 +560,33 @@
   margin-bottom: var(--space-2xl);
 }
 
+/* The Cast toggle is a fully-styled button on mobile but should
+   render as a plain h2 on desktop — strip the affordances. */
+.castToggle {
+  @include tablet-up {
+    cursor: default;
+    pointer-events: none;
+  }
+}
+
+.castArrow {
+  @include tablet-up {
+    display: none;
+  }
+}
+
 .castGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--space-md);
+}
+
+/* Only honour the collapsed state on mobile — desktop ignores it so
+   the cast grid is always visible regardless of toggle state. */
+.castGridCollapsed {
+  @include mobile {
+    display: none;
+  }
 }
 
 .castMember {

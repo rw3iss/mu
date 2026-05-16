@@ -43,6 +43,15 @@ import { fetchThemes } from '@/state/themes.state';
 import { initConsoleDebug } from '@/utils/console-debug';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
+/**
+ * Full URL (pathname + querystring), updated on every router change.
+ * Pages that need to react to query-only changes (e.g. /library
+ * picking up a new ?q= when the header search clears) depend on
+ * this instead of `currentPath`, which only ticks on pathname swaps.
+ */
+export const currentUrl = signal(
+	typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/',
+);
 
 function Redirect({
 	to,
@@ -84,6 +93,7 @@ function enforceAuth(url: string): boolean {
 }
 
 function handleRouteChange(e: { url: string }) {
+	currentUrl.value = e.url;
 	const url = e.url.split('?')[0] ?? e.url;
 	currentPath.value = url;
 

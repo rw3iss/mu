@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { currentPath } from '@/app';
+import { currentPath, currentUrl } from '@/app';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { Select } from '@/components/common/Select';
@@ -205,9 +205,12 @@ export function Library(_props: LibraryProps) {
 		};
 	}, []);
 
-	// External URL changes (header search submit, /search → /library redirect,
-	// browser back/forward) update localSearch so the existing debounced
-	// search effect picks them up.
+	// External URL changes (header search submit, header clear, /search →
+	// /library redirect, browser back/forward) update localSearch so the
+	// existing debounced search effect picks them up. Keyed on
+	// `currentUrl` (full URL including ?q=) so query-only changes — like
+	// clearing the header search while already on /library — still fire
+	// this effect; `currentPath` alone wouldn't tick.
 	useEffect(() => {
 		if (currentPath.value !== '/library') return;
 		const q = new URLSearchParams(window.location.search).get('q') || '';
@@ -215,7 +218,7 @@ export function Library(_props: LibraryProps) {
 			currentQRef.current = q;
 			setLocalSearch(q);
 		}
-	}, [currentPath.value]);
+	}, [currentUrl.value]);
 
 	useEffect(() => {
 		// Skip the initial mount — the first useEffect already loads the correct page

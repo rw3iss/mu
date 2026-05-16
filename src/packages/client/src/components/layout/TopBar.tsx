@@ -31,10 +31,18 @@ export function TopBar() {
 	);
 
 	const handleSearchBlur = useCallback(() => {
-		if (searchValue.trim()) {
-			goToLibrary(searchValue);
-		}
+		// Always sync the URL on blur. When the input is empty, we still
+		// need to drop any existing ?q= the user just wiped out —
+		// otherwise the Library page stays stuck on the old filter.
+		goToLibrary(searchValue);
 	}, [searchValue, goToLibrary]);
+
+	const handleSearchClear = useCallback(() => {
+		setSearchValue('');
+		// Clearing should drop ?q= and refetch the unfiltered library
+		// immediately — don't wait for blur.
+		goToLibrary('');
+	}, [goToLibrary]);
 
 	const themeLabel = theme.value === 'dark' ? 'Dark' : theme.value === 'light' ? 'Light' : 'Auto';
 
@@ -69,7 +77,7 @@ export function TopBar() {
 					<button
 						type="button"
 						class={styles.searchClear}
-						onClick={() => setSearchValue('')}
+						onClick={handleSearchClear}
 						aria-label="Clear search"
 						title="Clear search"
 					>
