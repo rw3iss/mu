@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { currentPath } from '@/app';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { Select } from '@/components/common/Select';
+import type { BulkAction } from '@/components/movie/BulkActionsBar';
+import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
+import { MovieGrid } from '@/components/movie/MovieGrid';
+import { useDebounce } from '@/hooks/useDebounce';
+import { PluginSlot } from '@/plugins/PluginSlot';
+import { UI } from '@/plugins/ui-slots';
+import { libraryEvents } from '@/services/library-events.service';
+import { moviesService } from '@/services/movies.service';
+import { sourcesService } from '@/services/sources.service';
 import {
 	fetchParentGroups,
 	groupedOnly,
@@ -12,15 +22,6 @@ import {
 	toggleGroupedOnly,
 	toggleGroupView,
 } from '@/state/groups.state';
-import type { BulkAction } from '@/components/movie/BulkActionsBar';
-import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
-import { MovieGrid } from '@/components/movie/MovieGrid';
-import { useDebounce } from '@/hooks/useDebounce';
-import { PluginSlot } from '@/plugins/PluginSlot';
-import { UI } from '@/plugins/ui-slots';
-import { libraryEvents } from '@/services/library-events.service';
-import { moviesService } from '@/services/movies.service';
-import { sourcesService } from '@/services/sources.service';
 import type { LibraryFilters } from '@/state/library.state';
 import {
 	currentPage,
@@ -58,21 +59,27 @@ import styles from './Library.module.scss';
 const PAGE_SIZE_OPTIONS = [20, 40, 60, 80, 100];
 
 /** Update URL query params without triggering a full navigation. */
-function syncUrlParams(page: number, size: number) {
+function syncUrlParams(page: number, size: number, q?: string) {
 	const url = new URL(window.location.href);
 	if (page > 1) url.searchParams.set('page', String(page));
 	else url.searchParams.delete('page');
 	if (size !== 40) url.searchParams.set('pageSize', String(size));
 	else url.searchParams.delete('pageSize');
+	const trimmed = (q ?? '').trim();
+	if (trimmed) url.searchParams.set('q', trimmed);
+	else url.searchParams.delete('q');
 	window.history.replaceState(null, '', url.toString());
 }
 
-/** Read page/pageSize from URL query params. */
-function readUrlParams(): { page: number; size: number } | null {
+/** Read page/pageSize/q from URL query params. */
+function readUrlParams(): { page: number; size: number; q: string } | null {
 	const url = new URL(window.location.href);
 	const p = parseInt(url.searchParams.get('page') || '', 10);
 	const s = parseInt(url.searchParams.get('pageSize') || '', 10);
-	if (p > 0 || s > 0) return { page: p > 0 ? p : 1, size: s > 0 ? s : pageSize.value };
+	const q = url.searchParams.get('q') || '';
+	if (p > 0 || s > 0 || q) {
+		return { page: p > 0 ? p : 1, size: s > 0 ? s : pageSize.value, q };
+	}
 	return null;
 }
 
@@ -119,7 +126,12 @@ interface LibraryProps {
 }
 
 export function Library(_props: LibraryProps) {
-	const [localSearch, setLocalSearch] = useState(searchQuery.value);
+	// Seed from URL ?q= so deep links and header submits stay in sync.
+	const initialQ =
+		typeof window !== 'undefined'
+			? new URLSearchParams(window.location.search).get('q') || ''
+			: '';
+	const [localSearch, setLocalSearch] = useState(initialQ || searchQuery.value);
 	const [genres, setGenres] = useState<string[]>([]);
 	const [showFilters, setShowFilters] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
@@ -133,6 +145,9 @@ export function Library(_props: LibraryProps) {
 	const debouncedSearch = useDebounce(localSearch, 300);
 	const pendingScrollRef = useRef<number | null>(null);
 	const initialLoadRef = useRef(true);
+	// Track whether mount already synced search → state, so the URL-watcher
+	// below knows when to apply external ?q= changes (e.g. header submit).
+	const currentQRef = useRef(initialQ);
 
 	useEffect(() => {
 		initViewMode();
@@ -144,8 +159,10 @@ export function Library(_props: LibraryProps) {
 		const scrollRestore = restoreLibraryScroll();
 
 		let startPage = 1;
+		let startQ = '';
 		if (urlParams) {
 			startPage = urlParams.page;
+			startQ = urlParams.q;
 			if (urlParams.size !== pageSize.value) {
 				pageSize.value = urlParams.size;
 			}
@@ -154,8 +171,13 @@ export function Library(_props: LibraryProps) {
 			pendingScrollRef.current = scrollRestore.scrollY;
 		}
 
+		// Ensure server fetch picks up the URL q on first load.
+		if (startQ !== searchQuery.value) {
+			searchQuery.value = startQ;
+		}
+
 		fetchMovies(startPage).then(() => {
-			syncUrlParams(startPage, pageSize.value);
+			syncUrlParams(startPage, pageSize.value, startQ);
 			// Restore scroll after movies render
 			if (pendingScrollRef.current != null) {
 				requestAnimationFrame(() => {
@@ -183,13 +205,28 @@ export function Library(_props: LibraryProps) {
 		};
 	}, []);
 
+	// External URL changes (header search submit, /search → /library redirect,
+	// browser back/forward) update localSearch so the existing debounced
+	// search effect picks them up.
+	useEffect(() => {
+		if (currentPath.value !== '/library') return;
+		const q = new URLSearchParams(window.location.search).get('q') || '';
+		if (q !== currentQRef.current) {
+			currentQRef.current = q;
+			setLocalSearch(q);
+		}
+	}, [currentPath.value]);
+
 	useEffect(() => {
 		// Skip the initial mount — the first useEffect already loads the correct page
 		if (initialLoadRef.current) {
 			initialLoadRef.current = false;
+			currentQRef.current = debouncedSearch;
 			return;
 		}
+		currentQRef.current = debouncedSearch;
 		searchMovies(debouncedSearch);
+		syncUrlParams(1, pageSize.value, debouncedSearch);
 	}, [debouncedSearch]);
 
 	async function loadGenres() {
@@ -213,18 +250,14 @@ export function Library(_props: LibraryProps) {
 		}
 	}, []);
 
-	const handleSearchInput = useCallback((e: Event) => {
-		setLocalSearch((e.target as HTMLInputElement).value);
-	}, []);
-
 	const handlePageChange = useCallback((page: number) => {
-		fetchMovies(page).then(() => syncUrlParams(page, pageSize.value));
+		fetchMovies(page).then(() => syncUrlParams(page, pageSize.value, searchQuery.value));
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}, []);
 
 	const handlePageSizeChange = useCallback((size: number) => {
 		setPageSize(size);
-		syncUrlParams(1, size);
+		syncUrlParams(1, size, searchQuery.value);
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}, []);
 
@@ -298,7 +331,7 @@ export function Library(_props: LibraryProps) {
 
 	return (
 		<div class={styles.library}>
-			{/* Header */}
+			{/* Header — title on the left, all toolbar controls on the right */}
 			<div class={styles.header}>
 				<div class={styles.headerLeft}>
 					<h1 class={styles.title}>Library</h1>
@@ -312,54 +345,41 @@ export function Library(_props: LibraryProps) {
 						)}
 					</span>
 				</div>
-				<Button variant="secondary" size="sm" loading={isUpdating} onClick={handleUpdate}>
-					{isUpdating ? 'Updating...' : 'Update'}
-				</Button>
-			</div>
 
-			{/* Toolbar */}
-			<div class={styles.toolbar}>
-				<div class={styles.searchBar}>
-					<input
-						type="search"
-						class={styles.searchInput}
-						placeholder="Search your library..."
-						value={localSearch}
-						onInput={handleSearchInput}
-					/>
-				</div>
+				<div class={styles.headerActions}>
+					{(hasRemoteServers.value || remoteServerList.value.length > 0) && (
+						<Select
+							value={serverFilter.value}
+							onChange={setServerFilter}
+							options={[
+								{ value: 'all', label: 'All Libraries' },
+								{ value: 'local', label: 'My Library' },
+								...remoteServerList.value.map((s) => ({
+									value: s.id,
+									label: s.name,
+								})),
+							]}
+						/>
+					)}
 
-				{(hasRemoteServers.value || remoteServerList.value.length > 0) && (
-					<Select
-						value={serverFilter.value}
-						onChange={setServerFilter}
-						options={[
-							{ value: 'all', label: 'All Libraries' },
-							{ value: 'local', label: 'My Library' },
-							...remoteServerList.value.map((s) => ({ value: s.id, label: s.name })),
-						]}
-					/>
-				)}
+					<button
+						class={`${styles.showHiddenBtn} ${showHidden.value ? styles.active : ''}`}
+						onClick={toggleShowHidden}
+						title={showHidden.value ? 'Showing all movies' : 'Show hidden movies'}
+					>
+						<Icon name={showHidden.value ? 'eye' : 'eye-off'} />
+						<span>Hidden</span>
+					</button>
 
-				<button
-					class={`${styles.showHiddenBtn} ${showHidden.value ? styles.active : ''}`}
-					onClick={toggleShowHidden}
-					title={showHidden.value ? 'Showing all movies' : 'Show hidden movies'}
-				>
-					<Icon name={showHidden.value ? 'eye' : 'eye-off'} />
-					<span>Hidden</span>
-				</button>
+					<button
+						class={`${styles.showHiddenBtn} ${hideWatched.value ? styles.active : ''}`}
+						onClick={toggleHideWatched}
+						title={hideWatched.value ? 'Showing unwatched only' : 'Hide watched movies'}
+					>
+						<Icon name={hideWatched.value ? 'eye-off' : 'eye'} />
+						<span>Unwatched</span>
+					</button>
 
-				<button
-					class={`${styles.showHiddenBtn} ${hideWatched.value ? styles.active : ''}`}
-					onClick={toggleHideWatched}
-					title={hideWatched.value ? 'Showing unwatched only' : 'Hide watched movies'}
-				>
-					<Icon name={hideWatched.value ? 'eye-off' : 'eye'} />
-					<span>Unwatched</span>
-				</button>
-
-				<div class={styles.toolbarActions}>
 					<Select<LibraryFilters['sortBy']>
 						value={filters.value.sortBy}
 						onChange={handleSortChange}
@@ -379,7 +399,9 @@ export function Library(_props: LibraryProps) {
 						aria-label={`Sort ${filters.value.sortOrder === 'asc' ? 'ascending' : 'descending'}`}
 						title={filters.value.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
 					>
-						<Icon name={filters.value.sortOrder === 'asc' ? 'arrow-up' : 'arrow-down'} />
+						<Icon
+							name={filters.value.sortOrder === 'asc' ? 'arrow-up' : 'arrow-down'}
+						/>
 					</button>
 
 					<div class={styles.viewToggle}>
@@ -487,6 +509,16 @@ export function Library(_props: LibraryProps) {
 						Filters{' '}
 						{filters.value.genres.length > 0 ? `(${filters.value.genres.length})` : ''}
 					</Button>
+
+					<button
+						class={`${styles.refreshBtn} ${isUpdating ? styles.spinning : ''}`}
+						onClick={handleUpdate}
+						disabled={isUpdating}
+						aria-label="Refresh library"
+						title="Refresh library"
+					>
+						<Icon name="refresh" />
+					</button>
 				</div>
 			</div>
 
@@ -555,9 +587,9 @@ export function Library(_props: LibraryProps) {
 					if (parentGroups.value.length === 0) {
 						return (
 							<div class={styles.groupsEmpty}>
-								No collections yet. Run <strong>Settings → Admin → Group
-								Similar Items</strong> to detect series + collections from
-								your library.
+								No collections yet. Run{' '}
+								<strong>Settings → Admin → Group Similar Items</strong> to detect
+								series + collections from your library.
 							</div>
 						);
 					}
@@ -672,7 +704,10 @@ export function Library(_props: LibraryProps) {
 						onChange={handlePageSizeChange}
 						size="sm"
 						menuAlign="end"
-						options={PAGE_SIZE_OPTIONS.map((n) => ({ value: n, label: `${n} per page` }))}
+						options={PAGE_SIZE_OPTIONS.map((n) => ({
+							value: n,
+							label: `${n} per page`,
+						}))}
 					/>
 				</div>
 			)}

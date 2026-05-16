@@ -13,7 +13,6 @@ interface NavTab {
 const tabs: NavTab[] = [
 	{ label: 'Home', path: '/', icon: 'home' },
 	{ label: 'Library', path: '/library', icon: 'film' },
-	{ label: 'Search', path: '/search', icon: 'search' },
 	{ label: 'Playlists', path: '/playlists', icon: 'list-plus' },
 	{ label: 'Profile', path: '/settings', icon: 'settings' },
 ];

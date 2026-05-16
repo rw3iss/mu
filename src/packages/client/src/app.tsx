@@ -6,12 +6,12 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Changelog } from '@/pages/Changelog';
 import { Dashboard } from '@/pages/Dashboard';
 import { Discover } from '@/pages/Discover';
+import { GroupDetail } from '@/pages/GroupDetail';
 import { History } from '@/pages/History';
 import { JobDetails } from '@/pages/JobDetails';
 import { JobList } from '@/pages/JobList';
 import { Library } from '@/pages/Library';
 import { Login } from '@/pages/Login';
-import { GroupDetail } from '@/pages/GroupDetail';
 import { MovieDetail } from '@/pages/MovieDetail';
 import { NotFound } from '@/pages/NotFound';
 import { PersonDetail } from '@/pages/PersonDetail';
@@ -19,7 +19,6 @@ import { PersonDetail } from '@/pages/PersonDetail';
 import { PlaylistDetail } from '@/pages/PlaylistDetail';
 import { Playlists } from '@/pages/Playlists';
 import { PublicWatch } from '@/pages/PublicWatch';
-import { Search } from '@/pages/Search';
 import { Settings } from '@/pages/Settings';
 import { Setup } from '@/pages/Setup';
 import { Watchlist } from '@/pages/Watchlist';
@@ -45,9 +44,19 @@ import { initConsoleDebug } from '@/utils/console-debug';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
 
-function Redirect({ to, path: _path }: { to: string; path: string }) {
+function Redirect({
+	to,
+	path: _path,
+	preserveQuery,
+}: {
+	to: string;
+	path: string;
+	preserveQuery?: boolean;
+}) {
 	useEffect(() => {
-		route(to, true);
+		const target =
+			preserveQuery && window.location.search ? `${to}${window.location.search}` : to;
+		route(target, true);
 	}, []);
 	return null;
 }
@@ -175,7 +184,7 @@ export function App() {
 						<Watchlist path="/watchlist" />
 						<History path="/history" />
 						<Discover path="/discover" />
-						<Search path="/search" />
+						<Redirect path="/search" to="/library" preserveQuery />
 						<Settings path="/settings/:tab?" />
 						<Changelog path="/changelog" />
 						<Redirect path="/plugins" to="/settings/plugins" />

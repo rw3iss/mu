@@ -99,6 +99,13 @@
 	cursor: pointer;
 	padding: 0;
 
+	@include mobile {
+		// Center the thumbnail horizontally under the "Trailer ›"
+		// header on narrow screens.
+		margin-left: auto;
+		margin-right: auto;
+	}
+
 	&:hover .playOverlay {
 		background: rgba(0, 0, 0, 0.55);
 		color: var(--color-accent, #06b6d4);

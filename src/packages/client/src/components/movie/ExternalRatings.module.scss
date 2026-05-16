@@ -3,6 +3,13 @@
   align-items: center;
   gap: var(--space-sm);
   flex-wrap: wrap;
+
+  // Mobile: tighter so the row fits alongside the user-rating widget
+  // without wrapping.
+  @include mobile {
+    gap: var(--space-xs);
+    flex-wrap: nowrap;
+  }
 }
 
 .badge {
@@ -13,6 +20,12 @@
   border-radius: var(--radius-sm);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
+
+  @include mobile {
+    padding: 2px 6px;
+    font-size: 11px;
+    gap: 3px;
+  }
 }
 
 .source {

@@ -1,28 +1,21 @@
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Icon } from '@/components/common/Icon';
-import { useDebounce } from '@/hooks/useDebounce';
 import { theme, toggleTheme } from '@/state/theme.state';
 
 import styles from './TopBar.module.scss';
 
 export function TopBar() {
 	const [searchValue, setSearchValue] = useState('');
-	const debouncedSearch = useDebounce(searchValue, 300);
 
-	useEffect(() => {
-		const trimmed = debouncedSearch.trim();
-		if (trimmed) {
-			route(`/search?q=${encodeURIComponent(trimmed)}`);
-			return;
+	const goToLibrary = useCallback((value: string) => {
+		const trimmed = value.trim();
+		const target = trimmed ? `/library?q=${encodeURIComponent(trimmed)}` : '/library';
+		const current = window.location.pathname + window.location.search;
+		if (current !== target) {
+			route(target);
 		}
-		// Input is now empty — if the user is on the /search route, take
-		// them back to /library so they see all movies instead of stale
-		// results from the previous query.
-		if (window.location.pathname.startsWith('/search')) {
-			route('/library');
-		}
-	}, [debouncedSearch]);
+	}, []);
 
 	const handleSearch = useCallback((e: Event) => {
 		const target = e.target as HTMLInputElement;
@@ -32,22 +25,16 @@ export function TopBar() {
 	const handleSearchSubmit = useCallback(
 		(e: Event) => {
 			e.preventDefault();
-			if (searchValue.trim()) {
-				route(`/search?q=${encodeURIComponent(searchValue.trim())}`);
-			}
+			goToLibrary(searchValue);
 		},
-		[searchValue],
+		[searchValue, goToLibrary],
 	);
 
-	const handleSearchFocus = useCallback(() => {
+	const handleSearchBlur = useCallback(() => {
 		if (searchValue.trim()) {
-			const current = window.location.pathname + window.location.search;
-			const target = `/search?q=${encodeURIComponent(searchValue.trim())}`;
-			if (current !== target) {
-				route(target);
-			}
+			goToLibrary(searchValue);
 		}
-	}, [searchValue]);
+	}, [searchValue, goToLibrary]);
 
 	const themeLabel = theme.value === 'dark' ? 'Dark' : theme.value === 'light' ? 'Light' : 'Auto';
 
@@ -75,7 +62,7 @@ export function TopBar() {
 					placeholder="Search movies..."
 					value={searchValue}
 					onInput={handleSearch}
-					onFocus={handleSearchFocus}
+					onBlur={handleSearchBlur}
 					aria-label="Search movies"
 				/>
 				{searchValue && (
