@@ -62,9 +62,7 @@ export function buildTitleQuery(input: BuildTitleQueryInput): TitleQuery {
 
 	// SE detection — try the filename first (canonical), then the title.
 	const se =
-		(fileName && parseSeasonEpisode(fileName)) ||
-		parseSeasonEpisode(storedTitle) ||
-		null;
+		(fileName && parseSeasonEpisode(fileName)) || parseSeasonEpisode(storedTitle) || null;
 
 	if (se && se.prefix.trim().length > 0) {
 		// Show-name candidate: whatever sat before the SE marker.

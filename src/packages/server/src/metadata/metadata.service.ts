@@ -78,8 +78,7 @@ export class MetadataService {
 			durationSeconds: file?.durationSeconds ?? null,
 		});
 		const resolvedYear = query.year;
-		const fileDurationMinutes =
-			query.kind === 'movie' ? query.durationMinutes : null;
+		const fileDurationMinutes = query.kind === 'movie' ? query.durationMinutes : null;
 
 		// --- 1. Fast path: known IDs --------------------------------------
 		if (movie.tmdbId || movie.imdbId) {
@@ -121,8 +120,7 @@ export class MetadataService {
 			this.tmdb.searchMovie(searchTitle, resolvedYear ?? undefined),
 			this.omdb.searchByTitle(searchTitle, resolvedYear ?? undefined),
 		]);
-		const tmdbResults =
-			tmdbSearch.status === 'fulfilled' ? (tmdbSearch.value ?? []) : [];
+		const tmdbResults = tmdbSearch.status === 'fulfilled' ? (tmdbSearch.value ?? []) : [];
 		const omdbResult: OmdbSearchResult | null =
 			omdbSearch.status === 'fulfilled' ? omdbSearch.value : null;
 		if (tmdbSearch.status === 'rejected') {
@@ -136,9 +134,7 @@ export class MetadataService {
 		// match; TMDB returns many — the matcher dedupes by score.
 		const candidates: MovieCandidate[] = [];
 		for (const r of tmdbResults) {
-			const candYear = r.release_date
-				? parseInt(r.release_date.slice(0, 4), 10)
-				: null;
+			const candYear = r.release_date ? parseInt(r.release_date.slice(0, 4), 10) : null;
 			candidates.push({
 				provider: 'tmdb',
 				externalId: r.id,
@@ -222,10 +218,7 @@ export class MetadataService {
 		entityLabel: string,
 		query: Extract<TitleQuery, { kind: 'tv-episode' }>,
 	): Promise<any | 'fall-through'> {
-		const tvResults = await this.tmdb.searchTv(
-			query.showTitle,
-			query.year ?? undefined,
-		);
+		const tvResults = await this.tmdb.searchTv(query.showTitle, query.year ?? undefined);
 		if (!tvResults || tvResults.length === 0) {
 			this.logger.debug(
 				`TV search for "${query.showTitle}" returned no hits — falling back to movie path`,
@@ -234,9 +227,7 @@ export class MetadataService {
 		}
 
 		const candidates: MovieCandidate[] = tvResults.map((r) => {
-			const candYear = r.first_air_date
-				? parseInt(r.first_air_date.slice(0, 4), 10)
-				: null;
+			const candYear = r.first_air_date ? parseInt(r.first_air_date.slice(0, 4), 10) : null;
 			return {
 				provider: 'tmdb-tv-episode',
 				externalId: r.id,
@@ -301,8 +292,7 @@ export class MetadataService {
 		}
 
 		const now = nowISO();
-		const episodeTitle =
-			`${tvDetails.name} - S${pad2(query.season)}E${pad2(query.episode)} - ${episode.name}`;
+		const episodeTitle = `${tvDetails.name} - S${pad2(query.season)}E${pad2(query.episode)} - ${episode.name}`;
 		const showImdbId = tvDetails.external_ids?.imdb_id ?? null;
 		const stillUrl = this.tmdb.getImageUrl(episode.still_path, 'w500');
 		const backdropUrl = this.tmdb.getImageUrl(tvDetails.backdrop_path, 'w1280');
@@ -319,10 +309,7 @@ export class MetadataService {
 						: null,
 				overview: episode.overview || tvDetails.overview || null,
 				tagline: tvDetails.tagline || null,
-				runtimeMinutes:
-					episode.runtime ||
-					tvDetails.episode_run_time?.[0] ||
-					null,
+				runtimeMinutes: episode.runtime || tvDetails.episode_run_time?.[0] || null,
 				releaseDate,
 				year: year && !Number.isNaN(year) ? year : null,
 				// Use the still as poster; TV show backdrop as backdrop.
@@ -360,9 +347,7 @@ export class MetadataService {
 			directors: JSON.stringify(directors),
 			writers: JSON.stringify(writers),
 			keywords: JSON.stringify(tvDetails.keywords?.results?.map((k) => k.name) ?? []),
-			productionCompanies: JSON.stringify(
-				tvDetails.networks?.map((n) => n.name) ?? [],
-			),
+			productionCompanies: JSON.stringify(tvDetails.networks?.map((n) => n.name) ?? []),
 			budget: null,
 			revenue: null,
 			tmdbRating: episode.vote_average || tvDetails.vote_average || null,
@@ -423,11 +408,7 @@ export class MetadataService {
 	 * table, clears all candidates, then runs the regular merge fetch
 	 * with the picked IDs.
 	 */
-	async applyCandidate(
-		movieId: string,
-		provider: string,
-		externalId: string,
-	): Promise<any> {
+	async applyCandidate(movieId: string, provider: string, externalId: string): Promise<any> {
 		const row = this.matchCandidates.find('movie', movieId, provider, externalId);
 		if (!row) {
 			throw new NotFoundException(
@@ -519,8 +500,7 @@ export class MetadataService {
 			tmdbId ? this.tmdb.getMovieDetails(tmdbId) : Promise.resolve(null),
 			imdbId ? this.omdb.getByImdbId(imdbId) : Promise.resolve(null),
 		]);
-		const tmdbDetails =
-			tmdbDetailsRes.status === 'fulfilled' ? tmdbDetailsRes.value : null;
+		const tmdbDetails = tmdbDetailsRes.status === 'fulfilled' ? tmdbDetailsRes.value : null;
 		let omdbData = omdbByIdRes.status === 'fulfilled' ? omdbByIdRes.value : null;
 
 		// If TMDB filled in the IMDB ID, fetch OMDB now to enrich.
@@ -548,9 +528,7 @@ export class MetadataService {
 			? `https://www.youtube.com/watch?v=${trailerVideo.key}`
 			: null;
 
-		const usRelease = tmdbDetails?.release_dates?.results?.find(
-			(r) => r.iso_3166_1 === 'US',
-		);
+		const usRelease = tmdbDetails?.release_dates?.results?.find((r) => r.iso_3166_1 === 'US');
 		const tmdbCertification = usRelease?.release_dates
 			?.map((rd) => rd.certification)
 			.find((c) => c && c.length > 0);
@@ -567,16 +545,11 @@ export class MetadataService {
 		// here.
 		const runtimeMinutes = omdbData?.runtimeMinutes || tmdbDetails?.runtime || null;
 		const releaseDate = tmdbDetails?.release_date || null;
-		const year = releaseDate
-			? parseInt(releaseDate.slice(0, 4), 10)
-			: priorYear;
+		const year = releaseDate ? parseInt(releaseDate.slice(0, 4), 10) : priorYear;
 		const language = tmdbDetails?.spoken_languages?.[0]?.iso_639_1 ?? null;
 		const country = tmdbDetails?.production_countries?.[0]?.iso_3166_1 ?? null;
 		const posterUrl = this.tmdb.getImageUrl(tmdbDetails?.poster_path ?? null);
-		const backdropUrl = this.tmdb.getImageUrl(
-			tmdbDetails?.backdrop_path ?? null,
-			'w1280',
-		);
+		const backdropUrl = this.tmdb.getImageUrl(tmdbDetails?.backdrop_path ?? null, 'w1280');
 		const contentRating = firstNonEmpty(omdbData?.rated, tmdbCertification);
 
 		const movieUpdate: Record<string, unknown> = {
@@ -604,7 +577,10 @@ export class MetadataService {
 		const genres = tmdbDetails?.genres?.length
 			? tmdbDetails.genres.map((g) => g.name)
 			: omdbData?.genre
-				? omdbData.genre.split(',').map((g) => g.trim()).filter(Boolean)
+				? omdbData.genre
+						.split(',')
+						.map((g) => g.trim())
+						.filter(Boolean)
 				: [];
 
 		const castMembers = tmdbDetails?.credits?.cast
@@ -625,7 +601,10 @@ export class MetadataService {
 					),
 				)
 			: omdbData?.director
-				? omdbData.director.split(',').map((d) => d.trim()).filter(Boolean)
+				? omdbData.director
+						.split(',')
+						.map((d) => d.trim())
+						.filter(Boolean)
 				: [];
 
 		const writers = tmdbDetails?.credits?.crew
@@ -637,7 +616,10 @@ export class MetadataService {
 					),
 				)
 			: omdbData?.writer
-				? omdbData.writer.split(',').map((w) => w.trim()).filter(Boolean)
+				? omdbData.writer
+						.split(',')
+						.map((w) => w.trim())
+						.filter(Boolean)
 				: [];
 
 		const keywords = tmdbDetails?.keywords?.keywords
@@ -684,9 +666,7 @@ export class MetadataService {
 			imdbVotes,
 			rottenTomatoesScore,
 			metacriticScore,
-			extendedData: Object.keys(extendedData).length
-				? JSON.stringify(extendedData)
-				: null,
+			extendedData: Object.keys(extendedData).length ? JSON.stringify(extendedData) : null,
 			source: sources,
 			fetchedAt: now,
 			updatedAt: now,

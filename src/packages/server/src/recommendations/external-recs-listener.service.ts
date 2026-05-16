@@ -8,10 +8,7 @@ import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { ProviderEventsService } from '../providers/provider-events.service.js';
 import { RateLimitService } from '../providers/rate-limit.service.js';
 import { TraktRecommender } from '../providers/sources/trakt/trakt.recommender.js';
-import {
-	ExternalRecsRepository,
-	type IncomingExternalRec,
-} from './external-recs.repository.js';
+import { ExternalRecsRepository, type IncomingExternalRec } from './external-recs.repository.js';
 
 interface MovieEventPayload {
 	movieId?: string;

@@ -8,6 +8,19 @@ export type { JobHistoryEntry, NewJobHistoryEntry } from './job-history.ts';
 export { jobHistory } from './job-history.ts';
 export type { MediaSource, NewMediaSource } from './media-sources.ts';
 export { mediaSources } from './media-sources.ts';
+export type {
+	MetadataMatchCandidate,
+	NewMetadataMatchCandidate,
+} from './metadata-match-candidates.ts';
+export { metadataMatchCandidates } from './metadata-match-candidates.ts';
+export type { MovieEmbedding, NewMovieEmbedding } from './movie-embeddings.ts';
+export { movieEmbeddings } from './movie-embeddings.ts';
+export type {
+	ExternalRecSource,
+	MovieExternalRec,
+	NewMovieExternalRec,
+} from './movie-external-recs.ts';
+export { movieExternalRecs } from './movie-external-recs.ts';
 export type { MovieFile, NewMovieFile } from './movie-files.ts';
 export { movieFiles } from './movie-files.ts';
 export type {
@@ -17,31 +30,18 @@ export type {
 	NewMovieGroup,
 } from './movie-groups.ts';
 export { movieGroups } from './movie-groups.ts';
-export type { MovieEmbedding, NewMovieEmbedding } from './movie-embeddings.ts';
-export { movieEmbeddings } from './movie-embeddings.ts';
 export type {
 	MovieLlmFeatures,
 	NewMovieLlmFeatures,
 } from './movie-llm-features.ts';
 export { movieLlmFeatures } from './movie-llm-features.ts';
+export type { MovieMetadata, NewMovieMetadata } from './movie-metadata.ts';
+export { movieMetadata } from './movie-metadata.ts';
 export type {
 	MovieRecExplanation,
 	NewMovieRecExplanation,
 } from './movie-rec-explanations.ts';
 export { movieRecExplanations } from './movie-rec-explanations.ts';
-export type {
-	ExternalRecSource,
-	MovieExternalRec,
-	NewMovieExternalRec,
-} from './movie-external-recs.ts';
-export { movieExternalRecs } from './movie-external-recs.ts';
-export type { MovieMetadata, NewMovieMetadata } from './movie-metadata.ts';
-export { movieMetadata } from './movie-metadata.ts';
-export type {
-	MetadataMatchCandidate,
-	NewMetadataMatchCandidate,
-} from './metadata-match-candidates.ts';
-export { metadataMatchCandidates } from './metadata-match-candidates.ts';
 export type { Movie, NewMovie } from './movies.ts';
 export { movies } from './movies.ts';
 export type { NewPlaylistMovie, PlaylistMovie } from './playlist-movies.ts';

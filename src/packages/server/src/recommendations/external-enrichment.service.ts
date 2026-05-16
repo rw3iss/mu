@@ -4,8 +4,8 @@ import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
-import { JobManagerService } from '../jobs/job-manager.service.js';
 import type { JobRecord } from '../jobs/job.interface.js';
+import { JobManagerService } from '../jobs/job-manager.service.js';
 import { OmdbProvider } from '../metadata/providers/omdb.provider.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { BudgetExhausted, RateLimitExceeded } from '../providers/exceptions.js';
@@ -216,7 +216,10 @@ export class ExternalEnrichmentService implements OnModuleInit {
 				.where(eq(movieMetadata.id, existingMeta.id))
 				.run();
 		} else {
-			this.database.db.insert(movieMetadata).values(metaValues as any).run();
+			this.database.db
+				.insert(movieMetadata)
+				.values(metaValues as any)
+				.run();
 		}
 
 		// Fire the same event the regular metadata pipeline uses so the

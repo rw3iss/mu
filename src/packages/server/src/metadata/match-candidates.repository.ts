@@ -3,10 +3,7 @@ import { nowISO } from '@mu/shared';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import {
-	metadataMatchCandidates,
-	type MetadataMatchCandidate,
-} from '../database/schema/index.js';
+import { type MetadataMatchCandidate, metadataMatchCandidates } from '../database/schema/index.js';
 import type { MatchCandidate, ScoredCandidate } from './matching/index.js';
 
 export type CandidateEntityType = 'movie' | 'group';
@@ -54,11 +51,7 @@ export class MatchCandidatesRepository {
 	}
 
 	/** Replace all candidates for a given entity in a single transaction. */
-	replace(
-		entityType: CandidateEntityType,
-		entityId: string,
-		candidates: NewCandidate[],
-	): void {
+	replace(entityType: CandidateEntityType, entityId: string, candidates: NewCandidate[]): void {
 		const now = nowISO();
 		this.database.db
 			.delete(metadataMatchCandidates)

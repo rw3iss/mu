@@ -25,11 +25,7 @@ export function Connections() {
 	}
 
 	if (providersError.value) {
-		return (
-			<div class={styles.error}>
-				Failed to load providers: {providersError.value}
-			</div>
-		);
+		return <div class={styles.error}>Failed to load providers: {providersError.value}</div>;
 	}
 
 	const list = providersList.value;
@@ -39,16 +35,16 @@ export function Connections() {
 			<div class={styles.intro}>
 				<h2 class={styles.heading}>Connections</h2>
 				<p class={styles.lede}>
-					External services Mu can use for recommendations, enrichment,
-					embeddings, and AI analysis. API keys live in the server's database
-					— never in config files or this repo.
+					External services Mu can use for recommendations, enrichment, embeddings, and AI
+					analysis. API keys live in the server's database — never in config files or this
+					repo.
 				</p>
 			</div>
 			{list.length === 0 ? (
 				<div class={styles.empty}>
-					No providers registered yet. Adding TMDB, Trakt, OpenAI, Anthropic,
-					etc. happens during later feature phases — once registered they'll
-					appear here for configuration.
+					No providers registered yet. Adding TMDB, Trakt, OpenAI, Anthropic, etc. happens
+					during later feature phases — once registered they'll appear here for
+					configuration.
 				</div>
 			) : (
 				<div class={styles.grid}>

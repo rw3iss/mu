@@ -160,8 +160,7 @@ function parseOmdbResult(raw: OmdbResult): OmdbData {
 	const yearParsed = raw.Year ? parseInt(raw.Year, 10) : null;
 
 	return {
-		imdbRating:
-			raw.imdbRating && raw.imdbRating !== 'N/A' ? parseFloat(raw.imdbRating) : null,
+		imdbRating: raw.imdbRating && raw.imdbRating !== 'N/A' ? parseFloat(raw.imdbRating) : null,
 		imdbVotes:
 			raw.imdbVotes && raw.imdbVotes !== 'N/A'
 				? parseInt(raw.imdbVotes.replace(/,/g, ''), 10)

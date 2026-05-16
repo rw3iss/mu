@@ -83,8 +83,7 @@ export const providersService = {
 		api.put<{ ok: boolean; isConfigured: boolean }>(`/providers/${id}/credentials`, {
 			config,
 		}),
-	deleteCredentials: (id: string) =>
-		api.delete<{ ok: boolean }>(`/providers/${id}/credentials`),
+	deleteCredentials: (id: string) => api.delete<{ ok: boolean }>(`/providers/${id}/credentials`),
 	setEnabled: (id: string, enabled: boolean) =>
 		api.patch<{ ok: boolean; enabled: boolean }>(`/providers/${id}`, { enabled }),
 	test: (id: string) => api.post<HealthCheckResult>(`/providers/${id}/test`, {}),

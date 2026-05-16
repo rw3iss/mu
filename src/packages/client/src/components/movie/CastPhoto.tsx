@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import styles from './CastPhoto.module.scss';
 
 interface CastPhotoProps {

@@ -88,8 +88,9 @@ export class GroupingController {
 		}
 		// Parent: aggregate movies across all child subgroups.
 		const children = this.repo.listChildren(id);
-		const out: typeof this.repo.listMoviesInSubgroup extends (...a: any) => infer R ? R : never =
-			[] as any;
+		const out: typeof this.repo.listMoviesInSubgroup extends (...a: any) => infer R
+			? R
+			: never = [] as any;
 		for (const child of children) {
 			out.push(...this.repo.listMoviesInSubgroup(child.id));
 		}
@@ -177,10 +178,7 @@ export class GroupingController {
 
 	@Post(':id/match-candidates/apply')
 	@Roles('admin')
-	async applyMatchCandidate(
-		@Param('id') groupId: string,
-		@Body() body: ApplyCandidateBody,
-	) {
+	async applyMatchCandidate(@Param('id') groupId: string, @Body() body: ApplyCandidateBody) {
 		if (!body?.provider || !body?.externalId) {
 			throw new BadRequestException('provider and externalId required');
 		}

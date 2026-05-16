@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { abbreviateJobId } from '@/components/admin/JobBadge';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { Select } from '@/components/common/Select';
 import { Spinner } from '@/components/common/Spinner';
-import { abbreviateJobId } from '@/components/admin/JobBadge';
 import { type Job, type JobStatus, jobsService } from '@/services/jobs.service';
 import { wsService } from '@/services/websocket.service';
 import { currentUser } from '@/state/auth.state';
@@ -126,7 +126,8 @@ export function JobList({ matches }: JobListProps) {
 				<div>
 					<h1 class={styles.title}>Jobs</h1>
 					<p class={styles.subtitle}>
-						Background processing queue. Filter by type or status; auto-refreshes via WebSocket.
+						Background processing queue. Filter by type or status; auto-refreshes via
+						WebSocket.
 					</p>
 				</div>
 				<Button variant="ghost" onClick={handlePrune} loading={pruning}>
@@ -142,7 +143,9 @@ export function JobList({ matches }: JobListProps) {
 						class={styles.filterInput}
 						placeholder="e.g. thumbnail, pre-transcode"
 						value={typeFilter}
-						onChange={(e) => setFilter('type', (e.target as HTMLInputElement).value.trim())}
+						onChange={(e) =>
+							setFilter('type', (e.target as HTMLInputElement).value.trim())
+						}
 					/>
 				</label>
 				<label class={styles.filter}>
@@ -190,12 +193,16 @@ export function JobList({ matches }: JobListProps) {
 									</td>
 									<td class={styles.labelCell}>{j.label}</td>
 									<td>
-										<span class={`${styles.status} ${styles[`status_${j.status}`] ?? ''}`}>
+										<span
+											class={`${styles.status} ${styles[`status_${j.status}`] ?? ''}`}
+										>
 											{j.status}
 										</span>
 									</td>
 									<td>
-										{typeof j.progress === 'number' ? `${Math.round(j.progress)}%` : '—'}
+										{typeof j.progress === 'number'
+											? `${Math.round(j.progress)}%`
+											: '—'}
 									</td>
 									<td class={styles.timeCell}>{formatTime(j.createdAt)}</td>
 								</tr>
@@ -236,7 +243,9 @@ export function JobList({ matches }: JobListProps) {
 										{typeof j.progress === 'number' && (
 											<span>{Math.round(j.progress)}%</span>
 										)}
-										<span class={styles.timeCell}>{formatTime(j.createdAt)}</span>
+										<span class={styles.timeCell}>
+											{formatTime(j.createdAt)}
+										</span>
 									</span>
 								</div>
 							</div>

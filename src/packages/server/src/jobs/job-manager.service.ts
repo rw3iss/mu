@@ -1,9 +1,4 @@
-import type {
-	JobDescriptor,
-	JobHandler,
-	JobRecord,
-	ScheduledJobOptions,
-} from './job.interface.js';
+import type { JobDescriptor, JobHandler, JobRecord, ScheduledJobOptions } from './job.interface.js';
 
 /**
  * Abstract job-runner contract. Concrete implementations:

@@ -38,7 +38,9 @@ export function TrailerSection({ trailerUrl, posterUrl, title }: TrailerSectionP
 					<Icon name={expanded ? 'chevron-down' : 'play'} size={14} />
 				</span>
 				<span class={styles.headerTitle}>{headerLabel}</span>
-				<span class={styles.headerHint}>{expanded ? 'Click to hide' : 'Click to watch'}</span>
+				<span class={styles.headerHint}>
+					{expanded ? 'Click to hide' : 'Click to watch'}
+				</span>
 			</button>
 
 			{expanded && (

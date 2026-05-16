@@ -34,10 +34,7 @@ export class ExternalCacheStrategy implements SimilarityStrategy {
 		return true;
 	}
 
-	async score(
-		seed: MovieWithMetadata,
-		candidates: MovieWithMetadata[],
-	): Promise<StrategyResult> {
+	async score(seed: MovieWithMetadata, candidates: MovieWithMetadata[]): Promise<StrategyResult> {
 		const rows = this.database.db
 			.select({
 				source: movieExternalRecs.source,

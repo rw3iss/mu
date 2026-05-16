@@ -29,10 +29,7 @@ export class LlmRerankStrategy implements SimilarityStrategy {
 		return this.anthropic.isConfigured();
 	}
 
-	async score(
-		seed: MovieWithMetadata,
-		candidates: MovieWithMetadata[],
-	): Promise<StrategyResult> {
+	async score(seed: MovieWithMetadata, candidates: MovieWithMetadata[]): Promise<StrategyResult> {
 		if (!this.available() || candidates.length === 0) {
 			return { strategy: this.name, scores: [] };
 		}
@@ -41,11 +38,9 @@ export class LlmRerankStrategy implements SimilarityStrategy {
 		// candidates, not the whole library.
 		const trimmed = candidates.slice(0, MAX_CANDIDATES_TO_RERANK);
 		try {
-			const ranked = await this.anthropic.rerank(
-				toSeed(seed),
-				trimmed.map(toSeed),
-				{ withWhy: true },
-			);
+			const ranked = await this.anthropic.rerank(toSeed(seed), trimmed.map(toSeed), {
+				withWhy: true,
+			});
 			const scores: StrategyScore[] = ranked
 				.filter((r): r is typeof r & { movieId: string } => typeof r.movieId === 'string')
 				.map((r) => ({

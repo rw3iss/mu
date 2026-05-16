@@ -1,6 +1,6 @@
 import { route } from 'preact-router';
-import { SmartImage } from '@/components/common/SmartImage';
 import { Icon } from '@/components/common/Icon';
+import { SmartImage } from '@/components/common/SmartImage';
 import type { MovieGroup } from '@/services/groups.service';
 import styles from './GroupTile.module.scss';
 
@@ -49,7 +49,9 @@ export function GroupTile({ group }: GroupTileProps) {
 					alt={group.name}
 					class={styles.poster}
 					fallback={
-						<div class={styles.posterFallback}>{group.name.charAt(0).toUpperCase()}</div>
+						<div class={styles.posterFallback}>
+							{group.name.charAt(0).toUpperCase()}
+						</div>
 					}
 				/>
 			</div>

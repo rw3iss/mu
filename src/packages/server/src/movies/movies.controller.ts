@@ -170,10 +170,7 @@ export class MoviesController {
 
 	@Post(':id/sanitize-title')
 	@Roles('admin')
-	async sanitizeTitle(
-		@Param('id') id: string,
-		@CurrentUser('id') userId: string,
-	) {
+	async sanitizeTitle(@Param('id') id: string, @CurrentUser('id') userId: string) {
 		const result = this.moviesService.sanitizeMovieTitle(id);
 		// Always return the (possibly updated) full movie so the client
 		// can drop straight into the view without a follow-up GET.

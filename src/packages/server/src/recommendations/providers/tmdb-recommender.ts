@@ -1,11 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { TmdbProvider } from '../../metadata/providers/tmdb.provider.js';
+import type { MovieSeed, Recommendation, Recommender } from '../../providers/provider.interface.js';
 import { ProviderEventsService } from '../../providers/provider-events.service.js';
-import type {
-	MovieSeed,
-	Recommendation,
-	Recommender,
-} from '../../providers/provider.interface.js';
 import { ProviderRegistry } from '../../providers/provider-registry.service.js';
 import { RateLimitService } from '../../providers/rate-limit.service.js';
 

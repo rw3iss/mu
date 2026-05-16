@@ -1,5 +1,5 @@
 import { signal } from '@preact/signals';
-import { providersService, type ProviderSummary } from '@/services/providers.service';
+import { type ProviderSummary, providersService } from '@/services/providers.service';
 
 /**
  * Cached list of registered providers from the server. Loaded on

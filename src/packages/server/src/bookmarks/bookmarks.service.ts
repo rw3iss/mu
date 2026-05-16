@@ -2,12 +2,7 @@ import { nowISO } from '@mu/shared';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import {
-	movieMetadata,
-	movies,
-	userWatchlist,
-	type NewMovie,
-} from '../database/schema/index.js';
+import { movieMetadata, movies, type NewMovie, userWatchlist } from '../database/schema/index.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 
 export interface BookmarkInput {
@@ -153,7 +148,7 @@ export class BookmarksService {
 		const now = nowISO();
 
 		let title = input.title ?? null;
-		let year = input.year ?? null;
+		const year = input.year ?? null;
 		let movieValues: NewMovie = {
 			id,
 			title: title ?? 'Untitled',
@@ -174,7 +169,9 @@ export class BookmarksService {
 						...movieValues,
 						title: title ?? 'Untitled',
 						originalTitle:
-							details.original_title !== details.title ? details.original_title : null,
+							details.original_title !== details.title
+								? details.original_title
+								: null,
 						year: details.release_date
 							? parseInt(details.release_date.slice(0, 4), 10) || year
 							: year,
@@ -206,7 +203,9 @@ export class BookmarksService {
 								.filter((c) => c.department === 'Writing')
 								.map((c) => c.name),
 						),
-						keywords: JSON.stringify(details.keywords?.keywords?.map((k) => k.name) ?? []),
+						keywords: JSON.stringify(
+							details.keywords?.keywords?.map((k) => k.name) ?? [],
+						),
 						productionCompanies: JSON.stringify(
 							details.production_companies?.map((c) => c.name) ?? [],
 						),

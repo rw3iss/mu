@@ -61,9 +61,10 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 
 	const scorePct = Math.round(movie.score * 100);
 	const reason = movie.explanation[0];
-	const ratingLabel = movie.rating != null && movie.rating > 0
-		? `${movie.ratingSource === 'imdb' ? 'IMDB' : 'TMDB'} ${movie.rating.toFixed(1)}`
-		: null;
+	const ratingLabel =
+		movie.rating != null && movie.rating > 0
+			? `${movie.ratingSource === 'imdb' ? 'IMDB' : 'TMDB'} ${movie.rating.toFixed(1)}`
+			: null;
 	const votesLabel = movie.votes != null && movie.votes > 0 ? formatVotes(movie.votes) : null;
 
 	return (
@@ -76,7 +77,10 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 			<div class={styles.posterWrap}>
 				{scorePct > 0 && <span class={styles.scoreBadge}>{scorePct}%</span>}
 				{ratingLabel && (
-					<span class={styles.ratingBadge} title={`${ratingLabel}${votesLabel ? ` · ${votesLabel} votes` : ''}`}>
+					<span
+						class={styles.ratingBadge}
+						title={`${ratingLabel}${votesLabel ? ` · ${votesLabel} votes` : ''}`}
+					>
 						★ {movie.rating!.toFixed(1)}
 					</span>
 				)}
@@ -111,7 +115,9 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 					{ratingLabel && <span class={styles.metaPill}>{ratingLabel}</span>}
 					{votesLabel && <span class={styles.metaPillMuted}>{votesLabel} votes</span>}
 					{movie.usedSources.length > 0 && (
-						<span class={styles.sources}>{movie.usedSources.slice(0, 2).join(' · ')}</span>
+						<span class={styles.sources}>
+							{movie.usedSources.slice(0, 2).join(' · ')}
+						</span>
 					)}
 				</div>
 				{reason && <div class={styles.reason}>{reason}</div>}

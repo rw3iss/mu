@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
-import { EmbeddingStore } from './embedding-store.interface.js';
 import { MiniLMLocalEmbedder } from './embedders/minilm-local.embedder.js';
+import { EmbeddingStore } from './embedding-store.interface.js';
 import { SqliteBlobEmbeddingStore } from './sqlite-blob-embedding-store.ts';
 
 /**

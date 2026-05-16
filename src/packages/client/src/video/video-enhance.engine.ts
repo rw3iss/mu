@@ -157,9 +157,7 @@ export class VideoEnhanceEngine {
 				});
 			}
 			if (!adapter) {
-				this.reportError(
-					'No WebGPU adapter (tried default, compatibility, low-power)',
-				);
+				this.reportError('No WebGPU adapter (tried default, compatibility, low-power)');
 				return false;
 			}
 			const device = await adapter.requestDevice();

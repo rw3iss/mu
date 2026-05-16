@@ -5,7 +5,6 @@ import { DatabaseService } from '../database/database.service.js';
 import { jobHistory } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { JobManagerService } from './job-manager.service.js';
 import type {
 	JobDescriptor,
 	JobHandler,
@@ -14,6 +13,7 @@ import type {
 	JobStatus,
 	ScheduledJobOptions,
 } from './job.interface.js';
+import { JobManagerService } from './job-manager.service.js';
 
 export interface BullMqProviderOptions {
 	redisUrl: string;
@@ -266,9 +266,7 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 				},
 				{ jobId: id, priority: job.priority, attempts: 1 },
 			)
-			.catch((err: any) =>
-				this.logger.warn(`resume enqueue failed: ${err?.message ?? err}`),
-			);
+			.catch((err: any) => this.logger.warn(`resume enqueue failed: ${err?.message ?? err}`));
 		job.status = 'pending';
 		this.emitJobEvent(WsEvent.JOB_PROGRESS, job);
 		return true;
@@ -368,7 +366,10 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 					scheduled: options.name,
 				},
 				{
-					repeat: { every: options.intervalMs, immediately: options.runImmediately ?? false },
+					repeat: {
+						every: options.intervalMs,
+						immediately: options.runImmediately ?? false,
+					},
 					jobId: `scheduled:${options.name}`,
 				},
 			)
@@ -380,11 +381,9 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 
 	unschedule(name: string): void {
 		if (!this.queue) return;
-		this.queue
-			.removeRepeatableByKey(`scheduled:${name}`)
-			.catch(() => {
-				/* not all keys may have a stored repeat job */
-			});
+		this.queue.removeRepeatableByKey(`scheduled:${name}`).catch(() => {
+			/* not all keys may have a stored repeat job */
+		});
 	}
 
 	listScheduledJobs(): string[] {

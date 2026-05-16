@@ -12,12 +12,7 @@
  */
 
 /** The kinds of work a provider can perform. */
-export type Capability =
-	| 'recommend'
-	| 'enrich'
-	| 'embed'
-	| 'rerank'
-	| 'explain';
+export type Capability = 'recommend' | 'enrich' | 'embed' | 'rerank' | 'explain';
 
 /** Shape of a config field a provider declares for the admin UI. */
 export interface ConfigFieldSpec {
@@ -113,12 +108,7 @@ export interface Recommender extends Provider {
 	recommend(seed: MovieSeed, k: number): Promise<Recommendation[]>;
 }
 
-export type EnrichField =
-	| 'keywords'
-	| 'tags'
-	| 'themes'
-	| 'ratings'
-	| 'comparables';
+export type EnrichField = 'keywords' | 'tags' | 'themes' | 'ratings' | 'comparables';
 
 export interface EnrichResult {
 	keywords?: string[];

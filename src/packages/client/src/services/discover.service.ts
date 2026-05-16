@@ -84,7 +84,11 @@ export interface Bookmark {
 
 export const bookmarksService = {
 	list: () => api.get<{ bookmarks: Bookmark[] }>('/bookmarks'),
-	add: (input: { tmdbId?: number | null; imdbId?: string | null; title?: string; year?: number | null }) =>
-		api.post<{ movieId: string; ok: boolean }>('/bookmarks', input),
+	add: (input: {
+		tmdbId?: number | null;
+		imdbId?: string | null;
+		title?: string;
+		year?: number | null;
+	}) => api.post<{ movieId: string; ok: boolean }>('/bookmarks', input),
 	remove: (movieId: string) => api.delete<{ ok: boolean }>(`/bookmarks/${movieId}`),
 };

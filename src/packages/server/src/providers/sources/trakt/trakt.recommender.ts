@@ -1,12 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { BudgetExhausted, RateLimitExceeded } from '../../exceptions.js';
+import type { MovieSeed, Recommendation, Recommender } from '../../provider.interface.js';
 import { ProviderCredentialsService } from '../../provider-credentials.service.js';
 import { ProviderEventsService } from '../../provider-events.service.js';
-import type {
-	MovieSeed,
-	Recommendation,
-	Recommender,
-} from '../../provider.interface.js';
 import { ProviderRegistry } from '../../provider-registry.service.js';
 import { RateLimitService } from '../../rate-limit.service.js';
 import { TraktHttpClient } from './trakt.http-client.js';

@@ -14,10 +14,7 @@ import {
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { SubtitleService } from './subtitle.service.js';
-import {
-	SUBTITLE_EXTS,
-	SubtitleIngestionService,
-} from './subtitle-ingestion.service.js';
+import { SUBTITLE_EXTS, SubtitleIngestionService } from './subtitle-ingestion.service.js';
 import { SubtitleRemoteProxyService } from './subtitle-remote-proxy.service.js';
 import { SubtitleSearchService } from './subtitle-search.service.js';
 import { SubtitleTracksRepository } from './subtitle-tracks.repository.js';
@@ -41,7 +38,10 @@ export class SubtitleManageController {
 	): Promise<{ subtitles: MovieSubtitleInfo[] }> {
 		const remote = this.remoteProxy.parseRemoteId(movieId);
 		if (remote) {
-			return this.remoteProxy.get(remote.serverId, `/shared/subtitles/${remote.remoteMovieId}`);
+			return this.remoteProxy.get(
+				remote.serverId,
+				`/shared/subtitles/${remote.remoteMovieId}`,
+			);
 		}
 
 		const file = await this.tracksRepo.getAvailableMovieFile(movieId);
@@ -234,9 +234,7 @@ export class SubtitleManageController {
 		}
 
 		// Remove the row and re-index remaining tracks contiguously
-		const remaining = tracks
-			.filter((t) => t.index !== idx)
-			.map((t, i) => ({ ...t, index: i }));
+		const remaining = tracks.filter((t) => t.index !== idx).map((t, i) => ({ ...t, index: i }));
 		await this.tracksRepo.setTracks(file.id, remaining);
 
 		// Re-extract to rebuild VTT cache with correct indices

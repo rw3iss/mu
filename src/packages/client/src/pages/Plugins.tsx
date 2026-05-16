@@ -374,7 +374,9 @@ export function Plugins(_props: PluginsProps) {
 									) : sv.definition.type === 'select' ? (
 										<Select
 											value={sv.value as string}
-											onChange={(v) => handleSettingChange(sv.definition.key, v)}
+											onChange={(v) =>
+												handleSettingChange(sv.definition.key, v)
+											}
 											options={(sv.definition.options || []).map((opt) => ({
 												value: opt.value,
 												label: opt.label,

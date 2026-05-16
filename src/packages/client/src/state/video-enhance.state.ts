@@ -17,9 +17,7 @@ const SCALE_KEY = 'video_enhance_scale';
 const ENABLED_KEY = 'video_enhance_enabled';
 
 /** WebGPU is the only path; if `navigator.gpu` is missing we hard-disable the UI. */
-export const videoEnhanceSupported = signal(
-	typeof navigator !== 'undefined' && 'gpu' in navigator,
-);
+export const videoEnhanceSupported = signal(typeof navigator !== 'undefined' && 'gpu' in navigator);
 
 /** Master toggle. */
 export const videoEnhanceEnabled = signal<boolean>(getUiSetting(ENABLED_KEY, false));

@@ -225,8 +225,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 				}
 				const r = d.result ?? {};
 				const pruned = r.pruned ?? 0;
-				const prunedNote =
-					pruned > 0 ? `, pruned ${pruned} single-member group(s)` : '';
+				const prunedNote = pruned > 0 ? `, pruned ${pruned} single-member group(s)` : '';
 				notifySuccess(
 					`Grouped ${r.grouped ?? 0} of ${r.scanned ?? 0} movies${prunedNote}.`,
 					undefined,
@@ -279,9 +278,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						.join(', ')}`,
 				);
 			} else {
-				notifySuccess(
-					`No dirty titles found among ${result.scanned} unmatched movies.`,
-				);
+				notifySuccess(`No dirty titles found among ${result.scanned} unmatched movies.`);
 			}
 		} catch {
 			removeNotification(startedId);

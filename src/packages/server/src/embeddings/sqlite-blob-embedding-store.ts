@@ -41,17 +41,17 @@ export class SqliteBlobEmbeddingStore extends EmbeddingStore {
 		const existing = this.database.db
 			.select({ movieId: movieEmbeddings.movieId })
 			.from(movieEmbeddings)
-			.where(
-				and(
-					eq(movieEmbeddings.movieId, movieId),
-					eq(movieEmbeddings.model, this.model),
-				),
-			)
+			.where(and(eq(movieEmbeddings.movieId, movieId), eq(movieEmbeddings.model, this.model)))
 			.get();
 		if (existing) {
 			this.database.db
 				.update(movieEmbeddings)
-				.set({ vector: buf, sourceTextHash: sourceTextHash ?? null, updatedAt: now, dim: this.dim })
+				.set({
+					vector: buf,
+					sourceTextHash: sourceTextHash ?? null,
+					updatedAt: now,
+					dim: this.dim,
+				})
 				.where(
 					and(
 						eq(movieEmbeddings.movieId, movieId),
@@ -85,12 +85,7 @@ export class SqliteBlobEmbeddingStore extends EmbeddingStore {
 		const row = this.database.db
 			.select({ vector: movieEmbeddings.vector })
 			.from(movieEmbeddings)
-			.where(
-				and(
-					eq(movieEmbeddings.movieId, movieId),
-					eq(movieEmbeddings.model, this.model),
-				),
-			)
+			.where(and(eq(movieEmbeddings.movieId, movieId), eq(movieEmbeddings.model, this.model)))
 			.get();
 		if (!row) return null;
 		const buf = row.vector as Buffer;
@@ -117,12 +112,7 @@ export class SqliteBlobEmbeddingStore extends EmbeddingStore {
 		const row = this.database.db
 			.select({ hash: movieEmbeddings.sourceTextHash })
 			.from(movieEmbeddings)
-			.where(
-				and(
-					eq(movieEmbeddings.movieId, movieId),
-					eq(movieEmbeddings.model, this.model),
-				),
-			)
+			.where(and(eq(movieEmbeddings.movieId, movieId), eq(movieEmbeddings.model, this.model)))
 			.get();
 		return !!row && row.hash === sourceTextHash;
 	}
@@ -130,12 +120,7 @@ export class SqliteBlobEmbeddingStore extends EmbeddingStore {
 	async delete(movieId: string): Promise<void> {
 		this.database.db
 			.delete(movieEmbeddings)
-			.where(
-				and(
-					eq(movieEmbeddings.movieId, movieId),
-					eq(movieEmbeddings.model, this.model),
-				),
-			)
+			.where(and(eq(movieEmbeddings.movieId, movieId), eq(movieEmbeddings.model, this.model)))
 			.run();
 		this.cache?.delete(movieId);
 	}

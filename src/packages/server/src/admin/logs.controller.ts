@@ -129,7 +129,8 @@ export class LogsController {
 		const dataDir = this.config.get<string>('dataDir', './data');
 		const logsDirOverride = this.config.get<string>('logs.dir', '') || null;
 		const dir = logsDirOverride ?? path.resolve(dataDir, 'logs');
-		const sources: Array<{ key: string; fileName: string; bytes: number; exists: boolean }> = [];
+		const sources: Array<{ key: string; fileName: string; bytes: number; exists: boolean }> =
+			[];
 		for (const [key, fileName] of Object.entries(LOG_SOURCES)) {
 			const p = path.resolve(dir, fileName);
 			try {

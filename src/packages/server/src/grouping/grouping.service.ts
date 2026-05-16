@@ -7,8 +7,8 @@ import { eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { type Movie, movieFiles, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
-import { JobManagerService } from '../jobs/job-manager.service.js';
 import type { JobHelpers, JobRecord } from '../jobs/job.interface.js';
+import { JobManagerService } from '../jobs/job-manager.service.js';
 import {
 	GROUP_METADATA_JOB,
 	GroupMetadataService,
@@ -16,16 +16,12 @@ import {
 } from '../metadata/group-metadata.service.js';
 import { MatchCandidatesRepository } from '../metadata/match-candidates.repository.js';
 import { SettingsService } from '../settings/settings.service.js';
-import {
-	DEFAULT_THRESHOLDS,
-	statusForConfidence,
-	type GroupingThresholds,
-} from './confidence.js';
+import { DEFAULT_THRESHOLDS, type GroupingThresholds, statusForConfidence } from './confidence.js';
 import { FolderTreeDetector } from './detectors/folder-tree-detector.js';
 import { FuzzyTitleDetector } from './detectors/fuzzy-title-detector.js';
 import { MultiFileDetector } from './detectors/multi-file-detector.js';
 import { SxxExxDetector } from './detectors/sxxexx-detector.js';
-import type { Detector, DetectionInput, DetectionResult } from './detectors/types.js';
+import type { DetectionInput, DetectionResult, Detector } from './detectors/types.js';
 import { GroupsRepository } from './groups.repository.js';
 
 const SETTING_KEYS = {
@@ -177,11 +173,7 @@ export class GroupingService implements OnModuleInit {
 	 */
 	async detectAndAttach(movieId: string): Promise<string | null> {
 		if (!this.isEnabled()) return null;
-		const movie = this.database.db
-			.select()
-			.from(movies)
-			.where(eq(movies.id, movieId))
-			.get();
+		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
 		if (!movie) return null;
 
 		const file = this.database.db
@@ -236,10 +228,7 @@ export class GroupingService implements OnModuleInit {
 	 * thousands of movies doesn't time out the request.
 	 */
 	enqueueRebuild(): { jobId: string; totalMovies: number } {
-		const totalMovies = this.database.db
-			.select({ id: movies.id })
-			.from(movies)
-			.all().length;
+		const totalMovies = this.database.db.select({ id: movies.id }).from(movies).all().length;
 		const jobId = this.jobs.enqueue({
 			type: 'grouping-rebuild',
 			label: `Group similar items (${totalMovies} movies)`,
@@ -366,11 +355,7 @@ export class GroupingService implements OnModuleInit {
 		source?: string;
 	}> {
 		if (!this.isEnabled()) return { outcome: 'no-detection' };
-		const movie = this.database.db
-			.select()
-			.from(movies)
-			.where(eq(movies.id, movieId))
-			.get();
+		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
 		if (!movie) return { outcome: 'no-movie' };
 
 		const file = this.database.db
@@ -573,9 +558,12 @@ export class GroupingService implements OnModuleInit {
 	}
 }
 
-function bucketByCount(
-	subgroups: Array<{ memberCount: number }>,
-): { singletons: number; pairs: number; small: number; large: number } {
+function bucketByCount(subgroups: Array<{ memberCount: number }>): {
+	singletons: number;
+	pairs: number;
+	small: number;
+	large: number;
+} {
 	let singletons = 0;
 	let pairs = 0;
 	let small = 0;

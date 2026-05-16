@@ -99,17 +99,11 @@ export const groupsService = {
 		return api.post('/groups/admin/rebuild', {});
 	},
 
-	listMatchCandidates(
-		groupId: string,
-	): Promise<{ candidates: MatchCandidate[] }> {
+	listMatchCandidates(groupId: string): Promise<{ candidates: MatchCandidate[] }> {
 		return api.get(`/groups/${groupId}/match-candidates`);
 	},
 
-	applyMatchCandidate(
-		groupId: string,
-		provider: string,
-		externalId: string,
-	): Promise<unknown> {
+	applyMatchCandidate(groupId: string, provider: string, externalId: string): Promise<unknown> {
 		return api.post(`/groups/${groupId}/match-candidates/apply`, {
 			provider,
 			externalId,

@@ -1,13 +1,13 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { BudgetExhausted, RateLimitExceeded } from '../providers/exceptions.js';
-import { ProviderCredentialsService } from '../providers/provider-credentials.service.js';
-import { ProviderEventsService } from '../providers/provider-events.service.js';
 import type {
 	LLMClient,
 	MovieFeatures,
 	MovieSeed,
 	RankedResult,
 } from '../providers/provider.interface.js';
+import { ProviderCredentialsService } from '../providers/provider-credentials.service.js';
+import { ProviderEventsService } from '../providers/provider-events.service.js';
 import { ProviderRegistry } from '../providers/provider-registry.service.js';
 import { RateLimitService } from '../providers/rate-limit.service.js';
 
@@ -253,7 +253,11 @@ export class AnthropicClient implements LLMClient, OnModuleInit {
 				?.filter((c) => c.type === 'text')
 				.map((c) => c.text ?? '')
 				.join('') ?? '';
-		const costUsd = estimateCost(model, data.usage?.input_tokens ?? 0, data.usage?.output_tokens ?? 0);
+		const costUsd = estimateCost(
+			model,
+			data.usage?.input_tokens ?? 0,
+			data.usage?.output_tokens ?? 0,
+		);
 		return { text, costUsd };
 	}
 }
@@ -262,18 +266,12 @@ export class AnthropicClient implements LLMClient, OnModuleInit {
 // Prompt builders + cost
 // =========================================================================
 
-function buildRerankPrompt(
-	seed: MovieSeed,
-	candidates: MovieSeed[],
-	withWhy: boolean,
-): string {
+function buildRerankPrompt(seed: MovieSeed, candidates: MovieSeed[], withWhy: boolean): string {
 	const seedBlock = movieBlock(seed);
 	const candBlock = candidates
 		.map((c, i) => `${i + 1}. id=${c.id} | ${c.title}${c.year ? ` (${c.year})` : ''}`)
 		.join('\n');
-	const whyHint = withWhy
-		? `Include a one-sentence "why" per result.`
-		: `Omit the "why" field.`;
+	const whyHint = withWhy ? `Include a one-sentence "why" per result.` : `Omit the "why" field.`;
 	return `Re-rank these movies by how similar they are to the SEED. Consider tone, theme, plot mechanics, and emotional register — not just genre.
 
 SEED:

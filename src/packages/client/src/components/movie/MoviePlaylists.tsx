@@ -111,9 +111,7 @@ export function MoviePlaylists({
 					onChange={handleAdd}
 					disabled={availablePlaylists.length === 0}
 					placeholder={
-						availablePlaylists.length === 0
-							? 'In all playlists'
-							: 'Add to playlist…'
+						availablePlaylists.length === 0 ? 'In all playlists' : 'Add to playlist…'
 					}
 					options={availablePlaylists.map((p) => ({ value: p.id, label: p.name }))}
 				/>

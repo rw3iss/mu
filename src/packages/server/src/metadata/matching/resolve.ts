@@ -7,8 +7,8 @@ import {
 	DEFAULT_MATCHER_CONFIG,
 	findBestMatch,
 	type MatchCandidate,
-	type MatchQuery,
 	type MatcherConfig,
+	type MatchQuery,
 	type ScoredCandidate,
 } from './matcher.js';
 

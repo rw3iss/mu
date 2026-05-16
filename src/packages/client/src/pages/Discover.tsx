@@ -4,6 +4,7 @@ import { Spinner } from '@/components/common/Spinner';
 import { DiscoverFilters as FilterPanel } from '@/components/discover/DiscoverFilters';
 import { DiscoverResultCard } from '@/components/discover/DiscoverResultCard';
 import { SeedChip } from '@/components/discover/SeedChip';
+import type { IncludeMode } from '@/services/discover.service';
 import { moviesService } from '@/services/movies.service';
 import {
 	clearFilters,
@@ -25,7 +26,6 @@ import {
 	setSeed,
 	usedSources,
 } from '@/state/discover.state';
-import type { IncludeMode } from '@/services/discover.service';
 import styles from './Discover.module.scss';
 
 interface DiscoverProps {
@@ -95,7 +95,10 @@ export function Discover(_props: DiscoverProps) {
 			}
 		}
 
-		moviesService.getGenres().then(setGenres).catch(() => setGenres([]));
+		moviesService
+			.getGenres()
+			.then(setGenres)
+			.catch(() => setGenres([]));
 		// Re-fetch then restore scroll once results have rendered. We
 		// look at the in-memory results length too — if the user is
 		// returning from a movie detail with state already populated,
@@ -161,11 +164,7 @@ export function Discover(_props: DiscoverProps) {
 							{usedSources.value.join(' · ')}
 						</span>
 					)}
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => setShowFilters((v) => !v)}
-					>
+					<Button variant="ghost" size="sm" onClick={() => setShowFilters((v) => !v)}>
 						{showFilters ? 'Hide filters' : 'Show filters'}
 					</Button>
 				</div>
@@ -174,8 +173,8 @@ export function Discover(_props: DiscoverProps) {
 			{enrichmentsQueued.value > 0 && (
 				<div class={styles.enrichBanner}>
 					Enriching {enrichmentsQueued.value} new candidate
-					{enrichmentsQueued.value === 1 ? '' : 's'} in the background. Refresh in a few seconds
-					for sharper rankings.
+					{enrichmentsQueued.value === 1 ? '' : 's'} in the background. Refresh in a few
+					seconds for sharper rankings.
 				</div>
 			)}
 

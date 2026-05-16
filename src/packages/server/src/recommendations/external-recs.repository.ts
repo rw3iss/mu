@@ -54,21 +54,14 @@ export class ExternalRecsRepository {
 						.all()
 				: [];
 
-		const localByTmdb = new Map(
-			tmdbMatches.map((m) => [m.tmdbId as number, m.id] as const),
-		);
-		const localByImdb = new Map(
-			imdbMatches.map((m) => [m.imdbId as string, m.id] as const),
-		);
+		const localByTmdb = new Map(tmdbMatches.map((m) => [m.tmdbId as number, m.id] as const));
+		const localByImdb = new Map(imdbMatches.map((m) => [m.imdbId as string, m.id] as const));
 
 		// Wipe existing rows for this (movie, source).
 		this.database.db
 			.delete(movieExternalRecs)
 			.where(
-				and(
-					eq(movieExternalRecs.movieId, movieId),
-					eq(movieExternalRecs.source, source),
-				),
+				and(eq(movieExternalRecs.movieId, movieId), eq(movieExternalRecs.source, source)),
 			)
 			.run();
 

@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module.js';
-import { ProviderEventsService } from './provider-events.service.js';
 import { ProviderCredentialsService } from './provider-credentials.service.js';
+import { ProviderEventsService } from './provider-events.service.js';
 import { ProviderRegistry } from './provider-registry.service.js';
 import { ProvidersController } from './providers.controller.js';
 import { RateLimitService } from './rate-limit.service.js';

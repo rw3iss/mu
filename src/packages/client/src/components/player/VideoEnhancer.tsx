@@ -1,11 +1,11 @@
 import { effect } from '@preact/signals';
 import { useEffect, useRef } from 'preact/hooks';
-import { sharedVideoEngine } from '@/state/videoEngineRef';
 import {
 	videoEnhanceEnabled,
 	videoEnhanceScale,
 	videoEnhanceStrength,
 } from '@/state/video-enhance.state';
+import { sharedVideoEngine } from '@/state/videoEngineRef';
 import { VideoEnhanceEngine } from '@/video/video-enhance.engine';
 import styles from './VideoEnhancer.module.scss';
 

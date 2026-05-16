@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { ConfigFieldSpec } from '../provider.interface.js';
 import {
 	isMaskedSecret,
 	maskSecret,
 	ProviderCredentialsService,
 } from '../provider-credentials.service.js';
-import type { ConfigFieldSpec } from '../provider.interface.js';
 import { makeFakeDatabaseService, makeTestDb } from './test-db.js';
 
 const FIELDS: ConfigFieldSpec[] = [
@@ -45,11 +45,7 @@ describe('ProviderCredentialsService', () => {
 		service.upsert('trakt', { clientId: 'abc', clientSecret: 'originalsecret123' }, FIELDS);
 		const masked = service.getMasked('trakt', FIELDS) as Record<string, string>;
 		// Simulate the UI sending the masked value back unchanged
-		service.upsert(
-			'trakt',
-			{ clientId: 'abc-2', clientSecret: masked.clientSecret },
-			FIELDS,
-		);
+		service.upsert('trakt', { clientId: 'abc-2', clientSecret: masked.clientSecret }, FIELDS);
 		expect(service.getRaw('trakt')).toEqual({
 			clientId: 'abc-2',
 			clientSecret: 'originalsecret123',

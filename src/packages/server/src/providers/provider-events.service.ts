@@ -3,9 +3,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import {
-	providerEvents,
 	type ProviderEvent,
 	type ProviderEventType,
+	providerEvents,
 } from '../database/schema/index.js';
 
 export interface ProviderEventInput {
@@ -94,8 +94,12 @@ export class ProviderEventsService {
 		>();
 		for (const r of rows) {
 			const date = r.occurredAt.slice(0, 10);
-			const entry =
-				map.get(date) ?? { calls: 0, errors: 0, latencies: [] as number[], costUsd: 0 };
+			const entry = map.get(date) ?? {
+				calls: 0,
+				errors: 0,
+				latencies: [] as number[],
+				costUsd: 0,
+			};
 			if (r.eventType === 'call') entry.calls++;
 			if (r.eventType === 'error') entry.errors++;
 			if (r.durationMs != null) entry.latencies.push(r.durationMs);

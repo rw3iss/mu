@@ -17,10 +17,7 @@ export class RecommendationsController {
 	) {}
 
 	@Get()
-	async personalized(
-		@CurrentUser() user: { sub: string },
-		@Query('limit') limit?: string,
-	) {
+	async personalized(@CurrentUser() user: { sub: string }, @Query('limit') limit?: string) {
 		return this.recs.getPersonalized(user.sub, parseLimit(limit));
 	}
 
@@ -33,10 +30,7 @@ export class RecommendationsController {
 	}
 
 	@Get('similar/:movieId/detail')
-	async similarDetailed(
-		@Param('movieId') movieId: string,
-		@Query('limit') limit?: string,
-	) {
+	async similarDetailed(@Param('movieId') movieId: string, @Query('limit') limit?: string) {
 		return this.recs.getSimilarMovies(movieId, { k: parseLimit(limit) });
 	}
 
@@ -94,9 +88,7 @@ export class RecommendationsController {
 	}
 
 	@Post('multi')
-	async multi(
-		@Body() body: { movieIds: string[]; limit?: number; mmrLambda?: number },
-	) {
+	async multi(@Body() body: { movieIds: string[]; limit?: number; mmrLambda?: number }) {
 		if (!body?.movieIds || !Array.isArray(body.movieIds) || body.movieIds.length === 0) {
 			return { results: [], usedSources: [], reason: 'no_seeds_provided' };
 		}
@@ -163,7 +155,10 @@ function parseFilters(raw: {
 	const v = num(raw.minVotes);
 	if (v != null) out.minVotes = v;
 	if (raw.genres) {
-		out.genres = raw.genres.split(',').map((g) => g.trim()).filter(Boolean);
+		out.genres = raw.genres
+			.split(',')
+			.map((g) => g.trim())
+			.filter(Boolean);
 	}
 	const yf = num(raw.yearFrom);
 	if (yf != null) out.yearFrom = yf;

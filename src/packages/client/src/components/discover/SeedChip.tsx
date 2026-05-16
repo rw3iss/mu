@@ -14,7 +14,12 @@ export function SeedChip({ label, onRemove }: SeedChipProps) {
 	return (
 		<span class={styles.chip}>
 			<span class={styles.label}>{label}</span>
-			<button class={styles.x} onClick={onRemove} aria-label={`Remove ${label}`} title="Remove">
+			<button
+				class={styles.x}
+				onClick={onRemove}
+				aria-label={`Remove ${label}`}
+				title="Remove"
+			>
 				×
 			</button>
 		</span>

@@ -6,7 +6,6 @@ import { DatabaseService } from '../database/database.service.js';
 import { jobHistory } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { JobManagerService } from './job-manager.service.js';
 import type {
 	JobDescriptor,
 	JobHandler,
@@ -14,6 +13,7 @@ import type {
 	JobRecord,
 	ScheduledJobOptions,
 } from './job.interface.js';
+import { JobManagerService } from './job-manager.service.js';
 
 /**
  * Single-process, in-memory implementation of `JobManagerService`.

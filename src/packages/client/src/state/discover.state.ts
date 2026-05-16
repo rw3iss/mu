@@ -1,7 +1,7 @@
 import { signal } from '@preact/signals';
 import {
-	discoverService,
 	type DiscoverFilters,
+	discoverService,
 	type IncludeMode,
 	type ScoredMovie,
 } from '@/services/discover.service';

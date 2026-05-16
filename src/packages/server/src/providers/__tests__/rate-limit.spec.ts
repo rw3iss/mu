@@ -57,9 +57,7 @@ describe('RateLimitService', () => {
 	});
 
 	it('throws BudgetExhausted when projected spend exceeds ceiling', async () => {
-		registry.register(
-			provider('p', { costPerCall: 0.01, monthlyBudgetUsd: 0.025 }),
-		);
+		registry.register(provider('p', { costPerCall: 0.01, monthlyBudgetUsd: 0.025 }));
 		service.record('p'); // 0.01
 		service.record('p'); // 0.02
 		// projected next: 0.03 > 0.025
@@ -67,9 +65,7 @@ describe('RateLimitService', () => {
 	});
 
 	it('records actual cost when provided', () => {
-		registry.register(
-			provider('p', { costPerCall: 0.01, monthlyBudgetUsd: 100 }),
-		);
+		registry.register(provider('p', { costPerCall: 0.01, monthlyBudgetUsd: 100 }));
 		service.record('p', 1, 0.123);
 		expect(service.snapshot('p').monthCost).toBeCloseTo(0.123, 4);
 	});

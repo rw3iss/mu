@@ -1,18 +1,15 @@
 import { Spinner } from '@/components/common/Spinner';
 import type { MovieGroup } from '@/services/groups.service';
-import type { Movie, ViewMode } from '@/state/library.state';
+import type { LibraryFilters, Movie, ViewMode } from '@/state/library.state';
 import { removeMovieFromList, updateMovieInList } from '@/state/library.state';
-import type { LibraryFilters } from '@/state/library.state';
-import { GroupTile } from './GroupTile';
 import { GroupListItem } from './GroupListItem';
+import { GroupTile } from './GroupTile';
 import { MovieCard } from './MovieCard';
 import styles from './MovieGrid.module.scss';
 import { MovieLargeCard } from './MovieLargeCard';
 import { MovieListItem } from './MovieListItem';
 
-type GridItem =
-	| { kind: 'movie'; movie: Movie }
-	| { kind: 'group'; group: MovieGroup };
+type GridItem = { kind: 'movie'; movie: Movie } | { kind: 'group'; group: MovieGroup };
 
 interface MovieGridProps {
 	movies: Movie[];
@@ -40,30 +37,38 @@ interface MovieGridProps {
 }
 
 /** Pull the sort key off either kind of item, normalising to a comparable. */
-function itemSortKey(
-	item: GridItem,
-	sortBy: LibraryFilters['sortBy'],
-): number | string | null {
+function itemSortKey(item: GridItem, sortBy: LibraryFilters['sortBy']): number | string | null {
 	if (item.kind === 'movie') {
 		switch (sortBy) {
-			case 'title': return item.movie.title?.toLowerCase() ?? '';
-			case 'year': return item.movie.year ?? 0;
-			case 'addedAt': return item.movie.addedAt ?? '';
-			case 'rating': return item.movie.rating ?? 0;
-			case 'runtime': return item.movie.runtime ?? 0;
-			case 'fileSize': return item.movie.fileInfo?.fileSize ?? 0;
-			default: return item.movie.addedAt ?? '';
+			case 'title':
+				return item.movie.title?.toLowerCase() ?? '';
+			case 'year':
+				return item.movie.year ?? 0;
+			case 'addedAt':
+				return item.movie.addedAt ?? '';
+			case 'rating':
+				return item.movie.rating ?? 0;
+			case 'runtime':
+				return item.movie.runtime ?? 0;
+			case 'fileSize':
+				return item.movie.fileInfo?.fileSize ?? 0;
+			default:
+				return item.movie.addedAt ?? '';
 		}
 	}
 	// Group sort keys — best-effort, derived from the parent or its members.
 	switch (sortBy) {
-		case 'title': return item.group.name?.toLowerCase() ?? '';
-		case 'year': return item.group.earliestYear ?? 0;
-		case 'addedAt': return item.group.latestMemberAddedAt ?? item.group.updatedAt ?? '';
+		case 'title':
+			return item.group.name?.toLowerCase() ?? '';
+		case 'year':
+			return item.group.earliestYear ?? 0;
+		case 'addedAt':
+			return item.group.latestMemberAddedAt ?? item.group.updatedAt ?? '';
 		// Rating, runtime, fileSize: groups have no sensible equivalent —
 		// fall through to the latest-member-added-at proxy so they still
 		// sort stably alongside movies.
-		default: return item.group.latestMemberAddedAt ?? item.group.updatedAt ?? '';
+		default:
+			return item.group.latestMemberAddedAt ?? item.group.updatedAt ?? '';
 	}
 }
 

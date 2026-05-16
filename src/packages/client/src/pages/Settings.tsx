@@ -34,9 +34,9 @@ import {
 } from '@/state/themes.state';
 import { AdminDashboard } from './AdminDashboard';
 import { Plugins } from './Plugins';
+import styles from './Settings.module.scss';
 import { Connections } from './settings/Connections';
 import { Matching } from './settings/Matching';
-import styles from './Settings.module.scss';
 
 function OverlayTimeoutSetting() {
 	const [val, setVal] = useUiSetting('overlay_hide_timeout', 2000);
@@ -1133,13 +1133,18 @@ export function Settings(props: SettingsProps) {
 												<div class={styles.settingControl}>
 													<Select<ItemSpacing>
 														value={editConfig.itemSpacing}
-														onChange={(v) => updateEditConfig({ itemSpacing: v })}
+														onChange={(v) =>
+															updateEditConfig({ itemSpacing: v })
+														}
 														options={[
 															{ value: 'none', label: 'None' },
 															{ value: 'minimal', label: 'Minimal' },
 															{ value: 'compact', label: 'Compact' },
 															{ value: 'normal', label: 'Normal' },
-															{ value: 'comfortable', label: 'Comfortable' },
+															{
+																value: 'comfortable',
+																label: 'Comfortable',
+															},
 															{ value: 'spaced', label: 'Spaced' },
 														]}
 													/>
@@ -2315,7 +2320,11 @@ export function Settings(props: SettingsProps) {
 													}
 												}}
 											>
-												{testingServer === server.id ? '…' : <Icon name="refresh" size={14} />}
+												{testingServer === server.id ? (
+													'…'
+												) : (
+													<Icon name="refresh" size={14} />
+												)}
 											</button>
 											<button
 												class={styles.iconBtn}

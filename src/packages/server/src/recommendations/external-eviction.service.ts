@@ -2,8 +2,8 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { and, eq, lte, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movies } from '../database/schema/index.js';
-import { JobManagerService } from '../jobs/job-manager.service.js';
 import type { JobRecord } from '../jobs/job.interface.js';
+import { JobManagerService } from '../jobs/job-manager.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 const JOB_TYPE = 'external-eviction';

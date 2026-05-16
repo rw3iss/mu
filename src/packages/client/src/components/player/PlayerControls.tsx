@@ -17,7 +17,6 @@ import {
 } from '@/state/audio-effects.state';
 import { globalMovie, globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import type { StreamSession } from '@/state/player.state';
-import { shareMode } from '@/state/share.state';
 import {
 	audioTrack,
 	currentSession,
@@ -35,6 +34,7 @@ import {
 	toggleMute,
 	volume,
 } from '@/state/player.state';
+import { shareMode } from '@/state/share.state';
 import styles from './PlayerControls.module.scss';
 
 interface PlayerControlsProps {
@@ -472,7 +472,11 @@ export function PlayerControls({
 									// /movie/:id, so the title acts as an "open info"
 									// affordance instead — same behaviour as the info
 									// button in the player toolbar.
-									href={shareMode.value ? undefined : `/movie/${globalMovieId.value}`}
+									href={
+										shareMode.value
+											? undefined
+											: `/movie/${globalMovieId.value}`
+									}
 									class={styles.titleText}
 									onClick={(e) => {
 										e.preventDefault();
@@ -908,7 +912,8 @@ export function PlayerControls({
 												class={styles.menuItem}
 												onClick={() => setSettingsPanel('subtitle-manage')}
 											>
-												Manage Subtitles <Icon name="chevron-right" size={14} />
+												Manage Subtitles{' '}
+												<Icon name="chevron-right" size={14} />
 											</button>
 										</>
 									)}
@@ -919,7 +924,8 @@ export function PlayerControls({
 												class={styles.menuBack}
 												onClick={() => setSettingsPanel('subtitles')}
 											>
-												<Icon name="chevron-left" size={14} /> Manage Subtitles
+												<Icon name="chevron-left" size={14} /> Manage
+												Subtitles
 											</button>
 											<div class={styles.menuPanelContent}>
 												<SubtitleSettingsCollapsible />

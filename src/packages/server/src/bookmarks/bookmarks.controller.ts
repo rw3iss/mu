@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
-import { BookmarksService, type BookmarkInput } from './bookmarks.service.js';
+import { type BookmarkInput, BookmarksService } from './bookmarks.service.js';
 
 @Controller('bookmarks')
 export class BookmarksController {

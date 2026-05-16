@@ -722,7 +722,11 @@ export class MoviesService {
 	 *
 	 * Backs the Admin → Sanitize Title Names action.
 	 */
-	sanitizeUnmatchedTitles(): { scanned: number; updated: number; sample: Array<{ from: string; to: string }> } {
+	sanitizeUnmatchedTitles(): {
+		scanned: number;
+		updated: number;
+		sample: Array<{ from: string; to: string }>;
+	} {
 		const candidates = this.database.db
 			.select({
 				id: movies.id,

@@ -2,11 +2,7 @@ import { nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import {
-	movieExternalRecs,
-	movies,
-	type NewMovie,
-} from '../database/schema/index.js';
+import { movieExternalRecs, movies, type NewMovie } from '../database/schema/index.js';
 
 export interface ExternalCandidate {
 	movieId: string;
@@ -129,9 +125,7 @@ export class ExternalCandidatesService {
 				: [];
 
 		const byMovieId = new Map(existingById.map((m) => [m.id, m] as const));
-		const byTmdb = new Map(
-			existingByTmdb.map((m) => [m.tmdbId as number, m] as const),
-		);
+		const byTmdb = new Map(existingByTmdb.map((m) => [m.tmdbId as number, m] as const));
 		const byImdb = new Map(existingByImdb.map((m) => [m.imdbId as string, m] as const));
 
 		const accum = new Map<string, ExternalCandidate>();

@@ -34,10 +34,7 @@ export class ContentVectorStrategy implements SimilarityStrategy {
 		return true;
 	}
 
-	async score(
-		seed: MovieWithMetadata,
-		candidates: MovieWithMetadata[],
-	): Promise<StrategyResult> {
+	async score(seed: MovieWithMetadata, candidates: MovieWithMetadata[]): Promise<StrategyResult> {
 		const scores: StrategyScore[] = [];
 
 		const sGenres = new Set(seed.genres.map((g) => g.toLowerCase()));
@@ -57,9 +54,7 @@ export class ContentVectorStrategy implements SimilarityStrategy {
 			if (genreOverlap.length > 0) {
 				const j = jaccard(sGenres, cGenres);
 				total += this.w.genres * j;
-				const friendly = c.genres.filter((g) =>
-					sGenres.has(g.toLowerCase()),
-				);
+				const friendly = c.genres.filter((g) => sGenres.has(g.toLowerCase()));
 				if (friendly.length > 0) {
 					reasons.push(`Shared genres: ${friendly.slice(0, 3).join(', ')}`);
 				}

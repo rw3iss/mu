@@ -14,7 +14,7 @@ function m(id: string, genres: string[]): MovieWithMetadata {
 		imdbId: null,
 		hidden: false,
 		groupId: null,
-		source: "library" as const,
+		source: 'library' as const,
 
 		addedAt: '2026-01-01',
 		genres,

@@ -124,12 +124,7 @@ export function MatchCandidatesPanel({
 			</ul>
 
 			<div class={styles.footer}>
-				<Button
-					variant="ghost"
-					size="sm"
-					onClick={handleDismiss}
-					disabled={dismissing}
-				>
+				<Button variant="ghost" size="sm" onClick={handleDismiss} disabled={dismissing}>
 					{dismissing ? 'Dismissing…' : dismissLabel}
 				</Button>
 			</div>

@@ -1,4 +1,4 @@
-import { Global, Logger, Module, type FactoryProvider } from '@nestjs/common';
+import { type FactoryProvider, Global, Logger, Module } from '@nestjs/common';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { EventsService } from '../events/events.service.js';
@@ -30,7 +30,9 @@ const jobManagerProvider: FactoryProvider = {
 		database: DatabaseService,
 	): Promise<JobManagerService> => {
 		const logger = new Logger('JobModule');
-		const backend = (config.get<string>('jobs.backend', 'in-memory') || 'in-memory').toLowerCase();
+		const backend = (
+			config.get<string>('jobs.backend', 'in-memory') || 'in-memory'
+		).toLowerCase();
 
 		if (backend === 'bullmq') {
 			try {

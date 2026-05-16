@@ -182,9 +182,7 @@ export class FileProbeService {
 					width: s.width,
 					height: s.height,
 					tags: s.tags
-						? Object.fromEntries(
-								Object.entries(s.tags).map(([k, v]) => [k, String(v)]),
-							)
+						? Object.fromEntries(Object.entries(s.tags).map(([k, v]) => [k, String(v)]))
 						: undefined,
 				}));
 

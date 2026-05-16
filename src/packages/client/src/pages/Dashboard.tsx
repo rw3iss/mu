@@ -108,11 +108,7 @@ export function Dashboard(_props: DashboardProps) {
 							</Button>
 						</div>
 					</div>
-					<MovieGrid
-						movies={continueWatching}
-						isLoading={isLoading}
-						viewMode={cwView}
-					/>
+					<MovieGrid movies={continueWatching} isLoading={isLoading} viewMode={cwView} />
 				</section>
 			)}
 

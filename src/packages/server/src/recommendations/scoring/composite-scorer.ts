@@ -16,10 +16,7 @@ export function composite(
 	weights: Record<string, number>,
 	candidatesById: Map<string, MovieWithMetadata>,
 ): ScoredMovie[] {
-	const blended = new Map<
-		string,
-		{ score: number; reasons: string[]; sources: Set<string> }
-	>();
+	const blended = new Map<string, { score: number; reasons: string[]; sources: Set<string> }>();
 
 	for (const r of results) {
 		if (r.scores.length === 0) continue;

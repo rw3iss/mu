@@ -84,9 +84,7 @@ export function Watchlist(_props: WatchlistProps) {
 	// needed. Accessing `.value` here subscribes the component to changes.
 	const live = watchlistIds.value;
 	const visibleMovies =
-		viewingUnwatched || live === null
-			? movies
-			: movies.filter((m) => live.has(m.id));
+		viewingUnwatched || live === null ? movies : movies.filter((m) => live.has(m.id));
 
 	return (
 		<div class={styles.watchlist}>

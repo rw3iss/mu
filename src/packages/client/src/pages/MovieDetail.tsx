@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
+import { Select } from '@/components/common/Select';
 import { SmartImage } from '@/components/common/SmartImage';
 import { Spinner } from '@/components/common/Spinner';
 import { CastPhoto } from '@/components/movie/CastPhoto';
 import { ExternalRatings } from '@/components/movie/ExternalRatings';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
-import { Select } from '@/components/common/Select';
 import { MatchCandidatesPanel } from '@/components/movie/MatchCandidatesPanel';
 import { MovieBreadcrumbs } from '@/components/movie/MovieBreadcrumbs';
 import { MovieOptionsMenu } from '@/components/movie/MovieOptionsMenu';
@@ -450,7 +450,9 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						) : (
 							<div class={styles.titleRow} onClick={startEditingTitle}>
 								<h1 class={styles.title}>{movie.title}</h1>
-								<span class={styles.titleEditIcon}><Icon name="edit" size={12} /></span>
+								<span class={styles.titleEditIcon}>
+									<Icon name="edit" size={12} />
+								</span>
 							</div>
 						)}
 
@@ -771,7 +773,10 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									Playlists{playlistCount > 0 ? ` (${playlistCount})` : ''}
 								</h2>
 								<span class={styles.fileInfoArrow}>
-									<Icon name={showPlaylists ? 'chevron-up' : 'chevron-down'} size={14} />
+									<Icon
+										name={showPlaylists ? 'chevron-up' : 'chevron-down'}
+										size={14}
+									/>
 								</span>
 							</button>
 							{showPlaylists && (
@@ -801,7 +806,10 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								>
 									<h2 class={styles.sectionTitle}>Play Settings</h2>
 									<span class={styles.fileInfoArrow}>
-										<Icon name={showPlaySettings ? 'chevron-up' : 'chevron-down'} size={14} />
+										<Icon
+											name={showPlaySettings ? 'chevron-up' : 'chevron-down'}
+											size={14}
+										/>
 									</span>
 								</button>
 
@@ -823,8 +831,15 @@ export function MovieDetail({ id }: MovieDetailProps) {
 												options={[
 													{ value: '', label: 'None (use default)' },
 													...audioProfiles
-														.filter((p) => p.type === 'eq' || p.type === 'full')
-														.map((p) => ({ value: p.id, label: p.name })),
+														.filter(
+															(p) =>
+																p.type === 'eq' ||
+																p.type === 'full',
+														)
+														.map((p) => ({
+															value: p.id,
+															label: p.name,
+														})),
 												]}
 											/>
 
@@ -835,15 +850,23 @@ export function MovieDetail({ id }: MovieDetailProps) {
 												value={selectedCompProfile}
 												onChange={(val) => {
 													setSelectedCompProfile(val);
-													updatePlaySetting('compressorProfileId', val || null);
+													updatePlaySetting(
+														'compressorProfileId',
+														val || null,
+													);
 												}}
 												options={[
 													{ value: '', label: 'None (use default)' },
 													...audioProfiles
 														.filter(
-															(p) => p.type === 'compressor' || p.type === 'full',
+															(p) =>
+																p.type === 'compressor' ||
+																p.type === 'full',
 														)
-														.map((p) => ({ value: p.id, label: p.name })),
+														.map((p) => ({
+															value: p.id,
+															label: p.name,
+														})),
 												]}
 											/>
 
@@ -854,13 +877,19 @@ export function MovieDetail({ id }: MovieDetailProps) {
 												value={selectedVideoProfile}
 												onChange={(val) => {
 													setSelectedVideoProfile(val);
-													updatePlaySetting('videoProfileId', val || null);
+													updatePlaySetting(
+														'videoProfileId',
+														val || null,
+													);
 												}}
 												options={[
 													{ value: '', label: 'None (use default)' },
 													...audioProfiles
 														.filter((p) => p.type === 'video')
-														.map((p) => ({ value: p.id, label: p.name })),
+														.map((p) => ({
+															value: p.id,
+															label: p.name,
+														})),
 												]}
 											/>
 										</div>
@@ -878,7 +907,10 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								>
 									<h2 class={styles.sectionTitle}>File Info</h2>
 									<span class={styles.fileInfoArrow}>
-										<Icon name={showFileInfo ? 'chevron-up' : 'chevron-down'} size={14} />
+										<Icon
+											name={showFileInfo ? 'chevron-up' : 'chevron-down'}
+											size={14}
+										/>
 									</span>
 								</button>
 
@@ -904,7 +936,14 @@ export function MovieDetail({ id }: MovieDetailProps) {
 													? `${movie.fileInfo.subtitleTracks.length} subtitle${movie.fileInfo.subtitleTracks.length === 1 ? '' : 's'} found`
 													: 'No subtitles found'}
 												<span class={styles.fileInfoArrow}>
-													<Icon name={showSubtitles ? 'chevron-up' : 'chevron-down'} size={14} />
+													<Icon
+														name={
+															showSubtitles
+																? 'chevron-up'
+																: 'chevron-down'
+														}
+														size={14}
+													/>
 												</span>
 											</button>
 											{showSubtitles && (

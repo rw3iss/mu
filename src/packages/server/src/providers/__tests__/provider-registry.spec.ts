@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ProviderRegistry } from '../provider-registry.service.js';
 import type { Provider } from '../provider.interface.js';
+import { ProviderRegistry } from '../provider-registry.service.js';
 
 function fakeProvider(over: Partial<Provider> & Pick<Provider, 'id'>): Provider {
 	return {
@@ -12,7 +12,8 @@ function fakeProvider(over: Partial<Provider> & Pick<Provider, 'id'>): Provider 
 		configFields: over.configFields ?? [],
 		rateLimit: over.rateLimit ?? {},
 		isConfigured: over.isConfigured ?? (() => true),
-		healthCheck: over.healthCheck ?? (async () => ({ ok: true, checkedAt: new Date().toISOString() })),
+		healthCheck:
+			over.healthCheck ?? (async () => ({ ok: true, checkedAt: new Date().toISOString() })),
 	};
 }
 

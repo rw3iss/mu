@@ -60,9 +60,6 @@ export function jobAction(jobId: string, label?: string): NotificationAction {
  * given job type (e.g. "thumbnail", "pre-transcode"). Useful when an
  * admin action enqueues many jobs and there's no single id to link to.
  */
-export function jobListAction(
-	type: string,
-	label = 'View jobs',
-): NotificationAction {
+export function jobListAction(type: string, label = 'View jobs'): NotificationAction {
 	return { label, href: `/admin/jobs?type=${encodeURIComponent(type)}` };
 }

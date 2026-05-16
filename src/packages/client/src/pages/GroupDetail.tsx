@@ -6,7 +6,11 @@ import { SmartImage } from '@/components/common/SmartImage';
 import { Spinner } from '@/components/common/Spinner';
 import { MatchCandidatesPanel } from '@/components/movie/MatchCandidatesPanel';
 import { MovieListItem } from '@/components/movie/MovieListItem';
-import { type GroupDetailResponse, groupsService, type MovieGroup } from '@/services/groups.service';
+import {
+	type GroupDetailResponse,
+	groupsService,
+	type MovieGroup,
+} from '@/services/groups.service';
 import type { MatchCandidate } from '@/services/movies.service';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './GroupDetail.module.scss';
@@ -34,7 +38,9 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 	const [busy, setBusy] = useState(false);
 	// Per-subgroup episode lists, lazy-loaded on expand.
 	const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-	const [childMovies, setChildMovies] = useState<Record<string, GroupDetailResponse['movies']>>({});
+	const [childMovies, setChildMovies] = useState<Record<string, GroupDetailResponse['movies']>>(
+		{},
+	);
 	const [candidates, setCandidates] = useState<MatchCandidate[]>([]);
 
 	useEffect(() => {
@@ -159,7 +165,8 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 	}
 
 	async function handleReject(target: MovieGroup) {
-		if (!confirm(`Ungroup "${target.name}"? Its movies will return to the flat library.`)) return;
+		if (!confirm(`Ungroup "${target.name}"? Its movies will return to the flat library.`))
+			return;
 		setBusy(true);
 		try {
 			await groupsService.reject(target.id);
@@ -241,14 +248,11 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 								</span>
 							) : (
 								<span>
-									{totalEpisodes}{' '}
-									{totalEpisodes === 1 ? 'episode' : 'episodes'}
+									{totalEpisodes} {totalEpisodes === 1 ? 'episode' : 'episodes'}
 								</span>
 							)}
 							{data.group.confidence != null && (
-								<span>
-									{Math.round(data.group.confidence * 100)}% confidence
-								</span>
+								<span>{Math.round(data.group.confidence * 100)}% confidence</span>
 							)}
 							{data.group.detectionSource && (
 								<span class={styles.metaMuted}>
@@ -339,13 +343,18 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 									>
 										<Icon
 											name={
-												expanded[child.id] ? 'chevron-down' : 'chevron-right'
+												expanded[child.id]
+													? 'chevron-down'
+													: 'chevron-right'
 											}
 											size={14}
 										/>
 										<span class={styles.seasonName}>{child.name}</span>
 										{child.status === 'unsure' && (
-											<span class={styles.unsurePill} title="Mu isn't sure about this">
+											<span
+												class={styles.unsurePill}
+												title="Mu isn't sure about this"
+											>
 												<Icon name="warning" size={12} /> unsure
 											</span>
 										)}
@@ -369,10 +378,7 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 															(b.groupEpisodeOrdinal ?? 0),
 													)
 													.map((m) => (
-														<MovieListItem
-															key={m.id}
-															movie={m}
-														/>
+														<MovieListItem key={m.id} movie={m} />
 													))
 											)}
 											{child.status === 'unsure' && (
@@ -405,10 +411,7 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 				<div class={styles.episodesFlat}>
 					{data.movies
 						.slice()
-						.sort(
-							(a, b) =>
-								(a.groupEpisodeOrdinal ?? 0) - (b.groupEpisodeOrdinal ?? 0),
-						)
+						.sort((a, b) => (a.groupEpisodeOrdinal ?? 0) - (b.groupEpisodeOrdinal ?? 0))
 						.map((m) => (
 							<MovieListItem key={m.id} movie={m} />
 						))}

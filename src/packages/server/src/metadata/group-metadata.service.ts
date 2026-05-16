@@ -101,7 +101,9 @@ export class GroupMetadataService {
 			COLLECTION_GROUP_TYPES.has(groupType) || !TV_GROUP_TYPES.has(groupType);
 
 		const [tvRes, colRes] = await Promise.allSettled([
-			wantTv ? this.tmdb.searchTv(group.name, memberAgg.earliestYear ?? undefined) : Promise.resolve(null),
+			wantTv
+				? this.tmdb.searchTv(group.name, memberAgg.earliestYear ?? undefined)
+				: Promise.resolve(null),
 			wantCollection ? this.tmdb.searchCollection(group.name) : Promise.resolve(null),
 		]);
 		const tvResults = tvRes.status === 'fulfilled' ? (tvRes.value ?? []) : [];
@@ -153,7 +155,8 @@ export class GroupMetadataService {
 			repository: this.matchCandidates,
 			logger: this.logger,
 			overviewOf: (c) => c.overview,
-			onConfident: async (winner) => this.resolveByProvider(winner.provider, Number(winner.externalId)),
+			onConfident: async (winner) =>
+				this.resolveByProvider(winner.provider, Number(winner.externalId)),
 		});
 
 		return outcome.kind === 'applied' ? outcome.result : null;

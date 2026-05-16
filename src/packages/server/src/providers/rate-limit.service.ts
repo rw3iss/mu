@@ -43,10 +43,7 @@ export class RateLimitService {
 	private readonly logger = new Logger('RateLimitService');
 
 	/** providerId → { second: Bucket, minute: Bucket } */
-	private readonly memBuckets = new Map<
-		string,
-		{ second: InMemBucket; minute: InMemBucket }
-	>();
+	private readonly memBuckets = new Map<string, { second: InMemBucket; minute: InMemBucket }>();
 
 	constructor(
 		private readonly database: DatabaseService,
@@ -164,9 +161,7 @@ export class RateLimitService {
 
 	/** History of the last `days` daily counts, oldest → newest. */
 	dailyHistory(providerId: string, days = 7): { date: string; count: number }[] {
-		const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-			.toISOString()
-			.slice(0, 10);
+		const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 		const rows = this.database.db
 			.select({
 				bucketKey: providerUsage.bucketKey,

@@ -80,10 +80,7 @@ export function Select<T extends string | number = string>({
 	const reactId = useId();
 	const listId = `select-${id ?? reactId}-list`;
 
-	const selectedOption = useMemo(
-		() => options.find((o) => o.value === value),
-		[options, value],
-	);
+	const selectedOption = useMemo(() => options.find((o) => o.value === value), [options, value]);
 
 	// Sync highlight when value changes externally.
 	useEffect(() => {
@@ -191,9 +188,7 @@ export function Select<T extends string | number = string>({
 		}
 	};
 
-	const wrapClass = [styles.wrap, fullWidth ? styles.fullWidth : '']
-		.filter(Boolean)
-		.join(' ');
+	const wrapClass = [styles.wrap, fullWidth ? styles.fullWidth : ''].filter(Boolean).join(' ');
 	const triggerClass = [
 		styles.trigger,
 		size === 'sm' ? styles.sm : '',
@@ -267,7 +262,9 @@ export function Select<T extends string | number = string>({
 									{opt.description && (
 										<span class={styles.optionDesc}>{opt.description}</span>
 									)}
-									{selected && <Icon name="check" size={12} class={styles.check} />}
+									{selected && (
+										<Icon name="check" size={12} class={styles.check} />
+									)}
 								</li>
 							);
 						})

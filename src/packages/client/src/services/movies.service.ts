@@ -101,9 +101,7 @@ export const moviesService = {
 	 * List ambiguous match candidates persisted when the auto-matcher
 	 * couldn't pick a single winner.
 	 */
-	listMatchCandidates(
-		movieId: string,
-	): Promise<{ candidates: MatchCandidate[] }> {
+	listMatchCandidates(movieId: string): Promise<{ candidates: MatchCandidate[] }> {
 		return api.get(`/movies/${movieId}/match-candidates`);
 	},
 
@@ -111,11 +109,7 @@ export const moviesService = {
 	 * Apply a user-chosen candidate. Server clears the dropdown and
 	 * re-runs the merge fetch using the picked provider+externalId.
 	 */
-	applyMatchCandidate(
-		movieId: string,
-		provider: string,
-		externalId: string,
-	): Promise<unknown> {
+	applyMatchCandidate(movieId: string, provider: string, externalId: string): Promise<unknown> {
 		return api.post(`/movies/${movieId}/match-candidates/apply`, {
 			provider,
 			externalId,
@@ -132,9 +126,7 @@ export const moviesService = {
 	 * surface the rename in a toast and refresh the page without a
 	 * follow-up GET.
 	 */
-	sanitizeTitle(
-		movieId: string,
-	): Promise<{
+	sanitizeTitle(movieId: string): Promise<{
 		movie: Movie;
 		changed: boolean;
 		from: string | null;

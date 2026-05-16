@@ -49,10 +49,7 @@ export class MetadataController {
 
 	@Post('movies/:id/match-candidates/apply')
 	@Roles('admin')
-	async applyCandidate(
-		@Param('id') movieId: string,
-		@Body() body: ApplyCandidateBody,
-	) {
+	async applyCandidate(@Param('id') movieId: string, @Body() body: ApplyCandidateBody) {
 		if (!body?.provider || !body?.externalId) {
 			throw new BadRequestException('provider and externalId required');
 		}
@@ -70,7 +67,6 @@ export class MetadataController {
 		this.matchCandidates.clear('movie', movieId);
 		return { ok: true };
 	}
-
 
 	@Post('movies/refresh-all')
 	@Roles('admin')

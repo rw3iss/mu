@@ -9,9 +9,9 @@ import { hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieCard.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
 import { RatingBadge } from './RatingBadge';
-import { WatchProgressBar } from './WatchProgressBar';
 import type { MovieDisplayProps } from './types';
 import { useMovieCardBehavior } from './useMovieCardBehavior';
+import { WatchProgressBar } from './WatchProgressBar';
 
 type MovieCardProps = MovieDisplayProps;
 
@@ -83,7 +83,6 @@ export function MovieCard({
 				/>
 
 				<RatingBadge value={rating} class={styles.ratingBadge} />
-
 
 				{!selectionMode && (
 					<div class={styles.overlay}>

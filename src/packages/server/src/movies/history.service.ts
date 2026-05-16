@@ -213,8 +213,7 @@ export class HistoryService implements OnModuleInit {
 		return rows.map((row) => {
 			const totalSeconds = row.durationSeconds || (row.runtimeMinutes ?? 0) * 60;
 			const watchPosition = row.completed ? totalSeconds : (row.positionSeconds ?? 0);
-			const watchProgress =
-				totalSeconds > 0 ? Math.min(1, watchPosition / totalSeconds) : 0;
+			const watchProgress = totalSeconds > 0 ? Math.min(1, watchPosition / totalSeconds) : 0;
 			const posterUrl = row.posterUrl || row.thumbnailUrl;
 			return {
 				id: row.id,

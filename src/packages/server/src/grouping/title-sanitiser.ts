@@ -119,10 +119,7 @@ const QUALITY_TOKENS = [
 	'screener',
 ];
 
-const QUALITY_REGEX = new RegExp(
-	`\\b(?:${QUALITY_TOKENS.join('|')})\\b`,
-	'gi',
-);
+const QUALITY_REGEX = new RegExp(`\\b(?:${QUALITY_TOKENS.join('|')})\\b`, 'gi');
 
 // Release-group: trailing `-NAME` (often after a quality token) or
 // matching well-known groups anywhere.
@@ -172,7 +169,7 @@ const KNOWN_GROUP_REGEX = new RegExp(
 const TRAILING_GROUP_AFTER_QUALITY = /-([A-Za-z][\w]{2,})\s*$/;
 
 // Bracketed sections: [...], (...), {...}. Stripped entirely.
-const BRACKET_CONTENT = /[\[({][^\[\](){}]*[\])}]/g;
+const BRACKET_CONTENT = /[[({][^[\](){}]*[\])}]/g;
 
 // Year markers 1900-2099.
 const YEAR_REGEX = /\b(19\d{2}|20\d{2})\b/g;
@@ -180,24 +177,24 @@ const YEAR_REGEX = /\b(19\d{2}|20\d{2})\b/g;
 // Season/episode patterns. Order matters — most specific first.
 const SE_PATTERNS: { regex: RegExp; season: number; episode: number }[] = [
 	// S01E04, s01 e04, S01.E04, S01-E04
-	{ regex: /(?:^|[\s._\-])s(\d{1,2})[\s._\-]?e(\d{1,3})(?=[\s._\-]|$|\.)/i, season: 1, episode: 2 },
+	{ regex: /(?:^|[\s._-])s(\d{1,2})[\s._-]?e(\d{1,3})(?=[\s._-]|$|\.)/i, season: 1, episode: 2 },
 	// 3x07, 03x07
-	{ regex: /(?:^|[\s._\-])(\d{1,2})x(\d{1,3})(?=[\s._\-]|$|\.)/i, season: 1, episode: 2 },
+	{ regex: /(?:^|[\s._-])(\d{1,2})x(\d{1,3})(?=[\s._-]|$|\.)/i, season: 1, episode: 2 },
 	// Season 1 Episode 4
 	{
-		regex: /(?:^|[\s._\-])season[\s._\-]?(\d{1,2})[\s._\-]+episode[\s._\-]?(\d{1,3})/i,
+		regex: /(?:^|[\s._-])season[\s._-]?(\d{1,2})[\s._-]+episode[\s._-]?(\d{1,3})/i,
 		season: 1,
 		episode: 2,
 	},
 ];
 
 // Standalone "Season N" / "S0N" marker (no episode) — for folder-tree only.
-const SEASON_ONLY = /(?:^|[\s._\-])(?:season|series|s)[\s._\-]?(\d{1,3})(?=[\s._\-]|$|\.)/i;
+const SEASON_ONLY = /(?:^|[\s._-])(?:season|series|s)[\s._-]?(\d{1,3})(?=[\s._-]|$|\.)/i;
 
-const LEADING_THE = /^the[\s._\-]+/i;
+const LEADING_THE = /^the[\s._-]+/i;
 const COLLAPSE_WS = /\s+/g;
-const TRAILING_PUNCT = /[\s._\-]+$/;
-const LEADING_PUNCT = /^[\s._\-]+/;
+const TRAILING_PUNCT = /[\s._-]+$/;
+const LEADING_PUNCT = /^[\s._-]+/;
 
 /**
  * Generic top-level folder names that must NEVER become a grouping

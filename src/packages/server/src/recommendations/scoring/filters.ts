@@ -20,10 +20,7 @@ export interface FilterContext {
  * of the King" eating slots — those should be surfaced via the group
  * view. The filter compares group_id when set.
  */
-export function applyFilters(
-	scored: ScoredMovie[],
-	ctx: FilterContext,
-): ScoredMovie[] {
+export function applyFilters(scored: ScoredMovie[], ctx: FilterContext): ScoredMovie[] {
 	const seedGroup = ctx.seed.groupId;
 	const directorCount = new Map<string, number>();
 	const out: ScoredMovie[] = [];

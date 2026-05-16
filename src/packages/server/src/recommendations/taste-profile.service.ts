@@ -3,12 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import {
-	movieMetadata,
-	movies,
-	userRatings,
-	userWatchHistory,
-} from '../database/schema/index.js';
+import { movieMetadata, movies, userRatings, userWatchHistory } from '../database/schema/index.js';
 
 export interface TasteProfile {
 	userId: string;
@@ -90,7 +85,8 @@ export class TasteProfileService {
 			accumulate(genres, parseArr(row.genres), w);
 			accumulate(directors, parseArr(row.directors), w);
 			accumulate(actors, parseArr(row.cast), w);
-			if (row.year) decades.set(decadeOf(row.year), (decades.get(decadeOf(row.year)) ?? 0) + w);
+			if (row.year)
+				decades.set(decadeOf(row.year), (decades.get(decadeOf(row.year)) ?? 0) + w);
 		}
 
 		const ratedIds = new Set(ratings.map((r) => r.movieId));
@@ -100,7 +96,8 @@ export class TasteProfileService {
 			accumulate(genres, parseArr(row.genres), w);
 			accumulate(directors, parseArr(row.directors), w);
 			accumulate(actors, parseArr(row.cast), w);
-			if (row.year) decades.set(decadeOf(row.year), (decades.get(decadeOf(row.year)) ?? 0) + w);
+			if (row.year)
+				decades.set(decadeOf(row.year), (decades.get(decadeOf(row.year)) ?? 0) + w);
 		}
 
 		const totalRated = ratings.length;
@@ -128,7 +125,9 @@ export class TasteProfileService {
 			profile,
 			PROFILE_CACHE_TTL,
 		);
-		this.logger.log(`Built taste profile for ${userId}: ${totalRated} rated, ${totalWatched} watched`);
+		this.logger.log(
+			`Built taste profile for ${userId}: ${totalRated} rated, ${totalWatched} watched`,
+		);
 		return profile;
 	}
 

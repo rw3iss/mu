@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import {
-	movieGroups,
 	type MovieGroup,
-	type NewMovieGroup,
+	movieGroups,
 	movies,
+	type NewMovieGroup,
 } from '../database/schema/index.js';
 
 export interface AltParent {
@@ -90,11 +90,7 @@ export class GroupsRepository {
 
 	get(id: string): MovieGroup | null {
 		return (
-			this.database.db
-				.select()
-				.from(movieGroups)
-				.where(eq(movieGroups.id, id))
-				.get() ?? null
+			this.database.db.select().from(movieGroups).where(eq(movieGroups.id, id)).get() ?? null
 		);
 	}
 
@@ -112,10 +108,7 @@ export class GroupsRepository {
 		const where =
 			ordinal === null
 				? and(eq(movieGroups.parentGroupId, parentId), isNull(movieGroups.ordinal))
-				: and(
-						eq(movieGroups.parentGroupId, parentId),
-						eq(movieGroups.ordinal, ordinal),
-					);
+				: and(eq(movieGroups.parentGroupId, parentId), eq(movieGroups.ordinal, ordinal));
 		return this.database.db.select().from(movieGroups).where(where).get() ?? null;
 	}
 
@@ -221,12 +214,8 @@ export class GroupsRepository {
 			.run();
 	}
 
-	listMoviesInSubgroup(subgroupId: string): typeof movies.$inferSelect[] {
-		return this.database.db
-			.select()
-			.from(movies)
-			.where(eq(movies.groupId, subgroupId))
-			.all();
+	listMoviesInSubgroup(subgroupId: string): (typeof movies.$inferSelect)[] {
+		return this.database.db.select().from(movies).where(eq(movies.groupId, subgroupId)).all();
 	}
 
 	movieCountInSubgroup(subgroupId: string): number {

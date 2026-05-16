@@ -61,8 +61,7 @@ export class TraktHttpClient {
 		const { imdb, tmdb, title, year } = opts;
 		let url: string | null = null;
 		if (imdb) url = `${TRAKT_BASE}/search/imdb/${encodeURIComponent(imdb)}?type=movie`;
-		else if (tmdb != null)
-			url = `${TRAKT_BASE}/search/tmdb/${tmdb}?type=movie`;
+		else if (tmdb != null) url = `${TRAKT_BASE}/search/tmdb/${tmdb}?type=movie`;
 		else if (title)
 			url = `${TRAKT_BASE}/search/movie?query=${encodeURIComponent(title)}${
 				year ? `&year=${year}` : ''
@@ -77,7 +76,9 @@ export class TraktHttpClient {
 			},
 		});
 		if (!res.ok) return null;
-		const arr = (await res.json()) as Array<{ movie?: { ids: { trakt: number; slug: string } } }>;
+		const arr = (await res.json()) as Array<{
+			movie?: { ids: { trakt: number; slug: string } };
+		}>;
 		const first = arr.find((x) => x.movie);
 		if (!first?.movie) return null;
 		return { id: first.movie.ids.trakt, slug: first.movie.ids.slug };

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
-import { notifyError, notifySuccess } from '@/state/notifications.state';
 import {
-	providersService,
 	type ConfigFieldSpec,
 	type ProviderSummary,
+	providersService,
 } from '@/services/providers.service';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { fetchProviders } from '@/state/providers.state';
 import styles from './ProviderConfigModal.module.scss';
 
@@ -158,15 +158,25 @@ function FieldRow({
 				<input
 					type="checkbox"
 					checked={value === 'true'}
-					onChange={(e) => onChange((e.target as HTMLInputElement).checked ? 'true' : 'false')}
+					onChange={(e) =>
+						onChange((e.target as HTMLInputElement).checked ? 'true' : 'false')
+					}
 				/>
 			) : (
 				<input
 					class={styles.input}
-					type={field.type === 'secret' ? 'password' : field.type === 'number' ? 'number' : 'text'}
+					type={
+						field.type === 'secret'
+							? 'password'
+							: field.type === 'number'
+								? 'number'
+								: 'text'
+					}
 					value={value}
 					required={field.required}
-					placeholder={field.type === 'secret' && value.includes('••••') ? value : undefined}
+					placeholder={
+						field.type === 'secret' && value.includes('••••') ? value : undefined
+					}
 					onInput={(e) => onChange((e.target as HTMLInputElement).value)}
 				/>
 			)}

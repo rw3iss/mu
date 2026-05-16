@@ -27,10 +27,7 @@ export class EmbeddingSimilarityStrategy implements SimilarityStrategy {
 		return true;
 	}
 
-	async score(
-		seed: MovieWithMetadata,
-		candidates: MovieWithMetadata[],
-	): Promise<StrategyResult> {
+	async score(seed: MovieWithMetadata, candidates: MovieWithMetadata[]): Promise<StrategyResult> {
 		const store = this.embeddings.getStore();
 		const seedVec = await store.get(seed.id);
 		if (!seedVec) return { strategy: this.name, scores: [] };

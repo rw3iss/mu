@@ -2,10 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { SubtitleService } from './subtitle.service.js';
-import {
-	SubtitleTrackRow,
-	SubtitleTracksRepository,
-} from './subtitle-tracks.repository.js';
+import { SubtitleTrackRow, SubtitleTracksRepository } from './subtitle-tracks.repository.js';
 
 export const SUBTITLE_EXTS = ['.srt', '.vtt', '.ass', '.ssa', '.sub'] as const;
 
@@ -37,12 +34,7 @@ export class SubtitleIngestionService {
 	}
 
 	/** Write a subtitle sidecar next to the movie file, returns the absolute path. */
-	async writeSidecar(
-		moviePath: string,
-		lang: string,
-		ext: string,
-		buf: Buffer,
-	): Promise<string> {
+	async writeSidecar(moviePath: string, lang: string, ext: string, buf: Buffer): Promise<string> {
 		const out = this.sidecarPath(moviePath, lang, ext);
 		await writeFile(out, buf);
 		return out;

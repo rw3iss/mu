@@ -78,9 +78,10 @@ export function MovieBreadcrumbs({
 		: `/group/${subgroup.id}`;
 	const cls = className ? `${styles.crumbs} ${className}` : styles.crumbs;
 
-	const ep = showEpisode && movie.groupEpisodeOrdinal != null
-		? `E${String(movie.groupEpisodeOrdinal).padStart(2, '0')}`
-		: null;
+	const ep =
+		showEpisode && movie.groupEpisodeOrdinal != null
+			? `E${String(movie.groupEpisodeOrdinal).padStart(2, '0')}`
+			: null;
 
 	return (
 		<span class={cls} aria-label="Group breadcrumbs">

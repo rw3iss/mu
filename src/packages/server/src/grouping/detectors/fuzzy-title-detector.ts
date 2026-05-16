@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { titleSimilarity, DEFAULT_THRESHOLDS } from '../confidence.js';
+import { DEFAULT_THRESHOLDS, titleSimilarity } from '../confidence.js';
 import { normaliseTitle } from '../title-normaliser.js';
-import { Detector, DetectionInput, DetectionResult } from './types.js';
+import { DetectionInput, DetectionResult, Detector } from './types.js';
 
 /**
  * Last-resort detector: no SExx, no clear folder layout, no multi-file

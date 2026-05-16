@@ -13,11 +13,11 @@ import {
 	Query,
 } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import type { Capability, Provider } from './provider.interface.js';
+import { ProviderCredentialsService } from './provider-credentials.service.js';
 import { ProviderEventsService } from './provider-events.service.js';
 import { ProviderRegistry } from './provider-registry.service.js';
-import { ProviderCredentialsService } from './provider-credentials.service.js';
 import { RateLimitService } from './rate-limit.service.js';
-import type { Capability, Provider } from './provider.interface.js';
 
 interface ProviderSummary {
 	id: string;
@@ -77,7 +77,10 @@ export class ProvidersController {
 
 	@Put(':id/credentials')
 	@Roles('admin')
-	async setCredentials(@Param('id') id: string, @Body() body: { config: Record<string, unknown> }) {
+	async setCredentials(
+		@Param('id') id: string,
+		@Body() body: { config: Record<string, unknown> },
+	) {
 		const p = this.registry.get(id);
 		if (!p) throw new NotFoundException(`Provider "${id}" not registered`);
 		if (!body || typeof body.config !== 'object' || body.config === null) {
@@ -130,7 +133,11 @@ export class ProvidersController {
 				durationMs,
 				payload: { message: err?.message ?? 'unknown' },
 			});
-			return { ok: false, detail: err?.message ?? 'unknown', checkedAt: new Date().toISOString() };
+			return {
+				ok: false,
+				detail: err?.message ?? 'unknown',
+				checkedAt: new Date().toISOString(),
+			};
 		}
 	}
 

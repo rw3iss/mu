@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { titleSimilarity, DEFAULT_THRESHOLDS } from '../confidence.js';
+import { DEFAULT_THRESHOLDS, titleSimilarity } from '../confidence.js';
 import { GENERIC_FOLDER_NAMES, sanitiseRawTitle } from '../title-sanitiser.js';
-import { Detector, DetectionInput, DetectionResult } from './types.js';
+import { DetectionInput, DetectionResult, Detector } from './types.js';
 
 /**
  * Folder-tree detector. Picks up the common Plex-style layout:
@@ -94,13 +94,11 @@ export class FolderTreeDetector implements Detector {
 	private parseEpisodeFromFilename(fname: string): number | null {
 		const base = path.basename(fname, path.extname(fname));
 		// E12, e12 — standalone episode marker without season.
-		const ePattern = /(?:^|[\s._\-])e(\d{1,3})(?:[\s._\-]|$)/i;
+		const ePattern = /(?:^|[\s._-])e(\d{1,3})(?:[\s._-]|$)/i;
 		const m = ePattern.exec(base);
 		if (m) return parseInt(m[1]!, 10);
 		// Trailing number: "episode 7", "ep 7", "07. Title", "Title - 07".
-		const trailing = /(?:^|[\s._\-])(?:ep(?:isode)?[\s._\-]?)?(\d{1,3})(?:[\s._\-]|$)/i.exec(
-			base,
-		);
+		const trailing = /(?:^|[\s._-])(?:ep(?:isode)?[\s._-]?)?(\d{1,3})(?:[\s._-]|$)/i.exec(base);
 		if (trailing) {
 			const n = parseInt(trailing[1]!, 10);
 			if (n >= 1 && n <= 999) return n;

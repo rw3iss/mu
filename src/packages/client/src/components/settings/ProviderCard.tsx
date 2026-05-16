@@ -1,8 +1,8 @@
 import { useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import type { ProviderSummary } from '@/services/providers.service';
-import { ProviderConfigModal } from './ProviderConfigModal';
 import styles from './ProviderCard.module.scss';
+import { ProviderConfigModal } from './ProviderConfigModal';
 
 interface ProviderCardProps {
 	provider: ProviderSummary;

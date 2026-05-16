@@ -3,24 +3,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import {
-	movieMetadata,
-	movies,
-	userRatings,
-	userWatchHistory,
-} from '../database/schema/index.js';
+import { movieMetadata, movies, userRatings, userWatchHistory } from '../database/schema/index.js';
 import { EmbeddingsService } from '../embeddings/embeddings.service.js';
 import { ExternalCandidatesService } from './external-candidates.service.js';
 import { ExternalEnrichmentService } from './external-enrichment.service.js';
+import { composite } from './scoring/composite-scorer.js';
 import { applyDiscoverFilters } from './scoring/discover-filters.js';
 import { applyFilters, type FilterContext } from './scoring/filters.js';
-import { composite } from './scoring/composite-scorer.js';
 import { mmr } from './scoring/mmr.js';
-import {
-	analyseMultiInputSet,
-	centroid,
-	reciprocalRankFusion,
-} from './scoring/multi-input.js';
+import { analyseMultiInputSet, centroid, reciprocalRankFusion } from './scoring/multi-input.js';
 import { ContentVectorStrategy } from './strategies/content-vector.strategy.js';
 import { EmbeddingSimilarityStrategy } from './strategies/embedding.strategy.js';
 import { ExternalCacheStrategy } from './strategies/external-cache.strategy.js';
@@ -86,7 +77,10 @@ export class RecommendationsService {
 	/**
 	 * Find movies similar to a single seed movie.
 	 */
-	async getSimilarMovies(movieId: string, opts: RecommendOptions = {}): Promise<RecommendResponse> {
+	async getSimilarMovies(
+		movieId: string,
+		opts: RecommendOptions = {},
+	): Promise<RecommendResponse> {
 		const k = opts.k ?? DEFAULT_RECOMMEND_OPTIONS.k;
 		const include = opts.include ?? 'owned';
 		const cacheKey = `similar:${movieId}:${k}:${include}:${JSON.stringify(opts.weights ?? {})}:${JSON.stringify(opts.filters ?? {})}`;
@@ -159,8 +153,7 @@ export class RecommendationsService {
 		const store = this.embeddings.getStore();
 		const requestedPolicy = opts.policy ?? 'auto';
 		const analysis = await analyseMultiInputSet(seeds, store);
-		const effectivePolicy =
-			requestedPolicy === 'auto' ? analysis.policy : requestedPolicy;
+		const effectivePolicy = requestedPolicy === 'auto' ? analysis.policy : requestedPolicy;
 
 		// Centroid path needs all seeds embedded for it to be meaningful.
 		const ranked =
@@ -204,7 +197,9 @@ export class RecommendationsService {
 					title: m.title,
 					year: m.year,
 					score: Math.round(h.score * 1000) / 1000,
-					explanation: [`Centroid of ${seeds.length} seeds (variance ${variance.toFixed(2)})`],
+					explanation: [
+						`Centroid of ${seeds.length} seeds (variance ${variance.toFixed(2)})`,
+					],
 					posterUrl: m.posterUrl,
 					usedSources: ['centroid'],
 				};
@@ -336,9 +331,7 @@ export class RecommendationsService {
 		const directors = new Map(
 			profile.favoriteDirectors.map((d) => [d.name.toLowerCase(), d.weight]),
 		);
-		const actors = new Map(
-			profile.favoriteActors.map((a) => [a.name.toLowerCase(), a.weight]),
-		);
+		const actors = new Map(profile.favoriteActors.map((a) => [a.name.toLowerCase(), a.weight]));
 		const decades = new Map(profile.preferredDecades.map((d) => [d.decade, d.weight]));
 
 		const scored: ScoredMovie[] = [];
@@ -360,7 +353,9 @@ export class RecommendationsService {
 			}
 			if (m.genres.length > 0 && matchedGenres.length > 0) {
 				score += (genreMatch / m.genres.length) * 0.4;
-				reasons.push(`Matches your favourite genres: ${matchedGenres.slice(0, 3).join(', ')}`);
+				reasons.push(
+					`Matches your favourite genres: ${matchedGenres.slice(0, 3).join(', ')}`,
+				);
 			}
 
 			let dirMatch = 0;
@@ -600,7 +595,10 @@ export class RecommendationsService {
 
 		// Run each strategy against each seed; aggregate per-strategy.
 		const activeStrategies = this.strategies.filter((s) => s.available());
-		const perStrategyAccum = new Map<string, Map<string, { score: number; reasons: string[] }>>();
+		const perStrategyAccum = new Map<
+			string,
+			Map<string, { score: number; reasons: string[] }>
+		>();
 		for (const seed of seeds) {
 			for (const strat of activeStrategies) {
 				const out = await strat.score(seed, pool);

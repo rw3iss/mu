@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ProviderEventsService } from '../../providers/provider-events.service.js';
 import type { Embedder } from '../../providers/provider.interface.js';
+import { ProviderEventsService } from '../../providers/provider-events.service.js';
 import { ProviderRegistry } from '../../providers/provider-registry.service.js';
 
 const MODEL_ID = 'Xenova/all-MiniLM-L6-v2';

@@ -200,7 +200,9 @@ export function SubtitlePanel({
 				<span class={styles.sectionTitle}>
 					Subtitles{tracks.length > 0 ? ` (${tracks.length})` : ''}
 				</span>
-				<span class={styles.arrow}><Icon name={tracksOpen ? 'chevron-up' : 'chevron-down'} size={12} /></span>
+				<span class={styles.arrow}>
+					<Icon name={tracksOpen ? 'chevron-up' : 'chevron-down'} size={12} />
+				</span>
 			</button>
 
 			{tracksOpen && (
@@ -315,7 +317,9 @@ export function SubtitlePanel({
 								)}
 							</button>
 						)}
-						<span class={styles.arrow}><Icon name={searchOpen ? 'chevron-up' : 'chevron-down'} size={12} /></span>
+						<span class={styles.arrow}>
+							<Icon name={searchOpen ? 'chevron-up' : 'chevron-down'} size={12} />
+						</span>
 					</span>
 				</button>
 

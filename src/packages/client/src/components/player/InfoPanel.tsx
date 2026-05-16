@@ -218,7 +218,10 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									>
 										<h3 class={styles.sectionTitle}>File Info</h3>
 										<span class={styles.fileInfoArrow}>
-											<Icon name={showFileInfo ? 'chevron-up' : 'chevron-down'} size={14} />
+											<Icon
+												name={showFileInfo ? 'chevron-up' : 'chevron-down'}
+												size={14}
+											/>
 										</span>
 									</button>
 									{showFileInfo && <FileInfoGrid movie={movie} dark />}
@@ -370,7 +373,10 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								>
 									<h3 class={styles.sectionTitle}>File Info</h3>
 									<span class={styles.fileInfoArrow}>
-										<Icon name={showFileInfo ? 'chevron-up' : 'chevron-down'} size={14} />
+										<Icon
+											name={showFileInfo ? 'chevron-up' : 'chevron-down'}
+											size={14}
+										/>
 									</span>
 								</button>
 								{showFileInfo && <FileInfoGrid movie={movie} dark />}

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { titleSimilarity, DEFAULT_THRESHOLDS } from '../confidence.js';
+import { DEFAULT_THRESHOLDS, titleSimilarity } from '../confidence.js';
 import { normaliseTitle } from '../title-normaliser.js';
-import { Detector, DetectionInput, DetectionResult } from './types.js';
+import { DetectionInput, DetectionResult, Detector } from './types.js';
 
 /**
  * Gold-standard detector: filename SxxExx (or NxNN) pattern. The most
@@ -17,8 +17,8 @@ export class SxxExxDetector implements Detector {
 	name = 'sxxexx-filename';
 
 	/** Conservative: separator before+after to avoid matching things like 'gs06e10' inside a word. */
-	private readonly SE_PATTERN = /(?:^|[\s._\-])s(\d{1,2})[\s._\-]?e(\d{1,3})(?:[\s._\-]|$|\.)/i;
-	private readonly NX_PATTERN = /(?:^|[\s._\-])(\d{1,2})x(\d{1,3})(?:[\s._\-]|$|\.)/i;
+	private readonly SE_PATTERN = /(?:^|[\s._-])s(\d{1,2})[\s._-]?e(\d{1,3})(?:[\s._-]|$|\.)/i;
+	private readonly NX_PATTERN = /(?:^|[\s._-])(\d{1,2})x(\d{1,3})(?:[\s._-]|$|\.)/i;
 
 	/** Tokens that suggest the captured show-name isn't a real title. */
 	private readonly BLOCKLIST = new Set([

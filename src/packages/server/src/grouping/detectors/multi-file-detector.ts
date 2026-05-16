@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { titleSimilarity, DEFAULT_THRESHOLDS } from '../confidence.js';
+import { DEFAULT_THRESHOLDS, titleSimilarity } from '../confidence.js';
 import { GENERIC_FOLDER_NAMES, sanitiseRawTitle } from '../title-sanitiser.js';
-import { Detector, DetectionInput, DetectionResult } from './types.js';
+import { DetectionInput, DetectionResult, Detector } from './types.js';
 
 /**
  * Multi-file folder heuristic: the file lives in a folder that contains

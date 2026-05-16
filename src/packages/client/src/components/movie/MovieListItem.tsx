@@ -6,9 +6,9 @@ import { hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieListItem.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
 import { RatingBadge } from './RatingBadge';
-import { WatchProgressBar } from './WatchProgressBar';
 import type { MovieDisplayProps } from './types';
 import { useMovieCardBehavior } from './useMovieCardBehavior';
+import { WatchProgressBar } from './WatchProgressBar';
 
 type MovieListItemProps = MovieDisplayProps;
 

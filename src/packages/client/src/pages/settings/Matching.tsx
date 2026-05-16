@@ -61,9 +61,9 @@ export function Matching() {
 			<div class={styles.intro}>
 				<h2 class={styles.heading}>Matching</h2>
 				<p class={styles.lede}>
-					Tune how Mu finds similar movies. Defaults work well — change these
-					if you want more adventurous results, longer cache retention, or
-					tighter spend on paid providers.
+					Tune how Mu finds similar movies. Defaults work well — change these if you want
+					more adventurous results, longer cache retention, or tighter spend on paid
+					providers.
 				</p>
 			</div>
 
@@ -71,9 +71,9 @@ export function Matching() {
 				<div class={styles.sectionHeader}>
 					<h3 class={styles.sectionTitle}>External cache retention</h3>
 					<p class={styles.sectionLede}>
-						When Discover surfaces movies you don't own, Mu caches them
-						(metadata + embeddings) so subsequent ranking is fast. Untouched
-						entries beyond this window are evicted automatically.
+						When Discover surfaces movies you don't own, Mu caches them (metadata +
+						embeddings) so subsequent ranking is fast. Untouched entries beyond this
+						window are evicted automatically.
 					</p>
 				</div>
 				<div class={styles.controlRow}>
@@ -93,7 +93,10 @@ export function Matching() {
 			<div class={styles.placeholder}>
 				More tuning controls coming:
 				<ul>
-					<li>Strategy weight sliders (TMDB / Trakt / content-vector / embedding / LLM rerank)</li>
+					<li>
+						Strategy weight sliders (TMDB / Trakt / content-vector / embedding / LLM
+						rerank)
+					</li>
 					<li>Diversity (MMR λ) and quality floor</li>
 					<li>Exclusion filters (same-group, already-watched, per-director cap)</li>
 					<li>Multi-input policy (centroid / union-of-neighbours / auto)</li>

@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-const YEAR_REGEX = /(?:^|[\s._\-\(\[])(19\d{2}|20\d{2})(?:[\s._\-\)\]]|$)/;
+const YEAR_REGEX = /(?:^|[\s._\-([])(19\d{2}|20\d{2})(?:[\s._\-)\]]|$)/;
 
 /**
  * Extract a release year from a filename / folder name. Looks for a

@@ -14,7 +14,7 @@ function m(over: Partial<MovieWithMetadata> & { id: string; title: string }): Mo
 		imdbId: over.imdbId ?? null,
 		hidden: false,
 		groupId: over.groupId ?? null,
-		source: "library" as const,
+		source: 'library' as const,
 
 		addedAt: '2026-01-01T00:00:00.000Z',
 		genres: over.genres ?? [],
