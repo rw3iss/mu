@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { Icon } from '@/components/common/Icon';
 import { MovieGrid } from '@/components/movie/MovieGrid';
+import { useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
 import { currentUser } from '@/state/auth.state';
-import type { Movie } from '@/state/library.state';
+import type { Movie, ViewMode } from '@/state/library.state';
 import styles from './Dashboard.module.scss';
 
 interface DashboardProps {
@@ -18,6 +20,7 @@ export function Dashboard(_props: DashboardProps) {
 	const [recentlyAdded, setRecentlyAdded] = useState<Movie[]>([]);
 	const [trending, setTrending] = useState<Movie[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [cwView, setCwView] = useUiSetting<ViewMode>('dashboard_cw_view', 'grid');
 
 	useEffect(() => {
 		async function load() {
@@ -48,32 +51,68 @@ export function Dashboard(_props: DashboardProps) {
 		<div class={styles.dashboard}>
 			<PluginSlot name={UI.DASHBOARD_TOP} context={{}} />
 
-			{/* Hero Section */}
-			<section class={styles.hero}>
-				<div class={styles.heroContent}>
-					<h1 class={styles.heroTitle}>Welcome back{user ? `, ${user.username}` : ''}</h1>
-					<p class={styles.heroSubtitle}>Your personal movie library awaits</p>
-					<div class={styles.heroActions}>
-						<Button variant="primary" size="lg" onClick={() => route('/library')}>
-							Browse Library
-						</Button>
-						<Button variant="secondary" size="lg" onClick={() => route('/discover')}>
-							Discover
-						</Button>
-					</div>
-				</div>
-			</section>
+			{/* Compact welcome row: single-line text + inline link buttons.
+			    Mobile hides the inline buttons (the bottom nav already has
+			    Library + Discover tabs). */}
+			<div class={styles.welcomeRow}>
+				<p class={styles.welcomeText}>
+					Welcome back
+					{user && (
+						<>
+							, <span class={styles.welcomeUser}>{user.username}</span>
+						</>
+					)}
+				</p>
+				<span class={styles.welcomeLinks}>
+					<button class={styles.welcomeLink} onClick={() => route('/library')}>
+						Browse Library
+					</button>
+					<button class={styles.welcomeLink} onClick={() => route('/discover')}>
+						Discover
+					</button>
+				</span>
+			</div>
 
 			{/* Continue Watching */}
 			{continueWatching.length > 0 && (
 				<section class={styles.section}>
 					<div class={styles.sectionHeader}>
 						<h2 class={styles.sectionTitle}>Continue Watching</h2>
-						<Button variant="ghost" size="sm" onClick={() => route('/history')}>
-							See All
-						</Button>
+						<div class={styles.sectionActions}>
+							<div
+								class={styles.viewToggle}
+								role="group"
+								aria-label="Continue watching view"
+							>
+								<button
+									class={`${styles.viewBtn} ${cwView === 'grid' ? styles.active : ''}`}
+									onClick={() => setCwView('grid')}
+									aria-label="Grid view"
+									aria-pressed={cwView === 'grid'}
+									title="Grid"
+								>
+									<Icon name="view-grid" size={14} />
+								</button>
+								<button
+									class={`${styles.viewBtn} ${cwView === 'list' ? styles.active : ''}`}
+									onClick={() => setCwView('list')}
+									aria-label="List view"
+									aria-pressed={cwView === 'list'}
+									title="List"
+								>
+									<Icon name="view-list" size={14} />
+								</button>
+							</div>
+							<Button variant="ghost" size="sm" onClick={() => route('/history')}>
+								See All
+							</Button>
+						</div>
 					</div>
-					<MovieGrid movies={continueWatching} isLoading={isLoading} />
+					<MovieGrid
+						movies={continueWatching}
+						isLoading={isLoading}
+						viewMode={cwView}
+					/>
 				</section>
 			)}
 

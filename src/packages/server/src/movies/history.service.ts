@@ -180,37 +180,60 @@ export class HistoryService implements OnModuleInit {
 	}
 
 	getContinueWatching(userId: string) {
+		// Returns the user's most-recently-watched movies regardless of
+		// completion state. The dashboard's "Continue Watching" rail
+		// mirrors the sidebar's "Recent" list — anything you watched,
+		// fully or partially, ordered by when you last touched it.
+		// Completed movies still show with progress=1 so the card shows
+		// the full progress bar (the player decides whether "Play"
+		// resumes or restarts based on watch position).
 		const rows = this.database.db
 			.select({
 				id: movies.id,
 				title: movies.title,
 				year: movies.year,
+				overview: movies.overview,
 				posterUrl: movies.posterUrl,
 				thumbnailUrl: movies.thumbnailUrl,
+				backdropUrl: movies.backdropUrl,
 				runtimeMinutes: movies.runtimeMinutes,
 				addedAt: movies.addedAt,
 				positionSeconds: userWatchHistory.positionSeconds,
+				completed: userWatchHistory.completed,
+				watchedAt: userWatchHistory.watchedAt,
+				durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
 			})
 			.from(userWatchHistory)
 			.innerJoin(movies, eq(userWatchHistory.movieId, movies.id))
-			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, false)))
+			.where(eq(userWatchHistory.userId, userId))
 			.orderBy(desc(userWatchHistory.watchedAt))
 			.limit(20)
 			.all();
 
 		return rows.map((row) => {
-			const totalSeconds = (row.runtimeMinutes ?? 0) * 60;
-			const watchProgress = totalSeconds > 0 ? (row.positionSeconds ?? 0) / totalSeconds : 0;
+			const totalSeconds = row.durationSeconds || (row.runtimeMinutes ?? 0) * 60;
+			const watchPosition = row.completed ? totalSeconds : (row.positionSeconds ?? 0);
+			const watchProgress =
+				totalSeconds > 0 ? Math.min(1, watchPosition / totalSeconds) : 0;
 			const posterUrl = row.posterUrl || row.thumbnailUrl;
 			return {
 				id: row.id,
 				title: row.title,
 				year: row.year,
+				overview: row.overview ?? '',
 				posterUrl,
 				thumbnailUrl: row.thumbnailUrl,
-				runtimeMinutes: row.runtimeMinutes,
+				backdropUrl: row.backdropUrl,
+				runtime: row.runtimeMinutes ?? 0,
 				addedAt: row.addedAt,
+				watchPosition,
+				durationSeconds: totalSeconds,
+				watched: !!row.completed,
+				watchedAt: row.watchedAt,
 				watchProgress,
+				genres: [] as string[],
+				cast: [] as unknown[],
+				rating: 0,
 			};
 		});
 	}

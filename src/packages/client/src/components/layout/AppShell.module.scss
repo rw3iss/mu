@@ -48,6 +48,18 @@
   @include mobile {
     padding: var(--space-md);
     margin-left: 0;
+    // Reserve space for the fixed MobileNav so the last row of
+    // content isn't covered by the nav bar. Combine with mini-player
+    // offset when the mini-player is also docked.
+    padding-bottom: calc(var(--mobile-nav-height) + var(--space-md));
+  }
+
+  .withMiniPlayer & {
+    @include mobile {
+      padding-bottom: calc(
+        var(--player-bar-height) + var(--mobile-nav-height) + var(--space-md)
+      );
+    }
   }
 }
 

@@ -162,44 +162,87 @@ export function JobList({ matches }: JobListProps) {
 			) : jobs.length === 0 ? (
 				<div class={styles.empty}>No jobs match the current filters.</div>
 			) : (
-				<table class={styles.table}>
-					<thead>
-						<tr>
-							<th>ID</th>
-							<th>Type</th>
-							<th>Label</th>
-							<th>Status</th>
-							<th>Progress</th>
-							<th>Created</th>
-						</tr>
-					</thead>
-					<tbody>
+				<>
+					{/* Desktop: dense table */}
+					<table class={styles.table}>
+						<thead>
+							<tr>
+								<th>ID</th>
+								<th>Type</th>
+								<th>Label</th>
+								<th>Status</th>
+								<th>Progress</th>
+								<th>Created</th>
+							</tr>
+						</thead>
+						<tbody>
+							{jobs.map((j) => (
+								<tr
+									key={j.id}
+									class={styles.row}
+									onClick={() => route(`/admin/jobs/${j.id}`)}
+								>
+									<td>
+										<code class={styles.id}>{abbreviateJobId(j.id)}</code>
+									</td>
+									<td>
+										<span class={styles.typeCell}>{j.type}</span>
+									</td>
+									<td class={styles.labelCell}>{j.label}</td>
+									<td>
+										<span class={`${styles.status} ${styles[`status_${j.status}`] ?? ''}`}>
+											{j.status}
+										</span>
+									</td>
+									<td>
+										{typeof j.progress === 'number' ? `${Math.round(j.progress)}%` : '—'}
+									</td>
+									<td class={styles.timeCell}>{formatTime(j.createdAt)}</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+
+					{/* Mobile: same data as wrap-friendly cards */}
+					<div class={styles.mobileCards}>
 						{jobs.map((j) => (
-							<tr
+							<div
 								key={j.id}
-								class={styles.row}
+								class={styles.card}
+								role="button"
+								tabIndex={0}
 								onClick={() => route(`/admin/jobs/${j.id}`)}
+								onKeyDown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										route(`/admin/jobs/${j.id}`);
+									}
+								}}
 							>
-								<td>
-									<code class={styles.id}>{abbreviateJobId(j.id)}</code>
-								</td>
-								<td>
-									<span class={styles.typeCell}>{j.type}</span>
-								</td>
-								<td class={styles.labelCell}>{j.label}</td>
-								<td>
-									<span class={`${styles.status} ${styles[`status_${j.status}`] ?? ''}`}>
+								<div class={styles.cardTopRow}>
+									<span class={styles.cardLabel}>{j.label}</span>
+									<span
+										class={`${styles.status} ${styles[`status_${j.status}`] ?? ''}`}
+									>
 										{j.status}
 									</span>
-								</td>
-								<td>
-									{typeof j.progress === 'number' ? `${Math.round(j.progress)}%` : '—'}
-								</td>
-								<td class={styles.timeCell}>{formatTime(j.createdAt)}</td>
-							</tr>
+								</div>
+								<div class={styles.cardBottomRow}>
+									<span class={styles.cardMetaGroup}>
+										<code class={styles.id}>{abbreviateJobId(j.id)}</code>
+										<span class={styles.typeCell}>{j.type}</span>
+									</span>
+									<span class={styles.cardMetaGroup}>
+										{typeof j.progress === 'number' && (
+											<span>{Math.round(j.progress)}%</span>
+										)}
+										<span class={styles.timeCell}>{formatTime(j.createdAt)}</span>
+									</span>
+								</div>
+							</div>
 						))}
-					</tbody>
-				</table>
+					</div>
+				</>
 			)}
 		</div>
 	);
