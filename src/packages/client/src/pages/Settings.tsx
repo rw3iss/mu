@@ -16,7 +16,18 @@ import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
 import { sourcesService } from '@/services/sources.service';
 import { themesApi } from '@/services/themes.service';
-import { type ItemSpacing } from '@/state/appearance.state';
+import {
+	BASE_FONT_SCALE_MAX,
+	BASE_FONT_SCALE_MIN,
+	BASE_FONT_SCALE_STEP,
+	baseFontScale,
+	disableHover,
+	type ItemSpacing,
+	reduceMotion,
+	setBaseFontScale,
+	setDisableHover,
+	setReduceMotion,
+} from '@/state/appearance.state';
 import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import type { Theme } from '@/state/theme.state';
@@ -822,6 +833,97 @@ export function Settings(props: SettingsProps) {
 						<div class={styles.panel}>
 							<h2 class={styles.panelTitle}>Appearance</h2>
 
+							{/* ============================================ */}
+							{/* Global Appearance — applies across all themes */}
+							{/* ============================================ */}
+							<h3 class={styles.sectionTitle}>Global appearance</h3>
+
+							{/* Base Font Scale */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Base Font Scale</span>
+									<span class={styles.settingDescription}>
+										Canonical text scale applied to the root. Themes inherit via
+										rems; per-theme font scale multiplies on top.
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<div class={styles.rangeWithValue}>
+										<input
+											type="range"
+											class={styles.rangeInput}
+											min={BASE_FONT_SCALE_MIN}
+											max={BASE_FONT_SCALE_MAX}
+											step={BASE_FONT_SCALE_STEP}
+											value={baseFontScale.value}
+											onInput={(e) =>
+												setBaseFontScale(
+													parseFloat(
+														(e.target as HTMLInputElement).value,
+													),
+												)
+											}
+										/>
+										<span class={styles.rangeValue}>
+											{baseFontScale.value.toFixed(2)}x
+										</span>
+									</div>
+								</div>
+							</div>
+
+							{/* Disable Hover Effects (global) */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Disable Hover Effects</span>
+									<span class={styles.settingDescription}>
+										Stop cards and links from animating on hover
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<label class={styles.toggle}>
+										<input
+											type="checkbox"
+											checked={disableHover.value}
+											onChange={(e) =>
+												setDisableHover(
+													(e.target as HTMLInputElement).checked,
+												)
+											}
+										/>
+										<span class={styles.toggleTrack} />
+									</label>
+								</div>
+							</div>
+
+							{/* Reduce Motion (global) */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Reduce Motion</span>
+									<span class={styles.settingDescription}>
+										Minimize animations and transitions across the app
+									</span>
+								</div>
+								<div class={styles.settingControl}>
+									<label class={styles.toggle}>
+										<input
+											type="checkbox"
+											checked={reduceMotion.value}
+											onChange={(e) =>
+												setReduceMotion(
+													(e.target as HTMLInputElement).checked,
+												)
+											}
+										/>
+										<span class={styles.toggleTrack} />
+									</label>
+								</div>
+							</div>
+
+							{/* ============================================ */}
+							{/* Theme — per-theme settings                    */}
+							{/* ============================================ */}
+							<h3 class={styles.sectionTitle}>Theme</h3>
+
 							{/* Theme Mode */}
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
@@ -1302,42 +1404,15 @@ export function Settings(props: SettingsProps) {
 												</div>
 											)}
 
-											{/* Disable Hover Effects */}
+											{/* Theme Font Scale (multiplier on top of base) */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
 													<span class={styles.settingLabel}>
-														Disable Hover Effects
+														Theme Font Scale
 													</span>
 													<span class={styles.settingDescription}>
-														Stop cards from animating on hover
-													</span>
-												</div>
-												<div class={styles.settingControl}>
-													<label class={styles.toggle}>
-														<input
-															type="checkbox"
-															checked={editConfig.disableHover}
-															onChange={(e) =>
-																updateEditConfig({
-																	disableHover: (
-																		e.target as HTMLInputElement
-																	).checked,
-																})
-															}
-														/>
-														<span class={styles.toggleTrack} />
-													</label>
-												</div>
-											</div>
-
-											{/* Font Scale */}
-											<div class={styles.settingRow}>
-												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>
-														Font Scale
-													</span>
-													<span class={styles.settingDescription}>
-														Adjust the text size across the app
+														Multiplier applied on top of the global base
+														font scale
 													</span>
 												</div>
 												<div class={styles.settingControl}>
@@ -1346,7 +1421,7 @@ export function Settings(props: SettingsProps) {
 															type="range"
 															class={styles.rangeInput}
 															min="0.8"
-															max="1.2"
+															max="1.5"
 															step="0.05"
 															value={editConfig.textScale}
 															onInput={(e) =>

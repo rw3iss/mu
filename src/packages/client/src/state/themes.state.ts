@@ -2,6 +2,7 @@ import type { ThemeConfig, ThemeRecord } from '@mu/shared';
 import { effect, signal } from '@preact/signals';
 import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
 import { themesApi } from '@/services/themes.service';
+import { baseFontScale } from './appearance.state';
 import { theme } from './theme.state';
 
 // ============================================
@@ -88,13 +89,14 @@ export function applyThemeConfig(config: ThemeConfig): void {
 		`${config.cardBorder.width}px solid rgba(${r}, ${g}, ${b}, ${config.cardBorder.opacity})`,
 	);
 
-	if (config.disableHover) {
-		root.dataset.nohover = '';
-	} else {
-		delete root.dataset.nohover;
-	}
+	// Note: `disableHover` is intentionally NOT applied here anymore — it's
+	// owned by the global appearance state (`appearance.state.ts`), which
+	// sets the canonical `data-no-hover` attribute. Legacy per-theme
+	// `config.disableHover` values are ignored.
 
-	root.style.setProperty('--text-scale', String(config.textScale));
+	// `--text-scale` is computed reactively as baseFontScale * theme.textScale
+	// by the effect at the bottom of this file. We don't write it here so
+	// that swapping themes won't clobber an in-flight base-scale change.
 
 	activeConfig.value = config;
 }
@@ -169,4 +171,16 @@ effect(() => {
 	if (themesList.value.length > 0) {
 		applyActiveTheme();
 	}
+});
+
+// ============================================
+// Effect — compute effective font scale
+// effective = baseFontScale (global) * theme.textScale (multiplier)
+// ============================================
+
+effect(() => {
+	const base = baseFontScale.value;
+	const themeMul = activeConfig.value?.textScale ?? 1.0;
+	const effective = base * themeMul;
+	document.documentElement.style.setProperty('--text-scale', String(effective));
 });

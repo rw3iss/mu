@@ -13,9 +13,14 @@ export interface CardBorder {
 
 export type ItemSpacing = 'none' | 'minimal' | 'compact' | 'normal' | 'comfortable' | 'spaced';
 
-/** Available font scale levels */
-export const TEXT_SCALE_VALUES = [0.9, 1.0, 1.1, 1.2, 1.3] as const;
+/** Available font scale levels (legacy discrete-step selector — kept for back-compat) */
+export const TEXT_SCALE_VALUES = [0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5] as const;
 export type TextScale = (typeof TEXT_SCALE_VALUES)[number];
+
+/** Continuous-range bounds for the base font scale slider. */
+export const BASE_FONT_SCALE_MIN = 0.8;
+export const BASE_FONT_SCALE_MAX = 1.5;
+export const BASE_FONT_SCALE_STEP = 0.05;
 
 // ============================================
 // Defaults
@@ -28,6 +33,8 @@ const DEFAULT_PAGE_BG = '';
 const DEFAULT_PANEL_BG = '';
 const DEFAULT_DISABLE_HOVER = false;
 const DEFAULT_TEXT_SCALE: TextScale = 1.0;
+const DEFAULT_BASE_FONT_SCALE = 1.0;
+const DEFAULT_REDUCE_MOTION = false;
 
 // ============================================
 // Signals
@@ -47,6 +54,20 @@ export const disableHover = signal<boolean>(
 );
 export const textScale = signal<TextScale>(
 	getUiSetting<TextScale>('text_scale', DEFAULT_TEXT_SCALE),
+);
+
+/**
+ * Global base font scale (applied to root). Per-theme `textScale` in the
+ * active theme config acts as a *multiplier* on top of this — effective
+ * scale = baseFontScale * theme.textScale. See `themes.state.ts`.
+ */
+export const baseFontScale = signal<number>(
+	getUiSetting<number>('base_font_scale', DEFAULT_BASE_FONT_SCALE),
+);
+
+/** Global "Reduce Motion" toggle — disables animations/transitions app-wide. */
+export const reduceMotion = signal<boolean>(
+	getUiSetting<boolean>('reduce_motion', DEFAULT_REDUCE_MOTION),
 );
 
 // ============================================
@@ -121,15 +142,11 @@ effect(() => {
 	}
 });
 
-effect(() => {
-	const root = document.documentElement;
-	const scale = textScale.value;
-	if (scale !== 1.0) {
-		root.style.setProperty('--text-scale', String(scale));
-	} else {
-		root.style.removeProperty('--text-scale');
-	}
-});
+// Note: --text-scale is owned by `themes.state.ts`, which computes
+// effective scale = baseFontScale * activeConfig.textScale and writes
+// it to the DOM. The legacy `textScale` signal is retained for
+// back-compat with the discrete FontScaler component but no longer
+// drives the CSS variable directly.
 
 effect(() => {
 	const root = document.documentElement;
@@ -137,6 +154,15 @@ effect(() => {
 		root.dataset.noHover = '';
 	} else {
 		delete root.dataset.noHover;
+	}
+});
+
+effect(() => {
+	const root = document.documentElement;
+	if (reduceMotion.value) {
+		root.dataset.reduceMotion = 'true';
+	} else {
+		delete root.dataset.reduceMotion;
 	}
 });
 
@@ -179,6 +205,17 @@ export function setDisableHover(v: boolean): void {
 	setUiSetting('disable_hover', v);
 }
 
+export function setBaseFontScale(v: number): void {
+	const clamped = Math.max(BASE_FONT_SCALE_MIN, Math.min(BASE_FONT_SCALE_MAX, v));
+	baseFontScale.value = clamped;
+	setUiSetting('base_font_scale', clamped);
+}
+
+export function setReduceMotion(v: boolean): void {
+	reduceMotion.value = v;
+	setUiSetting('reduce_motion', v);
+}
+
 // ============================================
 // Reset functions
 // ============================================
@@ -209,4 +246,12 @@ export function resetTextScale(): void {
 
 export function resetDisableHover(): void {
 	setDisableHover(DEFAULT_DISABLE_HOVER);
+}
+
+export function resetBaseFontScale(): void {
+	setBaseFontScale(DEFAULT_BASE_FONT_SCALE);
+}
+
+export function resetReduceMotion(): void {
+	setReduceMotion(DEFAULT_REDUCE_MOTION);
 }
