@@ -1,6 +1,7 @@
 import { computed, signal } from '@preact/signals';
 import { route } from 'preact-router';
 import { api } from '@/services/api';
+import { invalidateFavorites } from '@/state/favorites.state';
 
 // ============================================
 // Types
@@ -49,6 +50,7 @@ export async function logout(): Promise<void> {
 		localStorage.removeItem('mu_player_state');
 		localStorage.removeItem('mu_is_playing');
 		currentUser.value = null;
+		invalidateFavorites();
 		route('/login');
 	}
 }

@@ -6,6 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Changelog } from '@/pages/Changelog';
 import { Dashboard } from '@/pages/Dashboard';
 import { Discover } from '@/pages/Discover';
+import { Favorites } from '@/pages/Favorites';
 import { GroupDetail } from '@/pages/GroupDetail';
 import { History } from '@/pages/History';
 import { JobDetails } from '@/pages/JobDetails';
@@ -37,6 +38,7 @@ import { GlobalPlayer } from '@/components/player/GlobalPlayer';
 import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { wsService } from '@/services/websocket.service';
+import { ensureFavoritesLoaded } from '@/state/favorites.state';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
 import { initProcessingState } from '@/state/processing.state';
 import { fetchThemes } from '@/state/themes.state';
@@ -140,6 +142,7 @@ export function App() {
 	useEffect(() => {
 		if (!isLoading.value && (isAuthenticated.value || localBypass.value)) {
 			pluginClientManager.initialize();
+			void ensureFavoritesLoaded();
 		}
 	}, [isLoading.value, isAuthenticated.value]);
 
@@ -192,6 +195,7 @@ export function App() {
 						<Playlists path="/playlists" />
 						<PlaylistDetail path="/playlists/:id" />
 						<Watchlist path="/watchlist" />
+						<Favorites path="/favorites" />
 						<History path="/history" />
 						<Discover path="/discover" />
 						<Redirect path="/search" to="/library" preserveQuery />

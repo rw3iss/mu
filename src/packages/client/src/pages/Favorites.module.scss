@@ -1,0 +1,32 @@
+.page {
+	padding: 24px 32px;
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+}
+
+.header {
+	display: flex;
+	align-items: baseline;
+	gap: 16px;
+
+	h1 {
+		font-size: 28px;
+		font-weight: 600;
+		margin: 0;
+		color: var(--color-text-primary);
+	}
+}
+
+.count {
+	font-size: 14px;
+	color: var(--color-text-secondary);
+}
+
+.empty {
+	padding: 48px;
+	text-align: center;
+	color: var(--color-text-secondary);
+	border: 1px dashed var(--color-border-strong);
+	border-radius: 12px;
+}

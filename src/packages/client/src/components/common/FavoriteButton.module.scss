@@ -1,0 +1,110 @@
+/**
+ * FavoriteButton — a star inside a rounded cube. Outline when not
+ * favorited; filled (star + cube background) when favorited.
+ *
+ * Three sizes:
+ *   mini   — 18px, inline with text (e.g. next to director name)
+ *   normal — 28px, default (cast rows, person details)
+ *   large  — 40px, hero (movie/title row, person header)
+ *
+ * Themes via tokens: --color-fg, --color-fg-muted, --color-border,
+ * --color-accent, --color-bg-elev, --radius-md.
+ */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	border: 1.5px solid var(--color-border-strong, rgba(255, 255, 255, 0.18));
+	color: var(--color-text-secondary, rgba(255, 255, 255, 0.6));
+	cursor: pointer;
+	padding: 0;
+	flex-shrink: 0;
+	transition:
+		background-color 180ms ease,
+		border-color 180ms ease,
+		color 180ms ease,
+		transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+	&:hover {
+		color: var(--color-text-primary, #fff);
+		border-color: var(--color-accent, rgba(255, 255, 255, 0.32));
+		background-color: var(--color-accent-subtle, rgba(255, 255, 255, 0.06));
+	}
+
+	&:active {
+		transform: scale(0.92);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--color-accent, #f5c518);
+		outline-offset: 2px;
+	}
+}
+
+.star {
+	display: block;
+	transition:
+		transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+		fill 180ms ease;
+	transform-origin: center;
+}
+
+/* ── Active (favorited) state ──────────────────────────────────── */
+
+.active {
+	background-color: var(--color-accent, #f5c518);
+	border-color: var(--color-accent, #f5c518);
+	color: var(--color-text-inverse, #1a1a1a);
+
+	&:hover {
+		background-color: var(--color-accent, #f5c518);
+		border-color: var(--color-accent, #f5c518);
+		color: var(--color-text-inverse, #1a1a1a);
+		filter: brightness(1.06);
+	}
+
+	.star {
+		animation: pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+	}
+}
+
+@keyframes pop {
+	0% {
+		transform: scale(0.6);
+	}
+	60% {
+		transform: scale(1.18);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+
+/* ── Size variants ─────────────────────────────────────────────── */
+
+.size_mini {
+	border-radius: 5px;
+	border-width: 1.25px;
+	vertical-align: middle;
+}
+
+.size_normal {
+	border-radius: 8px;
+}
+
+.size_large {
+	border-radius: 12px;
+	border-width: 2px;
+}
+
+/* Reduced motion accommodation. */
+@media (prefers-reduced-motion: reduce) {
+	.btn,
+	.star {
+		transition: none;
+	}
+	.active .star {
+		animation: none;
+	}
+}

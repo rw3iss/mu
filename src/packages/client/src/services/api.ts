@@ -106,7 +106,10 @@ async function request<T>(
 		...options?.headers,
 	};
 
-	if (body !== undefined && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+	if (
+		body !== undefined &&
+		(method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE')
+	) {
 		headers['Content-Type'] = 'application/json';
 	}
 
@@ -141,7 +144,8 @@ export const api = {
 		return request<T>('PATCH', path, body, options);
 	},
 
-	delete<T>(path: string, options?: RequestOptions): Promise<T> {
-		return request<T>('DELETE', path, undefined, options);
+	delete<T>(path: string, options?: RequestOptions & { body?: unknown }): Promise<T> {
+		const body = options?.body;
+		return request<T>('DELETE', path, body, options);
 	},
 };
