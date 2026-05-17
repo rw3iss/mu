@@ -51,6 +51,16 @@ export interface DetectionResult {
 	 * what they observe; default 'series'.
 	 */
 	groupTypeHint?: string;
+	/**
+	 * Stable external identifiers the detector already knows. The
+	 * default SxxExx / folder / multi-file detectors don't populate
+	 * these (they fire before TMDB enrichment), but the placeholder
+	 * tmdb-tv detector or a future server-side dedupe path can — and
+	 * when present, the orchestrator prefers them over the parsed
+	 * name when finding an existing parent.
+	 */
+	tmdbTvId?: number | null;
+	imdbId?: string | null;
 }
 
 export interface Detector {

@@ -104,6 +104,124 @@ export class GroupsRepository {
 		);
 	}
 
+	/**
+	 * Resolve an existing PARENT group, preferring a stable identifier
+	 * when known. Lookup order:
+	 *   1. `tmdbTvId` if provided — survives renames / case differences.
+	 *   2. `imdbId` if provided.
+	 *   3. Exact-match `name`.
+	 *
+	 * Returns the first hit. Callers should pass whichever identifiers
+	 * they have at detection time; the SxxExx detector typically only
+	 * has the parsed show name, but later enrichment may populate the
+	 * TMDB id and `findParentByTmdbTvId` is then used for dedupe.
+	 */
+	findExistingParent(opts: {
+		name?: string | null;
+		tmdbTvId?: number | null;
+		imdbId?: string | null;
+	}): MovieGroup | null {
+		if (opts.tmdbTvId) {
+			const byTmdb = this.findParentByTmdbTvId(opts.tmdbTvId);
+			if (byTmdb) return byTmdb;
+		}
+		if (opts.imdbId) {
+			const byImdb = this.findParentByImdbId(opts.imdbId);
+			if (byImdb) return byImdb;
+		}
+		if (opts.name) return this.getByNameAndType(opts.name, 'parent');
+		return null;
+	}
+
+	findParentByTmdbTvId(tmdbTvId: number): MovieGroup | null {
+		return (
+			this.database.db
+				.select()
+				.from(movieGroups)
+				.where(and(eq(movieGroups.type, 'parent'), eq(movieGroups.tmdbTvId, tmdbTvId)))
+				.get() ?? null
+		);
+	}
+
+	findParentByImdbId(imdbId: string): MovieGroup | null {
+		return (
+			this.database.db
+				.select()
+				.from(movieGroups)
+				.where(and(eq(movieGroups.type, 'parent'), eq(movieGroups.imdbId, imdbId)))
+				.get() ?? null
+		);
+	}
+
+	/**
+	 * List PARENT groups that share `tmdbTvId` with the given one
+	 * (excluding the given parent itself). Empty array when no
+	 * duplicates exist.
+	 */
+	findSiblingParentsByTmdbTvId(parentId: string, tmdbTvId: number): MovieGroup[] {
+		return this.database.db
+			.select()
+			.from(movieGroups)
+			.where(
+				and(
+					eq(movieGroups.type, 'parent'),
+					eq(movieGroups.tmdbTvId, tmdbTvId),
+					sql`${movieGroups.id} != ${parentId}`,
+				),
+			)
+			.all();
+	}
+
+	/**
+	 * Merge all subgroups + movies from `sourceParentId` into
+	 * `targetParentId`, then delete the source. Same-ordinal
+	 * subgroups (e.g. both have Season 1) are coalesced: members
+	 * move into the target's subgroup and the source's empty
+	 * subgroup is dropped. Returns counts for logging.
+	 *
+	 * NOT a transaction — better-sqlite3 calls already share a single
+	 * connection and these are all small writes. If a later step
+	 * fails the caller should re-run; the operation is idempotent.
+	 */
+	mergeParent(
+		sourceParentId: string,
+		targetParentId: string,
+	): { subgroupsMerged: number; subgroupsMoved: number; moviesMoved: number } {
+		if (sourceParentId === targetParentId) {
+			return { subgroupsMerged: 0, subgroupsMoved: 0, moviesMoved: 0 };
+		}
+		let subgroupsMerged = 0;
+		let subgroupsMoved = 0;
+		let moviesMoved = 0;
+
+		const sourceSubs = this.listChildren(sourceParentId);
+		for (const src of sourceSubs) {
+			const twin = this.findSubgroup(targetParentId, src.ordinal);
+			if (twin) {
+				// Same season already exists in target — relocate movies.
+				const updated = this.database.db
+					.update(movies)
+					.set({ groupId: twin.id })
+					.where(eq(movies.groupId, src.id))
+					.run();
+				moviesMoved += updated.changes;
+				this.delete(src.id);
+				subgroupsMerged += 1;
+			} else {
+				// Adopt the subgroup wholesale.
+				this.database.db
+					.update(movieGroups)
+					.set({ parentGroupId: targetParentId })
+					.where(eq(movieGroups.id, src.id))
+					.run();
+				subgroupsMoved += 1;
+			}
+		}
+
+		this.delete(sourceParentId);
+		return { subgroupsMerged, subgroupsMoved, moviesMoved };
+	}
+
 	findSubgroup(parentId: string, ordinal: number | null): MovieGroup | null {
 		const where =
 			ordinal === null

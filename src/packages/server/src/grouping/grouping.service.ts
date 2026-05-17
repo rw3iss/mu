@@ -48,6 +48,20 @@ export class GroupingService implements OnModuleInit {
 	private readonly logger = new Logger(GroupingService.name);
 	private readonly detectors: Detector[];
 
+	/**
+	 * Per-show in-flight serialization for detection. When two episodes
+	 * of the same show finish scanning back-to-back (or in parallel
+	 * from a bulk re-scan), each LIBRARY_MOVIE_ADDED handler races the
+	 * other to look up "does a parent group named X already exist?".
+	 * Both saw `null` and both inserted → duplicate parent.
+	 *
+	 * Keyed by normalised show name (and movieId for the fallback path
+	 * where no name has been derived yet). Each new detection waits on
+	 * any prior in-flight detection for the same key before running,
+	 * so the second one sees the parent the first one created.
+	 */
+	private readonly inflightDetection = new Map<string, Promise<string | null>>();
+
 	constructor(
 		private readonly repo: GroupsRepository,
 		private readonly database: DatabaseService,
@@ -141,6 +155,27 @@ export class GroupingService implements OnModuleInit {
 			backdropUrl: patch.backdropUrl ?? null,
 			overview: patch.overview ?? null,
 		});
+		// Once a stable external id lands on this parent, look for any
+		// sibling parents already carrying the same id and merge them
+		// in. This catches the race where two LIBRARY_MOVIE_ADDED
+		// handlers both inserted a parent for the same show before the
+		// per-show lock was added — the leftover duplicate gets folded
+		// here as soon as either parent learns its TMDB id.
+		if (patch.tmdbTvId) {
+			this.dedupeByTmdbTvId(groupId, patch.tmdbTvId);
+		}
+	}
+
+	private dedupeByTmdbTvId(canonicalParentId: string, tmdbTvId: number): void {
+		const siblings = this.repo.findSiblingParentsByTmdbTvId(canonicalParentId, tmdbTvId);
+		for (const sib of siblings) {
+			const r = this.repo.mergeParent(sib.id, canonicalParentId);
+			this.logger.log(
+				`Merged duplicate parent ${sib.id} ("${sib.name}") into ${canonicalParentId}: ` +
+					`subgroupsMerged=${r.subgroupsMerged} subgroupsMoved=${r.subgroupsMoved} ` +
+					`moviesMoved=${r.moviesMoved}`,
+			);
+		}
 	}
 
 	// ── Public API ────────────────────────────────────────────
@@ -211,7 +246,26 @@ export class GroupingService implements OnModuleInit {
 			return null;
 		}
 
-		return this.persistDetection(movie, bestResult, thresholds);
+		// Serialize persistence per-show so concurrent detections of the
+		// same series can't both miss an existing parent and create
+		// duplicates. The lock key is the detected show name (already
+		// title-cased + normalised by the detector); falling back to
+		// movieId for anonymous detections (no parentName).
+		const lockKey = `parent:${bestResult.parentName ?? `movie:${movie.id}`}`;
+		const prior = this.inflightDetection.get(lockKey);
+		const run = (prior ? prior.catch(() => null) : Promise.resolve()).then(() =>
+			Promise.resolve(this.persistDetection(movie, bestResult, thresholds)),
+		);
+		this.inflightDetection.set(lockKey, run);
+		try {
+			return await run;
+		} finally {
+			// Only clear if no later detection has chained onto this key;
+			// otherwise the chain stays in place.
+			if (this.inflightDetection.get(lockKey) === run) {
+				this.inflightDetection.delete(lockKey);
+			}
+		}
 	}
 
 	async rebuildAll(): Promise<{ scanned: number; grouped: number; pruned: number }> {
@@ -490,11 +544,18 @@ export class GroupingService implements OnModuleInit {
 		// status='none' isn't a DB enum value; that branch is filtered earlier.
 		const persistStatus = status === 'none' ? 'unsure' : status;
 
-		// 1. Ensure parent exists.
+		// 1. Ensure parent exists. Look up by every stable identifier
+		// we have (tmdb_tv_id / imdb_id / name) — caller may have
+		// filled any of them. Name-only is the common path because the
+		// SxxExx detector runs before metadata enrichment.
 		let parentId = result.parentGroupId;
 		let createdParent = false;
 		if (!parentId) {
-			const existing = this.repo.getByNameAndType(result.parentName, 'parent');
+			const existing = this.repo.findExistingParent({
+				name: result.parentName,
+				tmdbTvId: result.tmdbTvId ?? null,
+				imdbId: result.imdbId ?? null,
+			});
 			if (existing) {
 				parentId = existing.id;
 			} else {
