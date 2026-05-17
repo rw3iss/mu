@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { CastPhoto } from '@/components/movie/CastPhoto';
@@ -9,6 +10,7 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
+import { personKeyFor } from '@/state/favorites.state';
 import { globalMovie, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { showInfoPanel } from '@/state/player.state';
@@ -87,20 +89,50 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							/>
 						</div>
 						<div class={styles.inlineContent}>
-							{shareMode.value ? (
-								<h2 class={styles.title}>{movie.title}</h2>
-							) : (
-								<h2
-									class={`${styles.title} ${styles.titleLink}`}
-									onClick={() => route(`/movie/${movie.id}`)}
-								>
-									{movie.title}
-								</h2>
-							)}
+							<div class={styles.titleRow}>
+								{shareMode.value ? (
+									<h2 class={styles.title}>{movie.title}</h2>
+								) : (
+									<h2
+										class={`${styles.title} ${styles.titleLink}`}
+										onClick={() => route(`/movie/${movie.id}`)}
+									>
+										{movie.title}
+									</h2>
+								)}
+								<FavoriteButton
+									entityType="movie"
+									movieId={movie.id}
+									size="normal"
+									stopPropagation
+								/>
+							</div>
 							<div class={styles.meta}>
 								{movie.year > 0 && <span>{movie.year}</span>}
 								{runtimeText && <span>{runtimeText}</span>}
-								{movie.director && <span>Dir. {movie.director}</span>}
+								{movie.director && (
+									<span class={styles.directorRow}>
+										<a
+											class={styles.directorLink}
+											href={`/person/${personKeyFor({ name: movie.director })}`}
+											onClick={(e) => {
+												e.preventDefault();
+												route(
+													`/person/${personKeyFor({ name: movie.director! })}`,
+												);
+											}}
+										>
+											Dir. {movie.director}
+										</a>
+										<FavoriteButton
+											entityType="person"
+											name={movie.director}
+											personRole="director"
+											size="mini"
+											stopPropagation
+										/>
+									</span>
+								)}
 								{movie.groupId && <MovieBreadcrumbs movie={movie} />}
 							</div>
 
@@ -184,28 +216,56 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								<div class={styles.section}>
 									<h3 class={styles.sectionTitle}>Cast</h3>
 									<div class={styles.castList}>
-										{movie.cast.slice(0, 8).map((member) => (
-											<div key={member.name} class={styles.castMember}>
-												<CastPhoto
-													name={member.name}
-													profileUrl={member.profileUrl}
-													character={member.character}
-													size={32}
-													expandedSize={180}
-													thumbClass={styles.castPhoto}
-												/>
-												<div class={styles.castInfo}>
-													<span class={styles.castName}>
-														{member.name}
-													</span>
-													{member.character && (
-														<span class={styles.castCharacter}>
-															{member.character}
+										{movie.cast.slice(0, 8).map((member) => {
+											const key = personKeyFor({
+												tmdbId: member.tmdbId,
+												name: member.name,
+											});
+											return (
+												<a
+													key={member.name}
+													class={styles.castMember}
+													href={`/person/${key}`}
+													onClick={(e) => {
+														e.preventDefault();
+														route(`/person/${key}`);
+													}}
+												>
+													<CastPhoto
+														name={member.name}
+														profileUrl={member.profileUrl}
+														character={member.character}
+														size={32}
+														expandedSize={180}
+														thumbClass={styles.castPhoto}
+													/>
+													<div class={styles.castInfo}>
+														<span class={styles.castName}>
+															{member.name}
 														</span>
-													)}
-												</div>
-											</div>
-										))}
+														{member.character && (
+															<span class={styles.castCharacter}>
+																{member.character}
+															</span>
+														)}
+													</div>
+													<div class={styles.castActions}>
+														<span class={styles.castArrow}>
+															<Icon name="chevron-right" size={12} />
+														</span>
+														<FavoriteButton
+															entityType="person"
+															tmdbId={member.tmdbId}
+															name={member.name}
+															profileUrl={member.profileUrl}
+															personRole="actor"
+															size="normal"
+															stopPropagation
+														/>
+													</div>
+												</a>
+											);
+										})}
 									</div>
 								</div>
 							)}
@@ -240,27 +300,57 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							/>
 						</div>
 
-						{shareMode.value ? (
-							<h2 class={styles.title}>{movie.title}</h2>
-						) : (
-							<h2
-								class={`${styles.title} ${styles.titleLink}`}
-								onClick={() => {
-									route(`/movie/${movie.id}`);
-									if (playerMode.value === 'full') {
-										minimizePlayer();
-									}
-									showInfoPanel.value = false;
-								}}
-							>
-								{movie.title}
-							</h2>
-						)}
+						<div class={styles.titleRow}>
+							{shareMode.value ? (
+								<h2 class={styles.title}>{movie.title}</h2>
+							) : (
+								<h2
+									class={`${styles.title} ${styles.titleLink}`}
+									onClick={() => {
+										route(`/movie/${movie.id}`);
+										if (playerMode.value === 'full') {
+											minimizePlayer();
+										}
+										showInfoPanel.value = false;
+									}}
+								>
+									{movie.title}
+								</h2>
+							)}
+							<FavoriteButton
+								entityType="movie"
+								movieId={movie.id}
+								size="normal"
+								stopPropagation
+							/>
+						</div>
 
 						<div class={styles.meta}>
 							{movie.year > 0 && <span>{movie.year}</span>}
 							{runtimeText && <span>{runtimeText}</span>}
-							{movie.director && <span>Dir. {movie.director}</span>}
+							{movie.director && (
+								<span class={styles.directorRow}>
+									<a
+										class={styles.directorLink}
+										href={`/person/${personKeyFor({ name: movie.director })}`}
+										onClick={(e) => {
+											e.preventDefault();
+											route(
+												`/person/${personKeyFor({ name: movie.director! })}`,
+											);
+										}}
+									>
+										Dir. {movie.director}
+									</a>
+									<FavoriteButton
+										entityType="person"
+										name={movie.director}
+										personRole="director"
+										size="mini"
+										stopPropagation
+									/>
+								</span>
+							)}
 						</div>
 
 						{movie.genres && movie.genres.length > 0 && (
@@ -341,26 +431,56 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							<div class={styles.section}>
 								<h3 class={styles.sectionTitle}>Cast</h3>
 								<div class={styles.castList}>
-									{movie.cast.slice(0, 8).map((member) => (
-										<div key={member.name} class={styles.castMember}>
-											<CastPhoto
-												name={member.name}
-												profileUrl={member.profileUrl}
-												character={member.character}
-												size={32}
-												expandedSize={180}
-												thumbClass={styles.castPhoto}
-											/>
-											<div class={styles.castInfo}>
-												<span class={styles.castName}>{member.name}</span>
-												{member.character && (
-													<span class={styles.castCharacter}>
-														{member.character}
+									{movie.cast.slice(0, 8).map((member) => {
+										const key = personKeyFor({
+											tmdbId: member.tmdbId,
+											name: member.name,
+										});
+										return (
+											<a
+												key={member.name}
+												class={styles.castMember}
+												href={`/person/${key}`}
+												onClick={(e) => {
+													e.preventDefault();
+													route(`/person/${key}`);
+												}}
+											>
+												<CastPhoto
+													name={member.name}
+													profileUrl={member.profileUrl}
+													character={member.character}
+													size={32}
+													expandedSize={180}
+													thumbClass={styles.castPhoto}
+												/>
+												<div class={styles.castInfo}>
+													<span class={styles.castName}>
+														{member.name}
 													</span>
-												)}
-											</div>
-										</div>
-									))}
+													{member.character && (
+														<span class={styles.castCharacter}>
+															{member.character}
+														</span>
+													)}
+												</div>
+												<div class={styles.castActions}>
+													<span class={styles.castArrow}>
+														<Icon name="chevron-right" size={12} />
+													</span>
+													<FavoriteButton
+														entityType="person"
+														tmdbId={member.tmdbId}
+														name={member.name}
+														profileUrl={member.profileUrl}
+														personRole="actor"
+														size="normal"
+														stopPropagation
+													/>
+												</div>
+											</a>
+										);
+									})}
 								</div>
 							</div>
 						)}

@@ -15,7 +15,7 @@ type PersonProps = {
 	tmdbId?: number | null;
 	name: string;
 	profileUrl?: string | null;
-	role?: string | null;
+	personRole?: string | null;
 };
 
 type MovieProps = {
@@ -72,7 +72,7 @@ export function FavoriteButton(props: FavoriteButtonProps) {
 						tmdbId: props.tmdbId,
 						name: props.name,
 						profileUrl: props.profileUrl ?? null,
-						role: props.role ?? null,
+						role: props.personRole ?? null,
 					});
 				}
 			} else {

@@ -2,10 +2,23 @@
 	padding: 24px 32px;
 	display: flex;
 	flex-direction: column;
-	gap: 24px;
+	gap: 20px;
+
+	@media (max-width: 640px) {
+		padding: 16px;
+		gap: 16px;
+	}
 }
 
 .header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+.headerLeft {
 	display: flex;
 	align-items: baseline;
 	gap: 16px;
@@ -23,10 +36,277 @@
 	color: var(--color-text-secondary);
 }
 
+.viewToggle {
+	display: flex;
+	border: 1px solid var(--color-border-strong);
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.viewBtn {
+	background: transparent;
+	border: none;
+	padding: 8px 12px;
+	cursor: pointer;
+	color: var(--color-text-secondary);
+	display: inline-flex;
+	align-items: center;
+	transition:
+		background-color 150ms ease,
+		color 150ms ease;
+
+	&:hover {
+		background-color: var(--color-bg-elevated);
+		color: var(--color-text-primary);
+	}
+}
+
+.viewBtnActive {
+	background-color: var(--color-bg-elevated);
+	color: var(--color-accent);
+}
+
+.toolbar {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+	align-items: stretch;
+
+	> * {
+		min-width: 0;
+	}
+}
+
+.searchBar {
+	position: relative;
+	flex: 1 1 240px;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+}
+
+.searchIcon {
+	position: absolute;
+	left: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--color-text-secondary);
+	pointer-events: none;
+	display: inline-flex;
+}
+
+.searchInput {
+	width: 100%;
+	padding: 8px 32px 8px 34px;
+	border-radius: 8px;
+	border: 1px solid var(--color-border-strong);
+	background: var(--color-bg-surface);
+	color: var(--color-text-primary);
+	font-size: 14px;
+	outline: none;
+
+	&:focus {
+		border-color: var(--color-accent);
+	}
+}
+
+.searchClear {
+	position: absolute;
+	right: 8px;
+	top: 50%;
+	transform: translateY(-50%);
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	color: var(--color-text-secondary);
+	display: inline-flex;
+	padding: 2px;
+
+	&:hover {
+		color: var(--color-text-primary);
+	}
+}
+
+.loading {
+	padding: 48px;
+	text-align: center;
+	color: var(--color-text-secondary);
+}
+
 .empty {
 	padding: 48px;
 	text-align: center;
 	color: var(--color-text-secondary);
 	border: 1px dashed var(--color-border-strong);
 	border-radius: 12px;
+}
+
+.emptyHint {
+	color: var(--color-text-muted);
+	font-size: 14px;
+	margin-top: 8px;
+}
+
+/* ── Cards view ────────────────────────────────────────────────── */
+
+.cardsGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 16px;
+}
+
+.card {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	cursor: pointer;
+	transition: transform 180ms ease;
+
+	&:hover {
+		transform: translateY(-2px);
+
+		.cardImage {
+			border-color: var(--color-accent);
+		}
+	}
+}
+
+.cardImage {
+	position: relative;
+	aspect-ratio: 2 / 3;
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--color-bg-elevated);
+	border: 1px solid var(--color-border);
+	transition: border-color 180ms ease;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+}
+
+.cardImagePerson {
+	aspect-ratio: 1 / 1.4;
+}
+
+.cardImageFallback {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--color-text-muted);
+}
+
+.cardFav {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+}
+
+.cardInfo {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 0 2px;
+}
+
+.cardTitle {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--color-text-primary);
+	line-height: 1.3;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.cardMeta {
+	font-size: 12px;
+	color: var(--color-text-secondary);
+	text-transform: capitalize;
+}
+
+/* ── List view ─────────────────────────────────────────────────── */
+
+.list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 12px;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: background-color 150ms ease;
+
+	&:hover {
+		background-color: var(--color-bg-elevated);
+	}
+}
+
+.rowThumb {
+	width: 40px;
+	height: 60px;
+	border-radius: 6px;
+	overflow: hidden;
+	background: var(--color-bg-elevated);
+	border: 1px solid var(--color-border);
+	flex-shrink: 0;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+}
+
+.rowThumbPerson {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+}
+
+.rowThumbFallback {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--color-text-muted);
+}
+
+.rowInfo {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.rowTitle {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--color-text-primary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.rowMeta {
+	font-size: 12px;
+	color: var(--color-text-secondary);
+	text-transform: capitalize;
+}
+
+.rowActions {
+	flex-shrink: 0;
 }

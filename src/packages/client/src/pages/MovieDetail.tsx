@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { Select } from '@/components/common/Select';
 import { SmartImage } from '@/components/common/SmartImage';
@@ -22,6 +23,7 @@ import { type AudioProfile, audioProfilesService } from '@/services/audio-profil
 import { bookmarksService } from '@/services/discover.service';
 import { type MatchCandidate, moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
+import { personKeyFor } from '@/state/favorites.state';
 import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
@@ -453,13 +455,29 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								</button>
 							</div>
 						) : isRemote ? (
-							<h1 class={styles.title}>{movie.title}</h1>
-						) : (
-							<div class={styles.titleRow} onClick={startEditingTitle}>
+							<div class={styles.titleRow}>
 								<h1 class={styles.title}>{movie.title}</h1>
-								<span class={styles.titleEditIcon}>
+								<FavoriteButton
+									entityType="movie"
+									movieId={movie.id}
+									size="large"
+									stopPropagation
+								/>
+							</div>
+						) : (
+							<div class={styles.titleRow}>
+								<h1 class={styles.title} onClick={startEditingTitle}>
+									{movie.title}
+								</h1>
+								<span class={styles.titleEditIcon} onClick={startEditingTitle}>
 									<Icon name="edit" size={12} />
 								</span>
+								<FavoriteButton
+									entityType="movie"
+									movieId={movie.id}
+									size="large"
+									stopPropagation
+								/>
 							</div>
 						)}
 
@@ -483,7 +501,29 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								</span>
 							)}
 							{runtimeText && <span>{runtimeText}</span>}
-							{movie.director && <span>Dir. {movie.director}</span>}
+							{movie.director && (
+								<span class={styles.directorRow}>
+									<a
+										class={styles.directorLink}
+										href={`/person/${personKeyFor({ name: movie.director })}`}
+										onClick={(e) => {
+											e.preventDefault();
+											route(
+												`/person/${personKeyFor({ name: movie.director! })}`,
+											);
+										}}
+									>
+										Dir. {movie.director}
+									</a>
+									<FavoriteButton
+										entityType="person"
+										name={movie.director}
+										personRole="director"
+										size="mini"
+										stopPropagation
+									/>
+								</span>
+							)}
 							{movie.groupId && <MovieBreadcrumbs movie={movie} />}
 						</div>
 
@@ -769,24 +809,54 @@ export function MovieDetail({ id }: MovieDetailProps) {
 										!showCast ? styles.castGridCollapsed : ''
 									}`}
 								>
-									{movie.cast.slice(0, 12).map((member) => (
-										<div key={member.name} class={styles.castMember}>
-											<CastPhoto
-												name={member.name}
-												profileUrl={member.profileUrl}
-												character={member.character}
-												size={48}
-												expandedSize={220}
-												thumbClass={styles.castAvatar}
-											/>
-											<div class={styles.castInfo}>
-												<span class={styles.castName}>{member.name}</span>
-												<span class={styles.castCharacter}>
-													{member.character}
-												</span>
-											</div>
-										</div>
-									))}
+									{movie.cast.slice(0, 12).map((member) => {
+										const key = personKeyFor({
+											tmdbId: member.tmdbId,
+											name: member.name,
+										});
+										return (
+											<a
+												key={member.name}
+												class={styles.castMember}
+												href={`/person/${key}`}
+												onClick={(e) => {
+													e.preventDefault();
+													route(`/person/${key}`);
+												}}
+											>
+												<CastPhoto
+													name={member.name}
+													profileUrl={member.profileUrl}
+													character={member.character}
+													size={48}
+													expandedSize={220}
+													thumbClass={styles.castAvatar}
+												/>
+												<div class={styles.castInfo}>
+													<span class={styles.castName}>
+														{member.name}
+													</span>
+													<span class={styles.castCharacter}>
+														{member.character}
+													</span>
+												</div>
+												<div class={styles.castActions}>
+													<span class={styles.castArrow}>
+														<Icon name="chevron-right" size={14} />
+													</span>
+													<FavoriteButton
+														entityType="person"
+														tmdbId={member.tmdbId}
+														name={member.name}
+														profileUrl={member.profileUrl}
+														personRole="actor"
+														size="normal"
+														stopPropagation
+													/>
+												</div>
+											</a>
+										);
+									})}
 								</div>
 							</div>
 						)}
