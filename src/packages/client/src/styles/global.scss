@@ -114,3 +114,29 @@ html[data-reduce-motion='true'] *::after {
   white-space: nowrap;
   border-width: 0;
 }
+
+// ============================================
+// Interaction polish — opt-in classes
+// ============================================
+// Drop `class="press"` on any clickable element for unified tactile
+// feedback (subtle scale on active). Works alongside existing :hover;
+// respects reduce-motion via the global override above.
+.press {
+  transition: transform 100ms var(--ease-snap, ease-out);
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+// Soft hover-lift for cards. Combine with .press for tactile package.
+.lift {
+  transition:
+    transform 180ms var(--ease-out, ease-out),
+    box-shadow 180ms var(--ease-out, ease-out);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.35);
+  }
+}

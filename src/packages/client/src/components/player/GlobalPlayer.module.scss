@@ -218,6 +218,10 @@
 // Mini mode: bar sits BELOW the video thumbnail
 .playerBarMini {
   z-index: var(--z-player-controls);
+
+  @include mobile {
+    height: 56px;
+  }
 }
 
 // ── Persistent video wrapper — stays in DOM, CSS transitions size ──
@@ -295,7 +299,12 @@
     opacity: 1;
   }
 
+  // Mobile: shrink the floating thumbnail proportionally so the
+  // 100×178 desktop pip doesn't dominate a phone viewport. Bar
+  // sits below the mobile nav bar (56px tall + safe-area).
   @include mobile {
+    width: 96px;
+    height: 56px;
     bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   }
 }
@@ -502,4 +511,9 @@
   width: var(--player-mini-width);
   height: var(--player-mini-height);
   flex-shrink: 0;
+
+  @include mobile {
+    width: 96px;
+    height: 56px;
+  }
 }

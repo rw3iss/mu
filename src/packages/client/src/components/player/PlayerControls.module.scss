@@ -701,3 +701,87 @@
 		transform: translateY(0);
 	}
 }
+
+// ============================================
+// Mobile mini-overlay overrides
+// ----------------------------------------------------------------
+// In mini mode at default --player-bar-height (~105px), every
+// .controlBtn is height: 100% + aspect-ratio: 1 → ~100px squares.
+// That eats half a phone viewport. Below 768px:
+//   - shrink the buttons to touch-target spec (44px)
+//   - shrink icons & title
+//   - hide controls a touch user can't usefully reach (hover
+//     popouts: skip-extended, volume slider; and Maximize-then-
+//     reach: effects panel, settings menu). Play, Maximize, Info,
+//     Fullscreen, Close remain.
+// Activated by the existing .miniMode class (set when
+// hasMiniThumbnail is true in PlayerControls).
+// ============================================
+
+@include mobile {
+	.miniMode {
+		.seekRow {
+			top: -8px;
+		}
+		.seekBar {
+			height: 16px;
+		}
+		.seekTrack {
+			height: 2.5px;
+		}
+
+		.leftSection {
+			padding: 4px 8px 0 8px;
+		}
+		.titleText {
+			font-size: 13px;
+			margin-bottom: 2px;
+			line-height: 1.2;
+		}
+		.timingLabel {
+			display: none;
+		}
+
+		.mainRow {
+			padding: 0;
+		}
+
+		.centerControls {
+			gap: 0;
+		}
+
+		.controlBtn {
+			aspect-ratio: auto;
+			width: 44px;
+			height: 44px;
+			margin: 0;
+			align-self: center;
+
+			svg {
+				width: 20px;
+				height: 20px;
+			}
+		}
+		.playBtn svg {
+			width: 22px;
+			height: 22px;
+		}
+
+		// Touch users can scrub via the seek bar; the hover-driven
+		// skip-extended popouts and volume slider aren't reachable.
+		// Effects + settings menus are still available after
+		// Maximize, so dropping them from the mini bar keeps the
+		// essentials within thumb reach.
+		.skipWrap,
+		.volumeWrap,
+		.effectsBtnWrap,
+		.menuContainer {
+			display: none;
+		}
+
+		.rightControls {
+			margin: 0;
+			align-items: center;
+		}
+	}
+}

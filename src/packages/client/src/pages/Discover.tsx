@@ -3,6 +3,7 @@ import { Button } from '@/components/common/Button';
 import { Spinner } from '@/components/common/Spinner';
 import { DiscoverFilters as FilterPanel } from '@/components/discover/DiscoverFilters';
 import { DiscoverResultCard } from '@/components/discover/DiscoverResultCard';
+import { QuickStartPanel } from '@/components/discover/QuickStartPanel';
 import { SeedChip } from '@/components/discover/SeedChip';
 import type { IncludeMode } from '@/services/discover.service';
 import { moviesService } from '@/services/movies.service';
@@ -196,6 +197,7 @@ export function Discover(_props: DiscoverProps) {
 			<div class={styles.layout}>
 				{showFilters && (
 					<aside class={styles.sidebar}>
+						<QuickStartPanel />
 						<FilterPanel
 							value={filterValue}
 							availableGenres={genres}
