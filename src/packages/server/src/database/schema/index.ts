@@ -4,6 +4,8 @@ export type { AudioProfile, NewAudioProfile } from './audio-profiles.ts';
 export { audioProfiles } from './audio-profiles.ts';
 export type { Device, NewDevice } from './devices.ts';
 export { devices } from './devices.ts';
+export type { Favorite, NewFavorite } from './favorites.ts';
+export { favorites } from './favorites.ts';
 export type { JobHistoryEntry, NewJobHistoryEntry } from './job-history.ts';
 export { jobHistory } from './job-history.ts';
 export type { MediaSource, NewMediaSource } from './media-sources.ts';
@@ -44,6 +46,8 @@ export type {
 export { movieRecExplanations } from './movie-rec-explanations.ts';
 export type { Movie, NewMovie } from './movies.ts';
 export { movies } from './movies.ts';
+export type { NewPerson, Person } from './people.ts';
+export { people } from './people.ts';
 export type { NewPlaylistMovie, PlaylistMovie } from './playlist-movies.ts';
 export { playlistMovies } from './playlist-movies.ts';
 export type { NewPlaylist, Playlist } from './playlists.ts';

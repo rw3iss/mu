@@ -279,6 +279,42 @@ const tables = [
 	)`,
 	`CREATE INDEX IF NOT EXISTS mmc_entity_idx ON metadata_match_candidates(entity_type, entity_id)`,
 	`CREATE INDEX IF NOT EXISTS mmc_rank_idx ON metadata_match_candidates(entity_type, entity_id, rank)`,
+	`CREATE TABLE IF NOT EXISTS people (
+		id TEXT PRIMARY KEY,
+		external_id TEXT NOT NULL,
+		source TEXT NOT NULL,
+		tmdb_id INTEGER,
+		imdb_id TEXT,
+		name TEXT NOT NULL,
+		profile_url TEXT,
+		birthday TEXT,
+		place_of_birth TEXT,
+		deathday TEXT,
+		biography TEXT,
+		known_for_department TEXT,
+		gender INTEGER,
+		popularity REAL,
+		also_known_as TEXT,
+		metadata TEXT,
+		fetched_at TEXT,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS people_external_id_idx ON people(external_id)`,
+	`CREATE INDEX IF NOT EXISTS people_tmdb_id_idx ON people(tmdb_id)`,
+	`CREATE INDEX IF NOT EXISTS people_imdb_id_idx ON people(imdb_id)`,
+	`CREATE INDEX IF NOT EXISTS people_name_idx ON people(name)`,
+	`CREATE TABLE IF NOT EXISTS favorites (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		entity_type TEXT NOT NULL,
+		entity_id TEXT NOT NULL,
+		role TEXT,
+		created_at TEXT NOT NULL
+	)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS favorites_unique_idx ON favorites(user_id, entity_type, entity_id)`,
+	`CREATE INDEX IF NOT EXISTS favorites_user_idx ON favorites(user_id)`,
+	`CREATE INDEX IF NOT EXISTS favorites_user_type_idx ON favorites(user_id, entity_type)`,
 ];
 
 for (const sql of tables) {
