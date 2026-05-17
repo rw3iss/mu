@@ -42,6 +42,7 @@ import { ensureFavoritesLoaded } from '@/state/favorites.state';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
 import { initProcessingState } from '@/state/processing.state';
 import { fetchThemes } from '@/state/themes.state';
+import { installUserGestureListener } from '@/state/user-gesture.state';
 import { initConsoleDebug } from '@/utils/console-debug';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
@@ -104,6 +105,7 @@ function handleRouteChange(e: { url: string }) {
 
 export function App() {
 	useEffect(() => {
+		installUserGestureListener();
 		initTheme();
 		checkAuth();
 		wsService.connect();

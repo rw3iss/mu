@@ -15,6 +15,7 @@ import {
 	activeEqProfileId,
 	activeVideoProfileId,
 } from './audio-profiles.state';
+import { whenUserGestured } from './user-gesture.state';
 import {
 	DEFAULT_VIDEO_EFFECTS,
 	type VideoEffectSettings,
@@ -128,18 +129,14 @@ export function initAudioEffects(): void {
 	);
 	const savedSelectedBand = getUiSetting<CompressorBand>('audio_multiband_selected_band', 'mid');
 
-	// Apply to engine first
+	// Apply non-attaching settings immediately — these are pure parameter
+	// stores on the engine and don't create the AudioContext.
 	if (savedBands) audioEngine.setBands(savedBands);
 	if (savedCompSettings) audioEngine.setCompressorSettings(savedCompSettings);
-	audioEngine.setEqEnabled(savedEq);
-	audioEngine.setCompressorEnabled(savedComp);
 	audioEngine.setInputGain(savedInputGain);
 	audioEngine.setStereoWidthAmount(savedStereoWidthAmount);
 	audioEngine.setBassEnhanceAmount(savedBassEnhanceAmount);
 	audioEngine.setHrtfAmount(savedHrtfAmount);
-	audioEngine.setStereoWidthEnabled(savedStereoWidthEnabled);
-	audioEngine.setBassEnhanceEnabled(savedBassEnhanceEnabled);
-	audioEngine.setHrtfEnabled(savedHrtfEnabled);
 	if (savedMultiBandSettings) {
 		audioEngine.setBandCrossovers(
 			savedMultiBandSettings.lowCrossover,
@@ -149,19 +146,33 @@ export function initAudioEffects(): void {
 		audioEngine.setBandCompressorSettings('mid', savedMultiBandSettings.mid);
 		audioEngine.setBandCompressorSettings('high', savedMultiBandSettings.high);
 	}
-	audioEngine.setMultiBandEnabled(savedMultiBandEnabled);
-	if (
-		(savedSpectrum || savedCompVisualizer) &&
-		!savedEq &&
-		!savedComp &&
-		!savedStereoWidthEnabled &&
-		!savedBassEnhanceEnabled &&
-		!savedHrtfEnabled
-	) {
-		// Visualizers need the audio graph attached even if no effect is on
-		// (the analyser node lives in the graph).
-		audioEngine.attach();
-	}
+
+	// Enable flags create the AudioContext and bind a MediaElementSource
+	// to the <video>. Both operations require a user gesture: Chrome
+	// rejects context.resume() without one, and once a MediaElementSource
+	// is bound it cannot be un-bound — so a premature attach() leaves
+	// the video silently re-routed into a suspended graph.
+	// Defer the actual flips until the first user interaction.
+	whenUserGestured(() => {
+		audioEngine.setEqEnabled(savedEq);
+		audioEngine.setCompressorEnabled(savedComp);
+		audioEngine.setStereoWidthEnabled(savedStereoWidthEnabled);
+		audioEngine.setBassEnhanceEnabled(savedBassEnhanceEnabled);
+		audioEngine.setHrtfEnabled(savedHrtfEnabled);
+		audioEngine.setMultiBandEnabled(savedMultiBandEnabled);
+		if (
+			(savedSpectrum || savedCompVisualizer) &&
+			!savedEq &&
+			!savedComp &&
+			!savedStereoWidthEnabled &&
+			!savedBassEnhanceEnabled &&
+			!savedHrtfEnabled
+		) {
+			// Visualizers need the audio graph attached even if no effect is on
+			// (the analyser node lives in the graph).
+			audioEngine.attach();
+		}
+	});
 
 	const savedVideoEnabled = getUiSetting('video_effects_enabled', false);
 	const savedVideoEffects = getUiSetting<VideoEffectSettings | null>(
