@@ -1,0 +1,118 @@
+// IconButton — square icon-only button. Sister of <Button>; the
+// player's inline `.controlBtn` pattern will eventually adopt this
+// (deferred — see audit doc).
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border-radius: 8px;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--color-text-primary);
+	cursor: pointer;
+	flex-shrink: 0;
+	transition:
+		background-color 140ms var(--ease-snap, ease),
+		border-color 140ms var(--ease-snap, ease),
+		color 140ms var(--ease-snap, ease),
+		transform 100ms var(--ease-snap, ease);
+
+	&:active {
+		transform: scale(0.92);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	&:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	svg {
+		display: block;
+	}
+}
+
+/* ── Sizes ─────────────────────────────────────────────────────── */
+
+.size_xs {
+	width: 24px;
+	height: 24px;
+	svg { width: 14px; height: 14px; }
+}
+.size_sm {
+	width: 32px;
+	height: 32px;
+	svg { width: 16px; height: 16px; }
+}
+.size_md {
+	width: 40px;
+	height: 40px;
+	svg { width: 20px; height: 20px; }
+}
+.size_lg {
+	width: 48px;
+	height: 48px;
+	svg { width: 22px; height: 22px; }
+}
+
+/* ── Variants ──────────────────────────────────────────────────── */
+
+.variant_ghost {
+	color: var(--color-text-secondary);
+
+	&:hover {
+		color: var(--color-text-primary);
+		background: var(--color-bg-elevated);
+	}
+}
+
+.variant_subtle {
+	color: var(--color-text-secondary);
+	border-color: var(--color-border);
+
+	&:hover {
+		color: var(--color-text-primary);
+		border-color: var(--color-border-strong);
+		background: var(--color-bg-elevated);
+	}
+}
+
+.variant_solid {
+	color: var(--color-text-inverse);
+	background: var(--color-accent);
+	border-color: var(--color-accent);
+
+	&:hover {
+		filter: brightness(1.07);
+	}
+}
+
+.variant_danger {
+	color: rgba(239, 68, 68, 0.92);
+	border-color: rgba(239, 68, 68, 0.35);
+
+	&:hover {
+		color: #fff;
+		background: rgba(239, 68, 68, 0.85);
+		border-color: rgba(239, 68, 68, 0.85);
+	}
+}
+
+/* ── Active ────────────────────────────────────────────────────── */
+
+.active {
+	color: var(--color-accent);
+	border-color: var(--color-accent);
+	background: var(--color-accent-subtle);
+
+	&:hover {
+		background: var(--color-accent-subtle);
+		color: var(--color-accent);
+	}
+}

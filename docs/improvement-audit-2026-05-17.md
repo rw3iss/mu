@@ -97,11 +97,14 @@ Each implements its own hover-lift, poster-wrap, fallback-image fallback. A shar
 - **Phase B (applied by my call):**
   - 4.1 Discover favorites quick-start panel.
 
-- **Phase C (deferred — planned, not auto-applied):**
-  - 3.2 Card pattern consolidation (cross-cutting, needs design + product call on how much divergence is product-meaningful vs. visual drift).
-  - 3.3 IconButton extraction (touches player internals; needs a focused verification pass).
-  - Discover "seed by person" backend support — currently the recommender only seeds from movieIds. A future enhancement could accept person tmdb_ids and synthesise a seed set from their known-for. Requires backend change to `RecommendationsService`.
-  - Overflow-menu pattern on mobile mini bar — user mentioned "expand to lists upward with more button options" as an alternative. Current pass shrank + hid; a future pass could add an overflow `⋯` button → upward popover with the hidden options. Requires PlayerControls JSX changes.
+- **Phase C (originally deferred) — addressed in follow-up pass:**
+  - **Overflow-menu pattern on mobile mini bar** ✅ Applied. New `.mobileOverflow` button + upward popover in `PlayerControls.tsx`; surfaces Info / Effects / Mute behind a single `⋯` tap target so touch users can still reach controls hidden by the mini-mode mobile rule. Desktop / split / non-mini unaffected (CSS-gated).
+  - **Discover seed-by-person** ✅ Applied (frontend-only). Tapping a favorited person in `<QuickStartPanel>` now fetches `/people/:key`, picks their top 4 *owned* credits, and seeds Discover with them. Falls back to navigating to the person page when nothing is in-library. Tiny drill-arrow next to each person chip preserves the "open person page" path. No backend change needed — bridges through existing `addSeed(movieId)`.
+  - **Card + IconButton primitives** ✅ Applied additively. New `<Card variant padding interactive>` and `<IconButton size variant active>` live in `components/common/`. Existing cards/buttons untouched — future components can adopt opportunistically without a sweeping refactor.
+
+- **Phase C — still deferred (architectural):**
+  - Backend "seed by person" — the frontend-only bridge above covers the common case (favorited person with library coverage). A proper backend that accepts `personTmdbIds` directly and synthesises a seed centroid from the recommender's external graph would handle the "favorited person I don't own anything by" case better. Out of scope for this pass.
+  - Migrating existing `MovieCard` / `DiscoverResultCard` / `FavoriteCard` to use the new `<Card>` primitive — needs per-card review (each carries product-meaningful badges/affordances). Best done one card at a time when touching them anyway.
 
 ## 6. Documentation sync
 

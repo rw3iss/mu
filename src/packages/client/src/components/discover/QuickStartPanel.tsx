@@ -3,9 +3,13 @@ import { route } from 'preact-router';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { type FavoriteEntry, favoritesService } from '@/services/favorites.service';
+import { peopleService } from '@/services/people.service';
 import { addSeed } from '@/state/discover.state';
 import { ensureFavoritesLoaded, favoritePersonKeys } from '@/state/favorites.state';
+import { notifyError, notifyInfo } from '@/state/notifications.state';
 import styles from './QuickStartPanel.module.scss';
+
+const MAX_PERSON_SEEDS = 4;
 
 /**
  * Discover-page quick-start panel: surfaces the user's favorites
@@ -94,26 +98,74 @@ export function QuickStartPanel() {
 					<span class={styles.sectionLabel}>People</span>
 					<div class={styles.row}>
 						{favPeople.slice(0, 8).map((f) => (
-							<button
-								key={f.id}
-								type="button"
-								class={styles.chip}
-								onClick={() => route(`/person/${f.key}`)}
-								title={`Browse ${f.person!.name}'s filmography`}
-							>
-								<span class={styles.chipThumb}>
-									{f.person!.profileUrl ? (
-										<SmartImage src={f.person!.profileUrl} alt="" />
-									) : (
-										<Icon name="star" size={12} />
-									)}
-								</span>
-								<span class={styles.chipLabel}>{f.person!.name}</span>
-							</button>
+							<PersonChip key={f.id} entry={f} />
 						))}
 					</div>
 				</div>
 			)}
+		</div>
+	);
+}
+
+function PersonChip({ entry }: { entry: FavoriteEntry }) {
+	const [seeding, setSeeding] = useState(false);
+
+	const seedFromPerson = async () => {
+		if (seeding) return;
+		setSeeding(true);
+		try {
+			const { person } = await peopleService.get(entry.key);
+			const ownedCredits = (person.knownForMovies ?? []).filter(
+				(c) => c.movieId && c.mediaType === 'movie',
+			);
+			if (ownedCredits.length === 0) {
+				notifyInfo(
+					`${person.name} has no movies in your library yet — open their page to see all credits.`,
+				);
+				route(`/person/${entry.key}`);
+				return;
+			}
+			const picked = ownedCredits.slice(0, MAX_PERSON_SEEDS);
+			for (const c of picked) {
+				if (c.movieId) addSeed(c.movieId, c.title);
+			}
+			notifyInfo(
+				`Seeded Discover with ${picked.length} of ${person.name}'s ${picked.length === 1 ? 'film' : 'films'}.`,
+			);
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Could not load person details');
+		} finally {
+			setSeeding(false);
+		}
+	};
+
+	return (
+		<div class={styles.personChipWrap}>
+			<button
+				type="button"
+				class={styles.chip}
+				onClick={seedFromPerson}
+				disabled={seeding}
+				title={`Seed Discover with ${entry.person!.name}'s films`}
+			>
+				<span class={styles.chipThumb}>
+					{entry.person!.profileUrl ? (
+						<SmartImage src={entry.person!.profileUrl} alt="" />
+					) : (
+						<Icon name="star" size={12} />
+					)}
+				</span>
+				<span class={styles.chipLabel}>{entry.person!.name}</span>
+			</button>
+			<button
+				type="button"
+				class={styles.personDrillBtn}
+				onClick={() => route(`/person/${entry.key}`)}
+				aria-label={`Open ${entry.person!.name}'s page`}
+				title={`Open ${entry.person!.name}'s page`}
+			>
+				<Icon name="arrow-up-right" size={11} />
+			</button>
 		</div>
 	);
 }

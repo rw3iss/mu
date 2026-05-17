@@ -110,3 +110,33 @@
 	white-space: nowrap;
 	max-width: 160px;
 }
+
+.personChipWrap {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.personDrillBtn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	background: transparent;
+	border: 1px solid var(--color-border);
+	border-radius: 50%;
+	color: var(--color-text-muted);
+	cursor: pointer;
+	transition:
+		background-color 120ms var(--ease-snap, ease),
+		color 120ms var(--ease-snap, ease),
+		border-color 120ms var(--ease-snap, ease);
+
+	&:hover {
+		color: var(--color-accent);
+		border-color: var(--color-accent);
+		background: var(--color-accent-subtle);
+	}
+}
