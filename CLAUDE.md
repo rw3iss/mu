@@ -106,6 +106,8 @@ NestJS modules in `packages/server/src/`:
 | `remote` | Remote server federation |
 | `settings` | App-wide settings |
 | `media` | Poster/backdrop image proxying |
+| `people` | Canonical person rows (TMDB-backed, cached). Powers `/person/:key` detail page; key format: `tmdb:<id>` or `name:<slug>`. |
+| `favorites` | Polymorphic favorites (person/movie). Per-user in-memory key cache busted on mutation; `GET /favorites/keys` for client hydration. |
 
 ### Job Backend (pluggable)
 

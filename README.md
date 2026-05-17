@@ -51,6 +51,11 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 - **PWA** -- installable on mobile devices
 - **Processing indicators** -- movies being transcoded show status on cards and detail pages with real-time progress via WebSocket
 
+### Favorites & People
+- **Favorites** -- star any cast member, director, writer, or movie. One shared `<FavoriteButton>` (sizes mini/normal/large) appears next to movie titles, director names, and cast rows on both the Movie Details page and the playing-movie info flyout. Favorites are cached client-side as keyed Sets for O(1) `isFavorite()` checks.
+- **Favorites page** -- search, sort (recent / name / role / year), filter by type (All / People / Movies / Actors / Directors / Writers), and toggle cards-vs-list view.
+- **Person Details** -- click any cast row or director name to open a person page with profile photo, biography, birth/place facts, and known-for credits cross-referenced against your library. Backend fetches and caches from TMDB on demand (`/people/:key` where key is `tmdb:<id>` or `name:<slug>`).
+
 ### Administration
 - **Admin dashboard** -- server stats, user management, media sources, log viewer, cache management
 - **Bulk movie operations** -- multi-select cards (Edit toggle in Library and Search), bulk re-scan, refresh metadata, clear metadata, hide/unhide, mark watched/unwatched, remove from library, delete from disk; per-movie failures are isolated so one bad row doesn't kill the batch
