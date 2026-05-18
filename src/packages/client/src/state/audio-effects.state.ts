@@ -15,6 +15,7 @@ import {
 	activeEqProfileId,
 	activeVideoProfileId,
 } from './audio-profiles.state';
+import { whenUserGestured } from './user-gesture.state';
 import {
 	DEFAULT_VIDEO_EFFECTS,
 	type VideoEffectSettings,
@@ -146,21 +147,23 @@ export function initAudioEffects(): void {
 		audioEngine.setBandCompressorSettings('high', savedMultiBandSettings.high);
 	}
 
-	// The audio engine is now eagerly attached on video creation
-	// (see useVideoEngine.ts) — before HLS.js calls
-	// MediaSource.attachMedia(). That ordering matters: Chrome taints
-	// createMediaElementSource output if the video already has a
-	// MediaSource attached. With eager attach, the engine is ready
-	// here and the saved enable-flags just trigger a chain rebuild;
-	// no createMediaElementSource happens late. AudioContext stays
-	// suspended until the user clicks Play (audioEngine.resume()
-	// inside togglePlay() in useVideoEngine handles gesture credit).
-	audioEngine.setEqEnabled(savedEq);
-	audioEngine.setCompressorEnabled(savedComp);
-	audioEngine.setStereoWidthEnabled(savedStereoWidthEnabled);
-	audioEngine.setBassEnhanceEnabled(savedBassEnhanceEnabled);
-	audioEngine.setHrtfEnabled(savedHrtfEnabled);
-	audioEngine.setMultiBandEnabled(savedMultiBandEnabled);
+	// Defer the enable-flag application until the user has actually
+	// interacted with the page. Each set*Enabled(true) call triggers
+	// audioEngine.attach() → createMediaElementSource → permanently
+	// binds the <video>'s audio into the Web Audio graph. We need a
+	// real user-gesture frame for AudioContext.resume() to succeed,
+	// otherwise the source is bound to a suspended ctx and audio is
+	// silent until the next click. whenUserGestured() either runs
+	// the callback immediately if the user has already gestured, or
+	// queues it to fire inside the next gesture handler.
+	whenUserGestured(() => {
+		audioEngine.setEqEnabled(savedEq);
+		audioEngine.setCompressorEnabled(savedComp);
+		audioEngine.setStereoWidthEnabled(savedStereoWidthEnabled);
+		audioEngine.setBassEnhanceEnabled(savedBassEnhanceEnabled);
+		audioEngine.setHrtfEnabled(savedHrtfEnabled);
+		audioEngine.setMultiBandEnabled(savedMultiBandEnabled);
+	});
 
 	const savedVideoEnabled = getUiSetting('video_effects_enabled', false);
 	const savedVideoEffects = getUiSetting<VideoEffectSettings | null>(

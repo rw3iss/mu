@@ -185,24 +185,18 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		video.addEventListener('waiting', onWaiting);
 		video.addEventListener('canplay', onCanPlay);
 
-		// Register the video element with the audio engine AND attach it
-		// immediately, BEFORE HLS.js has a chance to call
-		// MediaSource.attachMedia() / set video.src to a blob: URL.
-		//
-		// Chrome silently TAINTS createMediaElementSource output when
-		// called on a video element that already has a MediaSource
-		// attached — the AudioContext processes samples but
-		// `ctx.destination` produces silence. This is the root cause of
-		// "audio dies the moment I enable EQ/comp": the deferred-attach
-		// refactor (d285db1) guaranteed attach() always ran late,
-		// post-HLS. Eager attach on an empty `<video>` works fine —
-		// Chrome lets us bind the source, the AudioContext starts in
-		// `suspended` state until the user clicks Play (which calls
-		// audioEngine.resume() inside togglePlay()), and audio then
-		// flows through whichever chain rebuildChain() sets up. Both
-		// the original `c0031cd` and `f7a0155` commits documented this.
+		// Register the video element with the audio engine. Web Audio
+		// is NOT engaged here — until the user enables EQ/compressor,
+		// audio flows natively through the <video> element straight
+		// to speakers, which is the only path that's been verified
+		// reliable across this app's history. Eager-attach (creating
+		// MediaElementSource on the empty element before HLS attaches
+		// MediaSource) was attempted and produced silent output: the
+		// source binding doesn't subscribe to the audio that HLS later
+		// streams in. Lazy attach defers the createMediaElementSource
+		// risk until the user explicitly opts into Web Audio
+		// processing.
 		audioEngine.register(video);
-		audioEngine.attach(video);
 		initAudioEffects();
 
 		// 60fps time tracking via requestAnimationFrame
