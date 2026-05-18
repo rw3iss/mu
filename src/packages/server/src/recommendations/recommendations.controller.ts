@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { PeopleService } from '../people/people.service.js';
 import { RecommendationsService } from './recommendations.service.js';
 import { TasteProfileService } from './taste-profile.service.js';
 import type { DiscoverFilters, IncludeMode } from './types.js';
@@ -14,6 +15,7 @@ export class RecommendationsController {
 	constructor(
 		private readonly recs: RecommendationsService,
 		private readonly tasteProfile: TasteProfileService,
+		private readonly people: PeopleService,
 	) {}
 
 	@Get()
@@ -45,6 +47,7 @@ export class RecommendationsController {
 		@CurrentUser() user: { sub: string },
 		@Query('seedMovieId') seedMovieId?: string,
 		@Query('seedMovieIds') seedMovieIds?: string,
+		@Query('personKeys') personKeys?: string,
 		@Query('limit') limit?: string,
 		@Query('include') include?: string,
 		@Query('minRating') minRating?: string,
@@ -67,24 +70,80 @@ export class RecommendationsController {
 		const k = parseLimit(limit);
 		const inc = parseInclude(include);
 
-		if (seedMovieIds) {
-			const ids = seedMovieIds.split(',').filter(Boolean);
-			if (ids.length === 1) {
-				return this.recs.getSimilarMovies(ids[0]!, { k, filters, include: inc });
-			}
-			if (ids.length > 1) {
-				return this.recs.getMultiInput(ids, { k, filters, include: inc });
+		// Resolve `personKeys` to movie ids via the people↔library
+		// bridge. Merged with any explicit seedMovieIds so callers
+		// can combine "use these people" + "and also this seed film"
+		// in a single request.
+		const personDerivedIds: string[] = [];
+		const unresolvedPersonKeys: string[] = [];
+		if (personKeys) {
+			const keys = personKeys
+				.split(',')
+				.map((k) => k.trim())
+				.filter(Boolean);
+			if (keys.length > 0) {
+				const r = await this.people.resolveOwnedMovieIds(keys);
+				personDerivedIds.push(...r.movieIds);
+				unresolvedPersonKeys.push(...r.unresolvedKeys);
 			}
 		}
-		if (seedMovieId) {
-			return this.recs.getSimilarMovies(seedMovieId, { k, filters, include: inc });
+
+		const explicitIds = seedMovieIds
+			? seedMovieIds.split(',').filter(Boolean)
+			: seedMovieId
+				? [seedMovieId]
+				: [];
+
+		const allSeedIds = Array.from(new Set([...explicitIds, ...personDerivedIds]));
+
+		if (allSeedIds.length === 1) {
+			const out = await this.recs.getSimilarMovies(allSeedIds[0]!, {
+				k,
+				filters,
+				include: inc,
+			});
+			return this.augmentWithPersonMeta(out, unresolvedPersonKeys, personDerivedIds);
 		}
+		if (allSeedIds.length > 1) {
+			const out = await this.recs.getMultiInput(allSeedIds, { k, filters, include: inc });
+			return this.augmentWithPersonMeta(out, unresolvedPersonKeys, personDerivedIds);
+		}
+
+		// `personKeys` provided but resolved to nothing in-library —
+		// surface that so the client can prompt the user.
+		if (personKeys && allSeedIds.length === 0) {
+			return {
+				results: [],
+				usedSources: [],
+				reason: 'no_owned_credits_for_person_keys',
+				unresolvedPersonKeys,
+			};
+		}
+
 		const results = await this.recs.getPersonalized(user.sub, k, filters, inc);
 		return {
 			results,
 			usedSources: ['taste-profile'],
 			reason: results.length === 0 ? 'no_signal' : undefined,
 		};
+	}
+
+	private augmentWithPersonMeta<T>(
+		out: T,
+		unresolvedPersonKeys: string[],
+		personDerivedIds: string[],
+	): T & { unresolvedPersonKeys?: string[]; personDerivedSeedIds?: string[] } {
+		if (unresolvedPersonKeys.length === 0 && personDerivedIds.length === 0) {
+			return out as T & {
+				unresolvedPersonKeys?: string[];
+				personDerivedSeedIds?: string[];
+			};
+		}
+		return {
+			...(out as object),
+			...(personDerivedIds.length > 0 ? { personDerivedSeedIds: personDerivedIds } : {}),
+			...(unresolvedPersonKeys.length > 0 ? { unresolvedPersonKeys } : {}),
+		} as T & { unresolvedPersonKeys?: string[]; personDerivedSeedIds?: string[] };
 	}
 
 	@Post('multi')

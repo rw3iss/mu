@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { EmptyState } from '@/components/common/EmptyState';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { Select } from '@/components/common/Select';
@@ -176,20 +177,31 @@ export function Favorites(_props: FavoritesProps) {
 			</div>
 
 			{isLoading ? (
-				<div class={styles.loading}>Loading…</div>
-			) : visible.length === 0 ? (
-				<div class={styles.empty}>
-					{favorites.length === 0 ? (
-						<>
-							<p>You haven't favorited anything yet.</p>
-							<p class={styles.emptyHint}>
-								Star a cast member, director, or movie to add it here.
-							</p>
-						</>
-					) : (
-						<p>No matches for "{query}".</p>
+				<div class={viewMode === 'cards' ? styles.cardsGrid : styles.list}>
+					{Array.from({ length: viewMode === 'cards' ? 8 : 5 }).map((_, i) =>
+						viewMode === 'cards' ? (
+							<FavoriteCardSkeleton key={i} />
+						) : (
+							<FavoriteRowSkeleton key={i} />
+						),
 					)}
 				</div>
+			) : visible.length === 0 ? (
+				favorites.length === 0 ? (
+					<EmptyState
+						variant="dashed"
+						icon="star"
+						title="No favorites yet"
+						message="Star a cast member, director, or movie to add it here."
+					/>
+				) : (
+					<EmptyState
+						variant="dashed"
+						icon="search"
+						title="No matches"
+						message={`Nothing matches "${query}". Try a different search or filter.`}
+					/>
+				)
 			) : viewMode === 'cards' ? (
 				<div class={styles.cardsGrid}>
 					{visible.map((f) => (
@@ -262,6 +274,42 @@ function FavoriteCard({ entry }: { entry: FavoriteEntry }) {
 						? (entry.role ?? entry.person?.knownForDepartment ?? 'Person')
 						: (entry.movie?.year ?? '')}
 				</span>
+			</div>
+		</div>
+	);
+}
+
+function FavoriteCardSkeleton() {
+	return (
+		<div class={styles.card} aria-hidden="true">
+			<div class={`${styles.cardImage} skeleton`} />
+			<div class={styles.cardInfo}>
+				<span
+					class={`${styles.cardTitle} skeleton`}
+					style={{ height: '14px', width: '70%' }}
+				/>
+				<span
+					class={`${styles.cardMeta} skeleton`}
+					style={{ height: '12px', width: '40%' }}
+				/>
+			</div>
+		</div>
+	);
+}
+
+function FavoriteRowSkeleton() {
+	return (
+		<div class={styles.row} aria-hidden="true">
+			<div class={`${styles.rowThumb} skeleton`} />
+			<div class={styles.rowInfo}>
+				<span
+					class={`${styles.rowTitle} skeleton`}
+					style={{ height: '14px', width: '60%' }}
+				/>
+				<span
+					class={`${styles.rowMeta} skeleton`}
+					style={{ height: '12px', width: '30%' }}
+				/>
 			</div>
 		</div>
 	);

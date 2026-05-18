@@ -73,6 +73,7 @@
 	transition:
 		background-color 140ms var(--ease-snap, ease),
 		border-color 140ms var(--ease-snap, ease),
+		color 140ms var(--ease-snap, ease),
 		transform 100ms var(--ease-snap, ease);
 
 	&:hover {
@@ -82,6 +83,21 @@
 
 	&:active {
 		transform: scale(0.97);
+	}
+
+	&:disabled {
+		cursor: default;
+	}
+}
+
+.chipActive {
+	background: var(--color-accent-subtle);
+	border-color: var(--color-accent);
+	color: var(--color-accent);
+
+	&:hover {
+		background: var(--color-accent-subtle);
+		border-color: var(--color-accent);
 	}
 }
 

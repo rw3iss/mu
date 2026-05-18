@@ -140,3 +140,27 @@ html[data-reduce-motion='true'] *::after {
     box-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.35);
   }
 }
+
+// Shimmer skeleton for loading placeholders. Drop on a block-level
+// element with explicit dimensions. Respects reduce-motion via the
+// global override above (animation neutralised).
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-elevated) 0%,
+    var(--color-border-strong) 50%,
+    var(--color-bg-elevated) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

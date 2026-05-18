@@ -15,6 +15,9 @@ import {
 	filters,
 	includeMode,
 	isLoading,
+	personSeedKeys,
+	personSeedLabels,
+	removePersonSeed,
 	removeSeed,
 	restoreDiscoverScroll,
 	results,
@@ -25,6 +28,7 @@ import {
 	setFilters,
 	setIncludeMode,
 	setSeed,
+	unresolvedPersonKeys,
 	usedSources,
 } from '@/state/discover.state';
 import styles from './Discover.module.scss';
@@ -120,15 +124,17 @@ export function Discover(_props: DiscoverProps) {
 		};
 	}, []);
 
-	// Re-fetch whenever seeds, filters, or include mode change.
+	// Re-fetch whenever seeds, person seeds, filters, or include mode change.
 	useEffect(() => {
 		const dispose = seedMovieIds.subscribe(() => runDiscover());
 		const dispose2 = filters.subscribe(() => runDiscover());
 		const dispose3 = includeMode.subscribe(() => runDiscover());
+		const dispose4 = personSeedKeys.subscribe(() => runDiscover());
 		return () => {
 			dispose();
 			dispose2();
 			dispose3();
+			dispose4();
 		};
 	}, []);
 
@@ -179,7 +185,7 @@ export function Discover(_props: DiscoverProps) {
 				</div>
 			)}
 
-			{seeds.length > 0 && (
+			{(seeds.length > 0 || personSeedKeys.value.length > 0) && (
 				<div class={styles.seedRow}>
 					{seeds.map((id) => (
 						<SeedChip
@@ -188,9 +194,26 @@ export function Discover(_props: DiscoverProps) {
 							onRemove={() => removeSeed(id)}
 						/>
 					))}
+					{personSeedKeys.value.map((key) => (
+						<SeedChip
+							key={key}
+							label={`👤 ${personSeedLabels.value[key] ?? key}`}
+							onRemove={() => removePersonSeed(key)}
+						/>
+					))}
 					<button class={styles.clearLink} onClick={clearSeeds}>
-						Clear seed{seeds.length > 1 ? 's' : ''}
+						Clear seed{seeds.length + personSeedKeys.value.length > 1 ? 's' : ''}
 					</button>
+				</div>
+			)}
+
+			{unresolvedPersonKeys.value.length > 0 && (
+				<div class={styles.enrichBanner}>
+					Couldn't find library credits for{' '}
+					{unresolvedPersonKeys.value
+						.map((k) => personSeedLabels.value[k] ?? k)
+						.join(', ')}
+					. Add at least one of their films to use them as a seed.
 				</div>
 			)}
 

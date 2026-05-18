@@ -36,11 +36,22 @@ export interface DiscoverResponse {
 	usedSources: string[];
 	reason?: string;
 	enrichmentsQueued?: number;
+	/** Movie ids the server inferred from `personKeys`. */
+	personDerivedSeedIds?: string[];
+	/** Person keys the server couldn't resolve to in-library credits. */
+	unresolvedPersonKeys?: string[];
 }
 
 export interface DiscoverRequest {
 	seedMovieId?: string;
 	seedMovieIds?: string[];
+	/**
+	 * Server-side resolves these (e.g. `tmdb:287`) into in-library
+	 * credit movie ids via the people↔library bridge. Merged with
+	 * `seedMovieIds`. Surface in the response under
+	 * `personDerivedSeedIds` / `unresolvedPersonKeys`.
+	 */
+	personKeys?: string[];
 	limit?: number;
 	filters?: DiscoverFilters;
 	include?: IncludeMode;
@@ -51,6 +62,7 @@ function toQueryParams(req: DiscoverRequest): Record<string, string> {
 	if (req.seedMovieId) p.seedMovieId = req.seedMovieId;
 	if (req.seedMovieIds && req.seedMovieIds.length > 0)
 		p.seedMovieIds = req.seedMovieIds.join(',');
+	if (req.personKeys && req.personKeys.length > 0) p.personKeys = req.personKeys.join(',');
 	if (req.limit) p.limit = String(req.limit);
 	if (req.include && req.include !== 'owned') p.include = req.include;
 	const f = req.filters;

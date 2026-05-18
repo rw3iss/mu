@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { type FavoriteEntry, favoritesService } from '@/services/favorites.service';
-import { peopleService } from '@/services/people.service';
-import { addSeed } from '@/state/discover.state';
+import { addPersonSeed, addSeed, personSeedKeys } from '@/state/discover.state';
 import { ensureFavoritesLoaded, favoritePersonKeys } from '@/state/favorites.state';
-import { notifyError, notifyInfo } from '@/state/notifications.state';
 import styles from './QuickStartPanel.module.scss';
-
-const MAX_PERSON_SEEDS = 4;
 
 /**
  * Discover-page quick-start panel: surfaces the user's favorites
@@ -108,45 +105,29 @@ export function QuickStartPanel() {
 }
 
 function PersonChip({ entry }: { entry: FavoriteEntry }) {
-	const [seeding, setSeeding] = useState(false);
+	const seeded = personSeedKeys.value.includes(entry.key);
 
-	const seedFromPerson = async () => {
-		if (seeding) return;
-		setSeeding(true);
-		try {
-			const { person } = await peopleService.get(entry.key);
-			const ownedCredits = (person.knownForMovies ?? []).filter(
-				(c) => c.movieId && c.mediaType === 'movie',
-			);
-			if (ownedCredits.length === 0) {
-				notifyInfo(
-					`${person.name} has no movies in your library yet — open their page to see all credits.`,
-				);
-				route(`/person/${entry.key}`);
-				return;
-			}
-			const picked = ownedCredits.slice(0, MAX_PERSON_SEEDS);
-			for (const c of picked) {
-				if (c.movieId) addSeed(c.movieId, c.title);
-			}
-			notifyInfo(
-				`Seeded Discover with ${picked.length} of ${person.name}'s ${picked.length === 1 ? 'film' : 'films'}.`,
-			);
-		} catch (err: any) {
-			notifyError(err?.message ?? 'Could not load person details');
-		} finally {
-			setSeeding(false);
-		}
+	const seedFromPerson = () => {
+		// Server-side: /recommendations/discover?personKeys=… resolves
+		// each key to in-library credits via the people↔library
+		// bridge. Adds the key once; runDiscover() re-runs on signal
+		// change. If the server returns unresolvedPersonKeys, the
+		// "no library coverage" copy renders below.
+		addPersonSeed(entry.key, entry.person!.name);
 	};
 
 	return (
 		<div class={styles.personChipWrap}>
 			<button
 				type="button"
-				class={styles.chip}
+				class={`${styles.chip} ${seeded ? styles.chipActive : ''}`}
 				onClick={seedFromPerson}
-				disabled={seeding}
-				title={`Seed Discover with ${entry.person!.name}'s films`}
+				disabled={seeded}
+				title={
+					seeded
+						? `${entry.person!.name} is already seeded`
+						: `Seed Discover with ${entry.person!.name}'s films`
+				}
 			>
 				<span class={styles.chipThumb}>
 					{entry.person!.profileUrl ? (

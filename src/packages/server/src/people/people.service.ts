@@ -2,7 +2,7 @@ import { nowISO } from '@mu/shared';
 import { Injectable } from '@nestjs/common';
 import { eq, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { type NewPerson, type Person, people } from '../database/schema/index.js';
+import { movies, type NewPerson, type Person, people } from '../database/schema/index.js';
 import {
 	type TmdbPersonCombinedCredits,
 	type TmdbPersonDetails,
@@ -136,6 +136,65 @@ export class PeopleService {
 		const rows = this.database.db.select().from(people).where(inArray(people.id, ids)).all();
 		for (const row of rows) map.set(row.id, row);
 		return map;
+	}
+
+	/**
+	 * Resolve a set of person keys (`tmdb:N` / `name:slug`) to **local
+	 * movie ids** for credits already in the library. Used by the
+	 * Discover endpoint as the canonical bridge between a favorited
+	 * person and the recommender's seed input — the recommender only
+	 * accepts in-library movie ids, so this hides the people→films
+	 * lookup + library cross-ref behind a single call.
+	 *
+	 * Per-person budget defaults to 4 so a user with many favorite
+	 * people doesn't dilute the seed centroid into noise.
+	 */
+	async resolveOwnedMovieIds(
+		keys: string[],
+		perPersonLimit: number = 4,
+	): Promise<{ movieIds: string[]; unresolvedKeys: string[] }> {
+		const movieIds: string[] = [];
+		const unresolved: string[] = [];
+		const seen = new Set<string>();
+
+		for (const key of keys) {
+			const view = await this.getOrFetch(key);
+			if (!view || view.knownForMovies.length === 0) {
+				unresolved.push(key);
+				continue;
+			}
+			const movieCredits = view.knownForMovies.filter(
+				(c) => c.mediaType === 'movie' && c.tmdbId,
+			);
+			if (movieCredits.length === 0) {
+				unresolved.push(key);
+				continue;
+			}
+			const tmdbIds = movieCredits.map((c) => c.tmdbId);
+			const owned = this.database.db
+				.select({ id: movies.id, tmdbId: movies.tmdbId })
+				.from(movies)
+				.where(inArray(movies.tmdbId, tmdbIds))
+				.all();
+			if (owned.length === 0) {
+				unresolved.push(key);
+				continue;
+			}
+			const ownedByTmdb = new Map<number, string>();
+			for (const o of owned) if (o.tmdbId) ownedByTmdb.set(o.tmdbId, o.id);
+
+			let added = 0;
+			for (const c of movieCredits) {
+				if (added >= perPersonLimit) break;
+				const id = ownedByTmdb.get(c.tmdbId);
+				if (id && !seen.has(id)) {
+					movieIds.push(id);
+					seen.add(id);
+					added += 1;
+				}
+			}
+		}
+		return { movieIds, unresolvedKeys: unresolved };
 	}
 
 	/**
