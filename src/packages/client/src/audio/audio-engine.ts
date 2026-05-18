@@ -346,22 +346,15 @@ export class AudioEngine {
 			this.pinOutputAudioToDefault();
 		}
 
-		// Pin `AudioContext.destination` to the OS default device.
-		// Opt-in only (localStorage flag) — the call to
-		// AudioContext.setSinkId('') was found to misroute the
-		// AudioContext output to a non-existent sink on some Chrome
-		// builds when invoked late in the page lifecycle (after the
-		// defer-attach refactor). Diagnostic showed ctx.state=running,
-		// chain wired to ctx.destination, currentTime advancing — yet
-		// silent at speakers. Skipping pinSinkToDefault by default
-		// lets Chrome use whatever sink it picked for native <video>
-		// playback, which was already producing sound.
-		const wantPinSink =
-			typeof localStorage !== 'undefined' &&
-			localStorage.getItem('mu_audio_pin_sink') === '1';
-		if (wantPinSink) {
-			this.pinSinkToDefault();
-		}
+		// Pin `AudioContext.destination` to the OS default device. With
+		// direct routing this is what actually plays the audio; with
+		// MediaStream routing it's belt-and-suspenders (some Chrome
+		// builds gate stream production on destination state).
+		//
+		// History: briefly made opt-in (commit aeb9a4d) on a wrong
+		// diagnosis. Reverted — the unconditional call was working
+		// state for Titanic / Goliath / every movie yesterday.
+		this.pinSinkToDefault();
 
 		// Force the context to running state. Chrome may start it suspended
 		// even when attach() is reached from a click handler if signal/effect
