@@ -104,12 +104,14 @@ export class AudioEngine {
 	private ctx: AudioContext | null = null;
 	private source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null;
 	/**
-	 * When we took the captureStream() path, native audio is muted on
-	 * the element to avoid double-playback. Track that so detach
-	 * paths can restore it.
+	 * When we took the captureStream() path, we silence the native
+	 * speaker output of the bound element via `volume = 0` (NOT
+	 * `muted = true` — muting also silences the captured audio
+	 * track, while volume changes affect only the native output).
+	 * Track the original volume so detach paths can restore it.
 	 */
-	private nativeMutedByAttach = false;
-	private originalMutedState = false;
+	private nativeVolumeSilencedByAttach = false;
+	private originalNativeVolume = 1;
 	private boundElement: HTMLMediaElement | null = null;
 	private pendingElement: HTMLMediaElement | null = null;
 	private inputGainNode: GainNode | null = null;
@@ -290,9 +292,14 @@ export class AudioEngine {
 					});
 					if (tracks.length > 0) {
 						this.source = this.ctx.createMediaStreamSource(stream);
-						this.originalMutedState = target.muted;
-						target.muted = true;
-						this.nativeMutedByAttach = true;
+						// Silence native output via volume=0 (NOT muted=true).
+						// captureStream's audio track reflects the element's
+						// mute state — muting would silence the captured
+						// stream too. Volume changes affect only native
+						// playback, leaving the captured audio intact.
+						this.originalNativeVolume = target.volume;
+						target.volume = 0;
+						this.nativeVolumeSilencedByAttach = true;
 						usedCaptureStream = true;
 					}
 				} catch (err) {
@@ -946,10 +953,12 @@ export class AudioEngine {
 			navigator.mediaDevices.removeEventListener('devicechange', this.deviceChangeListener);
 			this.deviceChangeListener = null;
 		}
-		// Restore the native mute state if we changed it during attach.
-		if (this.nativeMutedByAttach && this.boundElement) {
-			this.boundElement.muted = this.originalMutedState;
-			this.nativeMutedByAttach = false;
+		// Restore the native volume if we silenced it during attach
+		// (captureStream path). The native element's mute state was
+		// never touched; only volume.
+		if (this.nativeVolumeSilencedByAttach && this.boundElement) {
+			this.boundElement.volume = this.originalNativeVolume;
+			this.nativeVolumeSilencedByAttach = false;
 		}
 		if (this.source) {
 			this.source.disconnect();
