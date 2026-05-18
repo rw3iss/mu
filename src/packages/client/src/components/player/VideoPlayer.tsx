@@ -28,7 +28,6 @@ export function VideoPlayer({
 	streamUrl,
 	directPlay = false,
 	startPosition = 0,
-	movie = null,
 	externalEngine,
 }: VideoPlayerProps) {
 	const containerRef = useRef<HTMLDivElement>(null);

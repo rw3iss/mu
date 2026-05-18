@@ -69,8 +69,11 @@ export class SxxExxDetector implements Detector {
 		return this.makeResult(showName, season, episode, confidence, input, normalised);
 	}
 
-	private computeConfidence(raw: string, normalised: string): number {
+	private computeConfidence(_raw: string, normalised: string): number {
 		// Empty / very short / pure-number show names lower confidence.
+		// `_raw` reserved for future heuristics that weigh punctuation
+		// noise (e.g. heavy bracket clutter) against the cleaner
+		// normalised form. Underscored to mark intentional non-use.
 		if (!normalised) return 0.55;
 		if (normalised.length <= 2) return 0.65;
 		if (/^\d+$/.test(normalised)) return 0.6;

@@ -84,7 +84,7 @@ export function MovieBreadcrumbs({
 			: null;
 
 	return (
-		<span class={cls} aria-label="Group breadcrumbs">
+		<nav class={cls} style={style} aria-label="Group breadcrumbs">
 			{parent && (
 				<>
 					<a
@@ -113,6 +113,6 @@ export function MovieBreadcrumbs({
 				{subgroup.name}
 			</a>
 			{ep && <span class={styles.episode}>{ep}</span>}
-		</span>
+		</nav>
 	);
 }

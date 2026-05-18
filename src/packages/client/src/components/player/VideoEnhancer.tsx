@@ -87,5 +87,5 @@ export function VideoEnhancer() {
 
 	if (!enabled || !supported) return null;
 
-	return <canvas ref={canvasRef} class={styles.canvas} aria-hidden="true" />;
+	return <canvas ref={canvasRef} class={styles.canvas} aria-hidden="true" tabIndex={-1} />;
 }

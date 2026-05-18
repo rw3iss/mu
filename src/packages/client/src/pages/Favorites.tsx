@@ -4,8 +4,8 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { MediaCard } from '@/components/common/MediaCard';
+import { MediaRow } from '@/components/common/MediaRow';
 import { Select } from '@/components/common/Select';
-import { SmartImage } from '@/components/common/SmartImage';
 import { type FavoriteEntry, favoritesService } from '@/services/favorites.service';
 import {
 	ensureFavoritesLoaded,
@@ -247,12 +247,7 @@ function FavoriteCard({ entry }: { entry: FavoriteEntry }) {
 			stopPropagation
 		/>
 	) : (
-		<FavoriteButton
-			entityType="movie"
-			movieId={entry.entityId}
-			size="normal"
-			stopPropagation
-		/>
+		<FavoriteButton entityType="movie" movieId={entry.entityId} size="normal" stopPropagation />
 	);
 
 	return (
@@ -312,52 +307,36 @@ function FavoriteRow({ entry }: { entry: FavoriteEntry }) {
 		if (isPerson) route(personHref(entry));
 		else if (entry.movie) route(`/movie/${entry.movie.id}`);
 	};
+	const name = isPerson ? (entry.person?.name ?? '') : (entry.movie?.title ?? '');
+	const thumbUrl = isPerson ? entry.person?.profileUrl : entry.movie?.posterUrl;
+	const subtitle = isPerson
+		? (entry.role ?? entry.person?.knownForDepartment ?? 'Person')
+		: String(entry.movie?.year ?? '');
+
+	const actions = isPerson ? (
+		<FavoriteButton
+			entityType="person"
+			tmdbId={entry.person?.tmdbId}
+			name={entry.person?.name ?? entry.key}
+			profileUrl={entry.person?.profileUrl}
+			personRole={entry.role}
+			size="normal"
+			stopPropagation
+		/>
+	) : (
+		<FavoriteButton entityType="movie" movieId={entry.entityId} size="normal" stopPropagation />
+	);
+
 	return (
-		<div class={styles.row} onClick={onClick} role="button" tabIndex={0}>
-			<div class={`${styles.rowThumb} ${isPerson ? styles.rowThumbPerson : ''}`}>
-				{(isPerson ? entry.person?.profileUrl : entry.movie?.posterUrl) ? (
-					<SmartImage
-						src={
-							(isPerson ? entry.person!.profileUrl : entry.movie!.posterUrl) as string
-						}
-						alt={isPerson ? entry.person!.name : entry.movie!.title}
-					/>
-				) : (
-					<div class={styles.rowThumbFallback}>
-						<Icon name={isPerson ? 'star' : 'film'} size={20} />
-					</div>
-				)}
-			</div>
-			<div class={styles.rowInfo}>
-				<span class={styles.rowTitle}>
-					{isPerson ? entry.person?.name : entry.movie?.title}
-				</span>
-				<span class={styles.rowMeta}>
-					{isPerson
-						? (entry.role ?? entry.person?.knownForDepartment ?? 'Person')
-						: (entry.movie?.year ?? '')}
-				</span>
-			</div>
-			<div class={styles.rowActions}>
-				{isPerson ? (
-					<FavoriteButton
-						entityType="person"
-						tmdbId={entry.person?.tmdbId}
-						name={entry.person?.name ?? entry.key}
-						profileUrl={entry.person?.profileUrl}
-						personRole={entry.role}
-						size="normal"
-						stopPropagation
-					/>
-				) : (
-					<FavoriteButton
-						entityType="movie"
-						movieId={entry.entityId}
-						size="normal"
-						stopPropagation
-					/>
-				)}
-			</div>
-		</div>
+		<MediaRow
+			thumbUrl={thumbUrl ?? ''}
+			thumbAlt={name}
+			thumbFallbackLabel={name}
+			thumbShape={isPerson ? 'circle' : 'poster'}
+			title={name}
+			subtitle={subtitle}
+			actions={actions}
+			onClick={onClick}
+		/>
 	);
 }

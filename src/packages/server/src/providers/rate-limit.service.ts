@@ -1,5 +1,5 @@
 import { nowISO } from '@mu/shared';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { and, eq, gte, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { providerUsage } from '../database/schema/index.js';
@@ -40,8 +40,6 @@ interface UsageSnapshot {
  */
 @Injectable()
 export class RateLimitService {
-	private readonly logger = new Logger('RateLimitService');
-
 	/** providerId → { second: Bucket, minute: Bucket } */
 	private readonly memBuckets = new Map<string, { second: InMemBucket; minute: InMemBucket }>();
 

@@ -2,7 +2,6 @@ import { JSX } from 'preact';
 import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import { currentPath } from '@/app';
-import { Icon } from '@/components/common/Icon';
 import { currentUser, logout } from '@/state/auth.state';
 import { isPlayerActive, playerMode } from '@/state/globalPlayer.state';
 import { fetchMovies } from '@/state/library.state';

@@ -1,5 +1,5 @@
 import { nowISO } from '@mu/shared';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movieMetadata, movies, type NewMovie, userWatchlist } from '../database/schema/index.js';

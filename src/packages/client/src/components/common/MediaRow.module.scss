@@ -1,0 +1,173 @@
+// MediaRow — generic horizontal list-row shell.
+
+.row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 10px 12px;
+	border-radius: 8px;
+	cursor: pointer;
+	color: var(--color-text-primary);
+	transition:
+		background-color 140ms var(--ease-snap, ease-out),
+		opacity 140ms var(--ease-snap, ease-out);
+
+	&:hover {
+		background-color: var(--color-bg-elevated);
+	}
+
+	&:active {
+		background-color: var(--color-bg-tertiary, var(--color-bg-elevated));
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -2px;
+	}
+}
+
+.compact {
+	gap: 8px;
+	padding: 6px 8px;
+}
+
+.selected {
+	background-color: var(--color-accent-subtle);
+
+	&:hover {
+		background-color: var(--color-accent-subtle);
+	}
+}
+
+.dim {
+	opacity: 0.65;
+}
+
+.disabled {
+	cursor: default;
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+// ── Leading slot (left of thumb) ──────────────────────────
+
+.leading {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+}
+
+// ── Thumbnail ─────────────────────────────────────────────
+
+.thumb {
+	flex-shrink: 0;
+	overflow: hidden;
+	background: var(--color-bg-elevated);
+	border: 1px solid var(--color-border);
+	color: var(--color-text-muted);
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+}
+
+.shape_square {
+	width: 44px;
+	height: 44px;
+	border-radius: 6px;
+}
+
+.shape_circle {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+}
+
+.shape_poster {
+	width: 40px;
+	height: 60px;
+	border-radius: 6px;
+}
+
+.shape_backdrop {
+	width: 72px;
+	height: 40px;
+	border-radius: 6px;
+}
+
+.compact {
+	.shape_square,
+	.shape_circle {
+		width: 32px;
+		height: 32px;
+	}
+	.shape_poster {
+		width: 28px;
+		height: 42px;
+	}
+	.shape_backdrop {
+		width: 56px;
+		height: 32px;
+	}
+}
+
+.thumbInner {
+	width: 100%;
+	height: 100%;
+}
+
+.thumbImg {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.thumbFallback {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 600;
+	font-size: 16px;
+	color: var(--color-text-muted);
+}
+
+// ── Info ──────────────────────────────────────────────────
+
+.info {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.title {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--color-text-primary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.subtitle {
+	font-size: 12px;
+	color: var(--color-text-secondary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+// ── Actions ───────────────────────────────────────────────
+
+.actions {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}

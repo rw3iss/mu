@@ -150,7 +150,7 @@ export class LogsController {
 				'Logs API not enabled — set auth.apiToken (or MU_AUTH_API_TOKEN) on the server.',
 			);
 		}
-		const header = (req.headers['x-mu-api-token'] ?? req.headers['authorization']) as
+		const header = (req.headers['x-mu-api-token'] ?? req.headers.authorization) as
 			| string
 			| undefined;
 		if (!header) {

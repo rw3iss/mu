@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import type { TraktRelatedMovie } from './trakt.types.js';
 
 const TRAKT_BASE = 'https://api.trakt.tv';
@@ -14,8 +13,6 @@ export interface TraktHttpClientOptions {
  * appropriately.
  */
 export class TraktHttpClient {
-	private readonly logger = new Logger('TraktHttpClient');
-
 	constructor(private readonly options: TraktHttpClientOptions) {}
 
 	async related(idOrSlug: string | number, limit = 10): Promise<TraktRelatedMovie[]> {

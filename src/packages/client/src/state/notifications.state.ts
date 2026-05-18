@@ -16,7 +16,11 @@ export type NotificationType = 'success' | 'error' | 'warning' | 'info';
 export interface NotificationAction {
 	label: string;
 	href?: string;
-	onClick?: () => void | boolean;
+	/**
+	 * Return `true` to keep the toast open after the action runs;
+	 * any other return (including `undefined`) closes it.
+	 */
+	onClick?: () => boolean | undefined;
 }
 
 export interface Notification {

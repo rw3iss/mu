@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service.js';
 import { MiniLMLocalEmbedder } from './embedders/minilm-local.embedder.js';
 import { EmbeddingStore } from './embedding-store.interface.js';
@@ -13,7 +13,6 @@ import { SqliteBlobEmbeddingStore } from './sqlite-blob-embedding-store.ts';
  */
 @Injectable()
 export class EmbeddingsService {
-	private readonly logger = new Logger('EmbeddingsService');
 	private readonly store: EmbeddingStore;
 
 	constructor(

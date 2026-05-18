@@ -1,5 +1,5 @@
 import { CACHE_NAMESPACES } from '@mu/shared';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -52,7 +52,6 @@ export interface RecommendResponse {
  */
 @Injectable()
 export class RecommendationsService {
-	private readonly logger = new Logger('RecommendationsService');
 	private readonly strategies: SimilarityStrategy[];
 
 	constructor(
