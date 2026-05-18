@@ -944,7 +944,7 @@
 			display: none;
 		}
 
-		// ── Row 2: Transport (centered, no gap) ──
+		// ── Row 2: Transport (centered, with ~10px gap between buttons) ──
 		// Keep position: static (within the column flow) but anchor
 		// the play button to the visual center; the skip extended
 		// clusters expand OUTWARD via position: absolute and never
@@ -955,7 +955,7 @@
 			margin: 0;
 			align-self: center;
 			justify-content: center;
-			gap: 0;
+			gap: 10px;
 			min-height: 48px;
 		}
 		.skipWrap {
