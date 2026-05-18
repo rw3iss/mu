@@ -59,7 +59,13 @@ function getSharedVideoElement(): HTMLVideoElement {
 		video.crossOrigin = 'anonymous';
 		video.style.width = '100%';
 		video.style.height = '100%';
-		video.style.objectFit = 'contain';
+		// Don't set object-fit inline — the wrapper class drives it per
+		// mode (.videoWrapperFull → cover; .videoWrapperSplit → contain;
+		// .videoWrapperMini → cover). An inline style here would override
+		// those rules and force `contain` everywhere, which left visible
+		// black bars on mobile-landscape (viewport aspect ≠ video aspect)
+		// even though `.videoWrapperFull` deliberately specifies cover
+		// for edge-to-edge fill.
 		sharedVideoElement = video;
 	}
 	return sharedVideoElement;
