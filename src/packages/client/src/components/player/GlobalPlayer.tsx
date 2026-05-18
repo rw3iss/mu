@@ -79,42 +79,48 @@ export function GlobalPlayer() {
 	const preFullscreenModeRef = useRef<PlayerMode | null>(null);
 	const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+	/**
+	 * Show the controls now and schedule them to fade after the
+	 * configured `overlay_hide_timeout`. Called from:
+	 *  - the video wrapper's `onMouseMove` (activity over the video)
+	 *  - `armAutoHide` (entered an overlay mode)
+	 *
+	 * The setTimeout callback respects `isHoveringControls` so the user
+	 * keeps the controls up by parking the cursor on the top header
+	 * or bottom bar; moving off retriggers the fade on the next
+	 * activity reset.
+	 */
 	const resetControlsTimer = useCallback(() => {
 		showControls.value = true;
 		if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-		if (isPlaying.value) {
-			const timeout = Math.max(100, getUiSetting('overlay_hide_timeout', 2000));
-			if (timeout >= 100) {
-				controlsTimerRef.current = setTimeout(() => {
-					if (!isHoveringControls.value) {
-						showControls.value = false;
-					}
-				}, timeout);
+		const timeout = Math.max(100, getUiSetting('overlay_hide_timeout', 2000));
+		controlsTimerRef.current = setTimeout(() => {
+			if (!isHoveringControls.value) {
+				showControls.value = false;
 			}
-		}
+		}, timeout);
 	}, []);
 
-	// Auto-hide controls when playing starts OR when the player transitions into
-	// a mode that auto-hides (full / exclusive split). Watching playerMode here
-	// covers the case where the user maximizes from split/mini without ever
-	// moving the mouse over the video — the mouseMove handler would otherwise
-	// never fire, and the controls would stay stuck visible forever.
-	//
-	// `isFullscreen.value` is in the deps for the "already in full mode,
-	// double-click to enter browser fullscreen" path: playerMode stays
-	// `'full'` so it doesn't trigger the effect on its own, but the
-	// fullscreen change does — and the user expects the timer to start
-	// after that interaction the same as any other maximize.
+	/**
+	 * Whenever the player enters a state that overlays the video
+	 * (full mode, exclusive split, or browser fullscreen), arm the
+	 * auto-hide timer immediately — regardless of whether the mouse
+	 * is over the video. Mouse activity over the video then resets
+	 * the timer normally via the wrapper's `onMouseMove` handler.
+	 *
+	 * This is the only place the timer is armed on mode transitions;
+	 * click/dblclick on the video do NOT explicitly arm it because
+	 * the resulting mode/fullscreen change already triggers this
+	 * effect.
+	 */
 	useEffect(() => {
-		const isExclusiveSplit = playerMode.value === 'split' && splitExclusive.value;
-		if (
-			isPlaying.value &&
-			playerMode.value !== 'mini' &&
-			(playerMode.value !== 'split' || isExclusiveSplit)
-		) {
+		const inOverlayMode =
+			playerMode.value === 'full' ||
+			(playerMode.value === 'split' && splitExclusive.value);
+		if (inOverlayMode || isFullscreen.value) {
 			resetControlsTimer();
 		}
-	}, [isPlaying.value, splitExclusive.value, playerMode.value, isFullscreen.value]);
+	}, [playerMode.value, splitExclusive.value, isFullscreen.value, resetControlsTimer]);
 
 	// Expose the video engine via module-level ref so Player page can access it
 	useEffect(() => {
@@ -305,17 +311,10 @@ export function GlobalPlayer() {
 				wrapper.insertBefore(video, wrapper.firstChild);
 			}
 
-			// Click to toggle play, double-click for fullscreen.
-			// Only respond to clicks directly on the video element — ignore
-			// clicks on overlay buttons that might bubble through.
-			//
-			// Each interaction unconditionally arms the auto-hide timer.
-			// This is the reliable path even when no state change in the
-			// auto-hide effect's dep array would otherwise fire (e.g.
-			// double-click in `full` mode toggles browser-fullscreen but
-			// leaves playerMode unchanged). resetControlsTimer is
-			// idempotent: it clears any prior timer before scheduling a
-			// new one, so we can't leak.
+			// Click → toggle play. Double-click → toggle browser fullscreen
+			// (in full mode) or maximize (in split/mini). Only respond to
+			// clicks directly on the video element — ignore clicks on
+			// overlay buttons that might bubble through.
 			const handleClick = (e: MouseEvent) => {
 				if (playerMode.value === 'mini') return;
 				if (e.target !== video) return;
@@ -323,7 +322,6 @@ export function GlobalPlayer() {
 					videoClickTimerRef.current = setTimeout(() => {
 						videoClickTimerRef.current = null;
 						engine.togglePlay();
-						resetControlsTimer();
 					}, 250);
 				}
 			};
@@ -334,19 +332,12 @@ export function GlobalPlayer() {
 					clearTimeout(videoClickTimerRef.current);
 					videoClickTimerRef.current = null;
 				}
-				// In fullscreen full mode: just exit fullscreen (stay in full mode)
+				// In browser fullscreen + full mode: just exit fullscreen.
 				if (document.fullscreenElement && playerMode.value === 'full') {
 					document.exitFullscreen().catch(() => {});
-					resetControlsTimer();
 					return;
 				}
 				handleToggleFullscreen();
-				// Arm the auto-hide timer immediately. handleToggleFullscreen is
-				// async (awaits the fullscreen API), but resetControlsTimer
-				// doesn't depend on its completion — it just needs to start
-				// counting from "now" so the controls fade after the user
-				// stops interacting, even if the mouse never enters the video.
-				resetControlsTimer();
 			};
 
 			// Scroll wheel to adjust volume (must be non-passive to preventDefault)
