@@ -99,6 +99,12 @@ export function GlobalPlayer() {
 	// covers the case where the user maximizes from split/mini without ever
 	// moving the mouse over the video — the mouseMove handler would otherwise
 	// never fire, and the controls would stay stuck visible forever.
+	//
+	// `isFullscreen.value` is in the deps for the "already in full mode,
+	// double-click to enter browser fullscreen" path: playerMode stays
+	// `'full'` so it doesn't trigger the effect on its own, but the
+	// fullscreen change does — and the user expects the timer to start
+	// after that interaction the same as any other maximize.
 	useEffect(() => {
 		const isExclusiveSplit = playerMode.value === 'split' && splitExclusive.value;
 		if (
@@ -108,7 +114,7 @@ export function GlobalPlayer() {
 		) {
 			resetControlsTimer();
 		}
-	}, [isPlaying.value, splitExclusive.value, playerMode.value]);
+	}, [isPlaying.value, splitExclusive.value, playerMode.value, isFullscreen.value]);
 
 	// Expose the video engine via module-level ref so Player page can access it
 	useEffect(() => {
@@ -302,6 +308,14 @@ export function GlobalPlayer() {
 			// Click to toggle play, double-click for fullscreen.
 			// Only respond to clicks directly on the video element — ignore
 			// clicks on overlay buttons that might bubble through.
+			//
+			// Each interaction unconditionally arms the auto-hide timer.
+			// This is the reliable path even when no state change in the
+			// auto-hide effect's dep array would otherwise fire (e.g.
+			// double-click in `full` mode toggles browser-fullscreen but
+			// leaves playerMode unchanged). resetControlsTimer is
+			// idempotent: it clears any prior timer before scheduling a
+			// new one, so we can't leak.
 			const handleClick = (e: MouseEvent) => {
 				if (playerMode.value === 'mini') return;
 				if (e.target !== video) return;
@@ -309,6 +323,7 @@ export function GlobalPlayer() {
 					videoClickTimerRef.current = setTimeout(() => {
 						videoClickTimerRef.current = null;
 						engine.togglePlay();
+						resetControlsTimer();
 					}, 250);
 				}
 			};
@@ -322,9 +337,16 @@ export function GlobalPlayer() {
 				// In fullscreen full mode: just exit fullscreen (stay in full mode)
 				if (document.fullscreenElement && playerMode.value === 'full') {
 					document.exitFullscreen().catch(() => {});
+					resetControlsTimer();
 					return;
 				}
 				handleToggleFullscreen();
+				// Arm the auto-hide timer immediately. handleToggleFullscreen is
+				// async (awaits the fullscreen API), but resetControlsTimer
+				// doesn't depend on its completion — it just needs to start
+				// counting from "now" so the controls fade after the user
+				// stops interacting, even if the mouse never enters the video.
+				resetControlsTimer();
 			};
 
 			// Scroll wheel to adjust volume (must be non-passive to preventDefault)
