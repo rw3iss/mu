@@ -92,14 +92,5 @@
   animation: scaleIn var(--transition-normal) ease forwards;
 }
 
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--color-bg-surface) 25%,
-    var(--color-bg-elevated) 50%,
-    var(--color-bg-surface) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: var(--radius-sm);
-}
+// .skeleton lives in global.scss (canonical). The `shimmer` keyframes
+// above stay here for the `.skeleton` animation utility.

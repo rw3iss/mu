@@ -17,6 +17,31 @@ body {
 }
 
 // ============================================
+// Theme-change crossfade
+// ----------------------------------------------------------------
+// When the user switches themes the CSS custom properties on :root
+// flip instantly. That's a visually jarring snap on a UI as wide as
+// the player + sidebar + cards. By transitioning the *animatable*
+// root properties (color, background-color, border-color) only
+// during the brief window around theme apply, the whole app
+// crossfades into the new palette without polluting normal hover /
+// active transitions the rest of the time.
+//
+// `--theme-transition-duration` is tokenised (0 disables, e.g. for
+// reduce-motion paths). Scoped via `:where()` so component CSS keeps
+// its own per-rule timings during regular interaction — this block
+// only kicks in while `<html data-theme-transitioning='true'>` is
+// set by the theme apply runtime (one tick around the switch).
+html[data-theme-transitioning='true'] :where(*) {
+  transition:
+    background-color var(--theme-transition-duration, 0ms) ease,
+    color var(--theme-transition-duration, 0ms) ease,
+    border-color var(--theme-transition-duration, 0ms) ease,
+    fill var(--theme-transition-duration, 0ms) ease,
+    stroke var(--theme-transition-duration, 0ms) ease !important;
+}
+
+// ============================================
 // Headings use medium/semibold weight
 // ============================================
 
@@ -57,9 +82,13 @@ h1, h2, h3, h4, h5, h6 {
 // Focus & Selection
 // ============================================
 
+// Use the focus-ring tokens so a re-theme propagates here too. Default
+// outline is the simplest accessible focus signal across all element
+// types; components needing a richer ring can opt in via the
+// `@mixin focus-ring` (which adds the `--accent-glow` halo).
 :focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
 }
 
 :focus:not(:focus-visible) {
@@ -67,9 +96,12 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: none;
 }
 
+// Selection tracks the active theme accent instead of a fixed mint
+// shade. `color-mix` keeps the alpha consistent across hues; the
+// foreground reads the theme text color so it stays legible.
 ::selection {
-  background-color: rgba(34, 211, 167, 0.3);
-  color: #ffffff;
+  background-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  color: var(--color-text-primary);
 }
 
 // ============================================
@@ -97,6 +129,27 @@ html[data-reduce-motion='true'] *::after {
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
+}
+
+// System-level reduced-motion preference — honor the OS setting even
+// when the user hasn't flipped the in-app toggle. The two paths are
+// independent (system pref + manual toggle); either triggers the
+// same neutralisation. Manual toggle still overrides via specificity.
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  // Also zero out the theme-switch crossfade so the system pref
+  // suppresses it without needing an extra signal.
+  :root {
+    --theme-transition-duration: 0ms;
+  }
 }
 
 // ============================================

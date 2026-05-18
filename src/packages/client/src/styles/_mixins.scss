@@ -102,3 +102,39 @@ $breakpoint-desktop: 1280px !default;
     }
   }
 }
+
+// Theme-aware focus ring with optional halo. Use on interactive
+// surfaces that want a richer focus signal than the default outline
+// (cards, custom inputs, primary CTAs).
+@mixin focus-ring($with-halo: true) {
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+    @if $with-halo {
+      box-shadow: var(--accent-glow);
+    }
+  }
+}
+
+// Frosted-glass surface. Defaults pull from `--surface-glass-*` tokens
+// so re-theming changes blur radius / background opacity globally.
+@mixin glass-surface($bg: null, $blur: null) {
+  background: if($bg, $bg, var(--surface-glass-bg));
+  backdrop-filter: blur(if($blur, $blur, var(--surface-glass-blur)));
+  -webkit-backdrop-filter: blur(if($blur, $blur, var(--surface-glass-blur)));
+  border: var(--surface-glass-border);
+}
+
+// Soft hover lift for clickable surfaces. Adds a translateY + drop
+// shadow, transitioned via the `--ease-out` curve. Respects
+// reduce-motion via the global `*` override in global.scss.
+@mixin hover-lift {
+  transition:
+    transform 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
+
+  &:hover {
+    transform: translateY(var(--hover-lift-distance));
+    box-shadow: var(--hover-lift-shadow);
+  }
+}

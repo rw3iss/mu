@@ -34,6 +34,24 @@ function hexToRgbParts(hex: string): { r: number; g: number; b: number } {
 	return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
 }
 
+/**
+ * Briefly flip a `data-theme-transitioning` attribute on <html> so the
+ * global crossfade rule in global.scss activates for one swap window.
+ * Without this, switching themes snaps every color instantly across
+ * the entire UI. The window covers one full --theme-transition-duration.
+ */
+function flashThemeTransition(): void {
+	if (typeof document === 'undefined') return;
+	const root = document.documentElement;
+	// Read the computed duration so we don't drop the flag mid-fade.
+	const durStr = getComputedStyle(root).getPropertyValue('--theme-transition-duration').trim();
+	const durMs = parseFloat(durStr) || 220;
+	root.setAttribute('data-theme-transitioning', 'true');
+	window.setTimeout(() => {
+		root.removeAttribute('data-theme-transitioning');
+	}, durMs + 30); // small buffer for the end of the easing curve
+}
+
 // ============================================
 // Actions
 // ============================================
@@ -54,6 +72,13 @@ let previousTokenKeys: string[] = [];
 
 export function applyThemeConfig(config: ThemeConfig): void {
 	const root = document.documentElement;
+
+	// Activate the one-window CSS crossfade so root colors glide into
+	// the new palette instead of snapping. No-op on the very first
+	// apply (no FOUC) because the root has no prior color to fade from.
+	if (activeConfig.value !== null) {
+		flashThemeTransition();
+	}
 
 	// Clear any rich tokens from the previous theme that the new theme
 	// doesn't set — otherwise switching from a richly-themed entry back
@@ -82,6 +107,18 @@ export function applyThemeConfig(config: ThemeConfig): void {
 	root.style.setProperty('--panel-bg', config.panelBg);
 	root.style.setProperty('--item-gap', ITEM_GAP_MAP[config.itemSpacing] ?? ITEM_GAP_MAP.normal);
 	root.style.setProperty('--item-radius', `${config.itemRadius}px`);
+
+	// Derive `--accent-rgb` (space-separated) from the accent hex so
+	// callers can build translucent variants via `rgb(var(--accent-rgb)
+	// / 0.4)`. Theme.tokens may override this explicitly (Aurora /
+	// Sunset Cinema / Vaporwave do); the derivation here is the
+	// fallback that keeps every theme — including user-picked accent
+	// colors via the ColorPicker — coherent.
+	const accentRgbToken = config.tokens?.['accent-rgb'];
+	if (!accentRgbToken) {
+		const { r, g, b } = hexToRgbParts(config.accentColor);
+		root.style.setProperty('--accent-rgb', `${r} ${g} ${b}`);
+	}
 
 	const { r, g, b } = hexToRgbParts(config.cardBorder.color);
 	root.style.setProperty(
