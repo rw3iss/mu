@@ -25,12 +25,17 @@ export function applyDiscoverFilters(
 		if (!m) return false;
 
 		if (filters.minRating != null && filters.minRating > 0) {
+			// Strict: a movie with no rating data can't satisfy a
+			// "minimum rating X" constraint. Excluding null/0 here
+			// matches user expectation ("show me movies rated ≥ X").
 			const r = m.tmdbRating ?? m.imdbRating ?? 0;
-			if (r > 0 && r < filters.minRating) return false;
+			if (r < filters.minRating) return false;
 		}
 		if (filters.minVotes != null && filters.minVotes > 0) {
-			// We don't carry tmdbVotes on MovieWithMetadata — skip until
-			// the hydration layer exposes it; harmless no-op for now.
+			// Strict: same rationale as minRating. Null tmdbVotes is
+			// treated as "unknown count, doesn't meet threshold".
+			const v = m.tmdbVotes ?? 0;
+			if (v < filters.minVotes) return false;
 		}
 		if (wantGenres.length > 0) {
 			const ml = m.genres.map((g) => g.toLowerCase());

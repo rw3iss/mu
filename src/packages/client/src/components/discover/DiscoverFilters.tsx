@@ -66,6 +66,23 @@ export function DiscoverFilters({
 			</div>
 
 			<div class={styles.section}>
+				<label class={styles.fieldLabel}>Minimum votes</label>
+				<input
+					type="number"
+					class={styles.numInput}
+					placeholder="e.g. 1000"
+					min={0}
+					step={100}
+					value={value.minVotes ?? ''}
+					onInput={(e) => {
+						const raw = (e.target as HTMLInputElement).value;
+						const n = raw ? parseInt(raw, 10) : NaN;
+						update({ minVotes: Number.isFinite(n) && n > 0 ? n : undefined });
+					}}
+				/>
+			</div>
+
+			<div class={styles.section}>
 				<label class={styles.fieldLabel}>Year</label>
 				<div class={styles.yearRow}>
 					<input
