@@ -14,7 +14,7 @@
   "dependencies": {
     "@mu/shared": "workspace:*",
     "@preact/signals": "^2.8.2",
-    "dev-debug-panel": "file:../../vendor/dev-debug-panel-2.0.0.tgz",
+    "dev-debug-panel": "file:../../vendor/dev-debug-panel-2.0.1.tgz",
     "dev-loggers": "file:../../vendor/dev-loggers-4.0.0.tgz",
     "hls.js": "^1.5.0",
     "preact": "^10.29.0",
