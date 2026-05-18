@@ -790,22 +790,19 @@
 }
 
 // ============================================
-// Mobile mini-overlay overrides
+// Mobile mini-overlay overrides — LANDSCAPE ONLY
 // ----------------------------------------------------------------
-// In mini mode at default --player-bar-height (~105px), every
-// .controlBtn is height: 100% + aspect-ratio: 1 → ~100px squares.
-// That eats half a phone viewport. Below 768px:
-//   - shrink the buttons to touch-target spec (44px)
-//   - shrink icons & title
-//   - hide controls a touch user can't usefully reach (hover
-//     popouts: skip-extended, volume slider; and Maximize-then-
-//     reach: effects panel, settings menu). Play, Maximize, Info,
-//     Fullscreen, Close remain.
-// Activated by the existing .miniMode class (set when
-// hasMiniThumbnail is true in PlayerControls).
+// In mini-landscape the bar is only 56px tall; there's no room for
+// the full multi-row layout AND the controls need to share a single
+// row beside the thumbnail. The landscape block below handles the
+// row layout; this block just tightens up sizes for that context.
+//
+// Mini-portrait (taller bar, bigger thumbnail) uses the same
+// multi-row layout as non-mini portrait — see the portrait block
+// further down which intentionally targets both.
 // ============================================
 
-@include mobile {
+@media (max-width: 767px) and (orientation: landscape) {
 	.miniMode {
 		.seekRow {
 			top: -8px;
@@ -854,21 +851,10 @@
 			height: 22px;
 		}
 
-		// Touch users can scrub via the seek bar; the hover-driven
-		// skip-extended popouts and volume slider aren't reachable.
-		// Effects + settings menus are still available after
-		// Maximize, so dropping them from the mini bar keeps the
-		// essentials within thumb reach.
-		.skipWrap,
-		.volumeWrap,
-		.effectsBtnWrap,
-		.menuContainer {
-			display: none;
-		}
-
-		// Overflow popover replaces the hidden controls above.
+		// Mobile-overflow ⋯ button stays hidden — the landscape
+		// layout fits all secondary controls inline on row 2.
 		.mobileOverflow {
-			display: flex;
+			display: none;
 		}
 
 		.rightControls {
@@ -879,10 +865,10 @@
 }
 
 // ============================================
-// Mobile FULL-mode (non-mini, non-split) layout
+// Mobile PORTRAIT layout — full + mini, non-split
 // ----------------------------------------------------------------
-// On a phone, the desktop "one wide row" doesn't fit. Stack into
-// three rows growing UP from the bottom of the viewport:
+// On a phone in portrait, the desktop "one wide row" doesn't fit.
+// Stack into three rows growing UP from the bottom of the viewport:
 //
 //   ┌─ seek bar ─────────────────────────────────────┐
 //   │ Title (full width, centered)                   │  ← row 1
@@ -890,13 +876,15 @@
 //   │ Info  Effects  Volume  Settings   Maximize     │  ← row 3 (space-between)
 //   └────────────────────────────────────────────────┘
 //
-// Tap << or >> → skipExtended buttons grow outward inline,
-// pushing into the same row (skipExtendedLeft uses flex order:-1
-// so options appear to the LEFT of the skip button).
+// Mini mode applies the same layout but the thumbnail sits in the
+// .miniSpacer beside the mainRow (the bar is taller in portrait —
+// see GlobalPlayer.module.scss .playerBarMini portrait override).
+// Tap << or >> → skipExtended overlays outward via absolute
+// positioning (right:100% / left:100%) without reflowing the row.
 // ============================================
 
-@include mobile {
-	.controls:not(.miniMode):not(.splitControls) {
+@media (max-width: 767px) and (orientation: portrait) {
+	.controls:not(.splitControls) {
 		.seekRow {
 			top: -6px;
 		}
@@ -907,12 +895,33 @@
 			height: 3px;
 		}
 
-		.contentRow,
+		// .mainRow always stacks (title / transport / secondary).
 		.mainRow {
 			flex-direction: column;
 			align-items: stretch;
+			min-width: 0;
 			padding: 0 8px 8px;
 			gap: 6px;
+		}
+		// .contentRow stacks only in non-mini (no spacer). In mini
+		// portrait the spacer sits beside mainRow.
+		&:not(.miniMode) .contentRow {
+			flex-direction: column;
+			align-items: stretch;
+			padding: 0;
+			gap: 0;
+		}
+		// Mini portrait: thumbnail beside mainRow, mainRow flexes
+		// into the remaining width.
+		&.miniMode .contentRow {
+			flex-direction: row;
+			align-items: stretch;
+			gap: 8px;
+			padding: 0;
+		}
+		&.miniMode .mainRow {
+			flex: 1;
+			padding: 0 8px 8px 0;
 		}
 
 		// ── Row 1: Title (full width) ──
@@ -927,6 +936,9 @@
 			text-align: center;
 			width: 100%;
 			margin-bottom: 0;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
 		}
 		.timingLabel {
 			display: none;
@@ -958,27 +970,29 @@
 			opacity: 1;
 			pointer-events: auto;
 		}
+		// Extended skip buttons use the SAME look as regular .controlBtn
+		// (no background, hover-tinted) with even gaps between them.
 		.skipExtended {
-			// Restore absolute positioning so opening the extended
-			// cluster doesn't reflow the centered transport row.
 			position: absolute;
 			top: 0;
 			bottom: 0;
 			display: flex;
-			align-items: stretch;
-			background: rgba(18, 18, 18, 0.85);
-			border-radius: 4px;
+			align-items: center;
+			background: transparent;
+			gap: 4px;
 			z-index: 3;
 		}
 		.skipExtendedLeft {
 			// Grow LEFT from the skip-back button's left edge.
 			right: 100%;
 			left: auto;
+			padding-right: 4px;
 		}
 		.skipExtendedRight {
 			// Grow RIGHT from the skip-forward button's right edge.
 			left: 100%;
 			right: auto;
+			padding-left: 4px;
 		}
 		.skipExtBtn {
 			width: 48px;
@@ -1087,7 +1101,7 @@
 			gap: 12px;
 		}
 		.titleText {
-			font-size: 13px;
+			font-size: 15px;
 			margin-bottom: 0;
 			flex: 1;
 			min-width: 0;
@@ -1098,24 +1112,36 @@
 		// Show the timing label inline on landscape (portrait hides it).
 		.timingLabel {
 			display: inline-block;
-			font-size: 12px;
+			font-size: 13px;
 			flex-shrink: 0;
 		}
 
 		// ── Row 2: All controls on one row (transport + secondary) ──
+		// Vertically center contents within whatever row-height the bar
+		// settles at (mini = 56px, full = auto/120px+).
 		.controlsBottomRow {
 			display: flex;
 			width: 100%;
 			align-items: center;
 			justify-content: space-between;
 			gap: 8px;
+			// Reserve ~200px of leftward expansion room for the skip-back
+			// extended cluster (3 buttons × 44px + gaps ≈ 156px, plus
+			// breathing room) so it can fully expand without being
+			// clipped by the bar's left edge / .miniSpacer.
+			padding-left: 200px;
+			// In mini mode the .miniSpacer sits to the left of the
+			// mainRow inside .contentRow, so the 200px reserve is
+			// measured from mainRow's left edge — still enough since
+			// the spacer naturally pushes the cluster further right.
 		}
 		.centerControls {
 			position: static;
 			transform: none;
 			margin: 0;
 			gap: 0;
-			min-height: 40px;
+			align-items: center;
+			min-height: 44px;
 			// Anchor for absolutely-positioned skipExtended.
 			.skipWrap {
 				position: relative;
@@ -1125,53 +1151,62 @@
 			opacity: 1;
 			pointer-events: auto;
 		}
+		// Skip-extended overlays use the SAME look as regular .controlBtn
+		// (no background, hover-tinted) — no dark container background.
+		// They're individually-rendered .controlBtn elements with even
+		// gaps between them.
 		.skipExtended {
 			position: absolute;
 			top: 0;
 			bottom: 0;
 			display: flex;
-			align-items: stretch;
-			background: rgba(18, 18, 18, 0.85);
-			border-radius: 4px;
+			align-items: center;
+			background: transparent;
+			gap: 4px;
 			z-index: 3;
 		}
 		.skipExtendedLeft {
 			right: 100%;
 			left: auto;
+			// Pad so the rightmost extended button doesn't butt against
+			// the skip-back base button.
+			padding-right: 4px;
 		}
 		.skipExtendedRight {
 			left: 100%;
 			right: auto;
+			padding-left: 4px;
 		}
+		// Match the standard control button size in landscape (44px).
 		.skipExtBtn {
-			width: 40px;
-			height: 40px;
+			width: 44px;
+			height: 44px;
 		}
 
 		.rightControls {
 			width: auto;
 			margin: 0;
-			min-height: 40px;
+			min-height: 44px;
 			justify-content: flex-end;
 			align-items: center;
 		}
 
-		// Smaller buttons everywhere in landscape — vertical space is
-		// at a premium when the phone is sideways.
+		// Slightly larger square buttons in landscape (44px) — chunky
+		// enough to thumb without eating the viewport.
 		.controlBtn {
 			aspect-ratio: auto;
-			width: 40px;
-			height: 40px;
+			width: 44px;
+			height: 44px;
 			margin: 0;
 			align-self: center;
 			svg {
-				width: 20px;
-				height: 20px;
+				width: 22px;
+				height: 22px;
 			}
 		}
 		.playBtn svg {
-			width: 24px;
-			height: 24px;
+			width: 26px;
+			height: 26px;
 		}
 
 		.mobileOverflow {
@@ -1181,10 +1216,16 @@
 		// Mini mode in landscape: .contentRow stays row-direction so
 		// .miniSpacer (the thumbnail) sits beside .mainRow. mainRow
 		// flexes into the remaining width and stacks title-row +
-		// controls-row inside it. .mainRow already has `min-width: 0`
-		// above so the title can ellipsize instead of forcing overflow.
+		// controls-row inside it. mainRow already has min-width: 0 so
+		// the title can ellipsize instead of forcing overflow.
 		&.miniMode .mainRow {
 			flex: 1;
+		}
+		// In mini-landscape the bar is only 56px tall and the spacer
+		// already steals ~96px from the row — drop the 200px reserve
+		// to ~100px so the controls aren't pushed off-screen.
+		&.miniMode .controlsBottomRow {
+			padding-left: 100px;
 		}
 	}
 }

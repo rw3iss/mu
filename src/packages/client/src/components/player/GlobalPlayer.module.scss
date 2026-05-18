@@ -230,12 +230,20 @@
 
 // Mini mode: bar sits BELOW the video thumbnail; on mobile it must
 // clear the mobile nav so it doesn't overlap the bottom nav bar.
+//
+// Portrait gets a taller bar + bigger thumbnail because vertical space
+// is plentiful and a 56px-tall bar makes the controls cramped. Landscape
+// keeps the compact 56px to preserve viewing area when held sideways.
 .playerBarMini {
   z-index: var(--z-player-controls);
 
   @include mobile {
     height: 56px;
     bottom: calc(var(--mobile-nav-height, 56px) + env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (max-width: 767px) and (orientation: portrait) {
+    height: 96px;
   }
 }
 
@@ -321,6 +329,13 @@
     width: 96px;
     height: 56px;
     bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+
+  // Portrait gets a bigger thumbnail (the bar is also taller — see
+  // .playerBarMini portrait override).
+  @media (max-width: 767px) and (orientation: portrait) {
+    width: 144px;
+    height: 96px;
   }
 }
 
@@ -530,5 +545,11 @@
   @include mobile {
     width: 96px;
     height: 56px;
+  }
+
+  // Portrait mini: match the larger thumbnail.
+  @media (max-width: 767px) and (orientation: portrait) {
+    width: 144px;
+    height: 96px;
   }
 }
