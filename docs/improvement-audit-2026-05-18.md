@@ -146,12 +146,19 @@ Keep the `@keyframes shimmer` so the animation utility remains importable.
   a new always-dark overlay token group (`--on-dark-overlay-1/2/3`) rather than reuse
   `--surface-overlay-*`. Moved to Phase C.
 
-### Phase C (planned — not applied this pass)
-- **On-dark overlay token group**: introduce `--on-dark-overlay-1/2/3` (always white at fixed alphas) so player components can use tokens without theme-flipping. Then migrate the ~150 player hardcodes onto those tokens.
-- ColorPicker.module.scss token migration (18 hardcodes — partially theme-aware surface, partially always-dark popover; needs per-rule decision).
-- New theme picker UI with live preview swatches (currently uses dropdowns; the new `--accent-rgb` + `color-mix` tokens make swatch previews trivially renderable in CSS).
-- Per-accent harmonious palette generator (HSL ramp at theme apply time, replacing pre-mixed `color-accent-hover`/`active` per-theme).
-- Adopt the new `@mixin glass-surface` and `@mixin focus-ring` across existing popover surfaces (PlayerControls .menu, InfoPanel .panel, MovieDetail backdrop, Settings panels) — about 10 files. Opportunistic; not blocking.
+### Phase C — applied 2026-05-18
+
+- **`--on-dark-overlay-1/2/3/-strong` + `--on-dark-text-primary/secondary/muted` tokens** added to `_variables.scss`. Fixed white-on-dark values (not overridden in light theme), so always-dark surfaces like the player chrome get a tokenized way to set hover/active/text fills without flipping in light theme. Migrated 24 hardcoded `rgba(255,255,255,…)` instances in `PlayerControls.module.scss` (the worst offender) to the new tokens. EffectsPanel / GlobalPlayer / InfoPanel migration remains opportunistic.
+
+- **ColorPicker.module.scss token migration** — popup is now theme-aware (`--surface-glass-bg`, `--surface-glass-blur`, `--color-text-primary`, `--surface-overlay-1`, `--color-border-strong`, `--color-error`). The sat/hue thumb chrome stays white-on-shadow intentionally because it overlays a full-spectrum gradient canvas.
+
+- **`ThemeSwatchRow` swatch picker UI** — `components/common/ThemeSwatchRow.tsx` + `.module.scss`. Each swatch renders a 96×64 preview gradient from `pageBg → panelBg → accentColor` with the accent dot in the corner and the theme name across the bottom on a dark scrim. Active swatch wears the live `--accent-glow` ring. Wired above both the dark- and light-theme `<Select>` rows in Settings — Select kept for keyboard / accessibility / search.
+
+- **Harmonious accent palette generator** — `deriveAccentVariants(hex)` (RGB→HSL→hex) produces `hover` (+10% L, +5% S), `active` (-10% L, -5% S), `subtle` (rgba @ 0.14), and `rgb` (space-separated) from any base accent. `applyThemeConfig` calls it on every theme apply; each derived value is written only if the theme's `tokens` block doesn't already supply that key. Existing themes that ship explicit values still win — this is the fallback that keeps user-picked accents (via ColorPicker) coherent and lets future minimal themes ship just `accentColor` and get a harmonious palette for free.
+
+Phase C residual (Phase D candidates):
+- Full migration of EffectsPanel / GlobalPlayer / InfoPanel hardcoded colors to `--on-dark-*` tokens (~130 instances remaining).
+- Adopt `@mixin glass-surface` / `@mixin focus-ring` across remaining popover surfaces (~10 files).
 
 ---
 

@@ -6,6 +6,7 @@ import { ColorPicker } from '@/components/common/ColorPicker';
 import { FolderBrowser } from '@/components/common/FolderBrowser';
 import { Icon } from '@/components/common/Icon';
 import { Select } from '@/components/common/Select';
+import { ThemeSwatchRow } from '@/components/common/ThemeSwatchRow';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
@@ -952,6 +953,12 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.settingDescription}>
 										Theme used in dark mode
 									</span>
+									<ThemeSwatchRow
+										themes={themesList.value}
+										selectedId={selectedDarkId.value}
+										onSelect={setSelectedDarkId}
+										mode="dark"
+									/>
 								</div>
 								<div class={styles.settingControl}>
 									<Select
@@ -1017,6 +1024,12 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.settingDescription}>
 										Theme used in light mode
 									</span>
+									<ThemeSwatchRow
+										themes={themesList.value}
+										selectedId={selectedLightId.value}
+										onSelect={setSelectedLightId}
+										mode="light"
+									/>
 								</div>
 								<div class={styles.settingControl}>
 									<Select

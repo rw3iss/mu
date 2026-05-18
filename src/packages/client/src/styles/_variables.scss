@@ -60,6 +60,22 @@
   --surface-overlay-3: rgba(255, 255, 255, 0.15);
   --surface-overlay-strong: rgba(255, 255, 255, 0.30);
 
+  // Always-light overlays for "on-dark" surfaces — i.e. surfaces that
+  // remain dark regardless of the active app theme (the global player
+  // bar overlays the video, so its chrome stays dark in light theme
+  // too). Player components should use these instead of the
+  // theme-flipping `--surface-overlay-*` variants. Values are fixed:
+  // a light theme override block below leaves them unchanged.
+  --on-dark-overlay-1: rgba(255, 255, 255, 0.06);
+  --on-dark-overlay-2: rgba(255, 255, 255, 0.10);
+  --on-dark-overlay-3: rgba(255, 255, 255, 0.15);
+  --on-dark-overlay-strong: rgba(255, 255, 255, 0.30);
+
+  // Text colors for on-dark surfaces (matches above).
+  --on-dark-text-primary: rgba(255, 255, 255, 0.92);
+  --on-dark-text-secondary: rgba(255, 255, 255, 0.70);
+  --on-dark-text-muted: rgba(255, 255, 255, 0.45);
+
   // Spacing scale
   --space-xs: 4px;
   --space-sm: 8px;

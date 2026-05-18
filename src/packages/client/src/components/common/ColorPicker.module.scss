@@ -16,6 +16,11 @@
 }
 
 // ── Popup panel ──
+//
+// Theme-aware: tracks the active theme's elevated surface + blur. In
+// dark themes the popup reads as a near-black floating panel; in
+// light themes it becomes a frosted white. Border + text + input
+// chrome all use tokens too so re-theming propagates cleanly.
 
 .popup {
   position: absolute;
@@ -24,11 +29,12 @@
   z-index: 200;
   width: 236px;
   padding: 8px;
-  background: rgba(18, 18, 18, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-glass-bg);
+  border: 1px solid var(--color-border-strong);
   border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(var(--surface-glass-blur));
+  -webkit-backdrop-filter: blur(var(--surface-glass-blur));
   animation: pickerFadeIn 120ms ease;
   display: flex;
   flex-direction: column;
@@ -64,6 +70,9 @@
   border-radius: 4px;
 }
 
+// The sat/hue thumbs stay white-on-shadow because they overlay the
+// gradient canvas (always-vivid color regardless of theme). Using
+// theme tokens here would make them invisible on the gradient.
 .satThumb {
   position: absolute;
   width: 14px;
@@ -118,7 +127,7 @@
   width: 22px;
   height: 22px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--color-border-strong);
   flex-shrink: 0;
 }
 
@@ -126,12 +135,12 @@
   flex: 1;
   min-width: 0;
   padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--surface-overlay-1);
+  border: 1px solid var(--color-border-strong);
   border-radius: 4px;
-  color: #ffffff;
+  color: var(--color-text-primary);
   font-size: 12px;
-  font-family: monospace;
+  font-family: var(--font-family-mono);
   outline: none;
 
   &:focus {
@@ -140,10 +149,10 @@
 }
 
 .hexInputError {
-  border-color: #ef4444;
+  border-color: var(--color-error);
 
   &:focus {
-    border-color: #ef4444;
+    border-color: var(--color-error);
   }
 }
 
@@ -154,13 +163,13 @@
   width: 24px;
   height: 24px;
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--color-text-muted);
   border-radius: 4px;
   transition: color 120ms ease, background 120ms ease;
   cursor: pointer;
 
   &:hover {
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+    background: var(--surface-overlay-2);
   }
 }

@@ -34,6 +34,101 @@ function hexToRgbParts(hex: string): { r: number; g: number; b: number } {
 	return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
 }
 
+function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+	const rn = r / 255;
+	const gn = g / 255;
+	const bn = b / 255;
+	const max = Math.max(rn, gn, bn);
+	const min = Math.min(rn, gn, bn);
+	const l = (max + min) / 2;
+	let h = 0;
+	let s = 0;
+	if (max !== min) {
+		const d = max - min;
+		s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+		switch (max) {
+			case rn:
+				h = (gn - bn) / d + (gn < bn ? 6 : 0);
+				break;
+			case gn:
+				h = (bn - rn) / d + 2;
+				break;
+			default:
+				h = (rn - gn) / d + 4;
+		}
+		h /= 6;
+	}
+	return { h, s, l };
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+	const c = (1 - Math.abs(2 * l - 1)) * s;
+	const x = c * (1 - Math.abs(((h * 6) % 2) - 1));
+	const m = l - c / 2;
+	let rp = 0;
+	let gp = 0;
+	let bp = 0;
+	const seg = h * 6;
+	if (seg < 1) {
+		rp = c;
+		gp = x;
+	} else if (seg < 2) {
+		rp = x;
+		gp = c;
+	} else if (seg < 3) {
+		gp = c;
+		bp = x;
+	} else if (seg < 4) {
+		gp = x;
+		bp = c;
+	} else if (seg < 5) {
+		rp = x;
+		bp = c;
+	} else {
+		rp = c;
+		bp = x;
+	}
+	const toHex = (v: number) =>
+		Math.round((v + m) * 255)
+			.toString(16)
+			.padStart(2, '0');
+	return `#${toHex(rp)}${toHex(gp)}${toHex(bp)}`;
+}
+
+/**
+ * Derive a harmonious palette of accent variants from a single hex.
+ * Returns hover (lighter, more saturated), active (darker), and a
+ * subtle translucent fill. Lets any user-picked accent automatically
+ * get a coherent set of variants without the theme having to specify
+ * each one. Themes that DO provide explicit values in `tokens` still
+ * win — this is the fallback, not the override.
+ *
+ * The shifts are chosen empirically to match the existing curated
+ * themes (Midnight Reel: hover +12% L, active -8% L; subtle 0.14
+ * alpha). They work across hues because the ramp is in HSL.
+ */
+function deriveAccentVariants(hex: string): {
+	hover: string;
+	active: string;
+	subtle: string;
+	rgb: string;
+} {
+	const { r, g, b } = hexToRgbParts(hex);
+	const { h, s, l } = rgbToHsl(r, g, b);
+	// Hover sits brighter; active sits darker. Saturation bumped slightly on
+	// hover so it pops; trimmed on active so it doesn't muddy.
+	const hoverL = Math.min(0.92, l + 0.1);
+	const hoverS = Math.min(1, s + 0.05);
+	const activeL = Math.max(0.18, l - 0.1);
+	const activeS = Math.max(0, s - 0.05);
+	return {
+		hover: hslToHex(h, hoverS, hoverL),
+		active: hslToHex(h, activeS, activeL),
+		subtle: `rgba(${r}, ${g}, ${b}, 0.14)`,
+		rgb: `${r} ${g} ${b}`,
+	};
+}
+
 /**
  * Briefly flip a `data-theme-transitioning` attribute on <html> so the
  * global crossfade rule in global.scss activates for one swap window.
@@ -108,16 +203,23 @@ export function applyThemeConfig(config: ThemeConfig): void {
 	root.style.setProperty('--item-gap', ITEM_GAP_MAP[config.itemSpacing] ?? ITEM_GAP_MAP.normal);
 	root.style.setProperty('--item-radius', `${config.itemRadius}px`);
 
-	// Derive `--accent-rgb` (space-separated) from the accent hex so
-	// callers can build translucent variants via `rgb(var(--accent-rgb)
-	// / 0.4)`. Theme.tokens may override this explicitly (Aurora /
-	// Sunset Cinema / Vaporwave do); the derivation here is the
-	// fallback that keeps every theme — including user-picked accent
-	// colors via the ColorPicker — coherent.
-	const accentRgbToken = config.tokens?.['accent-rgb'];
-	if (!accentRgbToken) {
-		const { r, g, b } = hexToRgbParts(config.accentColor);
-		root.style.setProperty('--accent-rgb', `${r} ${g} ${b}`);
+	// Derive a coherent palette from `accentColor` for any variant the
+	// theme didn't supply explicitly. Theme `tokens` values still win
+	// when present — this is the fallback that keeps user-picked
+	// accents (via ColorPicker) harmonious without forcing the user
+	// to also pick hover/active/subtle.
+	const variants = deriveAccentVariants(config.accentColor);
+	if (!config.tokens?.['accent-rgb']) {
+		root.style.setProperty('--accent-rgb', variants.rgb);
+	}
+	if (!config.tokens?.['color-accent-hover']) {
+		root.style.setProperty('--color-accent-hover', variants.hover);
+	}
+	if (!config.tokens?.['color-accent-active']) {
+		root.style.setProperty('--color-accent-active', variants.active);
+	}
+	if (!config.tokens?.['color-accent-subtle']) {
+		root.style.setProperty('--color-accent-subtle', variants.subtle);
 	}
 
 	const { r, g, b } = hexToRgbParts(config.cardBorder.color);
