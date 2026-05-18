@@ -44,7 +44,18 @@ function getSharedVideoElement(): HTMLVideoElement {
 	if (!sharedVideoElement) {
 		const video = document.createElement('video');
 		video.playsInline = true;
-		video.crossOrigin = 'anonymous';
+		// IMPORTANT: do NOT set crossOrigin = 'anonymous'.
+		// crossOrigin taints createMediaElementSource output even
+		// for same-origin HLS — the moment Web Audio attaches to the
+		// <video>, native audio is re-routed away from speakers and
+		// the AudioContext receives "opaque" samples that produce
+		// silence. This was rediscovered live on prod: audio plays
+		// fine until the user enables EQ/compressor, at which point
+		// the chain goes silent and disabling doesn't recover.
+		// Subtitles use blob URLs (see GlobalPlayer.tsx) so they
+		// don't need crossOrigin. If a future feature DOES need
+		// cross-origin media, gate it behind a flag that the audio
+		// engine respects.
 		video.style.width = '100%';
 		video.style.height = '100%';
 		video.style.objectFit = 'contain';
