@@ -293,6 +293,14 @@
 	align-items: stretch;
 }
 
+// Wrapper around centerControls + rightControls. Transparent by
+// default (display: contents); on mobile landscape it becomes a
+// flex row so both clusters share a single full-width row beneath
+// the title row.
+.controlsBottomRow {
+	display: contents;
+}
+
 // ============================================
 // Buttons
 // ============================================
@@ -925,6 +933,10 @@
 		}
 
 		// ── Row 2: Transport (centered, no gap) ──
+		// Keep position: static (within the column flow) but anchor
+		// the play button to the visual center; the skip extended
+		// clusters expand OUTWARD via position: absolute and never
+		// shift the centered layout.
 		.centerControls {
 			position: static;
 			transform: none;
@@ -932,30 +944,45 @@
 			align-self: center;
 			justify-content: center;
 			gap: 0;
-			min-height: 44px;
+			min-height: 48px;
 		}
 		.skipWrap {
 			gap: 0;
+			// Anchor for the absolutely-positioned .skipExtended.
+			position: relative;
 		}
-		// Keep the original skip button visible when the extended
-		// options open; the extended cluster grows next to it
-		// inline rather than overlaying.
+		// The base skip-back / skip-forward icon stays visible at all
+		// times — the extended buttons OVERLAY outward from its sides
+		// without hiding it. (Default base hides it via opacity:0.)
 		.skipBtnHidden {
 			opacity: 1;
 			pointer-events: auto;
 		}
 		.skipExtended {
-			position: static;
-			animation: none;
-			height: 44px;
+			// Restore absolute positioning so opening the extended
+			// cluster doesn't reflow the centered transport row.
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			display: flex;
+			align-items: stretch;
+			background: rgba(18, 18, 18, 0.85);
+			border-radius: 4px;
+			z-index: 3;
 		}
 		.skipExtendedLeft {
-			// Options appear to the LEFT of the skip-back button.
-			order: -1;
+			// Grow LEFT from the skip-back button's left edge.
+			right: 100%;
+			left: auto;
+		}
+		.skipExtendedRight {
+			// Grow RIGHT from the skip-forward button's right edge.
+			left: 100%;
+			right: auto;
 		}
 		.skipExtBtn {
-			width: 44px;
-			height: 44px;
+			width: 48px;
+			height: 48px;
 		}
 
 		// ── Row 3: Secondary controls (space-between) ──
@@ -979,15 +1006,171 @@
 				height: 22px;
 			}
 		}
+		// Transport buttons (back / play / forward) are slightly
+		// larger than the secondary row so the primary actions feel
+		// chunkier under the thumb.
+		.centerControls .controlBtn {
+			width: 48px;
+			height: 48px;
+			svg {
+				width: 24px;
+				height: 24px;
+			}
+		}
 		.playBtn svg {
-			width: 26px;
-			height: 26px;
+			width: 28px;
+			height: 28px;
 		}
 
 		// Hide the mobile-overflow ⋯ button (this is the full layout,
 		// where info/effects/volume/settings already render in row 3).
 		.mobileOverflow {
 			display: none;
+		}
+	}
+}
+
+// ============================================
+// Mobile LANDSCAPE — phone held sideways
+// ----------------------------------------------------------------
+// Two rows total, both full-width:
+//
+//   ┌─ seek bar ─────────────────────────────────────────────────┐
+//   │ Title (left)                              0:42 / 1:38:00   │  ← row 1
+//   │ << ▶ >>     Info  Effects  Volume  Settings  Maximize      │  ← row 2 (space-between)
+//   └────────────────────────────────────────────────────────────┘
+//
+// In mini mode the left column holds the video thumbnail, so the
+// content rows are simply offset to the right to make room — the
+// rest of the layout is identical.
+// ============================================
+
+@media (orientation: landscape) and (max-height: 500px) {
+	.controls:not(.splitControls) {
+		.seekRow {
+			top: -6px;
+		}
+		.seekBar {
+			height: 14px;
+		}
+		.seekTrack {
+			height: 3px;
+		}
+
+		.contentRow,
+		.mainRow {
+			flex-direction: column;
+			align-items: stretch;
+			padding: 0 8px 6px;
+			gap: 4px;
+		}
+
+		// ── Row 1: Title (left) + timing (right) ──
+		.leftSection {
+			width: 100%;
+			padding: 0;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+		}
+		.titleText {
+			font-size: 13px;
+			margin-bottom: 0;
+			flex: 1;
+			min-width: 0;
+		}
+		// Show the timing label inline on landscape (portrait hides it).
+		.timingLabel {
+			display: inline-block;
+			font-size: 12px;
+			flex-shrink: 0;
+		}
+
+		// ── Row 2: All controls on one row (transport + secondary) ──
+		.controlsBottomRow {
+			display: flex;
+			width: 100%;
+			align-items: center;
+			justify-content: space-between;
+			gap: 8px;
+		}
+		.centerControls {
+			position: static;
+			transform: none;
+			margin: 0;
+			gap: 0;
+			min-height: 40px;
+			// Anchor for absolutely-positioned skipExtended.
+			.skipWrap {
+				position: relative;
+			}
+		}
+		.skipBtnHidden {
+			opacity: 1;
+			pointer-events: auto;
+		}
+		.skipExtended {
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			display: flex;
+			align-items: stretch;
+			background: rgba(18, 18, 18, 0.85);
+			border-radius: 4px;
+			z-index: 3;
+		}
+		.skipExtendedLeft {
+			right: 100%;
+			left: auto;
+		}
+		.skipExtendedRight {
+			left: 100%;
+			right: auto;
+		}
+		.skipExtBtn {
+			width: 40px;
+			height: 40px;
+		}
+
+		.rightControls {
+			width: auto;
+			margin: 0;
+			min-height: 40px;
+			justify-content: flex-end;
+			align-items: center;
+		}
+
+		// Smaller buttons everywhere in landscape — vertical space is
+		// at a premium when the phone is sideways.
+		.controlBtn {
+			aspect-ratio: auto;
+			width: 40px;
+			height: 40px;
+			margin: 0;
+			align-self: center;
+			svg {
+				width: 20px;
+				height: 20px;
+			}
+		}
+		.playBtn svg {
+			width: 24px;
+			height: 24px;
+		}
+
+		.mobileOverflow {
+			display: none;
+		}
+
+		// Mini mode in landscape: thumbnail occupies the left column,
+		// so push the content rows right to make room (same as desktop
+		// mini, but the rows themselves still stack the landscape way).
+		&.miniMode {
+			.contentRow,
+			.mainRow {
+				padding-left: calc(var(--player-mini-thumb-width, 160px) + 12px);
+			}
 		}
 	}
 }
