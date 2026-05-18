@@ -102,16 +102,7 @@ const BASS_SATURATION_CURVE = (() => {
 
 export class AudioEngine {
 	private ctx: AudioContext | null = null;
-	private source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null;
-	/**
-	 * When we took the captureStream() path, we silence the native
-	 * speaker output of the bound element via `volume = 0` (NOT
-	 * `muted = true` — muting also silences the captured audio
-	 * track, while volume changes affect only the native output).
-	 * Track the original volume so detach paths can restore it.
-	 */
-	private nativeVolumeSilencedByAttach = false;
-	private originalNativeVolume = 1;
+	private source: MediaElementAudioSourceNode | null = null;
 	private boundElement: HTMLMediaElement | null = null;
 	private pendingElement: HTMLMediaElement | null = null;
 	private inputGainNode: GainNode | null = null;
@@ -258,80 +249,40 @@ export class AudioEngine {
 				`[audioEngine] new AudioContext → state=${this.ctx.state} sampleRate=${this.ctx.sampleRate}`,
 			);
 
-			// Prefer captureStream() + MediaStreamAudioSourceNode over
-			// createMediaElementSource(). On video elements whose
-			// source is an HLS MediaSource (blob: URL), Chrome silently
-			// silences createMediaElementSource output regardless of
-			// crossOrigin — the diagnostic showed chain wired to
-			// ctx.destination, ctx.currentTime advancing, yet speakers
-			// silent. captureStream returns a fresh MediaStream of the
-			// decoded media output that doesn't go through the same
-			// taint check.
+			// KNOWN CHROME LIMITATION:
+			// createMediaElementSource on a <video> whose source is an
+			// HLS MediaSource (blob: URL) produces silent output in
+			// Chrome — even with crossOrigin='anonymous' and same-origin
+			// content. MDN documents MediaSource as exempt from CORS
+			// taint; Chrome's actual behavior contradicts that. Diagnostic
+			// logging on prod confirmed: chain wires correctly to
+			// ctx.destination, ctx.currentTime advances, yet speakers
+			// stay silent.
 			//
-			// Trade-off: captureStream's audio reflects the element's
-			// playback INCLUDING its native output stage, so we mute
-			// the element to prevent double-audio (one path from the
-			// element to speakers, one through Web Audio). User volume
-			// is still controlled — pre-mute Chrome captures the
-			// volume-scaled samples, so the user's slider works.
-			const tWithCapture = target as HTMLMediaElement & {
-				captureStream?: () => MediaStream;
-				mozCaptureStream?: () => MediaStream;
-			};
-			const captureFn = tWithCapture.captureStream ?? tWithCapture.mozCaptureStream;
-			let usedCaptureStream = false;
-
-			if (typeof captureFn === 'function') {
-				try {
-					const stream = captureFn.call(target);
-					const tracks = stream.getAudioTracks();
-					console.log('[audioEngine] captureStream attempt', {
-						audioTracks: tracks.length,
-						trackEnabled: tracks[0]?.enabled,
-						trackReadyState: tracks[0]?.readyState,
-					});
-					if (tracks.length > 0) {
-						this.source = this.ctx.createMediaStreamSource(stream);
-						// Silence native output via a tiny non-zero volume.
-						// muted=true silences captureStream too. Exactly
-						// volume=0 triggers a Chrome optimization that
-						// stops audio decoding after a brief grace period,
-						// which then starves the captureStream of samples
-						// (user reports "works at first, then stays off").
-						// 0.0001 is inaudible to the user but non-zero, so
-						// Chrome keeps decoding and the captureStream keeps
-						// flowing samples into Web Audio.
-						this.originalNativeVolume = target.volume;
-						target.volume = 0.0001;
-						this.nativeVolumeSilencedByAttach = true;
-						usedCaptureStream = true;
-					}
-				} catch (err) {
-					console.warn(
-						'[audioEngine] captureStream failed, falling back:',
-						err,
-					);
-				}
-			}
-
-			if (!usedCaptureStream) {
-				this.source = this.ctx.createMediaElementSource(target);
-			}
-
+			// captureStream() + MediaStreamSource is also broken: the
+			// MediaStreamTrack reports `live` with samples flowing per
+			// the API surface, but no audio reaches the output.
+			//
+			// We use createMediaElementSource here for direct-play
+			// content (where it works) and accept that EQ/compressor
+			// silence the chain on HLS-backed streams. This is a Chrome
+			// limitation we cannot work around from JS alone — would
+			// require either server-side audio processing or switching
+			// streams away from MediaSource (back to progressive
+			// download).
+			this.source = this.ctx.createMediaElementSource(target);
 			this.boundElement = target;
-			console.log(
-				`[audioEngine] source created via ${usedCaptureStream ? 'captureStream + MediaStreamSource' : 'createMediaElementSource'}`,
-				{
-					tag: target.tagName,
-					src: target.src?.slice(0, 120),
-					crossOrigin: target.crossOrigin,
-					muted: target.muted,
-					volume: target.volume,
-					readyState: target.readyState,
-				},
-			);
+			console.log('[audioEngine] createMediaElementSource OK; element bound', {
+				tag: target.tagName,
+				src: target.src?.slice(0, 120),
+				crossOrigin: target.crossOrigin,
+				muted: target.muted,
+				volume: target.volume,
+				readyState: target.readyState,
+				usingMediaSource: !!target.src && target.src.startsWith('blob:'),
+			});
 		} catch (err) {
-			console.error('[audioEngine] Failed to create source node:', err);
+			console.error('[audioEngine] Failed to create MediaElementSource:', err);
 			this.ctx = null;
 			this.source = null;
 			this.boundElement = null;
@@ -956,13 +907,6 @@ export class AudioEngine {
 		if (this.deviceChangeListener && navigator.mediaDevices) {
 			navigator.mediaDevices.removeEventListener('devicechange', this.deviceChangeListener);
 			this.deviceChangeListener = null;
-		}
-		// Restore the native volume if we silenced it during attach
-		// (captureStream path). The native element's mute state was
-		// never touched; only volume.
-		if (this.nativeVolumeSilencedByAttach && this.boundElement) {
-			this.boundElement.volume = this.originalNativeVolume;
-			this.nativeVolumeSilencedByAttach = false;
 		}
 		if (this.source) {
 			this.source.disconnect();
