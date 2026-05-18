@@ -160,18 +160,17 @@ export function initAudioEffects(): void {
 		audioEngine.setBassEnhanceEnabled(savedBassEnhanceEnabled);
 		audioEngine.setHrtfEnabled(savedHrtfEnabled);
 		audioEngine.setMultiBandEnabled(savedMultiBandEnabled);
-		if (
-			(savedSpectrum || savedCompVisualizer) &&
-			!savedEq &&
-			!savedComp &&
-			!savedStereoWidthEnabled &&
-			!savedBassEnhanceEnabled &&
-			!savedHrtfEnabled
-		) {
-			// Visualizers need the audio graph attached even if no effect is on
-			// (the analyser node lives in the graph).
-			audioEngine.attach();
-		}
+		// Note: we intentionally DON'T auto-attach() here for the
+		// visualizer-only case (savedSpectrum / savedCompVisualizer
+		// enabled but no effects). The auto-attach silently bound a
+		// MediaElementSource outside any real user-gesture frame
+		// (whenUserGestured fires after the gesture handler has
+		// returned, so Chrome's transient activation has lapsed),
+		// leaving the AudioContext stuck in 'suspended' and audio
+		// permanently routed to silence. Visualizers will show data
+		// the moment the user enables any effect (which fires
+		// setEqEnabled/etc. from a real click handler, securing
+		// gesture credit for resume()).
 	});
 
 	const savedVideoEnabled = getUiSetting('video_effects_enabled', false);

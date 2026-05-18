@@ -299,7 +299,16 @@ export class AudioEngine {
 				this.startOutputAudio();
 			})
 			.catch((err) => {
-				dwarn('[audioEngine] resume() rejected:', err);
+				// Not gated on the debug flag. A rejected resume() here
+				// means the AudioContext is stuck suspended — and since
+				// the MediaElementSource is already permanently bound to
+				// the <video>, audio is silently routed to a graph that
+				// never plays. This used to fail invisibly; surface it
+				// so it never silent-fails again.
+				console.warn(
+					'[audioEngine] AudioContext.resume() rejected — audio routed to a suspended graph until next user interaction. Cause:',
+					err,
+				);
 				this.startOutputAudio();
 			});
 		this.installResumeOnInteraction();
