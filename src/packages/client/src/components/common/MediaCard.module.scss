@@ -1,0 +1,182 @@
+// MediaCard — generic poster + info shell.
+// Shape-agnostic; product-specific badges/overlays live in
+// consumer SCSS and slot in via the JSX props.
+
+.card {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	cursor: pointer;
+	color: var(--color-text-primary);
+	transition:
+		transform 180ms var(--ease-out, ease-out),
+		opacity 180ms var(--ease-snap, ease-out);
+
+	&:hover {
+		transform: translateY(-2px);
+
+		.posterWrap {
+			border-color: var(--color-accent);
+		}
+
+		.hoverOverlay {
+			opacity: 1;
+			pointer-events: auto;
+		}
+	}
+
+	&:active {
+		transform: translateY(0) scale(0.985);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 4px;
+		border-radius: 10px;
+	}
+}
+
+.disabled {
+	cursor: default;
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.dim {
+	opacity: 0.7;
+}
+
+.hiddenState {
+	opacity: 0.55;
+}
+
+.selected {
+	.posterWrap {
+		border-color: var(--color-accent);
+		box-shadow: 0 0 0 2px var(--color-accent);
+	}
+}
+
+.processing {
+	.posterWrap::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.45);
+		pointer-events: none;
+		z-index: 1;
+	}
+}
+
+// ── Poster ─────────────────────────────────────────────────
+
+.posterWrap {
+	position: relative;
+	width: 100%;
+	overflow: hidden;
+	border-radius: 8px;
+	background: var(--color-bg-elevated);
+	border: 1px solid var(--color-border);
+	transition: border-color 180ms var(--ease-snap, ease-out);
+}
+
+.shape_poster .posterWrap   { aspect-ratio: 2 / 3; }
+.shape_portrait .posterWrap { aspect-ratio: 1 / 1.4; }
+.shape_square .posterWrap   { aspect-ratio: 1 / 1; }
+.shape_backdrop .posterWrap { aspect-ratio: 16 / 9; }
+
+.poster {
+	width: 100%;
+	height: 100%;
+}
+
+.posterImg {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+// ── Badge slots ────────────────────────────────────────────
+
+.topLeft {
+	position: absolute;
+	top: 6px;
+	left: 6px;
+	z-index: 2;
+	display: flex;
+	gap: 4px;
+}
+
+.topRight {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	z-index: 2;
+	display: flex;
+	gap: 4px;
+}
+
+// ── Hover overlay ─────────────────────────────────────────
+
+.hoverOverlay {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 12px;
+	background: linear-gradient(
+		to top,
+		rgba(0, 0, 0, 0.85) 0%,
+		rgba(0, 0, 0, 0.4) 50%,
+		rgba(0, 0, 0, 0) 100%
+	);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 180ms var(--ease-out, ease-out);
+	z-index: 3;
+}
+
+// ── Info ──────────────────────────────────────────────────
+
+.info {
+	padding: 8px 2px 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.title {
+	font-size: 14px;
+	font-weight: 500;
+	margin: 0;
+	color: var(--color-text-primary);
+	line-height: 1.3;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+.subtitle {
+	font-size: 12px;
+	color: var(--color-text-secondary);
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+}
+
+.caption {
+	margin-top: 4px;
+	font-size: 12px;
+	color: var(--color-text-muted);
+	line-height: 1.35;
+}
+
+// Reduce-motion is handled globally; no override needed here.

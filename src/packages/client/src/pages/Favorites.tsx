@@ -3,6 +3,7 @@ import { route } from 'preact-router';
 import { EmptyState } from '@/components/common/EmptyState';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
+import { MediaCard } from '@/components/common/MediaCard';
 import { Select } from '@/components/common/Select';
 import { SmartImage } from '@/components/common/SmartImage';
 import { type FavoriteEntry, favoritesService } from '@/services/favorites.service';
@@ -229,53 +230,43 @@ function FavoriteCard({ entry }: { entry: FavoriteEntry }) {
 		if (isPerson) route(personHref(entry));
 		else if (entry.movie) route(`/movie/${entry.movie.id}`);
 	};
+	const name = isPerson ? entry.person!.name : entry.movie!.title;
+	const url = isPerson ? entry.person?.profileUrl : entry.movie?.posterUrl;
+	const subtitle = isPerson
+		? (entry.role ?? entry.person?.knownForDepartment ?? 'Person')
+		: (entry.movie?.year ?? '');
+
+	const topRight = isPerson ? (
+		<FavoriteButton
+			entityType="person"
+			tmdbId={entry.person?.tmdbId}
+			name={entry.person?.name ?? entry.key}
+			profileUrl={entry.person?.profileUrl}
+			personRole={entry.role}
+			size="normal"
+			stopPropagation
+		/>
+	) : (
+		<FavoriteButton
+			entityType="movie"
+			movieId={entry.entityId}
+			size="normal"
+			stopPropagation
+		/>
+	);
+
 	return (
-		<div class={styles.card} onClick={onClick} role="button" tabIndex={0}>
-			<div class={`${styles.cardImage} ${isPerson ? styles.cardImagePerson : ''}`}>
-				{(isPerson ? entry.person?.profileUrl : entry.movie?.posterUrl) ? (
-					<SmartImage
-						src={
-							(isPerson ? entry.person!.profileUrl : entry.movie!.posterUrl) as string
-						}
-						alt={isPerson ? entry.person!.name : entry.movie!.title}
-					/>
-				) : (
-					<div class={styles.cardImageFallback}>
-						<Icon name={isPerson ? 'star' : 'film'} size={32} />
-					</div>
-				)}
-				<div class={styles.cardFav}>
-					{isPerson ? (
-						<FavoriteButton
-							entityType="person"
-							tmdbId={entry.person?.tmdbId}
-							name={entry.person?.name ?? entry.key}
-							profileUrl={entry.person?.profileUrl}
-							personRole={entry.role}
-							size="normal"
-							stopPropagation
-						/>
-					) : (
-						<FavoriteButton
-							entityType="movie"
-							movieId={entry.entityId}
-							size="normal"
-							stopPropagation
-						/>
-					)}
-				</div>
-			</div>
-			<div class={styles.cardInfo}>
-				<span class={styles.cardTitle}>
-					{isPerson ? entry.person?.name : entry.movie?.title}
-				</span>
-				<span class={styles.cardMeta}>
-					{isPerson
-						? (entry.role ?? entry.person?.knownForDepartment ?? 'Person')
-						: (entry.movie?.year ?? '')}
-				</span>
-			</div>
-		</div>
+		<MediaCard
+			posterUrl={url ?? ''}
+			alt={name}
+			fallbackLabel={name}
+			posterShape={isPerson ? 'portrait' : 'poster'}
+			onClick={onClick}
+			class={styles.mediaCard}
+			topRight={topRight}
+			title={name}
+			subtitle={<span class={styles.metaCap}>{subtitle}</span>}
+		/>
 	);
 }
 

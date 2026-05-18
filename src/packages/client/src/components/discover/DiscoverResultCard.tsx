@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { route } from 'preact-router';
-import { SmartImage } from '@/components/common/SmartImage';
+import { MediaCard } from '@/components/common/MediaCard';
 import { bookmarksService, type ScoredMovie } from '@/services/discover.service';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './DiscoverResultCard.module.scss';
@@ -11,12 +11,14 @@ interface DiscoverResultCardProps {
 }
 
 /**
- * Discover-page card variant. Adds: relevance score badge, top
- * explanation as a caption, "See similar to this" link, and a click
- * target that opens the movie detail page.
+ * Discover-page card. Composes `<MediaCard>` and slots in
+ * discover-specific affordances: relevance score, IMDB/TMDB
+ * rating, "Not in library" pill, hover bar with seed +
+ * bookmark, and the top explanation as the caption.
  *
- * Tries to use the same dimensions as a standard MovieCard so the
- * grid lines up next to one if needed.
+ * Click target lands on `/movie/:id` — library + not-owned
+ * movies share the same detail route; that page renders in
+ * "preview" mode for non-library items.
  */
 export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 	const isOwned = movie.inLibrary ?? movie.source === 'library' ?? true;
@@ -24,16 +26,15 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 	const [busy, setBusy] = useState(false);
 
 	const goToDetail = () => {
-		// Library + not-owned movies share /movie/:id. The detail page
-		// renders in "preview" mode (no Play button, Bookmark instead
-		// of Watchlist, etc.) when the movie's source isn't 'library'.
 		route(`/movie/${movie.movieId}`);
 	};
+
 	const handleSeed = (e: MouseEvent) => {
 		e.stopPropagation();
 		if (onSeed) onSeed();
 		else route(`/discover?seedMovieId=${encodeURIComponent(movie.movieId)}`);
 	};
+
 	const handleBookmark = async (e: MouseEvent) => {
 		e.stopPropagation();
 		if (busy) return;
@@ -67,62 +68,69 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 			: null;
 	const votesLabel = movie.votes != null && movie.votes > 0 ? formatVotes(movie.votes) : null;
 
+	const topLeft = (
+		<>
+			{scorePct > 0 && <span class={styles.scoreBadge}>{scorePct}%</span>}
+			{!isOwned && <span class={styles.notOwnedBadge}>Not in library</span>}
+			{movie.enriching && <span class={styles.enrichingBadge}>Enriching…</span>}
+		</>
+	);
+
+	const topRight =
+		ratingLabel && movie.rating != null ? (
+			<span
+				class={styles.ratingBadge}
+				title={`${ratingLabel}${votesLabel ? ` · ${votesLabel} votes` : ''}`}
+			>
+				★ {movie.rating.toFixed(1)}
+			</span>
+		) : null;
+
+	const hoverOverlay = (
+		<>
+			<button class={styles.seedBtn} onClick={handleSeed} title="See similar">
+				See similar →
+			</button>
+			{!isOwned && (
+				<button
+					class={`${styles.bookmarkBtn} ${bookmarked ? styles.bookmarkBtnActive : ''}`}
+					onClick={handleBookmark}
+					title={bookmarked ? 'Remove bookmark' : 'Bookmark for later'}
+					disabled={busy}
+				>
+					{bookmarked ? '★ Saved' : '☆ Save'}
+				</button>
+			)}
+		</>
+	);
+
+	const subtitle = (
+		<>
+			<span>{movie.year ?? '—'}</span>
+			{ratingLabel && <span class={styles.metaPill}>{ratingLabel}</span>}
+			{votesLabel && <span class={styles.metaPillMuted}>{votesLabel} votes</span>}
+			{movie.usedSources.length > 0 && (
+				<span class={styles.sources}>{movie.usedSources.slice(0, 2).join(' · ')}</span>
+			)}
+		</>
+	);
+
 	return (
-		<div
-			class={`${styles.card} ${!isOwned ? styles.notOwned : ''}`}
+		<MediaCard
+			posterUrl={movie.posterUrl ?? ''}
+			alt={movie.title}
+			fallbackLabel={movie.title.charAt(0)}
+			posterShape="poster"
 			onClick={goToDetail}
-			role="button"
-			tabIndex={0}
-		>
-			<div class={styles.posterWrap}>
-				{scorePct > 0 && <span class={styles.scoreBadge}>{scorePct}%</span>}
-				{ratingLabel && (
-					<span
-						class={styles.ratingBadge}
-						title={`${ratingLabel}${votesLabel ? ` · ${votesLabel} votes` : ''}`}
-					>
-						★ {movie.rating!.toFixed(1)}
-					</span>
-				)}
-				{!isOwned && <span class={styles.notOwnedBadge}>Not in library</span>}
-				{movie.enriching && <span class={styles.enrichingBadge}>Enriching…</span>}
-				<SmartImage
-					src={movie.posterUrl ?? ''}
-					alt={movie.title}
-					class={styles.poster}
-					fallback={<div class={styles.posterFallback}>{movie.title.charAt(0)}</div>}
-				/>
-				<div class={styles.hoverBar}>
-					<button class={styles.seedBtn} onClick={handleSeed} title="See similar">
-						See similar →
-					</button>
-					{!isOwned && (
-						<button
-							class={`${styles.bookmarkBtn} ${bookmarked ? styles.bookmarkBtnActive : ''}`}
-							onClick={handleBookmark}
-							title={bookmarked ? 'Remove bookmark' : 'Bookmark for later'}
-							disabled={busy}
-						>
-							{bookmarked ? '★ Saved' : '☆ Save'}
-						</button>
-					)}
-				</div>
-			</div>
-			<div class={styles.body}>
-				<div class={styles.title}>{movie.title}</div>
-				<div class={styles.meta}>
-					{movie.year ?? '—'}
-					{ratingLabel && <span class={styles.metaPill}>{ratingLabel}</span>}
-					{votesLabel && <span class={styles.metaPillMuted}>{votesLabel} votes</span>}
-					{movie.usedSources.length > 0 && (
-						<span class={styles.sources}>
-							{movie.usedSources.slice(0, 2).join(' · ')}
-						</span>
-					)}
-				</div>
-				{reason && <div class={styles.reason}>{reason}</div>}
-			</div>
-		</div>
+			dim={!isOwned}
+			class={styles.card}
+			topLeft={topLeft}
+			topRight={topRight}
+			hoverOverlay={hoverOverlay}
+			title={movie.title}
+			subtitle={subtitle}
+			caption={reason}
+		/>
 	);
 }
 
