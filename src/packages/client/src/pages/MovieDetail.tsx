@@ -502,7 +502,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 							)}
 							{runtimeText && <span>{runtimeText}</span>}
 							{movie.director && (
-								<span class={styles.directorRow}>
+								<span class={styles.directorRow} data-reveal-host>
 									<a
 										class={styles.directorLink}
 										href={`/person/${personKeyFor({ name: movie.director })}`}
@@ -521,6 +521,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 										personRole="director"
 										size="mini"
 										stopPropagation
+										revealOnHover
 									/>
 								</span>
 							)}
@@ -819,6 +820,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 												key={member.name}
 												class={styles.castMember}
 												href={`/person/${key}`}
+												data-reveal-host
 												onClick={(e) => {
 													e.preventDefault();
 													route(`/person/${key}`);
@@ -852,6 +854,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 														personRole="actor"
 														size="normal"
 														stopPropagation
+														revealOnHover
 													/>
 												</div>
 											</a>

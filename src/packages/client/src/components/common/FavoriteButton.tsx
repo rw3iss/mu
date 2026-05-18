@@ -29,6 +29,19 @@ export type FavoriteButtonProps = (PersonProps | MovieProps) & {
 	title?: string;
 	/** Stop click propagation — useful on clickable parent rows. */
 	stopPropagation?: boolean;
+	/**
+	 * Hide the star unless either:
+	 *   - the entity is already favorited (active), OR
+	 *   - an ancestor element marked `data-reveal-host` is hovered /
+	 *     focus-within, OR the button itself is keyboard-focused.
+	 *
+	 * Used to declutter cast lists and director rows — the star only
+	 * surfaces when the user actually needs it. Reveal CSS lives in
+	 * `global.scss` so the pattern stays self-contained: any element
+	 * tagged `data-reveal-host` automatically reveals any descendant
+	 * `data-reveal-on-hover` on hover/focus.
+	 */
+	revealOnHover?: boolean;
 };
 
 const SIZE_DIMENSIONS: Record<ButtonSize, number> = {
@@ -100,6 +113,7 @@ export function FavoriteButton(props: FavoriteButtonProps) {
 			aria-label={ariaLabel}
 			title={props.title ?? ariaLabel}
 			style={{ width: `${px}px`, height: `${px}px` }}
+			data-reveal-on-hover={props.revealOnHover ? 'true' : undefined}
 		>
 			<svg
 				class={styles.star}

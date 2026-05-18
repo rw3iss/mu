@@ -111,7 +111,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								{movie.year > 0 && <span>{movie.year}</span>}
 								{runtimeText && <span>{runtimeText}</span>}
 								{movie.director && (
-									<span class={styles.directorRow}>
+									<span class={styles.directorRow} data-reveal-host>
 										<a
 											class={styles.directorLink}
 											href={`/person/${personKeyFor({ name: movie.director })}`}
@@ -130,6 +130,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 											personRole="director"
 											size="mini"
 											stopPropagation
+											revealOnHover
 										/>
 									</span>
 								)}
@@ -226,6 +227,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 													key={member.name}
 													class={styles.castMember}
 													href={`/person/${key}`}
+													data-reveal-host
 													onClick={(e) => {
 														e.preventDefault();
 														route(`/person/${key}`);
@@ -261,6 +263,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 															personRole="actor"
 															size="normal"
 															stopPropagation
+															revealOnHover
 														/>
 													</div>
 												</a>
@@ -329,7 +332,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							{movie.year > 0 && <span>{movie.year}</span>}
 							{runtimeText && <span>{runtimeText}</span>}
 							{movie.director && (
-								<span class={styles.directorRow}>
+								<span class={styles.directorRow} data-reveal-host>
 									<a
 										class={styles.directorLink}
 										href={`/person/${personKeyFor({ name: movie.director })}`}
@@ -348,6 +351,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										personRole="director"
 										size="mini"
 										stopPropagation
+										revealOnHover
 									/>
 								</span>
 							)}
@@ -441,6 +445,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 												key={member.name}
 												class={styles.castMember}
 												href={`/person/${key}`}
+												data-reveal-host
 												onClick={(e) => {
 													e.preventDefault();
 													route(`/person/${key}`);
@@ -476,6 +481,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 														personRole="actor"
 														size="normal"
 														stopPropagation
+														revealOnHover
 													/>
 												</div>
 											</a>

@@ -194,6 +194,46 @@ html[data-reduce-motion='true'] *::after {
   }
 }
 
+// ============================================
+// Reveal-on-hover pattern
+// ----------------------------------------------------------------
+// Self-contained CSS-only "reveal on hover" mechanism so individual
+// components don't have to reach into each other's SCSS modules.
+//
+// Usage:
+//   <div data-reveal-host>
+//     <span>Some label</span>
+//     <button data-reveal-on-hover="true">Star</button>
+//   </div>
+//
+// The button stays hidden until either:
+//   - the host is hovered or contains keyboard focus, OR
+//   - the button itself receives keyboard focus, OR
+//   - the button has `aria-pressed="true"` (already favorited),
+//     so favorited items always remain visible regardless of hover.
+//
+// Used by FavoriteButton's `revealOnHover` prop to declutter cast
+// lists and director rows — stars only surface when the user
+// actually needs them.
+// ============================================
+
+[data-reveal-on-hover='true']:not([aria-pressed='true']) {
+  opacity: 0;
+  transform: scale(0.85);
+  pointer-events: none;
+  transition:
+    opacity 160ms var(--ease-out, ease-out),
+    transform 160ms var(--ease-out, ease-out);
+}
+
+[data-reveal-host]:hover [data-reveal-on-hover='true']:not([aria-pressed='true']),
+[data-reveal-host]:focus-within [data-reveal-on-hover='true']:not([aria-pressed='true']),
+[data-reveal-on-hover='true']:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
 // Shimmer skeleton for loading placeholders. Drop on a block-level
 // element with explicit dimensions. Respects reduce-motion via the
 // global override above (animation neutralised).
