@@ -292,13 +292,17 @@ export class AudioEngine {
 					});
 					if (tracks.length > 0) {
 						this.source = this.ctx.createMediaStreamSource(stream);
-						// Silence native output via volume=0 (NOT muted=true).
-						// captureStream's audio track reflects the element's
-						// mute state — muting would silence the captured
-						// stream too. Volume changes affect only native
-						// playback, leaving the captured audio intact.
+						// Silence native output via a tiny non-zero volume.
+						// muted=true silences captureStream too. Exactly
+						// volume=0 triggers a Chrome optimization that
+						// stops audio decoding after a brief grace period,
+						// which then starves the captureStream of samples
+						// (user reports "works at first, then stays off").
+						// 0.0001 is inaudible to the user but non-zero, so
+						// Chrome keeps decoding and the captureStream keeps
+						// flowing samples into Web Audio.
 						this.originalNativeVolume = target.volume;
-						target.volume = 0;
+						target.volume = 0.0001;
 						this.nativeVolumeSilencedByAttach = true;
 						usedCaptureStream = true;
 					}
