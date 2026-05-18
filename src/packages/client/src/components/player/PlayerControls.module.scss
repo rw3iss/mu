@@ -1036,10 +1036,74 @@
 			height: 28px;
 		}
 
-		// Hide the mobile-overflow ⋯ button (this is the full layout,
-		// where info/effects/volume/settings already render in row 3).
-		.mobileOverflow {
+		// Hide the mobile-overflow ⋯ button in NON-mini portrait — full
+		// layout has all secondary buttons inline on row 3. In mini
+		// portrait it's shown (see &.miniMode override below).
+		&:not(.miniMode) .mobileOverflow {
 			display: none;
+		}
+
+		// ── Mini-portrait: collapse all secondary controls into ⋯ ──
+		// The bar's vertical room is tight (96px including the thumb)
+		// and the previous multi-row layout overlapped the bottom nav.
+		// Instead: keep title on row 1, put [<< ▶ >>] + flex-spacer +
+		// [⋯ options] on a single row 2. Tapping ⋯ expands a vertical
+		// strip of square icon-only buttons ABOVE the bar (Info /
+		// Effects / Mute / Maximize).
+		&.miniMode {
+			// Force controlsBottomRow to be a real flex row (default
+			// is display: contents). centerControls sits left, the
+			// ⋯ button (only remaining child of rightControls) sits
+			// right via margin-left: auto on rightControls.
+			.controlsBottomRow {
+				display: flex;
+				width: 100%;
+				align-items: center;
+				justify-content: flex-start;
+				gap: 8px;
+			}
+			// rightControls becomes a flex row that hugs the right edge,
+			// containing ONLY the .mobileOverflow ⋯ button.
+			.rightControls {
+				width: auto;
+				min-height: 44px;
+				margin-left: auto;
+				justify-content: flex-end;
+				align-items: center;
+			}
+			// Hide every direct child of rightControls except the
+			// mobile-overflow wrapper. (Plugin slots, info, effects,
+			// volume, settings, plain fullscreen button — all moved
+			// into the popover.)
+			.rightControls > *:not(.mobileOverflow) {
+				display: none !important;
+			}
+			.mobileOverflow {
+				display: flex;
+			}
+
+			// Popover items in mini-portrait are square icon-only
+			// buttons that match the ⋯ button's footprint.
+			.mobileOverflowMenu {
+				min-width: auto;
+				padding: 4px;
+				gap: 4px;
+			}
+			.mobileOverflowItem {
+				width: 44px;
+				height: 44px;
+				padding: 0;
+				justify-content: center;
+				gap: 0;
+				// Hide the text label — icon only on mini-portrait.
+				span {
+					display: none;
+				}
+				svg {
+					width: 22px;
+					height: 22px;
+				}
+			}
 		}
 	}
 }
