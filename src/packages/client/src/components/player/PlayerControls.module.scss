@@ -1057,12 +1057,24 @@
 			height: 3px;
 		}
 
-		.contentRow,
+		// In mini mode, .contentRow is a flex ROW with .miniSpacer (the
+		// thumbnail) sitting beside .mainRow — leave it alone so the
+		// spacer doesn't stack above the controls. Only .mainRow needs
+		// to switch to column to stack title-row + controls-row inside
+		// the space the spacer leaves it.
 		.mainRow {
 			flex-direction: column;
 			align-items: stretch;
+			min-width: 0;
 			padding: 0 8px 6px;
 			gap: 4px;
+		}
+		// Non-mini contentRow can stack too — there's no spacer.
+		&:not(.miniMode) .contentRow {
+			flex-direction: column;
+			align-items: stretch;
+			padding: 0;
+			gap: 0;
 		}
 
 		// ── Row 1: Title (left) + timing (right) ──
@@ -1079,6 +1091,9 @@
 			margin-bottom: 0;
 			flex: 1;
 			min-width: 0;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
 		}
 		// Show the timing label inline on landscape (portrait hides it).
 		.timingLabel {
@@ -1163,14 +1178,13 @@
 			display: none;
 		}
 
-		// Mini mode in landscape: thumbnail occupies the left column,
-		// so push the content rows right to make room (same as desktop
-		// mini, but the rows themselves still stack the landscape way).
-		&.miniMode {
-			.contentRow,
-			.mainRow {
-				padding-left: calc(var(--player-mini-thumb-width, 160px) + 12px);
-			}
+		// Mini mode in landscape: .contentRow stays row-direction so
+		// .miniSpacer (the thumbnail) sits beside .mainRow. mainRow
+		// flexes into the remaining width and stacks title-row +
+		// controls-row inside it. .mainRow already has `min-width: 0`
+		// above so the title can ellipsize instead of forcing overflow.
+		&.miniMode .mainRow {
+			flex: 1;
 		}
 	}
 }
