@@ -1076,9 +1076,16 @@
 		// spacer doesn't stack above the controls. Only .mainRow needs
 		// to switch to column to stack title-row + controls-row inside
 		// the space the spacer leaves it.
+		//
+		// `justify-content: flex-start` + `.leftSection { flex: 0 0 auto }`
+		// + `.controlsBottomRow { flex: 1 }` makes the title sit at the
+		// top of mainRow and the controls row expand to fill the rest,
+		// so its `align-items: center` vertically centers buttons in
+		// the space between the title and the bottom of the bar.
 		.mainRow {
 			flex-direction: column;
 			align-items: stretch;
+			justify-content: flex-start;
 			min-width: 0;
 			padding: 0 8px 6px;
 			gap: 4px;
@@ -1092,9 +1099,12 @@
 		}
 
 		// ── Row 1: Title (left) + timing (right) ──
+		// flex: 0 0 auto so title stays at its natural row-height at the
+		// top of mainRow; the controls row below expands to fill.
 		.leftSection {
 			width: 100%;
 			padding: 0;
+			flex: 0 0 auto;
 			flex-direction: row;
 			align-items: center;
 			justify-content: space-between;
@@ -1117,23 +1127,22 @@
 		}
 
 		// ── Row 2: All controls on one row (transport + secondary) ──
-		// Vertically center contents within whatever row-height the bar
-		// settles at (mini = 56px, full = auto/120px+).
+		// `flex: 1` makes the row fill remaining mainRow height so
+		// `align-items: center` vertically centers the buttons between
+		// the title above and the bar's bottom edge.
 		.controlsBottomRow {
 			display: flex;
+			flex: 1;
 			width: 100%;
 			align-items: center;
 			justify-content: space-between;
 			gap: 8px;
-			// Reserve ~200px of leftward expansion room for the skip-back
-			// extended cluster (3 buttons × 44px + gaps ≈ 156px, plus
+			// Reserve ~350px of leftward expansion room for the skip-back
+			// extended cluster (3 buttons × 48px + gaps ≈ 160px, plus
 			// breathing room) so it can fully expand without being
-			// clipped by the bar's left edge / .miniSpacer.
-			padding-left: 200px;
-			// In mini mode the .miniSpacer sits to the left of the
-			// mainRow inside .contentRow, so the 200px reserve is
-			// measured from mainRow's left edge — still enough since
-			// the spacer naturally pushes the cluster further right.
+			// clipped. Also shifts the transport cluster well right of
+			// the title's left edge for a more balanced look.
+			padding-left: 350px;
 		}
 		.centerControls {
 			position: static;
@@ -1141,7 +1150,7 @@
 			margin: 0;
 			gap: 0;
 			align-items: center;
-			min-height: 44px;
+			min-height: 48px;
 			// Anchor for absolutely-positioned skipExtended.
 			.skipWrap {
 				position: relative;
@@ -1177,36 +1186,36 @@
 			right: auto;
 			padding-left: 4px;
 		}
-		// Match the standard control button size in landscape (44px).
+		// Match the standard control button size in landscape (48px).
 		.skipExtBtn {
-			width: 44px;
-			height: 44px;
+			width: 48px;
+			height: 48px;
 		}
 
 		.rightControls {
 			width: auto;
 			margin: 0;
-			min-height: 44px;
+			min-height: 48px;
 			justify-content: flex-end;
 			align-items: center;
 		}
 
-		// Slightly larger square buttons in landscape (44px) — chunky
+		// Bigger square buttons in landscape (48px default) — chunky
 		// enough to thumb without eating the viewport.
 		.controlBtn {
 			aspect-ratio: auto;
-			width: 44px;
-			height: 44px;
+			width: 48px;
+			height: 48px;
 			margin: 0;
 			align-self: center;
 			svg {
-				width: 22px;
-				height: 22px;
+				width: 24px;
+				height: 24px;
 			}
 		}
 		.playBtn svg {
-			width: 26px;
-			height: 26px;
+			width: 28px;
+			height: 28px;
 		}
 
 		.mobileOverflow {
@@ -1222,10 +1231,35 @@
 			flex: 1;
 		}
 		// In mini-landscape the bar is only 56px tall and the spacer
-		// already steals ~96px from the row — drop the 200px reserve
-		// to ~100px so the controls aren't pushed off-screen.
+		// already steals ~96px from the row — keep the right shift
+		// (+150 over the previous 100px = 250px) but still less than
+		// the full-landscape 350px because the spacer pre-shifts the
+		// content.
 		&.miniMode .controlsBottomRow {
-			padding-left: 100px;
+			padding-left: 250px;
+		}
+		// Mini-landscape bar is only 56px tall; shrink buttons back
+		// to 44px so they fit cleanly and don't overflow the bar.
+		&.miniMode {
+			.controlBtn {
+				width: 44px;
+				height: 44px;
+				svg {
+					width: 22px;
+					height: 22px;
+				}
+			}
+			.playBtn svg {
+				width: 24px;
+				height: 24px;
+			}
+			.skipExtBtn {
+				width: 44px;
+				height: 44px;
+			}
+			.centerControls {
+				min-height: 44px;
+			}
 		}
 	}
 }
