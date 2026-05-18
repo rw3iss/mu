@@ -196,6 +196,14 @@ export class AudioEngine {
 	 * output device (matches YouTube and any other `<video>` consumer).
 	 */
 	register(element: HTMLMediaElement): void {
+		console.log('[audioEngine] register()', {
+			tag: element.tagName,
+			crossOrigin: element.crossOrigin,
+			src: element.src?.slice(0, 120),
+			muted: element.muted,
+			volume: element.volume,
+			same: element === this.pendingElement ? 'same as before' : 'NEW element',
+		});
 		this.pendingElement = element;
 	}
 
@@ -214,23 +222,42 @@ export class AudioEngine {
 	 */
 	attach(element?: HTMLMediaElement): void {
 		const target = element ?? this.pendingElement;
-		if (!target) return;
+		console.log('[audioEngine] attach() called', {
+			haveTarget: !!target,
+			alreadyAttached: this.attached,
+			pendingElement: !!this.pendingElement,
+		});
+		if (!target) {
+			console.warn('[audioEngine] attach() — no target element, bailing');
+			return;
+		}
 		if (this.attached) {
 			if (this.boundElement !== target) {
-				dwarn(
+				console.warn(
 					'[audioEngine] attach() called with a different element than the one ' +
-						'already bound. Ignoring — call destroy() first to re-bind. This ' +
-						'indicates the video element is being recreated across component ' +
-						'remounts; the new element will bypass EQ/compressor processing.',
+						'already bound. Ignoring — call destroy() first to re-bind.',
 				);
+			} else {
+				console.log('[audioEngine] attach() — already attached, no-op');
 			}
 			return;
 		}
 
 		try {
 			this.ctx = new AudioContext({ latencyHint: 'playback' });
+			console.log(
+				`[audioEngine] new AudioContext → state=${this.ctx.state} sampleRate=${this.ctx.sampleRate}`,
+			);
 			this.source = this.ctx.createMediaElementSource(target);
 			this.boundElement = target;
+			console.log('[audioEngine] createMediaElementSource OK; element bound', {
+				tag: target.tagName,
+				src: target.src?.slice(0, 120),
+				crossOrigin: target.crossOrigin,
+				muted: target.muted,
+				volume: target.volume,
+				readyState: target.readyState,
+			});
 		} catch (err) {
 			console.error('[audioEngine] Failed to create MediaElementSource:', err);
 			this.ctx = null;
@@ -432,20 +459,114 @@ export class AudioEngine {
 		return this.attached;
 	}
 
+	/**
+	 * Full diagnostic snapshot of the engine + bound element. Logged
+	 * around every toggle and chain rebuild so we can see exactly
+	 * what state the graph is in when audio dies. Unconditional —
+	 * not gated on a debug flag — because the previous version
+	 * surfaced nothing when audio silently failed and we lost a day
+	 * of debugging.
+	 */
+	dumpState(label: string): void {
+		const v = this.boundElement as HTMLMediaElement | null;
+		const snapshot: Record<string, unknown> = {
+			label,
+			attached: this.attached,
+			ctx: this.ctx
+				? {
+						state: this.ctx.state,
+						sampleRate: this.ctx.sampleRate,
+						baseLatency: (this.ctx as AudioContext & { baseLatency?: number })
+							.baseLatency,
+						currentTime: this.ctx.currentTime,
+					}
+				: null,
+			source: this.source ? 'MediaElementSourceNode' : null,
+			boundElement: v
+				? {
+						tag: v.tagName,
+						src: v.src?.slice(0, 120),
+						crossOrigin: v.crossOrigin,
+						muted: v.muted,
+						volume: v.volume,
+						paused: v.paused,
+						readyState: v.readyState,
+						networkState: v.networkState,
+					}
+				: null,
+			enables: {
+				eq: this.eqEnabled,
+				compressor: this.compressorEnabled,
+				stereoWidth: this.stereoWidthEnabled,
+				bassEnhance: this.bassEnhanceEnabled,
+				hrtf: this.hrtfEnabled,
+				multiBand: this.multiBandEnabled,
+			},
+			eqFilters: this.filters.map((f) => ({
+				type: f.type,
+				freq: f.frequency.value,
+				gain: f.gain.value,
+				q: f.Q.value,
+			})),
+			compressorSettings: this.compressor
+				? {
+						threshold: this.compressor.threshold.value,
+						knee: this.compressor.knee.value,
+						ratio: this.compressor.ratio.value,
+						attack: this.compressor.attack.value,
+						release: this.compressor.release.value,
+						reduction: this.compressor.reduction,
+					}
+				: null,
+			gains: {
+				inputGain: this.inputGainNode?.gain.value,
+				makeupGain: this.makeupGainNode?.gain.value,
+				dryGain: this.dryGainNode?.gain.value,
+				wetGain: this.wetGainNode?.gain.value,
+			},
+			routing: {
+				useStreamDest: !!this.streamDest,
+				outputAudioExists: !!this.outputAudio,
+				outputAudioPaused: this.outputAudio?.paused,
+				outputAudioVolume: this.outputAudio?.volume,
+				outputAudioMuted: this.outputAudio?.muted,
+			},
+		};
+		console.log('[audioEngine STATE]', snapshot);
+	}
+
 	setEqEnabled(enabled: boolean): void {
+		console.log(`[audioEngine] setEqEnabled(${enabled}) — entering`);
+		this.dumpState(`setEqEnabled(${enabled}) BEFORE`);
 		this.eqEnabled = enabled;
 		if (enabled) {
 			this.attach();
-			this.ctx?.resume().catch(() => {});
+			this.ctx
+				?.resume()
+				.then(() => console.log('[audioEngine] resume after setEqEnabled → ok'))
+				.catch((err) =>
+					console.warn('[audioEngine] resume after setEqEnabled REJECTED:', err),
+				);
 		}
 		this.rebuildChain();
+		this.dumpState(`setEqEnabled(${enabled}) AFTER`);
 	}
 
 	setCompressorEnabled(enabled: boolean): void {
+		console.log(`[audioEngine] setCompressorEnabled(${enabled}) — entering`);
+		this.dumpState(`setCompressorEnabled(${enabled}) BEFORE`);
 		this.compressorEnabled = enabled;
 		if (enabled) {
 			this.attach();
-			this.ctx?.resume().catch(() => {});
+			this.ctx
+				?.resume()
+				.then(() => console.log('[audioEngine] resume after setCompressorEnabled → ok'))
+				.catch((err) =>
+					console.warn(
+						'[audioEngine] resume after setCompressorEnabled REJECTED:',
+						err,
+					),
+				);
 		}
 		if (!enabled) {
 			// When disabling, reset dry/wet gains to safe values
@@ -458,6 +579,7 @@ export class AudioEngine {
 			this.applyMix(this.currentCompressor.mix);
 			this.applyCompressorSettings(this.currentCompressor);
 		}
+		this.dumpState(`setCompressorEnabled(${enabled}) AFTER`);
 	}
 
 	getEqEnabled(): boolean {
@@ -901,7 +1023,12 @@ export class AudioEngine {
 	}
 
 	private rebuildChain(): void {
-		if (!this.ctx || !this.source) return;
+		if (!this.ctx || !this.source) {
+			console.log('[audioEngine] rebuildChain() — no ctx/source, bailing');
+			return;
+		}
+		const trace: string[] = [];
+		const traceConnect = (from: string, to: string) => trace.push(`${from} → ${to}`);
 
 		// Disconnect everything
 		this.source.disconnect();
@@ -943,6 +1070,7 @@ export class AudioEngine {
 
 		// Build chain: source → [Amp] → [EQ] → [Compressor] → [Stereo Width] → [Bass] → [HRTF] → destination
 		let current: AudioNode = this.source;
+		traceConnect('source', '(start)');
 
 		const anyEffectOn =
 			this.eqEnabled ||
@@ -955,6 +1083,7 @@ export class AudioEngine {
 		// slider works independently of which effects are on.
 		if (anyEffectOn && this.inputGainNode) {
 			current.connect(this.inputGainNode);
+			traceConnect('source', `inputGain (val=${this.inputGainNode.gain.value})`);
 			current = this.inputGainNode;
 		}
 
@@ -963,6 +1092,7 @@ export class AudioEngine {
 				current.connect(filter);
 				current = filter;
 			}
+			traceConnect('inputGain', `${this.filters.length} EQ filters`);
 		}
 
 		// Tap the analyser AFTER the EQ stage (or at source if no EQ) so
@@ -1102,7 +1232,15 @@ export class AudioEngine {
 		// Route to streamDest (consumed by hidden <audio> element) when
 		// available; fall back to AudioContext.destination if creation
 		// failed for any reason.
-		current.connect(this.streamDest ?? this.ctx.destination);
+		const finalDest = this.streamDest ?? this.ctx.destination;
+		current.connect(finalDest);
+		traceConnect('lastStage', this.streamDest ? 'streamDest' : 'ctx.destination');
+		console.log('[audioEngine] rebuildChain done', {
+			anyEffectOn,
+			ctxState: this.ctx.state,
+			finalDest: this.streamDest ? 'streamDest (MediaStream)' : 'ctx.destination',
+			trace,
+		});
 	}
 
 	private applyCompressorSettings(s: CompressorSettings): void {
