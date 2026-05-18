@@ -94,7 +94,11 @@ export function GlobalPlayer() {
 		}
 	}, []);
 
-	// Auto-hide controls when playing starts (full mode + exclusive split mode)
+	// Auto-hide controls when playing starts OR when the player transitions into
+	// a mode that auto-hides (full / exclusive split). Watching playerMode here
+	// covers the case where the user maximizes from split/mini without ever
+	// moving the mouse over the video — the mouseMove handler would otherwise
+	// never fire, and the controls would stay stuck visible forever.
 	useEffect(() => {
 		const isExclusiveSplit = playerMode.value === 'split' && splitExclusive.value;
 		if (
@@ -104,7 +108,7 @@ export function GlobalPlayer() {
 		) {
 			resetControlsTimer();
 		}
-	}, [isPlaying.value, splitExclusive.value]);
+	}, [isPlaying.value, splitExclusive.value, playerMode.value]);
 
 	// Expose the video engine via module-level ref so Player page can access it
 	useEffect(() => {
