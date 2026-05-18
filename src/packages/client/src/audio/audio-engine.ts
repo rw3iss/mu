@@ -102,7 +102,14 @@ const BASS_SATURATION_CURVE = (() => {
 
 export class AudioEngine {
 	private ctx: AudioContext | null = null;
-	private source: MediaElementAudioSourceNode | null = null;
+	private source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null;
+	/**
+	 * When we took the captureStream() path, native audio is muted on
+	 * the element to avoid double-playback. Track that so detach
+	 * paths can restore it.
+	 */
+	private nativeMutedByAttach = false;
+	private originalMutedState = false;
 	private boundElement: HTMLMediaElement | null = null;
 	private pendingElement: HTMLMediaElement | null = null;
 	private inputGainNode: GainNode | null = null;
@@ -248,18 +255,72 @@ export class AudioEngine {
 			console.log(
 				`[audioEngine] new AudioContext → state=${this.ctx.state} sampleRate=${this.ctx.sampleRate}`,
 			);
-			this.source = this.ctx.createMediaElementSource(target);
+
+			// Prefer captureStream() + MediaStreamAudioSourceNode over
+			// createMediaElementSource(). On video elements whose
+			// source is an HLS MediaSource (blob: URL), Chrome silently
+			// silences createMediaElementSource output regardless of
+			// crossOrigin — the diagnostic showed chain wired to
+			// ctx.destination, ctx.currentTime advancing, yet speakers
+			// silent. captureStream returns a fresh MediaStream of the
+			// decoded media output that doesn't go through the same
+			// taint check.
+			//
+			// Trade-off: captureStream's audio reflects the element's
+			// playback INCLUDING its native output stage, so we mute
+			// the element to prevent double-audio (one path from the
+			// element to speakers, one through Web Audio). User volume
+			// is still controlled — pre-mute Chrome captures the
+			// volume-scaled samples, so the user's slider works.
+			const tWithCapture = target as HTMLMediaElement & {
+				captureStream?: () => MediaStream;
+				mozCaptureStream?: () => MediaStream;
+			};
+			const captureFn = tWithCapture.captureStream ?? tWithCapture.mozCaptureStream;
+			let usedCaptureStream = false;
+
+			if (typeof captureFn === 'function') {
+				try {
+					const stream = captureFn.call(target);
+					const tracks = stream.getAudioTracks();
+					console.log('[audioEngine] captureStream attempt', {
+						audioTracks: tracks.length,
+						trackEnabled: tracks[0]?.enabled,
+						trackReadyState: tracks[0]?.readyState,
+					});
+					if (tracks.length > 0) {
+						this.source = this.ctx.createMediaStreamSource(stream);
+						this.originalMutedState = target.muted;
+						target.muted = true;
+						this.nativeMutedByAttach = true;
+						usedCaptureStream = true;
+					}
+				} catch (err) {
+					console.warn(
+						'[audioEngine] captureStream failed, falling back:',
+						err,
+					);
+				}
+			}
+
+			if (!usedCaptureStream) {
+				this.source = this.ctx.createMediaElementSource(target);
+			}
+
 			this.boundElement = target;
-			console.log('[audioEngine] createMediaElementSource OK; element bound', {
-				tag: target.tagName,
-				src: target.src?.slice(0, 120),
-				crossOrigin: target.crossOrigin,
-				muted: target.muted,
-				volume: target.volume,
-				readyState: target.readyState,
-			});
+			console.log(
+				`[audioEngine] source created via ${usedCaptureStream ? 'captureStream + MediaStreamSource' : 'createMediaElementSource'}`,
+				{
+					tag: target.tagName,
+					src: target.src?.slice(0, 120),
+					crossOrigin: target.crossOrigin,
+					muted: target.muted,
+					volume: target.volume,
+					readyState: target.readyState,
+				},
+			);
 		} catch (err) {
-			console.error('[audioEngine] Failed to create MediaElementSource:', err);
+			console.error('[audioEngine] Failed to create source node:', err);
 			this.ctx = null;
 			this.source = null;
 			this.boundElement = null;
@@ -884,6 +945,11 @@ export class AudioEngine {
 		if (this.deviceChangeListener && navigator.mediaDevices) {
 			navigator.mediaDevices.removeEventListener('devicechange', this.deviceChangeListener);
 			this.deviceChangeListener = null;
+		}
+		// Restore the native mute state if we changed it during attach.
+		if (this.nativeMutedByAttach && this.boundElement) {
+			this.boundElement.muted = this.originalMutedState;
+			this.nativeMutedByAttach = false;
 		}
 		if (this.source) {
 			this.source.disconnect();
