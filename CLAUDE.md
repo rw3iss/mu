@@ -204,12 +204,42 @@ echo 'command here' | ssh rw3iss@192.168.50.211
 
 ### Deploying
 
-From your local machine:
+**ALWAYS use `src/scripts/deploy-remote.sh` — never improvise.**
 
 ```bash
-# Full deploy (pull, install, build, restart)
-echo 'bash deploy.sh' | ssh rw3iss@192.168.50.211
+# Canonical deploy: push current branch + remote deploy + external verify
+bash src/scripts/deploy-remote.sh
 
+# Skip the git push step (assume HEAD is already on origin)
+bash src/scripts/deploy-remote.sh --no-push
+```
+
+That single command:
+1. Refuses to run if the working tree has uncommitted changes.
+2. Pushes the current branch to origin.
+3. SSHes to prod and runs `src/deploy.sh`, which **force-syncs git to `origin/main`** (handles detached HEAD / leftover bisect state), reinstalls, rebuilds (always nukes `client/dist/` first to avoid Turbo's partial-restore bug), runs migrations, restarts the NSSM service, and verifies HTTP 200 locally on prod with one auto-retry.
+4. After the remote returns, hits `https://mu.ryanweiss.net:4000/` externally and confirms 200.
+5. Exits non-zero on any failure — never silently "succeeds" with a broken prod.
+
+Environment overrides: `MU_REMOTE_HOST`, `MU_REMOTE_PATH`, `MU_PUBLIC_URL`.
+
+#### Anti-patterns (do NOT do these)
+
+The following ad-hoc forms used to be common; they all skip the canonical pipeline and have caused real outages (silent rollback to old commits, missing index.html, port-stuck restarts):
+
+```bash
+# ❌ Skips git pull — rebuilds whatever stale commit prod's git is on
+echo 'cd … && rm -rf packages/client/dist && (cd packages/client && pnpm exec vite build) && nssm restart mu-server' | ssh rw3iss@192.168.50.211
+
+# ❌ Calls deploy.sh but provides no external verification
+echo 'cd /c/Users/rw3is/Documents/Sites/other/mu/src && bash deploy.sh' | ssh rw3iss@192.168.50.211
+```
+
+Always use `bash src/scripts/deploy-remote.sh` instead.
+
+#### Other one-shots
+
+```bash
 # Restart without rebuilding
 echo 'bash $DEPLOY_DIR/src/restart.sh' | ssh rw3iss@192.168.50.211
 
@@ -220,19 +250,15 @@ echo 'bash $DEPLOY_DIR/src/stop.sh' | ssh rw3iss@192.168.50.211
 echo 'tail -50 /c/Users/rw3is/Documents/Sites/other/mu/data/logs/server.log' | ssh rw3iss@192.168.50.211
 ```
 
-The local `src/deploy.sh` script is the canonical deploy script. The remote `~/deploy.sh` is an older copy — prefer running the repo version:
+### Deploy Flow (what `deploy.sh` does on the remote)
 
-```bash
-echo 'cd /c/Users/rw3is/Documents/Sites/other/mu/src && bash deploy.sh' | ssh rw3iss@192.168.50.211
-```
-
-### Deploy Flow
-
-1. `git pull` on the remote
-2. `pnpm install` + `pnpm build` (Turborepo builds shared, server, client)
-3. Stops existing server (by PID file, then by port)
-4. Starts `node dist/main.js` in production mode (detached, logs to `data/logs/server.log`)
-5. Verifies process is alive after 3 seconds
+1. Stop the NSSM service; force-kill anything still holding port 4000.
+2. `git fetch origin main && git checkout -f main && git reset --hard origin/main` — survives detached HEAD / local divergence.
+3. `pnpm install` + `pnpm build` (Turborepo). `client/dist/` is **nuked first** so Turbo's partial-restore bug can't manifest.
+4. If `dist/index.html` or `dist/assets/` is still missing post-build, falls back to a direct `pnpm exec vite build` and re-checks. Aborts non-zero if still bad.
+5. Runs DB migrations (`scripts/migrate.js`).
+6. Kills orphan Session-0 `node.exe` / `ffmpeg.exe`.
+7. NSSM start; waits up to 15s for port bind; then `curl https://localhost:4000/` and confirms 200. If that fails, stops + kills orphans + retries once. If still failing, tails the log and exits non-zero.
 
 ## Coding Conventions
 
@@ -277,6 +303,6 @@ echo 'cd /c/Users/rw3is/Documents/Sites/other/mu/src && bash deploy.sh' | ssh rw
 - Always verify edits applied correctly with Read or Grep after deeply-nested changes
 
 ### Deploy
-- Use `echo 'cd /c/Users/rw3is/Documents/Sites/other/mu/src && bash deploy.sh' | ssh rw3iss@192.168.50.211` (canonical deploy)
+- Canonical: `bash src/scripts/deploy-remote.sh`. Anything else (raw SSH + `bash deploy.sh`, ad-hoc `rm -rf dist && vite build && nssm restart` shortcuts) skips git-pull or external verification and has caused outages.
 - Git remote uses SSH URL: `git@github.com:rw3iss/cinehost.git` (repo was renamed to `mu` but SSH URL still works)
 - `pnpm logs` tails local server log; `pnpm logs:prod` tails production via SSH
