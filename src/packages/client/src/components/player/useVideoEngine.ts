@@ -44,18 +44,19 @@ function getSharedVideoElement(): HTMLVideoElement {
 	if (!sharedVideoElement) {
 		const video = document.createElement('video');
 		video.playsInline = true;
-		// IMPORTANT: do NOT set crossOrigin = 'anonymous'.
-		// crossOrigin taints createMediaElementSource output even
-		// for same-origin HLS — the moment Web Audio attaches to the
-		// <video>, native audio is re-routed away from speakers and
-		// the AudioContext receives "opaque" samples that produce
-		// silence. This was rediscovered live on prod: audio plays
-		// fine until the user enables EQ/compressor, at which point
-		// the chain goes silent and disabling doesn't recover.
-		// Subtitles use blob URLs (see GlobalPlayer.tsx) so they
-		// don't need crossOrigin. If a future feature DOES need
-		// cross-origin media, gate it behind a flag that the audio
-		// engine respects.
+		// crossOrigin='anonymous' is REQUIRED here. With the eager-attach
+		// flow (createMediaElementSource called on the empty <video>
+		// BEFORE HLS.js attaches a MediaSource), the source node binds
+		// to the element; the audio data must then flow through Web
+		// Audio without taint. blob: URLs from MediaSource are treated
+		// as opaque by Chrome's tainting logic when the element wasn't
+		// configured for CORS — same-origin or not, the MediaElementSource
+		// output ends up silenced. Without this attribute,
+		// `createMediaElementSource` silently produces no samples even
+		// for content served from the same host:port as the page.
+		// This was the working configuration in commit f7a0155 and the
+		// rediscovered configuration here.
+		video.crossOrigin = 'anonymous';
 		video.style.width = '100%';
 		video.style.height = '100%';
 		video.style.objectFit = 'contain';

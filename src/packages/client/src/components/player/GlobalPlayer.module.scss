@@ -204,23 +204,38 @@
     opacity: 0;
     pointer-events: none;
   }
+}
+
+// Full mode: bar sits ABOVE the video; on mobile it pins to the
+// viewport bottom (respecting safe-area-inset-bottom for iOS home
+// indicators) and grows content UPWARD over the video — multi-row
+// transport/secondary layout doesn't need to coexist with a mobile
+// nav since the player covers the screen.
+.playerBarFull {
+  z-index: calc(var(--z-player-controls) + 1);
 
   @include mobile {
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    height: auto;
+    min-height: 120px;
+    bottom: env(safe-area-inset-bottom, 0px);
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.85) 0%,
+      rgba(0, 0, 0, 0.55) 60%,
+      rgba(0, 0, 0, 0) 100%
+    );
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
-// Full mode: bar sits ABOVE the video
-.playerBarFull {
-  z-index: calc(var(--z-player-controls) + 1);
-}
-
-// Mini mode: bar sits BELOW the video thumbnail
+// Mini mode: bar sits BELOW the video thumbnail; on mobile it must
+// clear the mobile nav so it doesn't overlap the bottom nav bar.
 .playerBarMini {
   z-index: var(--z-player-controls);
 
   @include mobile {
     height: 56px;
+    bottom: calc(var(--mobile-nav-height, 56px) + env(safe-area-inset-bottom, 0px));
   }
 }
 

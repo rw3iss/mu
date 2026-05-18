@@ -869,3 +869,125 @@
 		}
 	}
 }
+
+// ============================================
+// Mobile FULL-mode (non-mini, non-split) layout
+// ----------------------------------------------------------------
+// On a phone, the desktop "one wide row" doesn't fit. Stack into
+// three rows growing UP from the bottom of the viewport:
+//
+//   ┌─ seek bar ─────────────────────────────────────┐
+//   │ Title (full width, centered)                   │  ← row 1
+//   │            << ▶ >>                             │  ← row 2 (centered, no gap)
+//   │ Info  Effects  Volume  Settings   Maximize     │  ← row 3 (space-between)
+//   └────────────────────────────────────────────────┘
+//
+// Tap << or >> → skipExtended buttons grow outward inline,
+// pushing into the same row (skipExtendedLeft uses flex order:-1
+// so options appear to the LEFT of the skip button).
+// ============================================
+
+@include mobile {
+	.controls:not(.miniMode):not(.splitControls) {
+		.seekRow {
+			top: -6px;
+		}
+		.seekBar {
+			height: 16px;
+		}
+		.seekTrack {
+			height: 3px;
+		}
+
+		.contentRow,
+		.mainRow {
+			flex-direction: column;
+			align-items: stretch;
+			padding: 0 8px 8px;
+			gap: 6px;
+		}
+
+		// ── Row 1: Title (full width) ──
+		.leftSection {
+			width: 100%;
+			padding: 0;
+			align-items: center;
+			text-align: center;
+		}
+		.titleText {
+			font-size: 14px;
+			text-align: center;
+			width: 100%;
+			margin-bottom: 0;
+		}
+		.timingLabel {
+			display: none;
+		}
+
+		// ── Row 2: Transport (centered, no gap) ──
+		.centerControls {
+			position: static;
+			transform: none;
+			margin: 0;
+			align-self: center;
+			justify-content: center;
+			gap: 0;
+			min-height: 44px;
+		}
+		.skipWrap {
+			gap: 0;
+		}
+		// Keep the original skip button visible when the extended
+		// options open; the extended cluster grows next to it
+		// inline rather than overlaying.
+		.skipBtnHidden {
+			opacity: 1;
+			pointer-events: auto;
+		}
+		.skipExtended {
+			position: static;
+			animation: none;
+			height: 44px;
+		}
+		.skipExtendedLeft {
+			// Options appear to the LEFT of the skip-back button.
+			order: -1;
+		}
+		.skipExtBtn {
+			width: 44px;
+			height: 44px;
+		}
+
+		// ── Row 3: Secondary controls (space-between) ──
+		.rightControls {
+			width: 100%;
+			margin: 0;
+			min-height: 44px;
+			justify-content: space-between;
+			align-items: center;
+		}
+
+		// Buttons everywhere — proper touch target.
+		.controlBtn {
+			aspect-ratio: auto;
+			width: 44px;
+			height: 44px;
+			margin: 0;
+			align-self: center;
+			svg {
+				width: 22px;
+				height: 22px;
+			}
+		}
+		.playBtn svg {
+			width: 26px;
+			height: 26px;
+		}
+
+		// Hide the mobile-overflow ⋯ button (this is the full layout,
+		// where info/effects/volume/settings already render in row 3).
+		.mobileOverflow {
+			display: none;
+		}
+	}
+}
