@@ -235,7 +235,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 														name={member.name}
 														profileUrl={member.profileUrl}
 														character={member.character}
-														size={32}
+														size={36}
 														expandedSize={180}
 														thumbClass={styles.castPhoto}
 													/>
@@ -450,7 +450,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 													name={member.name}
 													profileUrl={member.profileUrl}
 													character={member.character}
-													size={32}
+													size={36}
 													expandedSize={180}
 													thumbClass={styles.castPhoto}
 												/>

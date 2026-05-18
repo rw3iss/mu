@@ -828,7 +828,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 													name={member.name}
 													profileUrl={member.profileUrl}
 													character={member.character}
-													size={48}
+													size={52}
 													expandedSize={220}
 													thumbClass={styles.castAvatar}
 												/>

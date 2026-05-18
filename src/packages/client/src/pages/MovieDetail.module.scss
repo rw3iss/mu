@@ -562,6 +562,7 @@
 
 .castSection {
   margin-bottom: var(--space-2xl);
+  padding-right: var(--space-md);
 }
 
 /* The Cast toggle is a fully-styled button on mobile but should
@@ -582,7 +583,8 @@
 .castGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--space-md);
+  gap: var(--space-lg);
+  margin-top: var(--space-md);
 }
 
 /* Only honour the collapsed state on mobile — desktop ignores it so
@@ -596,9 +598,9 @@
 .castMember {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: 6px 8px;
-  margin: -6px -8px;
+  gap: 12px;
+  padding: 8px 10px;
+  margin: -8px -10px;
   border-radius: 8px;
   text-decoration: none;
   color: inherit;
@@ -652,8 +654,8 @@
 }
 
 .castAvatar {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius-full);
   overflow: hidden;
   background: var(--color-bg-elevated);
@@ -681,14 +683,14 @@
 }
 
 .castName {
-  font-size: var(--font-size-sm);
+  font-size: 15px;
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
   @include truncate(1);
 }
 
 .castCharacter {
-  font-size: var(--font-size-xs);
+  font-size: 13px;
   color: var(--color-text-muted);
   @include truncate(1);
 }
