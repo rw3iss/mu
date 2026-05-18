@@ -977,13 +977,36 @@ export class AudioEngine {
 	// ── Private ──
 
 	private pinSinkToDefault(): void {
-		if (!this.ctx) return;
-		const setSinkId = (this.ctx as AudioContext & { setSinkId?: (id: string) => Promise<void> })
-			.setSinkId;
-		if (typeof setSinkId !== 'function') return;
-		setSinkId.call(this.ctx, '').catch((err: unknown) => {
-			dwarn('[audioEngine] AudioContext.setSinkId(default) failed:', err);
+		if (!this.ctx) {
+			debug('audio:sink', { event: 'pin-no-ctx' });
+			return;
+		}
+		const ctxWithSink = this.ctx as AudioContext & {
+			setSinkId?: (id: string) => Promise<void>;
+			sinkId?: string;
+		};
+		debug('audio:sink', {
+			event: 'pin-attempt',
+			setSinkIdAvailable: typeof ctxWithSink.setSinkId === 'function',
+			currentSinkId: ctxWithSink.sinkId ?? '(unset)',
 		});
+		if (typeof ctxWithSink.setSinkId !== 'function') {
+			debug('audio:sink', { event: 'pin-not-supported' });
+			return;
+		}
+		ctxWithSink.setSinkId
+			.call(this.ctx, '')
+			.then(() => {
+				debug('audio:sink', {
+					event: 'pin-success',
+					newSinkId: ctxWithSink.sinkId ?? '(unset)',
+				});
+			})
+			.catch((err: unknown) => {
+				const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+				debug('audio:sink', { event: 'pin-failed', error: msg });
+				console.warn('[audioEngine] AudioContext.setSinkId(default) failed:', err);
+			});
 	}
 
 	private pinOutputAudioToDefault(): void {
