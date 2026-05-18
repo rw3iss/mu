@@ -105,7 +105,14 @@ export function CastPhoto({
 	};
 
 	const handleThumbClick = (e: MouseEvent) => {
+		// stopPropagation alone is NOT enough when this thumb lives inside
+		// an `<a href>` wrapper (cast row in MovieDetail / InfoPanel): the
+		// outer link's *default* navigation runs independently of its
+		// onClick handler, and preventDefault on the child is what blocks
+		// it. Without this the photo click both enlarges the thumb AND
+		// navigates to the person page — fixed here.
 		e.stopPropagation();
+		e.preventDefault();
 		if (open) {
 			setOpen(false);
 			return;
