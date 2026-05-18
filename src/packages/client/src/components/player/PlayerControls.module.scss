@@ -1231,12 +1231,10 @@
 			flex: 1;
 		}
 		// In mini-landscape the bar is only 56px tall and the spacer
-		// already steals ~96px from the row — keep the right shift
-		// (+150 over the previous 100px = 250px) but still less than
-		// the full-landscape 350px because the spacer pre-shifts the
-		// content.
+		// already steals ~96px from the row — pre-shift means we need
+		// less padding-left than the full-landscape 350px.
 		&.miniMode .controlsBottomRow {
-			padding-left: 250px;
+			padding-left: 210px;
 		}
 		// Mini-landscape bar is only 56px tall; shrink buttons back
 		// to 44px so they fit cleanly and don't overflow the bar.
