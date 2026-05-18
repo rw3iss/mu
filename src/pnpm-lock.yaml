@@ -34,6 +34,12 @@ importers:
       '@preact/signals':
         specifier: ^2.8.2
         version: 2.8.2(preact@10.29.0)
+      dev-debug-panel:
+        specifier: link:../../../../tools/dev-debug-panel
+        version: link:../../../../tools/dev-debug-panel
+      dev-loggers:
+        specifier: link:../../../../tools/dev-loggers
+        version: link:../../../../tools/dev-loggers
       hls.js:
         specifier: ^1.5.0
         version: 1.6.15

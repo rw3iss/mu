@@ -1,3 +1,5 @@
+import { debug } from 'dev-loggers';
+
 /**
  * Audio processing engine using Web Audio API.
  *
@@ -196,14 +198,17 @@ export class AudioEngine {
 	 * output device (matches YouTube and any other `<video>` consumer).
 	 */
 	register(element: HTMLMediaElement): void {
-		console.log('[audioEngine] register()', {
+		const info = {
+			event: 'register',
 			tag: element.tagName,
 			crossOrigin: element.crossOrigin,
 			src: element.src?.slice(0, 120),
 			muted: element.muted,
 			volume: element.volume,
 			same: element === this.pendingElement ? 'same as before' : 'NEW element',
-		});
+		};
+		debug('audio:attach', info);
+		console.log('[audioEngine] register()', info);
 		this.pendingElement = element;
 	}
 
@@ -222,22 +227,28 @@ export class AudioEngine {
 	 */
 	attach(element?: HTMLMediaElement): void {
 		const target = element ?? this.pendingElement;
-		console.log('[audioEngine] attach() called', {
+		const ctxInfo = {
+			event: 'attach',
 			haveTarget: !!target,
 			alreadyAttached: this.attached,
 			pendingElement: !!this.pendingElement,
-		});
+		};
+		debug('audio:attach', ctxInfo);
+		console.log('[audioEngine] attach() called', ctxInfo);
 		if (!target) {
+			debug('audio:attach', { event: 'attach', result: 'bail-no-target' });
 			console.warn('[audioEngine] attach() — no target element, bailing');
 			return;
 		}
 		if (this.attached) {
 			if (this.boundElement !== target) {
+				debug('audio:attach', { event: 'attach', result: 'refused-different-element' });
 				console.warn(
 					'[audioEngine] attach() called with a different element than the one ' +
 						'already bound. Ignoring — call destroy() first to re-bind.',
 				);
 			} else {
+				debug('audio:attach', { event: 'attach', result: 'noop-same-element' });
 				console.log('[audioEngine] attach() — already attached, no-op');
 			}
 			return;
@@ -245,6 +256,11 @@ export class AudioEngine {
 
 		try {
 			this.ctx = new AudioContext({ latencyHint: 'playback' });
+			debug('audio:attach', {
+				event: 'audio-context',
+				state: this.ctx.state,
+				sampleRate: this.ctx.sampleRate,
+			});
 			console.log(
 				`[audioEngine] new AudioContext → state=${this.ctx.state} sampleRate=${this.ctx.sampleRate}`,
 			);
@@ -272,7 +288,8 @@ export class AudioEngine {
 			// download).
 			this.source = this.ctx.createMediaElementSource(target);
 			this.boundElement = target;
-			console.log('[audioEngine] createMediaElementSource OK; element bound', {
+			const boundInfo = {
+				event: 'media-element-source-bound',
 				tag: target.tagName,
 				src: target.src?.slice(0, 120),
 				crossOrigin: target.crossOrigin,
@@ -280,7 +297,9 @@ export class AudioEngine {
 				volume: target.volume,
 				readyState: target.readyState,
 				usingMediaSource: !!target.src && target.src.startsWith('blob:'),
-			});
+			};
+			debug('audio:attach', boundInfo);
+			console.log('[audioEngine] createMediaElementSource OK; element bound', boundInfo);
 		} catch (err) {
 			console.error('[audioEngine] Failed to create MediaElementSource:', err);
 			this.ctx = null;
@@ -566,10 +585,12 @@ export class AudioEngine {
 				outputAudioMuted: this.outputAudio?.muted,
 			},
 		};
+		debug('audio:state', snapshot);
 		console.log('[audioEngine STATE]', snapshot);
 	}
 
 	setEqEnabled(enabled: boolean): void {
+		debug('audio:toggle', { event: 'setEqEnabled', enabled });
 		console.log(`[audioEngine] setEqEnabled(${enabled}) — entering`);
 		this.dumpState(`setEqEnabled(${enabled}) BEFORE`);
 		this.eqEnabled = enabled;
@@ -587,6 +608,7 @@ export class AudioEngine {
 	}
 
 	setCompressorEnabled(enabled: boolean): void {
+		debug('audio:toggle', { event: 'setCompressorEnabled', enabled });
 		console.log(`[audioEngine] setCompressorEnabled(${enabled}) — entering`);
 		this.dumpState(`setCompressorEnabled(${enabled}) BEFORE`);
 		this.compressorEnabled = enabled;
@@ -596,10 +618,7 @@ export class AudioEngine {
 				?.resume()
 				.then(() => console.log('[audioEngine] resume after setCompressorEnabled → ok'))
 				.catch((err) =>
-					console.warn(
-						'[audioEngine] resume after setCompressorEnabled REJECTED:',
-						err,
-					),
+					console.warn('[audioEngine] resume after setCompressorEnabled REJECTED:', err),
 				);
 		}
 		if (!enabled) {
@@ -1058,6 +1077,7 @@ export class AudioEngine {
 
 	private rebuildChain(): void {
 		if (!this.ctx || !this.source) {
+			debug('audio:chain', { event: 'rebuild', result: 'bail-no-ctx-or-source' });
 			console.log('[audioEngine] rebuildChain() — no ctx/source, bailing');
 			return;
 		}
@@ -1269,12 +1289,15 @@ export class AudioEngine {
 		const finalDest = this.streamDest ?? this.ctx.destination;
 		current.connect(finalDest);
 		traceConnect('lastStage', this.streamDest ? 'streamDest' : 'ctx.destination');
-		console.log('[audioEngine] rebuildChain done', {
+		const chainInfo = {
+			event: 'rebuild-done',
 			anyEffectOn,
 			ctxState: this.ctx.state,
 			finalDest: this.streamDest ? 'streamDest (MediaStream)' : 'ctx.destination',
 			trace,
-		});
+		};
+		debug('audio:chain', chainInfo);
+		console.log('[audioEngine] rebuildChain done', chainInfo);
 	}
 
 	private applyCompressorSettings(s: CompressorSettings): void {

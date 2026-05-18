@@ -44,6 +44,7 @@ import { initProcessingState } from '@/state/processing.state';
 import { fetchThemes } from '@/state/themes.state';
 import { installUserGestureListener } from '@/state/user-gesture.state';
 import { initConsoleDebug } from '@/utils/console-debug';
+import { initDebugPanel } from '@/utils/debug-panel';
 
 export const currentPath = signal(typeof window !== 'undefined' ? window.location.pathname : '/');
 /**
@@ -112,6 +113,7 @@ export function App() {
 		initGlobalPlayer();
 		initProcessingState();
 		initConsoleDebug();
+		initDebugPanel();
 		fetchThemes();
 
 		// Ensure AudioContext is created on first user interaction (Chrome requirement)
