@@ -15,7 +15,6 @@ import {
 	activeEqProfileId,
 	activeVideoProfileId,
 } from './audio-profiles.state';
-import { whenUserGestured } from './user-gesture.state';
 import {
 	DEFAULT_VIDEO_EFFECTS,
 	type VideoEffectSettings,
@@ -147,31 +146,21 @@ export function initAudioEffects(): void {
 		audioEngine.setBandCompressorSettings('high', savedMultiBandSettings.high);
 	}
 
-	// Enable flags create the AudioContext and bind a MediaElementSource
-	// to the <video>. Both operations require a user gesture: Chrome
-	// rejects context.resume() without one, and once a MediaElementSource
-	// is bound it cannot be un-bound — so a premature attach() leaves
-	// the video silently re-routed into a suspended graph.
-	// Defer the actual flips until the first user interaction.
-	whenUserGestured(() => {
-		audioEngine.setEqEnabled(savedEq);
-		audioEngine.setCompressorEnabled(savedComp);
-		audioEngine.setStereoWidthEnabled(savedStereoWidthEnabled);
-		audioEngine.setBassEnhanceEnabled(savedBassEnhanceEnabled);
-		audioEngine.setHrtfEnabled(savedHrtfEnabled);
-		audioEngine.setMultiBandEnabled(savedMultiBandEnabled);
-		// Note: we intentionally DON'T auto-attach() here for the
-		// visualizer-only case (savedSpectrum / savedCompVisualizer
-		// enabled but no effects). The auto-attach silently bound a
-		// MediaElementSource outside any real user-gesture frame
-		// (whenUserGestured fires after the gesture handler has
-		// returned, so Chrome's transient activation has lapsed),
-		// leaving the AudioContext stuck in 'suspended' and audio
-		// permanently routed to silence. Visualizers will show data
-		// the moment the user enables any effect (which fires
-		// setEqEnabled/etc. from a real click handler, securing
-		// gesture credit for resume()).
-	});
+	// The audio engine is now eagerly attached on video creation
+	// (see useVideoEngine.ts) — before HLS.js calls
+	// MediaSource.attachMedia(). That ordering matters: Chrome taints
+	// createMediaElementSource output if the video already has a
+	// MediaSource attached. With eager attach, the engine is ready
+	// here and the saved enable-flags just trigger a chain rebuild;
+	// no createMediaElementSource happens late. AudioContext stays
+	// suspended until the user clicks Play (audioEngine.resume()
+	// inside togglePlay() in useVideoEngine handles gesture credit).
+	audioEngine.setEqEnabled(savedEq);
+	audioEngine.setCompressorEnabled(savedComp);
+	audioEngine.setStereoWidthEnabled(savedStereoWidthEnabled);
+	audioEngine.setBassEnhanceEnabled(savedBassEnhanceEnabled);
+	audioEngine.setHrtfEnabled(savedHrtfEnabled);
+	audioEngine.setMultiBandEnabled(savedMultiBandEnabled);
 
 	const savedVideoEnabled = getUiSetting('video_effects_enabled', false);
 	const savedVideoEffects = getUiSetting<VideoEffectSettings | null>(
