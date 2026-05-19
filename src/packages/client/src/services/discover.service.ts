@@ -55,6 +55,15 @@ export interface DiscoverRequest {
 	limit?: number;
 	filters?: DiscoverFilters;
 	include?: IncludeMode;
+	/**
+	 * Blend the user's taste profile (favorites, ratings, watch
+	 * history) into the recommendation. Default true. When false AND
+	 * no seeds present, the server returns a filter-only cold browse
+	 * sorted by votes/rating. Seeds-present + useProfile=false is
+	 * equivalent to seeds-present + useProfile=true (the seed-driven
+	 * strategies don't blend profile signal regardless).
+	 */
+	useProfile?: boolean;
 }
 
 function toQueryParams(req: DiscoverRequest): Record<string, string> {
@@ -65,6 +74,8 @@ function toQueryParams(req: DiscoverRequest): Record<string, string> {
 	if (req.personKeys && req.personKeys.length > 0) p.personKeys = req.personKeys.join(',');
 	if (req.limit) p.limit = String(req.limit);
 	if (req.include && req.include !== 'owned') p.include = req.include;
+	// Only serialise when explicitly false — server defaults to true.
+	if (req.useProfile === false) p.useProfile = 'false';
 	const f = req.filters;
 	if (f) {
 		if (f.minRating != null) p.minRating = String(f.minRating);

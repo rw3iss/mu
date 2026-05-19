@@ -1,17 +1,82 @@
 .panel {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: 10px;
 	padding: 12px 14px;
 	background: var(--color-bg-elevated);
 	border: 1px solid var(--color-border);
 	border-radius: 8px;
+	transition:
+		opacity 180ms var(--ease-out, ease-out),
+		filter 180ms var(--ease-out, ease-out);
+}
+
+// When "Use My Profile" is off, the favorites in this panel don't
+// influence the recommendations. Visually communicate that by
+// desaturating + dimming so the user knows it's inert, but still
+// readable for context.
+.disabled {
+	opacity: 0.5;
+	filter: saturate(0.4);
 }
 
 .header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	width: 100%;
+	padding: 0;
+	margin: 0;
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	color: inherit;
+	text-align: left;
+
+	&:focus-visible {
+		outline: var(--focus-ring-width) solid var(--focus-ring-color);
+		outline-offset: var(--focus-ring-offset);
+		border-radius: 4px;
+	}
+}
+
+.headerRight {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.chevron {
+	display: inline-flex;
+	align-items: center;
+	color: var(--color-text-muted);
+	transition: transform 160ms var(--ease-out, ease);
+}
+
+.chevronCollapsed {
+	transform: rotate(-90deg);
+}
+
+// Scrollable inner list — bounds growth when the user has dozens
+// of favorites. The exact height plays nicely with the sticky
+// sidebar above the filter panel.
+.body {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	max-height: 360px;
+	overflow-y: auto;
+	padding-right: 2px; // room for the scrollbar without clipping chips
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-text-muted) transparent;
+
+	&::-webkit-scrollbar {
+		width: 4px;
+	}
+	&::-webkit-scrollbar-thumb {
+		background: var(--color-text-muted);
+		border-radius: 2px;
+	}
 }
 
 .title {

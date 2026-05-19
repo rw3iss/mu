@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
+import { MoviePicker } from '@/components/common/MoviePicker';
 import { Spinner } from '@/components/common/Spinner';
 import { DiscoverFilters as FilterPanel } from '@/components/discover/DiscoverFilters';
 import { DiscoverResultCard } from '@/components/discover/DiscoverResultCard';
@@ -8,6 +9,7 @@ import { SeedChip } from '@/components/discover/SeedChip';
 import type { IncludeMode } from '@/services/discover.service';
 import { moviesService } from '@/services/movies.service';
 import {
+	addSeed,
 	clearFilters,
 	clearSeeds,
 	enrichmentsQueued,
@@ -28,8 +30,10 @@ import {
 	setFilters,
 	setIncludeMode,
 	setSeed,
+	setUseProfile,
 	unresolvedPersonKeys,
 	usedSources,
+	useProfile,
 } from '@/state/discover.state';
 import styles from './Discover.module.scss';
 
@@ -83,6 +87,7 @@ function IncludeToggle({
 export function Discover(_props: DiscoverProps) {
 	const [genres, setGenres] = useState<string[]>([]);
 	const [showFilters, setShowFilters] = useState(true);
+	const [pickerOpen, setPickerOpen] = useState(false);
 
 	// On mount: parse URL params, load genres.
 	useEffect(() => {
@@ -124,17 +129,20 @@ export function Discover(_props: DiscoverProps) {
 		};
 	}, []);
 
-	// Re-fetch whenever seeds, person seeds, filters, or include mode change.
+	// Re-fetch whenever seeds, person seeds, filters, include mode, or
+	// the use-profile flag change.
 	useEffect(() => {
 		const dispose = seedMovieIds.subscribe(() => runDiscover());
 		const dispose2 = filters.subscribe(() => runDiscover());
 		const dispose3 = includeMode.subscribe(() => runDiscover());
 		const dispose4 = personSeedKeys.subscribe(() => runDiscover());
+		const dispose5 = useProfile.subscribe(() => runDiscover());
 		return () => {
 			dispose();
 			dispose2();
 			dispose3();
 			dispose4();
+			dispose5();
 		};
 	}, []);
 
@@ -165,6 +173,31 @@ export function Discover(_props: DiscoverProps) {
 					<p class={styles.subtitle}>{headerSubtitle}</p>
 				</div>
 				<div class={styles.headerActions}>
+					<button
+						type="button"
+						class={styles.refreshBtn}
+						onClick={() => runDiscover()}
+						disabled={loading}
+						aria-label="Refresh recommendations"
+						title="Refresh with current filters"
+					>
+						<svg
+							class={loading ? styles.refreshSpinning : undefined}
+							width={14}
+							height={14}
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width={2.25}
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M21 12a9 9 0 1 1-3-6.7" />
+							<polyline points="21 4 21 10 15 10" />
+						</svg>
+						<span>Refresh</span>
+					</button>
 					<IncludeToggle value={includeMode.value} onChange={setIncludeMode} />
 					{usedSources.value.length > 0 && (
 						<span class={styles.sourcesBadge} title="Active recommendation sources">
@@ -185,27 +218,49 @@ export function Discover(_props: DiscoverProps) {
 				</div>
 			)}
 
-			{(seeds.length > 0 || personSeedKeys.value.length > 0) && (
-				<div class={styles.seedRow}>
-					{seeds.map((id) => (
-						<SeedChip
-							key={id}
-							label={seedLabelMap[id] ?? id.slice(0, 8)}
-							onRemove={() => removeSeed(id)}
-						/>
-					))}
-					{personSeedKeys.value.map((key) => (
-						<SeedChip
-							key={key}
-							label={`👤 ${personSeedLabels.value[key] ?? key}`}
-							onRemove={() => removePersonSeed(key)}
-						/>
-					))}
+			<div class={styles.seedRow}>
+				{seeds.map((id) => (
+					<SeedChip
+						key={id}
+						label={seedLabelMap[id] ?? id.slice(0, 8)}
+						onRemove={() => removeSeed(id)}
+					/>
+				))}
+				{personSeedKeys.value.map((key) => (
+					<SeedChip
+						key={key}
+						label={`👤 ${personSeedLabels.value[key] ?? key}`}
+						onRemove={() => removePersonSeed(key)}
+					/>
+				))}
+				<button
+					type="button"
+					class={styles.addSeedBtn}
+					onClick={() => setPickerOpen(true)}
+					title="Add seed movies to influence recommendations"
+				>
+					+ Add
+				</button>
+				{(seeds.length > 0 || personSeedKeys.value.length > 0) && (
 					<button class={styles.clearLink} onClick={clearSeeds}>
 						Clear seed{seeds.length + personSeedKeys.value.length > 1 ? 's' : ''}
 					</button>
-				</div>
-			)}
+				)}
+			</div>
+
+			<MoviePicker
+				isOpen={pickerOpen}
+				onClose={() => setPickerOpen(false)}
+				mode="multi"
+				title="Add seed movies"
+				confirmLabel="Add to seeds"
+				disabledIds={seeds}
+				onSelect={(picks) => {
+					for (const p of picks) {
+						addSeed(p.id, p.title);
+					}
+				}}
+			/>
 
 			{unresolvedPersonKeys.value.length > 0 && (
 				<div class={styles.enrichBanner}>
@@ -220,7 +275,23 @@ export function Discover(_props: DiscoverProps) {
 			<div class={styles.layout}>
 				{showFilters && (
 					<aside class={styles.sidebar}>
-						<QuickStartPanel />
+						<button
+							type="button"
+							class={`${styles.profileToggle} ${useProfile.value ? styles.profileToggleActive : ''}`}
+							onClick={() => setUseProfile(!useProfile.value)}
+							aria-pressed={useProfile.value}
+							title={
+								useProfile.value
+									? 'Recommendations include your favorites, ratings, and watch history'
+									: 'Recommendations ignore your profile — filters and seeds only'
+							}
+						>
+							<span class={styles.profileToggleDot} aria-hidden="true" />
+							<span class={styles.profileToggleLabel}>
+								Use My Profile{useProfile.value ? '' : ' (off)'}
+							</span>
+						</button>
+						<QuickStartPanel disabled={!useProfile.value} />
 						<FilterPanel
 							value={filterValue}
 							availableGenres={genres}

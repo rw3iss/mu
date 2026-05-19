@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals';
+import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
 import {
 	type DiscoverFilters,
 	discoverService,
@@ -25,6 +26,14 @@ export const unresolvedPersonKeys = signal<string[]>([]);
 export const seedLabels = signal<Record<string, string>>({});
 export const filters = signal<DiscoverFilters>({});
 export const includeMode = signal<IncludeMode>('owned');
+/**
+ * When true, the server blends the user's taste profile (favorites,
+ * ratings, watch history) into the recommendation. When false AND
+ * there are no seeds, the server returns a filter-only cold browse.
+ * Persisted to localStorage so the user's preference sticks across
+ * sessions.
+ */
+export const useProfile = signal<boolean>(getUiSetting<boolean>('discover_use_profile', true));
 export const results = signal<ScoredMovie[]>([]);
 export const isLoading = signal<boolean>(false);
 export const errorMessage = signal<string | null>(null);
@@ -70,6 +79,11 @@ export function clearDiscoverScroll(): void {
 
 export function setIncludeMode(mode: IncludeMode): void {
 	includeMode.value = mode;
+}
+
+export function setUseProfile(next: boolean): void {
+	useProfile.value = next;
+	setUiSetting('discover_use_profile', next);
 }
 
 export function setSeed(movieId: string | null, label?: string): void {
@@ -136,6 +150,7 @@ export async function runDiscover(): Promise<void> {
 			filters: filters.value,
 			limit: 36,
 			include: includeMode.value,
+			useProfile: useProfile.value,
 		});
 		results.value = response.results;
 		usedSources.value = response.usedSources;

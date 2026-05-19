@@ -8,6 +8,15 @@ import { addPersonSeed, addSeed, personSeedKeys } from '@/state/discover.state';
 import { ensureFavoritesLoaded, favoritePersonKeys } from '@/state/favorites.state';
 import styles from './QuickStartPanel.module.scss';
 
+interface QuickStartPanelProps {
+	/**
+	 * When true, the panel is dimmed and chips are non-interactive —
+	 * indicates the user has disabled "Use My Profile" and their
+	 * favorites won't influence the current recommendations.
+	 */
+	disabled?: boolean;
+}
+
 /**
  * Discover-page quick-start panel: surfaces the user's favorites
  * directly into the seed flow so building a "tailored to me"
@@ -18,9 +27,14 @@ import styles from './QuickStartPanel.module.scss';
  *     pick a known-for credit to seed from (people aren't direct
  *     seeds in the current recommender — credit choice acts as the
  *     bridge).
+ *
+ * Collapsible (chevron in the header) so the user can hide the
+ * panel when their favorites list is long. Body scrolls vertically
+ * with a tokenised max-height so the page layout stays compact.
  */
-export function QuickStartPanel() {
+export function QuickStartPanel({ disabled = false }: QuickStartPanelProps) {
 	const [favorites, setFavorites] = useState<FavoriteEntry[] | null>(null);
+	const [collapsed, setCollapsed] = useState(false);
 
 	useEffect(() => {
 		void ensureFavoritesLoaded();
@@ -42,6 +56,7 @@ export function QuickStartPanel() {
 	}
 
 	const seedAll = () => {
+		if (disabled) return;
 		// Take up to 5 favorite movies as the multi-seed set so the
 		// recommender derives a taste centroid from them. Hitting
 		// 5+ is plenty — more seeds dilutes the signal.
@@ -53,58 +68,88 @@ export function QuickStartPanel() {
 		}
 	};
 
+	const panelClass = `${styles.panel} ${disabled ? styles.disabled : ''}`;
+
 	return (
-		<div class={styles.panel}>
-			<div class={styles.header}>
+		<div class={panelClass} aria-disabled={disabled || undefined}>
+			<button
+				type="button"
+				class={styles.header}
+				onClick={() => setCollapsed((v) => !v)}
+				aria-expanded={!collapsed}
+				aria-controls="quickstart-body"
+			>
 				<h3 class={styles.title}>From your favorites</h3>
-				{favMovies.length > 1 && (
-					<button type="button" class={styles.allBtn} onClick={seedAll}>
-						Seed all
-					</button>
-				)}
-			</div>
-
-			{favMovies.length > 0 && (
-				<div class={styles.section}>
-					<span class={styles.sectionLabel}>Movies</span>
-					<div class={styles.row}>
-						{favMovies.slice(0, 8).map((f) => (
-							<button
-								key={f.id}
-								type="button"
-								class={styles.chip}
-								onClick={() => addSeed(f.movie!.id, f.movie!.title)}
-								title={`Seed Discover with "${f.movie!.title}"`}
-							>
-								<span class={styles.chipThumb}>
-									{f.movie!.posterUrl ? (
-										<SmartImage src={f.movie!.posterUrl} alt="" />
-									) : (
-										<Icon name="film" size={12} />
-									)}
-								</span>
-								<span class={styles.chipLabel}>{f.movie!.title}</span>
-							</button>
-						))}
-					</div>
+				<div class={styles.headerRight}>
+					{!collapsed && favMovies.length > 1 && (
+						<span
+							role="button"
+							tabIndex={0}
+							class={styles.allBtn}
+							onClick={(e) => {
+								e.stopPropagation();
+								seedAll();
+							}}
+						>
+							Seed all
+						</span>
+					)}
+					<span class={`${styles.chevron} ${collapsed ? styles.chevronCollapsed : ''}`}>
+						<Icon name="chevron-down" size={14} />
+					</span>
 				</div>
-			)}
+			</button>
 
-			{favPeople.length > 0 && (
-				<div class={styles.section}>
-					<span class={styles.sectionLabel}>People</span>
-					<div class={styles.row}>
-						{favPeople.slice(0, 8).map((f) => (
-							<PersonChip key={f.id} entry={f} />
-						))}
-					</div>
+			{!collapsed && (
+				<div id="quickstart-body" class={styles.body}>
+					{favMovies.length > 0 && (
+						<div class={styles.section}>
+							<span class={styles.sectionLabel}>Movies</span>
+							<div class={styles.row}>
+								{favMovies.map((f) => (
+									<button
+										key={f.id}
+										type="button"
+										class={styles.chip}
+										onClick={() => addSeed(f.movie!.id, f.movie!.title)}
+										disabled={disabled}
+										title={
+											disabled
+												? '"Use My Profile" is off — favorites are not influencing recommendations'
+												: `Seed Discover with "${f.movie!.title}"`
+										}
+									>
+										<span class={styles.chipThumb}>
+											{f.movie!.posterUrl ? (
+												<SmartImage src={f.movie!.posterUrl} alt="" />
+											) : (
+												<Icon name="film" size={12} />
+											)}
+										</span>
+										<span class={styles.chipLabel}>{f.movie!.title}</span>
+									</button>
+								))}
+							</div>
+						</div>
+					)}
+
+					{favPeople.length > 0 && (
+						<div class={styles.section}>
+							<span class={styles.sectionLabel}>People</span>
+							<div class={styles.row}>
+								{favPeople.map((f) => (
+									<PersonChip key={f.id} entry={f} disabled={disabled} />
+								))}
+							</div>
+						</div>
+					)}
 				</div>
 			)}
 		</div>
 	);
 }
 
-function PersonChip({ entry }: { entry: FavoriteEntry }) {
+function PersonChip({ entry, disabled }: { entry: FavoriteEntry; disabled?: boolean }) {
 	const seeded = personSeedKeys.value.includes(entry.key);
 
 	const seedFromPerson = () => {
@@ -122,11 +167,13 @@ function PersonChip({ entry }: { entry: FavoriteEntry }) {
 				type="button"
 				class={`${styles.chip} ${seeded ? styles.chipActive : ''}`}
 				onClick={seedFromPerson}
-				disabled={seeded}
+				disabled={seeded || disabled}
 				title={
-					seeded
-						? `${entry.person!.name} is already seeded`
-						: `Seed Discover with ${entry.person!.name}'s films`
+					disabled
+						? '"Use My Profile" is off — favorites are not influencing recommendations'
+						: seeded
+							? `${entry.person!.name} is already seeded`
+							: `Seed Discover with ${entry.person!.name}'s films`
 				}
 			>
 				<span class={styles.chipThumb}>

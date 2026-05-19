@@ -1,0 +1,276 @@
+.container {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	// Bound the picker height so very long libraries don't push the
+	// confirm/cancel footer off-screen. The Modal "lg" size caps width
+	// at its own var; height stays under the viewport via this clamp.
+	max-height: 70vh;
+
+	@media (max-width: 767px) {
+		max-height: 80vh;
+	}
+}
+
+.controls {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+
+	@media (max-width: 600px) {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 8px;
+	}
+}
+
+.searchWrap {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1;
+	min-width: 0;
+	padding: 6px 10px;
+	background: var(--surface-overlay-1);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	color: var(--color-text-muted);
+	transition: border-color var(--transition-fast);
+
+	&:focus-within {
+		border-color: var(--color-accent);
+		color: var(--color-text-primary);
+	}
+}
+
+.searchInput {
+	flex: 1;
+	min-width: 0;
+	background: transparent;
+	border: none;
+	color: var(--color-text-primary);
+	font-size: var(--font-size-md);
+	font-family: var(--font-family);
+	outline: none;
+
+	&::placeholder {
+		color: var(--color-text-muted);
+	}
+}
+
+.searchClear {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	background: transparent;
+	border: none;
+	color: var(--color-text-muted);
+	cursor: pointer;
+	border-radius: 50%;
+
+	&:hover {
+		color: var(--color-text-primary);
+		background: var(--surface-overlay-2);
+	}
+}
+
+.sortWrap {
+	flex-shrink: 0;
+}
+
+// Scrolling region that holds the result rows. min-height: 0 lets
+// the flex parent compute the available space correctly so the
+// scrollbar appears INSIDE this region rather than overflowing the
+// modal.
+.listScroll {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	background: var(--color-bg-surface);
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-text-muted) transparent;
+
+	&::-webkit-scrollbar {
+		width: 6px;
+	}
+	&::-webkit-scrollbar-thumb {
+		background: var(--color-text-muted);
+		border-radius: 3px;
+	}
+}
+
+.list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+// Tight row layout — small poster, title + year. Theme-aware. The
+// selected state uses the accent subtle as a left rail so it's
+// readable on either light or dark themes.
+.row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	padding: 8px 12px;
+	background: transparent;
+	border: none;
+	border-left: 3px solid transparent;
+	color: var(--color-text-primary);
+	cursor: pointer;
+	text-align: left;
+	transition: background var(--transition-fast), border-color var(--transition-fast);
+
+	&:hover:not(:disabled) {
+		background: var(--surface-overlay-1);
+	}
+
+	& + & {
+		border-top: 1px solid var(--color-border);
+	}
+}
+
+.rowSelected {
+	background: var(--color-accent-subtle);
+	border-left-color: var(--color-accent);
+
+	&:hover {
+		background: var(--color-accent-subtle);
+	}
+}
+
+.rowDisabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.rowCheck {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 4px;
+	border: 1px solid var(--color-border-strong);
+	background: var(--color-bg-elevated);
+	color: var(--color-bg-elevated);
+	flex-shrink: 0;
+	transition: background var(--transition-fast), color var(--transition-fast);
+
+	.rowSelected & {
+		background: var(--color-accent);
+		color: var(--color-text-inverse);
+		border-color: var(--color-accent);
+	}
+}
+
+.rowPoster {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 48px;
+	border-radius: 3px;
+	overflow: hidden;
+	background: var(--color-bg-elevated);
+	color: var(--color-text-muted);
+	flex-shrink: 0;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+}
+
+.rowMeta {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	flex: 1;
+}
+
+.rowTitle {
+	font-size: var(--font-size-md);
+	color: var(--color-text-primary);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.rowSub {
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+}
+
+.loading,
+.emptyState,
+.errorState {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 40px 16px;
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+	text-align: center;
+}
+
+.errorState {
+	color: var(--color-error);
+}
+
+// Selection summary bar above the footer — title for single mode,
+// "Selected (N): t1, t2, …" for multi. Ellipses cleanly when many
+// movies are picked so the bar height stays stable.
+.selectedSummary {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 12px;
+	background: var(--surface-overlay-1);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	color: var(--color-text-secondary);
+	font-size: var(--font-size-sm);
+}
+
+.selectedSummaryText {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.clearSelectionBtn {
+	flex-shrink: 0;
+	background: transparent;
+	border: none;
+	color: var(--color-accent);
+	font-size: var(--font-size-xs);
+	font-weight: var(--font-weight-medium);
+	cursor: pointer;
+	padding: 2px 6px;
+	border-radius: var(--radius-sm);
+	transition: background var(--transition-fast);
+
+	&:hover {
+		background: var(--color-accent-subtle);
+	}
+}
+
+.footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	padding-top: 4px;
+}

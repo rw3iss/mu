@@ -463,6 +463,54 @@ export class RecommendationsService {
 	}
 
 	/** Most watched + rated in the last 30 days. */
+	/**
+	 * Cold discover — no taste-profile, no seeds. Returns movies that
+	 * match the user's filters (year, genres, minRating, minVotes,
+	 * etc.) ranked by popularity signal (votes desc, then rating).
+	 *
+	 * Used when the client sets `useProfile=false` AND there are no
+	 * seeds. Differs from `getPersonalized` in that it never touches
+	 * the user's favorites / ratings / watch history — the result is
+	 * purely a filtered browse over the candidate set.
+	 */
+	async getColdDiscover(
+		limit = 24,
+		filters?: import('./types.js').DiscoverFilters,
+		include: IncludeMode = 'owned',
+	): Promise<ScoredMovie[]> {
+		const all = this.loadAllCandidates(include);
+
+		// Score: votes dominate (popularity proxy), rating breaks ties.
+		// Movies missing both signals fall to the bottom but still appear
+		// — useful when the user has narrow filters and few matches.
+		const scored: ScoredMovie[] = [];
+		for (const m of all) {
+			if (m.hidden) continue;
+			const rating = m.tmdbRating ?? m.imdbRating ?? 0;
+			const votes = m.tmdbVotes ?? 0;
+			// Log-scale votes so a 100k-vote film doesn't drown out a
+			// 5k-vote one entirely; rating then provides ordering inside
+			// each popularity tier.
+			const score = Math.log10(1 + votes) * 0.7 + (rating / 10) * 0.3;
+			const reasons: string[] = [];
+			if (votes > 0) reasons.push(`${votes.toLocaleString()} votes`);
+			if (rating > 0) reasons.push(`Rated ${rating.toFixed(1)}`);
+			scored.push({
+				movieId: m.id,
+				title: m.title,
+				year: m.year,
+				score: Math.round(score * 1000) / 1000,
+				explanation: reasons,
+				posterUrl: m.posterUrl,
+				usedSources: ['cold-discover'],
+			});
+		}
+		scored.sort((a, b) => b.score - a.score);
+		const allHydrated = new Map(all.map((m) => [m.id, m]));
+		const userFiltered = applyDiscoverFilters(scored, allHydrated, filters);
+		return userFiltered.slice(0, limit);
+	}
+
 	async getTrending(limit = 24): Promise<ScoredMovie[]> {
 		const cacheKey = `trending:${limit}`;
 		const cached = await this.cache.get<ScoredMovie[]>(

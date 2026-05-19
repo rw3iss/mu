@@ -50,6 +50,7 @@ export class RecommendationsController {
 		@Query('personKeys') personKeys?: string,
 		@Query('limit') limit?: string,
 		@Query('include') include?: string,
+		@Query('useProfile') useProfile?: string,
 		@Query('minRating') minRating?: string,
 		@Query('minVotes') minVotes?: string,
 		@Query('genres') genres?: string,
@@ -69,6 +70,9 @@ export class RecommendationsController {
 		});
 		const k = parseLimit(limit);
 		const inc = parseInclude(include);
+		// Default true (preserves existing behavior). Anything other than
+		// the literal string 'false' is treated as truthy.
+		const profile = useProfile !== 'false';
 
 		// Resolve `personKeys` to movie ids via the people↔library
 		// bridge. Merged with any explicit seedMovieIds so callers
@@ -117,6 +121,17 @@ export class RecommendationsController {
 				usedSources: [],
 				reason: 'no_owned_credits_for_person_keys',
 				unresolvedPersonKeys,
+			};
+		}
+
+		// No seeds. If the user has opted out of taste-profile,
+		// fall through to a filter-only "cold" browse instead.
+		if (!profile) {
+			const cold = await this.recs.getColdDiscover(k, filters, inc);
+			return {
+				results: cold,
+				usedSources: ['cold-discover'],
+				reason: cold.length === 0 ? 'no_matches' : undefined,
 			};
 		}
 
