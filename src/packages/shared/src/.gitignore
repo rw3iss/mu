@@ -1,0 +1,9 @@
+# TypeScript output never belongs in src/ — see tsconfig.json `outDir`
+# which sends everything to ../dist. These patterns guard against an
+# accidental `tsc` run without `--outDir` (which has bitten us once
+# already, producing stale .js files that Vite's @mu/shared alias
+# resolved instead of the .ts source on a remote build).
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
