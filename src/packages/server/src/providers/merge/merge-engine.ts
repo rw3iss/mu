@@ -329,7 +329,15 @@ function valueToList(v: unknown): ListItem[] {
 				out.push(obj as ListItem);
 			} else {
 				const s = String(x).trim();
-				if (s) out.push(s);
+				if (!s) continue;
+				// Drop the literal '[object Object]' string — a leftover
+				// from the pre-fix stringification bug. Any incoming data
+				// with this value is corrupt and can never be a real
+				// cast/genre/keyword name. Without this guard, refreshing
+				// an already-corrupted row would carry the bad entry
+				// forward forever (dedupe key matches itself).
+				if (s.toLowerCase() === '[object object]') continue;
+				out.push(s);
 			}
 		}
 		return out;

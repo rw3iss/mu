@@ -146,6 +146,23 @@ describe('MergeEngine', () => {
 		expect(merged).toEqual([{ name: 'Graham Chapman', tmdbId: 21 }]);
 	});
 
+	it('scrubs leftover "[object Object]" strings from previous corruption on refresh', () => {
+		// Regression: when a refresh feeds a previously-corrupted
+		// cast list (containing the literal '[object Object]' string)
+		// back into the engine, the bad entry's dedupe key has no
+		// match in the fresh contribution and would otherwise be
+		// preserved forever. valueToList now drops these.
+		const engine = MergeEngine.withRules(RULES);
+		const corruptedExisting = ['Graham Chapman', '[object Object]', 'John Cleese'];
+		const out = engine.apply({ cast: corruptedExisting }, { cast: 'omdb' }, [
+			contribution('tmdb', {
+				cast: [{ name: 'Graham Chapman' }, { name: 'John Cleese' }],
+			}),
+		]);
+		const merged = out.merged.cast as Array<unknown>;
+		expect(merged).toEqual([{ name: 'Graham Chapman' }, { name: 'John Cleese' }]);
+	});
+
 	it('drops object items without a `name` field', () => {
 		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({}, {}, [
