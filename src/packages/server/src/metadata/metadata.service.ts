@@ -7,6 +7,12 @@ import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
+import { MovieIdentityService } from '../providers/identity/movie-identity.service.js';
+import { MovieSourcePayloadsService } from '../providers/identity/movie-source-payloads.service.js';
+import { MergeEngine } from '../providers/merge/merge-engine.js';
+import type { CanonicalField, ProvenanceMap } from '../providers/merge/merge-types.js';
+import { omdbToContribution } from './adapters/omdb.adapter.js';
+import { tmdbToContribution } from './adapters/tmdb.adapter.js';
 import { MatchCandidatesRepository } from './match-candidates.repository.js';
 import {
 	buildTitleQuery,
@@ -38,6 +44,9 @@ export class MetadataService {
 		private readonly cache: CacheService,
 		private readonly events: EventsService,
 		private readonly matchCandidates: MatchCandidatesRepository,
+		private readonly mergeEngine: MergeEngine,
+		private readonly identityService: MovieIdentityService,
+		private readonly payloadsService: MovieSourcePayloadsService,
 	) {}
 
 	/**
@@ -514,126 +523,138 @@ export class MetadataService {
 			return null;
 		}
 
-		// IMDB ID resolution: prefer OMDB (always authoritative), else TMDB.
-		// OMDB getByImdbId doesn't echo the ID back in its trimmed shape, so
-		// fall back to the `imdbId` we used to query it.
 		const resolvedImdbId = imdbId ?? tmdbDetails?.imdb_id ?? null;
 		const resolvedTmdbId = tmdbDetails?.id ?? tmdbId ?? null;
 
 		const now = nowISO();
-		const trailerVideo = tmdbDetails?.videos?.results?.find(
-			(v) => v.site === 'YouTube' && v.type === 'Trailer',
-		);
-		const trailerUrl = trailerVideo
-			? `https://www.youtube.com/watch?v=${trailerVideo.key}`
-			: null;
 
-		const usRelease = tmdbDetails?.release_dates?.results?.find((r) => r.iso_3166_1 === 'US');
-		const tmdbCertification = usRelease?.release_dates
-			?.map((rd) => rd.certification)
-			.find((c) => c && c.length > 0);
+		// --- Phase 0.5 — generic merge path ---------------------------------
+		//
+		// Each provider's raw response is normalised to a SourceContribution
+		// (canonical field names + values). The MergeEngine resolves
+		// per-field precedence using the declarative rules in
+		// providers/merge/merge-rules.ts. The result + provenance map is
+		// what we persist.
+		//
+		// Side effects in this orchestrator (still needed because the
+		// engine is scope-limited to canonical fields):
+		//   - persist the raw payloads so re-merge is possible offline
+		//   - link external IDs into the multi-source identity registry
+		//   - keep handling tagline + extendedData (still hardcoded — they
+		//     don't yet live in the canonical schema)
+		const contributions = [];
+		if (tmdbDetails) {
+			contributions.push(
+				tmdbToContribution({
+					tmdbDetails,
+					getImageUrl: (p, s) => this.tmdb.getImageUrl(p, s),
+				}),
+			);
+			void this.payloadsService.store({ movieId, source: 'tmdb', payload: tmdbDetails });
+		}
+		if (omdbData) {
+			contributions.push(omdbToContribution(omdbData, imdbId));
+			void this.payloadsService.store({ movieId, source: 'omdb', payload: omdbData });
+		}
 
-		// Per-field merge.
-		const overview = firstNonEmpty(tmdbDetails?.overview, omdbData?.plot);
+		// Load existing provenance so the engine respects what's already
+		// there (e.g., a user override survives a re-fetch).
+		const existingMeta = this.database.db
+			.select()
+			.from(movieMetadata)
+			.where(eq(movieMetadata.movieId, movieId))
+			.get();
+		const existingMovieRow = this.database.db
+			.select()
+			.from(movies)
+			.where(eq(movies.id, movieId))
+			.get();
+
+		const existingProvenance: ProvenanceMap = existingMeta?.provenance
+			? safeJsonParse(existingMeta.provenance)
+			: {};
+
+		// Build the existing canonical record from BOTH movies hot
+		// columns AND movie_metadata so engine sees the full picture.
+		const existingCanonical = {
+			title: existingMovieRow?.title ?? null,
+			originalTitle: existingMovieRow?.originalTitle ?? null,
+			year: existingMovieRow?.year ?? priorYear ?? null,
+			overview: existingMovieRow?.overview ?? null,
+			tmdbId: existingMovieRow?.tmdbId ?? null,
+			imdbId: existingMovieRow?.imdbId ?? null,
+			posterUrl: existingMovieRow?.posterUrl ?? null,
+			backdropUrl: existingMovieRow?.backdropUrl ?? null,
+			trailerUrl: existingMovieRow?.trailerUrl ?? null,
+			releaseDate: existingMovieRow?.releaseDate ?? null,
+			runtimeMinutes: existingMovieRow?.runtimeMinutes ?? null,
+			language: existingMovieRow?.language ?? null,
+			country: existingMovieRow?.country ?? null,
+			contentRating: existingMovieRow?.contentRating ?? null,
+			genres: safeJsonParse(existingMeta?.genres) ?? [],
+			cast: safeJsonParse(existingMeta?.cast) ?? [],
+			directors: safeJsonParse(existingMeta?.directors) ?? [],
+			writers: safeJsonParse(existingMeta?.writers) ?? [],
+			keywords: safeJsonParse(existingMeta?.keywords) ?? [],
+			productionCompanies: safeJsonParse(existingMeta?.productionCompanies) ?? [],
+			budget: existingMeta?.budget ?? null,
+			revenue: existingMeta?.revenue ?? null,
+			imdbRating: existingMeta?.imdbRating ?? null,
+			imdbVotes: existingMeta?.imdbVotes ?? null,
+			tmdbRating: existingMeta?.tmdbRating ?? null,
+			tmdbVotes: existingMeta?.tmdbVotes ?? null,
+			rottenTomatoesScore: existingMeta?.rottenTomatoesScore ?? null,
+			metacriticScore: existingMeta?.metacriticScore ?? null,
+		};
+
+		const merge = this.mergeEngine.apply(existingCanonical, existingProvenance, contributions);
+		const m = merge.merged;
+
+		// Record identities (idempotent) so cross-source lookups work later.
+		if (resolvedTmdbId) {
+			await this.identityService.link({
+				movieId,
+				source: 'tmdb',
+				externalId: resolvedTmdbId,
+			});
+		}
+		if (resolvedImdbId) {
+			await this.identityService.link({
+				movieId,
+				source: 'imdb',
+				externalId: resolvedImdbId,
+			});
+		}
+
+		// --- Write back to movies (hot columns) ------------------------------
+		// `tagline` stays special: it isn't in the canonical schema and is
+		// TMDB-only today. extendedData also stays here for now.
 		const tagline = tmdbDetails?.tagline || null;
-		const originalTitle =
-			tmdbDetails?.original_title && tmdbDetails.original_title !== tmdbDetails.title
-				? tmdbDetails.original_title
-				: null;
-		// Runtime preference: OMDB (IMDB-sourced) → TMDB. File-probe duration
-		// already lives on movie_files.duration_seconds, no need to merge it
-		// here.
-		const runtimeMinutes = omdbData?.runtimeMinutes || tmdbDetails?.runtime || null;
-		const releaseDate = tmdbDetails?.release_date || null;
-		const year = releaseDate ? parseInt(releaseDate.slice(0, 4), 10) : priorYear;
-		const language = tmdbDetails?.spoken_languages?.[0]?.iso_639_1 ?? null;
-		const country = tmdbDetails?.production_countries?.[0]?.iso_3166_1 ?? null;
-		const posterUrl = this.tmdb.getImageUrl(tmdbDetails?.poster_path ?? null);
-		const backdropUrl = this.tmdb.getImageUrl(tmdbDetails?.backdrop_path ?? null, 'w1280');
-		const contentRating = firstNonEmpty(omdbData?.rated, tmdbCertification);
 
 		const movieUpdate: Record<string, unknown> = {
-			tmdbId: resolvedTmdbId,
-			imdbId: resolvedImdbId,
+			tmdbId: (m.tmdbId as number | null) ?? resolvedTmdbId,
+			imdbId: (m.imdbId as string | null) ?? resolvedImdbId,
 			updatedAt: now,
 		};
-		if (overview) movieUpdate.overview = overview;
+		const setIf = (key: keyof typeof movieUpdate, val: unknown) => {
+			if (val !== null && val !== undefined && val !== '') movieUpdate[key] = val;
+		};
+		setIf('overview', m.overview);
 		if (tagline) movieUpdate.tagline = tagline;
-		if (originalTitle) movieUpdate.originalTitle = originalTitle;
-		if (runtimeMinutes) movieUpdate.runtimeMinutes = runtimeMinutes;
-		if (releaseDate) movieUpdate.releaseDate = releaseDate;
-		if (year) movieUpdate.year = year;
-		if (language) movieUpdate.language = language;
-		if (country) movieUpdate.country = country;
-		if (posterUrl) movieUpdate.posterUrl = posterUrl;
-		if (backdropUrl) movieUpdate.backdropUrl = backdropUrl;
-		if (trailerUrl) movieUpdate.trailerUrl = trailerUrl;
-		if (contentRating) movieUpdate.contentRating = contentRating;
+		setIf('originalTitle', m.originalTitle);
+		setIf('runtimeMinutes', m.runtimeMinutes);
+		setIf('releaseDate', m.releaseDate);
+		setIf('year', m.year);
+		setIf('language', m.language);
+		setIf('country', m.country);
+		setIf('posterUrl', m.posterUrl);
+		setIf('backdropUrl', m.backdropUrl);
+		setIf('trailerUrl', m.trailerUrl);
+		setIf('contentRating', m.contentRating);
 
 		this.database.db.update(movies).set(movieUpdate).where(eq(movies.id, movieId)).run();
 
-		// Genres / cast / crew. Prefer TMDB structured arrays; OMDB
-		// strings are split on ", " as fallback.
-		const genres = tmdbDetails?.genres?.length
-			? tmdbDetails.genres.map((g) => g.name)
-			: omdbData?.genre
-				? omdbData.genre
-						.split(',')
-						.map((g) => g.trim())
-						.filter(Boolean)
-				: [];
-
-		const castMembers = tmdbDetails?.credits?.cast
-			? tmdbDetails.credits.cast.slice(0, 20).map((c) => ({
-					name: c.name,
-					character: c.character,
-					profileUrl: this.tmdb.getImageUrl(c.profile_path, 'w185'),
-					tmdbId: c.id,
-				}))
-			: [];
-
-		const directors = tmdbDetails?.credits?.crew
-			? Array.from(
-					new Set(
-						tmdbDetails.credits.crew
-							.filter((c) => c.job === 'Director')
-							.map((c) => c.name),
-					),
-				)
-			: omdbData?.director
-				? omdbData.director
-						.split(',')
-						.map((d) => d.trim())
-						.filter(Boolean)
-				: [];
-
-		const writers = tmdbDetails?.credits?.crew
-			? Array.from(
-					new Set(
-						tmdbDetails.credits.crew
-							.filter((c) => c.department === 'Writing')
-							.map((c) => c.name),
-					),
-				)
-			: omdbData?.writer
-				? omdbData.writer
-						.split(',')
-						.map((w) => w.trim())
-						.filter(Boolean)
-				: [];
-
-		const keywords = tmdbDetails?.keywords?.keywords
-			? tmdbDetails.keywords.keywords.map((k) => k.name)
-			: [];
-		const productionCompanies = tmdbDetails?.production_companies?.map((c) => c.name) ?? [];
-
-		// IMDB-backed signals (always from OMDB).
-		const imdbRating = omdbData?.imdbRating ?? null;
-		const imdbVotes = omdbData?.imdbVotes ?? null;
-		const rottenTomatoesScore = omdbData?.rottenTomatoesScore ?? null;
-		const metacriticScore = omdbData?.metacriticScore ?? null;
-
-		// Anything that doesn't fit a column → extendedData JSON.
+		// --- Build extendedData (untouched by engine, still hardcoded) -------
 		const extendedData: Record<string, unknown> = {};
 		if (omdbData?.awards) extendedData.omdbAwards = omdbData.awards;
 		if (omdbData?.actors) extendedData.omdbActorsRaw = omdbData.actors;
@@ -650,33 +671,29 @@ export class MetadataService {
 			.filter(Boolean)
 			.join('+');
 
+		// --- Write back to movie_metadata ------------------------------------
 		const metaValues = {
 			movieId,
-			genres: JSON.stringify(genres),
-			cast: JSON.stringify(castMembers),
-			directors: JSON.stringify(directors),
-			writers: JSON.stringify(writers),
-			keywords: JSON.stringify(keywords),
-			productionCompanies: JSON.stringify(productionCompanies),
-			budget: tmdbDetails?.budget || null,
-			revenue: tmdbDetails?.revenue || null,
-			tmdbRating: tmdbDetails?.vote_average || null,
-			tmdbVotes: tmdbDetails?.vote_count || null,
-			imdbRating,
-			imdbVotes,
-			rottenTomatoesScore,
-			metacriticScore,
+			genres: JSON.stringify(m.genres ?? []),
+			cast: JSON.stringify(m.cast ?? []),
+			directors: JSON.stringify(m.directors ?? []),
+			writers: JSON.stringify(m.writers ?? []),
+			keywords: JSON.stringify(m.keywords ?? []),
+			productionCompanies: JSON.stringify(m.productionCompanies ?? []),
+			budget: (m.budget as number | null) ?? null,
+			revenue: (m.revenue as number | null) ?? null,
+			tmdbRating: (m.tmdbRating as number | null) ?? null,
+			tmdbVotes: (m.tmdbVotes as number | null) ?? null,
+			imdbRating: (m.imdbRating as number | null) ?? null,
+			imdbVotes: (m.imdbVotes as number | null) ?? null,
+			rottenTomatoesScore: (m.rottenTomatoesScore as number | null) ?? null,
+			metacriticScore: (m.metacriticScore as number | null) ?? null,
 			extendedData: Object.keys(extendedData).length ? JSON.stringify(extendedData) : null,
 			source: sources,
+			provenance: JSON.stringify(merge.provenance),
 			fetchedAt: now,
 			updatedAt: now,
 		};
-
-		const existingMeta = this.database.db
-			.select()
-			.from(movieMetadata)
-			.where(eq(movieMetadata.movieId, movieId))
-			.get();
 
 		if (existingMeta) {
 			this.database.db
@@ -691,7 +708,9 @@ export class MetadataService {
 				.run();
 		}
 
-		this.logger.log(`Metadata merged for ${movieId} from ${sources}`);
+		this.logger.log(
+			`Metadata merged for ${movieId} from ${sources} (${merge.diff.length} field change${merge.diff.length === 1 ? '' : 's'})`,
+		);
 
 		return this.database.db
 			.select()
@@ -929,6 +948,15 @@ export class MetadataService {
 }
 
 /** Returns the first argument that is a non-empty string. */
+function safeJsonParse(input: string | null | undefined): any {
+	if (!input) return null;
+	try {
+		return JSON.parse(input);
+	} catch {
+		return null;
+	}
+}
+
 function firstNonEmpty(...values: (string | null | undefined)[]): string | null {
 	for (const v of values) {
 		if (typeof v === 'string' && v.trim().length > 0) return v;

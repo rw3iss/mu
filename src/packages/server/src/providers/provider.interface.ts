@@ -12,7 +12,7 @@
  */
 
 /** The kinds of work a provider can perform. */
-export type Capability = 'recommend' | 'enrich' | 'embed' | 'rerank' | 'explain';
+export type Capability = 'search' | 'recommend' | 'enrich' | 'embed' | 'rerank' | 'explain';
 
 /** Shape of a config field a provider declares for the admin UI. */
 export interface ConfigFieldSpec {
@@ -108,6 +108,49 @@ export interface Recommender extends Provider {
 	recommend(seed: MovieSeed, k: number): Promise<Recommendation[]>;
 }
 
+// =========================================================================
+// Searcher — title→candidate lookup across multiple sources.
+//
+// Used by the matcher to fan out a single SearchQuery (title + year +
+// optional duration / external-id hints) to every configured Searcher
+// in parallel, collect hits, run the title/year/duration scorer
+// across the union, and pick the best match. Replaces the previous
+// pattern of calling TMDB + OMDB directly from the matcher.
+// =========================================================================
+
+export interface SearchQuery {
+	title: string;
+	year?: number | null;
+	durationMinutes?: number | null;
+	/** Pre-resolved external IDs from earlier sources, used as
+	 *  short-circuit hints (e.g. Wikidata can resolve a movie in one
+	 *  query if we hand it the imdb id). */
+	imdbId?: string | null;
+	tmdbId?: number | null;
+}
+
+export interface SearchHit {
+	/** Source id (matches Provider.id). Filled in by the matcher
+	 *  wrapper if the provider's `search` returns hits without it. */
+	sourceId?: string;
+	/** All external IDs the source knows about this candidate. Keys
+	 *  follow the `Provider.id` convention. */
+	externalIds: Record<string, string | number>;
+	title: string;
+	year?: number | null;
+	durationMinutes?: number | null;
+	posterUrl?: string | null;
+	/** Provider-internal confidence (0..1) when applicable; the
+	 *  matcher composes this with its own title/year/duration scorer. */
+	confidence?: number;
+	/** Full raw payload, persisted to movie_source_payloads. */
+	raw?: unknown;
+}
+
+export interface Searcher extends Provider {
+	search(query: SearchQuery, limit?: number): Promise<SearchHit[]>;
+}
+
 export type EnrichField = 'keywords' | 'tags' | 'themes' | 'ratings' | 'comparables';
 
 export interface EnrichResult {
@@ -163,6 +206,10 @@ export interface LLMClient extends Provider {
 
 export function isRecommender(p: Provider): p is Recommender {
 	return p.capabilities.has('recommend');
+}
+
+export function isSearcher(p: Provider): p is Searcher {
+	return p.capabilities.has('search');
 }
 
 export function isEnricher(p: Provider): p is Enricher {

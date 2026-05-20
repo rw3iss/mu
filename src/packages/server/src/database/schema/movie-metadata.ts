@@ -23,6 +23,15 @@ export const movieMetadata = sqliteTable('movie_metadata', {
 	metacriticScore: integer('metacritic_score'),
 	extendedData: text('extended_data'),
 	source: text('source'),
+	/**
+	 * Per-field provenance map, JSON. Records which provider set each
+	 * field on the row so the MergeEngine can decide whether an
+	 * incoming source has authority to overwrite it. Shape:
+	 *   { imdbRating: 'omdb', posterUrl: 'tmdb', cast: 'tmdb', … }
+	 * The sentinel value 'user' beats any provider — used when an
+	 * admin manually overrides a field through the UI.
+	 */
+	provenance: text('provenance'),
 	fetchedAt: text('fetched_at').notNull(),
 	updatedAt: text('updated_at').notNull(),
 });

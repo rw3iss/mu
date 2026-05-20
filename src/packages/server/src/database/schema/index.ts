@@ -23,6 +23,10 @@ export type {
 	NewMovieExternalRec,
 } from './movie-external-recs.ts';
 export { movieExternalRecs } from './movie-external-recs.ts';
+export type { MovieIdentity, NewMovieIdentity } from './movie-identities.ts';
+export { movieIdentities } from './movie-identities.ts';
+export type { MovieSourcePayload, NewMovieSourcePayload } from './movie-source-payloads.ts';
+export { movieSourcePayloads } from './movie-source-payloads.ts';
 export type { MovieFile, NewMovieFile } from './movie-files.ts';
 export { movieFiles } from './movie-files.ts';
 export type {
@@ -48,6 +52,8 @@ export type { Movie, NewMovie } from './movies.ts';
 export { movies } from './movies.ts';
 export type { NewPerson, Person } from './people.ts';
 export { people } from './people.ts';
+export type { NewPersonIdentity, PersonIdentity } from './person-identities.ts';
+export { personIdentities } from './person-identities.ts';
 export type { NewPlaylistMovie, PlaylistMovie } from './playlist-movies.ts';
 export { playlistMovies } from './playlist-movies.ts';
 export type { NewPlaylist, Playlist } from './playlists.ts';

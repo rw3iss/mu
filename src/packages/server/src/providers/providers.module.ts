@@ -1,5 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module.js';
+import { MovieIdentityService } from './identity/movie-identity.service.js';
+import { MovieSourcePayloadsService } from './identity/movie-source-payloads.service.js';
+import { MergeEngine } from './merge/merge-engine.js';
 import { ProviderCredentialsService } from './provider-credentials.service.js';
 import { ProviderEventsService } from './provider-events.service.js';
 import { ProviderRegistry } from './provider-registry.service.js';
@@ -26,12 +29,18 @@ import { RateLimitService } from './rate-limit.service.js';
 		ProviderCredentialsService,
 		RateLimitService,
 		ProviderEventsService,
+		MergeEngine,
+		MovieIdentityService,
+		MovieSourcePayloadsService,
 	],
 	exports: [
 		ProviderRegistry,
 		ProviderCredentialsService,
 		RateLimitService,
 		ProviderEventsService,
+		MergeEngine,
+		MovieIdentityService,
+		MovieSourcePayloadsService,
 	],
 })
 export class ProvidersModule {}

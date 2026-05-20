@@ -315,6 +315,42 @@ const tables = [
 	`CREATE UNIQUE INDEX IF NOT EXISTS favorites_unique_idx ON favorites(user_id, entity_type, entity_id)`,
 	`CREATE INDEX IF NOT EXISTS favorites_user_idx ON favorites(user_id)`,
 	`CREATE INDEX IF NOT EXISTS favorites_user_type_idx ON favorites(user_id, entity_type)`,
+	// Multi-source identity registry: one row per (source, externalId)
+	// pointing back at the canonical movie. Adding a new source means
+	// inserting rows here — no schema migration needed.
+	`CREATE TABLE IF NOT EXISTS movie_identities (
+		id TEXT PRIMARY KEY,
+		movie_id TEXT REFERENCES movies(id) ON DELETE CASCADE,
+		source TEXT NOT NULL,
+		external_id TEXT NOT NULL,
+		confidence REAL NOT NULL DEFAULT 1.0,
+		added_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS movie_identities_source_external ON movie_identities(source, external_id)`,
+	`CREATE INDEX IF NOT EXISTS movie_identities_movie_idx ON movie_identities(movie_id)`,
+	// Same shape, for cast/crew.
+	`CREATE TABLE IF NOT EXISTS person_identities (
+		id TEXT PRIMARY KEY,
+		person_id TEXT REFERENCES people(id) ON DELETE CASCADE,
+		source TEXT NOT NULL,
+		external_id TEXT NOT NULL,
+		confidence REAL NOT NULL DEFAULT 1.0,
+		added_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS person_identities_source_external ON person_identities(source, external_id)`,
+	`CREATE INDEX IF NOT EXISTS person_identities_person_idx ON person_identities(person_id)`,
+	// Raw per-source payloads kept so the MergeEngine can re-merge
+	// without re-fetching when rules / precedence change.
+	`CREATE TABLE IF NOT EXISTS movie_source_payloads (
+		id TEXT PRIMARY KEY,
+		movie_id TEXT NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+		source TEXT NOT NULL,
+		payload TEXT NOT NULL,
+		fetched_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS movie_source_payloads_movie_source ON movie_source_payloads(movie_id, source)`,
 ];
 
 for (const sql of tables) {
@@ -323,6 +359,11 @@ for (const sql of tables) {
 
 // Add columns that may not exist
 const alters = [
+	// Sources Phase 0: per-field provenance map (JSON). Tracks which
+	// provider set each field on a movie_metadata row so the
+	// MergeEngine can decide whether a new source has authority to
+	// overwrite. See packages/server/src/providers/merge/.
+	'ALTER TABLE movie_metadata ADD COLUMN provenance TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_url TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_aspect_ratio REAL',
 	'ALTER TABLE movies ADD COLUMN hidden INTEGER DEFAULT 0',
