@@ -10,8 +10,33 @@ import { movieFiles } from '../database/schema/index.js';
 const COLUMNS = 10;
 const ROWS = 10;
 const FRAMES_PER_SHEET = COLUMNS * ROWS;
-const FRAME_WIDTH = 120;
 const QUALITY = 5; // FFmpeg JPEG quality (2=best, 31=worst)
+
+/**
+ * User-pickable thumbnail sizes. Widths in pixels (16:9 height
+ * derived). Generated sheets are stored under
+ *   data/sprites/{movieId}/{size}/...
+ * Legacy sheets (no size subdir) are treated as 'small' at lookup.
+ */
+export type ThumbnailSize = 'small' | 'medium' | 'large';
+
+export const THUMBNAIL_SIZE_WIDTHS: Record<ThumbnailSize, number> = {
+	small: 120,
+	medium: 240,
+	large: 360,
+};
+
+/** Ordered smallest → largest. Resolver walks this to find a stored
+ *  sheet of the requested size OR larger (cheap downscale via CSS). */
+const SIZE_ORDER: ThumbnailSize[] = ['small', 'medium', 'large'];
+
+function isThumbnailSize(s: unknown): s is ThumbnailSize {
+	return s === 'small' || s === 'medium' || s === 'large';
+}
+
+export function parseThumbnailSize(value: unknown, fallback: ThumbnailSize = 'large'): ThumbnailSize {
+	return isThumbnailSize(value) ? value : fallback;
+}
 
 export interface SpriteMeta {
 	interval: number;
@@ -21,6 +46,8 @@ export interface SpriteMeta {
 	rows: number;
 	sheetCount: number;
 	totalFrames: number;
+	/** The size the served sheet was actually generated at. */
+	size?: ThumbnailSize;
 }
 
 @Injectable()
@@ -38,36 +65,98 @@ export class SpriteService {
 		}
 	}
 
-	/** Directory for a specific movie's sprite sheets */
-	getMovieDir(movieId: string): string {
-		return join(this.spriteDir, movieId);
+	/** Directory for a movie's sheets at a specific size. When size is
+	 *  omitted, returns the legacy (unsized) directory. */
+	getMovieDir(movieId: string, size?: ThumbnailSize): string {
+		return size ? join(this.spriteDir, movieId, size) : join(this.spriteDir, movieId);
 	}
 
-	/** Path to the metadata JSON for a movie */
-	getMetaPath(movieId: string): string {
-		return join(this.getMovieDir(movieId), 'meta.json');
+	/** Metadata JSON path for the given size (or legacy if no size). */
+	getMetaPath(movieId: string, size?: ThumbnailSize): string {
+		return join(this.getMovieDir(movieId, size), 'meta.json');
 	}
 
-	/** Path to a specific sprite sheet image */
-	getSheetPath(movieId: string, index: number): string {
-		return join(this.getMovieDir(movieId), `${index}.jpg`);
+	/** Sheet image path for the given size (or legacy if no size). */
+	getSheetPath(movieId: string, index: number, size?: ThumbnailSize): string {
+		return join(this.getMovieDir(movieId, size), `${index}.jpg`);
 	}
 
-	/** Check if sprite sheets already exist for a movie */
+	/**
+	 * True when ANY sprite sheets exist for this movie — sized or
+	 * legacy. Used by the bulk "Generate missing" endpoint.
+	 */
 	hasSprites(movieId: string): boolean {
-		return existsSync(this.getMetaPath(movieId));
+		if (existsSync(this.getMetaPath(movieId))) return true;
+		return SIZE_ORDER.some((s) => existsSync(this.getMetaPath(movieId, s)));
 	}
 
-	/** Read sprite metadata (returns null if not generated) */
-	getMeta(movieId: string): SpriteMeta | null {
-		const metaPath = this.getMetaPath(movieId);
-		if (!existsSync(metaPath)) return null;
-		try {
-			const raw = readFileSync(metaPath, 'utf-8');
-			return JSON.parse(raw) as SpriteMeta;
-		} catch {
-			return null;
+	/** True iff sheets exist at this exact size (sized dir OR — for
+	 *  size='small' only — the legacy unsized dir). */
+	hasSpritesAtSize(movieId: string, size: ThumbnailSize): boolean {
+		if (existsSync(this.getMetaPath(movieId, size))) return true;
+		// Legacy sheets are 120px wide ≡ small. Treat the legacy dir
+		// as a small-size cache hit so we don't regenerate when
+		// someone has the 'small' preference.
+		if (size === 'small' && existsSync(this.getMetaPath(movieId))) return true;
+		return false;
+	}
+
+	/**
+	 * Resolve which stored size to serve for a requested size.
+	 *
+	 * Returns:
+	 *   - the requested size if available
+	 *   - otherwise the smallest stored size LARGER than requested
+	 *     (acceptable: client downscales the bitmap via CSS)
+	 *   - otherwise null, even if smaller sizes exist (caller should
+	 *     queue generation at the requested size — upscaling small
+	 *     bitmaps would be blurry)
+	 *
+	 * Falls back to 'small' for the legacy unsized directory layout.
+	 */
+	resolveServingSize(movieId: string, requested: ThumbnailSize): ThumbnailSize | null {
+		const startIdx = SIZE_ORDER.indexOf(requested);
+		for (let i = startIdx; i < SIZE_ORDER.length; i++) {
+			if (this.hasSpritesAtSize(movieId, SIZE_ORDER[i]!)) return SIZE_ORDER[i]!;
 		}
+		return null;
+	}
+
+	/** True iff some size is stored that's SMALLER than requested.
+	 *  Used to decide whether to enqueue regen at the requested size
+	 *  even though the resolver returned null. */
+	hasSmallerThan(movieId: string, requested: ThumbnailSize): boolean {
+		const startIdx = SIZE_ORDER.indexOf(requested);
+		for (let i = 0; i < startIdx; i++) {
+			if (this.hasSpritesAtSize(movieId, SIZE_ORDER[i]!)) return true;
+		}
+		return false;
+	}
+
+	/** Read meta for the given size (or legacy if no size). */
+	getMeta(movieId: string, size?: ThumbnailSize): SpriteMeta | null {
+		// Prefer the sized meta when size is requested; fall back to
+		// the legacy unsized one only when size === 'small' (legacy
+		// sheets are 120px wide ≡ small).
+		const candidates: string[] = [];
+		if (size) {
+			candidates.push(this.getMetaPath(movieId, size));
+			if (size === 'small') candidates.push(this.getMetaPath(movieId));
+		} else {
+			candidates.push(this.getMetaPath(movieId));
+		}
+		for (const p of candidates) {
+			if (!existsSync(p)) continue;
+			try {
+				const raw = readFileSync(p, 'utf-8');
+				const meta = JSON.parse(raw) as SpriteMeta;
+				if (size && !meta.size) meta.size = size;
+				return meta;
+			} catch {
+				// keep looking
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -76,8 +165,20 @@ export class SpriteService {
 	 */
 	async generateForMovie(
 		movieId: string,
-		onProgress?: (percent: number) => void,
+		sizeOrOpts: ThumbnailSize | { size?: ThumbnailSize; onProgress?: (p: number) => void } = 'large',
+		legacyOnProgress?: (percent: number) => void,
 	): Promise<SpriteMeta | null> {
+		// Backwards-compat: old signature was (movieId, onProgress?).
+		// If sizeOrOpts is a function it's actually the progress callback.
+		const size: ThumbnailSize =
+			typeof sizeOrOpts === 'string'
+				? sizeOrOpts
+				: (sizeOrOpts.size ?? 'large');
+		const onProgress: ((p: number) => void) | undefined =
+			typeof sizeOrOpts === 'function'
+				? (sizeOrOpts as (p: number) => void)
+				: (legacyOnProgress ?? (typeof sizeOrOpts === 'object' ? sizeOrOpts.onProgress : undefined));
+		const frameWidth = THUMBNAIL_SIZE_WIDTHS[size];
 		const file = this.database.db
 			.select()
 			.from(movieFiles)
@@ -101,14 +202,15 @@ export class SpriteService {
 		const totalFrames = Math.floor(durationSeconds / interval);
 		const sheetCount = Math.ceil(totalFrames / FRAMES_PER_SHEET);
 
-		// Prepare output directory
-		const movieDir = this.getMovieDir(movieId);
+		// Prepare output directory — scoped to the requested size so
+		// multiple sizes can coexist for the same movie.
+		const movieDir = this.getMovieDir(movieId, size);
 		if (existsSync(movieDir)) rmSync(movieDir, { recursive: true });
 		mkdirSync(movieDir, { recursive: true });
 
 		this.logger.log(
-			`Generating ${sheetCount} sprite sheets for movie ${movieId} ` +
-				`(${totalFrames} frames, ${interval}s interval)`,
+			`Generating ${sheetCount} ${size} sprite sheets for movie ${movieId} ` +
+				`(${totalFrames} frames, ${interval}s interval, ${frameWidth}px wide)`,
 		);
 
 		const ffmpegPath = this.detectFfmpeg();
@@ -129,7 +231,7 @@ export class SpriteService {
 					'-i',
 					filePath,
 					'-vf',
-					`scale=${FRAME_WIDTH}:-2`,
+					`scale=${frameWidth}:-2`,
 					'-frames:v',
 					'1',
 					'-q:v',
@@ -197,23 +299,24 @@ export class SpriteService {
 		// Clean up individual frames
 		rmSync(framesDir, { recursive: true, force: true });
 
-		const frameHeight = Math.round((FRAME_WIDTH / 16) * 9);
+		const frameHeight = Math.round((frameWidth / 16) * 9);
 
 		const meta: SpriteMeta = {
 			interval,
-			frameWidth: FRAME_WIDTH,
+			frameWidth,
 			frameHeight,
 			columns: COLUMNS,
 			rows: ROWS,
 			sheetCount: actualSheetCount,
 			totalFrames,
+			size,
 		};
 
-		writeFileSync(this.getMetaPath(movieId), JSON.stringify(meta));
+		writeFileSync(this.getMetaPath(movieId, size), JSON.stringify(meta));
 		onProgress?.(100);
 
 		this.logger.log(
-			`Sprite sheets complete for ${movieId}: ${actualSheetCount} sheets, ${totalFrames} frames`,
+			`Sprite sheets complete for ${movieId} (${size}): ${actualSheetCount} sheets, ${totalFrames} frames`,
 		);
 		return meta;
 	}

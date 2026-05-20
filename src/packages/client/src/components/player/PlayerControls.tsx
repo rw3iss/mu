@@ -154,7 +154,7 @@ function renderSpritePortal(args: {
 					boxShadow: '0 4px 16px rgba(0, 0, 0, 0.6)',
 					backgroundColor: '#000',
 					backgroundRepeat: 'no-repeat',
-					backgroundImage: `url(/api/v1/media/sprites/${movieId}/${sheetIndex}.jpg)`,
+					backgroundImage: `url(/api/v1/media/sprites/${movieId}/${sheetIndex}.jpg?size=${encodeURIComponent(meta.size ?? 'large')})`,
 					backgroundPosition: `${bgX}px ${bgY}px`,
 					backgroundSize: `${meta.frameWidth * meta.columns}px ${meta.frameHeight * meta.rows}px`,
 				}}

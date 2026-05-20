@@ -18,7 +18,7 @@ import { movieFiles, movies, transcodeCache, userWatchHistory } from '../databas
 import { EventsService } from '../events/events.service.js';
 import type { JobHelpers, JobRecord } from '../jobs/job.interface.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
-import { SpriteService } from '../media/sprite.service.js';
+import { parseThumbnailSize, SpriteService } from '../media/sprite.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { MetadataService } from '../metadata/metadata.service.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -140,10 +140,15 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			JOB_TYPE.SPRITE_SHEET,
 			async (job: JobRecord, helpers: JobHelpers) => {
 				const movieId = job.payload.movieId as string;
-				helpers.log(`Generating sprite sheets for movie ${movieId}`);
-				const meta = await this.sprite.generateForMovie(movieId, (p) =>
-					helpers.reportProgress(p),
-				);
+				// New: per-job size selection. Defaults to 'large' so jobs
+				// scheduled before the size feature existed still produce
+				// the highest-res sheet (smaller is cheap to derive in CSS).
+				const size = parseThumbnailSize(job.payload.size, 'large');
+				helpers.log(`Generating ${size} sprite sheets for movie ${movieId}`);
+				const meta = await this.sprite.generateForMovie(movieId, {
+					size,
+					onProgress: (p) => helpers.reportProgress(p),
+				});
 				helpers.reportProgress(100);
 				return meta;
 			},

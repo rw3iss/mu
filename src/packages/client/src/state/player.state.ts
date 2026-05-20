@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals';
+import { getUiSetting } from '@/hooks/useUiSetting';
 import { streamService } from '@/services/stream.service';
 
 // ============================================
@@ -125,6 +126,13 @@ export interface SpriteMeta {
 	rows: number;
 	sheetCount: number;
 	totalFrames: number;
+	/** Size the server actually served (resolver may downgrade
+	 *  smaller→larger if only a bigger cache exists). Used by the
+	 *  client to build sheet URLs that hit the same size. */
+	size?: 'small' | 'medium' | 'large';
+	/** Echoed by the server: what the client asked for. Distinct from
+	 *  `size` when the resolver fell back to a different cached size. */
+	requestedSize?: 'small' | 'medium' | 'large';
 }
 export const spriteMeta = signal<SpriteMeta | null>(null);
 
@@ -140,9 +148,13 @@ export async function startStream(
 	currentSession.value = session;
 	currentTime.value = session.startPosition || 0;
 
-	// Fetch sprite sheet metadata for seek previews (non-blocking)
+	// Fetch sprite sheet metadata for seek previews (non-blocking).
+	// Size is the user's preferred thumbnail size; server resolves
+	// to the best stored size at or above that, falling back to
+	// queuing regeneration when nothing acceptable is cached.
 	spriteMeta.value = null;
-	fetch(`/api/v1/media/sprites/${movieId}/meta.json`)
+	const size = getUiSetting<'small' | 'medium' | 'large'>('thumbnail_size', 'large');
+	fetch(`/api/v1/media/sprites/${movieId}/meta.json?size=${encodeURIComponent(size)}`)
 		.then((r) => (r.ok ? r.json() : null))
 		.then((meta) => {
 			if (meta) spriteMeta.value = meta;

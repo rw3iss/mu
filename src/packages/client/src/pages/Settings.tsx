@@ -259,6 +259,16 @@ export function Settings(props: SettingsProps) {
 
 	// Appearance settings
 	const [showRecentlyPlayed, setShowRecentlyPlayed] = useUiSetting('show_recently_played', true);
+	// Seek-preview thumbnail size. Drives which sprite-sheet variant
+	// is requested from the server. Default 'large' so new users get
+	// the sharpest experience; the server resolver downgrades
+	// gracefully if only a smaller stored size is available, and
+	// upgrades by queuing regeneration when the user picks a size
+	// larger than what's cached.
+	const [thumbnailSize, setThumbnailSize] = useUiSetting<'small' | 'medium' | 'large'>(
+		'thumbnail_size',
+		'large',
+	);
 	const [showBorderEditor, setShowBorderEditor] = useState(false);
 	const [editConfig, setEditConfig] = useState<ThemeConfig | null>(null);
 	const [editThemeName, setEditThemeName] = useState('');
@@ -2057,6 +2067,28 @@ export function Settings(props: SettingsProps) {
 										{ value: '6', label: 'Every 6 hours' },
 										{ value: '12', label: 'Every 12 hours' },
 										{ value: '24', label: 'Daily' },
+									]}
+								/>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Thumbnail Size</span>
+									<span class={styles.settingDescription}>
+										Size of the seek-bar preview thumbnails. Larger sizes
+										generate new sprite sheets in the background; smaller
+										sizes downscale the existing cache.
+									</span>
+								</div>
+								<Select
+									value={thumbnailSize}
+									onChange={(v) =>
+										setThumbnailSize(v as 'small' | 'medium' | 'large')
+									}
+									options={[
+										{ value: 'small', label: 'Small (current) (120 × 68)' },
+										{ value: 'medium', label: 'Medium (240 × 135)' },
+										{ value: 'large', label: 'Large (360 × 203)' },
 									]}
 								/>
 							</div>
