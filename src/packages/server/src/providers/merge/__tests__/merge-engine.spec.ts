@@ -115,6 +115,47 @@ describe('MergeEngine', () => {
 		expect(second.diff).toHaveLength(0);
 	});
 
+	it('preserves object shape when merging arrays of named objects (cast field)', () => {
+		// Regression: previously the engine stringified objects via
+		// String(x) → '[object Object]' before deduping, corrupting
+		// the cast list whose TMDB shape is {name, character, …}.
+		const engine = MergeEngine.withRules(RULES);
+		const tmdbCast = [
+			{ name: 'Graham Chapman', character: 'King Arthur', tmdbId: 21 },
+			{ name: 'John Cleese', character: 'Sir Lancelot', tmdbId: 22 },
+		];
+		const omdbCast = 'graham chapman, john cleese, eric idle';
+		const out = engine.apply({}, {}, [
+			contribution('tmdb', { cast: tmdbCast }),
+			contribution('omdb', { cast: omdbCast }),
+		]);
+		const merged = out.merged.cast as Array<{ name: string }>;
+		expect(merged).toHaveLength(3);
+		expect(merged[0]).toEqual(tmdbCast[0]); // object preserved
+		expect(merged[1]).toEqual(tmdbCast[1]); // object preserved
+		expect(merged[2]).toBe('eric idle'); // string-only contributor still merges in
+	});
+
+	it('upgrades string entries to objects when a later contribution carries the structured form', () => {
+		const engine = MergeEngine.withRules(RULES);
+		const out = engine.apply({}, {}, [
+			contribution('omdb', { cast: 'Graham Chapman' }),
+			contribution('tmdb', { cast: [{ name: 'Graham Chapman', tmdbId: 21 }] }),
+		]);
+		const merged = out.merged.cast as Array<unknown>;
+		expect(merged).toEqual([{ name: 'Graham Chapman', tmdbId: 21 }]);
+	});
+
+	it('drops object items without a `name` field', () => {
+		const engine = MergeEngine.withRules(RULES);
+		const out = engine.apply({}, {}, [
+			contribution('tmdb', {
+				cast: [{ name: 'A' }, {}, { character: 'no name' }, { name: '' }],
+			}),
+		]);
+		expect(out.merged.cast).toEqual([{ name: 'A' }]);
+	});
+
 	it('ignores null/undefined/empty incoming values', () => {
 		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({ title: 'Existing' }, { title: 'omdb' }, [

@@ -255,31 +255,90 @@ function toNumber(v: unknown): number | null {
 	return null;
 }
 
-/** Union two array-or-string values into an array, deduped case-insensitively. */
-function mergeArrayValues(a: unknown, b: unknown): string[] {
-	const out: string[] = [];
-	const seen = new Set<string>();
+/**
+ * List item: either a plain string (genres / keywords / OMDB-style
+ * "actor, actor, actor" splits) OR an object whose `name` field
+ * acts as the dedupe key (TMDB cast members carry `{ name,
+ * character, profileUrl, tmdbId }` — stringifying via
+ * `String({…})` was the cast-corruption bug we just fixed).
+ */
+type ListItem = string | (Record<string, unknown> & { name?: string });
+
+/** Pick a stable, case-insensitive dedupe key for an item. */
+function listItemKey(item: ListItem): string {
+	if (typeof item === 'string') return item.toLowerCase();
+	if (typeof item.name === 'string' && item.name.trim() !== '') {
+		return item.name.toLowerCase();
+	}
+	// Fallback: stringify the whole object. Rare path — only hit
+	// for objects without a `name` field, which we never emit today.
+	try {
+		return JSON.stringify(item).toLowerCase();
+	} catch {
+		return '';
+	}
+}
+
+/**
+ * Union two array-or-string values into a single list, deduped by
+ * lowercase string or by `.name` for object items. When the same
+ * conceptual entry appears in both inputs, the FIRST occurrence
+ * wins — except that object form is preferred over a bare string
+ * (objects carry richer fields like `character`, `profileUrl`,
+ * `tmdbId` that a string can't represent).
+ */
+function mergeArrayValues(a: unknown, b: unknown): ListItem[] {
+	const out: ListItem[] = [];
+	const seen = new Map<string, number>(); // key → index in out
 	for (const x of [a, b]) {
 		for (const item of valueToList(x)) {
-			const key = item.toLowerCase();
-			if (!seen.has(key)) {
-				seen.add(key);
+			const key = listItemKey(item);
+			if (!key) continue;
+			const existingIdx = seen.get(key);
+			if (existingIdx === undefined) {
+				seen.set(key, out.length);
 				out.push(item);
+				continue;
+			}
+			// Already present — upgrade string → object if the
+			// incoming version has more structure.
+			const existing = out[existingIdx];
+			if (typeof existing === 'string' && typeof item === 'object') {
+				out[existingIdx] = item;
 			}
 		}
 	}
 	return out;
 }
 
-function valueToList(v: unknown): string[] {
+/**
+ * Normalize a value into a list of items. Preserves object items
+ * (with a `name` field) verbatim — critical for the cast field,
+ * which carries `{ name, character, profileUrl, tmdbId }` objects
+ * from TMDB. Strings get split on commas (OMDB comma-list shape).
+ */
+function valueToList(v: unknown): ListItem[] {
 	if (Array.isArray(v)) {
-		return v.map((x) => String(x).trim()).filter(Boolean);
+		const out: ListItem[] = [];
+		for (const x of v) {
+			if (x == null) continue;
+			if (typeof x === 'object') {
+				// Drop empty/nameless objects.
+				const obj = x as Record<string, unknown>;
+				if (typeof obj.name !== 'string' || obj.name.trim() === '') continue;
+				out.push(obj as ListItem);
+			} else {
+				const s = String(x).trim();
+				if (s) out.push(s);
+			}
+		}
+		return out;
 	}
 	if (typeof v === 'string' && v.trim() !== '') {
 		// Accept either a JSON array, a comma-separated list, or a single value.
 		try {
 			const parsed = JSON.parse(v);
-			if (Array.isArray(parsed)) return parsed.map((x) => String(x).trim()).filter(Boolean);
+			if (Array.isArray(parsed)) return valueToList(parsed);
 		} catch {
 			// not JSON
 		}
@@ -291,10 +350,27 @@ function valueToList(v: unknown): string[] {
 	return [];
 }
 
-function sameArray(prev: unknown, next: string[]): boolean {
+function sameArray(prev: unknown, next: ListItem[]): boolean {
 	const prevList = valueToList(prev);
 	if (prevList.length !== next.length) return false;
-	const a = new Set(prevList.map((x) => x.toLowerCase()));
-	for (const x of next) if (!a.has(x.toLowerCase())) return false;
+	// Map prev by key → item so we can compare both the key AND the
+	// type of value. A string→object upgrade (e.g. OMDB's "graham
+	// chapman" being replaced by TMDB's { name, character, … })
+	// shares the same key but is NOT the same array — without this
+	// check the engine would short-circuit and the rich object would
+	// be discarded.
+	const prevByKey = new Map<string, ListItem>();
+	for (const p of prevList) prevByKey.set(listItemKey(p), p);
+	for (const x of next) {
+		const p = prevByKey.get(listItemKey(x));
+		if (!p) return false;
+		// Type mismatch (string ↔ object) means the merge produced
+		// new structure — caller should accept it as a change.
+		if (typeof p !== typeof x) return false;
+		// For object items, treat any extra/changed field as a diff.
+		if (typeof p === 'object' && typeof x === 'object') {
+			if (JSON.stringify(p) !== JSON.stringify(x)) return false;
+		}
+	}
 	return true;
 }
