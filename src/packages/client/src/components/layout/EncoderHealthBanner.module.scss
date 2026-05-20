@@ -16,7 +16,7 @@
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--surface-glass-blur));
   animation: slideIn 240ms ease;
 
   @media (max-width: 600px) {

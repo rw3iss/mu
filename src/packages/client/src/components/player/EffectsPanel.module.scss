@@ -7,7 +7,7 @@
   max-height: calc(100vh - 140px);
   background: rgba(15, 15, 15, 0.95);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--on-dark-overlay-2);
   border-radius: var(--radius-lg);
   z-index: calc(var(--z-player-controls) + 6);
   overflow: hidden;
@@ -21,7 +21,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--on-dark-overlay-1);
 }
 
 .headerTitle {
@@ -32,7 +32,7 @@
 
 .closeBtn {
   padding: 4px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-dark-text-muted);
   transition: color var(--transition-fast);
 
   &:hover {
@@ -42,7 +42,7 @@
 
 .tabs {
   display: flex;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--on-dark-overlay-1);
 }
 
 .tab {
@@ -53,18 +53,18 @@
   padding: 8px 12px;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-dark-text-muted);
   text-align: center;
   transition: color var(--transition-fast), background var(--transition-fast);
 
   &:hover {
-    color: rgba(255, 255, 255, 0.8);
-    background: rgba(255, 255, 255, 0.03);
+    color: var(--on-dark-text-primary);
+    background: var(--on-dark-overlay-1);
   }
 
   &.active {
     color: #fff;
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--on-dark-overlay-1);
     border-bottom: 2px solid var(--color-accent);
   }
 
@@ -81,7 +81,7 @@
 
 .tabProfileName {
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--on-dark-text-muted);
   margin-top: 1px;
   max-width: 120px;
   overflow: hidden;
@@ -94,14 +94,14 @@
   overflow-y: auto;
   padding: 12px 16px 16px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: var(--on-dark-overlay-3) transparent;
 
   &::-webkit-scrollbar {
     width: 4px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--on-dark-overlay-3);
     border-radius: 2px;
   }
 }
@@ -117,7 +117,7 @@
 
 .toggleLabel {
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--on-dark-text-secondary);
 }
 
 .toggle {
@@ -125,7 +125,7 @@
   width: 36px;
   height: 20px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--on-dark-overlay-3);
   transition: background var(--transition-fast);
   cursor: pointer;
 
@@ -154,7 +154,7 @@
 
 .collapsible {
   margin-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--on-dark-overlay-1);
 }
 
 .collapsibleToggle {
@@ -164,12 +164,12 @@
   width: 100%;
   padding: 8px 0;
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-dark-text-muted);
   cursor: pointer;
   transition: color var(--transition-fast);
 
   &:hover {
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--on-dark-text-primary);
   }
 }
 
@@ -197,7 +197,7 @@
 .profileLabel {
   min-width: 42px;
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-dark-text-muted);
   text-align: right;
   flex-shrink: 0;
 }
@@ -209,8 +209,8 @@
   padding: 4px 8px;
   font-size: var(--font-size-xs);
   color: #fff;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--on-dark-overlay-1);
+  border: 1px solid var(--on-dark-overlay-2);
   border-radius: var(--radius-sm);
   appearance: none;
   cursor: pointer;
@@ -228,15 +228,15 @@
   width: 26px;
   height: 26px;
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--on-dark-text-muted);
+  background: var(--on-dark-overlay-1);
+  border: 1px solid var(--on-dark-overlay-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--on-dark-overlay-2);
     color: #fff;
   }
 
@@ -253,15 +253,15 @@
   flex-shrink: 0;
   padding: 4px 10px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--on-dark-text-secondary);
+  background: var(--on-dark-overlay-1);
+  border: 1px solid var(--on-dark-overlay-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--on-dark-overlay-2);
     color: #fff;
   }
 }
@@ -302,7 +302,7 @@
 
   &::-webkit-slider-runnable-track {
     width: 4px;
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--on-dark-overlay-3);
     border-radius: 2px;
   }
 
@@ -317,7 +317,7 @@
 
   &::-moz-range-track {
     width: 4px;
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--on-dark-overlay-3);
     border-radius: 2px;
   }
 
@@ -332,18 +332,18 @@
 
 .eqLabel {
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--on-dark-text-muted);
   white-space: nowrap;
 
   &.eqLabelAmp {
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--on-dark-text-secondary);
     font-weight: 600;
   }
 }
 
 .eqValue {
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--on-dark-text-secondary);
   min-width: 28px;
   text-align: center;
 }
@@ -373,7 +373,7 @@
   gap: 4px;
   margin: 8px 0 6px;
   padding: 3px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--on-dark-overlay-1);
   border-radius: 8px;
 }
 
@@ -382,7 +382,7 @@
   padding: 5px 0;
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--on-dark-text-secondary);
   background: transparent;
   border: none;
   border-radius: 6px;
@@ -390,8 +390,8 @@
   transition: background 120ms ease, color 120ms ease;
 
   &:hover {
-    color: rgba(255, 255, 255, 0.85);
-    background: rgba(255, 255, 255, 0.05);
+    color: var(--on-dark-text-primary);
+    background: var(--on-dark-overlay-1);
   }
 }
 
@@ -414,7 +414,7 @@
 
 .enhanceRow {
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--on-dark-overlay-1);
 
   &:last-child {
     border-bottom: none;
@@ -434,7 +434,7 @@
 
 .compParamLabel {
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--on-dark-text-secondary);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -447,18 +447,18 @@
   width: 16px;
   height: 16px;
   margin-left: 4px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--on-dark-text-muted);
   cursor: pointer;
   transition: color 120ms ease;
 
   &:hover {
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--on-dark-text-primary);
   }
 }
 
 .compParamValue {
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--on-dark-text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -471,7 +471,7 @@
 
   &::-webkit-slider-runnable-track {
     height: 4px;
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--on-dark-overlay-3);
     border-radius: 2px;
   }
 
@@ -486,7 +486,7 @@
 
   &::-moz-range-track {
     height: 4px;
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--on-dark-overlay-3);
     border-radius: 2px;
   }
 
@@ -502,19 +502,19 @@
 .reductionMeter {
   margin-top: 8px;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--on-dark-overlay-1);
   border-radius: var(--radius-sm);
 }
 
 .reductionLabel {
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-dark-text-muted);
   margin-bottom: 4px;
 }
 
 .reductionBar {
   height: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--on-dark-overlay-1);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -533,7 +533,7 @@
 
 .mixLabel {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--on-dark-text-muted);
   flex-shrink: 0;
   min-width: 22px;
   text-align: center;
@@ -582,7 +582,7 @@
   gap: 4px;
   font-size: 10px;
   font-weight: var(--font-weight-medium);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--on-dark-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -591,7 +591,7 @@
   margin-left: auto;
   font-size: 10px;
   font-weight: var(--font-weight-normal);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-dark-text-muted);
   text-transform: none;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
@@ -604,8 +604,8 @@
   width: 13px;
   height: 13px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.7);
+  background: var(--on-dark-overlay-2);
+  color: var(--on-dark-text-secondary);
   font-size: 9px;
   font-weight: var(--font-weight-bold);
   line-height: 1;
@@ -614,7 +614,7 @@
   transition: background var(--transition-fast), color var(--transition-fast);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--on-dark-overlay-3);
     color: #fff;
   }
 }
@@ -696,7 +696,7 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.4);
+  border: 2px solid var(--on-dark-text-muted);
   border-top-color: #fff;
   animation: autoSpin 700ms linear infinite;
 }
@@ -722,7 +722,7 @@
   margin-top: 8px;
   padding: 4px 10px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-dark-text-muted);
   border-radius: var(--radius-sm);
   transition: color var(--transition-fast), background var(--transition-fast);
 

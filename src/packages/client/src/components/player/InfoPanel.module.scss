@@ -8,16 +8,16 @@
 // Inline mode — no positioning, no animation, just content
 .inlinePanel {
   padding: var(--space-md);
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--on-dark-text-primary);
 
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: var(--on-dark-overlay-3) transparent;
 
   &::-webkit-scrollbar {
     width: 4px;
   }
   &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--on-dark-overlay-3);
     border-radius: 2px;
   }
 }
@@ -60,8 +60,8 @@
   width: 380px;
   max-width: 90vw;
   background: rgba(15, 15, 15, 0.95);
-  backdrop-filter: blur(16px);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(var(--surface-glass-blur));
+  border-left: 1px solid var(--on-dark-overlay-1);
   z-index: calc(var(--z-player-controls) + 5);
   overflow-y: auto;
   padding: var(--space-xl);
@@ -74,14 +74,14 @@
 
   // Hide scrollbar but keep scrolling
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: var(--on-dark-overlay-3) transparent;
 
   &::-webkit-scrollbar {
     width: 4px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--on-dark-overlay-3);
     border-radius: 2px;
   }
 }
@@ -95,13 +95,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--on-dark-text-secondary);
   font-size: var(--font-size-md);
   border-radius: var(--radius-sm);
   transition: background var(--transition-fast), color var(--transition-fast);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--on-dark-overlay-2);
     color: #ffffff;
   }
 }
@@ -166,7 +166,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-dark-text-muted);
   font-size: var(--font-size-sm);
   margin-bottom: var(--space-md);
 
@@ -185,11 +185,11 @@
 
 .genreTag {
   padding: 2px 10px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--on-dark-overlay-1);
+  border: 1px solid var(--on-dark-overlay-2);
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--on-dark-text-secondary);
 }
 
 .ratings {
@@ -217,7 +217,7 @@
 
 .ratingSource {
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--on-dark-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -230,7 +230,7 @@
 
 .votesLabel {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--on-dark-text-muted);
   cursor: default;
   align-self: center;
   margin-left: 2px;
@@ -243,7 +243,7 @@
 .sectionTitle {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-dark-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: var(--space-sm);
@@ -251,7 +251,7 @@
 
 .overview {
   font-size: var(--font-size-sm);
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--on-dark-text-secondary);
   line-height: 1.6;
 }
 
@@ -267,7 +267,7 @@
   align-items: center;
   gap: 14px;
   padding: var(--space-xs) 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--on-dark-overlay-1);
   text-decoration: none;
   color: inherit;
   cursor: pointer;
@@ -275,7 +275,7 @@
   transition: background-color 150ms ease;
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.04);
+    background-color: var(--on-dark-overlay-1);
 
     .castArrow {
       opacity: 1;
@@ -295,7 +295,7 @@
 .castArrow {
   display: inline-flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--on-dark-text-muted);
   opacity: 0;
   transform: translateX(-4px);
   transition:
@@ -309,7 +309,7 @@
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--on-dark-overlay-2);
 
   img {
     width: 100%;
@@ -321,7 +321,7 @@
 .castPhotoPlaceholder {
   width: 100%;
   height: 100%;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--on-dark-overlay-1);
 }
 
 .castInfo {
@@ -332,13 +332,13 @@
 
 .castName {
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--on-dark-text-primary);
   font-weight: var(--font-weight-medium);
 }
 
 .castCharacter {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--on-dark-text-muted);
 }
 
 .fileInfoToggle {
@@ -359,5 +359,5 @@
 
 .fileInfoArrow {
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--on-dark-text-muted);
 }

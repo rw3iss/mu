@@ -492,7 +492,7 @@
 	border: 1px solid var(--on-dark-overlay-1);
 	border-radius: 6px;
 	box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
-	backdrop-filter: blur(12px);
+	backdrop-filter: blur(var(--surface-glass-blur));
 	animation: volumeFadeIn 120ms ease;
 
 	// Invisible hover bridge to the button below
@@ -607,7 +607,7 @@
 	padding: 4px 0;
 	box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
 	animation: fadeIn 120ms ease;
-	backdrop-filter: blur(12px);
+	backdrop-filter: blur(var(--surface-glass-blur));
 }
 
 .menuRow {
@@ -730,7 +730,7 @@
 	bottom: calc(100% + 6px);
 	min-width: 180px;
 	background: rgba(20, 20, 22, 0.96);
-	backdrop-filter: blur(12px);
+	backdrop-filter: blur(var(--surface-glass-blur));
 	border: 1px solid var(--on-dark-overlay-1);
 	border-radius: 10px;
 	padding: 6px;
