@@ -1,6 +1,12 @@
 import { api } from './api';
 
-export type Capability = 'recommend' | 'enrich' | 'embed' | 'rerank' | 'explain';
+export type Capability = 'search' | 'recommend' | 'enrich' | 'embed' | 'rerank' | 'explain';
+
+export interface BackfillResult {
+	queued: number;
+	alreadyQueued: number;
+	totalMovies: number;
+}
 
 export interface ConfigFieldSpec {
 	key: string;
@@ -87,6 +93,7 @@ export const providersService = {
 	setEnabled: (id: string, enabled: boolean) =>
 		api.patch<{ ok: boolean; enabled: boolean }>(`/providers/${id}`, { enabled }),
 	test: (id: string) => api.post<HealthCheckResult>(`/providers/${id}/test`, {}),
+	backfill: (id: string) => api.post<BackfillResult>(`/providers/${id}/backfill`, {}),
 	usage: (id: string, days = 7) =>
 		api.get<{
 			snapshot: UsageSnapshot;

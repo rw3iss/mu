@@ -50,9 +50,17 @@ export interface FieldRule {
  */
 export const DEFAULT_MERGE_RULES: FieldRule[] = [
 	// --- movies / hot fields ----------------------------------------------
-	{ field: 'title', precedence: { tmdb: 10, omdb: 6, trakt: 5, wikidata: 4 }, strategy: 'take-best' },
+	{
+		field: 'title',
+		precedence: { tmdb: 10, omdb: 6, trakt: 5, wikidata: 4 },
+		strategy: 'take-best',
+	},
 	{ field: 'originalTitle', precedence: { tmdb: 10, omdb: 4 }, strategy: 'take-best' },
-	{ field: 'year', precedence: { tmdb: 10, omdb: 8, trakt: 6, wikidata: 5 }, strategy: 'take-best' },
+	{
+		field: 'year',
+		precedence: { tmdb: 10, omdb: 8, trakt: 6, wikidata: 5 },
+		strategy: 'take-best',
+	},
 	{
 		field: 'overview',
 		// OMDB's IMDB-backed plot tends to be denser; TMDB tagline-style is shorter.
@@ -60,7 +68,11 @@ export const DEFAULT_MERGE_RULES: FieldRule[] = [
 		strategy: 'take-best',
 	},
 	{ field: 'tmdbId', precedence: { tmdb: 10, wikidata: 6 }, strategy: 'take-best' },
-	{ field: 'imdbId', precedence: { omdb: 10, tmdb: 8, wikidata: 6, trakt: 5 }, strategy: 'take-best' },
+	{
+		field: 'imdbId',
+		precedence: { omdb: 10, tmdb: 8, wikidata: 6, trakt: 5 },
+		strategy: 'take-best',
+	},
 	{ field: 'posterUrl', precedence: { tmdb: 10, trakt: 6, omdb: 3 }, strategy: 'take-best' },
 	{ field: 'backdropUrl', precedence: { tmdb: 10, trakt: 5 }, strategy: 'take-best' },
 	{ field: 'trailerUrl', precedence: { tmdb: 10 }, strategy: 'take-best' },

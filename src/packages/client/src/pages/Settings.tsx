@@ -683,7 +683,7 @@ export function Settings(props: SettingsProps) {
 			? [
 					{ id: 'plugins' as SettingsTab, label: 'Plugins' },
 					{ id: 'admin' as SettingsTab, label: 'Admin' },
-					{ id: 'connections' as SettingsTab, label: 'Connections' },
+					{ id: 'connections' as SettingsTab, label: 'Sources' },
 					{ id: 'matching' as SettingsTab, label: 'Matching' },
 					{ id: 'server' as SettingsTab, label: 'Server' },
 				]

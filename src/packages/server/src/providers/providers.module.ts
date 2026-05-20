@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module.js';
+import { JobModule } from '../jobs/job.module.js';
+import { SourceBackfillService } from './backfill/source-backfill.service.js';
 import { MovieIdentityService } from './identity/movie-identity.service.js';
 import { MovieSourcePayloadsService } from './identity/movie-source-payloads.service.js';
 import { MergeEngine } from './merge/merge-engine.js';
@@ -22,7 +24,7 @@ import { RateLimitService } from './rate-limit.service.js';
  */
 @Global()
 @Module({
-	imports: [DatabaseModule],
+	imports: [DatabaseModule, JobModule],
 	controllers: [ProvidersController],
 	providers: [
 		ProviderRegistry,
@@ -32,6 +34,7 @@ import { RateLimitService } from './rate-limit.service.js';
 		MergeEngine,
 		MovieIdentityService,
 		MovieSourcePayloadsService,
+		SourceBackfillService,
 	],
 	exports: [
 		ProviderRegistry,
@@ -41,6 +44,7 @@ import { RateLimitService } from './rate-limit.service.js';
 		MergeEngine,
 		MovieIdentityService,
 		MovieSourcePayloadsService,
+		SourceBackfillService,
 	],
 })
 export class ProvidersModule {}

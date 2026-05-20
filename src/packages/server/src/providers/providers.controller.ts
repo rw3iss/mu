@@ -13,6 +13,7 @@ import {
 	Query,
 } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { SourceBackfillService } from './backfill/source-backfill.service.js';
 import type { Capability, Provider } from './provider.interface.js';
 import { ProviderCredentialsService } from './provider-credentials.service.js';
 import { ProviderEventsService } from './provider-events.service.js';
@@ -51,6 +52,7 @@ export class ProvidersController {
 		private readonly credentials: ProviderCredentialsService,
 		private readonly rateLimit: RateLimitService,
 		private readonly events: ProviderEventsService,
+		private readonly backfill: SourceBackfillService,
 	) {}
 
 	@Get()
@@ -139,6 +141,24 @@ export class ProvidersController {
 				checkedAt: new Date().toISOString(),
 			};
 		}
+	}
+
+	/**
+	 * Re-run the library through this source. Used after enabling a
+	 * new source so existing movies get back-filled with whatever
+	 * identifiers / enrichment the source can provide. Returns the
+	 * queued count immediately — actual processing happens in the
+	 * background job queue, respecting the source's rate limit.
+	 */
+	@Post(':id/backfill')
+	@Roles('admin')
+	startBackfill(@Param('id') id: string) {
+		const p = this.registry.get(id);
+		if (!p) throw new NotFoundException(`Provider "${id}" not registered`);
+		if (!p.isConfigured()) {
+			throw new BadRequestException(`Provider "${id}" is not configured`);
+		}
+		return this.backfill.enqueueForLibrary(id);
 	}
 
 	@Get(':id/usage')

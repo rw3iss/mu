@@ -26,6 +26,11 @@ export function ProviderConfigModal({ provider, isOpen, onClose }: ProviderConfi
 	const [values, setValues] = useState<Record<string, string>>({});
 	const [saving, setSaving] = useState(false);
 	const [testing, setTesting] = useState(false);
+	const [backfilling, setBackfilling] = useState(false);
+
+	const canBackfill =
+		provider.isConfigured &&
+		(provider.capabilities.includes('search') || provider.capabilities.includes('enrich'));
 
 	useEffect(() => {
 		if (!isOpen) return;
@@ -88,6 +93,26 @@ export function ProviderConfigModal({ provider, isOpen, onClose }: ProviderConfi
 		}
 	};
 
+	const runBackfill = async () => {
+		setBackfilling(true);
+		try {
+			const result = await providersService.backfill(provider.id);
+			if (result.queued === 0 && result.alreadyQueued === 0) {
+				notifySuccess('Nothing to back-fill — library is empty.');
+			} else if (result.queued === 0) {
+				notifySuccess(`Already queued: ${result.alreadyQueued} movies in flight.`);
+			} else {
+				notifySuccess(
+					`Queued ${result.queued} of ${result.totalMovies} movies for back-fill through ${provider.displayName}. Runs in the background — refresh later to see new metadata.`,
+				);
+			}
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed to start back-fill');
+		} finally {
+			setBackfilling(false);
+		}
+	};
+
 	const remove = async () => {
 		try {
 			await providersService.deleteCredentials(provider.id);
@@ -125,6 +150,16 @@ export function ProviderConfigModal({ provider, isOpen, onClose }: ProviderConfi
 						)}
 					</div>
 					<div class={styles.rightActions}>
+						{canBackfill && (
+							<Button
+								variant="ghost"
+								onClick={runBackfill}
+								disabled={backfilling}
+								title="Iterate the library and re-enrich every movie through this source. Respects the rate limit."
+							>
+								{backfilling ? 'Queuing…' : 'Back-fill library'}
+							</Button>
+						)}
 						<Button variant="ghost" onClick={test} disabled={testing}>
 							{testing ? 'Testing…' : 'Test'}
 						</Button>

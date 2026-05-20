@@ -1,6 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { LibraryModule } from '../library/library.module.js';
 import { MediaModule } from '../media/media.module.js';
+import { WikidataModule } from '../providers/sources/wikidata/wikidata.module.js';
 import { FileProbeService } from './file-probe.service.js';
 import { GroupMetadataService } from './group-metadata.service.js';
 import { ImageController } from './image.controller.js';
@@ -12,7 +13,7 @@ import { OmdbProvider } from './providers/omdb.provider.js';
 import { TmdbProvider } from './providers/tmdb.provider.js';
 
 @Module({
-	imports: [MediaModule, forwardRef(() => LibraryModule)],
+	imports: [MediaModule, WikidataModule, forwardRef(() => LibraryModule)],
 	controllers: [MetadataController, ImageController],
 	providers: [
 		TmdbProvider,

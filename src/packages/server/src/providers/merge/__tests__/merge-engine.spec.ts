@@ -29,11 +29,9 @@ describe('MergeEngine', () => {
 
 	it('keeps the existing value when an incoming source has lower precedence', () => {
 		const engine = new MergeEngine(RULES);
-		const out = engine.apply(
-			{ title: 'Existing' },
-			{ title: 'tmdb' },
-			[contribution('omdb', { title: 'From OMDB' })],
-		);
+		const out = engine.apply({ title: 'Existing' }, { title: 'tmdb' }, [
+			contribution('omdb', { title: 'From OMDB' }),
+		]);
 		expect(out.merged.title).toBe('Existing');
 		expect(out.provenance.title).toBe('tmdb');
 		expect(out.diff).toHaveLength(0);
@@ -41,11 +39,9 @@ describe('MergeEngine', () => {
 
 	it('overwrites when a higher-precedence source arrives', () => {
 		const engine = new MergeEngine(RULES);
-		const out = engine.apply(
-			{ title: 'Existing' },
-			{ title: 'omdb' },
-			[contribution('tmdb', { title: 'From TMDB' })],
-		);
+		const out = engine.apply({ title: 'Existing' }, { title: 'omdb' }, [
+			contribution('tmdb', { title: 'From TMDB' }),
+		]);
 		expect(out.merged.title).toBe('From TMDB');
 		expect(out.provenance.title).toBe('tmdb');
 		expect(out.diff).toHaveLength(1);

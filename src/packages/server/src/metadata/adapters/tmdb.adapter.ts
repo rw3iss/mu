@@ -20,13 +20,9 @@ export function tmdbToContribution(input: TmdbAdapterInput): SourceContribution 
 	const trailerVideo = d?.videos?.results?.find?.(
 		(v: any) => v.site === 'YouTube' && v.type === 'Trailer',
 	);
-	const trailerUrl = trailerVideo
-		? `https://www.youtube.com/watch?v=${trailerVideo.key}`
-		: null;
+	const trailerUrl = trailerVideo ? `https://www.youtube.com/watch?v=${trailerVideo.key}` : null;
 
-	const usRelease = d?.release_dates?.results?.find?.(
-		(r: any) => r.iso_3166_1 === 'US',
-	);
+	const usRelease = d?.release_dates?.results?.find?.((r: any) => r.iso_3166_1 === 'US');
 	const tmdbCertification = usRelease?.release_dates
 		?.map?.((rd: any) => rd.certification)
 		.find?.((c: any) => c && c.length > 0);

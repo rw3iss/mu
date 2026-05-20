@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieSourcePayloads } from '../../database/schema/index.js';
@@ -52,7 +52,10 @@ export class MovieSourcePayloadsService {
 			.select({ payload: movieSourcePayloads.payload })
 			.from(movieSourcePayloads)
 			.where(
-				and(eq(movieSourcePayloads.movieId, movieId), eq(movieSourcePayloads.source, source)),
+				and(
+					eq(movieSourcePayloads.movieId, movieId),
+					eq(movieSourcePayloads.source, source),
+				),
 			)
 			.orderBy(desc(movieSourcePayloads.fetchedAt))
 			.limit(1)

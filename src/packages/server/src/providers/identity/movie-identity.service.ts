@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { Injectable } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieIdentities, movies } from '../../database/schema/index.js';
@@ -104,7 +104,10 @@ export class MovieIdentityService {
 			.select({ movieId: movieIdentities.movieId })
 			.from(movieIdentities)
 			.where(
-				and(eq(movieIdentities.source, source), eq(movieIdentities.externalId, String(externalId))),
+				and(
+					eq(movieIdentities.source, source),
+					eq(movieIdentities.externalId, String(externalId)),
+				),
 			)
 			.get();
 		return row?.movieId ?? null;
@@ -137,7 +140,9 @@ export class MovieIdentityService {
 		const rows = this.database.db
 			.select({ externalId: movieIdentities.externalId, movieId: movieIdentities.movieId })
 			.from(movieIdentities)
-			.where(and(eq(movieIdentities.source, source), inArray(movieIdentities.externalId, ids)))
+			.where(
+				and(eq(movieIdentities.source, source), inArray(movieIdentities.externalId, ids)),
+			)
 			.all();
 		const out = new Map<string, string>();
 		for (const r of rows) {
