@@ -1,6 +1,7 @@
 import type { ThemeConfig } from '@mu/shared';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { JobsPanel } from '@/components/admin/JobsPanel';
 import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
 import { FolderBrowser } from '@/components/common/FolderBrowser';
@@ -217,6 +218,7 @@ type SettingsTab =
 	| 'admin'
 	| 'connections'
 	| 'matching'
+	| 'jobs'
 	| 'server'
 	| 'about';
 
@@ -230,6 +232,7 @@ const VALID_TABS: SettingsTab[] = [
 	'admin',
 	'connections',
 	'matching',
+	'jobs',
 	'server',
 	'about',
 ];
@@ -685,6 +688,7 @@ export function Settings(props: SettingsProps) {
 					{ id: 'admin' as SettingsTab, label: 'Admin' },
 					{ id: 'connections' as SettingsTab, label: 'Sources' },
 					{ id: 'matching' as SettingsTab, label: 'Matching' },
+					{ id: 'jobs' as SettingsTab, label: 'Jobs' },
 					{ id: 'server' as SettingsTab, label: 'Server' },
 				]
 			: []),
@@ -2695,6 +2699,14 @@ export function Settings(props: SettingsProps) {
 					{activeTab === 'matching' && isAdmin && (
 						<div class={styles.panel}>
 							<Matching />
+						</div>
+					)}
+
+					{/* Jobs Tab (admin only) */}
+					{activeTab === 'jobs' && isAdmin && (
+						<div class={styles.panel}>
+							<h2 class={styles.panelTitle}>Jobs</h2>
+							<JobsPanel />
 						</div>
 					)}
 

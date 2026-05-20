@@ -10,7 +10,6 @@ import { Favorites } from '@/pages/Favorites';
 import { GroupDetail } from '@/pages/GroupDetail';
 import { History } from '@/pages/History';
 import { JobDetails } from '@/pages/JobDetails';
-import { JobList } from '@/pages/JobList';
 import { Library } from '@/pages/Library';
 import { Login } from '@/pages/Login';
 import { MovieDetail } from '@/pages/MovieDetail';
@@ -207,7 +206,10 @@ export function App() {
 						<Changelog path="/changelog" />
 						<Redirect path="/plugins" to="/settings/plugins" />
 						<Redirect path="/admin" to="/settings/admin" />
-						<JobList path="/admin/jobs" />
+						{/* Job list now lives in Settings → Jobs; preserve the
+						    old /admin/jobs URL by redirecting there. Detail
+						    page stays at /admin/jobs/:id. */}
+						<Redirect path="/admin/jobs" to="/settings/jobs" />
 						<JobDetails path="/admin/jobs/:id" />
 						<PersonDetail path="/person/:id" />
 						<Login path="/login" />
