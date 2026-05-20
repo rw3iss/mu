@@ -371,7 +371,7 @@ export function JobsPanel() {
 							class={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`}
 							onClick={() => setTab('history')}
 						>
-							History
+							History ({historyJobs.length})
 						</button>
 					</div>
 					<div class={styles.toolbarRight}>
@@ -519,9 +519,6 @@ export function JobsPanel() {
 							</button>
 						)}
 					</div>
-					<span class={styles.count}>
-						{filtered.length} job{filtered.length !== 1 ? 's' : ''}
-					</span>
 				</div>
 			</div>
 

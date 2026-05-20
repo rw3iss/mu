@@ -129,10 +129,10 @@ export interface SpriteMeta {
 	/** Size the server actually served (resolver may downgrade
 	 *  smaller→larger if only a bigger cache exists). Used by the
 	 *  client to build sheet URLs that hit the same size. */
-	size?: 'small' | 'medium' | 'large';
+	size?: 'small' | 'medium' | 'large' | 'xlarge';
 	/** Echoed by the server: what the client asked for. Distinct from
 	 *  `size` when the resolver fell back to a different cached size. */
-	requestedSize?: 'small' | 'medium' | 'large';
+	requestedSize?: 'small' | 'medium' | 'large' | 'xlarge';
 }
 export const spriteMeta = signal<SpriteMeta | null>(null);
 
@@ -153,7 +153,10 @@ export async function startStream(
 	// to the best stored size at or above that, falling back to
 	// queuing regeneration when nothing acceptable is cached.
 	spriteMeta.value = null;
-	const size = getUiSetting<'small' | 'medium' | 'large'>('thumbnail_size', 'large');
+	const size = getUiSetting<'small' | 'medium' | 'large' | 'xlarge'>(
+		'thumbnail_size',
+		'large',
+	);
 	fetch(`/api/v1/media/sprites/${movieId}/meta.json?size=${encodeURIComponent(size)}`)
 		.then((r) => (r.ok ? r.json() : null))
 		.then((meta) => {

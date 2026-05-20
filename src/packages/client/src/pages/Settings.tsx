@@ -265,10 +265,9 @@ export function Settings(props: SettingsProps) {
 	// gracefully if only a smaller stored size is available, and
 	// upgrades by queuing regeneration when the user picks a size
 	// larger than what's cached.
-	const [thumbnailSize, setThumbnailSize] = useUiSetting<'small' | 'medium' | 'large'>(
-		'thumbnail_size',
-		'large',
-	);
+	const [thumbnailSize, setThumbnailSize] = useUiSetting<
+		'small' | 'medium' | 'large' | 'xlarge'
+	>('thumbnail_size', 'large');
 	const [showBorderEditor, setShowBorderEditor] = useState(false);
 	const [editConfig, setEditConfig] = useState<ThemeConfig | null>(null);
 	const [editThemeName, setEditThemeName] = useState('');
@@ -2083,12 +2082,15 @@ export function Settings(props: SettingsProps) {
 								<Select
 									value={thumbnailSize}
 									onChange={(v) =>
-										setThumbnailSize(v as 'small' | 'medium' | 'large')
+										setThumbnailSize(
+											v as 'small' | 'medium' | 'large' | 'xlarge',
+										)
 									}
 									options={[
-										{ value: 'small', label: 'Small (current) (120 × 68)' },
+										{ value: 'small', label: 'Small (120 × 68)' },
 										{ value: 'medium', label: 'Medium (240 × 135)' },
 										{ value: 'large', label: 'Large (360 × 203)' },
+										{ value: 'xlarge', label: 'Extra Large (480 × 270)' },
 									]}
 								/>
 							</div>

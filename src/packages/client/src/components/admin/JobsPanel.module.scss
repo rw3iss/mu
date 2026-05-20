@@ -16,7 +16,10 @@
   top: 0;
   z-index: 5;
   background: var(--color-bg-primary);
-  padding-bottom: var(--space-sm);
+  // Inner padding so the search input + status/types dropdowns don't
+  // touch the container edges (.toolbar sits inside Settings'
+  // .panel, which had no inner padding of its own).
+  padding: 0 var(--space-sm) var(--space-sm);
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--space-sm);
 }

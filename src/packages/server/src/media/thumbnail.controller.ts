@@ -109,7 +109,7 @@ export class ThumbnailController {
 	/** Idempotent enqueue of a sprite-sheet job for this (movie, size).
 	 *  Skips if another job with the same payload is already pending
 	 *  or running. */
-	private enqueueSpriteJob(movieId: string, size: 'small' | 'medium' | 'large') {
+	private enqueueSpriteJob(movieId: string, size: 'small' | 'medium' | 'large' | 'xlarge') {
 		const existing = this.jobManager.findJobsByPayload(
 			'movieId',
 			movieId,

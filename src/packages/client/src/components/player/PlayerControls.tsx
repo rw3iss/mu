@@ -131,6 +131,14 @@ function renderSpritePortal(args: {
 	const clampedX = Math.max(halfWidth, Math.min(cursorX, viewportWidth - halfWidth));
 	const top = seekBarRect.top - meta.frameHeight - 28;
 
+	// Size-aware corner rounding. Formula: 5 + (level * 2)px, where
+	// level = 1 (small) … 4 (xlarge). Scales gently with the sheet
+	// dimensions so a small thumbnail looks tasteful and a 480px
+	// xlarge gets a more noticeable, comfortable curve.
+	const sizeLevel: Record<string, number> = { small: 1, medium: 2, large: 3, xlarge: 4 };
+	const level = sizeLevel[meta.size ?? 'large'] ?? 3;
+	const cornerRadiusPx = 5 + level * 2;
+
 	return createPortal(
 		<div
 			style={{
@@ -150,13 +158,17 @@ function renderSpritePortal(args: {
 					width: `${meta.frameWidth}px`,
 					height: `${meta.frameHeight}px`,
 					border: '2px solid rgba(255,255,255,0.9)',
-					borderRadius: '4px',
+					borderRadius: `${cornerRadiusPx}px`,
 					boxShadow: '0 4px 16px rgba(0, 0, 0, 0.6)',
 					backgroundColor: '#000',
 					backgroundRepeat: 'no-repeat',
 					backgroundImage: `url(/api/v1/media/sprites/${movieId}/${sheetIndex}.jpg?size=${encodeURIComponent(meta.size ?? 'large')})`,
 					backgroundPosition: `${bgX}px ${bgY}px`,
 					backgroundSize: `${meta.frameWidth * meta.columns}px ${meta.frameHeight * meta.rows}px`,
+					// Clip the sprite to the rounded border so corners
+					// render cleanly even when the bitmap fills the box.
+					backgroundClip: 'padding-box',
+					overflow: 'hidden',
 				}}
 			/>
 			<span

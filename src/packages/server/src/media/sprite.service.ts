@@ -17,21 +17,28 @@ const QUALITY = 5; // FFmpeg JPEG quality (2=best, 31=worst)
  * derived). Generated sheets are stored under
  *   data/sprites/{movieId}/{size}/...
  * Legacy sheets (no size subdir) are treated as 'small' at lookup.
+ *
+ * Each size is a multiple of the small base (120px):
+ *   small   = 1x = 120
+ *   medium  = 2x = 240
+ *   large   = 3x = 360
+ *   xlarge  = 4x = 480
  */
-export type ThumbnailSize = 'small' | 'medium' | 'large';
+export type ThumbnailSize = 'small' | 'medium' | 'large' | 'xlarge';
 
 export const THUMBNAIL_SIZE_WIDTHS: Record<ThumbnailSize, number> = {
 	small: 120,
 	medium: 240,
 	large: 360,
+	xlarge: 480,
 };
 
 /** Ordered smallest → largest. Resolver walks this to find a stored
  *  sheet of the requested size OR larger (cheap downscale via CSS). */
-const SIZE_ORDER: ThumbnailSize[] = ['small', 'medium', 'large'];
+const SIZE_ORDER: ThumbnailSize[] = ['small', 'medium', 'large', 'xlarge'];
 
 function isThumbnailSize(s: unknown): s is ThumbnailSize {
-	return s === 'small' || s === 'medium' || s === 'large';
+	return s === 'small' || s === 'medium' || s === 'large' || s === 'xlarge';
 }
 
 export function parseThumbnailSize(value: unknown, fallback: ThumbnailSize = 'large'): ThumbnailSize {
