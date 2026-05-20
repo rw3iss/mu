@@ -1,4 +1,4 @@
-import type { ThemeConfig } from '@mu/shared';
+import { DEFAULT_THUMBNAIL_SIZE, type ThemeConfig, type ThumbnailSize } from '@mu/shared';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { JobsPanel } from '@/components/admin/JobsPanel';
@@ -265,9 +265,10 @@ export function Settings(props: SettingsProps) {
 	// gracefully if only a smaller stored size is available, and
 	// upgrades by queuing regeneration when the user picks a size
 	// larger than what's cached.
-	const [thumbnailSize, setThumbnailSize] = useUiSetting<
-		'small' | 'medium' | 'large' | 'xlarge'
-	>('thumbnail_size', 'large');
+	const [thumbnailSize, setThumbnailSize] = useUiSetting<ThumbnailSize>(
+		'thumbnail_size',
+		DEFAULT_THUMBNAIL_SIZE,
+	);
 	const [showBorderEditor, setShowBorderEditor] = useState(false);
 	const [editConfig, setEditConfig] = useState<ThemeConfig | null>(null);
 	const [editThemeName, setEditThemeName] = useState('');
@@ -2081,11 +2082,7 @@ export function Settings(props: SettingsProps) {
 								</div>
 								<Select
 									value={thumbnailSize}
-									onChange={(v) =>
-										setThumbnailSize(
-											v as 'small' | 'medium' | 'large' | 'xlarge',
-										)
-									}
+									onChange={(v) => setThumbnailSize(v as ThumbnailSize)}
 									options={[
 										{ value: 'small', label: 'Small (120 × 68)' },
 										{ value: 'medium', label: 'Medium (240 × 135)' },

@@ -491,7 +491,7 @@
 	background: rgba(18, 18, 18, 0.97);
 	border: 1px solid var(--on-dark-overlay-1);
 	border-radius: 6px;
-	box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+	box-shadow: var(--shadow-overlay-up);
 	backdrop-filter: blur(var(--surface-glass-blur));
 	animation: volumeFadeIn 120ms ease;
 
@@ -605,7 +605,7 @@
 	border: 1px solid var(--surface-overlay-2);
 	border-radius: 6px;
 	padding: 4px 0;
-	box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+	box-shadow: var(--shadow-overlay-up);
 	animation: fadeIn 120ms ease;
 	backdrop-filter: blur(var(--surface-glass-blur));
 }
@@ -734,7 +734,7 @@
 	border: 1px solid var(--on-dark-overlay-1);
 	border-radius: 10px;
 	padding: 6px;
-	box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.55);
+	box-shadow: var(--shadow-overlay-strong);
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
