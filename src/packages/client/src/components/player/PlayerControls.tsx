@@ -1,4 +1,5 @@
 import type { VNode } from 'preact';
+import { createPortal } from 'preact/compat';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Icon } from '@/components/common/Icon';
@@ -73,6 +74,107 @@ function SubtitleSettingsCollapsible() {
 				</div>
 			)}
 		</div>
+	);
+}
+
+/**
+ * Render the seek-bar sprite preview tooltip into document.body via
+ * createPortal. Bypasses the player bar's backdrop-filter stacking
+ * context (which would otherwise paint the tooltip below the
+ * fixed-position video on some browser/composition paths) and pins
+ * positioning to viewport coordinates derived from the live
+ * `seekBarRect`. Returns null until both a hover position AND sprite
+ * meta are available.
+ *
+ * Z-index is computed against `--z-player-controls` so themes /
+ * future scale changes carry through automatically.
+ */
+function renderSpritePortal(args: {
+	seekHover: number | null;
+	seekBarRect: { left: number; top: number; width: number } | null;
+	seekHoverX: number;
+	meta: import('@/state/player.state').SpriteMeta | null;
+	movieId: string | null;
+}) {
+	const { seekHover, seekBarRect, seekHoverX, meta, movieId } = args;
+	if (
+		seekHover === null ||
+		!seekBarRect ||
+		!meta ||
+		!movieId ||
+		typeof document === 'undefined'
+	) {
+		return null;
+	}
+	// Cursor X in viewport coords = bar's left + cursor offset within bar.
+	const cursorX = seekBarRect.left + seekHoverX;
+
+	// Sprite math
+	const frameIndex = Math.min(
+		Math.floor(seekHover / meta.interval),
+		meta.totalFrames - 1,
+	);
+	const framesPerSheet = meta.columns * meta.rows;
+	const sheetIndex = Math.floor(frameIndex / framesPerSheet);
+	const frameInSheet = frameIndex % framesPerSheet;
+	const col = frameInSheet % meta.columns;
+	const row = Math.floor(frameInSheet / meta.columns);
+	const bgX = -(col * meta.frameWidth);
+	const bgY = -(row * meta.frameHeight);
+
+	// Position the tooltip 14px above the seek bar's top, centered on
+	// the cursor. Clamp horizontally to the viewport so the tooltip
+	// never overflows the screen edge.
+	const tooltipWidth = meta.frameWidth + 4;
+	const halfWidth = tooltipWidth / 2;
+	const viewportWidth = window.innerWidth;
+	const clampedX = Math.max(halfWidth, Math.min(cursorX, viewportWidth - halfWidth));
+	const top = seekBarRect.top - meta.frameHeight - 28;
+
+	return createPortal(
+		<div
+			style={{
+				position: 'fixed',
+				left: `${clampedX}px`,
+				top: `${top}px`,
+				transform: 'translateX(-50%)',
+				pointerEvents: 'none',
+				display: 'flex',
+				flexDirection: 'column',
+				alignItems: 'center',
+				zIndex: 2147483647,
+			}}
+		>
+			<div
+				style={{
+					width: `${meta.frameWidth}px`,
+					height: `${meta.frameHeight}px`,
+					border: '2px solid rgba(255,255,255,0.9)',
+					borderRadius: '4px',
+					boxShadow: '0 4px 16px rgba(0, 0, 0, 0.6)',
+					backgroundColor: '#000',
+					backgroundRepeat: 'no-repeat',
+					backgroundImage: `url(/api/v1/media/sprites/${movieId}/${sheetIndex}.jpg)`,
+					backgroundPosition: `${bgX}px ${bgY}px`,
+					backgroundSize: `${meta.frameWidth * meta.columns}px ${meta.frameHeight * meta.rows}px`,
+				}}
+			/>
+			<span
+				style={{
+					marginTop: '4px',
+					background: 'rgba(0, 0, 0, 0.85)',
+					color: '#fff',
+					fontSize: '11px',
+					fontVariantNumeric: 'tabular-nums',
+					padding: '1px 6px',
+					borderRadius: '3px',
+					whiteSpace: 'nowrap',
+				}}
+			>
+				{formatTime(seekHover)}
+			</span>
+		</div>,
+		document.body,
 	);
 }
 
@@ -226,6 +328,18 @@ export function PlayerControls({
 
 	// ── Seek bar: hover tooltip ──
 	const [seekHoverX, setSeekHoverX] = useState(0);
+	/**
+	 * Viewport-coords bounding box of the seek bar, captured on hover.
+	 * Used to position the sprite tooltip via createPortal into
+	 * document.body — escapes the player bar's stacking context (which
+	 * has backdrop-filter: blur, creating a new stacking root) so the
+	 * tooltip reliably paints above the video.
+	 */
+	const [seekBarRect, setSeekBarRect] = useState<{
+		left: number;
+		top: number;
+		width: number;
+	} | null>(null);
 	const handleSeekHover = useCallback((e: MouseEvent) => {
 		const bar = seekBarRef.current;
 		if (!bar) return;
@@ -233,6 +347,7 @@ export function PlayerControls({
 		const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
 		setSeekHover(fraction * duration.value);
 		setSeekHoverX(e.clientX - rect.left);
+		setSeekBarRect({ left: rect.left, top: rect.top, width: rect.width });
 	}, []);
 
 	// ── Seek bar: drag ──
@@ -434,7 +549,19 @@ export function PlayerControls({
 		);
 	};
 
+	// Sprite preview tooltip rendered via portal so it escapes the
+	// player bar's backdrop-filter stacking context — see the
+	// commentary on `seekBarRect` for why.
+	const spritePreview = renderSpritePortal({
+		seekHover,
+		seekBarRect,
+		seekHoverX,
+		meta: spriteMeta.value,
+		movieId: globalMovieId.value,
+	});
+
 	return (
+		<>
 		<div
 			data-player-panel
 			class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''} ${isSplit ? styles.splitControls : ''}`}
@@ -447,7 +574,10 @@ export function PlayerControls({
 					onClick={handleSeekBarClick}
 					onMouseDown={handleSeekMouseDown}
 					onMouseMove={handleSeekHover}
-					onMouseLeave={() => setSeekHover(null)}
+					onMouseLeave={() => {
+						setSeekHover(null);
+						setSeekBarRect(null);
+					}}
 					role="slider"
 					aria-label="Seek"
 					aria-valuemin={0}
@@ -461,66 +591,29 @@ export function PlayerControls({
 					{seekHover !== null &&
 						(() => {
 							const meta = spriteMeta.value;
-							const barWidth = seekBarRef.current?.offsetWidth ?? 1;
-							const tooltipWidth = meta ? meta.frameWidth + 4 : 0;
-							// Clamp tooltip so it doesn't overflow the seek bar
-							const rawLeft = seekHoverX;
-							const clampedLeft = meta
-								? Math.max(
-										tooltipWidth / 2,
-										Math.min(rawLeft, barWidth - tooltipWidth / 2),
-									)
-								: rawLeft;
-
-							if (meta) {
-								const movieId = globalMovieId.value;
-								const frameIndex = Math.min(
-									Math.floor(seekHover / meta.interval),
-									meta.totalFrames - 1,
-								);
-								const framesPerSheet = meta.columns * meta.rows;
-								const sheetIndex = Math.floor(frameIndex / framesPerSheet);
-								const frameInSheet = frameIndex % framesPerSheet;
-								const col = frameInSheet % meta.columns;
-								const row = Math.floor(frameInSheet / meta.columns);
-								const bgX = -(col * meta.frameWidth);
-								const bgY = -(row * meta.frameHeight);
-
+							// Fallback text-only tooltip when sprite meta
+							// isn't loaded yet (or this movie has no sprite
+							// sheet generated). Stays inside .seekBar
+							// because the text is small + we don't need
+							// the portal escape for it.
+							if (!meta) {
 								return (
 									<div
-										class={styles.seekTooltipSprite}
+										class={styles.seekTooltip}
 										style={{
-											left: `${clampedLeft}px`,
-											width: `${meta.frameWidth}px`,
+											left: `${(seekHover / (duration.value || 1)) * 100}%`,
 										}}
 									>
-										<div
-											class={styles.spriteFrame}
-											style={{
-												width: `${meta.frameWidth}px`,
-												height: `${meta.frameHeight}px`,
-												backgroundImage: `url(/api/v1/media/sprites/${movieId}/${sheetIndex}.jpg)`,
-												backgroundPosition: `${bgX}px ${bgY}px`,
-												backgroundSize: `${meta.frameWidth * meta.columns}px ${meta.frameHeight * meta.rows}px`,
-											}}
-										/>
-										<span class={styles.spriteTime}>
-											{formatTime(seekHover)}
-										</span>
+										{formatTime(seekHover)}
 									</div>
 								);
 							}
-
-							return (
-								<div
-									class={styles.seekTooltip}
-									style={{
-										left: `${(seekHover / (duration.value || 1)) * 100}%`,
-									}}
-								>
-									{formatTime(seekHover)}
-								</div>
-							);
+							// Sprite preview: rendered into a portal below
+							// (see {seekHover !== null && seekBarRect && …}
+							// at the bottom of the .controls return JSX).
+							// Inside the seekBar we render nothing here so
+							// the original layout stays clean.
+							return null;
 						})()}
 				</div>
 			</div>
@@ -1413,5 +1506,7 @@ export function PlayerControls({
 				</div>
 			</div>
 		</div>
+		{spritePreview}
+		</>
 	);
 }
