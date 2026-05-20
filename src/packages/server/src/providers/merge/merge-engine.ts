@@ -48,8 +48,22 @@ import { USER_SOURCE } from './merge-types.js';
 export class MergeEngine {
 	private readonly ruleMap: Map<CanonicalField, FieldRule>;
 
-	constructor(rules: FieldRule[] = DEFAULT_MERGE_RULES) {
-		this.ruleMap = buildRuleMap(rules);
+	/**
+	 * NestJS-friendly parameterless constructor. The default rule set
+	 * is loaded at construction time. Tests that need a different
+	 * rule set call {@link MergeEngine.withRules} (factory) instead
+	 * of new-ing this class directly.
+	 */
+	constructor() {
+		this.ruleMap = buildRuleMap(DEFAULT_MERGE_RULES);
+	}
+
+	/** Factory for tests / custom-rule scenarios. Not registered in DI. */
+	static withRules(rules: FieldRule[]): MergeEngine {
+		const instance = Object.create(MergeEngine.prototype) as MergeEngine;
+		(instance as unknown as { ruleMap: Map<CanonicalField, FieldRule> }).ruleMap =
+			buildRuleMap(rules);
+		return instance;
 	}
 
 	apply(

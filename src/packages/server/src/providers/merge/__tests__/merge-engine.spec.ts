@@ -18,7 +18,7 @@ function contribution(source: string, fields: Record<string, unknown>): SourceCo
 
 describe('MergeEngine', () => {
 	it('takes the highest-precedence value for take-best fields', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({}, {}, [
 			contribution('omdb', { title: 'From OMDB' }),
 			contribution('tmdb', { title: 'From TMDB' }),
@@ -28,7 +28,7 @@ describe('MergeEngine', () => {
 	});
 
 	it('keeps the existing value when an incoming source has lower precedence', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({ title: 'Existing' }, { title: 'tmdb' }, [
 			contribution('omdb', { title: 'From OMDB' }),
 		]);
@@ -38,7 +38,7 @@ describe('MergeEngine', () => {
 	});
 
 	it('overwrites when a higher-precedence source arrives', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({ title: 'Existing' }, { title: 'omdb' }, [
 			contribution('tmdb', { title: 'From TMDB' }),
 		]);
@@ -49,7 +49,7 @@ describe('MergeEngine', () => {
 	});
 
 	it('first-sets a field when nothing is there yet (even from a low-precedence source)', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({}, {}, [contribution('trakt', { title: 'From Trakt' })]);
 		expect(out.merged.title).toBe('From Trakt');
 		expect(out.provenance.title).toBe('trakt');
@@ -57,7 +57,7 @@ describe('MergeEngine', () => {
 	});
 
 	it('merges arrays case-insensitively without duplicates', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({ genres: ['Action', 'Sci-Fi'] }, { genres: 'tmdb' }, [
 			contribution('omdb', { genres: ['action', 'thriller'] }),
 		]);
@@ -66,7 +66,7 @@ describe('MergeEngine', () => {
 	});
 
 	it('handles numeric-max strategy', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({ tmdbVotes: 100 }, { tmdbVotes: 'tmdb' }, [
 			contribution('tmdb', { tmdbVotes: 500 }),
 		]);
@@ -74,7 +74,7 @@ describe('MergeEngine', () => {
 	});
 
 	it('never lets a lower numeric-max value win', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({ tmdbVotes: 1000 }, { tmdbVotes: 'tmdb' }, [
 			contribution('tmdb', { tmdbVotes: 50 }),
 		]);
@@ -83,7 +83,7 @@ describe('MergeEngine', () => {
 	});
 
 	it('user provenance is immutable to providers', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({ title: 'My Custom Title' }, { title: 'user' }, [
 			contribution('tmdb', { title: 'Re-fetched From TMDB' }),
 		]);
@@ -93,7 +93,7 @@ describe('MergeEngine', () => {
 	});
 
 	it('user override beats any provider', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({ title: 'From TMDB' }, { title: 'tmdb' }, [
 			contribution('user', { title: 'My Override' }),
 		]);
@@ -103,7 +103,7 @@ describe('MergeEngine', () => {
 	});
 
 	it('is idempotent — applying the same contributions twice has no further effect', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const contribs = [
 			contribution('tmdb', { title: 'X', genres: ['Action'] }),
 			contribution('omdb', { imdbRating: 8.7, genres: ['Thriller'] }),
@@ -116,7 +116,7 @@ describe('MergeEngine', () => {
 	});
 
 	it('ignores null/undefined/empty incoming values', () => {
-		const engine = new MergeEngine(RULES);
+		const engine = MergeEngine.withRules(RULES);
 		const out = engine.apply({ title: 'Existing' }, { title: 'omdb' }, [
 			contribution('tmdb', { title: null }),
 			contribution('omdb', { title: '' }),
