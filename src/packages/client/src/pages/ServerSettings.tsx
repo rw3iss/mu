@@ -646,6 +646,15 @@ function JobsSection() {
 						>
 							History
 						</button>
+						<button
+							type="button"
+							class={styles.openJobsPageLink}
+							onClick={() => route('/admin/jobs')}
+							title="Open the full Jobs page in a dedicated tab"
+						>
+							Open full page
+							<Icon name="arrow-up-right" size={11} />
+						</button>
 					</div>
 					<div class={styles.toolbarRight}>
 						{tab === 'current' && selected.size > 0 && (

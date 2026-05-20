@@ -212,7 +212,35 @@
 
 .tabs {
   display: flex;
+  align-items: center;
   gap: 0;
+}
+
+// "Open full page" sidekick next to the Current / History tabs.
+// Smaller than the tab buttons (it's a navigation hint, not a
+// peer tab) and sits to the right so the tabs stay grouped.
+.openJobsPageLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: var(--space-sm);
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+
+  &:hover {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+    background: var(--surface-overlay-1);
+  }
 }
 
 .tab {
