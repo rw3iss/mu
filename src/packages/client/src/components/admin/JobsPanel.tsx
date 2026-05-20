@@ -4,6 +4,7 @@ import { Button } from '@/components/common/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Select } from '@/components/common/Select';
 import { api } from '@/services/api';
+import { moviesService } from '@/services/movies.service';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './JobsPanel.module.scss';
 
@@ -64,6 +65,56 @@ const STATUS_COLORS: Record<string, string> = {
 	cancelled: '#6b7280',
 };
 
+/**
+ * Per-tab cache of resolved movie titles. Keyed by movieId.
+ * - undefined = never looked up
+ * - string    = title (or empty string if 404)
+ * - Promise   = in-flight fetch (shared across concurrent callers)
+ *
+ * Kept at module level so navigating away and back doesn't re-fetch.
+ * Cleared automatically on a hard refresh (it's not persisted).
+ */
+const movieTitleCache = new Map<string, string | Promise<string>>();
+
+/**
+ * Fetch a movie's title and update the cache. Called lazily from
+ * useMovieTitle; multiple concurrent callers share the same Promise
+ * so we don't issue duplicate requests for the same id.
+ */
+function fetchMovieTitle(id: string): Promise<string> {
+	const existing = movieTitleCache.get(id);
+	if (typeof existing === 'string') return Promise.resolve(existing);
+	if (existing instanceof Promise) return existing;
+	const p = moviesService
+		.get(id)
+		.then((m) => {
+			const title = m?.title ?? '';
+			movieTitleCache.set(id, title);
+			return title;
+		})
+		.catch(() => {
+			// 404 / network — cache empty so we don't retry every render.
+			movieTitleCache.set(id, '');
+			return '';
+		});
+	movieTitleCache.set(id, p);
+	return p;
+}
+
+/**
+ * Strip a trailing 8-hex-char ID suffix from a job label so the
+ * caller can append the movie title in its place. Returns the
+ * original string when no suffix is detected.
+ *
+ * Patterns we handle (from the existing label producers):
+ *   "Generate sprites: 6454b543"          → "Generate sprites:"
+ *   "Enrich external movie 6454b543"      → "Enrich external movie"
+ *   "Back-fill X for movie 6454b543"      → "Back-fill X for movie"
+ */
+function stripIdSuffix(label: string): string {
+	return label.replace(/\s*:?\s*[0-9a-f]{8}\s*$/, '').replace(/\s+$/, '');
+}
+
 function formatDuration(ms: number): string {
 	if (ms < 1000) return `${ms}ms`;
 	const seconds = Math.floor(ms / 1000);
@@ -93,6 +144,10 @@ export function JobsPanel() {
 	const [statusFilter, setStatusFilter] = useState<string>('');
 	const filterRef = useRef<HTMLDivElement>(null);
 	const lastSelectedRef = useRef<string | null>(null);
+	/** Resolved movie titles for visible jobs, keyed by movieId.
+	 *  Empty string = looked up and missing. Undefined = not fetched yet.
+	 *  Hydrated by the effect below; renders fall back to short id slice. */
+	const [movieTitles, setMovieTitles] = useState<Record<string, string>>({});
 
 	// Outside-click closes the type-filter dropdown.
 	useEffect(() => {
@@ -129,6 +184,49 @@ export function JobsPanel() {
 
 	// Clear selection when switching tabs.
 	useEffect(() => setSelected(new Set()), [tab]);
+
+	// Resolve movie titles for any job referencing a movieId. Pulls
+	// from / populates the module-level movieTitleCache so navigating
+	// back to this panel doesn't refetch. Cancellable so unmount /
+	// fast tab switches don't trample later results.
+	useEffect(() => {
+		const idsInView = new Set<string>();
+		for (const list of [currentJobs, historyJobs]) {
+			for (const j of list) {
+				const mid = j?.payload?.movieId;
+				if (typeof mid === 'string' && mid) idsInView.add(mid);
+			}
+		}
+		const needed: string[] = [];
+		const initialUpdates: Record<string, string> = {};
+		for (const id of idsInView) {
+			const cached = movieTitleCache.get(id);
+			if (typeof cached === 'string') {
+				if (!(id in movieTitles)) initialUpdates[id] = cached;
+			} else if (cached === undefined) {
+				needed.push(id);
+			}
+		}
+		if (Object.keys(initialUpdates).length > 0) {
+			setMovieTitles((prev) => ({ ...prev, ...initialUpdates }));
+		}
+		if (needed.length === 0) return;
+
+		let cancelled = false;
+		void Promise.all(
+			needed.map((id) =>
+				fetchMovieTitle(id).then((title) => {
+					if (cancelled) return;
+					setMovieTitles((prev) =>
+						prev[id] === title ? prev : { ...prev, [id]: title },
+					);
+				}),
+			),
+		);
+		return () => {
+			cancelled = true;
+		};
+	}, [currentJobs, historyJobs]);
 
 	const handleAction = useCallback(async (id: string, action: string) => {
 		try {
@@ -489,7 +587,36 @@ export function JobsPanel() {
 									>
 										{job.status}
 									</span>
-									<span class={styles.label}>{job.label}</span>
+									{(() => {
+										const mid = job.payload?.movieId as string | undefined;
+										const title = mid ? movieTitles[mid] : undefined;
+										// Drop the trailing 8-char id from the label when
+										// we have a real title to show in its place.
+										const cleanLabel = title
+											? stripIdSuffix(job.label || '')
+											: job.label;
+										return (
+											<span class={styles.label}>
+												{cleanLabel}
+												{mid && title ? (
+													<>
+														{cleanLabel ? ' ' : ''}
+														<a
+															href={`/movie/${mid}`}
+															class={styles.labelMovieLink}
+															onClick={(e: Event) => {
+																e.stopPropagation();
+																e.preventDefault();
+																route(`/movie/${mid}`);
+															}}
+														>
+															{title}
+														</a>
+													</>
+												) : null}
+											</span>
+										);
+									})()}
 									{job.progress > 0 && job.progress < 100 && (
 										<span class={styles.progress}>
 											{job.progress.toFixed(0)}%
@@ -569,22 +696,29 @@ export function JobsPanel() {
 								)}
 								{expandedJob === job.id && (
 									<div class={styles.details}>
+										{job.payload?.movieId &&
+											(() => {
+												const mid = job.payload.movieId as string;
+												const title = movieTitles[mid];
+												return (
+													<div class={styles.infoRow}>
+														<span class={styles.infoLabel}>Movie</span>
+														<a
+															class={`${styles.infoValue} ${styles.infoLink}`}
+															href={`/movie/${mid}`}
+															onClick={(e: Event) => {
+																e.preventDefault();
+																route(`/movie/${mid}`);
+															}}
+														>
+															{title || `(loading…) ${mid.slice(0, 8)}`}
+														</a>
+													</div>
+												);
+											})()}
 										<div class={styles.infoRow}>
 											<span class={styles.infoLabel}>ID</span>
-											{job.payload?.movieId ? (
-												<a
-													class={`${styles.infoValue} ${styles.infoLink}`}
-													href={`/movie/${job.payload.movieId}`}
-													onClick={(e: Event) => {
-														e.preventDefault();
-														route(`/movie/${job.payload.movieId}`);
-													}}
-												>
-													{job.id}
-												</a>
-											) : (
-												<span class={styles.infoValue}>{job.id}</span>
-											)}
+											<span class={styles.infoValue}>{job.id}</span>
 										</div>
 										{job.priority != null && (
 											<div class={styles.infoRow}>

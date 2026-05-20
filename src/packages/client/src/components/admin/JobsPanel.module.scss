@@ -316,6 +316,19 @@
   white-space: nowrap;
 }
 
+// Accent-coloured link rendered inline inside .label when a job
+// payload carries a movieId — replaces the short id slice that
+// the server originally appended to the label.
+.labelMovieLink {
+  color: var(--color-accent);
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .progress {
   font-size: var(--font-size-xs);
   color: var(--color-accent);
