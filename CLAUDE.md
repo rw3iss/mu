@@ -108,6 +108,7 @@ NestJS modules in `packages/server/src/`:
 | `media` | Poster/backdrop image proxying |
 | `people` | Canonical person rows (TMDB-backed, cached). Powers `/person/:key` detail page; key format: `tmdb:<id>` or `name:<slug>`. |
 | `favorites` | Polymorphic favorites (person/movie). Per-user in-memory key cache busted on mutation; `GET /favorites/keys` for client hydration. |
+| `search` | Federated search (movies + people) over local DB + TMDB + OMDB + Trakt. SSE-streaming via `@Sse('/search/{movies\|people}/stream?q=')` with JSON fallback. Persistent 7d `search_cache` table keyed by (type, normalized_query, source). |
 
 ### Job Backend (pluggable)
 
@@ -301,6 +302,14 @@ echo 'tail -50 /c/Users/rw3is/Documents/Sites/other/mu/data/logs/server.log' | s
 ### Edit Tool & Deep Indentation
 - The Edit tool can fail to match strings with deep tab nesting (13+ levels) — use Python string replacement via Bash as fallback
 - Always verify edits applied correctly with Read or Grep after deeply-nested changes
+
+### Federated Search
+- SSE-streaming via NestJS `@Sse('/search/{movies|people}/stream?q=')`. EventSource auto-reconnects; orchestrator is idempotent per query.
+- Client API: `useSearchStream` hook + `EntitySearchInput` / `MovieSearchInput` / `PersonSearchInput` components in `client/src/components/common/EntitySearchInput`.
+- Cross-source dedup key order: `imdbId` → `tmdbId` → `movieId` (local) → `slug(title)+year`. Merge unions sources, prefers populated fields, keeps highest matchScore.
+- Per-source 5s timeout; failing source emits `error` event but does not block others. Trakt is credentials-gated — silently no-ops when not configured.
+- `search_cache` table keyed by hash(type, normalized_query, source). 7d TTL enforced at read time. Local DB results are **never** cached so newly-scanned movies appear immediately.
+- Non-library TMDB-only movies: navigate to `/movie/tmdb:<id>` → `MoviesService.findOrFetchByKey` writes a `source='bookmark'` stub row, then `MovieDetail` renders `PreviewActions` (no Play button; shows "View on TMDB" + Bookmark for later).
 
 ### Deploy
 - Canonical: `bash src/scripts/deploy-remote.sh`. Anything else (raw SSH + `bash deploy.sh`, ad-hoc `rm -rf dist && vite build && nssm restart` shortcuts) skips git-pull or external verification and has caused outages.
