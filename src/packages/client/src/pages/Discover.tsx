@@ -1,6 +1,10 @@
+import type { MovieSearchHit, PersonSearchHit, SearchHit } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
-import { MoviePicker } from '@/components/common/MoviePicker';
+import {
+	MovieSearchInput,
+	PersonSearchInput,
+} from '@/components/common/EntitySearchInput';
 import { Spinner } from '@/components/common/Spinner';
 import { DiscoverFilters as FilterPanel } from '@/components/discover/DiscoverFilters';
 import { DiscoverResultCard } from '@/components/discover/DiscoverResultCard';
@@ -9,6 +13,7 @@ import { SeedChip } from '@/components/discover/SeedChip';
 import type { IncludeMode } from '@/services/discover.service';
 import { moviesService } from '@/services/movies.service';
 import {
+	addPersonSeed,
 	addSeed,
 	clearFilters,
 	clearSeeds,
@@ -87,7 +92,6 @@ function IncludeToggle({
 export function Discover(_props: DiscoverProps) {
 	const [genres, setGenres] = useState<string[]>([]);
 	const [showFilters, setShowFilters] = useState(true);
-	const [pickerOpen, setPickerOpen] = useState(false);
 
 	// On mount: parse URL params, load genres.
 	useEffect(() => {
@@ -218,10 +222,31 @@ export function Discover(_props: DiscoverProps) {
 				</div>
 			)}
 
+			<div class={styles.seedSearchRow}>
+				<MovieSearchInput
+					placeholder="Add a movie seed…"
+					disabledKeys={seeds}
+					onSelect={(hit: SearchHit) => {
+						const m = hit as MovieSearchHit;
+						const id = m.movieId ?? (m.tmdbId ? `tmdb:${m.tmdbId}` : null);
+						if (id) addSeed(id, m.title);
+					}}
+				/>
+				<PersonSearchInput
+					placeholder="Add a person seed (cast, director, …)"
+					disabledKeys={personSeedKeys.value}
+					onSelect={(hit: SearchHit) => {
+						const p = hit as PersonSearchHit;
+						addPersonSeed(p.personKey, p.name);
+					}}
+				/>
+			</div>
+
 			<div class={styles.seedRow}>
 				{seeds.map((id) => (
 					<SeedChip
 						key={id}
+						kind="movie"
 						label={seedLabelMap[id] ?? id.slice(0, 8)}
 						onRemove={() => removeSeed(id)}
 					/>
@@ -229,38 +254,17 @@ export function Discover(_props: DiscoverProps) {
 				{personSeedKeys.value.map((key) => (
 					<SeedChip
 						key={key}
-						label={`👤 ${personSeedLabels.value[key] ?? key}`}
+						kind="person"
+						label={personSeedLabels.value[key] ?? key}
 						onRemove={() => removePersonSeed(key)}
 					/>
 				))}
-				<button
-					type="button"
-					class={styles.addSeedBtn}
-					onClick={() => setPickerOpen(true)}
-					title="Add seed movies to influence recommendations"
-				>
-					+ Add
-				</button>
 				{(seeds.length > 0 || personSeedKeys.value.length > 0) && (
 					<button class={styles.clearLink} onClick={clearSeeds}>
 						Clear seed{seeds.length + personSeedKeys.value.length > 1 ? 's' : ''}
 					</button>
 				)}
 			</div>
-
-			<MoviePicker
-				isOpen={pickerOpen}
-				onClose={() => setPickerOpen(false)}
-				mode="multi"
-				title="Add seed movies"
-				confirmLabel="Add to seeds"
-				disabledIds={seeds}
-				onSelect={(picks) => {
-					for (const p of picks) {
-						addSeed(p.id, p.title);
-					}
-				}}
-			/>
 
 			{unresolvedPersonKeys.value.length > 0 && (
 				<div class={styles.enrichBanner}>

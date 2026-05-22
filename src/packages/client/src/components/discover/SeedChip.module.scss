@@ -12,6 +12,23 @@
 	max-width: 240px;
 }
 
+.person {
+	background: linear-gradient(
+		135deg,
+		rgba(168, 85, 247, 0.18),
+		rgba(168, 85, 247, 0.08)
+	);
+	color: var(--color-person, #c084fc);
+	border-color: rgba(168, 85, 247, 0.55);
+
+	&::before {
+		content: '👤';
+		margin-right: 4px;
+		opacity: 0.9;
+		font-size: 0.9em;
+	}
+}
+
 .label {
 	overflow: hidden;
 	text-overflow: ellipsis;
