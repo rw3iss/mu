@@ -157,15 +157,32 @@ export function PersonDetail({ id }: PersonDetailProps) {
 }
 
 function CreditCard({ credit }: { credit: PersonView['knownForMovies'][number] }) {
-	const clickable = !!credit.movieId;
-	const onClick =
-		clickable && credit.movieId ? () => route(`/movie/${credit.movieId}`) : undefined;
+	// Library hit → local detail page. Otherwise, if it's a movie with
+	// a TMDB id, route to the virtual-row preview at /movie/tmdb:<id>
+	// (server creates a 'bookmark' stub on first visit). TV credits stay
+	// non-clickable until /tv/tmdb:<id> exists.
+	const href = credit.movieId
+		? `/movie/${credit.movieId}`
+		: credit.mediaType === 'movie' && credit.tmdbId
+			? `/movie/tmdb:${credit.tmdbId}`
+			: null;
+	const clickable = href != null;
+	const onClick = href ? () => route(href) : undefined;
+	const onKeyDown = href
+		? (e: KeyboardEvent) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					route(href);
+				}
+			}
+		: undefined;
 	return (
 		<div
 			class={`${styles.creditCard} ${clickable ? styles.clickable : ''} ${
 				!credit.movieId ? styles.notOwned : ''
 			}`}
 			onClick={onClick}
+			onKeyDown={onKeyDown as any}
 			role={clickable ? 'button' : undefined}
 			tabIndex={clickable ? 0 : undefined}
 		>
