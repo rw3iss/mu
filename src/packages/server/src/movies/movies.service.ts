@@ -357,11 +357,12 @@ export class MoviesService {
 		this.database.db
 			.insert(movieMetadata)
 			.values({
+				id: crypto.randomUUID(),
 				movieId: stubId,
 				tmdbRating,
 				tmdbVotes,
 				source: 'tmdb',
-				createdAt: now,
+				fetchedAt: now,
 				updatedAt: now,
 			})
 			.onConflictDoNothing()
