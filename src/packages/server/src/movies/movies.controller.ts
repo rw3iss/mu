@@ -159,7 +159,10 @@ export class MoviesController {
 
 	@Get(':id')
 	findById(@Param('id') id: string, @CurrentUser('id') userId: string) {
-		return this.moviesService.findById(id, userId);
+		// Accept library UUIDs, bookmark UUIDs, or namespaced keys like
+		// `tmdb:603`. Non-existing TMDB keys trigger an on-demand fetch
+		// and stub-row creation; see MoviesService.findOrFetchByKey.
+		return this.moviesService.findOrFetchByKey(id, userId);
 	}
 
 	@Patch(':id')

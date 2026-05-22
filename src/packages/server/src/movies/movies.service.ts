@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { MovieListQuery } from '@mu/shared';
@@ -22,6 +23,8 @@ import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from '../library/library.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { ImageService } from '../metadata/image.service.js';
+import { MetadataService } from '../metadata/metadata.service.js';
+import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 
@@ -37,6 +40,8 @@ export class MoviesService {
 		private readonly imageService: ImageService,
 		private readonly transcoderService: TranscoderService,
 		private readonly subtitleService: SubtitleService,
+		private readonly tmdb: TmdbProvider,
+		private readonly metadataService: MetadataService,
 	) {}
 
 	private readonly listCache = new Map<string, { data: any; expires: number }>();
@@ -272,6 +277,81 @@ export class MoviesService {
 		});
 
 		return result;
+	}
+
+	/**
+	 * Resolves either a library UUID, an existing bookmark UUID, or a
+	 * namespaced key like `tmdb:603`. For `tmdb:<id>` keys without a
+	 * matching local row, fetches metadata from TMDB and writes a stub
+	 * `source='bookmark'` row so future visits are cached.
+	 */
+	async findOrFetchByKey(key: string, userId?: string) {
+		if (!key.includes(':')) {
+			return this.findById(key, userId);
+		}
+		const [scheme, idStr] = key.split(':', 2);
+		if (scheme !== 'tmdb') {
+			throw new BadRequestException(`Unsupported movie key scheme: ${scheme}`);
+		}
+		const tmdbId = Number.parseInt(idStr ?? '', 10);
+		if (!Number.isFinite(tmdbId)) {
+			throw new BadRequestException(`Invalid TMDB id: ${idStr}`);
+		}
+
+		const existing = this.database.db
+			.select({ id: movies.id })
+			.from(movies)
+			.where(eq(movies.tmdbId, tmdbId))
+			.get();
+		if (existing) return this.findById(existing.id, userId);
+
+		const details = await this.tmdb.getMovieDetails(tmdbId);
+		if (!details) {
+			throw new NotFoundException(`TMDB movie ${tmdbId} not found`);
+		}
+
+		const stubId = crypto.randomUUID();
+		const now = nowISO();
+		const year = details.release_date
+			? Number.parseInt(details.release_date.slice(0, 4), 10)
+			: null;
+
+		this.database.db
+			.insert(movies)
+			.values({
+				id: stubId,
+				title: details.title,
+				originalTitle: details.original_title ?? null,
+				overview: details.overview ?? null,
+				tagline: details.tagline ?? null,
+				year: Number.isFinite(year) ? year : null,
+				runtimeMinutes: details.runtime ?? null,
+				releaseDate: details.release_date ?? null,
+				tmdbId,
+				imdbId: details.imdb_id ?? null,
+				posterUrl: details.poster_path
+					? `https://image.tmdb.org/t/p/w500${details.poster_path}`
+					: null,
+				backdropUrl: details.backdrop_path
+					? `https://image.tmdb.org/t/p/original${details.backdrop_path}`
+					: null,
+				source: 'bookmark',
+				addedAt: now,
+				updatedAt: now,
+			})
+			.run();
+
+		// Pull full metadata (cast, crew, keywords, etc.) via the existing
+		// refresh pipeline. Fire-and-forget — the basic row above is
+		// enough for the immediate response; cast etc. fill in on next
+		// visit (or via WS event).
+		this.metadataService.refreshMetadata(stubId).catch((err) => {
+			this.logger.warn(
+				`Background refresh for tmdb stub ${tmdbId} failed: ${(err as Error).message}`,
+			);
+		});
+
+		return this.findById(stubId, userId);
 	}
 
 	async findById(id: string, userId?: string) {
