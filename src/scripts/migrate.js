@@ -351,6 +351,15 @@ const tables = [
 		fetched_at TEXT NOT NULL
 	)`,
 	`CREATE INDEX IF NOT EXISTS movie_source_payloads_movie_source ON movie_source_payloads(movie_id, source)`,
+	`CREATE TABLE IF NOT EXISTS search_cache (
+		id TEXT PRIMARY KEY,
+		type TEXT NOT NULL,
+		normalized_query TEXT NOT NULL,
+		source TEXT NOT NULL,
+		payload TEXT NOT NULL,
+		fetched_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS search_cache_type_query ON search_cache(type, normalized_query)`,
 ];
 
 for (const sql of tables) {

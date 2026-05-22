@@ -68,6 +68,8 @@ export type { NewProviderUsageRow, ProviderUsageRow } from './provider-usage.ts'
 export { providerUsage } from './provider-usage.ts';
 export type { NewScanLogEntry, ScanLogEntry } from './scan-log.ts';
 export { scanLog } from './scan-log.ts';
+export type { NewSearchCacheRow, SearchCacheRow } from './search-cache.ts';
+export { searchCache } from './search-cache.ts';
 export type { NewSetting, Setting } from './settings.ts';
 export { settings } from './settings.ts';
 export type { NewStreamSession, StreamSession } from './stream-sessions.ts';
