@@ -9,6 +9,13 @@ export interface MovieSearchHit {
 	year?: number;
 	posterUrl?: string;
 	overview?: string;
+	/** TMDB rating, 0–10 scale. Pulled from the search response when present. */
+	tmdbRating?: number;
+	/** TMDB vote count. Useful for confidence-weighting alongside the score. */
+	tmdbVotes?: number;
+	/** IMDB rating, 0–10 scale. Pulled from OMDB when available. */
+	imdbRating?: number;
+	imdbVotes?: number;
 	sources: SearchSource[];
 	isOwned: boolean;
 	matchScore: number;

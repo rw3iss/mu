@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { MovieListQuery } from '@mu/shared';
 import { nowISO, paginationDefaults } from '@mu/shared';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { and, asc, count, desc, eq, like, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, like, sql } from 'drizzle-orm';
 import { parseJsonArray, parseJsonObject, stringifyJsonObject } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
@@ -341,10 +341,36 @@ export class MoviesService {
 			})
 			.run();
 
-		// Pull full metadata (cast, crew, keywords, etc.) via the existing
-		// refresh pipeline. Fire-and-forget — the basic row above is
-		// enough for the immediate response; cast etc. fill in on next
-		// visit (or via WS event).
+		// Seed movie_metadata with TMDB ratings inline so the first
+		// response already carries star ratings — the background
+		// refresh below will enrich the rest (cast, OMDB ratings,
+		// keywords, etc.). Without this, the client sees no rating
+		// until the refresh completes.
+		const tmdbRating =
+			typeof details.vote_average === 'number' && details.vote_average > 0
+				? Math.round(details.vote_average * 10) / 10
+				: null;
+		const tmdbVotes =
+			typeof details.vote_count === 'number' && details.vote_count > 0
+				? details.vote_count
+				: null;
+		this.database.db
+			.insert(movieMetadata)
+			.values({
+				movieId: stubId,
+				tmdbRating,
+				tmdbVotes,
+				source: 'tmdb',
+				createdAt: now,
+				updatedAt: now,
+			})
+			.onConflictDoNothing()
+			.run();
+
+		// Pull full metadata (cast, crew, OMDB ratings, keywords, …) via
+		// the existing refresh pipeline. Fire-and-forget — basic ratings
+		// above are enough for the immediate response; everything else
+		// fills in on the next visit.
 		this.metadataService.refreshMetadata(stubId).catch((err) => {
 			this.logger.warn(
 				`Background refresh for tmdb stub ${tmdbId} failed: ${(err as Error).message}`,
@@ -610,23 +636,52 @@ export class MoviesService {
 			title: string;
 			year?: number;
 			posterUrl?: string;
+			tmdbRating?: number;
+			tmdbVotes?: number;
+			imdbRating?: number;
+			imdbVotes?: number;
 			isOwned: boolean;
 			sources: Array<'local'>;
 			matchScore: number;
 		}>
 	> {
 		const rows = this.search(query, userId).slice(0, 25);
-		return rows.map((m) => ({
-			movieId: m.id,
-			imdbId: m.imdbId ?? undefined,
-			tmdbId: m.tmdbId ?? undefined,
-			title: m.title,
-			year: m.year ?? undefined,
-			posterUrl: m.posterUrl ?? undefined,
-			isOwned: true,
-			sources: ['local'] as Array<'local'>,
-			matchScore: 0,
-		}));
+		if (rows.length === 0) return [];
+
+		// Look up ratings in one batched query so we don't pay 25 round
+		// trips per search.
+		const ids = rows.map((r) => r.id);
+		const metaRows = this.database.db
+			.select({
+				movieId: movieMetadata.movieId,
+				tmdbRating: movieMetadata.tmdbRating,
+				tmdbVotes: movieMetadata.tmdbVotes,
+				imdbRating: movieMetadata.imdbRating,
+				imdbVotes: movieMetadata.imdbVotes,
+			})
+			.from(movieMetadata)
+			.where(inArray(movieMetadata.movieId, ids))
+			.all();
+		const metaByMovieId = new Map(metaRows.map((m) => [m.movieId, m]));
+
+		return rows.map((m) => {
+			const meta = metaByMovieId.get(m.id);
+			return {
+				movieId: m.id,
+				imdbId: m.imdbId ?? undefined,
+				tmdbId: m.tmdbId ?? undefined,
+				title: m.title,
+				year: m.year ?? undefined,
+				posterUrl: m.posterUrl ?? undefined,
+				tmdbRating: meta?.tmdbRating ?? undefined,
+				tmdbVotes: meta?.tmdbVotes ?? undefined,
+				imdbRating: meta?.imdbRating ?? undefined,
+				imdbVotes: meta?.imdbVotes ?? undefined,
+				isOwned: true,
+				sources: ['local'] as Array<'local'>,
+				matchScore: 0,
+			};
+		});
 	}
 
 	/**

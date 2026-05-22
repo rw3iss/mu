@@ -34,6 +34,24 @@ function defaultOnView(hit: SearchHit) {
 	}
 }
 
+function formatVotes(n: number): string {
+	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+	if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+	return String(n);
+}
+
+function movieSubtitle(hit: MovieSearchHit): string {
+	const parts: string[] = [];
+	if (hit.year) parts.push(String(hit.year));
+	const rating = hit.imdbRating ?? hit.tmdbRating;
+	if (rating != null) {
+		const votes = hit.imdbRating != null ? hit.imdbVotes : hit.tmdbVotes;
+		const votesStr = votes != null && votes > 0 ? ` (${formatVotes(votes)})` : '';
+		parts.push(`★ ${rating.toFixed(1)}${votesStr}`);
+	}
+	return parts.join(' · ');
+}
+
 function hitKey(hit: SearchHit): string {
 	if ('personKey' in hit) return hit.personKey;
 	const m = hit as MovieSearchHit;
@@ -144,9 +162,7 @@ export function EntitySearchInput({
 							? (hit as PersonSearchHit).role ??
 								(hit as PersonSearchHit).knownFor?.slice(0, 3).join(', ') ??
 								''
-							: (hit as MovieSearchHit).year
-								? String((hit as MovieSearchHit).year)
-								: '';
+							: movieSubtitle(hit as MovieSearchHit);
 						const img = isPerson
 							? (hit as PersonSearchHit).profileUrl
 							: (hit as MovieSearchHit).posterUrl;

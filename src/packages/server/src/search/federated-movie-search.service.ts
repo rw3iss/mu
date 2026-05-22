@@ -180,6 +180,8 @@ export class FederatedMovieSearchService {
 	private normalizeTmdb(query: string, r: any): MovieSearchHit {
 		const yearStr = r.release_date ? String(r.release_date).slice(0, 4) : undefined;
 		const yearNum = yearStr ? Number.parseInt(yearStr, 10) : undefined;
+		const ratingNum = typeof r.vote_average === 'number' ? r.vote_average : undefined;
+		const votesNum = typeof r.vote_count === 'number' ? r.vote_count : undefined;
 		const hit: MovieSearchHit = {
 			tmdbId: r.id,
 			title: r.title,
@@ -188,6 +190,8 @@ export class FederatedMovieSearchService {
 				? `https://image.tmdb.org/t/p/w185${r.poster_path}`
 				: undefined,
 			overview: r.overview ? String(r.overview).slice(0, 200) : undefined,
+			tmdbRating: ratingNum && ratingNum > 0 ? Math.round(ratingNum * 10) / 10 : undefined,
+			tmdbVotes: votesNum && votesNum > 0 ? votesNum : undefined,
 			sources: ['tmdb'],
 			isOwned: false,
 			matchScore: 0,
