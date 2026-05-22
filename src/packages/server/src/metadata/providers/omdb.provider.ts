@@ -51,6 +51,13 @@ export interface OmdbSearchResult extends OmdbData {
 	title: string;
 }
 
+export interface OmdbBasicSearchHit {
+	imdbId: string;
+	title: string;
+	year?: number;
+	posterUrl?: string;
+}
+
 @Injectable()
 export class OmdbProvider {
 	private readonly logger = new Logger('OmdbProvider');
@@ -100,6 +107,64 @@ export class OmdbProvider {
 		} catch (err: any) {
 			this.logger.error(`OMDB error: ${err.message}`);
 			return null;
+		}
+	}
+
+	/**
+	 * Multi-result title search (?s=). Returns lightweight hits suitable
+	 * for federated search dropdowns. Only minimal fields are returned;
+	 * fetching ratings / plot / etc. requires a follow-up `getByImdbId`.
+	 */
+	async searchMovies(query: string): Promise<OmdbBasicSearchHit[]> {
+		if (!this.apiKey) return [];
+
+		const cacheKey = `omdb:search:multi:${query.toLowerCase()}`;
+		const cached = await this.cache.get<OmdbBasicSearchHit[]>(
+			CACHE_NAMESPACES.METADATA,
+			cacheKey,
+		);
+		if (cached) return cached;
+
+		const params = new URLSearchParams({
+			apikey: this.apiKey,
+			s: query,
+			type: 'movie',
+		});
+
+		try {
+			const response = await fetch(`${OMDB_BASE_URL}/?${params}`);
+			if (!response.ok) {
+				this.logger.warn(`OMDB multi-search failed: ${response.status}`);
+				return [];
+			}
+			const raw = (await response.json()) as {
+				Response: string;
+				Search?: Array<{
+					Title: string;
+					Year: string;
+					imdbID: string;
+					Type: string;
+					Poster: string;
+				}>;
+				Error?: string;
+			};
+			if (raw.Response === 'False' || !Array.isArray(raw.Search)) return [];
+			const out: OmdbBasicSearchHit[] = raw.Search.filter(
+				(r) => r.imdbID && r.Title,
+			).map((r) => {
+				const yearNum = r.Year ? Number.parseInt(r.Year, 10) : Number.NaN;
+				return {
+					imdbId: r.imdbID,
+					title: r.Title,
+					year: Number.isFinite(yearNum) ? yearNum : undefined,
+					posterUrl: r.Poster && r.Poster !== 'N/A' ? r.Poster : undefined,
+				};
+			});
+			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, out, CACHE_TTL.METADATA);
+			return out;
+		} catch (err: any) {
+			this.logger.error(`OMDB multi-search error: ${err.message}`);
+			return [];
 		}
 	}
 
