@@ -66,8 +66,14 @@ export function useSearchStream<T extends 'movie' | 'person'>(
 
 		setLoading(true);
 		const path = type === 'movie' ? 'movies' : 'people';
+		// EventSource can't set Authorization headers, so the JWT
+		// rides along as a query-string token (same pattern HLS.js
+		// and subtitle endpoints use). The server's auth guard checks
+		// for ?token= before falling back to cookies.
+		const token = localStorage.getItem('mu_token');
+		const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
 		const es = new EventSource(
-			`/api/v1/search/${path}/stream?q=${encodeURIComponent(query)}`,
+			`/api/v1/search/${path}/stream?q=${encodeURIComponent(query)}${tokenParam}`,
 		);
 		esRef.current = es;
 
