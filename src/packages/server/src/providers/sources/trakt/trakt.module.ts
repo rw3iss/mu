@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
+import { CacheModule } from '../../../cache/cache.module.js';
+import { ProvidersModule } from '../../providers.module.js';
 import { TraktRecommender } from './trakt.recommender.js';
+import { TraktSearchProvider } from './trakt-search.provider.js';
 
 /**
  * Trakt source. Self-registers with the global `ProviderRegistry`
@@ -7,12 +10,11 @@ import { TraktRecommender } from './trakt.recommender.js';
  * picks it up automatically; no other module needs to know it
  * exists.
  *
- * Exported so the recommendations module's external-recs listener
- * can snapshot `/related` results into `movie_external_recs` on
- * library events.
+ * Also exports `TraktSearchProvider` for federated search use.
  */
 @Module({
-	providers: [TraktRecommender],
-	exports: [TraktRecommender],
+	imports: [CacheModule, ProvidersModule],
+	providers: [TraktRecommender, TraktSearchProvider],
+	exports: [TraktRecommender, TraktSearchProvider],
 })
 export class TraktModule {}

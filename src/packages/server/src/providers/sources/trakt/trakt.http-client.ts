@@ -2,6 +2,21 @@ import type { TraktRelatedMovie } from './trakt.types.js';
 
 const TRAKT_BASE = 'https://api.trakt.tv';
 
+export interface TraktMovieSearchHit {
+	traktId?: number;
+	tmdbId?: number;
+	imdbId?: string;
+	title: string;
+	year?: number;
+}
+
+export interface TraktPersonSearchHit {
+	traktId?: number;
+	tmdbId?: number;
+	imdbId?: string;
+	name: string;
+}
+
 export interface TraktHttpClientOptions {
 	clientId: string;
 }
@@ -79,5 +94,61 @@ export class TraktHttpClient {
 		const first = arr.find((x) => x.movie);
 		if (!first?.movie) return null;
 		return { id: first.movie.ids.trakt, slug: first.movie.ids.slug };
+	}
+
+	/** Multi-result movie search for federated search dropdowns. */
+	async searchMovies(query: string, limit = 25): Promise<TraktMovieSearchHit[]> {
+		const url = `${TRAKT_BASE}/search/movie?query=${encodeURIComponent(query)}&limit=${limit}`;
+		const res = await fetch(url, {
+			headers: {
+				'Content-Type': 'application/json',
+				'trakt-api-version': '2',
+				'trakt-api-key': this.options.clientId,
+			},
+		});
+		if (!res.ok) return [];
+		const arr = (await res.json()) as Array<{
+			movie?: {
+				title: string;
+				year?: number;
+				ids: { trakt?: number; tmdb?: number; imdb?: string };
+			};
+		}>;
+		return arr
+			.filter((x) => x.movie?.title)
+			.map((x): TraktMovieSearchHit => ({
+				traktId: x.movie!.ids?.trakt,
+				tmdbId: x.movie!.ids?.tmdb ?? undefined,
+				imdbId: x.movie!.ids?.imdb ?? undefined,
+				title: x.movie!.title,
+				year: x.movie!.year ?? undefined,
+			}));
+	}
+
+	/** Multi-result person search for federated search dropdowns. */
+	async searchPeople(query: string, limit = 25): Promise<TraktPersonSearchHit[]> {
+		const url = `${TRAKT_BASE}/search/person?query=${encodeURIComponent(query)}&limit=${limit}`;
+		const res = await fetch(url, {
+			headers: {
+				'Content-Type': 'application/json',
+				'trakt-api-version': '2',
+				'trakt-api-key': this.options.clientId,
+			},
+		});
+		if (!res.ok) return [];
+		const arr = (await res.json()) as Array<{
+			person?: {
+				name: string;
+				ids: { trakt?: number; tmdb?: number; imdb?: string };
+			};
+		}>;
+		return arr
+			.filter((x) => x.person?.name)
+			.map((x): TraktPersonSearchHit => ({
+				traktId: x.person!.ids?.trakt,
+				tmdbId: x.person!.ids?.tmdb ?? undefined,
+				imdbId: x.person!.ids?.imdb ?? undefined,
+				name: x.person!.name,
+			}));
 	}
 }
