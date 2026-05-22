@@ -29,6 +29,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module.
 import { RemoteModule } from './remote/remote.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { SearchModule } from './search/search.module.js';
 import { ShareLinksModule } from './share-links/share-links.module.js';
 import { SharingModule } from './sharing/sharing.module.js';
 import { StreamModule } from './stream/stream.module.js';
@@ -69,6 +70,7 @@ import { UsersModule } from './users/users.module.js';
 		GroupingModule,
 		PeopleModule,
 		FavoritesModule,
+		SearchModule,
 	],
 	providers: [
 		{
