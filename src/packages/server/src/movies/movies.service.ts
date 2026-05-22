@@ -515,6 +515,41 @@ export class MoviesService {
 	}
 
 	/**
+	 * Federated-search helper: returns library hits normalized to the
+	 * MovieSearchHit shape used by FederatedMovieSearchService. Keeps
+	 * the search() method's UI-facing shape stable.
+	 */
+	async searchForFederation(
+		query: string,
+		userId: string,
+	): Promise<
+		Array<{
+			movieId: string;
+			imdbId?: string;
+			tmdbId?: number;
+			title: string;
+			year?: number;
+			posterUrl?: string;
+			isOwned: boolean;
+			sources: Array<'local'>;
+			matchScore: number;
+		}>
+	> {
+		const rows = this.search(query, userId).slice(0, 25);
+		return rows.map((m) => ({
+			movieId: m.id,
+			imdbId: m.imdbId ?? undefined,
+			tmdbId: m.tmdbId ?? undefined,
+			title: m.title,
+			year: m.year ?? undefined,
+			posterUrl: m.posterUrl ?? undefined,
+			isOwned: true,
+			sources: ['local'] as Array<'local'>,
+			matchScore: 0,
+		}));
+	}
+
+	/**
 	 * For list views, fall back to thumbnailUrl when posterUrl is empty.
 	 */
 	private applyPosterFallback<
