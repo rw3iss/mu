@@ -1,6 +1,6 @@
 import { nowISO } from '@mu/shared';
 import { Injectable } from '@nestjs/common';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movies, type NewPerson, type Person, people } from '../database/schema/index.js';
 import {
@@ -406,5 +406,46 @@ export class PeopleService {
 		// Sort by popularity-ish proxy: year desc, then job/cast prominence.
 		all.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
 		return all.slice(0, 24);
+	}
+
+	/**
+	 * Federated-search helper: returns library people hits normalized
+	 * to the PersonSearchHit shape used by FederatedPeopleSearchService.
+	 */
+	async searchPeopleForFederation(query: string): Promise<
+		Array<{
+			personKey: string;
+			tmdbId?: number;
+			name: string;
+			profileUrl?: string;
+			role?: string;
+			sources: Array<'local'>;
+			isOwned: boolean;
+			matchScore: number;
+		}>
+	> {
+		const q = `%${query.toLowerCase()}%`;
+		const rows = this.database.db
+			.select({
+				externalId: people.externalId,
+				tmdbId: people.tmdbId,
+				name: people.name,
+				profileUrl: people.profileUrl,
+				knownForDepartment: people.knownForDepartment,
+			})
+			.from(people)
+			.where(sql`lower(${people.name}) like ${q}`)
+			.limit(25)
+			.all();
+		return rows.map((r) => ({
+			personKey: r.externalId,
+			tmdbId: r.tmdbId ?? undefined,
+			name: r.name,
+			profileUrl: r.profileUrl ?? undefined,
+			role: r.knownForDepartment ?? undefined,
+			sources: ['local'] as Array<'local'>,
+			isOwned: true,
+			matchScore: 0,
+		}));
 	}
 }
