@@ -26,11 +26,16 @@ describe('FederatedMovieSearchService', () => {
 	let cache: any;
 	let svc: FederatedMovieSearchService;
 
+	let omdb: any;
+	let trakt: any;
+
 	beforeEach(() => {
 		local = mkLocal();
 		tmdb = mkTmdb();
 		cache = mkCache();
-		svc = new FederatedMovieSearchService(local, tmdb, cache);
+		omdb = { searchMovies: vi.fn().mockResolvedValue([]) };
+		trakt = { searchMovies: vi.fn().mockResolvedValue([]) };
+		svc = new FederatedMovieSearchService(local, tmdb, cache, omdb, trakt);
 	});
 
 	it('emits local results first then tmdb then done', async () => {
@@ -86,6 +91,28 @@ describe('FederatedMovieSearchService', () => {
 		]);
 		await collect(svc, 'matrix');
 		expect(cache.set).toHaveBeenCalledWith('movie', 'matrix', 'tmdb', expect.any(Array));
+	});
+
+	it('emits omdb results when omdb.searchMovies returns hits', async () => {
+		omdb.searchMovies.mockResolvedValue([
+			{ imdbId: 'tt1', title: 'OMDB Hit', year: 1999 },
+		]);
+		const events = await collect(svc, 'matrix');
+		const sources = events
+			.filter((e) => e.kind === 'results')
+			.map((e: any) => e.source);
+		expect(sources).toContain('omdb');
+	});
+
+	it('emits trakt results when trakt.searchMovies returns hits', async () => {
+		trakt.searchMovies.mockResolvedValue([
+			{ traktId: 1, tmdbId: 2, imdbId: 'tt2', title: 'Trakt Hit', year: 2001 },
+		]);
+		const events = await collect(svc, 'matrix');
+		const sources = events
+			.filter((e) => e.kind === 'results')
+			.map((e: any) => e.source);
+		expect(sources).toContain('trakt');
 	});
 
 	it('merges hits across sources by tmdbId', async () => {

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { PeopleService } from '../people/people.service.js';
+import { TraktSearchProvider } from '../providers/sources/trakt/trakt-search.provider.js';
 import { mergePersonHit, personDedupKey, scorePerson } from './dedup.js';
 import { SearchCacheService } from './search-cache.service.js';
 import type { PersonSearchHit, SearchEvent, SearchSource } from './search-types.js';
@@ -16,6 +17,7 @@ export class FederatedPeopleSearchService {
 		private readonly people: PeopleService,
 		private readonly tmdb: TmdbProvider,
 		private readonly cache: SearchCacheService,
+		private readonly trakt: TraktSearchProvider,
 	) {}
 
 	search$(query: string): Observable<SearchEvent<PersonSearchHit>> {
@@ -69,37 +71,10 @@ export class FederatedPeopleSearchService {
 					emitError('local', e?.message ?? String(e));
 				}
 
-				const cached = this.cache.get<PersonSearchHit>('person', query, 'tmdb');
-				if (cached) {
-					emit('cache', cached);
-				} else {
-					const raw = await withTimeout(this.tmdb.searchPerson(query), 'tmdb');
-					if (raw) {
-						const items = raw.map((r: any) => {
-							const hit: PersonSearchHit = {
-								personKey: `tmdb:${r.id}`,
-								tmdbId: r.id,
-								name: r.name,
-								profileUrl: r.profile_path
-									? `https://image.tmdb.org/t/p/w185${r.profile_path}`
-									: undefined,
-								role: r.known_for_department,
-								knownFor: Array.isArray(r.known_for)
-									? r.known_for
-											.map((k: any) => k.title || k.name)
-											.filter((x: unknown): x is string => typeof x === 'string' && x.length > 0)
-									: undefined,
-								sources: ['tmdb'],
-								isOwned: false,
-								matchScore: 0,
-							};
-							hit.matchScore = scorePerson(query, hit);
-							return hit;
-						});
-						emit('tmdb', items);
-						this.cache.set('person', query, 'tmdb', items);
-					}
-				}
+				await Promise.all([
+					this.runTmdb(query, withTimeout, emit),
+					this.runTrakt(query, withTimeout, emit),
+				]);
 
 				if (!cancelled) {
 					subscriber.next({ kind: 'done', sourcesQueried });
@@ -111,5 +86,76 @@ export class FederatedPeopleSearchService {
 				cancelled = true;
 			};
 		});
+	}
+
+	private async runTmdb(
+		query: string,
+		withTimeout: <T>(p: Promise<T>, s: SearchSource) => Promise<T | null>,
+		emit: (s: SearchSource, items: PersonSearchHit[]) => void,
+	) {
+		const cached = this.cache.get<PersonSearchHit>('person', query, 'tmdb');
+		if (cached) {
+			emit('cache', cached);
+			return;
+		}
+		const raw = await withTimeout(this.tmdb.searchPerson(query), 'tmdb');
+		if (!raw) return;
+		const items = raw.map((r: any) => {
+			const hit: PersonSearchHit = {
+				personKey: `tmdb:${r.id}`,
+				tmdbId: r.id,
+				name: r.name,
+				profileUrl: r.profile_path
+					? `https://image.tmdb.org/t/p/w185${r.profile_path}`
+					: undefined,
+				role: r.known_for_department,
+				knownFor: Array.isArray(r.known_for)
+					? r.known_for
+							.map((k: any) => k.title || k.name)
+							.filter((x: unknown): x is string => typeof x === 'string' && x.length > 0)
+					: undefined,
+				sources: ['tmdb'],
+				isOwned: false,
+				matchScore: 0,
+			};
+			hit.matchScore = scorePerson(query, hit);
+			return hit;
+		});
+		emit('tmdb', items);
+		this.cache.set('person', query, 'tmdb', items);
+	}
+
+	private async runTrakt(
+		query: string,
+		withTimeout: <T>(p: Promise<T>, s: SearchSource) => Promise<T | null>,
+		emit: (s: SearchSource, items: PersonSearchHit[]) => void,
+	) {
+		const cached = this.cache.get<PersonSearchHit>('person', query, 'trakt');
+		if (cached) {
+			emit('cache', cached);
+			return;
+		}
+		const raw = await withTimeout(this.trakt.searchPeople(query), 'trakt');
+		if (!raw || raw.length === 0) return;
+		const items = raw.map((r): PersonSearchHit => {
+			const personKey = r.tmdbId
+				? `tmdb:${r.tmdbId}`
+				: r.traktId
+					? `trakt:${r.traktId}`
+					: `name:${r.name.toLowerCase().replace(/\s+/g, '-')}`;
+			const hit: PersonSearchHit = {
+				personKey,
+				tmdbId: r.tmdbId,
+				traktId: r.traktId,
+				name: r.name,
+				sources: ['trakt'],
+				isOwned: false,
+				matchScore: 0,
+			};
+			hit.matchScore = scorePerson(query, hit);
+			return hit;
+		});
+		emit('trakt', items);
+		this.cache.set('person', query, 'trakt', items);
 	}
 }

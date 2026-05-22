@@ -16,11 +16,14 @@ describe('FederatedPeopleSearchService', () => {
 	let cache: any;
 	let svc: FederatedPeopleSearchService;
 
+	let trakt: any;
+
 	beforeEach(() => {
 		people = { searchPeopleForFederation: vi.fn().mockResolvedValue([]) };
 		tmdb = { searchPerson: vi.fn().mockResolvedValue([]) };
 		cache = { get: vi.fn().mockReturnValue(null), set: vi.fn() };
-		svc = new FederatedPeopleSearchService(people, tmdb, cache);
+		trakt = { searchPeople: vi.fn().mockResolvedValue([]) };
+		svc = new FederatedPeopleSearchService(people, tmdb, cache, trakt);
 	});
 
 	it('emits local first then tmdb then done', async () => {
@@ -65,6 +68,15 @@ describe('FederatedPeopleSearchService', () => {
 		const done = evs.find((e) => e.kind === 'done');
 		expect(errored).toBeTruthy();
 		expect(done).toBeTruthy();
+	});
+
+	it('emits trakt results when trakt.searchPeople returns hits', async () => {
+		trakt.searchPeople.mockResolvedValue([{ traktId: 99, tmdbId: 5, name: 'Trakt Person' }]);
+		const evs = await collect(svc, 'someone');
+		const sources = evs
+			.filter((e) => e.kind === 'results')
+			.map((e: any) => e.source);
+		expect(sources).toContain('trakt');
 	});
 
 	it('normalizes tmdb person results with profile URL', async () => {

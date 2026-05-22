@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
+import { OmdbProvider } from '../metadata/providers/omdb.provider.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { MoviesService } from '../movies/movies.service.js';
+import { TraktSearchProvider } from '../providers/sources/trakt/trakt-search.provider.js';
 import { mergeMovieHit, movieDedupKey, scoreMovie } from './dedup.js';
 import { SearchCacheService } from './search-cache.service.js';
 import type {
@@ -24,6 +26,8 @@ export class FederatedMovieSearchService {
 		private readonly movies: MoviesService,
 		private readonly tmdb: TmdbProvider,
 		private readonly cache: SearchCacheService,
+		private readonly omdb: OmdbProvider,
+		private readonly trakt: TraktSearchProvider,
 	) {}
 
 	search$(query: string, userId: string): Observable<SearchEvent<MovieSearchHit>> {
@@ -79,7 +83,11 @@ export class FederatedMovieSearchService {
 				}
 
 				// 2) External sources in parallel
-				await Promise.all([this.runTmdb(query, withTimeout, emitResults)]);
+				await Promise.all([
+					this.runTmdb(query, withTimeout, emitResults),
+					this.runOmdb(query, withTimeout, emitResults),
+					this.runTrakt(query, withTimeout, emitResults),
+				]);
 
 				if (!cancelled) {
 					subscriber.next({ kind: 'done', sourcesQueried });
@@ -108,6 +116,65 @@ export class FederatedMovieSearchService {
 		const hits = raw.map((r) => this.normalizeTmdb(query, r));
 		emit('tmdb', hits);
 		this.cache.set('movie', query, 'tmdb', hits);
+	}
+
+	private async runOmdb(
+		query: string,
+		withTimeout: <T>(p: Promise<T>, s: SearchSource) => Promise<T | null>,
+		emit: (s: SearchSource, items: MovieSearchHit[]) => void,
+	) {
+		const cached = this.cache.get<MovieSearchHit>('movie', query, 'omdb');
+		if (cached) {
+			emit('cache', cached);
+			return;
+		}
+		const raw = await withTimeout(this.omdb.searchMovies(query), 'omdb');
+		if (!raw || raw.length === 0) return;
+		const hits = raw.map((r): MovieSearchHit => {
+			const hit: MovieSearchHit = {
+				imdbId: r.imdbId,
+				title: r.title,
+				year: r.year,
+				posterUrl: r.posterUrl,
+				sources: ['omdb'],
+				isOwned: false,
+				matchScore: 0,
+			};
+			hit.matchScore = scoreMovie(query, hit);
+			return hit;
+		});
+		emit('omdb', hits);
+		this.cache.set('movie', query, 'omdb', hits);
+	}
+
+	private async runTrakt(
+		query: string,
+		withTimeout: <T>(p: Promise<T>, s: SearchSource) => Promise<T | null>,
+		emit: (s: SearchSource, items: MovieSearchHit[]) => void,
+	) {
+		const cached = this.cache.get<MovieSearchHit>('movie', query, 'trakt');
+		if (cached) {
+			emit('cache', cached);
+			return;
+		}
+		const raw = await withTimeout(this.trakt.searchMovies(query), 'trakt');
+		if (!raw || raw.length === 0) return;
+		const hits = raw.map((r): MovieSearchHit => {
+			const hit: MovieSearchHit = {
+				traktId: r.traktId,
+				tmdbId: r.tmdbId,
+				imdbId: r.imdbId,
+				title: r.title,
+				year: r.year,
+				sources: ['trakt'],
+				isOwned: false,
+				matchScore: 0,
+			};
+			hit.matchScore = scoreMovie(query, hit);
+			return hit;
+		});
+		emit('trakt', hits);
+		this.cache.set('movie', query, 'trakt', hits);
 	}
 
 	private normalizeTmdb(query: string, r: any): MovieSearchHit {
