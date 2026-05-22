@@ -1154,6 +1154,21 @@ function PreviewActions({ movie }: { movie: Movie }) {
 					</>
 				)}
 			</Button>
+			{movie.tmdbId != null && (
+				<Button
+					variant="ghost"
+					size="lg"
+					onClick={() => {
+						window.open(
+							`https://www.themoviedb.org/movie/${movie.tmdbId}`,
+							'_blank',
+							'noopener,noreferrer',
+						);
+					}}
+				>
+					<Icon name="share" size={14} /> View on TMDB
+				</Button>
+			)}
 		</>
 	);
 }
