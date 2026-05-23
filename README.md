@@ -300,7 +300,7 @@ IMDB publishes free daily TSV bulk dumps at `datasets.imdbws.com`. Mu can sync t
 - Toggling at runtime: *Settings → Matching → IMDB datasets (offline ratings) → Enable IMDB datasets sync*. The toggle writes `imdb.datasets.enabled` in the settings store, which the orchestrator picks up live (no restart).
 - Manual *Sync now* button in the same panel for an out-of-band refresh.
 
-**Storage & cost:** ~25 MB on disk for the ratings table + index. Sync downloads the gzipped TSV (~5 MB on the wire), streams it through `gunzip`, and upserts via a single transaction so a mid-sync crash leaves the previous data intact. Typical full sync takes 20–40 s on a home connection.
+**Storage & cost:** ~25 MB on disk for the ratings table + index. Sync downloads the gzipped TSV (~5 MB on the wire), streams it through `gunzip`, and upserts via a single transaction so a mid-sync crash leaves the previous data intact. Full sync of 1.4M rows takes ~5–10 minutes on a typical home connection — predominantly network time. Subsequent syncs are the same size since IMDB ships full daily snapshots (no delta format).
 
 **How the read-through works:** `OmdbProvider.getByImdbId` checks the local table first. If it hits, the rating + vote count come from there (daily-fresh) and OMDB is still called for the rich fields (plot, Rotten Tomatoes, Metacritic, etc.). When OMDB is unconfigured or rate-limited, the local table serves the rating alone so movies aren't blocked from getting *something*. A new `getRatingByImdbId` fast-path is also available for callers that only need the rating.
 
