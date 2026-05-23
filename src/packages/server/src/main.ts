@@ -168,10 +168,6 @@ async function bootstrap() {
 			root: clientDist,
 			prefix: '/',
 			decorateReply: false,
-			// Don't auto-serve index.html on directory hits — let the
-			// SEO-aware SPA fallback below handle '/' so the right
-			// per-route meta tags are injected.
-			index: false,
 		});
 
 		// SPA fallback: intercept 404 responses for non-API routes and serve index.html.
@@ -181,34 +177,43 @@ async function bootstrap() {
 		// even though the page itself is client-rendered.
 		const indexHtmlPath = join(clientDist, 'index.html');
 		const seoService = app.get(SeoService);
+		// SEO injection: catches BOTH SPA-fallback 404s (deep routes like
+		// /movie/abc) AND fastify-static's auto-served index.html for `/`
+		// and other directory hits. We detect the latter by looking at
+		// the response Content-Type — any text/html response on a non-API
+		// GET path runs through the injector.
 		fastify.addHook('onSend', async (request, reply, payload) => {
-			if (
-				reply.statusCode === 404 &&
-				request.method === 'GET' &&
-				!request.url.startsWith('/api/')
-			) {
+			if (request.method !== 'GET' || request.url.startsWith('/api/')) {
+				return payload;
+			}
+			const url = request.url.split('?')[0] ?? '/';
+			const forwardedProto = request.headers['x-forwarded-proto'] as string | undefined;
+			const forwardedHost =
+				(request.headers['x-forwarded-host'] as string | undefined) ??
+				(request.headers.host as string | undefined);
+			const proto = forwardedProto ?? (request.protocol as string) ?? 'http';
+			const origin = forwardedHost ? `${proto}://${forwardedHost}` : undefined;
+
+			// Case A: SPA fallback for unknown routes (404).
+			if (reply.statusCode === 404) {
 				try {
 					const rawHtml = readFileSync(indexHtmlPath, 'utf-8');
-					const url = request.url.split('?')[0] ?? '/';
-					// Reconstruct the public origin from the request so
-					// og:url + canonical reflect the actual host the
-					// crawler hit (not localhost). Honor reverse-proxy
-					// forwarded headers when present.
-					const forwardedProto =
-						(request.headers['x-forwarded-proto'] as string) ?? null;
-					const forwardedHost =
-						(request.headers['x-forwarded-host'] as string) ??
-						(request.headers.host as string) ??
-						null;
-					const proto = forwardedProto ?? (request.protocol as string) ?? 'http';
-					const origin = forwardedHost ? `${proto}://${forwardedHost}` : undefined;
-					const html = await seoService.renderForUrl(
-						url,
-						rawHtml,
-						request.server,
-						origin,
-					);
+					const html = await seoService.renderForUrl(url, rawHtml, request.server, origin);
 					reply.status(200).header('Content-Type', 'text/html; charset=utf-8');
+					return html;
+				} catch {
+					return payload;
+				}
+			}
+
+			// Case B: fastify-static served the file (e.g. `/` → index.html).
+			// Read it from disk so we have the source to inject into.
+			const contentType = (reply.getHeader('content-type') as string | undefined) ?? '';
+			if (reply.statusCode === 200 && contentType.startsWith('text/html')) {
+				try {
+					const rawHtml = readFileSync(indexHtmlPath, 'utf-8');
+					const html = await seoService.renderForUrl(url, rawHtml, request.server, origin);
+					reply.header('Content-Type', 'text/html; charset=utf-8');
 					return html;
 				} catch {
 					return payload;
