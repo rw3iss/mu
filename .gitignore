@@ -10,3 +10,6 @@ dist/
 *.log
 
 _*.md
+# Local scratch outputs
+graphify-out/
+recommendations.html
