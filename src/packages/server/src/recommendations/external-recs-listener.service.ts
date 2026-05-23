@@ -8,6 +8,7 @@ import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { ProviderEventsService } from '../providers/provider-events.service.js';
 import { RateLimitService } from '../providers/rate-limit.service.js';
 import { TraktRecommender } from '../providers/sources/trakt/trakt.recommender.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { ExternalRecsRepository, type IncomingExternalRec } from './external-recs.repository.js';
 
 interface MovieEventPayload {
@@ -39,6 +40,7 @@ export class ExternalRecsListenerService implements OnModuleInit {
 		private readonly trakt: TraktRecommender,
 		private readonly rateLimit: RateLimitService,
 		private readonly providerEvents: ProviderEventsService,
+		private readonly settings: SettingsService,
 	) {}
 
 	onModuleInit(): void {
@@ -55,6 +57,14 @@ export class ExternalRecsListenerService implements OnModuleInit {
 	}
 
 	private async handle(payload: MovieEventPayload): Promise<void> {
+		// Admin can disable auto-snapshotting via Settings > Matching.
+		// Default true so existing behaviour is preserved.
+		const enabled = this.settings.get<boolean>(
+			'recommendations.autoEnrichExternalRecs',
+			true,
+		);
+		if (!enabled) return;
+
 		const movieId = payload?.movieId;
 		if (!movieId) return;
 

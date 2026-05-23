@@ -8,7 +8,9 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0 var(--space-md);
+  /* Padding removed — the wrapping Settings panel already provides
+   * gutter, and the toolbar / tab strip below want to span the full
+   * width of the panel content. */
 }
 
 .toolbar {

@@ -104,3 +104,111 @@
 		gap: 0.25rem;
 	}
 }
+
+/* Numeric readout to the right of a slider — fixed width so the
+ * slider track doesn't reflow as values change. */
+.sliderValue {
+	min-width: 3ch;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	font-size: 0.8rem;
+	color: var(--color-text-muted);
+}
+
+.helpText {
+	font-size: 0.75rem;
+	color: var(--color-text-muted);
+}
+
+/* Toggle row: label + description on the left, switch on the right.
+ * Mirrors the Settings page convention but kept local because Matching
+ * uses its own section/control vocabulary. */
+.toggleRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0.4rem 0;
+}
+
+.toggleInfo {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 1;
+	min-width: 0;
+}
+
+.toggleLabel {
+	font-size: 0.85rem;
+	font-weight: var(--font-weight-medium);
+	color: var(--color-text);
+}
+
+.toggleDescription {
+	font-size: 0.75rem;
+	color: var(--color-text-muted);
+	line-height: 1.4;
+}
+
+.toggle {
+	position: relative;
+	display: inline-block;
+	width: 44px;
+	height: 24px;
+	cursor: pointer;
+	flex-shrink: 0;
+
+	input {
+		opacity: 0;
+		width: 0;
+		height: 0;
+		position: absolute;
+
+		&:checked + .toggleTrack {
+			background: var(--color-accent);
+
+			&::after {
+				transform: translateX(20px);
+			}
+		}
+
+		&:disabled + .toggleTrack {
+			opacity: 0.5;
+		}
+	}
+}
+
+.toggleTrack {
+	position: absolute;
+	inset: 0;
+	background: var(--color-bg-elevated);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-full, 999px);
+	transition: background var(--transition-fast);
+
+	&::after {
+		content: '';
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		width: 18px;
+		height: 18px;
+		background: #ffffff;
+		border-radius: 50%;
+		transition: transform var(--transition-fast);
+	}
+}
+
+.linkButton {
+	background: transparent;
+	border: none;
+	color: var(--color-accent);
+	cursor: pointer;
+	padding: 0;
+	font-size: 0.85rem;
+
+	&:hover {
+		text-decoration: underline;
+	}
+}

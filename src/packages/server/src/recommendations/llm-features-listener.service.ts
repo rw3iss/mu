@@ -5,6 +5,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { movieLlmFeatures, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { AnthropicClient } from '../llm/anthropic.client.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 interface MovieEventPayload {
 	movieId?: string;
@@ -26,6 +27,7 @@ export class LlmFeaturesListenerService implements OnModuleInit {
 		private readonly database: DatabaseService,
 		private readonly events: EventsService,
 		private readonly llm: AnthropicClient,
+		private readonly settings: SettingsService,
 	) {}
 
 	onModuleInit(): void {
@@ -41,6 +43,14 @@ export class LlmFeaturesListenerService implements OnModuleInit {
 	}
 
 	private async handle(movieId: string): Promise<void> {
+		// Admin can disable auto LLM feature extraction via Settings >
+		// Matching. Default true; respects the per-provider budget
+		// even when on.
+		const enabled = this.settings.get<boolean>(
+			'recommendations.autoEnrichLlmFeatures',
+			true,
+		);
+		if (!enabled) return;
 		if (!this.llm.isConfigured()) return;
 		if (this.inflight.has(movieId)) return;
 		this.inflight.add(movieId);

@@ -5,6 +5,7 @@ import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieMetadata, movies, userRatings, userWatchHistory } from '../database/schema/index.js';
 import { EmbeddingsService } from '../embeddings/embeddings.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { ExternalCandidatesService } from './external-candidates.service.js';
 import { ExternalEnrichmentService } from './external-enrichment.service.js';
 import { composite } from './scoring/composite-scorer.js';
@@ -65,6 +66,7 @@ export class RecommendationsService {
 		private readonly embeddings: EmbeddingsService,
 		private readonly externalCandidates: ExternalCandidatesService,
 		private readonly externalEnrichment: ExternalEnrichmentService,
+		private readonly settings: SettingsService,
 	) {
 		// LLM rerank lives after the cheap strategies in the array but
 		// the orchestrator filters it back to a post-rank pass (see
@@ -74,12 +76,60 @@ export class RecommendationsService {
 	}
 
 	/**
+	 * Merge admin-configured Matching settings into a caller's opts.
+	 * Resolution order: caller opts (explicit per-call override) →
+	 * settings (admin global default) → DEFAULT_RECOMMEND_OPTIONS
+	 * (built-in fallback). Returns a *new* opts object — callers
+	 * downstream still use the existing `?? DEFAULT_RECOMMEND_OPTIONS`
+	 * idiom and naturally pick up the merged value.
+	 */
+	private withSettings<O extends RecommendOptions>(opts: O): O {
+		const s = this.settings;
+		const merged: O = { ...opts };
+
+		if (merged.mmrLambda == null) {
+			const v = s.get<number>('recommendations.mmrLambda');
+			if (typeof v === 'number') merged.mmrLambda = v;
+		}
+		if (merged.qualityFloor == null) {
+			const v = s.get<number>('recommendations.qualityFloor');
+			if (typeof v === 'number') merged.qualityFloor = v;
+		}
+		if (merged.excludeWatched == null) {
+			const v = s.get<boolean>('recommendations.excludeWatched');
+			if (typeof v === 'boolean') merged.excludeWatched = v;
+		}
+		if (merged.excludeSameGroup == null) {
+			const v = s.get<boolean>('recommendations.excludeSameGroup');
+			if (typeof v === 'boolean') merged.excludeSameGroup = v;
+		}
+		if (merged.perDirectorCap == null) {
+			const v = s.get<number>('recommendations.perDirectorCap');
+			if (typeof v === 'number') merged.perDirectorCap = v;
+		}
+		if (merged.weights == null) {
+			const v = s.get<Record<string, number>>('recommendations.strategyWeights');
+			if (v && typeof v === 'object') merged.weights = v;
+		}
+		// Multi-input policy: lives on the subtype. Single-seed callers
+		// ignore the extra field — harmless to always attach.
+		const multi = merged as unknown as MultiRecommendOptions;
+		if (multi.policy == null) {
+			const v = s.get<'centroid' | 'union' | 'auto'>('recommendations.multiInputPolicy');
+			if (v === 'centroid' || v === 'union' || v === 'auto') multi.policy = v;
+		}
+
+		return merged;
+	}
+
+	/**
 	 * Find movies similar to a single seed movie.
 	 */
 	async getSimilarMovies(
 		movieId: string,
 		opts: RecommendOptions = {},
 	): Promise<RecommendResponse> {
+		opts = this.withSettings(opts);
 		const k = opts.k ?? DEFAULT_RECOMMEND_OPTIONS.k;
 		const include = opts.include ?? 'owned';
 		const cacheKey = `similar:${movieId}:${k}:${include}:${JSON.stringify(opts.weights ?? {})}:${JSON.stringify(opts.filters ?? {})}`;
@@ -133,6 +183,7 @@ export class RecommendationsService {
 		movieIds: string[],
 		opts: MultiRecommendOptions = {},
 	): Promise<RecommendResponse> {
+		opts = this.withSettings(opts);
 		const k = opts.k ?? DEFAULT_RECOMMEND_OPTIONS.k;
 		const include = opts.include ?? 'owned';
 		const seeds = movieIds

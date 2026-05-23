@@ -30,6 +30,61 @@ export class SettingsController {
 		};
 	}
 
+	/**
+	 * Aggregate read for the Settings > Matching page. Admin-only
+	 * surface (the page already requires admin) so we can return the
+	 * tuning knobs in one shot rather than ten round-trips. Returns
+	 * defaults inline so the client doesn't need to duplicate them.
+	 */
+	@Get('matching')
+	@Roles('admin')
+	getMatching() {
+		return {
+			strategyWeights: this.settingsService.get<Record<string, number>>(
+				'recommendations.strategyWeights',
+				{
+					'content-vector': 0.3,
+					'external-cache': 0.3,
+					embedding: 0.25,
+					'llm-rerank': 0.15,
+				},
+			),
+			mmrLambda: this.settingsService.get<number>('recommendations.mmrLambda', 0.7),
+			qualityFloor: this.settingsService.get<number>(
+				'recommendations.qualityFloor',
+				0,
+			),
+			excludeSameGroup: this.settingsService.get<boolean>(
+				'recommendations.excludeSameGroup',
+				true,
+			),
+			excludeWatched: this.settingsService.get<boolean>(
+				'recommendations.excludeWatched',
+				false,
+			),
+			perDirectorCap: this.settingsService.get<number>(
+				'recommendations.perDirectorCap',
+				2,
+			),
+			multiInputPolicy: this.settingsService.get<'centroid' | 'union' | 'auto'>(
+				'recommendations.multiInputPolicy',
+				'auto',
+			),
+			autoEnrichExternalRecs: this.settingsService.get<boolean>(
+				'recommendations.autoEnrichExternalRecs',
+				true,
+			),
+			autoEnrichEmbeddings: this.settingsService.get<boolean>(
+				'recommendations.autoEnrichEmbeddings',
+				true,
+			),
+			autoEnrichLlmFeatures: this.settingsService.get<boolean>(
+				'recommendations.autoEnrichLlmFeatures',
+				true,
+			),
+		};
+	}
+
 	@Get('server-url')
 	@Roles('admin')
 	getServerUrl() {

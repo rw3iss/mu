@@ -5,6 +5,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { movies } from '../database/schema/index.js';
 import { EmbeddingsService } from '../embeddings/embeddings.service.js';
 import { EventsService } from '../events/events.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 interface MovieEventPayload {
 	movieId?: string;
@@ -25,6 +26,7 @@ export class EmbeddingListenerService implements OnModuleInit {
 		private readonly database: DatabaseService,
 		private readonly events: EventsService,
 		private readonly embeddings: EmbeddingsService,
+		private readonly settings: SettingsService,
 	) {}
 
 	onModuleInit(): void {
@@ -40,6 +42,13 @@ export class EmbeddingListenerService implements OnModuleInit {
 	}
 
 	private async handle(movieId: string): Promise<void> {
+		// Admin can disable embeddings auto-enrichment via Settings >
+		// Matching. Default true so existing behaviour is preserved.
+		const enabled = this.settings.get<boolean>(
+			'recommendations.autoEnrichEmbeddings',
+			true,
+		);
+		if (!enabled) return;
 		if (this.inflight.has(movieId)) return;
 		this.inflight.add(movieId);
 		try {
