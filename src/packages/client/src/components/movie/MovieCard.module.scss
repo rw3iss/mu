@@ -183,16 +183,17 @@
 }
 
 .progressBar {
-  width: 100%;
+  /* Slightly inset from the card edge + centered, so the rounded
+   * pill sits inside the card's curve instead of fighting it. */
+  width: 98%;
+  margin: 0 auto;
   height: 3px;
   background: var(--color-bg-surface);
-  /* Round only the bottom corners so the bar tucks under the
-   * poster (top stays flush) and visually follows the card's
-   * outer curve. Overflow:hidden clips the fill so its left
-   * edge inherits the same rounding without a separate radius
-   * on .progressFill. */
-  border-bottom-left-radius: var(--item-radius);
-  border-bottom-right-radius: var(--item-radius);
+  /* Round only the bottom corners — top stays flush against the
+   * poster. Overflow:hidden clips the fill so its left edge
+   * inherits the same radius. */
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
   overflow: hidden;
 }
 
