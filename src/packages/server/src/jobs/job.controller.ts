@@ -49,6 +49,40 @@ export class JobController {
 		return { movieIds: [...movieIds] };
 	}
 
+	/**
+	 * Per-movie transcode status. Used by `useTranscodeStatus` on the
+	 * client as a polling fallback when the WebSocket connection
+	 * drops mid-job. Returns the highest-progress running job for the
+	 * movie, plus a `running` flag so the client can self-correct
+	 * its `processingMovieIds` set when WS lifecycle events were missed.
+	 *
+	 * Cheap: scans the in-memory job table; no DB read.
+	 */
+	@Get('movies/:movieId/transcode-status')
+	getTranscodeStatus(@Param('movieId') movieId: string) {
+		const jobs = this.jobManager.findJobsByPayload(
+			'movieId',
+			movieId,
+			'pre-transcode',
+			['pending', 'running'],
+		);
+		const running = jobs.filter((j) => j.status === 'running');
+		const isRunning = running.length > 0;
+		const progress = isRunning
+			? Math.round(
+					Math.max(
+						...running.map((j) => (typeof j.progress === 'number' ? j.progress : 0)),
+					),
+				)
+			: undefined;
+		return {
+			movieId,
+			running: isRunning,
+			progress,
+			pending: jobs.some((j) => j.status === 'pending'),
+		};
+	}
+
 	@Get(':id')
 	@Roles('admin')
 	getJob(@Param('id') id: string) {

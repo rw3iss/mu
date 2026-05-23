@@ -496,6 +496,20 @@
   transition: width 0.5s ease;
 }
 
+/* Orange "live stream while transcoding" Play button — same primary
+ * shape as the normal Play button but tinted to warn that the cache
+ * isn't ready. Tooltip on hover explains the trade-off. */
+.playProcessing {
+  background: #ea580c !important;
+  border-color: #ea580c !important;
+  color: #ffffff !important;
+
+  &:hover {
+    background: #f97316 !important;
+    border-color: #f97316 !important;
+  }
+}
+
 .transcodeProgressText {
   font-size: var(--font-size-sm);
   white-space: nowrap;

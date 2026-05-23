@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState } from 'preact/hooks';
 import { MediaCard } from '@/components/common/MediaCard';
+import { useTranscodeStatus } from '@/hooks/useTranscodeStatus';
 import { useWatchPosition } from '@/hooks/useWatchPosition';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
-import { getMovieProgress, processingMovieIds } from '@/state/processing.state';
 import { getRatingColor } from '@/utils/rating-color';
 import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
 import styles from './MovieCard.module.scss';
@@ -53,8 +53,7 @@ export function MovieCard({
 	const ratingColor = getRatingColor(rating);
 	const transcodeNeeded = needsTranscode(movie);
 	const streamLabel = getStreamModeLabel(movie);
-	const isProcessing = processingMovieIds.value.has(movie.id);
-	const progress = isProcessing ? getMovieProgress(movie.id) : undefined;
+	const { isProcessing, progress } = useTranscodeStatus(movie.id);
 
 	// Read the signal-backed resume position so every card in every
 	// view stays in sync with playback ticks + cross-tab updates.
@@ -91,12 +90,23 @@ export function MovieCard({
 		</div>
 	) : null;
 
+	const playTooltip = isProcessing
+		? `Still transcoding${
+				progress != null ? ` — ${progress}% done` : ''
+			}. You can watch the live stream now, but waiting for the cache to finish gives the smoothest playback.`
+		: undefined;
+
 	const hoverOverlay = !selectionMode ? (
 		<>
 			<button
-				class={styles.playButton}
+				class={`${styles.playButton} ${isProcessing ? styles.playButtonProcessing : ''}`}
 				onClick={handlePlay}
-				aria-label={`Play ${movie.title}`}
+				aria-label={
+					isProcessing
+						? `Play ${movie.title} (still transcoding)`
+						: `Play ${movie.title}`
+				}
+				title={playTooltip}
 			>
 				Play
 			</button>

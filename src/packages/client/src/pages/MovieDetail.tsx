@@ -595,8 +595,18 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								!isRemote ? (
 								<div class={styles.processingStatus}>
 									{movie.status === 'processing_playable' && (
-										<Button variant="primary" size="lg" onClick={handlePlay}>
-											<Icon name="play" size={14} /> Play
+										<Button
+											variant="primary"
+											size="lg"
+											onClick={handlePlay}
+											class={styles.playProcessing}
+											title={
+												transcodeProgress != null
+													? `Still transcoding — ${Math.round(transcodeProgress)}% done. You can watch the live stream now, but waiting for the cache to finish gives the smoothest playback.`
+													: 'Still transcoding. You can watch the live stream now, but waiting gives the smoothest playback.'
+											}
+										>
+											<Icon name="play" size={14} /> Play (live)
 										</Button>
 									)}
 									<div class={styles.transcodeInfo}>
