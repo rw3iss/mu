@@ -6,10 +6,15 @@ import { RatingsSyncService } from './ratings-sync.service.js';
 
 /** Run roughly daily (24h). The IMDB datasets refresh once per day,
  *  so anything tighter than that wastes bandwidth without adding
- *  freshness. Anchored to whatever hour the server starts; users who
- *  want a specific clock time can set it via settings down the line. */
+ *  freshness. */
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const JOB_NAME = 'imdb-datasets:ratings-sync';
+/** Hour-of-day (server local time) for the first sync of each day.
+ *  3 AM is the "no one is browsing" window — keeps the 5–10 min
+ *  write-heavy phase off the user-facing critical path so SQLite
+ *  WAL contention doesn't slow library reads. Overridable via
+ *  `imdb.datasets.syncHour` setting. */
+const DEFAULT_SYNC_HOUR = 3;
 
 export interface SyncStatus {
 	id: string;
@@ -42,6 +47,8 @@ export class ImdbDatasetsService implements OnModuleInit {
 	private readonly registry: DatasetSync[];
 	private readonly running = new Set<string>();
 	private readonly lastDuration = new Map<string, number>();
+	/** Pending first-run anchor so reconciles don't stack timers. */
+	private firstRunTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(
 		private readonly settings: SettingsService,
@@ -79,22 +86,54 @@ export class ImdbDatasetsService implements OnModuleInit {
 	 */
 	reconcileSchedule(): void {
 		const enabled = this.settings.get<boolean>('imdb.datasets.enabled', false);
+		if (this.firstRunTimer) {
+			clearTimeout(this.firstRunTimer);
+			this.firstRunTimer = null;
+		}
 		if (!enabled) {
 			this.jobs.unschedule(JOB_NAME);
 			return;
 		}
-		this.jobs.schedule({
-			name: JOB_NAME,
-			intervalMs: DAILY_INTERVAL_MS,
-			runImmediately: false,
-			job: {
-				type: 'imdb-datasets-sync',
-				label: 'IMDB datasets — daily sync',
-				payload: {},
-				priority: 90,
-			},
-		});
-		this.logger.log('Scheduled daily IMDB datasets sync');
+		// Anchor the first run to the configured off-peak hour so users
+		// don't see WAL contention during normal browsing. Once the
+		// first run fires, the 24h SimpleIntervalJob keeps it daily at
+		// the same wall-clock time without further babysitting.
+		const targetHour = this.settings.get<number>(
+			'imdb.datasets.syncHour',
+			DEFAULT_SYNC_HOUR,
+		);
+		const delay = this.msUntilHour(targetHour);
+		this.jobs.unschedule(JOB_NAME); // clear any previous schedule
+		this.firstRunTimer = setTimeout(() => {
+			this.firstRunTimer = null;
+			this.jobs.schedule({
+				name: JOB_NAME,
+				intervalMs: DAILY_INTERVAL_MS,
+				runImmediately: true, // first tick is NOW (we're at target hour)
+				job: {
+					type: 'imdb-datasets-sync',
+					label: 'IMDB datasets — daily sync',
+					payload: {},
+					priority: 90,
+				},
+			});
+			this.logger.log('Daily IMDB datasets sync now active');
+		}, delay);
+		const mins = Math.round(delay / 60000);
+		this.logger.log(
+			`First IMDB datasets sync scheduled for hour ${targetHour} (in ~${mins} min)`,
+		);
+	}
+
+	/** Milliseconds until the next instance of `hour` (0–23) in local time. */
+	private msUntilHour(hour: number): number {
+		const now = new Date();
+		const target = new Date(now);
+		target.setHours(hour, 0, 0, 0);
+		if (target.getTime() <= now.getTime()) {
+			target.setDate(target.getDate() + 1);
+		}
+		return target.getTime() - now.getTime();
 	}
 
 	/**
