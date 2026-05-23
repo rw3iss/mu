@@ -767,13 +767,17 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		const movieDurationSeconds = durationRow[0]?.d ?? null;
 
 		// "Near-end" tolerance: a movie counts as fully watched once the
-		// playhead is within COMPLETED_TAIL_SECONDS of the runtime (or
-		// past 98% if the runtime is unknown — credits typically run
-		// the last ~2%).
-		const COMPLETED_TAIL_SECONDS = 60;
+		// playhead is within `completedTailSeconds` of the runtime. The
+		// default of 300s (5 min) covers most credit sequences — users
+		// who stop during credits naturally have their history cleared.
+		// Configurable in Settings → Playback → Watch Tracking.
+		const completedTailSeconds = this.settings.get<number>(
+			'completedTailSeconds',
+			300,
+		);
 		const completedNow =
 			movieDurationSeconds != null && movieDurationSeconds > 0
-				? positionSeconds >= movieDurationSeconds - COMPLETED_TAIL_SECONDS
+				? positionSeconds >= movieDurationSeconds - completedTailSeconds
 				: false;
 
 		// `watchedThresholdSeconds` is the MINIMUM cumulative watch time

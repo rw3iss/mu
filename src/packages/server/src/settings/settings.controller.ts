@@ -11,6 +11,25 @@ export class SettingsController {
 		private readonly configService: ConfigService,
 	) {}
 
+	/**
+	 * Subset of settings the regular SPA needs to render correctly
+	 * (watch-tracking thresholds gate the resume UI). Read-only,
+	 * non-admin — admins still write via PUT /:key.
+	 */
+	@Get('playback')
+	getPlayback() {
+		return {
+			watchedThresholdSeconds: this.settingsService.get<number>(
+				'watchedThresholdSeconds',
+				30,
+			),
+			completedTailSeconds: this.settingsService.get<number>(
+				'completedTailSeconds',
+				300,
+			),
+		};
+	}
+
 	@Get('server-url')
 	@Roles('admin')
 	getServerUrl() {
