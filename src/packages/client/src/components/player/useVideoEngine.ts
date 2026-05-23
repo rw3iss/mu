@@ -16,6 +16,10 @@ import {
 	volume,
 } from '@/state/player.state';
 import { shareToken } from '@/state/share.state';
+import {
+	clearWatchPosition,
+	setLocalPosition,
+} from '@/state/watchPositions.state';
 
 const BUFFER_CONFIGS: Record<
 	string,
@@ -230,14 +234,38 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			}
 		};
 
-		// Progress reporting every 3s
+		// Progress reporting every 3s: server (for cross-device resume),
+		// localStorage (offline fallback), and the global watchPositions
+		// signal (so movie cards in other views reflect playback live).
 		progressIntervalRef.current = setInterval(() => {
 			if (isPlaying.value && videoRef.current) {
 				const t = videoRef.current.currentTime;
+				const duration = videoRef.current.duration;
 				updateProgress(t);
 				savePositionLocally(t);
+				const movieId = globalMovieId.value;
+				if (movieId) {
+					setLocalPosition(
+						movieId,
+						t,
+						Number.isFinite(duration) ? duration : null,
+					);
+				}
 			}
 		}, 3000);
+
+		// End-of-stream lifecycle: when the video ends naturally, clear
+		// the resume position on the server and locally so the next visit
+		// starts fresh — per the watch-history contract.
+		const onEnded = () => {
+			const movieId = globalMovieId.value;
+			if (!movieId) return;
+			try {
+				localStorage.removeItem(`mu_position_${movieId}`);
+			} catch {}
+			void clearWatchPosition(movieId);
+		};
+		video.addEventListener('ended', onEnded);
 
 		// Send final position on page unload / tab hide so resume works after refresh.
 		// Uses latestTimeRef (updated every frame) since the video element may already
@@ -285,6 +313,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			video.removeEventListener('pause', onPause);
 			video.removeEventListener('waiting', onWaiting);
 			video.removeEventListener('canplay', onCanPlay);
+			video.removeEventListener('ended', onEnded);
 			videoRef.current = null;
 		};
 	}, [enabled]);

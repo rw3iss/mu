@@ -1,11 +1,11 @@
 import { useCallback, useRef, useState } from 'preact/hooks';
 import { MediaCard } from '@/components/common/MediaCard';
+import { useWatchPosition } from '@/hooks/useWatchPosition';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { getMovieProgress, processingMovieIds } from '@/state/processing.state';
 import { getRatingColor } from '@/utils/rating-color';
 import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
-import { hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieCard.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
 import { RatingBadge } from './RatingBadge';
@@ -56,6 +56,17 @@ export function MovieCard({
 	const isProcessing = processingMovieIds.value.has(movie.id);
 	const progress = isProcessing ? getMovieProgress(movie.id) : undefined;
 
+	// Read the signal-backed resume position so every card in every
+	// view stays in sync with playback ticks + cross-tab updates.
+	// Falls back to the movie object's own fields (set by APIs that
+	// already join watch history, e.g. /history, /history/continue)
+	// when the signal cache hasn't been hydrated yet.
+	const watch = useWatchPosition(movie.id, {
+		watchPosition: movie.watchPosition,
+		durationSeconds: movie.durationSeconds,
+	});
+	const showResume = !!watch?.hasProgress;
+
 	// ── Slot contents ──────────────────────────────────────
 
 	const topRight = (
@@ -89,7 +100,7 @@ export function MovieCard({
 			>
 				Play
 			</button>
-			{hasWatchProgress(movie) && (
+			{showResume && (
 				<button
 					class={styles.resumeButton}
 					onClick={handleResume}

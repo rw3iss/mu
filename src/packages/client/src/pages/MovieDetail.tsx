@@ -29,6 +29,7 @@ import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { fetchProcessingMovies, processingMovieIds } from '@/state/processing.state';
+import { useWatchPosition } from '@/hooks/useWatchPosition';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieDetail.module.scss';
 
@@ -53,6 +54,16 @@ export function MovieDetail({ id }: MovieDetailProps) {
 				}
 			: null,
 	);
+
+	// Subscribe to the live watch-position signal so the Resume
+	// button + progress bar update in real time as playback advances
+	// in the global player (and across tabs / devices).
+	const watch = useWatchPosition(movie?.id ?? null, {
+		watchPosition: movie?.watchPosition,
+		durationSeconds: movie?.durationSeconds,
+	});
+	const showResume = !!watch?.hasProgress;
+	const resumePercent = watch?.percent ?? (movie ? getWatchPercent(movie) : 0);
 
 	// Transcode progress tracking
 	const [transcodeProgress, setTranscodeProgress] = useState<number | null>(null);
@@ -618,7 +629,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 										<Icon name="x" size={14} /> Cancel
 									</Button>
 								</div>
-							) : hasWatchProgress(movie) ? (
+							) : showResume ? (
 								<div class={styles.playGroup}>
 									<div class={styles.hybridBtn}>
 										<button
@@ -635,7 +646,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									<div class={styles.playProgressBar}>
 										<div
 											class={styles.playProgressFill}
-											style={{ width: `${getWatchPercent(movie)}%` }}
+											style={{ width: `${resumePercent}%` }}
 										/>
 									</div>
 								</div>

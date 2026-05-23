@@ -29,6 +29,7 @@ import {
 } from '@/state/player.state';
 import { shareMode } from '@/state/share.state';
 import { sharedVideoEngine } from '@/state/videoEngineRef';
+import { clearWatchPosition } from '@/state/watchPositions.state';
 
 // ============================================
 // Types
@@ -167,6 +168,14 @@ export async function playMovie(
 
 	if (opts?.fromBeginning) {
 		forceStartPosition.value = 0;
+		// "Start over" semantics: drop any previous resume position so
+		// the next 3s tick doesn't immediately re-create the row near
+		// the old position. Also clears the cached local copy so movie
+		// cards lose their resume bar instantly.
+		try {
+			localStorage.removeItem(`mu_position_${movieId}`);
+		} catch {}
+		void clearWatchPosition(movieId);
 	}
 
 	// Determine the target mode: keep current mode if full/split,
