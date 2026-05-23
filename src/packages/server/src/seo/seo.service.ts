@@ -9,6 +9,7 @@ import {
 	movies,
 	people,
 } from '../database/schema/index.js';
+import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { injectSeoHead, renderSeoHead } from './seo-injector.js';
 
 const DEFAULT_META: SeoMeta = {
@@ -43,6 +44,7 @@ export class SeoService {
 		private readonly database: DatabaseService,
 		private readonly config: ConfigService,
 		private readonly shareTokenVerifier: ShareTokenVerifier,
+		private readonly tmdb: TmdbProvider,
 	) {
 		this.publicBaseUrl = this.resolvePublicBaseUrl();
 	}
@@ -112,16 +114,14 @@ export class SeoService {
 	private async resolveMovie(rawKey: string, baseUrl: string): Promise<SeoMeta | null> {
 		const key = decodeURIComponent(rawKey);
 		// Look up by UUID first, then by tmdbId for `tmdb:N` style keys.
-		// Read-only — never trigger TMDB fetch from a meta resolver
-		// (that's a side effect the request should opt into via the
-		// actual movies controller). If the row doesn't exist, fall
-		// back to default meta.
 		let row: any = null;
+		let tmdbIdForFallback: number | null = null;
 		if (!key.includes(':')) {
 			row = this.database.db.select().from(movies).where(eq(movies.id, key)).get();
 		} else if (key.startsWith('tmdb:')) {
 			const tmdbId = Number.parseInt(key.slice(5), 10);
 			if (Number.isFinite(tmdbId)) {
+				tmdbIdForFallback = tmdbId;
 				row = this.database.db
 					.select()
 					.from(movies)
@@ -129,28 +129,61 @@ export class SeoService {
 					.get();
 			}
 		}
-		if (!row) return null;
 
-		const meta = this.database.db
-			.select()
-			.from(movieMetadata)
-			.where(eq(movieMetadata.movieId, row.id))
-			.get();
+		if (row) {
+			const meta = this.database.db
+				.select()
+				.from(movieMetadata)
+				.where(eq(movieMetadata.movieId, row.id))
+				.get();
 
-		const title = row.year ? `${row.title} (${row.year})` : row.title;
-		const description =
-			row.overview ??
-			(meta?.imdbRating || meta?.tmdbRating
-				? `Movie · ${title}`
-				: undefined);
-		const image = this.absUrl(row.posterUrl ?? row.backdropUrl ?? null, baseUrl);
+			const title = row.year ? `${row.title} (${row.year})` : row.title;
+			const description =
+				row.overview ??
+				(meta?.imdbRating || meta?.tmdbRating ? `Movie · ${title}` : undefined);
+			const image = this.absUrl(row.posterUrl ?? row.backdropUrl ?? null, baseUrl);
 
-		return {
-			title,
-			description: description ?? undefined,
-			image: image ?? undefined,
-			type: 'video.movie',
-		};
+			return {
+				title,
+				description: description ?? undefined,
+				image: image ?? undefined,
+				type: 'video.movie',
+			};
+		}
+
+		// No local row, but the URL referenced a TMDB id — fetch directly
+		// from TMDB so the share preview still works for never-visited
+		// movies. Read-only (no DB write); the TmdbProvider's own LRU
+		// cache absorbs repeat hits. When a real user later navigates to
+		// the page, MoviesService.findOrFetchByKey will create the stub
+		// row and subsequent resolves go through the fast DB path.
+		if (tmdbIdForFallback != null) {
+			try {
+				const details = await this.tmdb.getMovieDetails(tmdbIdForFallback);
+				if (details) {
+					const year = details.release_date
+						? Number.parseInt(details.release_date.slice(0, 4), 10)
+						: null;
+					const title = year && Number.isFinite(year)
+						? `${details.title} (${year})`
+						: details.title;
+					return {
+						title,
+						description: details.overview ?? undefined,
+						image: details.poster_path
+							? `https://image.tmdb.org/t/p/w500${details.poster_path}`
+							: undefined,
+						type: 'video.movie',
+					};
+				}
+			} catch (err: any) {
+				this.logger.debug?.(
+					`SEO TMDB fallback failed for tmdb:${tmdbIdForFallback}: ${err?.message ?? err}`,
+				);
+			}
+		}
+
+		return null;
 	}
 
 	private async resolvePerson(key: string, baseUrl: string): Promise<SeoMeta | null> {
