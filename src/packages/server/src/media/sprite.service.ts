@@ -1,11 +1,20 @@
 import { execSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles } from '../database/schema/index.js';
+
+/**
+ * Project root — same five-level walk as DatabaseService. Anchors
+ * the sprite directory so it resolves the same way no matter where
+ * the server was started from. Without this, `./data/sprites` lands
+ * under `<cwd>/data/sprites` — i.e. under `<server-package>/` in
+ * production — instead of next to the other data files.
+ */
+const PROJECT_ROOT = resolve(import.meta.dirname, '..', '..', '..', '..', '..');
 
 const COLUMNS = 10;
 const ROWS = 10;
@@ -65,10 +74,39 @@ export class SpriteService {
 		private readonly database: DatabaseService,
 		private readonly config: ConfigService,
 	) {
-		this.spriteDir = resolve(this.config.get<string>('media.spriteDir', './data/sprites'));
+		this.spriteDir = this.resolveSpriteDir();
 		if (!existsSync(this.spriteDir)) {
 			mkdirSync(this.spriteDir, { recursive: true });
 		}
+		this.logger.log(`Sprite directory: ${this.spriteDir}`);
+	}
+
+	/**
+	 * Resolution order (matches DatabaseService for consistency):
+	 *   1. `media.spriteDir` config / MU_MEDIA_SPRITEDIR env — absolute
+	 *      wins outright; relative anchors to PROJECT_ROOT.
+	 *   2. `<dataDir>/sprites` — uses the global `dataDir` setting so
+	 *      sprites land next to the DB / cache / thumbnails the user
+	 *      already pointed `dataDir` at.
+	 *   3. `<PROJECT_ROOT>/data/sprites` — final fallback for dev.
+	 *
+	 * Anchoring to PROJECT_ROOT (not cwd) means starting via NSSM,
+	 * pnpm dev, or a one-off `node dist/main.js` all resolve to the
+	 * same absolute path — no more "where did my sprites go?" after
+	 * a process-manager change.
+	 */
+	private resolveSpriteDir(): string {
+		const explicit = this.config.get<string>('media.spriteDir', '');
+		if (explicit) {
+			return isAbsolute(explicit) ? explicit : resolve(PROJECT_ROOT, explicit);
+		}
+		const dataDir =
+			this.config.get<string>('dataDir') || this.config.get<string>('datadir');
+		if (dataDir) {
+			const root = isAbsolute(dataDir) ? dataDir : resolve(PROJECT_ROOT, dataDir);
+			return join(root, 'sprites');
+		}
+		return resolve(PROJECT_ROOT, 'data', 'sprites');
 	}
 
 	/** Directory for a movie's sheets at a specific size. When size is
