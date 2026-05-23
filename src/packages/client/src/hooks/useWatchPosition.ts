@@ -1,5 +1,4 @@
-import { useComputed } from '@preact/signals';
-import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
+import { getWatchPercent } from '@/utils/watch-progress';
 import { playbackSettings } from '@/state/playbackSettings.state';
 import {
 	type WatchPosition,
@@ -20,62 +19,62 @@ export interface WatchPositionView {
 const FULLY_WATCHED_PERCENT = 95;
 
 /**
- * Convenience hook for movie cards / detail pages: returns the
- * currently-cached resume position for `movieId`, or `null` if the
- * user hasn't started this movie. Reactive — the consumer re-renders
- * automatically when the underlying signal changes (e.g. player
- * progress tick, server hydration, "Start over" clear).
+ * Reactive lookup of the cached resume position for `movieId`.
  *
- * The caller does NOT need to fetch anything itself: the global
- * `watchPositions` cache is hydrated once on app load (see
- * `fetchWatchPositions`) and kept in sync by the player.
+ * Reads the global signals directly during render so Preact's signal
+ * tracking auto-subscribes the caller — every component using this
+ * hook re-renders when:
+ *   - the player tick updates `watchPositions`,
+ *   - the `/history/positions` hydration finishes,
+ *   - the admin changes the Completed Tail setting,
+ *   - `clearWatchPosition` runs (end-of-stream, "Start over").
  *
- * Falls back to the per-movie `watchPosition` / `durationSeconds`
- * fields when present on a movie object — useful for code paths
- * that received their data before the cache was hydrated (rare).
+ * Returns `null` when:
+ *   - no `movieId`,
+ *   - no cached position AND no fallback position,
+ *   - the position is inside the configured completed-tail window
+ *     (the movie is effectively "watched in full"),
+ *   - the position is at or above 95% (handles short runtimes).
+ *
+ * Falls back to the movie object's `watchPosition` / `durationSeconds`
+ * fields when the signal cache hasn't hydrated yet — useful in the
+ * brief window after first paint.
  */
 export function useWatchPosition(
 	movieId: string | null | undefined,
 	fallback?: { watchPosition?: number; durationSeconds?: number },
 ): WatchPositionView | null {
-	const computed = useComputed(() => {
-		if (!movieId) return null;
-		const cached = watchPositions.value[movieId];
-		const position = cached?.positionSeconds ?? fallback?.watchPosition ?? 0;
-		const duration =
-			cached?.durationSeconds ?? fallback?.durationSeconds ?? 0;
-		if (position <= 0) return null;
-		const movieLike = {
-			watchPosition: position,
-			durationSeconds: duration,
-		};
-		const percent = getWatchPercent(movieLike);
+	// Subscribe by reading .value during render — Preact's signal
+	// runtime tracks both reads against the calling component.
+	const positions = watchPositions.value;
+	const tail = playbackSettings.value.completedTailSeconds;
 
-		// UI-level "watched in full" gate. Mirrors the server's tail
-		// rule so the resume bar disappears the moment a position
-		// crosses the threshold, even before the next tick clears the
-		// row. Two predicates so short runtimes (where 5 min would be
-		// half the movie) still get a sane high-percent check.
-		const tail = playbackSettings.value.completedTailSeconds;
-		const insideTail =
-			duration > 0 && position >= duration - tail;
-		const aboveFullyWatchedPct = percent >= FULLY_WATCHED_PERCENT;
-		const fullyWatched = insideTail || aboveFullyWatchedPct;
+	if (!movieId) return null;
+	const cached = positions[movieId];
+	const position = cached?.positionSeconds ?? fallback?.watchPosition ?? 0;
+	const duration = cached?.durationSeconds ?? fallback?.durationSeconds ?? 0;
+	if (position <= 0) return null;
 
-		const progress = !fullyWatched && hasWatchProgress(movieLike);
-		return {
-			positionSeconds: position,
-			durationSeconds: duration ?? 0,
-			percent,
-			hasProgress: progress,
-			raw:
-				cached ??
-				({
-					positionSeconds: position,
-					durationSeconds: duration ?? null,
-					watchedAt: '',
-				} as WatchPosition),
-		};
-	});
-	return computed.value;
+	const movieLike = { watchPosition: position, durationSeconds: duration };
+	const percent = getWatchPercent(movieLike);
+
+	const insideTail = duration > 0 && position >= duration - tail;
+	const aboveFullyWatchedPct = percent >= FULLY_WATCHED_PERCENT;
+	const fullyWatched = insideTail || aboveFullyWatchedPct;
+
+	const hasProgress = !fullyWatched && percent > 0 && percent < 100;
+
+	return {
+		positionSeconds: position,
+		durationSeconds: duration ?? 0,
+		percent,
+		hasProgress,
+		raw:
+			cached ??
+			({
+				positionSeconds: position,
+				durationSeconds: duration ?? null,
+				watchedAt: '',
+			} as WatchPosition),
+	};
 }
