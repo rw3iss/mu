@@ -38,6 +38,7 @@ import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { wsService } from '@/services/websocket.service';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
+import { fetchWatchPositions } from '@/state/watchPositions.state';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
 import { initProcessingState } from '@/state/processing.state';
 import { fetchThemes } from '@/state/themes.state';
@@ -126,8 +127,18 @@ export function App() {
 		document.addEventListener('touchstart', unlockAudio);
 		document.addEventListener('keydown', unlockAudio);
 
+		// Refresh watch positions when the tab regains focus so a movie
+		// watched on another device / tab shows the right resume bar.
+		const onFocus = () => {
+			if (isAuthenticated.value || localBypass.value) {
+				void fetchWatchPositions(true);
+			}
+		};
+		window.addEventListener('focus', onFocus);
+
 		return () => {
 			wsService.disconnect();
+			window.removeEventListener('focus', onFocus);
 			document.removeEventListener('click', unlockAudio);
 			document.removeEventListener('touchstart', unlockAudio);
 			document.removeEventListener('keydown', unlockAudio);
@@ -146,6 +157,7 @@ export function App() {
 		if (!isLoading.value && (isAuthenticated.value || localBypass.value)) {
 			pluginClientManager.initialize();
 			void ensureFavoritesLoaded();
+			void fetchWatchPositions();
 		}
 	}, [isLoading.value, isAuthenticated.value]);
 
