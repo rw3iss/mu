@@ -63,28 +63,33 @@ export class SeoService {
 	 * @param fastifyInstance Needed to verify share-tokens; pass
 	 *   `request.server` from the Fastify hook.
 	 */
-	async resolveMeta(pathname: string, fastifyInstance: any): Promise<SeoMeta> {
+	async resolveMeta(
+		pathname: string,
+		fastifyInstance: any,
+		requestOrigin?: string,
+	): Promise<SeoMeta> {
 		const path = pathname.split('?')[0]?.replace(/\/+$/, '') || '/';
+		const baseUrl = requestOrigin || this.publicBaseUrl;
 
 		// /movie/:key  (UUID or namespaced like tmdb:603)
 		const movieMatch = path.match(/^\/movie\/([^/]+)/);
 		if (movieMatch) {
-			const m = await this.resolveMovie(movieMatch[1]!);
-			if (m) return this.withCanonical(m, path);
+			const m = await this.resolveMovie(movieMatch[1]!, baseUrl);
+			if (m) return this.withCanonical(m, path, baseUrl);
 		}
 
 		// /person/:key
 		const personMatch = path.match(/^\/person\/([^/]+)/);
 		if (personMatch) {
-			const p = await this.resolvePerson(decodeURIComponent(personMatch[1]!));
-			if (p) return this.withCanonical(p, path);
+			const p = await this.resolvePerson(decodeURIComponent(personMatch[1]!), baseUrl);
+			if (p) return this.withCanonical(p, path, baseUrl);
 		}
 
 		// /watch/:token
 		const watchMatch = path.match(/^\/watch\/([^/]+)/);
 		if (watchMatch) {
-			const w = await this.resolveWatch(watchMatch[1]!, fastifyInstance);
-			if (w) return this.withCanonical(w, path);
+			const w = await this.resolveWatch(watchMatch[1]!, fastifyInstance, baseUrl);
+			if (w) return this.withCanonical(w, path, baseUrl);
 		}
 
 		// Static SPA routes — built-ins so the tab title is right.
@@ -93,17 +98,18 @@ export class SeoService {
 			return this.withCanonical(
 				{ ...DEFAULT_META, title: staticTitle },
 				path,
+				baseUrl,
 			);
 		}
 
-		return this.withCanonical(DEFAULT_META, path);
+		return this.withCanonical(DEFAULT_META, path, baseUrl);
 	}
 
-	private withCanonical(meta: SeoMeta, path: string): SeoMeta {
-		return { ...meta, canonical: meta.canonical ?? `${this.publicBaseUrl}${path}` };
+	private withCanonical(meta: SeoMeta, path: string, baseUrl: string): SeoMeta {
+		return { ...meta, canonical: meta.canonical ?? `${baseUrl}${path}` };
 	}
 
-	private async resolveMovie(rawKey: string): Promise<SeoMeta | null> {
+	private async resolveMovie(rawKey: string, baseUrl: string): Promise<SeoMeta | null> {
 		const key = decodeURIComponent(rawKey);
 		// Look up by UUID first, then by tmdbId for `tmdb:N` style keys.
 		// Read-only — never trigger TMDB fetch from a meta resolver
@@ -137,7 +143,7 @@ export class SeoService {
 			(meta?.imdbRating || meta?.tmdbRating
 				? `Movie · ${title}`
 				: undefined);
-		const image = this.absUrl(row.posterUrl ?? row.backdropUrl ?? null);
+		const image = this.absUrl(row.posterUrl ?? row.backdropUrl ?? null, baseUrl);
 
 		return {
 			title,
@@ -147,7 +153,7 @@ export class SeoService {
 		};
 	}
 
-	private async resolvePerson(key: string): Promise<SeoMeta | null> {
+	private async resolvePerson(key: string, baseUrl: string): Promise<SeoMeta | null> {
 		const row = this.database.db
 			.select()
 			.from(people)
@@ -160,7 +166,7 @@ export class SeoService {
 			: row.knownForDepartment
 				? `${row.knownForDepartment}${row.placeOfBirth ? ` · ${row.placeOfBirth}` : ''}`
 				: undefined;
-		const image = this.absUrl(row.profileUrl);
+		const image = this.absUrl(row.profileUrl, baseUrl);
 
 		return {
 			title: row.name,
@@ -173,6 +179,7 @@ export class SeoService {
 	private async resolveWatch(
 		rawToken: string,
 		fastifyInstance: any,
+		baseUrl: string,
 	): Promise<SeoMeta | null> {
 		try {
 			const token = decodeURIComponent(rawToken);
@@ -191,7 +198,7 @@ export class SeoService {
 				title,
 				description:
 					movie.overview ?? 'A movie shared from a private Mu library.',
-				image: this.absUrl(movie.posterUrl ?? movie.backdropUrl ?? null) ?? undefined,
+				image: this.absUrl(movie.posterUrl ?? movie.backdropUrl ?? null, baseUrl) ?? undefined,
 				type: 'video.other',
 				// Public shared content can be indexed by social-card bots
 				// but we still don't want it in Google. `noindex,follow`
@@ -206,34 +213,41 @@ export class SeoService {
 
 	/**
 	 * Make a poster/profile URL absolute. Relative `/api/v1/media/...`
-	 * paths get the public origin prepended; absolute URLs (TMDB CDN)
+	 * paths get the request's origin prepended; absolute URLs (TMDB CDN)
 	 * pass through unchanged.
 	 */
-	private absUrl(u: string | null | undefined): string | null {
+	private absUrl(u: string | null | undefined, baseUrl: string): string | null {
 		if (!u) return null;
 		if (/^https?:\/\//i.test(u)) return u;
-		if (u.startsWith('/')) return `${this.publicBaseUrl}${u}`;
-		return `${this.publicBaseUrl}/${u}`;
+		if (u.startsWith('/')) return `${baseUrl}${u}`;
+		return `${baseUrl}/${u}`;
 	}
 
 	/**
-	 * Resolve + render + inject. Cached by full URL for 60s so a
-	 * crawler hammering the same path doesn't hit the DB repeatedly.
+	 * Resolve + render + inject. Cached by (origin + path) for 60s so
+	 * a crawler hammering the same URL doesn't re-query the DB.
+	 *
+	 * @param requestOrigin e.g. `https://mu.example.com:4000` —
+	 *   derived from the request's Host header so og:url + canonical
+	 *   reflect the actual public URL. Falls back to the configured
+	 *   `server.publicUrl` when not supplied.
 	 */
 	async renderForUrl(
 		pathname: string,
 		rawHtml: string,
 		fastifyInstance: any,
+		requestOrigin?: string,
 	): Promise<string> {
 		const now = Date.now();
-		const cached = this.htmlCache.get(pathname);
+		const cacheKey = `${requestOrigin ?? ''}|${pathname}`;
+		const cached = this.htmlCache.get(cacheKey);
 		if (cached && cached.expiresAt > now) return cached.html;
 
 		try {
-			const meta = await this.resolveMeta(pathname, fastifyInstance);
+			const meta = await this.resolveMeta(pathname, fastifyInstance, requestOrigin);
 			const head = renderSeoHead(meta);
 			const html = injectSeoHead(rawHtml, head);
-			this.htmlCache.set(pathname, { html, expiresAt: now + HTML_CACHE_TTL_MS });
+			this.htmlCache.set(cacheKey, { html, expiresAt: now + HTML_CACHE_TTL_MS });
 			// Cap cache size — simplest possible LRU: when over the
 			// limit, drop the oldest 100 entries by insertion order.
 			if (this.htmlCache.size > 500) {

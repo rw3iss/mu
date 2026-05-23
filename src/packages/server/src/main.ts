@@ -168,6 +168,10 @@ async function bootstrap() {
 			root: clientDist,
 			prefix: '/',
 			decorateReply: false,
+			// Don't auto-serve index.html on directory hits — let the
+			// SEO-aware SPA fallback below handle '/' so the right
+			// per-route meta tags are injected.
+			index: false,
 		});
 
 		// SPA fallback: intercept 404 responses for non-API routes and serve index.html.
@@ -186,7 +190,24 @@ async function bootstrap() {
 				try {
 					const rawHtml = readFileSync(indexHtmlPath, 'utf-8');
 					const url = request.url.split('?')[0] ?? '/';
-					const html = await seoService.renderForUrl(url, rawHtml, request.server);
+					// Reconstruct the public origin from the request so
+					// og:url + canonical reflect the actual host the
+					// crawler hit (not localhost). Honor reverse-proxy
+					// forwarded headers when present.
+					const forwardedProto =
+						(request.headers['x-forwarded-proto'] as string) ?? null;
+					const forwardedHost =
+						(request.headers['x-forwarded-host'] as string) ??
+						(request.headers.host as string) ??
+						null;
+					const proto = forwardedProto ?? (request.protocol as string) ?? 'http';
+					const origin = forwardedHost ? `${proto}://${forwardedHost}` : undefined;
+					const html = await seoService.renderForUrl(
+						url,
+						rawHtml,
+						request.server,
+						origin,
+					);
 					reply.status(200).header('Content-Type', 'text/html; charset=utf-8');
 					return html;
 				} catch {
