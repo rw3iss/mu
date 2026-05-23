@@ -29,6 +29,10 @@ export interface ScoredMovie {
 	ratingSource?: 'imdb' | 'tmdb' | null;
 	/** Vote count from whichever rating source was used. */
 	votes?: number | null;
+	/** Per-source ratings, so the card can render both side-by-side. */
+	tmdbRating?: number | null;
+	tmdbVotes?: number | null;
+	imdbRating?: number | null;
 }
 
 export interface DiscoverResponse {

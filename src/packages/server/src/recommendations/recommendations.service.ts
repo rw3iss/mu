@@ -723,6 +723,9 @@ export class RecommendationsService {
 				// Votes only available from TMDB right now; OMDB IMDB
 				// vote counts aren't surfaced on MovieWithMetadata.
 				votes: m?.tmdbVotes ?? null,
+				tmdbRating: m?.tmdbRating ?? null,
+				tmdbVotes: m?.tmdbVotes ?? null,
+				imdbRating: m?.imdbRating ?? null,
 			};
 		});
 

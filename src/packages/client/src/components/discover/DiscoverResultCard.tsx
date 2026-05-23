@@ -62,10 +62,14 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 
 	const scorePct = Math.round(movie.score * 100);
 	const reason = movie.explanation[0];
-	const ratingLabel =
-		movie.rating != null && movie.rating > 0
-			? `${movie.ratingSource === 'imdb' ? 'IMDB' : 'TMDB'} ${movie.rating.toFixed(1)}`
-			: null;
+	const tmdb =
+		movie.tmdbRating != null && movie.tmdbRating > 0 ? movie.tmdbRating : null;
+	const imdb =
+		movie.imdbRating != null && movie.imdbRating > 0 ? movie.imdbRating : null;
+	// Top-right poster badge highlights the *highest* available rating
+	// so the card has a single eye-catching number; the subtitle row
+	// shows the full breakdown.
+	const topRating = tmdb != null || imdb != null ? Math.max(tmdb ?? 0, imdb ?? 0) : null;
 	const votesLabel = movie.votes != null && movie.votes > 0 ? formatVotes(movie.votes) : null;
 
 	const topLeft = (
@@ -77,12 +81,18 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 	);
 
 	const topRight =
-		ratingLabel && movie.rating != null ? (
+		topRating != null ? (
 			<span
 				class={styles.ratingBadge}
-				title={`${ratingLabel}${votesLabel ? ` · ${votesLabel} votes` : ''}`}
+				title={[
+					imdb != null ? `IMDB ${imdb.toFixed(1)}` : null,
+					tmdb != null ? `TMDB ${tmdb.toFixed(1)}` : null,
+					votesLabel ? `${votesLabel} votes` : null,
+				]
+					.filter(Boolean)
+					.join(' · ')}
 			>
-				★ {movie.rating.toFixed(1)}
+				★ {topRating.toFixed(1)}
 			</span>
 		) : null;
 
@@ -107,7 +117,16 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 	const subtitle = (
 		<>
 			<span>{movie.year ?? '—'}</span>
-			{ratingLabel && <span class={styles.metaPill}>{ratingLabel}</span>}
+			{imdb != null && (
+				<span class={styles.metaPill} title="IMDB rating">
+					IMDB {imdb.toFixed(1)}
+				</span>
+			)}
+			{tmdb != null && (
+				<span class={styles.metaPill} title="TMDB rating">
+					TMDB {tmdb.toFixed(1)}
+				</span>
+			)}
 			{votesLabel && <span class={styles.metaPillMuted}>{votesLabel} votes</span>}
 			{movie.usedSources.length > 0 && (
 				<span class={styles.sources}>{movie.usedSources.slice(0, 2).join(' · ')}</span>

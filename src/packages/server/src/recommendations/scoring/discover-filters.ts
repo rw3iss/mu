@@ -25,11 +25,21 @@ export function applyDiscoverFilters(
 		if (!m) return false;
 
 		if (filters.minRating != null && filters.minRating > 0) {
-			// Strict: a movie with no rating data can't satisfy a
-			// "minimum rating X" constraint. Excluding null/0 here
-			// matches user expectation ("show me movies rated ≥ X").
-			const r = m.tmdbRating ?? m.imdbRating ?? 0;
-			if (r < filters.minRating) return false;
+			// A movie passes only when it (a) has at least one 0–10 rating
+			// (no rating data ⇒ no signal ⇒ exclude), AND (b) every
+			// available 0–10 rating clears the threshold. The "all must
+			// pass" rule catches movies with inflated TMDB but poor IMDB
+			// (e.g. tmdb 6.1 / imdb 3.2): one weak rating is a strong
+			// quality signal even when another source disagrees.
+			const ratings: number[] = [];
+			if (typeof m.tmdbRating === 'number' && m.tmdbRating > 0) {
+				ratings.push(m.tmdbRating);
+			}
+			if (typeof m.imdbRating === 'number' && m.imdbRating > 0) {
+				ratings.push(m.imdbRating);
+			}
+			if (ratings.length === 0) return false;
+			if (ratings.some((r) => r < filters.minRating!)) return false;
 		}
 		if (filters.minVotes != null && filters.minVotes > 0) {
 			// Strict: same rationale as minRating. Null tmdbVotes is

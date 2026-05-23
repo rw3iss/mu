@@ -66,6 +66,10 @@ export interface ScoredMovie {
 	ratingSource?: 'imdb' | 'tmdb' | null;
 	/** Vote count from whichever rating source we used. */
 	votes?: number | null;
+	/** Each rating source surfaced for the card so all are visible. */
+	tmdbRating?: number | null;
+	tmdbVotes?: number | null;
+	imdbRating?: number | null;
 }
 
 export type IncludeMode = 'owned' | 'notOwned' | 'all';
