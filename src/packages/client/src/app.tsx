@@ -38,6 +38,7 @@ import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { wsService } from '@/services/websocket.service';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
+import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
 import { fetchWatchPositions } from '@/state/watchPositions.state';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
 import { initProcessingState } from '@/state/processing.state';
@@ -158,6 +159,7 @@ export function App() {
 			pluginClientManager.initialize();
 			void ensureFavoritesLoaded();
 			void fetchWatchPositions();
+			void fetchPlaybackSettings();
 		}
 	}, [isLoading.value, isAuthenticated.value]);
 

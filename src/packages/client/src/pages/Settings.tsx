@@ -32,6 +32,7 @@ import {
 } from '@/state/appearance.state';
 import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
 import type { Theme } from '@/state/theme.state';
 import { setTheme, theme } from '@/state/theme.state';
 import {
@@ -342,6 +343,7 @@ export function Settings(props: SettingsProps) {
 
 	// Watch tracking settings
 	const [watchedThreshold, setWatchedThreshold] = useState(30);
+	const [completedTail, setCompletedTail] = useState(300);
 
 	// Notification settings
 	const [notifyScanResults, setNotifyScanResults] = useState(true);
@@ -469,10 +471,15 @@ export function Settings(props: SettingsProps) {
 						setShowExternalRatings(rating.showExternalRatings);
 				}
 
-				// Load watched threshold
+				// Load watch-tracking thresholds
 				api.get<{ value: number }>('/settings/watchedThresholdSeconds')
 					.then((res) => {
 						if (res?.value) setWatchedThreshold(res.value);
+					})
+					.catch(() => {});
+				api.get<{ value: number }>('/settings/completedTailSeconds')
+					.then((res) => {
+						if (res?.value) setCompletedTail(res.value);
 					})
 					.catch(() => {});
 			} catch {
@@ -515,6 +522,15 @@ export function Settings(props: SettingsProps) {
 				},
 			});
 
+			// Watch tracking thresholds (Playback tab)
+			await api.put('/settings/watchedThresholdSeconds', {
+				value: Math.max(4, Math.min(1800, watchedThreshold)),
+			});
+			await api.put('/settings/completedTailSeconds', {
+				value: Math.max(0, Math.min(3600, completedTail)),
+			});
+			void fetchPlaybackSettings();
+
 			notifySuccess('Playback settings saved');
 		} catch {
 			notifyError('Failed to save settings');
@@ -538,6 +554,8 @@ export function Settings(props: SettingsProps) {
 		segmentDuration,
 		useChunkedTranscoding,
 		debugTranscoding,
+		watchedThreshold,
+		completedTail,
 	]);
 
 	const handleSaveLibrary = useCallback(async () => {
@@ -605,16 +623,13 @@ export function Settings(props: SettingsProps) {
 			await api.put('/settings/rating', {
 				value: { showExternalRatings },
 			});
-			await api.put('/settings/watchedThresholdSeconds', {
-				value: Math.max(4, Math.min(1800, watchedThreshold)),
-			});
 			notifySuccess('General settings saved');
 		} catch {
 			notifyError('Failed to save settings');
 		} finally {
 			setIsSaving(false);
 		}
-	}, [showExternalRatings, watchedThreshold]);
+	}, [showExternalRatings]);
 
 	// Scan state
 	const [isScanning, setIsScanning] = useState(false);
@@ -793,43 +808,6 @@ export function Settings(props: SettingsProps) {
 
 							{/* Overlay Hide Timeout */}
 							<OverlayTimeoutSetting />
-
-							<h3 class={styles.sectionTitle}>Watch Tracking</h3>
-
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Watched Threshold</span>
-									<span class={styles.settingDescription}>
-										Mark movies as "watched" after this many seconds of
-										cumulative play time. Range: 4–1800 seconds (30 minutes).
-									</span>
-								</div>
-								<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-									<input
-										type="number"
-										class={styles.select}
-										min={4}
-										max={1800}
-										value={watchedThreshold}
-										onInput={(e) => {
-											const val = parseInt(
-												(e.target as HTMLInputElement).value,
-												10,
-											);
-											if (!Number.isNaN(val)) setWatchedThreshold(val);
-										}}
-										style={{ width: '80px' }}
-									/>
-									<span
-										style={{
-											fontSize: 'var(--font-size-sm)',
-											color: 'var(--color-text-secondary)',
-										}}
-									>
-										seconds
-									</span>
-								</div>
-							</div>
 
 							<div class={styles.actions}>
 								<Button
@@ -1936,6 +1914,82 @@ export function Settings(props: SettingsProps) {
 									/>
 									<span class={styles.toggleTrack} />
 								</label>
+							</div>
+
+							<h3 class={styles.sectionTitle}>Watch Tracking</h3>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Minimum Watch Time</span>
+									<span class={styles.settingDescription}>
+										Minimum cumulative play time before a resume position is
+										recorded. Sub-threshold clicks (e.g. preview taps) don't
+										clutter your history. Range: 4–1800 seconds.
+									</span>
+								</div>
+								<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+									<input
+										type="number"
+										class={styles.select}
+										min={4}
+										max={1800}
+										value={watchedThreshold}
+										onInput={(e) => {
+											const val = parseInt(
+												(e.target as HTMLInputElement).value,
+												10,
+											);
+											if (!Number.isNaN(val)) setWatchedThreshold(val);
+										}}
+										style={{ width: '80px' }}
+									/>
+									<span
+										style={{
+											fontSize: 'var(--font-size-sm)',
+											color: 'var(--color-text-secondary)',
+										}}
+									>
+										seconds
+									</span>
+								</div>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Completed Tail</span>
+									<span class={styles.settingDescription}>
+										Once playback is within this many seconds of a movie's end
+										(i.e. during the credits), it's considered fully watched —
+										history is cleared and the resume bar disappears. Default
+										300s (5 minutes) covers most credit sequences. Range:
+										0–3600 seconds.
+									</span>
+								</div>
+								<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+									<input
+										type="number"
+										class={styles.select}
+										min={0}
+										max={3600}
+										value={completedTail}
+										onInput={(e) => {
+											const val = parseInt(
+												(e.target as HTMLInputElement).value,
+												10,
+											);
+											if (!Number.isNaN(val)) setCompletedTail(val);
+										}}
+										style={{ width: '80px' }}
+									/>
+									<span
+										style={{
+											fontSize: 'var(--font-size-sm)',
+											color: 'var(--color-text-secondary)',
+										}}
+									>
+										seconds
+									</span>
+								</div>
 							</div>
 
 							<div class={styles.actions}>

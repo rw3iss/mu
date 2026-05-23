@@ -1,5 +1,6 @@
 import { useComputed } from '@preact/signals';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
+import { playbackSettings } from '@/state/playbackSettings.state';
 import {
 	type WatchPosition,
 	watchPositions,
@@ -12,6 +13,11 @@ export interface WatchPositionView {
 	hasProgress: boolean;
 	raw: WatchPosition;
 }
+
+/** Above this percent, a movie counts as fully watched regardless of
+ * the absolute tail tolerance. Catches the "duration unknown / short
+ * runtime" edge case where 5 minutes would be most of the movie. */
+const FULLY_WATCHED_PERCENT = 95;
 
 /**
  * Convenience hook for movie cards / detail pages: returns the
@@ -44,7 +50,19 @@ export function useWatchPosition(
 			durationSeconds: duration,
 		};
 		const percent = getWatchPercent(movieLike);
-		const progress = hasWatchProgress(movieLike);
+
+		// UI-level "watched in full" gate. Mirrors the server's tail
+		// rule so the resume bar disappears the moment a position
+		// crosses the threshold, even before the next tick clears the
+		// row. Two predicates so short runtimes (where 5 min would be
+		// half the movie) still get a sane high-percent check.
+		const tail = playbackSettings.value.completedTailSeconds;
+		const insideTail =
+			duration > 0 && position >= duration - tail;
+		const aboveFullyWatchedPct = percent >= FULLY_WATCHED_PERCENT;
+		const fullyWatched = insideTail || aboveFullyWatchedPct;
+
+		const progress = !fullyWatched && hasWatchProgress(movieLike);
 		return {
 			positionSeconds: position,
 			durationSeconds: duration ?? 0,
