@@ -79,11 +79,38 @@ Scope: `/discover` page — movie/cast filtering, performance, depth, UI design 
 
 ## Execution log
 
-### Phase A (applied)
-_Filled in as items land._
+### Phase A — all applied
+- ✅ A1, A6 — `IncludeToggle` extracted to `components/discover/IncludeToggle.{tsx,module.scss}` (commit e959dae).
+- ✅ A2 — `imdbVotes` added to `MovieWithMetadata` + `ScoredMovie`; client mirror updated.
+- ✅ A3, F2 — `discover-filters.ts` minVotes uses `max(tmdbVotes, imdbVotes)`.
+- ✅ A5 — 40-genre cap lifted; selected-count surfaced in label.
+- ✅ F1 — language filter end-to-end: UI input, controller param, applied in filter loop with substring + code match.
+- ✅ F5 — `runtimeMinutes`, `genres`, `language` populated on `ScoredMovie` at annotate.
+- ✅ U2 — full explanation array reachable via `title` tooltip + "+N more" hint.
+- ✅ U3 — all `usedSources` in tooltip; "+N" suffix when truncated.
 
-### Phase B (applied)
-_Filled in as items land._
+### Phase B — all applied
+- ✅ U4, U7 — debounce via `scheduleDiscover()` (220ms), grid dim overlay (`gridLoading` class).
+- ✅ U5 — `AbortController` on `runDiscover`; in-flight reqs cancel cleanly.
+- ✅ U6 — refresh stays disabled while loading (already in place); combined with AbortController is now race-free.
+- ✅ U8 — decade chips ('60s–'20s) toggle yearFrom/yearTo.
+- ✅ U9, F3 — runtime min/max inputs + server filter.
+- ✅ U10 — resume bar on owned Discover cards via `useWatchPosition`.
+- ✅ U11 — runtime + first-genre pills on card subtitle.
+- ✅ F4 — client-side `watched` filter (All / Unwatched / In progress / Watched) using existing `watchPositions` signal.
+- ✅ A7 — WS subscription auto-refetches when `external-enrichment` jobs complete.
 
-### Phase C (deferred)
-Items listed above are planned only. Run `/improve` again or open a focused planning session for each.
+### Phase C — deferred (planning only)
+- **A4 / pagination** — offset+limit endpoint contract + "Load more" UI or infinite scroll. ~6 files, requires a paging contract on `runDiscover`/state and result-merging semantics. Open a dedicated plan via `/implement`.
+- **A8 / `loadAllCandidates` dedup** — refactor harvest flow to skip the redundant load. Server-only, isolated; could be tackled alongside scoring tweaks in a future server pass.
+- **Seed reordering** — drag-to-reorder seed pills + server-side primary-seed semantics for centroid weighting. ~4 client files + 1 scoring tweak.
+- **Shared `<FilterPanel>` component** — consolidate Discover + Library + Watchlist filter chrome. ~10 files; high blast radius.
+
+### Verification
+- Server: `pnpm exec vitest run src/recommendations` → 22/22 pass after test fixtures updated for new `MovieWithMetadata` fields.
+- Build: `pnpm build` clean across `@mu/shared`, `@mu/server`, `@mu/client`.
+- Deploy: `bash src/scripts/deploy-remote.sh` exited 0; external `https://mu.ryanweiss.net:4000/` → HTTP 200.
+
+### Docs touched
+- `docs/improvement-audit-2026-05-23.md` (this file).
+- No public API / CLI / config schema changed in a way that needs README updates. The new query params (`minRuntime`, `maxRuntime`) are additive to the existing recommendations endpoint — `CLAUDE.md` already describes the recommendations module abstractly.
