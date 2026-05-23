@@ -13,6 +13,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { WsAdapter } from '@nestjs/platform-ws';
 import { AppModule } from './app.module.js';
 import { ConfigService } from './config/config.service.js';
+import { SeoService } from './seo/seo.service.js';
 
 // Load .env file if present (no external dependency needed).
 // Searches: src/.env, project root .env, server package .env
@@ -169,25 +170,30 @@ async function bootstrap() {
 			decorateReply: false,
 		});
 
-		// SPA fallback: intercept 404 responses for non-API routes and serve index.html
-		// Read from disk each time so rebuilds are picked up without server restart
+		// SPA fallback: intercept 404 responses for non-API routes and serve index.html.
+		// Read from disk each time so rebuilds are picked up without server restart.
+		// Per-route SEO meta is injected by SeoService before the HTML ships, so
+		// crawlers and social-media bots see the right title / og:image / og:description
+		// even though the page itself is client-rendered.
 		const indexHtmlPath = join(clientDist, 'index.html');
-		fastify.addHook('onSend', (request, reply, payload, done) => {
+		const seoService = app.get(SeoService);
+		fastify.addHook('onSend', async (request, reply, payload) => {
 			if (
 				reply.statusCode === 404 &&
 				request.method === 'GET' &&
 				!request.url.startsWith('/api/')
 			) {
 				try {
-					const html = readFileSync(indexHtmlPath);
-					reply.status(200).header('Content-Type', 'text/html');
-					done(null, html);
+					const rawHtml = readFileSync(indexHtmlPath, 'utf-8');
+					const url = request.url.split('?')[0] ?? '/';
+					const html = await seoService.renderForUrl(url, rawHtml, request.server);
+					reply.status(200).header('Content-Type', 'text/html; charset=utf-8');
+					return html;
 				} catch {
-					done(null, payload);
+					return payload;
 				}
-			} else {
-				done(null, payload);
 			}
+			return payload;
 		});
 	}
 
