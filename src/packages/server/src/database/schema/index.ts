@@ -6,6 +6,8 @@ export type { Device, NewDevice } from './devices.ts';
 export { devices } from './devices.ts';
 export type { Favorite, NewFavorite } from './favorites.ts';
 export { favorites } from './favorites.ts';
+export type { ImdbRating, NewImdbRating } from './imdb-ratings.ts';
+export { imdbRatings } from './imdb-ratings.ts';
 export type { JobHistoryEntry, NewJobHistoryEntry } from './job-history.ts';
 export { jobHistory } from './job-history.ts';
 export type { MediaSource, NewMediaSource } from './media-sources.ts';

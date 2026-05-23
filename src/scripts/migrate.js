@@ -360,6 +360,13 @@ const tables = [
 		fetched_at TEXT NOT NULL
 	)`,
 	`CREATE INDEX IF NOT EXISTS search_cache_type_query ON search_cache(type, normalized_query)`,
+	`CREATE TABLE IF NOT EXISTS imdb_ratings (
+		tconst TEXT PRIMARY KEY,
+		average_rating REAL NOT NULL,
+		num_votes INTEGER NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS imdb_ratings_rating_idx ON imdb_ratings(average_rating, num_votes)`,
 ];
 
 for (const sql of tables) {

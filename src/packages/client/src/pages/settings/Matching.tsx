@@ -30,6 +30,21 @@ interface MatchingConfig {
 	autoEnrichLlmFeatures: boolean;
 }
 
+interface ImdbDatasetStatus {
+	id: string;
+	displayName: string;
+	approxSizeMb: number;
+	rowCount: number;
+	lastSyncAt: string | null;
+	lastSyncDurationMs: number | null;
+	lastError: string | null;
+	running: boolean;
+}
+interface ImdbDatasetsState {
+	enabled: boolean;
+	datasets: ImdbDatasetStatus[];
+}
+
 const STRATEGY_LABELS: Record<string, string> = {
 	'content-vector': 'Content vector (cast / genres / keywords overlap)',
 	'external-cache': 'TMDB + Trakt similar movies',
@@ -56,6 +71,16 @@ export function Matching() {
 	const [cfg, setCfg] = useState<MatchingConfig | null>(null);
 	const [saving, setSaving] = useState<string | null>(null);
 
+	// IMDB datasets enable / status / manual-sync.
+	const [imdb, setImdb] = useState<ImdbDatasetsState | null>(null);
+	const [imdbBusy, setImdbBusy] = useState(false);
+
+	const refreshImdbStatus = () =>
+		api
+			.get<ImdbDatasetsState>('/imdb-datasets/status')
+			.then(setImdb)
+			.catch(() => {});
+
 	useEffect(() => {
 		settingsService
 			.get(RETENTION_KEY)
@@ -77,7 +102,42 @@ export function Matching() {
 			.catch((err) =>
 				notifyError(`Failed to load tuning config: ${err?.message ?? err}`),
 			);
+
+		void refreshImdbStatus();
 	}, []);
+
+	const toggleImdb = async (enabled: boolean) => {
+		setImdbBusy(true);
+		try {
+			await api.put('/imdb-datasets/enabled', { enabled });
+			await refreshImdbStatus();
+			notifySuccess(
+				enabled
+					? 'IMDB datasets enabled — nightly sync scheduled'
+					: 'IMDB datasets disabled',
+			);
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed to toggle IMDB datasets');
+		} finally {
+			setImdbBusy(false);
+		}
+	};
+
+	const triggerImdbSync = async () => {
+		setImdbBusy(true);
+		try {
+			await api.post('/imdb-datasets/sync');
+			notifySuccess('IMDB sync started — runs in the background');
+			// Poll briefly so the status row updates without a manual refresh.
+			setTimeout(refreshImdbStatus, 4000);
+			setTimeout(refreshImdbStatus, 15000);
+			setTimeout(refreshImdbStatus, 45000);
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed to start sync');
+		} finally {
+			setImdbBusy(false);
+		}
+	};
 
 	const updateRetention = async (value: number) => {
 		setRetention(value);
@@ -138,6 +198,68 @@ export function Matching() {
 					paid providers.
 				</p>
 			</div>
+
+			<section class={styles.section}>
+				<div class={styles.sectionHeader}>
+					<h3 class={styles.sectionTitle}>IMDB datasets (offline ratings)</h3>
+					<p class={styles.sectionLede}>
+						Free daily download from IMDB's public bulk dumps. The ratings table
+						(~25 MB, ~1.4M titles) lives locally so rating lookups don't burn
+						OMDB quota and ratings stay daily-fresh. Future scope: cast / title
+						metadata for fully-local similarity searches.
+					</p>
+				</div>
+				<ToggleRow
+					label="Enable IMDB datasets sync"
+					description="Schedules a nightly sync of title.ratings.tsv.gz into a local SQLite table. The first run downloads ~25 MB and takes ~30 seconds."
+					checked={!!imdb?.enabled}
+					disabled={imdb == null || imdbBusy}
+					onChange={toggleImdb}
+				/>
+				{imdb?.datasets?.map((ds) => (
+					<div class={styles.controlRow} key={ds.id}>
+						<div class={styles.toggleInfo}>
+							<span class={styles.toggleLabel}>{ds.displayName}</span>
+							<span class={styles.toggleDescription}>
+								{ds.rowCount > 0 ? (
+									<>
+										{ds.rowCount.toLocaleString()} rows ·{' '}
+										{ds.lastSyncAt
+											? `synced ${new Date(ds.lastSyncAt).toLocaleString()}`
+											: 'not yet synced'}
+										{ds.lastSyncDurationMs != null && ds.lastSyncDurationMs > 0
+											? ` · ${(ds.lastSyncDurationMs / 1000).toFixed(1)}s`
+											: ''}
+									</>
+								) : ds.running ? (
+									<>Sync running — first import may take 30–60s…</>
+								) : (
+									<>
+										Not yet synced. ~{ds.approxSizeMb} MB / ~1.4M ratings on
+										first run.
+									</>
+								)}
+								{ds.lastError ? (
+									<>
+										<br />
+										<span style={{ color: 'var(--color-danger, #ef4444)' }}>
+											Last error: {ds.lastError}
+										</span>
+									</>
+								) : null}
+							</span>
+						</div>
+						<button
+							type="button"
+							class={styles.linkButton}
+							disabled={!imdb.enabled || ds.running || imdbBusy}
+							onClick={triggerImdbSync}
+						>
+							{ds.running ? 'Syncing…' : 'Sync now'}
+						</button>
+					</div>
+				))}
+			</section>
 
 			<section class={styles.section}>
 				<div class={styles.sectionHeader}>

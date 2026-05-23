@@ -29,6 +29,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module.
 import { RemoteModule } from './remote/remote.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { ImdbDatasetsModule } from './imdb-datasets/imdb-datasets.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SeoModule } from './seo/seo.module.js';
 import { ShareLinksModule } from './share-links/share-links.module.js';
@@ -73,6 +74,7 @@ import { UsersModule } from './users/users.module.js';
 		FavoritesModule,
 		SearchModule,
 		SeoModule,
+		ImdbDatasetsModule,
 	],
 	providers: [
 		{

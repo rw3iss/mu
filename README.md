@@ -284,6 +284,28 @@ Mu's job runner (scan, metadata, transcode, embedding, ...) is pluggable via `jo
 
 Switching backends is non-destructive — the same `JobManagerService` interface is used everywhere, so handlers (scan, metadata, etc.) work identically across both. State is *not* migrated between backends though; in-flight jobs are lost when you flip.
 
+### IMDB Datasets (offline ratings)
+
+IMDB publishes free daily TSV bulk dumps at `datasets.imdbws.com`. Mu can sync the **ratings** table (`title.ratings.tsv.gz`, ~25 MB unpacked, ~1.4M titles) into a local SQLite table and serve all IMDB rating lookups from disk — no OMDB quota, no API latency, daily-fresh.
+
+**What's pulled today:**
+
+| Dataset | Size | What it powers |
+|---|---|---|
+| `title.ratings` | ~25 MB / 1.4M rows | IMDB rating + vote count per title (read-through cache in front of OMDB) |
+
+**Enabling:**
+
+- Answered "yes" to the *Enable IMDB datasets nightly sync* prompt during install → already on. The first sync runs in the background within a minute of boot; subsequent syncs run once every 24h.
+- Toggling at runtime: *Settings → Matching → IMDB datasets (offline ratings) → Enable IMDB datasets sync*. The toggle writes `imdb.datasets.enabled` in the settings store, which the orchestrator picks up live (no restart).
+- Manual *Sync now* button in the same panel for an out-of-band refresh.
+
+**Storage & cost:** ~25 MB on disk for the ratings table + index. Sync downloads the gzipped TSV (~5 MB on the wire), streams it through `gunzip`, and upserts via a single transaction so a mid-sync crash leaves the previous data intact. Typical full sync takes 20–40 s on a home connection.
+
+**How the read-through works:** `OmdbProvider.getByImdbId` checks the local table first. If it hits, the rating + vote count come from there (daily-fresh) and OMDB is still called for the rich fields (plot, Rotten Tomatoes, Metacritic, etc.). When OMDB is unconfigured or rate-limited, the local table serves the rating alone so movies aren't blocked from getting *something*. A new `getRatingByImdbId` fast-path is also available for callers that only need the rating.
+
+**Future expansion** (not in this release): `title.basics`, `title.principals`, and `name.basics` for fully-local cast/crew lookups and bulk title search without TMDB. The `DatasetSync` interface and orchestrator are pluralised so each new dataset slots in without restructuring scheduling, status, or HTTP surfaces.
+
 ### Embeddings & Semantic Similarity
 
 Mu computes a 384-dimensional plot embedding for every movie in your library and uses it for the `embedding` strategy in Discover (semantic "movies that feel like this one" matching, beyond shared cast/genres).

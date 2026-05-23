@@ -1,4 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
+import { ImdbDatasetsModule } from '../imdb-datasets/imdb-datasets.module.js';
 import { LibraryModule } from '../library/library.module.js';
 import { MediaModule } from '../media/media.module.js';
 import { WikidataModule } from '../providers/sources/wikidata/wikidata.module.js';
@@ -13,7 +14,7 @@ import { OmdbProvider } from './providers/omdb.provider.js';
 import { TmdbProvider } from './providers/tmdb.provider.js';
 
 @Module({
-	imports: [MediaModule, WikidataModule, forwardRef(() => LibraryModule)],
+	imports: [MediaModule, WikidataModule, ImdbDatasetsModule, forwardRef(() => LibraryModule)],
 	controllers: [MetadataController, ImageController],
 	providers: [
 		TmdbProvider,

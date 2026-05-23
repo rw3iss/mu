@@ -1,7 +1,8 @@
 import { CACHE_NAMESPACES, CACHE_TTL } from '@mu/shared';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { CacheService } from '../../cache/cache.service.js';
 import { ConfigService } from '../../config/config.service.js';
+import { RatingsSyncService } from '../../imdb-datasets/ratings-sync.service.js';
 
 const OMDB_BASE_URL = 'https://www.omdbapi.com';
 
@@ -66,6 +67,7 @@ export class OmdbProvider {
 	constructor(
 		private readonly config: ConfigService,
 		private readonly cache: CacheService,
+		@Optional() @Inject(RatingsSyncService) private readonly ratings?: RatingsSyncService,
 	) {
 		this.apiKey = this.config.get<string>('thirdParty.omdb.apiKey', '') || null;
 		if (this.apiKey) {
@@ -75,12 +77,65 @@ export class OmdbProvider {
 		}
 	}
 
+	/**
+	 * Fast rating-only lookup. Hits the local IMDB datasets table
+	 * first (daily-fresh, no quota); falls back to a full OMDB call
+	 * if the dataset isn't enabled or doesn't have this title.
+	 *
+	 * Callers that just need the rating + vote count (filters, score
+	 * tiebreakers) should prefer this over `getByImdbId` to avoid
+	 * burning OMDB quota.
+	 */
+	async getRatingByImdbId(
+		imdbId: string,
+	): Promise<{ rating: number; votes: number } | null> {
+		const local = this.ratings?.get(imdbId);
+		if (local) return { rating: local.rating, votes: local.votes };
+		const full = await this.getByImdbId(imdbId);
+		if (full?.imdbRating != null && full?.imdbVotes != null) {
+			return { rating: full.imdbRating, votes: full.imdbVotes };
+		}
+		return null;
+	}
+
 	async getByImdbId(imdbId: string): Promise<OmdbData | null> {
-		if (!this.apiKey) return null;
+		// Local-only stub the no-OMDB-key and OMDB-failure paths fall
+		// back to. Built once up front so both branches use the same
+		// shape; daily-fresh local rating still beats no rating at all.
+		const localRating = this.ratings?.get(imdbId);
+		const localOnlyData = (): OmdbData | null => {
+			if (!localRating) return null;
+			return {
+				imdbRating: localRating.rating,
+				imdbVotes: localRating.votes,
+				rottenTomatoesScore: null,
+				metacriticScore: null,
+				plot: null,
+				director: null,
+				writer: null,
+				actors: null,
+				genre: null,
+				rated: null,
+				language: null,
+				country: null,
+				awards: null,
+				runtimeMinutes: null,
+				year: null,
+			};
+		};
+
+		if (!this.apiKey) return localOnlyData();
 
 		const cacheKey = `omdb:${imdbId}`;
 		const cached = await this.cache.get<OmdbData>(CACHE_NAMESPACES.METADATA, cacheKey);
-		if (cached) return cached;
+		if (cached) {
+			// Overlay the local rating onto an old cached row — the
+			// daily-fresh value is more trustworthy than whatever
+			// OMDB returned on the day we first cached it.
+			return localRating
+				? { ...cached, imdbRating: localRating.rating, imdbVotes: localRating.votes }
+				: cached;
+		}
 
 		const params = new URLSearchParams({
 			apikey: this.apiKey,
@@ -92,21 +147,26 @@ export class OmdbProvider {
 			const response = await fetch(`${OMDB_BASE_URL}/?${params}`);
 			if (!response.ok) {
 				this.logger.warn(`OMDB request failed: ${response.status}`);
-				return null;
+				return localOnlyData();
 			}
 
 			const raw = (await response.json()) as OmdbResult;
 			if (raw.Response === 'False') {
 				this.logger.warn(`OMDB error for ${imdbId}: ${raw.Error}`);
-				return null;
+				return localOnlyData();
 			}
 
 			const result: OmdbData = parseOmdbResult(raw);
-			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, result, CACHE_TTL.METADATA);
-			return result;
+			// Same overlay rule on the fresh path — local takes
+			// precedence for the rating fields even when OMDB succeeded.
+			const merged = localRating
+				? { ...result, imdbRating: localRating.rating, imdbVotes: localRating.votes }
+				: result;
+			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, merged, CACHE_TTL.METADATA);
+			return merged;
 		} catch (err: any) {
 			this.logger.error(`OMDB error: ${err.message}`);
-			return null;
+			return localOnlyData();
 		}
 	}
 
