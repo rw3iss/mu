@@ -2161,12 +2161,18 @@ export function Settings(props: SettingsProps) {
 								<Select
 									value={thumbnailSize}
 									onChange={(v) => setThumbnailSize(v as ThumbnailSize)}
-									options={[
-										{ value: 'small', label: 'Small (120 × 68)' },
-										{ value: 'medium', label: 'Medium (240 × 135)' },
-										{ value: 'large', label: 'Large (360 × 203)' },
-										{ value: 'xlarge', label: 'Extra Large (480 × 270)' },
-									]}
+									options={(
+										[
+											{ value: 'small' as ThumbnailSize, label: 'Small (120 × 68)' },
+											{ value: 'medium' as ThumbnailSize, label: 'Medium (240 × 135)' },
+											{ value: 'large' as ThumbnailSize, label: 'Large (360 × 203)' },
+											{ value: 'xlarge' as ThumbnailSize, label: 'Extra Large (480 × 270)' },
+										]
+									).map((o) => ({
+										value: o.value,
+										label: `${o.label} · ~${estimateSpriteLibrarySize(0, o.value).perMovieLabel}/movie`,
+									}))}
+									style={{ minWidth: 320 }}
 								/>
 							</div>
 
