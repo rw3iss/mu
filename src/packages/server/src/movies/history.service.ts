@@ -2,7 +2,11 @@ import { nowISO, paginationDefaults } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movies, userWatchHistory } from '../database/schema/index.js';
+import {
+	movieFiles,
+	movies,
+	userWatchHistory,
+} from '../database/schema/index.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 @Injectable()
@@ -184,27 +188,42 @@ export class HistoryService {
 			watchedAt: string;
 		}>;
 	} {
+		// LEFT JOIN movie_files for runtime. We pick the first file per
+		// movie (LIMIT 1 isn't expressible in a simple JOIN, so use a
+		// MIN aggregate keyed by movie_id — most movies have one file).
 		const rows = this.database.db
 			.select({
 				movieId: userWatchHistory.movieId,
 				positionSeconds: userWatchHistory.positionSeconds,
 				watchedAt: userWatchHistory.watchedAt,
-				durationSeconds: sql<
-					number | null
-				>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${userWatchHistory.movieId} LIMIT 1)`,
+				durationSeconds: movieFiles.durationSeconds,
 			})
 			.from(userWatchHistory)
+			.leftJoin(movieFiles, eq(movieFiles.movieId, userWatchHistory.movieId))
 			.where(eq(userWatchHistory.userId, userId))
 			.orderBy(desc(userWatchHistory.watchedAt))
 			.all();
-		return {
-			positions: rows.map((r) => ({
+
+		// Multi-file movies will produce multiple rows per movieId; keep
+		// the first (most-recent watchedAt order already applied).
+		const seen = new Set<string>();
+		const positions: Array<{
+			movieId: string;
+			positionSeconds: number;
+			durationSeconds: number | null;
+			watchedAt: string;
+		}> = [];
+		for (const r of rows) {
+			if (seen.has(r.movieId)) continue;
+			seen.add(r.movieId);
+			positions.push({
 				movieId: r.movieId,
 				positionSeconds: r.positionSeconds ?? 0,
 				durationSeconds: r.durationSeconds ?? null,
 				watchedAt: r.watchedAt,
-			})),
-		};
+			});
+		}
+		return { positions };
 	}
 
 	getContinueWatching(userId: string) {
