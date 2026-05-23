@@ -4,16 +4,32 @@
   animation: fadeIn 300ms ease;
 }
 
+/* "Settings" heading sticks just below the global TopBar so it
+ * stays visible while a long panel scrolls. A matching background
+ * hides the panel content sliding underneath. */
 .title {
+  position: sticky;
+  top: var(--topbar-height);
+  z-index: 3;
+  background: var(--color-bg);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
   margin-bottom: var(--space-xl);
+  padding: var(--space-md) 0;
+
+  @include mobile {
+    position: static;
+    padding: 0;
+  }
 }
 
 .layout {
   display: flex;
   gap: var(--space-xl);
+  /* Flex children default to stretch height; that prevents the
+   * left-rail's `position: sticky` from having room to scroll. */
+  align-items: flex-start;
 
   @include mobile {
     flex-direction: column;
@@ -21,14 +37,23 @@
   }
 }
 
+/* Tab rail sticks alongside the active panel as the user scrolls.
+ * Sits just under the sticky title (topbar + title row). */
 .tabs {
   flex-shrink: 0;
   width: 180px;
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  position: sticky;
+  top: calc(var(--topbar-height) + 4.5rem);
+  max-height: calc(100vh - var(--topbar-height) - 5rem);
+  overflow-y: auto;
 
   @include mobile {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
     width: 100%;
     flex-direction: row;
     overflow-x: auto;
@@ -426,6 +451,11 @@
   width: 44px;
   height: 24px;
   cursor: pointer;
+  /* Settings rows are flex containers, and long descriptions
+   * (e.g. Chunked / Debug Transcoding) would otherwise shrink
+   * the toggle below 44px and push the handle's translateX(20px)
+   * past the right edge of the track. Lock the width. */
+  flex-shrink: 0;
 
   input {
     opacity: 0;
@@ -710,6 +740,19 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+}
+
+/* Side-by-side name + password fields under the Server URL input.
+ * Each child input gets half the row, separated by the standard
+ * small gap. Collapses to one column on narrow viewports. */
+.serverFieldsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 // ============================================

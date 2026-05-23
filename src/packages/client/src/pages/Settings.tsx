@@ -2634,41 +2634,30 @@ export function Settings(props: SettingsProps) {
 												)
 											}
 										/>
-										<button
-											class={styles.iconBtn}
-											title="Configure"
-											onClick={() =>
-												setShowNewServerConfig(!showNewServerConfig)
-											}
-										>
-											<Icon name="settings" size={14} />
-										</button>
-										{showNewServerConfig && (
-											<div class={styles.serverEditRow}>
-												<input
-													type="text"
-													class={styles.textInput}
-													placeholder="Display name (optional)"
-													value={newServerName}
-													onInput={(e) =>
-														setNewServerName(
-															(e.target as HTMLInputElement).value,
-														)
-													}
-												/>
-												<input
-													type="password"
-													class={styles.textInput}
-													placeholder="Password (optional)"
-													value={newServerPassword}
-													onInput={(e) =>
-														setNewServerPassword(
-															(e.target as HTMLInputElement).value,
-														)
-													}
-												/>
-											</div>
-										)}
+										<div class={styles.serverFieldsRow}>
+											<input
+												type="text"
+												class={styles.textInput}
+												placeholder="Display name (optional)"
+												value={newServerName}
+												onInput={(e) =>
+													setNewServerName(
+														(e.target as HTMLInputElement).value,
+													)
+												}
+											/>
+											<input
+												type="password"
+												class={styles.textInput}
+												placeholder="Password (optional)"
+												value={newServerPassword}
+												onInput={(e) =>
+													setNewServerPassword(
+														(e.target as HTMLInputElement).value,
+													)
+												}
+											/>
+										</div>
 										<div class={styles.addServerActions}>
 											<Button
 												variant="primary"

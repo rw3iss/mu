@@ -1,7 +1,11 @@
 .shell {
   display: flex;
   min-height: 100vh;
-  overflow-x: hidden;
+  /* overflow-x: hidden on the shell was breaking position:sticky on
+   * the TopBar because any non-visible overflow turns the element
+   * into the sticky-anchor scroll container — and .shell isn't the
+   * actual scroller (the body is). Only clamp horizontal overflow
+   * when the split player is docked; see .withSplitPlayer. */
 }
 
 .main {
