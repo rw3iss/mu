@@ -284,6 +284,20 @@ Mu's job runner (scan, metadata, transcode, embedding, ...) is pluggable via `jo
 
 Switching backends is non-destructive — the same `JobManagerService` interface is used everywhere, so handlers (scan, metadata, etc.) work identically across both. State is *not* migrated between backends though; in-flight jobs are lost when you flip.
 
+### Embeddings & Semantic Similarity
+
+Mu computes a 384-dimensional plot embedding for every movie in your library and uses it for the `embedding` strategy in Discover (semantic "movies that feel like this one" matching, beyond shared cast/genres).
+
+**Model:** `Xenova/all-MiniLM-L6-v2`, served locally via `@huggingface/transformers` (ONNX runtime). ~80 MB model file, downloaded on first use to `<dataDir>/models/`. No API key, no network calls after the first download — runs on CPU.
+
+**Storage:** vectors live in `movie_embeddings` (one row per movie+model, Float32 BLOB). For libraries up to ~50K movies the in-process KNN scan finishes in ~50 ms per query. A `sqlite-vec` migration path is open if you outgrow that.
+
+**Triggering:** the `EmbeddingListenerService` subscribes to `LIBRARY_MOVIE_ADDED` / `LIBRARY_MOVIE_UPDATED` and embeds in the background (single-flight per movie, skipped if the overview text hasn't changed). Disable globally via *Settings → Matching → Auto-enrichment → Plot embeddings* if your hardware is constrained.
+
+**Cost profile:** ~100 ms per embed on a modern CPU; ~100 MB total disk for the model + ~200 MB for vectors across a 50K-movie library. No paid API spend.
+
+**Weighting:** the embedding strategy is one of four blended in the composite scorer. Tune its share in *Settings → Matching → Strategy weights → Plot embedding*. Setting the slider to 0 disables it.
+
 ### Standalone Workers (BullMQ only)
 
 With BullMQ active, you can run additional worker processes that pull jobs off the same queue — useful for CPU-heavy work (transcoding, embeddings) or to keep the HTTP server responsive under load.

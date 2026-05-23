@@ -285,15 +285,22 @@ export function Matching() {
 						patch('excludeWatched', 'recommendations.excludeWatched', v)
 					}
 				/>
-				<div class={styles.controlRow}>
-					<label class={styles.controlLabel}>Per-director cap</label>
+				<div class={styles.toggleRow}>
+					<div class={styles.toggleInfo}>
+						<span class={styles.toggleLabel}>Max movies per director</span>
+						<span class={styles.toggleDescription}>
+							Caps how many movies from any one director appear in a single set of
+							results — keeps a prolific filmmaker from monopolising your Discover
+							grid. Default 2. Set 0 for no cap.
+						</span>
+					</div>
 					<input
 						type="number"
 						min={0}
 						max={10}
 						step={1}
 						class={styles.select}
-						style={{ width: '70px' }}
+						style={{ width: '70px', flexShrink: 0 }}
 						value={cfg?.perDirectorCap ?? 2}
 						disabled={!cfg || saving === 'recommendations.perDirectorCap'}
 						onChange={(e) => {
@@ -306,7 +313,6 @@ export function Matching() {
 							);
 						}}
 					/>
-					<span class={styles.helpText}>0 = unlimited</span>
 				</div>
 			</section>
 

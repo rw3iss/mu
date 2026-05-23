@@ -36,7 +36,10 @@ export function applyFilters(scored: ScoredMovie[], ctx: FilterContext): ScoredM
 		if (ctx.excludeWatched && ctx.watchedMovieIds.has(movie.id)) continue;
 
 		if (ctx.qualityFloor > 0) {
-			const rating = movie.tmdbRating ?? movie.imdbRating ?? 0;
+			// Use the highest available rating so a movie with strong
+			// IMDB but missing TMDB (or vice versa) doesn't get unfairly
+			// dropped. Mirrors the minRating logic in discover-filters.
+			const rating = Math.max(movie.tmdbRating ?? 0, movie.imdbRating ?? 0);
 			if (rating > 0 && rating < ctx.qualityFloor) continue;
 		}
 
