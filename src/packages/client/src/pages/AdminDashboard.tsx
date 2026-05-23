@@ -463,78 +463,79 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 				</div>
 			)}
 
-			{/* Quick Actions */}
-			<section class={styles.section}>
-				<div class={styles.sectionHeader}>
+			{/* Quick Actions — collapsed by default. Native <details>
+			    gives accessible disclosure without manual state. */}
+			<details class={styles.collapsibleSection}>
+				<summary class={styles.collapsibleSummary}>
 					<h2 class={styles.sectionTitle}>Quick Actions</h2>
 					<a
 						class={styles.sectionLink}
 						href="/admin/jobs"
 						onClick={(e) => {
+							e.stopPropagation();
 							e.preventDefault();
 							route('/admin/jobs');
 						}}
 					>
 						View all jobs →
 					</a>
-				</div>
-				<div class={styles.actions}>
-					<Button variant="secondary" onClick={handleScanLibrary}>
-						Scan Library
-					</Button>
-					<Button variant="secondary" onClick={handleRefreshMetadata}>
-						Refresh All Metadata
-					</Button>
-					<Button
-						variant="secondary"
+				</summary>
+				<ul class={styles.actionList}>
+					<ActionRow
+						label="Scan Library"
+						description="Index any new files in your configured media sources."
+						onClick={handleScanLibrary}
+					/>
+					<ActionRow
+						label="Refresh All Metadata"
+						description="Re-fetch TMDB / OMDB metadata for every library movie."
+						onClick={handleRefreshMetadata}
+					/>
+					<ActionRow
+						label="Fetch Missing Thumbnails"
+						description="Generate thumbnails for movies that don't have one yet."
 						onClick={handleGenerateThumbnails}
 						loading={generatingThumbnails}
-					>
-						Fetch Missing Thumbnails
-					</Button>
-					<Button
-						variant="secondary"
+					/>
+					<ActionRow
+						label="Fix Broken Thumbnails"
+						description="Re-generate thumbnails whose file is missing on disk."
 						onClick={() => setShowFixThumbnailsConfirm(true)}
 						loading={fixingThumbnails}
-					>
-						Fix Broken Thumbnails
-					</Button>
-					<Button
-						variant="secondary"
+					/>
+					<ActionRow
+						label="Generate Seek Sprites"
+						description="Create seek-bar preview sprite sheets for movies missing them."
 						onClick={handleGenerateSprites}
 						loading={generatingSprites}
-					>
-						Generate Seek Sprites
-					</Button>
-					<Button
-						variant="danger"
-						onClick={() => setShowRemoveBrokenConfirm(true)}
-						loading={removingBroken}
-					>
-						Remove Broken Movies
-					</Button>
-					<Button
-						variant="danger"
-						onClick={() => setShowClearWatchedConfirm(true)}
-						loading={clearingWatched}
-					>
-						Clear Watched History
-					</Button>
-					<Button
-						variant="secondary"
+					/>
+					<ActionRow
+						label="Group Similar Items"
+						description="Auto-group sequels, series, and TV episodes that share metadata."
 						onClick={handleGroupSimilarItems}
 						loading={groupingItems}
-					>
-						Group Similar Items
-					</Button>
-					<Button
-						variant="secondary"
+					/>
+					<ActionRow
+						label="Sanitize Title Names"
+						description="Clean up filenames for movies without remote metadata (strip codec / release-group / quality tags)."
 						onClick={() => setShowSanitizeConfirm(true)}
 						loading={sanitizingTitles}
-					>
-						Sanitize Title Names
-					</Button>
-				</div>
+					/>
+					<ActionRow
+						label="Remove Broken Movies"
+						description="Delete library rows whose source file is missing on disk."
+						onClick={() => setShowRemoveBrokenConfirm(true)}
+						loading={removingBroken}
+						danger
+					/>
+					<ActionRow
+						label="Clear Watched History"
+						description='Reset the "watched" flag for every movie. Resume positions are preserved.'
+						onClick={() => setShowClearWatchedConfirm(true)}
+						loading={clearingWatched}
+						danger
+					/>
+				</ul>
 				<ConfirmDialog
 					isOpen={showSanitizeConfirm}
 					onClose={() => setShowSanitizeConfirm(false)}
@@ -571,7 +572,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					confirmLabel="Clear Watched History"
 					variant="danger"
 				/>
-			</section>
+			</details>
 
 			{/* Active Sessions */}
 			<section class={styles.section}>
@@ -606,6 +607,11 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 									<span class={styles.sessionMovie}>
 										{session.movieTitle || 'Unknown'}
 									</span>
+									{session.ipAddress && (
+										<span class={styles.sessionIp} title="Originating IP">
+											{session.ipAddress}
+										</span>
+									)}
 								</div>
 								<span class={styles.sessionTime}>
 									Started {new Date(session.startedAt).toLocaleTimeString()}
@@ -624,9 +630,9 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 				)}
 			</section>
 
-			{/* Session History */}
-			<section class={styles.section}>
-				<div class={styles.sectionHeader}>
+			{/* Session History — collapsed by default */}
+			<details class={styles.collapsibleSection}>
+				<summary class={styles.collapsibleSummary}>
 					<h2 class={styles.sectionTitle}>
 						Session History{' '}
 						<span class={styles.countBadge}>{sessionHistory.length}</span>
@@ -635,13 +641,16 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						<Button
 							variant="danger"
 							size="sm"
-							onClick={() => setShowClearHistoryConfirm(true)}
+							onClick={(e: any) => {
+								e?.stopPropagation?.();
+								setShowClearHistoryConfirm(true);
+							}}
 							loading={clearingHistory}
 						>
 							Clear History
 						</Button>
 					)}
-				</div>
+				</summary>
 				{sessionHistory.length === 0 ? (
 					<p class={styles.emptyText}>No session history</p>
 				) : (
@@ -695,7 +704,41 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					confirmLabel="Clear History"
 					variant="danger"
 				/>
-			</section>
+			</details>
 		</div>
+	);
+}
+
+/** One row in the Quick Actions list — label left, description right,
+ *  whole row clickable. Loading / danger states reuse the Button
+ *  semantics inline so we don't need a separate component module. */
+function ActionRow({
+	label,
+	description,
+	onClick,
+	loading,
+	danger,
+}: {
+	label: string;
+	description: string;
+	onClick: () => void;
+	loading?: boolean;
+	danger?: boolean;
+}) {
+	return (
+		<li class={styles.actionRow}>
+			<button
+				type="button"
+				class={`${styles.actionRowBtn} ${danger ? styles.actionRowDanger : ''}`}
+				onClick={onClick}
+				disabled={loading}
+			>
+				<span class={styles.actionLabel}>
+					{label}
+					{loading ? ' …' : ''}
+				</span>
+				<span class={styles.actionDescription}>{description}</span>
+			</button>
+		</li>
 	);
 }

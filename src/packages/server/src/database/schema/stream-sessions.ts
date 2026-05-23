@@ -18,6 +18,10 @@ export const streamSessions = sqliteTable('stream_sessions', {
 	lastActiveAt: text('last_active_at').notNull(),
 	positionSeconds: integer('position_seconds').default(0),
 	bandwidthBytes: integer('bandwidth_bytes').default(0),
+	/** Originating IP captured at session start. Honors X-Forwarded-For
+	 * when the request came through a proxy so the admin panel shows
+	 * the real client, not the reverse-proxy. */
+	ipAddress: text('ip_address'),
 });
 
 export type StreamSession = typeof streamSessions.$inferSelect;

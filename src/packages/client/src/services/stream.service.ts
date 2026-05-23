@@ -34,6 +34,10 @@ export interface ActiveSession {
 	position: number;
 	startedAt: string;
 	lastActivity: string;
+	/** Originating client IP captured at session start. Null for
+	 * sessions created before the column was added, or for share
+	 * viewers that bypass the session-tracking branch. */
+	ipAddress?: string | null;
 }
 
 export interface SessionHistoryEntry {

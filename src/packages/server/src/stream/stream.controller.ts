@@ -63,11 +63,19 @@ export class StreamController {
 		@Query('audioTrack') audioTrack: string | undefined,
 		@Query('subtitleTrack') subtitleTrack: string | undefined,
 		@CurrentUser() user: any,
+		@Req() req: any,
 	) {
+		// Honor reverse-proxy forwarded address when present so the
+		// admin sees the real client, not the proxy. Fastify already
+		// parses X-Forwarded-For into request.ip when trustProxy is on.
+		const forwardedFor = req.headers?.['x-forwarded-for'] as string | undefined;
+		const ipAddress =
+			(forwardedFor ? forwardedFor.split(',')[0]?.trim() : undefined) ?? req.ip ?? undefined;
 		return this.streamService.startStream(movieId, user.sub ?? user.id, {
 			quality,
 			audioTrack: audioTrack ? parseInt(audioTrack, 10) : undefined,
 			subtitleTrack: subtitleTrack ? parseInt(subtitleTrack, 10) : undefined,
+			ipAddress,
 		});
 	}
 

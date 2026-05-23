@@ -35,6 +35,10 @@ interface StartStreamOptions {
 	quality?: string;
 	audioTrack?: number;
 	subtitleTrack?: number;
+	/** Originating client IP, captured by the controller from the
+	 * Fastify request. Persisted on the session row so the admin
+	 * panel can show where active streams are coming from. */
+	ipAddress?: string;
 }
 
 /**
@@ -334,6 +338,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				startedAt: nowISO(),
 				lastActiveAt: nowISO(),
 				positionSeconds: 0,
+				ipAddress: options.ipAddress ?? null,
 			});
 		}
 
@@ -916,6 +921,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				position: streamSessions.positionSeconds,
 				startedAt: streamSessions.startedAt,
 				lastActivity: streamSessions.lastActiveAt,
+				ipAddress: streamSessions.ipAddress,
 			})
 			.from(streamSessions)
 			.leftJoin(users, eq(streamSessions.userId, users.id))

@@ -132,6 +132,150 @@
   color: var(--color-text-secondary);
 }
 
+/* Originating IP pill on Active Sessions — small inline tag in the
+ * info column, monospace so v4 / v6 addresses align cleanly. */
+.sessionIp {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, monospace);
+  color: var(--color-text-muted);
+  background: var(--color-bg-elevated);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+/* Collapsible section using native <details>. Removes the default
+ * disclosure arrow position so we can put our own affordance on the
+ * summary row; clicking the row toggles open/closed. */
+.collapsibleSection {
+  margin-bottom: var(--space-2xl);
+
+  /* WebKit default — remove the triangle from the disclosure. */
+  &::-webkit-details-marker {
+    display: none;
+  }
+}
+
+.collapsibleSection > summary {
+  list-style: none;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+}
+
+/* Summary row mirrors .sectionHeader but renders a chevron via ::before
+ * that rotates when the parent <details> is open. Whole row is the
+ * click target. */
+.collapsibleSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: var(--space-md);
+  list-style: none;
+
+  &::before {
+    content: '›';
+    display: inline-block;
+    font-size: var(--font-size-lg);
+    color: var(--color-text-muted);
+    transition: transform var(--transition-fast);
+    width: 16px;
+    text-align: center;
+    line-height: 1;
+  }
+
+  details[open] > &::before {
+    transform: rotate(90deg);
+  }
+
+  /* The chevron lives before the title; absorb the title's left margin. */
+  & > .sectionTitle {
+    flex: 1;
+  }
+
+  &:hover {
+    color: var(--color-text-primary);
+  }
+}
+
+/* Quick Actions — single column list of label-left, description-right
+ * rows. Each row is a button covering both columns so the entire row
+ * is the click target. */
+.actionList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-surface);
+}
+
+.actionRow {
+  list-style: none;
+  background: var(--color-bg-surface);
+}
+
+.actionRowBtn {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) 2fr;
+  gap: var(--space-md);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+
+  .actionList > .actionRow:first-child > & {
+    border-top: none;
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--color-bg-elevated);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+.actionRowDanger {
+  .actionLabel {
+    color: var(--color-danger, #ef4444);
+  }
+}
+
+.actionLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.actionDescription {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
 .sessionTime {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);

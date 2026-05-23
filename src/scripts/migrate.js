@@ -373,6 +373,7 @@ const alters = [
 	// MergeEngine can decide whether a new source has authority to
 	// overwrite. See packages/server/src/providers/merge/.
 	'ALTER TABLE movie_metadata ADD COLUMN provenance TEXT',
+	'ALTER TABLE stream_sessions ADD COLUMN ip_address TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_url TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_aspect_ratio REAL',
 	'ALTER TABLE movies ADD COLUMN hidden INTEGER DEFAULT 0',
