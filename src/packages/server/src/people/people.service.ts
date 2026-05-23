@@ -2,7 +2,13 @@ import { nowISO } from '@mu/shared';
 import { Injectable } from '@nestjs/common';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movies, type NewPerson, type Person, people } from '../database/schema/index.js';
+import {
+	movieMetadata,
+	movies,
+	type NewPerson,
+	type Person,
+	people,
+} from '../database/schema/index.js';
 import {
 	type TmdbPersonCombinedCredits,
 	type TmdbPersonDetails,
@@ -53,6 +59,12 @@ export interface PersonCreditView {
 	department?: string | null;
 	mediaType: 'movie' | 'tv';
 	movieId?: string | null;
+	/** TMDB rating + vote count taken from the combined-credits
+	 * response. For credits that resolve to a library movie we
+	 * prefer the local row's richer numbers (IMDB rating). */
+	tmdbRating?: number | null;
+	tmdbVotes?: number | null;
+	imdbRating?: number | null;
 }
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
@@ -248,6 +260,14 @@ export class PeopleService {
 				alsoKnownAs = JSON.parse(row.alsoKnownAs) ?? [];
 			} catch {}
 		}
+
+		// Enrich credits with library-row data when available: attach
+		// `movieId` so the card links to the local detail page instead
+		// of a TMDB stub, and prefer the local row's richer ratings
+		// (IMDB rating, more authoritative TMDB vote counts) over what
+		// the credits payload alone provides.
+		knownFor = this.enrichCreditsWithLibrary(knownFor);
+
 		return {
 			id: row.id,
 			key: row.externalId,
@@ -265,6 +285,50 @@ export class PeopleService {
 			alsoKnownAs,
 			knownForMovies: knownFor,
 		};
+	}
+
+	/**
+	 * Single batched query joining each credit's `tmdbId` against the
+	 * library + movie_metadata. For matches: set `movieId` and overwrite
+	 * rating fields with the local row's (which carries IMDB data the
+	 * TMDB credits payload doesn't). Misses pass through unchanged.
+	 */
+	private enrichCreditsWithLibrary(
+		credits: PersonCreditView[],
+	): PersonCreditView[] {
+		const tmdbIds = credits
+			.filter((c) => c.mediaType === 'movie' && typeof c.tmdbId === 'number')
+			.map((c) => c.tmdbId);
+		if (tmdbIds.length === 0) return credits;
+
+		const rows = this.database.db
+			.select({
+				id: movies.id,
+				tmdbId: movies.tmdbId,
+				tmdbRating: movieMetadata.tmdbRating,
+				tmdbVotes: movieMetadata.tmdbVotes,
+				imdbRating: movieMetadata.imdbRating,
+			})
+			.from(movies)
+			.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
+			.where(inArray(movies.tmdbId, tmdbIds))
+			.all();
+		if (rows.length === 0) return credits;
+
+		const byTmdb = new Map<number, (typeof rows)[number]>();
+		for (const r of rows) if (r.tmdbId != null) byTmdb.set(r.tmdbId, r);
+
+		return credits.map((c) => {
+			const hit = c.tmdbId != null ? byTmdb.get(c.tmdbId) : undefined;
+			if (!hit) return c;
+			return {
+				...c,
+				movieId: hit.id,
+				tmdbRating: hit.tmdbRating ?? c.tmdbRating ?? null,
+				tmdbVotes: hit.tmdbVotes ?? c.tmdbVotes ?? null,
+				imdbRating: hit.imdbRating ?? c.imdbRating ?? null,
+			};
+		});
 	}
 
 	private isStale(row: Person): boolean {
@@ -374,6 +438,10 @@ export class PeopleService {
 	private deriveKnownFor(credits: TmdbPersonCombinedCredits | null): PersonCreditView[] {
 		if (!credits) return [];
 		const all: PersonCreditView[] = [];
+		const ratingOf = (v?: number) =>
+			typeof v === 'number' && v > 0 ? Math.round(v * 10) / 10 : null;
+		const votesOf = (v?: number) =>
+			typeof v === 'number' && v > 0 ? v : null;
 		for (const c of credits.cast ?? []) {
 			if (!c.id) continue;
 			all.push({
@@ -385,6 +453,8 @@ export class PeopleService {
 				posterUrl: c.poster_path ? `${TMDB_IMAGE_BASE}/w342${c.poster_path}` : null,
 				character: c.character ?? null,
 				mediaType: c.media_type,
+				tmdbRating: ratingOf(c.vote_average),
+				tmdbVotes: votesOf(c.vote_count),
 			});
 		}
 		for (const c of credits.crew ?? []) {
@@ -401,6 +471,8 @@ export class PeopleService {
 				job: c.job ?? null,
 				department: c.department ?? null,
 				mediaType: c.media_type,
+				tmdbRating: ratingOf(c.vote_average),
+				tmdbVotes: votesOf(c.vote_count),
 			});
 		}
 		// Sort by popularity-ish proxy: year desc, then job/cast prominence.

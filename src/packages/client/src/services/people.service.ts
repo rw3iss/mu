@@ -10,6 +10,13 @@ export interface PersonCreditView {
 	department?: string | null;
 	mediaType: 'movie' | 'tv';
 	movieId?: string | null;
+	/** TMDB vote average for the credit. For library hits the server
+	 * overrides with the more-authoritative locally-stored value. */
+	tmdbRating?: number | null;
+	tmdbVotes?: number | null;
+	/** Only populated when the credit resolves to a library row that
+	 * was enriched via OMDB. Lets the card show IMDB on owned movies. */
+	imdbRating?: number | null;
 }
 
 export interface PersonView {

@@ -219,8 +219,51 @@ function CreditCard({ credit }: { credit: PersonView['knownForMovies'][number] }
 					{credit.character ? ` · as ${credit.character}` : ''}
 					{credit.job ? ` · ${credit.job}` : ''}
 				</span>
+				<CreditRatings credit={credit} />
 			</div>
 		</div>
+	);
+}
+
+function formatVotes(n: number): string {
+	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+	if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+	return String(n);
+}
+
+function CreditRatings({ credit }: { credit: PersonView['knownForMovies'][number] }) {
+	const imdb =
+		credit.imdbRating != null && credit.imdbRating > 0 ? credit.imdbRating : null;
+	const tmdb =
+		credit.tmdbRating != null && credit.tmdbRating > 0 ? credit.tmdbRating : null;
+	if (imdb == null && tmdb == null) return null;
+	const votes =
+		credit.tmdbVotes != null && credit.tmdbVotes > 0
+			? formatVotes(credit.tmdbVotes)
+			: null;
+	return (
+		<span
+			class={styles.creditRatings}
+			title={[
+				imdb != null ? `IMDB ${imdb.toFixed(1)}` : null,
+				tmdb != null ? `TMDB ${tmdb.toFixed(1)}` : null,
+				votes ? `${votes} votes` : null,
+			]
+				.filter(Boolean)
+				.join(' · ')}
+		>
+			{imdb != null && (
+				<span class={styles.creditRatingPill}>
+					<strong>IMDB</strong> {imdb.toFixed(1)}
+				</span>
+			)}
+			{tmdb != null && (
+				<span class={styles.creditRatingPill}>
+					<strong>TMDB</strong> {tmdb.toFixed(1)}
+				</span>
+			)}
+			{votes && <span class={styles.creditVotes}>{votes} votes</span>}
+		</span>
 	);
 }
 

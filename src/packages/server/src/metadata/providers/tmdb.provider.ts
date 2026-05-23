@@ -127,6 +127,7 @@ export interface TmdbPersonMovieCredit {
 	job?: string;
 	department?: string;
 	vote_average?: number;
+	vote_count?: number;
 	popularity?: number;
 }
 

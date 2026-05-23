@@ -244,6 +244,40 @@
 	color: var(--color-text-secondary);
 }
 
+/* Compact rating row under the credit meta — small pills with the
+ * source on the left, score on the right. Vote count trails as a
+ * muted addendum. Whole row inherits the card's hover/click target. */
+.creditRatings {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	margin-top: 4px;
+	font-size: 11px;
+}
+
+.creditRatingPill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 1px 6px;
+	border-radius: 3px;
+	background: var(--color-bg-elevated, rgba(255, 255, 255, 0.06));
+	color: var(--color-text-primary);
+
+	strong {
+		font-size: 10px;
+		font-weight: var(--font-weight-semibold);
+		color: var(--color-text-muted);
+		letter-spacing: 0.04em;
+	}
+}
+
+.creditVotes {
+	color: var(--color-text-muted);
+	font-size: 11px;
+}
+
 /* ── Skeleton ──────────────────────────────────────────────────── */
 
 .skeleton {
