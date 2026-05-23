@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { useSeo } from '@/hooks/useSeo';
 import { shareLinksService } from '@/services/share-links.service';
 import { playerMode, playMovie } from '@/state/globalPlayer.state';
 import { setShareToken, shareToken } from '@/state/share.state';
@@ -22,6 +23,15 @@ interface PublicWatchProps {
 export function PublicWatch({ token }: PublicWatchProps) {
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
+	// Server-side meta injection already supplies the real movie title /
+	// poster for crawlers + share previews; this just makes the in-app
+	// tab title sane while playback boots.
+	useSeo({
+		title: 'Watch',
+		description: 'Playing a movie shared from a private Mu library.',
+		type: 'video.other',
+		robots: 'noindex,follow',
+	});
 
 	useEffect(() => {
 		if (!token) {

@@ -6,6 +6,7 @@ import {
 	PersonSearchInput,
 } from '@/components/common/EntitySearchInput';
 import { Spinner } from '@/components/common/Spinner';
+import { useSeo } from '@/hooks/useSeo';
 import { DiscoverFilters as FilterPanel } from '@/components/discover/DiscoverFilters';
 import { DiscoverResultCard } from '@/components/discover/DiscoverResultCard';
 import { QuickStartPanel } from '@/components/discover/QuickStartPanel';
@@ -90,6 +91,11 @@ function IncludeToggle({
  * (`?seedMovieId=`, `?seedMovieIds=`) populate state on first mount.
  */
 export function Discover(_props: DiscoverProps) {
+	useSeo({
+		title: 'Discover',
+		description: 'Find your next movie — recommendations based on your taste, seeds, and filters.',
+		type: 'website',
+	});
 	const [genres, setGenres] = useState<string[]>([]);
 	const [showFilters, setShowFilters] = useState(true);
 

@@ -17,6 +17,7 @@ import { RatingWidget } from '@/components/movie/RatingWidget';
 import { ShareMovieModal } from '@/components/movie/ShareMovieModal';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { TrailerSection } from '@/components/movie/TrailerSection';
+import { useSeo } from '@/hooks/useSeo';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { type AudioProfile, audioProfilesService } from '@/services/audio-profiles.service';
@@ -41,6 +42,17 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [inWatchlist, setInWatchlist] = useState(false);
 	const [showShareModal, setShowShareModal] = useState(false);
+
+	useSeo(
+		movie
+			? {
+					title: movie.year ? `${movie.title} (${movie.year})` : movie.title,
+					description: movie.overview ?? undefined,
+					image: movie.posterUrl || movie.backdropUrl || undefined,
+					type: 'video.movie',
+				}
+			: null,
+	);
 
 	// Transcode progress tracking
 	const [transcodeProgress, setTranscodeProgress] = useState<number | null>(null);

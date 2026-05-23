@@ -3,6 +3,7 @@ import { route } from 'preact-router';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
+import { useSeo } from '@/hooks/useSeo';
 import { type PersonView, peopleService } from '@/services/people.service';
 import { ensureFavoritesLoaded, slugifyName } from '@/state/favorites.state';
 import styles from './PersonDetail.module.scss';
@@ -41,6 +42,21 @@ export function PersonDetail({ id }: PersonDetailProps) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [showFullBio, setShowFullBio] = useState(false);
+
+	useSeo(
+		person
+			? {
+					title: person.name,
+					description: person.biography
+						? person.biography
+						: person.knownForDepartment
+							? `${person.knownForDepartment}${person.placeOfBirth ? ` · ${person.placeOfBirth}` : ''}`
+							: undefined,
+					image: person.profileUrl ?? undefined,
+					type: 'profile',
+				}
+			: null,
+	);
 
 	useEffect(() => {
 		void ensureFavoritesLoaded();
