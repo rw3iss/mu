@@ -757,7 +757,34 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		}
 		this.sessionProgress.set(sessionId, { lastPosition: positionSeconds, lastTime: now });
 
-		// Upsert watch history with cumulative duration tracking
+		// Resolve the movie's runtime so we can detect "watched to end".
+		// Looked up once per call (indexed lookup; called every ~3s).
+		const durationRow = await this.database.db
+			.select({ d: movieFiles.durationSeconds })
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, session.movieId))
+			.limit(1);
+		const movieDurationSeconds = durationRow[0]?.d ?? null;
+
+		// "Near-end" tolerance: a movie counts as fully watched once the
+		// playhead is within COMPLETED_TAIL_SECONDS of the runtime (or
+		// past 98% if the runtime is unknown — credits typically run
+		// the last ~2%).
+		const COMPLETED_TAIL_SECONDS = 60;
+		const completedNow =
+			movieDurationSeconds != null && movieDurationSeconds > 0
+				? positionSeconds >= movieDurationSeconds - COMPLETED_TAIL_SECONDS
+				: false;
+
+		// `watchedThresholdSeconds` is the MINIMUM cumulative watch time
+		// before we bother recording a resume position. Below this, a
+		// click-and-bail doesn't pollute history.
+		const threshold = this.settings.get<number>('watchedThresholdSeconds', 30);
+
+		// Lifecycle:
+		//   < threshold       → ignore (no history row)
+		//   ≥ threshold, mid  → upsert position
+		//   near end          → DELETE the row (clean slate next time)
 		const existing = await this.database.db
 			.select()
 			.from(userWatchHistory)
@@ -768,30 +795,34 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				),
 			);
 
+		if (completedNow) {
+			if (existing.length > 0) {
+				await this.database.db
+					.delete(userWatchHistory)
+					.where(eq(userWatchHistory.id, existing[0]!.id));
+			}
+			return;
+		}
+
 		if (existing.length > 0) {
 			const entry = existing[0]!;
 			const newDuration = (entry.durationWatchedSeconds ?? 0) + increment;
-			const threshold = this.settings.get<number>('watchedThresholdSeconds', 30);
-			const shouldComplete = !entry.completed && newDuration >= threshold;
-
 			await this.database.db
 				.update(userWatchHistory)
 				.set({
 					positionSeconds,
 					durationWatchedSeconds: newDuration,
-					...(shouldComplete ? { completed: true } : {}),
 					watchedAt: nowISO(),
 				})
 				.where(eq(userWatchHistory.id, entry.id));
-		} else {
-			const threshold = this.settings.get<number>('watchedThresholdSeconds', 30);
+		} else if (increment >= threshold || positionSeconds >= threshold) {
 			await this.database.db.insert(userWatchHistory).values({
 				id: crypto.randomUUID(),
 				userId: session.userId,
 				movieId: session.movieId,
 				positionSeconds,
 				durationWatchedSeconds: increment,
-				completed: increment >= threshold,
+				completed: false,
 				watchedAt: nowISO(),
 			});
 		}

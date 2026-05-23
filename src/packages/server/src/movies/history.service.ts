@@ -1,42 +1,18 @@
 import { nowISO, paginationDefaults } from '@mu/shared';
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movies, userWatchHistory } from '../database/schema/index.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 @Injectable()
-export class HistoryService implements OnModuleInit {
+export class HistoryService {
 	private readonly logger = new Logger('HistoryService');
 
 	constructor(
 		private readonly database: DatabaseService,
 		private readonly settings: SettingsService,
 	) {}
-
-	/**
-	 * On startup, backfill `completed = true` for any watch history entries
-	 * where positionSeconds exceeds the watched threshold but completed was
-	 * never set (legacy data from before auto-detection was added).
-	 */
-	onModuleInit() {
-		const threshold = this.settings.get<number>('watchedThresholdSeconds', 30);
-		const result = this.database.db
-			.update(userWatchHistory)
-			.set({ completed: true })
-			.where(
-				and(
-					sql`(${userWatchHistory.completed} IS NULL OR ${userWatchHistory.completed} = 0)`,
-					sql`${userWatchHistory.positionSeconds} >= ${threshold}`,
-				),
-			)
-			.run();
-		if (result.changes > 0) {
-			this.logger.log(
-				`Backfilled ${result.changes} watch history entries as completed (threshold: ${threshold}s)`,
-			);
-		}
-	}
 
 	addToHistory(
 		userId: string,
@@ -177,6 +153,58 @@ export class HistoryService implements OnModuleInit {
 			.delete(userWatchHistory)
 			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, movieId)))
 			.run();
+	}
+
+	/**
+	 * Delete the watch-history row for a single (user, movie). Used
+	 * when the player reaches end-of-stream, when the user clicks
+	 * "Start over", or when the user manually resets a movie. After
+	 * this call, the resume button disappears and the next playback
+	 * session starts fresh.
+	 */
+	clearPosition(userId: string, movieId: string): boolean {
+		const result = this.database.db
+			.delete(userWatchHistory)
+			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, movieId)))
+			.run();
+		return result.changes > 0;
+	}
+
+	/**
+	 * Bulk lookup of all in-progress resume positions for one user.
+	 * Returned as a movieId-keyed map plus a flat list (for clients
+	 * that want stable iteration). Joins movie_files so the client
+	 * can compute progress percent without a follow-up call.
+	 */
+	getAllPositions(userId: string): {
+		positions: Array<{
+			movieId: string;
+			positionSeconds: number;
+			durationSeconds: number | null;
+			watchedAt: string;
+		}>;
+	} {
+		const rows = this.database.db
+			.select({
+				movieId: userWatchHistory.movieId,
+				positionSeconds: userWatchHistory.positionSeconds,
+				watchedAt: userWatchHistory.watchedAt,
+				durationSeconds: sql<
+					number | null
+				>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${userWatchHistory.movieId} LIMIT 1)`,
+			})
+			.from(userWatchHistory)
+			.where(eq(userWatchHistory.userId, userId))
+			.orderBy(desc(userWatchHistory.watchedAt))
+			.all();
+		return {
+			positions: rows.map((r) => ({
+				movieId: r.movieId,
+				positionSeconds: r.positionSeconds ?? 0,
+				durationSeconds: r.durationSeconds ?? null,
+				watchedAt: r.watchedAt,
+			})),
+		};
 	}
 
 	getContinueWatching(userId: string) {

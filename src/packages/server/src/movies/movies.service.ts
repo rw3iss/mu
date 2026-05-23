@@ -427,7 +427,10 @@ export class MoviesService {
 				.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, id)))
 				.get();
 			if (historyEntry) {
-				watchPosition = historyEntry.completed ? 0 : (historyEntry.positionSeconds ?? 0);
+				// Position is the resume point. Don't zero it on completed —
+				// the new completion lifecycle DELETEs entries on full-watch,
+				// so any row that still exists represents a real resume point.
+				watchPosition = historyEntry.positionSeconds ?? 0;
 				watched = !!historyEntry.completed;
 			}
 		}

@@ -1,10 +1,36 @@
-import { Controller, Delete, Get, Query } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { HistoryService } from './history.service.js';
 
 @Controller('history')
 export class HistoryController {
 	constructor(private readonly historyService: HistoryService) {}
+
+	/**
+	 * Bulk fetch of every in-progress resume position for the current
+	 * user. The client hydrates its `watchPositions` signal from this
+	 * once on app load + occasionally on focus, so movie cards in any
+	 * view can show the resume bar without a per-card request.
+	 */
+	@Get('positions')
+	getAllPositions(@CurrentUser('id') userId: string) {
+		return this.historyService.getAllPositions(userId);
+	}
+
+	/**
+	 * Clear the resume position for a single movie. Called when the
+	 * player reaches the end of the stream or when the user picks
+	 * "Start from beginning". Idempotent — returns `{ cleared: false }`
+	 * if no row existed.
+	 */
+	@Delete('movies/:movieId/position')
+	clearPosition(
+		@CurrentUser('id') userId: string,
+		@Param('movieId') movieId: string,
+	) {
+		const cleared = this.historyService.clearPosition(userId, movieId);
+		return { success: true, cleared };
+	}
 
 	@Get()
 	getHistory(
