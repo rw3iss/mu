@@ -138,31 +138,70 @@ export function clearFilters(): void {
 	filters.value = {};
 }
 
+/**
+ * In-flight controller so rapid filter changes (or refresh spamming)
+ * cancel the previous request instead of racing N responses. The
+ * losing request still resolves on the server but its `.then()` is
+ * skipped here.
+ */
+let inFlightController: AbortController | null = null;
+/** Debounce handle for the auto-fetch subscribers. */
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+const FETCH_DEBOUNCE_MS = 220;
+
 export async function runDiscover(): Promise<void> {
+	// Cancel any in-flight request before kicking off a new one.
+	inFlightController?.abort();
+	const controller = new AbortController();
+	inFlightController = controller;
+
 	isLoading.value = true;
 	errorMessage.value = null;
 	try {
 		const seeds = seedMovieIds.value;
 		const pKeys = personSeedKeys.value;
-		const response = await discoverService.fetch({
-			seedMovieIds: seeds.length > 0 ? seeds : undefined,
-			personKeys: pKeys.length > 0 ? pKeys : undefined,
-			filters: filters.value,
-			limit: 36,
-			include: includeMode.value,
-			useProfile: useProfile.value,
-		});
+		const response = await discoverService.fetch(
+			{
+				seedMovieIds: seeds.length > 0 ? seeds : undefined,
+				personKeys: pKeys.length > 0 ? pKeys : undefined,
+				filters: filters.value,
+				limit: 36,
+				include: includeMode.value,
+				useProfile: useProfile.value,
+			},
+			{ signal: controller.signal },
+		);
+		if (controller.signal.aborted) return;
 		results.value = response.results;
 		usedSources.value = response.usedSources;
 		enrichmentsQueued.value = response.enrichmentsQueued ?? 0;
 		unresolvedPersonKeys.value = response.unresolvedPersonKeys ?? [];
 	} catch (err: any) {
+		// Aborted requests aren't errors — they're voluntary cancellations.
+		if (err?.name === 'AbortError' || controller.signal.aborted) return;
 		errorMessage.value = err?.message ?? 'Failed to fetch recommendations';
 		results.value = [];
 		usedSources.value = [];
 		enrichmentsQueued.value = 0;
 		unresolvedPersonKeys.value = [];
 	} finally {
-		isLoading.value = false;
+		if (inFlightController === controller) {
+			isLoading.value = false;
+			inFlightController = null;
+		}
 	}
+}
+
+/**
+ * Debounced wrapper: coalesces bursts of filter/seed/mode changes
+ * into a single fetch ~220ms after the last edit. Used by the
+ * Discover page's signal subscribers so typing in the cast/director
+ * field doesn't fire one request per keystroke.
+ */
+export function scheduleDiscover(): void {
+	if (debounceTimer) clearTimeout(debounceTimer);
+	debounceTimer = setTimeout(() => {
+		debounceTimer = null;
+		void runDiscover();
+	}, FETCH_DEBOUNCE_MS);
 }

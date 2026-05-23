@@ -1,0 +1,1106 @@
+{
+  "/home/rw3iss/Sites/mu/src/packages/server/src/app.module.ts": {
+    "mtime": 1775752369.4618146,
+    "hash": "83173c9c4c680dc7c21a3b903a0c1b47"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/main.ts": {
+    "mtime": 1775875936.5274982,
+    "hash": "401ae62a55afefb15bb093aa5cb1a350"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/guid-resolver.service.ts": {
+    "mtime": 1775875952.880774,
+    "hash": "6c993e7e93c4a2aa9faa57a8f914b3f6"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/session-registry.service.ts": {
+    "mtime": 1775752217.8964531,
+    "hash": "f54f54073687712d472612942c4e2ab7"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/common.module.ts": {
+    "mtime": 1775752229.6234038,
+    "hash": "d693f783d05622eba7d23f432899c97a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/json-fields.ts": {
+    "mtime": 1777572104.3597972,
+    "hash": "6d5feeab44fb9f86834eaa5e96f9be36"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/decorators/public.decorator.ts": {
+    "mtime": 1772868057.8753767,
+    "hash": "04ce66f12d6dcfdf76cc0f072fa90b45"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/decorators/roles.decorator.ts": {
+    "mtime": 1773212951.6287513,
+    "hash": "b01c697b68366b2bf8cbaa6b4254a94d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/decorators/current-user.decorator.ts": {
+    "mtime": 1773075992.544673,
+    "hash": "317436d4fc44b3ae71f7dfbb62e01632"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/filters/global-exception.filter.ts": {
+    "mtime": 1773212951.6397512,
+    "hash": "f00d838af8094c10e8fcdda404deaa2c"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/guards/roles.guard.ts": {
+    "mtime": 1773212951.6397512,
+    "hash": "2f730ce79f2bcf8ffb4e6bbad4044a87"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/guards/jwt-auth.guard.ts": {
+    "mtime": 1775752308.4990714,
+    "hash": "c8e2e2e4f0308bb2e6fb1f1e356ee48c"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/interceptors/logging.interceptor.ts": {
+    "mtime": 1773075992.544673,
+    "hash": "0ac896fa44efc9f15b0c82d92ea369c8"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/common/pipes/zod-validation.pipe.ts": {
+    "mtime": 1774140548.2270813,
+    "hash": "8c93c3465419df5bd7a96f2376de0b22"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/config/config.types.ts": {
+    "mtime": 1772868038.556467,
+    "hash": "cfa065473199a800177416af762b2fc0"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/config/config.service.ts": {
+    "mtime": 1773075992.544673,
+    "hash": "844f8384c6056398876b5eefe99f97a9"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/config/config.module.ts": {
+    "mtime": 1773075992.544673,
+    "hash": "e7f5afc1837ca0887f999ce975b7b5d9"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/config/config.loader.ts": {
+    "mtime": 1775171533.2869983,
+    "hash": "68f6a2ccc3a7e368cc8c2e6bea4cb85b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/config/config.schema.ts": {
+    "mtime": 1775804144.706746,
+    "hash": "bea024a3c50c585ff430fc5ccad0d364"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/database.module.ts": {
+    "mtime": 1773212951.648751,
+    "hash": "52a449141ed433990fe6d20ca1b9cf34"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/seed.ts": {
+    "mtime": 1773212951.682751,
+    "hash": "b48d234bc588d240aa8c90d8c2621dcd"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/database.service.ts": {
+    "mtime": 1774927329.9102418,
+    "hash": "9820c8bc1c6edef9472ea0373840cd26"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/users.ts": {
+    "mtime": 1773077995.3987694,
+    "hash": "c35a1e4e1692ba1f32b6e9421036da4a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/media-sources.ts": {
+    "mtime": 1773212951.651751,
+    "hash": "0eb8cf870dd6d87901e75bb3b3baf61b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/settings.ts": {
+    "mtime": 1773075992.545673,
+    "hash": "a4d2530696153574dafc28a89d3a77b0"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/api-keys.ts": {
+    "mtime": 1773075992.544673,
+    "hash": "fa9675878386e85cf94faee908a9f05a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/devices.ts": {
+    "mtime": 1773075992.544673,
+    "hash": "ba0920c81a5e3d1edcbac3e9983ecc08"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/playlists.ts": {
+    "mtime": 1773212951.6567512,
+    "hash": "888bde2fe21a63c84d31babb2536a15a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/scan-log.ts": {
+    "mtime": 1773212951.651751,
+    "hash": "2f6a17ee3c7579f7189d24854b65fc47"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/stream-sessions.ts": {
+    "mtime": 1773212951.651751,
+    "hash": "46695b1c106bc7fb445b7026f3389eba"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/user-ratings.ts": {
+    "mtime": 1773212951.673751,
+    "hash": "1bad1edbaafd3fb82a1e850855dc0b9c"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/user-watch-history.ts": {
+    "mtime": 1773212951.677751,
+    "hash": "b6667a13ea5acf4b555d4d20aca95d9c"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/user-watchlist.ts": {
+    "mtime": 1773212951.677751,
+    "hash": "31a663a053221db276275eebed6fc7ee"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/movie-metadata.ts": {
+    "mtime": 1773212951.6397512,
+    "hash": "da9332461e6cb77b44c21b92d6583167"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/plugins.ts": {
+    "mtime": 1773212951.650751,
+    "hash": "00b66547e9b4cb04044d88c6e3e5c276"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/movie-files.ts": {
+    "mtime": 1773212951.648751,
+    "hash": "1bf8ced80ef149ed81e4673360979874"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/audio-profiles.ts": {
+    "mtime": 1773591405.3484135,
+    "hash": "93d57cd7c4e78d179e1a503cd59372ba"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/movies.ts": {
+    "mtime": 1773627898.6747224,
+    "hash": "248a149dba49ba3aac1b1c9f8a8826ca"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/playlist-movies.ts": {
+    "mtime": 1773683283.1307218,
+    "hash": "9f34259bfd3649fa300321748205a81a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/job-history.ts": {
+    "mtime": 1774064167.5139127,
+    "hash": "67400d0fd3934c02c30b3ac685affbc9"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/transcode-cache.ts": {
+    "mtime": 1774113649.721861,
+    "hash": "7b1cf01369b982ded3edd2cc57b86bfc"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/themes.ts": {
+    "mtime": 1774369260.289185,
+    "hash": "4de55e6f32908cc5faae5bd202c5c3e9"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/database/schema/index.ts": {
+    "mtime": 1774383781.1754506,
+    "hash": "d090ea33e825fc6b6dac4ea1570798fb"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/auth/auth.service.ts": {
+    "mtime": 1773212951.5977514,
+    "hash": "773232b1dc8144952b32e8f209c79fd9"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/auth/auth.module.ts": {
+    "mtime": 1773212951.6047513,
+    "hash": "28f6dec495412b750ba7cf8522c22e01"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/auth/auth.controller.ts": {
+    "mtime": 1773212951.6167512,
+    "hash": "5fef00d60f8a988518cf5b2121b5bd6d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/auth/dto/login.dto.ts": {
+    "mtime": 1773075992.544673,
+    "hash": "fcecf59f34a8414f36980d5c17747b59"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/users/users.service.ts": {
+    "mtime": 1773212951.673751,
+    "hash": "c112356a35292a7c133b4262897cbbbb"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/users/users.controller.ts": {
+    "mtime": 1773212951.702751,
+    "hash": "ef4455fda75b923c0a1f07e5c63f6a42"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/users/users.module.ts": {
+    "mtime": 1773212951.697751,
+    "hash": "847bd2d045c7da72ce00715aec8bdbfd"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/cache/cache.service.ts": {
+    "mtime": 1773212951.6327512,
+    "hash": "0666ee4a5a655bdb9d632cd394b171e3"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/cache/cache.module.ts": {
+    "mtime": 1773212951.6227512,
+    "hash": "6f17e7d64d57dcbea419025d484505e4"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/cache/providers/cache-provider.interface.ts": {
+    "mtime": 1773075992.544673,
+    "hash": "4c99cd8ce8e8d29fe1a431c72bd89ce1"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/cache/providers/memory-cache.provider.ts": {
+    "mtime": 1773077273.7149098,
+    "hash": "61f75113586f9deddf11bcc4abdd8386"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/events/events.service.ts": {
+    "mtime": 1773212951.657751,
+    "hash": "7c0e399d593f17479a2144c0e736c0e9"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/events/events.module.ts": {
+    "mtime": 1773212951.6667511,
+    "hash": "f2fb6dee9950f8e702e7a125940aed7a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/events/events.gateway.ts": {
+    "mtime": 1774683131.8560462,
+    "hash": "b6deaaa66899350b71908090bd8454bd"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/scheduler/scheduler.service.ts": {
+    "mtime": 1773212951.7107508,
+    "hash": "d9e33db7e04449b83c0510a0802f6ea7"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/scheduler/scheduler.module.ts": {
+    "mtime": 1773212951.7077508,
+    "hash": "a67a3624fdd8891e03f0fc5d6e1adc9d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/health/health.module.ts": {
+    "mtime": 1773212951.654751,
+    "hash": "3fa4c04beb44be19c8cac87553fcf00b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/health/health.controller.ts": {
+    "mtime": 1773218054.7886994,
+    "hash": "53884d877e20dbdc58f354572a283202"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/library/library.service.ts": {
+    "mtime": 1773212951.661751,
+    "hash": "6805e49c7e02372f96f717b1bf6d2ecd"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/library/library.controller.ts": {
+    "mtime": 1773212951.691751,
+    "hash": "fc479fe0eae436bdc271983ac620f111"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/library/watcher.service.ts": {
+    "mtime": 1774235325.5680313,
+    "hash": "9a1973849737b6f9d003f46b2c1166b7"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/library/library.module.ts": {
+    "mtime": 1774235325.5590312,
+    "hash": "193cbfa8e34b9cf6306272b51ef746bf"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/library/scanner.service.ts": {
+    "mtime": 1774819928.8362536,
+    "hash": "e2a4832bf5ba62d7c5904841a40e1214"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/library/library-jobs.service.ts": {
+    "mtime": 1777572223.1291769,
+    "hash": "0efa1a2e1d640ee56e3629f547f64c03"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/ratings.service.ts": {
+    "mtime": 1773212951.702751,
+    "hash": "a9c6ff85904a4bb93103bf9c6c5a332d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/ratings.controller.ts": {
+    "mtime": 1773212951.687751,
+    "hash": "f8f4ec466319fe1626e47d6a6f3da832"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/watchlist.controller.ts": {
+    "mtime": 1773212951.6967509,
+    "hash": "b6ea0c855075193a8d579a3374c5fc8e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/watchlist.service.ts": {
+    "mtime": 1773212951.6967509,
+    "hash": "9ac94239dd4cbb3633f687227ffb5809"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/playlists.service.ts": {
+    "mtime": 1773683488.909795,
+    "hash": "8c0747b24152bcd1b565f8766cca02fc"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/playlists.controller.ts": {
+    "mtime": 1773683488.907795,
+    "hash": "d10c4de1875966d37e9b82478320ee76"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/movies.module.ts": {
+    "mtime": 1774235325.5650313,
+    "hash": "831049b9ae8b1b49e9e560f7f6889883"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/history.controller.ts": {
+    "mtime": 1775934660.639,
+    "hash": "4319424c913ea4853aa6c6226489a944"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/history.service.ts": {
+    "mtime": 1775937065.5892463,
+    "hash": "d53dc7d8216c7a2ecb57d2886f9d43a9"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/movies.controller.ts": {
+    "mtime": 1776916878.2177184,
+    "hash": "17ce04264d08a638e3fdb2c0ee48b568"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/movies/movies.service.ts": {
+    "mtime": 1777572349.0585217,
+    "hash": "90f9b0885f0e954c98a0ef5b4a8440a5"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/metadata/image.controller.ts": {
+    "mtime": 1773212951.671751,
+    "hash": "403be327f0f600ee12061dead2199fad"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/metadata/image.service.ts": {
+    "mtime": 1774235325.5620313,
+    "hash": "a4441ff91847cf2e217583f76cee6213"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/metadata/metadata.module.ts": {
+    "mtime": 1773212951.690751,
+    "hash": "75c8afe2ee45562cad92aa76c7c53706"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/metadata/metadata.service.ts": {
+    "mtime": 1776286778.7869503,
+    "hash": "ac0ccaea82a6bc8656dc8a6e03f299d1"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/metadata/metadata.controller.ts": {
+    "mtime": 1777245060.2390344,
+    "hash": "026efaf644319fa4a685fc90350898ae"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/metadata/providers/tmdb.provider.ts": {
+    "mtime": 1773694695.8637028,
+    "hash": "23a5c692b3e31d44462917c4c5468282"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/metadata/providers/omdb.provider.ts": {
+    "mtime": 1773694727.338721,
+    "hash": "ab8b5b1ee133a4ee1a49e9ed3cc5da3d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/stream.module.ts": {
+    "mtime": 1774235325.5780313,
+    "hash": "c9a0db13a57117efc4cff4e3b6dd87dc"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/stream.controller.ts": {
+    "mtime": 1775194668.8512857,
+    "hash": "f61fe48dbad67d090374804dde67ede3"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/stream.service.ts": {
+    "mtime": 1777572246.4310553,
+    "hash": "bceb7e246739f600fbb229f9cc37a0c1"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/transcoder/transcoder.profiles.ts": {
+    "mtime": 1773075992.549673,
+    "hash": "c5ecc54db5fc622e0f4099fd796cc70a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/transcoder/chunk-meta.ts": {
+    "mtime": 1773944545.1607525,
+    "hash": "bda258945c5befe350ecb6a78e554d9c"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/transcoder/chunk-manager.service.ts": {
+    "mtime": 1774235325.5930312,
+    "hash": "1394017ba2234d4f49d3af4553b6bc4c"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/transcoder/hls-generator.service.ts": {
+    "mtime": 1774235325.5820312,
+    "hash": "41f81299943ef12386a7464b6dec1dad"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/transcoder/chunk-manifest.service.ts": {
+    "mtime": 1775875952.90694,
+    "hash": "af57888196821ac5d59f4e8d9ccadf91"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/transcoder/transcode-debug.types.ts": {
+    "mtime": 1774062577.3168175,
+    "hash": "0e541bfb88c72bdefe9d423530294657"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/transcoder/transcode-debugger.service.ts": {
+    "mtime": 1775875952.9249399,
+    "hash": "d798fd6c46c10786b24f965f9f7a2bee"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/transcoder/transcode-debug.controller.ts": {
+    "mtime": 1774062757.8900335,
+    "hash": "2788186123ed7e103e403a16a5865c3b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/transcoder/transcoder.service.ts": {
+    "mtime": 1777704616.9422731,
+    "hash": "c4c855867102432cb2ea86dc4a72eedf"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/direct-play/direct-play.service.ts": {
+    "mtime": 1773212951.7207508,
+    "hash": "5d09e8468d11e5002b31dcbb2bc4046a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/subtitles/subtitle.controller.ts": {
+    "mtime": 1773720818.0748355,
+    "hash": "d7024facaf353cad1a67057d5a068607"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/subtitles/subtitle-manage.controller.ts": {
+    "mtime": 1775875952.9187186,
+    "hash": "6174860847de80f8c3fed997d263f622"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/subtitles/subtitle-search.service.ts": {
+    "mtime": 1775875952.9172041,
+    "hash": "662b796b4b5e51ca84d3516a75c9f0e9"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/stream/subtitles/subtitle.service.ts": {
+    "mtime": 1775754759.1736784,
+    "hash": "3b90c6a2c41d409b66e0c247e8af091b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/plugins/plugin.controller.ts": {
+    "mtime": 1773212951.7007508,
+    "hash": "43b8d4959665087c3344ea534a567654"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/plugins/plugin.interface.ts": {
+    "mtime": 1773076661.339597,
+    "hash": "bd8c0536c286fcbf99f8e71e4a4da4e4"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/plugins/plugin-api-registry.service.ts": {
+    "mtime": 1773212951.697751,
+    "hash": "4b0445bf8955bf68952b8b8d30a74d21"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/plugins/plugin-api.controller.ts": {
+    "mtime": 1773212951.7007508,
+    "hash": "55fe18ed5aff1d24e60019eb4f9c0692"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/plugins/plugin.module.ts": {
+    "mtime": 1773212951.714751,
+    "hash": "908e53ff7a47a08aa38a0bfb3c0592a7"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/plugins/plugin-context.factory.ts": {
+    "mtime": 1773212951.7067509,
+    "hash": "cdbf76fdf130655816380b45ec1802e3"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/plugins/plugin-manager.service.ts": {
+    "mtime": 1773212951.7277508,
+    "hash": "ba9e3cae17f8662d33943620ab6f3c91"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/recommendations/recommendations.module.ts": {
+    "mtime": 1773075992.548673,
+    "hash": "16e3fb806e59aac9fe08a6c90543de9a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/recommendations/recommendations.controller.ts": {
+    "mtime": 1773212951.702751,
+    "hash": "afec470fc313ced9c5b1ed39b306429b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/recommendations/taste-profile.service.ts": {
+    "mtime": 1773212951.718751,
+    "hash": "eeeb03d97533c8627faf01859bfde165"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/recommendations/recommendations.service.ts": {
+    "mtime": 1773212951.7307508,
+    "hash": "9f98dd5ce9883aada44269a58b03442a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/settings/settings.service.ts": {
+    "mtime": 1773212951.715751,
+    "hash": "451215fc99e43f1f43859533c3c1004a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/settings/settings.module.ts": {
+    "mtime": 1773681059.8127642,
+    "hash": "f3e6356d997dd7e7801231330fb56bc4"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/settings/settings.controller.ts": {
+    "mtime": 1773681066.953732,
+    "hash": "3ae22207faf7b35f5bacab0d0029adb3"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/jobs/job.module.ts": {
+    "mtime": 1773212951.6567512,
+    "hash": "f8a35210e382440823f48e12467b92ef"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/jobs/job.interface.ts": {
+    "mtime": 1774064236.0296142,
+    "hash": "8554cd5925238fd068d66690033f5ea1"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/jobs/job.controller.ts": {
+    "mtime": 1774236428.1626725,
+    "hash": "c0ff8d98275dc33c5cf4e225526d95c4"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/jobs/job-manager.service.ts": {
+    "mtime": 1777591630.2241654,
+    "hash": "cf23d306b0ee1b72be13665535029680"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/media/thumbnail.service.ts": {
+    "mtime": 1775938892.0193994,
+    "hash": "b0cad11a7e193de0be10c90cb0a0522e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/media/thumbnail.controller.ts": {
+    "mtime": 1775961471.5703766,
+    "hash": "c47fb62a624c7b7a091136e882f83c34"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/media/media.module.ts": {
+    "mtime": 1775961479.5713437,
+    "hash": "4b4229e0fc863ac7b72e232ef639809b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/media/sprite.service.ts": {
+    "mtime": 1776237128.7966504,
+    "hash": "c87a11c211b2fdc8753b8828835bc35b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/filesystem/filesystem.service.ts": {
+    "mtime": 1773212951.660751,
+    "hash": "43fcf0efaf8ebcd26577b91a0662c331"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/filesystem/filesystem.controller.ts": {
+    "mtime": 1773212951.6537511,
+    "hash": "6925f1c0b4bd2d5e5b1aae1059d7a69e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/filesystem/filesystem.module.ts": {
+    "mtime": 1773212951.654751,
+    "hash": "ab16c5c8912fc50a9353cf3d4243c015"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/admin/admin.module.ts": {
+    "mtime": 1775849075.398291,
+    "hash": "ba4500741d70ce39b90425ce5cca874d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/admin/admin.controller.ts": {
+    "mtime": 1776553873.0091949,
+    "hash": "07b500941846ca1882a55b98ac3e3909"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/admin/server.service.ts": {
+    "mtime": 1777704436.3301852,
+    "hash": "981f9021b50e67a3583b08dac45cdf3f"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/admin/server.controller.ts": {
+    "mtime": 1777704438.6211739,
+    "hash": "9a7e8e37f1d54f1912bda78f6b9fdac9"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/audio-profiles/audio-profiles.service.ts": {
+    "mtime": 1773684936.8552744,
+    "hash": "6844fcdfe04a8cfd68958199aec4cf92"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/audio-profiles/audio-profiles.controller.ts": {
+    "mtime": 1773591440.1482341,
+    "hash": "cb5342da3fb51fb2b09fdeda81eea318"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/audio-profiles/audio-profiles.module.ts": {
+    "mtime": 1773591443.8512151,
+    "hash": "7d58b7545b306c9b18f1a6b4d3094ed1"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/sharing/sharing.module.ts": {
+    "mtime": 1773684936.8772743,
+    "hash": "8a29dbf3d91b06bf76a48c5f12d15965"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/sharing/sharing.service.ts": {
+    "mtime": 1773681142.9733882,
+    "hash": "6c8aa3c673f6026557d40cc1388a45cc"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/sharing/sharing-auth.guard.ts": {
+    "mtime": 1773685688.8979628,
+    "hash": "20bfa6194c4b957f08e1f2938471357b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/sharing/sharing.controller.ts": {
+    "mtime": 1777572308.479731,
+    "hash": "74e413e32dd6207356f59df23fcbde35"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/remote/remote.module.ts": {
+    "mtime": 1773651000.939489,
+    "hash": "6aaf9e1e2069b795ada487dba08ba4bf"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/remote/remote.service.ts": {
+    "mtime": 1775875952.91094,
+    "hash": "5cfa76a8a2068e4924d77a358a467174"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/remote/remote.controller.ts": {
+    "mtime": 1775875952.90394,
+    "hash": "536a57bceaae41572f58a29b0678e203"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/themes/themes.service.ts": {
+    "mtime": 1774383781.2104504,
+    "hash": "f60476bea16c83c4dc5ec7f31d918891"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/themes/themes.module.ts": {
+    "mtime": 1774369322.7348924,
+    "hash": "f2f6f599cfb451e5e1ca65cd5247b918"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/themes/themes.controller.ts": {
+    "mtime": 1774385750.6039257,
+    "hash": "5da437ccf1cea193f3ec27b4154ac0b3"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/share-links/share-links.service.ts": {
+    "mtime": 1775752243.539345,
+    "hash": "f2172770a60105345c67aee07d0b97dd"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/share-links/share-links.controller.ts": {
+    "mtime": 1775752252.6553066,
+    "hash": "bf314359ab2eaf5d04aac4d932b5a5fd"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/server/src/share-links/share-links.module.ts": {
+    "mtime": 1775752260.630273,
+    "hash": "73a98b1dbbeb20d5d221bdfd7b1dbd19"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/main.tsx": {
+    "mtime": 1774684385.8594837,
+    "hash": "eafaae6b2702b1ef6570221b51f83cd6"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/app.tsx": {
+    "mtime": 1775752497.5012753,
+    "hash": "86391d757838362c27e13baa9cbde72e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/notifications.state.ts": {
+    "mtime": 1773075992.534673,
+    "hash": "b9b3cf003d0b6afa9a4518c109589f0d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/theme.state.ts": {
+    "mtime": 1773212951.5797513,
+    "hash": "c6d54622a4cc64bbb34605037b3ce828"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/videoEngineRef.ts": {
+    "mtime": 1773075992.534673,
+    "hash": "641677f80fd2a8274e2a193d94eb399b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/accentColor.state.ts": {
+    "mtime": 1773212951.5757513,
+    "hash": "c039cc1c50198f082d526ce3e8ec4255"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/history.state.ts": {
+    "mtime": 1773075992.534673,
+    "hash": "36d9ff258c456dc39dbd5e60fabdac10"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/auth.state.ts": {
+    "mtime": 1773794334.0271196,
+    "hash": "e196d65261f9c93c9870c0ca279cb40a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/appearance.state.ts": {
+    "mtime": 1773898644.6102138,
+    "hash": "7a0e4721a2b272310ca53897e4fcfcaa"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/themes.state.ts": {
+    "mtime": 1774383781.1654506,
+    "hash": "75f28342e2e6aaee1a94f607c4014dcd"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/processing.state.ts": {
+    "mtime": 1775171828.3558834,
+    "hash": "d9fdfc79b1c98ce821620605383ca18e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/share.state.ts": {
+    "mtime": 1775752383.3027563,
+    "hash": "3d5bb8794f1183aef50d74b1dda3be82"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/globalPlayer.state.ts": {
+    "mtime": 1775875952.868778,
+    "hash": "aa6b7ae2ffee42f57380fc26fb495ce3"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/player.state.ts": {
+    "mtime": 1775961585.716907,
+    "hash": "5efab26cf5a6766a0e60977a6ad0c775"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/library.state.ts": {
+    "mtime": 1777320909.3460062,
+    "hash": "8d7cd1d02f1de50e642a17f44ff957c7"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/video-effects.state.ts": {
+    "mtime": 1777571530.3557959,
+    "hash": "662c78ef101ed0941b14b7bb6a5468dc"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/audio-profiles.state.ts": {
+    "mtime": 1777571634.5822513,
+    "hash": "3776e4c00aafde1710074d4efe2cc12c"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/state/audio-effects.state.ts": {
+    "mtime": 1777577044.9434361,
+    "hash": "f7f52cd59f4a3a1ce6baf13da980995f"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/settings.service.ts": {
+    "mtime": 1773075992.529673,
+    "hash": "49c69dd6c5f52d5ccb9b981df15cc0e3"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/admin.service.ts": {
+    "mtime": 1773075992.5286732,
+    "hash": "1938f21266e06efcc6b7c84e555099b1"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/sources.service.ts": {
+    "mtime": 1773075992.530673,
+    "hash": "b96b97d3c2877fc327bfb1188912e2f5"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/library-events.service.ts": {
+    "mtime": 1773212951.5727513,
+    "hash": "2b71d96084edb839e799acb7e1bc8aea"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/plugins.service.ts": {
+    "mtime": 1773076823.699876,
+    "hash": "662ad6fe34e1928ed8f8436aa3913f87"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/audio-profiles.service.ts": {
+    "mtime": 1773591690.6449428,
+    "hash": "d0e2dfa3819ec3f62d0300710cac7503"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/playlists.service.ts": {
+    "mtime": 1773683337.6084764,
+    "hash": "b2498c666d971a6c47131a166a9f0d96"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/subtitles.service.ts": {
+    "mtime": 1773770900.374522,
+    "hash": "683392483588ba507856a245f3599f7e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/websocket.service.ts": {
+    "mtime": 1774065347.1227717,
+    "hash": "96815c33ce96d6696e73c12c93bd831c"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/themes.service.ts": {
+    "mtime": 1774369408.9664884,
+    "hash": "69b38032b4a075764fc8e292babdbf31"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/api.ts": {
+    "mtime": 1775752398.8536909,
+    "hash": "7177d935db94f9fd3c12cb1b067c4c74"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/share-links.service.ts": {
+    "mtime": 1775752450.2574742,
+    "hash": "88596acbd9b4ff75b3b897d7717d4456"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/movies.service.ts": {
+    "mtime": 1776286532.1701286,
+    "hash": "014790e902a8e55c2c446ac4b0a575fb"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/services/stream.service.ts": {
+    "mtime": 1776553785.0246186,
+    "hash": "4ecfa2e3a826a5bf3029d66ca8033b09"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/layout/MobileNav.tsx": {
+    "mtime": 1773077995.3047698,
+    "hash": "547ddaee6ffcf5f60673a1db875bcad3"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/layout/RecentlyPlayed.tsx": {
+    "mtime": 1774677684.5259905,
+    "hash": "0afbfe1293f98c51e3867bf5d4a0b07b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/layout/Sidebar.tsx": {
+    "mtime": 1776985062.6418738,
+    "hash": "1ba9b4b9d96c447022409e748ac85d18"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/layout/TopBar.tsx": {
+    "mtime": 1777046781.7033768,
+    "hash": "89cecfa9200694c92fd9361c35f0ee2b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/layout/EncoderHealthBanner.tsx": {
+    "mtime": 1777570543.208985,
+    "hash": "3a585ea6f0a71d6a2ffbc14e7d7d3dac"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/layout/AppShell.tsx": {
+    "mtime": 1777570534.5200307,
+    "hash": "0f4dde3f120db4892cb26359fb02ac05"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/SubtitleAppearance.tsx": {
+    "mtime": 1774067528.3302567,
+    "hash": "8b9fe4d7c3586fb6580b0e3d3896e10a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/FileInfoGrid.tsx": {
+    "mtime": 1775875952.8409402,
+    "hash": "cc5edd26c7bbb73814601fc568cee60d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/RatingWidget.tsx": {
+    "mtime": 1775026066.317027,
+    "hash": "71857de486f76a2b3708717de33f1d2e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/ExternalRatings.tsx": {
+    "mtime": 1775292100.6626618,
+    "hash": "47a7525ea2b5920bfb675cc7612af08a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/ShareMovieModal.tsx": {
+    "mtime": 1775752654.8756123,
+    "hash": "0a0544364e1b8398b36fad1c24558810"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/BulkActionsBar.tsx": {
+    "mtime": 1776286841.0826526,
+    "hash": "2545c08c5d861592c35823eca957dbca"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/MoviePlaylists.tsx": {
+    "mtime": 1777013810.9254274,
+    "hash": "2ecf21ceadd0a186050dcbcd2af3c520"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/MovieGrid.tsx": {
+    "mtime": 1777320997.0705721,
+    "hash": "1b86f9d23835dcfe78e51d27b5bff327"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/MovieCarousel.tsx": {
+    "mtime": 1777538162.3040843,
+    "hash": "fc6f18643107184e723aaed814d58f9d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/types.ts": {
+    "mtime": 1777538126.888497,
+    "hash": "317fe4de17a6b09dfcf388b11a6b6043"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/SubtitlePanel.tsx": {
+    "mtime": 1777568887.0367532,
+    "hash": "97fef6f1dfbb29dae6b094f1096a425e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/useMovieCardBehavior.ts": {
+    "mtime": 1777571881.81296,
+    "hash": "23974c8e717c3bfe8173998a8f30ed12"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/MovieCard.tsx": {
+    "mtime": 1777571899.8528657,
+    "hash": "87bc33e6f4dbf917277cd443d3b814d8"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/MovieListItem.tsx": {
+    "mtime": 1777571913.8097928,
+    "hash": "8129e2b301c8328e20ea2336aea136a2"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/MovieLargeCard.tsx": {
+    "mtime": 1777571927.70072,
+    "hash": "5193df7c9150f12161ed334159d88f83"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/useMenuOpen.ts": {
+    "mtime": 1777571970.8874946,
+    "hash": "595722bb7b0d4395bea2af9288fdb414"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/DeleteMovieModal.tsx": {
+    "mtime": 1777572056.2160487,
+    "hash": "3209451155ebe2552f34a30ff5a79b87"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/movie/MovieOptionsMenu.tsx": {
+    "mtime": 1777572056.2190487,
+    "hash": "6e2ac3bccbfad9b4a0016a0f492857f6"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/InfoPanel.tsx": {
+    "mtime": 1775842688.8436687,
+    "hash": "8e27f1b30ee9cd52b04a2a64787ed4b6"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/VideoPlayer.tsx": {
+    "mtime": 1775894563.224364,
+    "hash": "9dd45dd805970a2a96cc24a924b309c5"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/PlayerControls.tsx": {
+    "mtime": 1777404011.2902524,
+    "hash": "a635f167580242bdd2c9d4d6a8822324"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/useVideoEngine.ts": {
+    "mtime": 1777269918.4041827,
+    "hash": "9da1eb23d8f53bbc09a286ed4be1424e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/EqSpectrum.tsx": {
+    "mtime": 1777433417.3249094,
+    "hash": "864fe8f1db99267b17c64dd809886798"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/CompressorCurve.tsx": {
+    "mtime": 1777433549.2312253,
+    "hash": "01fd974287aecee9251182037fd273cf"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/GlobalPlayer.tsx": {
+    "mtime": 1777434477.3644156,
+    "hash": "3c9ab0e6116f0dfa9ee576ada6808bab"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/EffectsPanel.tsx": {
+    "mtime": 1777571855.4040434,
+    "hash": "dbd7b316c1ea5b7722e2f32b449309a0"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/effects/ProfileControls.tsx": {
+    "mtime": 1777571855.4110978,
+    "hash": "68b2d7d21ea6364a7aa8e75d0f8edc73"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/effects/CollapsibleSettings.tsx": {
+    "mtime": 1777571771.6035357,
+    "hash": "be08dec11060e30dabfbd9038a94308a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/effects/VideoTab.tsx": {
+    "mtime": 1777571829.8832312,
+    "hash": "bd076e6107bc8663ffded82a7205a18d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/effects/EqTab.tsx": {
+    "mtime": 1777577002.7270718,
+    "hash": "25d7e495b52fd96939ba36792ac09c13"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/player/effects/CompressorTab.tsx": {
+    "mtime": 1777577039.9584618,
+    "hash": "d43cb75511cf85bdcd7b9e2e7b0afb74"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/Button.tsx": {
+    "mtime": 1773077273.68691,
+    "hash": "4e68f04bf9f48a850cf719a1d852f07b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/Spinner.tsx": {
+    "mtime": 1773077995.3047698,
+    "hash": "2a3e6867ca62d2095068702a9198964d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/Toast.tsx": {
+    "mtime": 1773212951.5257516,
+    "hash": "1602455f1d72d404bb5dc3ceefe59f66"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/Tabs.tsx": {
+    "mtime": 1773077995.3067696,
+    "hash": "65e2e9e8d4da6e9cc7484c7e7a5d1abd"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/EmptyState.tsx": {
+    "mtime": 1773077995.3047698,
+    "hash": "d8acc6144d181bc100e25d51c4b2125a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/FolderBrowser.tsx": {
+    "mtime": 1773212951.5417514,
+    "hash": "6a24ff4543c1a69a95911ae5860c3bbc"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/ColorPicker.tsx": {
+    "mtime": 1773646097.324514,
+    "hash": "1625602b6b7bcd7a16c0884b3822cc6a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/Modal.tsx": {
+    "mtime": 1773796167.8398046,
+    "hash": "8075415ce0cf25aa5bf31f70ac0de1f5"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/FontScaler.tsx": {
+    "mtime": 1773898367.0642946,
+    "hash": "4709c6322b8fe832d43252dcd4928eb1"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/ConfirmDialog.tsx": {
+    "mtime": 1777568806.0751836,
+    "hash": "d1175e2f358ef054d2c273913ea36f34"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/common/ToggleButton.tsx": {
+    "mtime": 1777576550.4299846,
+    "hash": "a7986042939a10d36637116ba8bf3224"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/library/MediaPathEntry.tsx": {
+    "mtime": 1773212951.5407515,
+    "hash": "9b0d24ddd00bbc23ef7270a4e0621085"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/components/library/MediaPathList.tsx": {
+    "mtime": 1773212951.5257516,
+    "hash": "1bd93376fa20a85d972b3177b90ae307"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Login.tsx": {
+    "mtime": 1773212951.5477514,
+    "hash": "92c87f0093f8d1ce02e59fd15e53bb73"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Discover.tsx": {
+    "mtime": 1773077995.3837693,
+    "hash": "6a44dd460bc698002a37df989cdc2f7c"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/NotFound.tsx": {
+    "mtime": 1773077995.3167696,
+    "hash": "27997fdf3f2512c6b60333ea59d13614"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/PersonDetail.tsx": {
+    "mtime": 1773212951.5587513,
+    "hash": "67f9462bc1daf152fe24ea554e0fa53c"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Setup.tsx": {
+    "mtime": 1773212951.5737514,
+    "hash": "c1b1a8381544cfbdae3ca04b1d7392e5"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Changelog.tsx": {
+    "mtime": 1773212951.5467515,
+    "hash": "9d02c0ace2d1ba5c9038b40b76a13028"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Plugins.tsx": {
+    "mtime": 1773212951.5757513,
+    "hash": "c6c1233d76771dcd15b01dd94c47924a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Dashboard.tsx": {
+    "mtime": 1773212951.5367515,
+    "hash": "eb0ade123db91f0ca3ed21158075349b"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/History.tsx": {
+    "mtime": 1773212951.5537515,
+    "hash": "4ac00e3b392acb6314eeff4189555cbb"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Playlists.tsx": {
+    "mtime": 1773212951.6227512,
+    "hash": "2a97aa73b65d73bf8281f9f33380abee"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/PlaylistDetail.tsx": {
+    "mtime": 1773212951.5777514,
+    "hash": "0fb9a1db675e536eae4fec169bfb54ba"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Player.tsx": {
+    "mtime": 1773798444.343857,
+    "hash": "6657f2b0649bb40bacdccaba6ac661b1"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/PublicWatch.tsx": {
+    "mtime": 1775752475.3823683,
+    "hash": "f186c7d442bdad886ad501f3d52932b8"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Settings.tsx": {
+    "mtime": 1775934950.5366056,
+    "hash": "595c5bc4edc65c2b4c4fb59b9fccedfc"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Watchlist.tsx": {
+    "mtime": 1775937137.708964,
+    "hash": "267581ed38387f2e5f88285af0847ad1"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Library.tsx": {
+    "mtime": 1776286778.7529504,
+    "hash": "3c388a7ce29f91d1b4bf76f0b33dc829"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/AdminDashboard.tsx": {
+    "mtime": 1776553849.742307,
+    "hash": "9957a275e15e709a2c1c4c9635e13fe5"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/MovieDetail.tsx": {
+    "mtime": 1777013810.9444275,
+    "hash": "fbe8ce76896570ec588943f9bf777ebe"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/Search.tsx": {
+    "mtime": 1777321003.970538,
+    "hash": "de44ed6eb9d981119cbc54e031c79950"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/pages/ServerSettings.tsx": {
+    "mtime": 1777705404.781266,
+    "hash": "602d672c156ad76cd4be76ba3de7f48a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/hooks/useDebounce.ts": {
+    "mtime": 1773212951.5277514,
+    "hash": "0388585824c2b0b2997859d466253bb7"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/hooks/useMediaQuery.ts": {
+    "mtime": 1773212951.5307515,
+    "hash": "70c3e4f9e05d8a8778c8e77117123f5e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/hooks/useUiSetting.ts": {
+    "mtime": 1773212951.5317514,
+    "hash": "4e7007601900f77b48577d340c444111"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/hooks/useScanEvents.ts": {
+    "mtime": 1773212951.5367515,
+    "hash": "8d3ec018d27d6e664426c99935f5213d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/hooks/useCanvasAnimator.ts": {
+    "mtime": 1777433393.3870337,
+    "hash": "22396d02478caceb8313d98db65fdc73"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/hooks/useAnimationFrame.ts": {
+    "mtime": 1777569101.6326127,
+    "hash": "5948493efce3db50d127b5ad2acf06a1"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/utils/rating-color.ts": {
+    "mtime": 1773075992.534673,
+    "hash": "dbf4bac5f7834276ea98f02e2469923e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/utils/watch-progress.ts": {
+    "mtime": 1773075992.534673,
+    "hash": "7978e85d028f959403f8105d64f5f4ad"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/utils/stream-mode.ts": {
+    "mtime": 1773623809.364576,
+    "hash": "d33b68b1306bb70345e4a86aabbe805e"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/utils/console-debug.ts": {
+    "mtime": 1774331643.9099822,
+    "hash": "3db97b2c479fd46e53f7fa145dd3e0c8"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/plugins/ui-slots.ts": {
+    "mtime": 1773082035.6224344,
+    "hash": "fd0327887bdecc6d1d036687b054240a"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/plugins/plugin-client.interface.ts": {
+    "mtime": 1773082048.371379,
+    "hash": "6d655912438c105d1cb57d734728d4a4"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/plugins/PluginSlot.tsx": {
+    "mtime": 1773212951.5597515,
+    "hash": "ba7281cf6abc548486936c9317de1d50"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/plugins/plugin-slot-manager.ts": {
+    "mtime": 1773212951.5717514,
+    "hash": "f51c2e1487e296d6f8c1b7da1a2fd0a2"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/plugins/plugin-client-manager.ts": {
+    "mtime": 1773212951.5837514,
+    "hash": "0b7d0527f82cabc7f10e40b7e7a60b7d"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/client/src/audio/audio-engine.ts": {
+    "mtime": 1777573845.480859,
+    "hash": "931325d41bc46d9906443239e62fd300"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/index.ts": {
+    "mtime": 1773212951.6597512,
+    "hash": "d072b8425706df81d29ece846ac9d7cb"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/types/user.ts": {
+    "mtime": 1773075992.551673,
+    "hash": "e1fdf4b357dbbc59bfc9a1fdedac3ff2"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/types/plugin.ts": {
+    "mtime": 1773076969.6592383,
+    "hash": "be98e7225171e84b98dcbd14f1b23937"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/types/movie.ts": {
+    "mtime": 1773210003.315055,
+    "hash": "bf871f3c9c4403455e6ccc104ebf10c3"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/types/subtitle.ts": {
+    "mtime": 1773644653.5548432,
+    "hash": "b67f48bf08b9af814fc3b69a635ad6b7"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/types/theme.ts": {
+    "mtime": 1774369245.9192524,
+    "hash": "c99b3279c8e23d292165d704fb77d634"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/types/index.ts": {
+    "mtime": 1774369250.3032317,
+    "hash": "9b5c4f9acb49c6ab0916ebe527d53333"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/types/api.ts": {
+    "mtime": 1775934394.3003237,
+    "hash": "4f245d7cfaa77a2aaa83b5a6d469b155"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/constants/index.ts": {
+    "mtime": 1773075992.550673,
+    "hash": "f82ac727b56e40e18fe28d7ffe0452f9"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/enums/index.ts": {
+    "mtime": 1773075992.550673,
+    "hash": "1832edc55abbc89fd06b42468dc33e23"
+  },
+  "/home/rw3iss/Sites/mu/src/packages/shared/src/utils/index.ts": {
+    "mtime": 1773076069.5209155,
+    "hash": "9969fd7ca5c99d4b8fe1b7ca01ab6c11"
+  }
+}

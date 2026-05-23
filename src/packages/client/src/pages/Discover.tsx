@@ -9,10 +9,11 @@ import { Spinner } from '@/components/common/Spinner';
 import { useSeo } from '@/hooks/useSeo';
 import { DiscoverFilters as FilterPanel } from '@/components/discover/DiscoverFilters';
 import { DiscoverResultCard } from '@/components/discover/DiscoverResultCard';
+import { IncludeToggle } from '@/components/discover/IncludeToggle';
 import { QuickStartPanel } from '@/components/discover/QuickStartPanel';
 import { SeedChip } from '@/components/discover/SeedChip';
-import type { IncludeMode } from '@/services/discover.service';
 import { moviesService } from '@/services/movies.service';
+import { wsService } from '@/services/websocket.service';
 import {
 	addPersonSeed,
 	addSeed,
@@ -31,6 +32,7 @@ import {
 	results,
 	runDiscover,
 	saveDiscoverScroll,
+	scheduleDiscover,
 	seedLabels,
 	seedMovieIds,
 	setFilters,
@@ -41,43 +43,11 @@ import {
 	usedSources,
 	useProfile,
 } from '@/state/discover.state';
+import { watchPositions } from '@/state/watchPositions.state';
 import styles from './Discover.module.scss';
 
 interface DiscoverProps {
 	path?: string;
-}
-
-function IncludeToggle({
-	value,
-	onChange,
-}: {
-	value: IncludeMode;
-	onChange: (m: IncludeMode) => void;
-}) {
-	const options: { id: IncludeMode; label: string; title: string }[] = [
-		{ id: 'owned', label: 'Owned', title: 'Only movies in your library' },
-		{ id: 'all', label: 'All', title: 'Library + not-owned suggestions' },
-		{
-			id: 'notOwned',
-			label: 'Not owned',
-			title: 'Only movies you don’t have yet — bookmark to remember',
-		},
-	];
-	return (
-		<div class={styles.includeToggle} role="radiogroup" aria-label="Include">
-			{options.map((o) => (
-				<button
-					key={o.id}
-					type="button"
-					title={o.title}
-					class={`${styles.includeBtn} ${value === o.id ? styles.includeActive : ''}`}
-					onClick={() => onChange(o.id)}
-				>
-					{o.label}
-				</button>
-			))}
-		</div>
-	);
 }
 
 /**
@@ -140,13 +110,14 @@ export function Discover(_props: DiscoverProps) {
 	}, []);
 
 	// Re-fetch whenever seeds, person seeds, filters, include mode, or
-	// the use-profile flag change.
+	// the use-profile flag change. Debounced (~220ms) so typing in
+	// the cast/director field doesn't fire a request per keystroke.
 	useEffect(() => {
-		const dispose = seedMovieIds.subscribe(() => runDiscover());
-		const dispose2 = filters.subscribe(() => runDiscover());
-		const dispose3 = includeMode.subscribe(() => runDiscover());
-		const dispose4 = personSeedKeys.subscribe(() => runDiscover());
-		const dispose5 = useProfile.subscribe(() => runDiscover());
+		const dispose = seedMovieIds.subscribe(() => scheduleDiscover());
+		const dispose2 = filters.subscribe(() => scheduleDiscover());
+		const dispose3 = includeMode.subscribe(() => scheduleDiscover());
+		const dispose4 = personSeedKeys.subscribe(() => scheduleDiscover());
+		const dispose5 = useProfile.subscribe(() => scheduleDiscover());
 		return () => {
 			dispose();
 			dispose2();
@@ -156,12 +127,51 @@ export function Discover(_props: DiscoverProps) {
 		};
 	}, []);
 
-	const list = results.value;
+	// Auto-refresh when background external-enrichment jobs finish so
+	// freshly-hydrated stubs (ratings, posters, overview) replace the
+	// "Enriching…" placeholders without the user clicking Refresh.
+	// We re-run only if we had queued enrichments AND the job that
+	// just finished is one of ours (type='external-enrichment').
+	useEffect(() => {
+		const handle = (data: unknown) => {
+			const ev = data as { type?: string };
+			if (ev?.type !== 'external-enrichment') return;
+			if (enrichmentsQueued.value <= 0) return;
+			scheduleDiscover();
+		};
+		wsService.on('job:completed', handle);
+		wsService.on('job:failed', handle);
+		return () => {
+			wsService.off('job:completed', handle);
+			wsService.off('job:failed', handle);
+		};
+	}, []);
+
+	const rawList = results.value;
 	const loading = isLoading.value;
 	const err = errorMessage.value;
 	const seeds = seedMovieIds.value;
 	const seedLabelMap = seedLabels.value;
 	const filterValue = filters.value;
+
+	// Client-side watch-state filter. The watch positions live in a
+	// signal already (hydrated on app init + kept fresh during
+	// playback), so this is a free local pass without a server
+	// round-trip. "All" / unset → bypass.
+	const watched = filterValue.watched ?? 'all';
+	const positions = watchPositions.value;
+	const list =
+		watched === 'all'
+			? rawList
+			: rawList.filter((m) => {
+					const pos = positions[m.movieId];
+					if (watched === 'unwatched') return !pos || pos.positionSeconds <= 0;
+					if (watched === 'in-progress')
+						return !!pos && pos.positionSeconds > 0;
+					if (watched === 'watched')
+						return !!pos && pos.positionSeconds > 0;
+					return true;
+				});
 
 	const headerTitle =
 		seeds.length === 0
@@ -331,7 +341,10 @@ export function Discover(_props: DiscoverProps) {
 							</p>
 						</div>
 					) : (
-						<div class={styles.grid}>
+						<div
+							class={`${styles.grid} ${loading ? styles.gridLoading : ''}`}
+							aria-busy={loading || undefined}
+						>
 							{list.map((movie) => (
 								<DiscoverResultCard key={movie.movieId} movie={movie} />
 							))}

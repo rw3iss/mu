@@ -191,6 +191,31 @@
 	margin-left: auto;
 	font-size: 0.65rem;
 	opacity: 0.7;
+	cursor: help;
+}
+
+.moreReasonsHint {
+	color: var(--color-text-muted);
+	font-style: italic;
+	opacity: 0.8;
+	cursor: help;
+}
+
+/* Resume progress bar — slim line directly under the poster, same
+ * placement and feel as the library MovieCard variant so the card
+ * vocabulary stays consistent across views. */
+.progressBar {
+	width: 100%;
+	height: 3px;
+	background: rgba(255, 255, 255, 0.08);
+	border-radius: 0;
+	overflow: hidden;
+}
+
+.progressFill {
+	height: 100%;
+	background: var(--color-accent, #06b6d4);
+	transition: width 200ms ease;
 }
 
 .reason {

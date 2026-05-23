@@ -106,6 +106,38 @@
 	font-style: italic;
 }
 
+/* Inline row of small toggle chips — used for decade shortcuts and
+ * the Watched state segmented control. Reuses .genreChip's hover /
+ * active states via the .decadeChip alias to keep the visual
+ * vocabulary tight. */
+.chipRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	margin-top: 0.5rem;
+}
+
+.decadeChip {
+	padding: 0.2rem 0.55rem;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 999px;
+	color: var(--color-text);
+	font-size: 0.7rem;
+	cursor: pointer;
+	transition: background 100ms ease;
+
+	&:hover {
+		background: rgba(255, 255, 255, 0.08);
+	}
+
+	&.active {
+		background: var(--color-accent-soft, rgba(6, 182, 212, 0.2));
+		border-color: var(--color-accent, #06b6d4);
+		color: var(--color-accent, #06b6d4);
+	}
+}
+
 input[type='range'] {
 	width: 100%;
 	accent-color: var(--color-accent, #06b6d4);

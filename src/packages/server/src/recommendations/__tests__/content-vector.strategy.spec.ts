@@ -25,6 +25,8 @@ function m(over: Partial<MovieWithMetadata> & { id: string; title: string }): Mo
 		tmdbRating: over.tmdbRating ?? null,
 		imdbRating: over.imdbRating ?? null,
 		tmdbVotes: null,
+		imdbVotes: null,
+		language: null,
 	};
 }
 

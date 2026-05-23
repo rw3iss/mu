@@ -75,38 +75,6 @@
 	to { transform: rotate(360deg); }
 }
 
-.includeToggle {
-	display: inline-flex;
-	align-items: stretch;
-	border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
-	border-radius: 6px;
-	overflow: hidden;
-}
-
-.includeBtn {
-	background: transparent;
-	color: var(--color-text-muted);
-	border: none;
-	padding: 0.4rem 0.75rem;
-	font-size: 0.75rem;
-	font-weight: var(--font-weight-medium);
-	cursor: pointer;
-	letter-spacing: 0.02em;
-
-	&:hover {
-		background: rgba(255, 255, 255, 0.04);
-		color: var(--color-text);
-	}
-
-	& + & {
-		border-left: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
-	}
-}
-
-.includeActive {
-	background: var(--color-accent-soft, rgba(6, 182, 212, 0.18));
-	color: var(--color-accent, #06b6d4);
-}
 
 .enrichBanner {
 	padding: 0.55rem 0.85rem;
@@ -276,6 +244,15 @@
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 	gap: 1rem;
+	transition: opacity 150ms ease;
+}
+
+/* Applied while a re-fetch is in flight but stale results are still
+ * shown — dims the grid so the user knows new results are coming
+ * without losing visual context. */
+.gridLoading {
+	opacity: 0.55;
+	pointer-events: none;
 }
 
 .loading {

@@ -58,6 +58,8 @@ export class RecommendationsController {
 		@Query('yearTo') yearTo?: string,
 		@Query('person') person?: string,
 		@Query('language') language?: string,
+		@Query('minRuntime') minRuntime?: string,
+		@Query('maxRuntime') maxRuntime?: string,
 	) {
 		const filters = parseFilters({
 			minRating,
@@ -67,6 +69,8 @@ export class RecommendationsController {
 			yearTo,
 			person,
 			language,
+			minRuntime,
+			maxRuntime,
 		});
 		const k = parseLimit(limit);
 		const inc = parseInclude(include);
@@ -217,6 +221,8 @@ function parseFilters(raw: {
 	yearTo?: string;
 	person?: string;
 	language?: string;
+	minRuntime?: string;
+	maxRuntime?: string;
 }): DiscoverFilters | undefined {
 	const out: DiscoverFilters = {};
 	const num = (s: string | undefined) => {
@@ -240,5 +246,9 @@ function parseFilters(raw: {
 	if (yt != null) out.yearTo = yt;
 	if (raw.person?.trim()) out.person = raw.person.trim();
 	if (raw.language?.trim()) out.language = raw.language.trim();
+	const mn = num(raw.minRuntime);
+	if (mn != null) out.minRuntime = mn;
+	const mx = num(raw.maxRuntime);
+	if (mx != null) out.maxRuntime = mx;
 	return Object.keys(out).length > 0 ? out : undefined;
 }

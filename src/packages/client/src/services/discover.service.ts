@@ -8,6 +8,10 @@ export interface DiscoverFilters {
 	yearTo?: number;
 	person?: string;
 	language?: string;
+	minRuntime?: number;
+	maxRuntime?: number;
+	/** Client-only: filters the rendered results by watch state. */
+	watched?: 'all' | 'watched' | 'unwatched' | 'in-progress';
 }
 
 export type IncludeMode = 'owned' | 'notOwned' | 'all';
@@ -33,6 +37,13 @@ export interface ScoredMovie {
 	tmdbRating?: number | null;
 	tmdbVotes?: number | null;
 	imdbRating?: number | null;
+	imdbVotes?: number | null;
+	/** Hydrated alongside ratings so the card can render extra
+	 * context (runtime pill, primary genre, language) without a
+	 * follow-up movie fetch. */
+	runtimeMinutes?: number | null;
+	genres?: string[];
+	language?: string | null;
 }
 
 export interface DiscoverResponse {
@@ -89,13 +100,16 @@ function toQueryParams(req: DiscoverRequest): Record<string, string> {
 		if (f.yearTo != null) p.yearTo = String(f.yearTo);
 		if (f.person) p.person = f.person;
 		if (f.language) p.language = f.language;
+		if (f.minRuntime != null) p.minRuntime = String(f.minRuntime);
+		if (f.maxRuntime != null) p.maxRuntime = String(f.maxRuntime);
+		// `watched` is client-side only — never serialise it.
 	}
 	return p;
 }
 
 export const discoverService = {
-	fetch: (req: DiscoverRequest) =>
-		api.get<DiscoverResponse>('/recommendations/discover', toQueryParams(req)),
+	fetch: (req: DiscoverRequest, opts?: { signal?: AbortSignal }) =>
+		api.get<DiscoverResponse>('/recommendations/discover', toQueryParams(req), opts),
 };
 
 export interface Bookmark {

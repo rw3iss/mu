@@ -28,6 +28,8 @@ export interface MovieWithMetadata {
 	tmdbRating: number | null;
 	imdbRating: number | null;
 	tmdbVotes: number | null;
+	imdbVotes: number | null;
+	language: string | null;
 }
 
 /** Per-strategy raw score for one candidate. */
@@ -70,6 +72,13 @@ export interface ScoredMovie {
 	tmdbRating?: number | null;
 	tmdbVotes?: number | null;
 	imdbRating?: number | null;
+	imdbVotes?: number | null;
+	/** Hydrated alongside ratings so the result card can render
+	 * extra context (runtime pill, primary genre, language flag) without
+	 * a follow-up movie fetch. */
+	runtimeMinutes?: number | null;
+	genres?: string[];
+	language?: string | null;
 }
 
 export type IncludeMode = 'owned' | 'notOwned' | 'all';
@@ -83,6 +92,8 @@ export interface DiscoverFilters {
 	yearTo?: number;
 	person?: string;
 	language?: string;
+	minRuntime?: number;
+	maxRuntime?: number;
 }
 
 /** Knobs the admin / caller can pass into a recommendation call. */
@@ -186,5 +197,7 @@ export function hydrate(
 		tmdbRating: metadata?.tmdbRating ?? null,
 		imdbRating: metadata?.imdbRating ?? null,
 		tmdbVotes: metadata?.tmdbVotes ?? null,
+		imdbVotes: metadata?.imdbVotes ?? null,
+		language: movie.language ?? null,
 	};
 }

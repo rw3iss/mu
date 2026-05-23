@@ -726,6 +726,10 @@ export class RecommendationsService {
 				tmdbRating: m?.tmdbRating ?? null,
 				tmdbVotes: m?.tmdbVotes ?? null,
 				imdbRating: m?.imdbRating ?? null,
+				imdbVotes: m?.imdbVotes ?? null,
+				runtimeMinutes: m?.runtimeMinutes ?? null,
+				genres: m?.genres ?? [],
+				language: m?.language ?? null,
 			};
 		});
 

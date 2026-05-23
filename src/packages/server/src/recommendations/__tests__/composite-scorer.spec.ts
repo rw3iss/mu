@@ -25,6 +25,8 @@ function m(id: string, title: string): MovieWithMetadata {
 		tmdbRating: null,
 		imdbRating: null,
 		tmdbVotes: null,
+		imdbVotes: null,
+		language: null,
 	};
 }
 

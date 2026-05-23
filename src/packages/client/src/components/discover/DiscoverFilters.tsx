@@ -10,6 +10,25 @@ interface DiscoverFiltersProps {
 	onClear: () => void;
 }
 
+/** Decade quick-buttons. End year is exclusive of the next decade so
+ * "1990s" means [1990, 1999] not [1990, 2000]. */
+const DECADES: ReadonlyArray<{ label: string; from: number; to: number }> = [
+	{ label: "'60s", from: 1960, to: 1969 },
+	{ label: "'70s", from: 1970, to: 1979 },
+	{ label: "'80s", from: 1980, to: 1989 },
+	{ label: "'90s", from: 1990, to: 1999 },
+	{ label: "'00s", from: 2000, to: 2009 },
+	{ label: "'10s", from: 2010, to: 2019 },
+	{ label: "'20s", from: 2020, to: 2029 },
+];
+
+const WATCHED_OPTIONS: ReadonlyArray<{ value: NonNullable<Filters['watched']>; label: string }> = [
+	{ value: 'all', label: 'All' },
+	{ value: 'unwatched', label: 'Unwatched' },
+	{ value: 'in-progress', label: 'In progress' },
+	{ value: 'watched', label: 'Watched' },
+];
+
 /**
  * Filter panel for the Discover page. Lives inline (collapsible)
  * rather than as a modal so the user can tweak + re-run quickly.
@@ -37,6 +56,10 @@ export function DiscoverFilters({
 		else next.add(lower);
 		update({ genres: Array.from(next) });
 	};
+
+	const watched = value.watched ?? 'all';
+	const decadeActive = (d: { from: number; to: number }): boolean =>
+		value.yearFrom === d.from && value.yearTo === d.to;
 
 	return (
 		<div class={styles.panel}>
@@ -107,10 +130,66 @@ export function DiscoverFilters({
 						}}
 					/>
 				</div>
+				<div class={styles.chipRow}>
+					{DECADES.map((d) => (
+						<button
+							key={d.label}
+							type="button"
+							class={`${styles.decadeChip} ${decadeActive(d) ? styles.active : ''}`}
+							onClick={() => {
+								if (decadeActive(d)) {
+									update({ yearFrom: undefined, yearTo: undefined });
+								} else {
+									update({ yearFrom: d.from, yearTo: d.to });
+								}
+							}}
+						>
+							{d.label}
+						</button>
+					))}
+				</div>
 			</div>
 
 			<div class={styles.section}>
-				<label class={styles.fieldLabel}>Genres</label>
+				<label class={styles.fieldLabel}>Runtime (minutes)</label>
+				<div class={styles.yearRow}>
+					<input
+						type="number"
+						class={styles.numInput}
+						placeholder="Min"
+						min={0}
+						step={5}
+						value={value.minRuntime ?? ''}
+						onInput={(e) => {
+							const raw = (e.target as HTMLInputElement).value;
+							const n = raw ? parseInt(raw, 10) : NaN;
+							update({ minRuntime: Number.isFinite(n) && n > 0 ? n : undefined });
+						}}
+					/>
+					<span class={styles.yearDash}>–</span>
+					<input
+						type="number"
+						class={styles.numInput}
+						placeholder="Max"
+						min={0}
+						step={5}
+						value={value.maxRuntime ?? ''}
+						onInput={(e) => {
+							const raw = (e.target as HTMLInputElement).value;
+							const n = raw ? parseInt(raw, 10) : NaN;
+							update({ maxRuntime: Number.isFinite(n) && n > 0 ? n : undefined });
+						}}
+					/>
+				</div>
+			</div>
+
+			<div class={styles.section}>
+				<label class={styles.fieldLabel}>
+					Genres
+					{selectedGenres.size > 0 && (
+						<span class={styles.fieldValue}>{selectedGenres.size} selected</span>
+					)}
+				</label>
 				<input
 					class={styles.searchInput}
 					type="text"
@@ -119,7 +198,7 @@ export function DiscoverFilters({
 					onInput={(e) => setGenreSearch((e.target as HTMLInputElement).value)}
 				/>
 				<div class={styles.genreChips}>
-					{visibleGenres.slice(0, 40).map((g) => {
+					{visibleGenres.map((g) => {
 						const active = selectedGenres.has(g.toLowerCase());
 						return (
 							<button
@@ -149,6 +228,39 @@ export function DiscoverFilters({
 						update({ person: (e.target as HTMLInputElement).value || undefined })
 					}
 				/>
+			</div>
+
+			<div class={styles.section}>
+				<label class={styles.fieldLabel}>Language</label>
+				<input
+					class={styles.searchInput}
+					type="text"
+					placeholder="e.g. en, fr, ja"
+					value={value.language ?? ''}
+					onInput={(e) =>
+						update({ language: (e.target as HTMLInputElement).value || undefined })
+					}
+				/>
+			</div>
+
+			<div class={styles.section}>
+				<label class={styles.fieldLabel}>Watch state</label>
+				<div class={styles.chipRow}>
+					{WATCHED_OPTIONS.map((opt) => (
+						<button
+							key={opt.value}
+							type="button"
+							class={`${styles.decadeChip} ${
+								watched === opt.value ? styles.active : ''
+							}`}
+							onClick={() =>
+								update({ watched: opt.value === 'all' ? undefined : opt.value })
+							}
+						>
+							{opt.label}
+						</button>
+					))}
+				</div>
 			</div>
 		</div>
 	);

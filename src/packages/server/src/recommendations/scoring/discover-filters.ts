@@ -42,9 +42,11 @@ export function applyDiscoverFilters(
 			if (ratings.some((r) => r < filters.minRating!)) return false;
 		}
 		if (filters.minVotes != null && filters.minVotes > 0) {
-			// Strict: same rationale as minRating. Null tmdbVotes is
-			// treated as "unknown count, doesn't meet threshold".
-			const v = m.tmdbVotes ?? 0;
+			// Use the *highest* available vote count across sources so the
+			// filter mirrors minRating's "any source can satisfy" intent.
+			// Previously this only checked tmdbVotes, hiding popular movies
+			// that have strong IMDB vote counts but sparse TMDB coverage.
+			const v = Math.max(m.tmdbVotes ?? 0, m.imdbVotes ?? 0);
 			if (v < filters.minVotes) return false;
 		}
 		if (wantGenres.length > 0) {
@@ -60,6 +62,22 @@ export function applyDiscoverFilters(
 				m.directors.some((d) => d.toLowerCase().includes(personLower));
 			if (!hit) return false;
 		}
+		const languageFilter = filters.language?.toLowerCase().trim();
+		if (languageFilter) {
+			// Match against the canonical TMDB language code first
+			// (e.g. "en", "fr"), then fall back to substring on the
+			// full name so users can type "English" or "Spanish" too.
+			const ml = (m.language ?? '').toLowerCase();
+			if (!ml || (ml !== languageFilter && !ml.includes(languageFilter))) {
+				return false;
+			}
+		}
+		if (filters.minRuntime != null && filters.minRuntime > 0) {
+			if (m.runtimeMinutes == null || m.runtimeMinutes < filters.minRuntime) return false;
+		}
+		if (filters.maxRuntime != null && filters.maxRuntime > 0) {
+			if (m.runtimeMinutes != null && m.runtimeMinutes > filters.maxRuntime) return false;
+		}
 		return true;
 	});
 }
@@ -72,6 +90,8 @@ function hasAnyFilter(f: DiscoverFilters): boolean {
 		f.yearFrom != null ||
 		f.yearTo != null ||
 		(f.person != null && f.person.trim() !== '') ||
-		(f.language != null && f.language !== '')
+		(f.language != null && f.language !== '') ||
+		(f.minRuntime != null && f.minRuntime > 0) ||
+		(f.maxRuntime != null && f.maxRuntime > 0)
 	);
 }
