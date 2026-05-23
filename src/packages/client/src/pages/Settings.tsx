@@ -34,7 +34,9 @@ import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
 import type { Theme } from '@/state/theme.state';
+import { totalMovies } from '@/state/library.state';
 import { setTheme, theme } from '@/state/theme.state';
+import { estimateSpriteLibrarySize } from '@/utils/sprite-size-estimate';
 import {
 	applyActiveTheme,
 	applyThemeConfig,
@@ -494,6 +496,17 @@ export function Settings(props: SettingsProps) {
 		if (stored !== null) setNotifyScanResults(stored !== 'false');
 		const storedPlaylist = localStorage.getItem('mu_notify_playlist');
 		if (storedPlaylist !== null) setNotifyPlaylist(storedPlaylist !== 'false');
+
+		// Ensure totalMovies is populated so the Thumbnail Size sublabel
+		// can show a realistic library footprint estimate even when the
+		// user opens Settings without visiting the Library tab first.
+		if (totalMovies.value === 0) {
+			api.get<{ total: number }>('/movies', { pageSize: '1' })
+				.then((res) => {
+					if (typeof res?.total === 'number') totalMovies.value = res.total;
+				})
+				.catch(() => {});
+		}
 	}, []);
 
 	const handleSavePlayback = useCallback(async () => {
@@ -2129,9 +2142,20 @@ export function Settings(props: SettingsProps) {
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Thumbnail Size</span>
 									<span class={styles.settingDescription}>
-										Size of the seek-bar preview thumbnails. Larger sizes
-										generate new sprite sheets in the background; smaller
-										sizes downscale the existing cache.
+										Seek-bar preview thumbnails.{' '}
+										{(() => {
+											const count = totalMovies.value;
+											const est = estimateSpriteLibrarySize(count, thumbnailSize);
+											return (
+												<>
+													~{est.perMovieLabel}/movie
+													{count > 0
+														? ` · ${est.totalLabel} for ${count.toLocaleString()} movies`
+														: ''}
+													.
+												</>
+											);
+										})()}
 									</span>
 								</div>
 								<Select
