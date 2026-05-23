@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { FavoritesService } from '../favorites/favorites.service.js';
 import { PeopleService } from '../people/people.service.js';
 import { RecommendationsService } from './recommendations.service.js';
 import { TasteProfileService } from './taste-profile.service.js';
@@ -16,6 +17,7 @@ export class RecommendationsController {
 		private readonly recs: RecommendationsService,
 		private readonly tasteProfile: TasteProfileService,
 		private readonly people: PeopleService,
+		private readonly favorites: FavoritesService,
 	) {}
 
 	@Get()
@@ -135,16 +137,73 @@ export class RecommendationsController {
 			return {
 				results: cold,
 				usedSources: ['cold-discover'],
-				reason: cold.length === 0 ? 'no_matches' : undefined,
+				reason: cold.length === 0 ? 'no_seeds_no_profile' : undefined,
 			};
 		}
 
+		// No seeds + useProfile enabled. The legacy path scores library
+		// candidates against the user's taste profile, which doesn't
+		// work well for `include=notOwned` (external stubs lack the
+		// cast / director metadata the profile scorer wants). Promote
+		// the user's favorited movies + people into implicit seeds so
+		// the standard seed-based pipeline (with external harvest) runs.
+		const implicitSeedIds = await this.deriveImplicitSeeds(user.sub);
+		if (implicitSeedIds.length > 0) {
+			const out =
+				implicitSeedIds.length === 1
+					? await this.recs.getSimilarMovies(implicitSeedIds[0]!, {
+							k,
+							filters,
+							include: inc,
+						})
+					: await this.recs.getMultiInput(implicitSeedIds, {
+							k,
+							filters,
+							include: inc,
+						});
+			return this.augmentWithPersonMeta(
+				{
+					...out,
+					usedSources: ['profile-favorites', ...(out.usedSources ?? [])],
+				},
+				unresolvedPersonKeys,
+				implicitSeedIds,
+			);
+		}
+
+		// No favorites either — fall back to the original taste-profile
+		// scoring path. Works for owned/library; usually empty for
+		// notOwned because external stubs lack rich metadata.
 		const results = await this.recs.getPersonalized(user.sub, k, filters, inc);
 		return {
 			results,
 			usedSources: ['taste-profile'],
 			reason: results.length === 0 ? 'no_signal' : undefined,
 		};
+	}
+
+	/**
+	 * Build implicit seed ids from the signed-in user's favorites so
+	 * the no-explicit-seed Discover call still has something to feed
+	 * the recommender. Favorited movies count directly; favorited
+	 * people resolve to their owned in-library credits.
+	 *
+	 * Capped at 5 ids — the multi-input scorer's centroid path gets
+	 * noisy past that, and we want representativeness, not breadth.
+	 */
+	private async deriveImplicitSeeds(userId: string): Promise<string[]> {
+		const { movieIds, personKeys: favPersonKeys } = this.favorites.listKeys(userId);
+		const seeds: string[] = [...movieIds];
+		if (favPersonKeys.length > 0 && seeds.length < 5) {
+			const { movieIds: peopleIds } =
+				await this.people.resolveOwnedMovieIds(favPersonKeys);
+			for (const id of peopleIds) {
+				if (seeds.includes(id)) continue;
+				seeds.push(id);
+				if (seeds.length >= 5) break;
+			}
+		}
+		return seeds.slice(0, 5);
 	}
 
 	private augmentWithPersonMeta<T>(

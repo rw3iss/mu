@@ -5,6 +5,7 @@ import { EmbeddingsModule } from '../embeddings/embeddings.module.js';
 import { EventsModule } from '../events/events.module.js';
 import { LlmModule } from '../llm/llm.module.js';
 import { MetadataModule } from '../metadata/metadata.module.js';
+import { FavoritesModule } from '../favorites/favorites.module.js';
 import { PeopleModule } from '../people/people.module.js';
 import { TraktModule } from '../providers/sources/trakt/trakt.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
@@ -45,6 +46,7 @@ import { TasteProfileService } from './taste-profile.service.js';
 		LlmModule,
 		SettingsModule,
 		PeopleModule,
+		FavoritesModule,
 	],
 	controllers: [RecommendationsController],
 	providers: [

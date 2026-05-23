@@ -140,7 +140,9 @@
 .directorRow {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  /* Breathing room between the director's name and the inline
+   * favorite star — 4px was visually flush at small font sizes. */
+  gap: 8px;
 }
 
 .directorLink {

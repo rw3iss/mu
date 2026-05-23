@@ -335,9 +335,23 @@ export function Discover(_props: DiscoverProps) {
 						<div class={styles.empty}>
 							<p>No recommendations yet.</p>
 							<p class={styles.emptyHint}>
-								{seeds.length === 0
-									? 'Rate or watch a few movies in your library, then revisit this page.'
-									: 'Try loosening your filters, or pick a different seed.'}
+								{seeds.length === 0 && personSeedKeys.value.length === 0 ? (
+									useProfile.value ? (
+										<>
+											Add a few favorites — star a movie or person — and
+											they'll seed your recommendations. You can also pick a
+											movie or actor in the search fields above.
+										</>
+									) : (
+										<>
+											No results. Enable <strong>Use My Profile</strong>{' '}
+											above, or add a movie or actor in the search fields to
+											find new movies.
+										</>
+									)
+								) : (
+									'Try loosening your filters, or pick a different seed.'
+								)}
 							</p>
 						</div>
 					) : (
