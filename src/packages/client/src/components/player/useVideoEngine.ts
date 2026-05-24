@@ -75,12 +75,14 @@ function getSharedVideoElement(): HTMLVideoElement {
 	return sharedVideoElement;
 }
 
-const MAX_RECOVERIES = 12;
-const RECOVERY_BASE_DELAY_MS = 1500;
+const MAX_RECOVERIES = 8;
+const RECOVERY_BASE_DELAY_MS = 1000;
 /** Max recoveries specifically for 503 (transcoding in progress) — more patient */
 const MAX_503_RECOVERIES = 30;
-/** Max full stream reloads before giving up entirely */
-const MAX_FULL_RELOADS = 3;
+/** Max full stream reloads before falling through to a fresh-session restart.
+ *  Set low because if MAX_RECOVERIES already failed, reloading the same
+ *  stale manifest rarely helps — the win is creating a new session. */
+const MAX_FULL_RELOADS = 1;
 
 /** User-facing status message during HLS recovery (e.g. transcoding in progress) */
 type HlsStatus = string | null;
@@ -479,6 +481,74 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 					if (hlsStatus) setHlsStatus(null);
 				});
 
+				/**
+				 * Persist the current playback position to localStorage and the
+				 * watch-positions signal *immediately*. Called before any
+				 * recovery path that destroys + recreates HLS — guarantees
+				 * a refresh during the recovery window still resumes at the
+				 * right spot.
+				 */
+				const persistPositionNow = (pos: number) => {
+					const movieId = globalMovieId.value;
+					if (!movieId || pos <= 0) return;
+					try {
+						localStorage.setItem(`mu_position_${movieId}`, String(pos));
+					} catch {}
+					const d = video.duration;
+					setLocalPosition(movieId, pos, Number.isFinite(d) ? d : null);
+				};
+
+				/**
+				 * Tear down the current HLS instance, request a brand-new
+				 * stream session (the old one almost certainly died with the
+				 * server), and re-init playback at `pos`.
+				 *
+				 * Used by both the 410 cache-corruption path and the
+				 * exhausted-reload final-fallback path. We can't rely on the
+				 * GlobalPlayer useEffect to re-init because its dep array
+				 * doesn't watch `currentSession.value` — so we drive
+				 * `initPlayback` directly from here.
+				 */
+				const restartStreamAtPosition = (pos: number) => {
+					const movieId = globalMovieId.value;
+					persistPositionNow(pos);
+					try {
+						hls.destroy();
+					} catch {}
+					hlsRef.current = null;
+					if (recoveryTimerRef.current) {
+						clearTimeout(recoveryTimerRef.current);
+						recoveryTimerRef.current = null;
+					}
+					if (!movieId) {
+						setPlaybackError('Stream session expired. Click play to restart.');
+						return;
+					}
+					setHlsStatus('Reconnecting...');
+					const wasPlaying = intendedPlayingRef.current;
+					streamService
+						.startStream(movieId)
+						.then((newSession) => {
+							currentSession.value = newSession;
+							setHlsStatus(null);
+							// initPlayback is the function we're currently inside —
+							// calling it tears down any leftover state and brings up
+							// a fresh HLS instance at `pos`.
+							initPlayback(
+								newSession.streamUrl,
+								newSession.directPlay,
+								pos > 0 ? pos : 0,
+								wasPlaying,
+							);
+						})
+						.catch((err) => {
+							console.error('[HLS] Reconnect failed:', err);
+							setPlaybackError(
+								'Stream session expired. Click play to restart.',
+							);
+						});
+				};
+
 				hls.on(Hls.Events.ERROR, (_event, data) => {
 					const resp = (data as any).response;
 					const statusCode = resp?.code ?? 0;
@@ -487,23 +557,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 					if (statusCode === 410) {
 						console.warn('[HLS] Cache corrupted (410), restarting stream...');
 						setHlsStatus('Repairing stream cache...');
-						hls.destroy();
-						hlsRef.current = null;
-						// Restart the stream from current position
-						const pos = video.currentTime;
-						import('../../state/globalPlayer.state.js').then(
-							({ startGlobalStream }) => {
-								startGlobalStream().then((session) => {
-									if (session) {
-										engine.startStream(
-											session,
-											pos > 0 ? pos : undefined,
-											true,
-										);
-									}
-								});
-							},
-						);
+						restartStreamAtPosition(video.currentTime);
 						return;
 					}
 
@@ -514,6 +568,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 						}
 						return;
 					}
+					// Snapshot position synchronously on the first fatal error so a
+					// refresh during the recovery window resumes at the right spot
+					// (the 3-second progress tick may have stale data).
+					persistPositionNow(video.currentTime || latestTimeRef.current);
 					const detail = data.details || 'unknown';
 
 					switch (data.type) {
@@ -535,13 +593,13 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 										if (hlsRef.current) hls.startLoad();
 									}, delay);
 								} else {
-									// All 503 retries exhausted — give up
-									const msg =
-										'Stream unavailable: transcoding failed or took too long';
-									console.error('[HLS] Max 503 recoveries exhausted');
-									setPlaybackError(msg);
-									hls.destroy();
-									hlsRef.current = null;
+									// All 503 retries exhausted — old session is gone.
+									// Spin up a fresh one at the last known position.
+									const pos = video.currentTime || latestTimeRef.current;
+									console.warn(
+										`[HLS] Max 503 recoveries exhausted; restarting stream session from ${pos}s`,
+									);
+									restartStreamAtPosition(pos);
 								}
 							} else if (networkRecoveries < MAX_RECOVERIES) {
 								networkRecoveries++;
@@ -595,35 +653,14 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 								networkRecoveries = 0;
 								transcodingRecoveries = 0;
 							} else {
-								// All reloads exhausted — session is likely dead.
-								// Try restarting with a brand new stream session.
-								const movieId = globalMovieId.value;
-								const pos = video.currentTime;
+								// All reloads exhausted — old session is dead (e.g.
+								// server restarted). Spin up a fresh session and
+								// re-init playback at the last known position.
+								const pos = video.currentTime || latestTimeRef.current;
 								console.warn(
 									`[HLS] All reloads exhausted, restarting stream session from ${pos}s`,
 								);
-								hls.destroy();
-								hlsRef.current = null;
-
-								if (movieId) {
-									setHlsStatus('Reconnecting...');
-									streamService
-										.startStream(movieId)
-										.then((newSession) => {
-											currentSession.value = newSession;
-											// The session change will trigger a new HLS setup
-											// via the useEffect that watches currentSession
-										})
-										.catch(() => {
-											setPlaybackError(
-												'Stream session expired. Click play to restart.',
-											);
-										});
-								} else {
-									setPlaybackError(
-										'Stream session expired. Click play to restart.',
-									);
-								}
+								restartStreamAtPosition(pos);
 							}
 							break;
 						}
