@@ -977,6 +977,24 @@ export class AudioEngine {
 
 	// ── Private ──
 
+	/**
+	 * Force the AudioContext output to the system default sink.
+	 *
+	 * History: this method had a ping-pong between unconditional and
+	 * opt-in. The unconditional version silences `ctx.destination` in
+	 * some Chrome builds when the sink is *already* the default —
+	 * calling `setSinkId('')` against an already-empty `sinkId` flips
+	 * the engine from the implicit hardware path onto an internal
+	 * routing pipeline that has historically been broken. Commit
+	 * aeb9a4d found this; commit 51db222 reverted on a misread of
+	 * "every movie worked yesterday" (it worked on Chrome builds that
+	 * weren't affected, then a Chrome update / different OS audio
+	 * config re-exposed the bug).
+	 *
+	 * Compromise: skip the call entirely when the sink is already
+	 * default. We still pin in the (rare) case where something else
+	 * set a non-default sink first.
+	 */
 	private pinSinkToDefault(): void {
 		if (!this.ctx) {
 			debug('audio:sink', { event: 'pin-no-ctx' });
@@ -986,13 +1004,23 @@ export class AudioEngine {
 			setSinkId?: (id: string) => Promise<void>;
 			sinkId?: string;
 		};
+		const setSinkIdAvailable = typeof ctxWithSink.setSinkId === 'function';
+		const currentSinkId = ctxWithSink.sinkId ?? '';
 		debug('audio:sink', {
 			event: 'pin-attempt',
-			setSinkIdAvailable: typeof ctxWithSink.setSinkId === 'function',
-			currentSinkId: ctxWithSink.sinkId ?? '(unset)',
+			setSinkIdAvailable,
+			currentSinkId: currentSinkId || '(unset)',
 		});
-		if (typeof ctxWithSink.setSinkId !== 'function') {
+		if (!setSinkIdAvailable) {
 			debug('audio:sink', { event: 'pin-not-supported' });
+			return;
+		}
+		// Already-default → skip. Calling setSinkId('') against an
+		// already-default sink can silence ctx.destination in some
+		// Chrome versions. The default device is what we want anyway,
+		// so the call is a no-op semantically and a footgun in practice.
+		if (currentSinkId === '') {
+			debug('audio:sink', { event: 'pin-skipped-already-default' });
 			return;
 		}
 		ctxWithSink.setSinkId
