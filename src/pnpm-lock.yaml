@@ -34,12 +34,9 @@ importers:
       '@preact/signals':
         specifier: ^2.8.2
         version: 2.8.2(preact@10.29.0)
-      dev-debug-panel:
-        specifier: file:../../vendor/dev-debug-panel-2.0.1.tgz
-        version: file:vendor/dev-debug-panel-2.0.1.tgz(jsondiffpatch@0.7.6)
       dev-loggers:
-        specifier: file:../../vendor/dev-loggers-4.0.0.tgz
-        version: file:vendor/dev-loggers-4.0.0.tgz
+        specifier: git+ssh://git@github.com:rw3iss/dev-loggers.git
+        version: https://codeload.github.com/rw3iss/dev-loggers/tar.gz/ca5918e2aa6aca4a21886d1b34823614a13f1d2e
       hls.js:
         specifier: ^1.5.0
         version: 1.6.15
@@ -2269,15 +2266,9 @@ packages:
   detect-node@2.1.0:
     resolution: {integrity: sha512-T0NIuQpnTvFDATNuHN5roPwSBG83rFsuO+MXXH9/3N1eFbn4wcPjttvjMLEPWJ0RGUYgQE7cGgS3tNxbqCGM7g==}
 
-  dev-debug-panel@file:vendor/dev-debug-panel-2.0.1.tgz:
-    resolution: {integrity: sha512-UBz2zUGakKamT4395EzOztF756polzc7MHUmAgSf0XPfriPaD0/nBRqeAqXdjBhae+FkyKS3lbLA606aLG0uWg==, tarball: file:vendor/dev-debug-panel-2.0.1.tgz}
-    version: 2.0.1
-    peerDependencies:
-      jsondiffpatch: ^0.7.3
-
-  dev-loggers@file:vendor/dev-loggers-4.0.0.tgz:
-    resolution: {integrity: sha512-kJNLOyQp3bP30ie7elXCSPopjG4BDJ/iJSjd1fERl2HlGim3BBhWfkxyfY0Avp3zXiwd9cQzKb9+YnC6SNz/fg==, tarball: file:vendor/dev-loggers-4.0.0.tgz}
-    version: 4.0.0
+  dev-loggers@https://codeload.github.com/rw3iss/dev-loggers/tar.gz/ca5918e2aa6aca4a21886d1b34823614a13f1d2e:
+    resolution: {tarball: https://codeload.github.com/rw3iss/dev-loggers/tar.gz/ca5918e2aa6aca4a21886d1b34823614a13f1d2e}
+    version: 5.0.1
 
   dom-serializer@2.0.0:
     resolution: {integrity: sha512-wIkAryiqt/nV5EQKqQpo3SToSOV9J0DnbJqwK7Wv/Trc92zIAYZ4FlMu+JPFW1DfGFt81ZTCGgDEabffXeLyJg==}
@@ -5448,12 +5439,10 @@ snapshots:
 
   detect-node@2.1.0: {}
 
-  dev-debug-panel@file:vendor/dev-debug-panel-2.0.1.tgz(jsondiffpatch@0.7.6):
+  dev-loggers@https://codeload.github.com/rw3iss/dev-loggers/tar.gz/ca5918e2aa6aca4a21886d1b34823614a13f1d2e:
     dependencies:
       fast-safe-stringify: 2.1.1
       jsondiffpatch: 0.7.6
-
-  dev-loggers@file:vendor/dev-loggers-4.0.0.tgz: {}
 
   dom-serializer@2.0.0:
     dependencies:
