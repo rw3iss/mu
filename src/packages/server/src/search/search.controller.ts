@@ -8,6 +8,7 @@ import {
 	Sse,
 } from '@nestjs/common';
 import { lastValueFrom, map, toArray, type Observable } from 'rxjs';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { FederatedMovieSearchService } from './federated-movie-search.service.js';
 import { FederatedPeopleSearchService } from './federated-people-search.service.js';
 import type { SearchEvent } from './search-types.js';
@@ -28,6 +29,7 @@ export class SearchController {
 		return q.trim();
 	}
 
+	@RequireAction('view:library')
 	@Sse('movies/stream')
 	streamMovies(@Query('q') q: string, @Req() req: any): Observable<MessageEvent> {
 		const query = this.requireQuery(q);
@@ -37,6 +39,7 @@ export class SearchController {
 			.pipe(map((ev) => ({ data: ev } as unknown as MessageEvent)));
 	}
 
+	@RequireAction('view:library')
 	@Sse('people/stream')
 	streamPeople(@Query('q') q: string): Observable<MessageEvent> {
 		const query = this.requireQuery(q);
@@ -45,6 +48,7 @@ export class SearchController {
 			.pipe(map((ev) => ({ data: ev } as unknown as MessageEvent)));
 	}
 
+	@RequireAction('view:library')
 	@Get('movies')
 	async listMovies(@Query('q') q: string, @Req() req: any) {
 		const query = this.requireQuery(q);
@@ -53,6 +57,7 @@ export class SearchController {
 		return this.flatten(events);
 	}
 
+	@RequireAction('view:library')
 	@Get('people')
 	async listPeople(@Query('q') q: string) {
 		const query = this.requireQuery(q);

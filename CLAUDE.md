@@ -92,8 +92,9 @@ NestJS modules in `packages/server/src/`:
 
 | Module | Purpose |
 |--------|---------|
-| `auth` | JWT authentication, user sessions |
-| `users` | User management |
+| `auth` | JWT authentication, user sessions. localBypass works only during initial setup; once a user exists, every request needs a JWT cookie. |
+| `users` | User management. Admin-only CRUD with last-admin protection (cannot demote/delete the only admin). |
+| `common/permissions` | Three-role model (`admin`/`contributor`/`viewer`) + `PermissionsService` + `@RequireAction(action)` decorator + global `RequireActionGuard`. See `docs/users-and-permissions.md`. |
 | `library` | Media source scanning, file discovery |
 | `movies` | Movie CRUD, detail endpoints |
 | `metadata` | TMDB/OMDB metadata fetching |

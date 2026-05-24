@@ -1,6 +1,9 @@
 import { networkInterfaces } from 'node:os';
 import { Body, Controller, Delete, Get, Param, Put } from '@nestjs/common';
+import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
+import type { JwtUser } from '../common/permissions/index.js';
 import { ConfigService } from '../config/config.service.js';
 import { SettingsService } from './settings.service.js';
 
@@ -12,20 +15,24 @@ export class SettingsController {
 	) {}
 
 	/**
-	 * Subset of settings the regular SPA needs to render correctly
-	 * (watch-tracking thresholds gate the resume UI). Read-only,
-	 * non-admin — admins still write via PUT /:key.
+	 * Watch-tracking thresholds. Returned as the per-user merged values
+	 * so a user override takes precedence over the app default. Share
+	 * tokens get the app default (no user id available).
 	 */
 	@Get('playback')
-	getPlayback() {
+	@RequireAction('view:library')
+	getPlayback(@CurrentUser() user: JwtUser) {
+		const userId = user?.role !== 'share' ? (user?.sub ?? user?.id ?? null) : null;
 		return {
-			watchedThresholdSeconds: this.settingsService.get<number>(
-				'watchedThresholdSeconds',
-				30,
+			watchedThresholdSeconds: this.settingsService.getForUser<number>(
+				'playback.watchedThresholdSeconds',
+				userId,
+				this.settingsService.get<number>('watchedThresholdSeconds', 30),
 			),
-			completedTailSeconds: this.settingsService.get<number>(
-				'completedTailSeconds',
-				300,
+			completedTailSeconds: this.settingsService.getForUser<number>(
+				'playback.completedTailSeconds',
+				userId,
+				this.settingsService.get<number>('completedTailSeconds', 300),
 			),
 		};
 	}
@@ -38,6 +45,7 @@ export class SettingsController {
 	 */
 	@Get('matching')
 	@Roles('admin')
+	@RequireAction('view:app-settings')
 	getMatching() {
 		return {
 			strategyWeights: this.settingsService.get<Record<string, number>>(
@@ -87,6 +95,7 @@ export class SettingsController {
 
 	@Get('server-url')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	getServerUrl() {
 		const port = this.configService.get<number>('server.port', 4000);
 		const nets = networkInterfaces();
@@ -106,12 +115,14 @@ export class SettingsController {
 
 	@Get()
 	@Roles('admin')
+	@RequireAction('view:app-settings')
 	getAll() {
 		return this.settingsService.getAll();
 	}
 
 	@Get(':key')
 	@Roles('admin')
+	@RequireAction('view:app-settings')
 	get(@Param('key') key: string) {
 		const value = this.settingsService.get(key);
 		return { key, value };
@@ -119,6 +130,7 @@ export class SettingsController {
 
 	@Put(':key')
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	set(@Param('key') key: string, @Body() body: { value: unknown }) {
 		this.settingsService.set(key, body.value);
 		return { key, value: body.value };
@@ -126,6 +138,7 @@ export class SettingsController {
 
 	@Put()
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	setBulk(@Body() body: Record<string, unknown>) {
 		this.settingsService.setBulk(body);
 		return { success: true };
@@ -133,6 +146,7 @@ export class SettingsController {
 
 	@Delete(':key')
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	delete(@Param('key') key: string) {
 		const deleted = this.settingsService.delete(key);
 		return { success: deleted };

@@ -11,6 +11,7 @@ import {
 	Post,
 } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -42,6 +43,7 @@ export class MetadataController {
 		private readonly matchCandidates: MatchCandidatesRepository,
 	) {}
 
+	@RequireAction('view:library')
 	@Get('movies/:id/match-candidates')
 	listCandidates(@Param('id') movieId: string) {
 		return { candidates: this.matchCandidates.list('movie', movieId) };
@@ -49,6 +51,7 @@ export class MetadataController {
 
 	@Post('movies/:id/match-candidates/apply')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	async applyCandidate(@Param('id') movieId: string, @Body() body: ApplyCandidateBody) {
 		if (!body?.provider || !body?.externalId) {
 			throw new BadRequestException('provider and externalId required');
@@ -63,6 +66,7 @@ export class MetadataController {
 
 	@Delete('movies/:id/match-candidates')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	clearCandidates(@Param('id') movieId: string) {
 		this.matchCandidates.clear('movie', movieId);
 		return { ok: true };
@@ -70,6 +74,7 @@ export class MetadataController {
 
 	@Post('movies/refresh-all')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	async refreshAll() {
 		// Get all movie IDs
 		const allMovies = this.database.db.select({ id: movies.id }).from(movies).all();
@@ -97,6 +102,7 @@ export class MetadataController {
 
 	@Post('movies/:id/refresh')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	async refreshMetadata(@Param('id') movieId: string) {
 		const metadata = await this.metadataService.refreshMetadata(movieId);
 		return metadata ?? { message: 'No metadata found' };
@@ -104,6 +110,7 @@ export class MetadataController {
 
 	@Post('movies/:id/clear-metadata')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	async clearMetadata(@Param('id') movieId: string) {
 		try {
 			await this.metadataService.clearMetadata(movieId);
@@ -115,6 +122,7 @@ export class MetadataController {
 
 	@Post('movies/:id/rescan')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	async rescan(@Param('id') movieId: string) {
 		const files = this.database.db
 			.select()

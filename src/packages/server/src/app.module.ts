@@ -7,6 +7,7 @@ import { BookmarksModule } from './bookmarks/bookmarks.module.js';
 import { CacheModule } from './cache/cache.module.js';
 import { CommonModule } from './common/common.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
+import { RequireActionGuard } from './common/guards/require-action.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
@@ -84,6 +85,10 @@ import { UsersModule } from './users/users.module.js';
 		{
 			provide: APP_GUARD,
 			useClass: RolesGuard,
+		},
+		{
+			provide: APP_GUARD,
+			useClass: RequireActionGuard,
 		},
 	],
 })

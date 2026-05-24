@@ -12,6 +12,7 @@ import {
 	Put,
 	Query,
 } from '@nestjs/common';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { SourceBackfillService } from './backfill/source-backfill.service.js';
 import type { Capability, Provider } from './provider.interface.js';
@@ -57,6 +58,7 @@ export class ProvidersController {
 
 	@Get()
 	@Roles('admin')
+	@RequireAction('admin:server')
 	list(): { providers: ProviderSummary[] } {
 		return {
 			providers: this.registry.list().map((p) => this.summarise(p)),
@@ -65,6 +67,7 @@ export class ProvidersController {
 
 	@Get(':id')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	get(@Param('id') id: string) {
 		const p = this.registry.get(id);
 		if (!p) throw new NotFoundException(`Provider "${id}" not registered`);
@@ -79,6 +82,7 @@ export class ProvidersController {
 
 	@Put(':id/credentials')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async setCredentials(
 		@Param('id') id: string,
 		@Body() body: { config: Record<string, unknown> },
@@ -95,6 +99,7 @@ export class ProvidersController {
 
 	@Delete(':id/credentials')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	deleteCredentials(@Param('id') id: string) {
 		const removed = this.credentials.delete(id);
 		return { ok: removed };
@@ -102,6 +107,7 @@ export class ProvidersController {
 
 	@Patch(':id')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	patch(@Param('id') id: string, @Body() body: { enabled?: boolean }) {
 		if (typeof body?.enabled !== 'boolean') {
 			throw new BadRequestException('Body must include { enabled: boolean }');
@@ -112,6 +118,7 @@ export class ProvidersController {
 
 	@Post(':id/test')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async test(@Param('id') id: string) {
 		const p = this.registry.get(id);
 		if (!p) throw new NotFoundException(`Provider "${id}" not registered`);
@@ -152,6 +159,7 @@ export class ProvidersController {
 	 */
 	@Post(':id/backfill')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	startBackfill(@Param('id') id: string) {
 		const p = this.registry.get(id);
 		if (!p) throw new NotFoundException(`Provider "${id}" not registered`);
@@ -163,6 +171,7 @@ export class ProvidersController {
 
 	@Get(':id/usage')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	usage(@Param('id') id: string, @Query('days') days?: string) {
 		if (!this.registry.has(id)) throw new NotFoundException(`Provider "${id}" not registered`);
 		const d = days ? Math.max(1, Math.min(90, parseInt(days, 10) || 7)) : 7;

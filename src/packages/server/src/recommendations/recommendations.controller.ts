@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { FavoritesService } from '../favorites/favorites.service.js';
 import { PeopleService } from '../people/people.service.js';
 import { RecommendationsService } from './recommendations.service.js';
@@ -20,11 +21,13 @@ export class RecommendationsController {
 		private readonly favorites: FavoritesService,
 	) {}
 
+	@RequireAction('view:library')
 	@Get()
 	async personalized(@CurrentUser() user: { sub: string }, @Query('limit') limit?: string) {
 		return this.recs.getPersonalized(user.sub, parseLimit(limit));
 	}
 
+	@RequireAction('view:library')
 	@Get('similar/:movieId')
 	async similar(@Param('movieId') movieId: string, @Query('limit') limit?: string) {
 		const response = await this.recs.getSimilarMovies(movieId, { k: parseLimit(limit) });
@@ -33,6 +36,7 @@ export class RecommendationsController {
 		return response.results;
 	}
 
+	@RequireAction('view:library')
 	@Get('similar/:movieId/detail')
 	async similarDetailed(@Param('movieId') movieId: string, @Query('limit') limit?: string) {
 		return this.recs.getSimilarMovies(movieId, { k: parseLimit(limit) });
@@ -44,6 +48,7 @@ export class RecommendationsController {
 	 * returns personalised recommendations from the user's taste
 	 * profile.
 	 */
+	@RequireAction('view:library')
 	@Get('discover')
 	async discover(
 		@CurrentUser() user: { sub: string },
@@ -224,6 +229,7 @@ export class RecommendationsController {
 		} as T & { unresolvedPersonKeys?: string[]; personDerivedSeedIds?: string[] };
 	}
 
+	@RequireAction('view:library')
 	@Post('multi')
 	async multi(@Body() body: { movieIds: string[]; limit?: number; mmrLambda?: number }) {
 		if (!body?.movieIds || !Array.isArray(body.movieIds) || body.movieIds.length === 0) {
@@ -235,6 +241,7 @@ export class RecommendationsController {
 		});
 	}
 
+	@RequireAction('view:library')
 	@Get('genre/:genre')
 	async byGenre(
 		@CurrentUser() user: { sub: string },
@@ -244,16 +251,19 @@ export class RecommendationsController {
 		return this.recs.getByGenre(genre, user.sub, parseLimit(limit));
 	}
 
+	@RequireAction('view:library')
 	@Get('trending')
 	async trending(@Query('limit') limit?: string) {
 		return this.recs.getTrending(parseLimit(limit));
 	}
 
+	@RequireAction('view:library')
 	@Get('recently-added')
 	async recentlyAdded(@Query('limit') limit?: string) {
 		return this.recs.getRecentlyAdded(parseLimit(limit));
 	}
 
+	@RequireAction('view:own-data')
 	@Get('profile')
 	async profile(@CurrentUser() user: { sub: string }) {
 		return this.tasteProfile.buildProfile(user.sub);

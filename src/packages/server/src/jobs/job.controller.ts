@@ -1,4 +1,5 @@
 import { Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { JobManagerService } from './job-manager.service.js';
 
@@ -8,18 +9,21 @@ export class JobController {
 
 	@Get()
 	@Roles('admin')
+	@RequireAction('view:library')
 	listJobs(@Query('type') type?: string, @Query('status') status?: string) {
 		return this.jobManager.listJobs({ type, status });
 	}
 
 	@Get('scheduled')
 	@Roles('admin')
+	@RequireAction('view:library')
 	listScheduled() {
 		return { jobs: this.jobManager.listScheduledJobs() };
 	}
 
 	@Post('cancel-by-movie/:movieId')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	cancelByMovie(@Param('movieId') movieId: string, @Query('type') type?: string) {
 		const results = this.jobManager.cancelByPayload(
 			'movieId',
@@ -33,6 +37,7 @@ export class JobController {
 	 * Get movie IDs that are currently processing or need transcoding.
 	 * Includes active jobs AND movies that haven't finished transcoding.
 	 */
+	@RequireAction('view:library')
 	@Get('processing-movies')
 	getProcessingMovies() {
 		// Only return movies with ACTIVELY RUNNING transcode jobs
@@ -58,6 +63,7 @@ export class JobController {
 	 *
 	 * Cheap: scans the in-memory job table; no DB read.
 	 */
+	@RequireAction('view:library')
 	@Get('movies/:movieId/transcode-status')
 	getTranscodeStatus(@Param('movieId') movieId: string) {
 		const jobs = this.jobManager.findJobsByPayload(
@@ -85,6 +91,7 @@ export class JobController {
 
 	@Get(':id')
 	@Roles('admin')
+	@RequireAction('view:library')
 	getJob(@Param('id') id: string) {
 		const job = this.jobManager.getJob(id);
 		if (!job) throw new NotFoundException(`Job ${id} not found`);
@@ -93,6 +100,7 @@ export class JobController {
 
 	@Post(':id/cancel')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	cancelJob(@Param('id') id: string) {
 		const cancelled = this.jobManager.cancel(id);
 		return { success: cancelled };
@@ -100,6 +108,7 @@ export class JobController {
 
 	@Post('prune')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	pruneJobs(@Query('maxAgeHours') maxAgeHours?: string) {
 		const ageMs = maxAgeHours ? parseInt(maxAgeHours, 10) * 3600000 : undefined;
 		const removed = this.jobManager.pruneOldJobs(ageMs);

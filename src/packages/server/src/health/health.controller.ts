@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { nowISO } from '@mu/shared';
 import { Controller, Get } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator.js';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { ConfigService } from '../config/config.service.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
@@ -47,6 +48,7 @@ export class HealthController {
 
 	@Get('stats')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async getStats() {
 		const cpus = os.cpus();
 		const [sessions, disk, dataDirSize, appMemory] = await Promise.all([

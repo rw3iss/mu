@@ -1,17 +1,21 @@
+import { type Action, roleCan } from '@mu/shared';
 import { computed, signal } from '@preact/signals';
 import { route } from 'preact-router';
 import { api } from '@/services/api';
 import { invalidateFavorites } from '@/state/favorites.state';
+import { fetchUserSettings, userSettings } from '@/state/userSettings.state';
 
 // ============================================
 // Types
 // ============================================
 
+export type UserRole = 'admin' | 'contributor' | 'viewer';
+
 export interface User {
 	id: string;
 	username: string;
 	email: string;
-	role: 'admin' | 'user';
+	role: UserRole;
 	avatarUrl?: string;
 	createdAt: string;
 }
@@ -25,6 +29,22 @@ export const isLoading = signal(true);
 export const isSetupComplete = signal(true);
 export const localBypass = signal(false);
 export const isAuthenticated = computed(() => currentUser.value !== null);
+export const isAdmin = computed(() => currentUser.value?.role === 'admin');
+export const isContributor = computed(() => currentUser.value?.role === 'contributor');
+export const isViewer = computed(() => currentUser.value?.role === 'viewer');
+
+/**
+ * Check whether the current user can perform `action`. Mirrors the
+ * server-side PermissionsService via the shared `roleCan()` helper.
+ */
+export function can(action: Action): boolean {
+	return roleCan(currentUser.value?.role, action);
+}
+
+/** True if `userId` is the current user. */
+export function isSelf(userId: string): boolean {
+	return currentUser.value?.id === userId;
+}
 
 // ============================================
 // Actions
@@ -38,6 +58,7 @@ export async function login(username: string, password: string): Promise<void> {
 
 	localStorage.setItem('mu_token', response.accessToken);
 	currentUser.value = response.user;
+	await fetchUserSettings();
 }
 
 export async function logout(): Promise<void> {
@@ -50,6 +71,7 @@ export async function logout(): Promise<void> {
 		localStorage.removeItem('mu_player_state');
 		localStorage.removeItem('mu_is_playing');
 		currentUser.value = null;
+		userSettings.value = {};
 		invalidateFavorites();
 		route('/login');
 	}
@@ -77,6 +99,7 @@ export async function checkAuth(): Promise<void> {
 			try {
 				const user = await api.get<User>('/auth/me');
 				currentUser.value = user;
+				await fetchUserSettings();
 			} catch {
 				// Local bypass failed (e.g. no admin user yet) — treat as unauthenticated
 				currentUser.value = null;
@@ -94,6 +117,7 @@ export async function checkAuth(): Promise<void> {
 
 		const user = await api.get<User>('/auth/me');
 		currentUser.value = user;
+		await fetchUserSettings();
 	} catch {
 		currentUser.value = null;
 		localStorage.removeItem('mu_token');
@@ -119,4 +143,5 @@ export async function setup(
 	}
 	currentUser.value = response.user ?? (response as any);
 	isSetupComplete.value = true;
+	await fetchUserSettings();
 }

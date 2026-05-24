@@ -9,7 +9,7 @@ export interface User {
 	updatedAt: string;
 }
 
-export type UserRole = 'admin' | 'user';
+export type UserRole = 'admin' | 'contributor' | 'viewer';
 
 export interface UserPreferences {
 	theme: 'dark' | 'light' | 'auto';

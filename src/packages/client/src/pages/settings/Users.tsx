@@ -1,0 +1,338 @@
+import type { UserRole } from '@mu/shared';
+import { useEffect, useState } from 'preact/hooks';
+import { Button } from '@/components/common/Button';
+import { Select } from '@/components/common/Select';
+import { api } from '@/services/api';
+import { currentUser } from '@/state/auth.state';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
+import styles from './Users.module.scss';
+
+interface UserRow {
+	id: string;
+	username: string;
+	email: string | null;
+	role: UserRole;
+	createdAt: string;
+	updatedAt: string;
+}
+
+const ROLE_OPTIONS: { label: string; value: UserRole }[] = [
+	{ label: 'Admin', value: 'admin' },
+	{ label: 'Contributor', value: 'contributor' },
+	{ label: 'Viewer', value: 'viewer' },
+];
+
+/**
+ * Admin Users panel. Lists every user, lets admins create new ones,
+ * change roles, reset passwords, and delete. Last-admin protection is
+ * enforced server-side — we surface the 409 as a notification.
+ */
+export function Users() {
+	const [users, setUsers] = useState<UserRow[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [busy, setBusy] = useState<string | null>(null);
+	const [showAdd, setShowAdd] = useState(false);
+	const [editPassword, setEditPassword] = useState<UserRow | null>(null);
+
+	const me = currentUser.value;
+
+	const refresh = async () => {
+		setLoading(true);
+		try {
+			const rows = await api.get<UserRow[]>('/users');
+			setUsers(rows);
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed to load users');
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		void refresh();
+	}, []);
+
+	const changeRole = async (u: UserRow, role: UserRole) => {
+		if (u.role === role) return;
+		if (u.role === 'admin' && role !== 'admin') {
+			const ok = confirm(
+				`Demote ${u.username} from admin to ${role}? If this is the last admin, the change will be refused.`,
+			);
+			if (!ok) return;
+		}
+		setBusy(u.id);
+		try {
+			await api.patch(`/users/${u.id}`, { role });
+			notifySuccess(`Updated ${u.username} → ${role}`);
+			await refresh();
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed to change role');
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	const remove = async (u: UserRow) => {
+		if (u.id === me?.id) {
+			notifyError('You can’t delete your own account from this page');
+			return;
+		}
+		const ok = confirm(`Delete user ${u.username}? This cannot be undone.`);
+		if (!ok) return;
+		setBusy(u.id);
+		try {
+			await api.delete(`/users/${u.id}`);
+			notifySuccess(`Deleted ${u.username}`);
+			await refresh();
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed to delete user');
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	return (
+		<div class={styles.wrap}>
+			<div class={styles.intro}>
+				<h2 class={styles.heading}>Users</h2>
+				<p class={styles.lede}>
+					Manage who can sign in. Viewers can search + play; contributors can also
+					edit movies; admins control everything including app settings, plugins,
+					and the user list itself.
+				</p>
+			</div>
+
+			<div class={styles.toolbar}>
+				<span>{loading ? 'Loading…' : `${users.length} user${users.length === 1 ? '' : 's'}`}</span>
+				<Button onClick={() => setShowAdd(true)}>Add user</Button>
+			</div>
+
+			<table class={styles.table}>
+				<thead>
+					<tr>
+						<th>Username</th>
+						<th>Email</th>
+						<th>Role</th>
+						<th>Created</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					{users.map((u) => (
+						<tr key={u.id}>
+							<td>
+								{u.username}
+								{u.id === me?.id ? <span class={styles.selfBadge}>you</span> : null}
+							</td>
+							<td>{u.email ?? '—'}</td>
+							<td>
+								<Select<UserRole>
+									className={styles.roleSelect}
+									value={u.role}
+									options={ROLE_OPTIONS}
+									disabled={busy === u.id}
+									onChange={(role) => changeRole(u, role)}
+								/>
+							</td>
+							<td>{new Date(u.createdAt).toLocaleDateString()}</td>
+							<td>
+								<div class={styles.actions}>
+									<button
+										type="button"
+										class={styles.linkButton}
+										disabled={busy === u.id}
+										onClick={() => setEditPassword(u)}
+									>
+										Reset password
+									</button>
+									<button
+										type="button"
+										class={`${styles.linkButton} ${styles.danger}`}
+										disabled={busy === u.id || u.id === me?.id}
+										onClick={() => remove(u)}
+									>
+										Delete
+									</button>
+								</div>
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+
+			{showAdd ? (
+				<AddUserModal
+					onClose={() => setShowAdd(false)}
+					onCreated={() => {
+						setShowAdd(false);
+						void refresh();
+					}}
+				/>
+			) : null}
+			{editPassword ? (
+				<ResetPasswordModal
+					user={editPassword}
+					onClose={() => setEditPassword(null)}
+					onDone={() => setEditPassword(null)}
+				/>
+			) : null}
+		</div>
+	);
+}
+
+function AddUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+	const [username, setUsername] = useState('');
+	const [email, setEmail] = useState('');
+	const [password, setPassword] = useState('');
+	const [role, setRole] = useState<UserRole>('viewer');
+	const [error, setError] = useState('');
+	const [submitting, setSubmitting] = useState(false);
+
+	const submit = async (e: Event) => {
+		e.preventDefault();
+		if (!username.trim() || !password) {
+			setError('Username and password are required');
+			return;
+		}
+		setError('');
+		setSubmitting(true);
+		try {
+			await api.post('/users', {
+				username: username.trim(),
+				email: email.trim() || undefined,
+				password,
+				role,
+			});
+			notifySuccess(`Created ${username}`);
+			onCreated();
+		} catch (err: any) {
+			setError(err?.message ?? 'Failed to create user');
+		} finally {
+			setSubmitting(false);
+		}
+	};
+
+	return (
+		<div class={styles.modalBackdrop} onClick={onClose}>
+			<form class={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+				<h3 class={styles.modalTitle}>Add user</h3>
+				<div class={styles.formRow}>
+					<label class={styles.formLabel} for="add-username">
+						Username
+					</label>
+					<input
+						id="add-username"
+						class={styles.input}
+						value={username}
+						onInput={(e) => setUsername((e.target as HTMLInputElement).value)}
+						autoFocus
+					/>
+				</div>
+				<div class={styles.formRow}>
+					<label class={styles.formLabel} for="add-email">
+						Email (optional)
+					</label>
+					<input
+						id="add-email"
+						type="email"
+						class={styles.input}
+						value={email}
+						onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
+					/>
+				</div>
+				<div class={styles.formRow}>
+					<label class={styles.formLabel} for="add-password">
+						Password
+					</label>
+					<input
+						id="add-password"
+						type="password"
+						class={styles.input}
+						value={password}
+						onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
+					/>
+				</div>
+				<div class={styles.formRow}>
+					<label class={styles.formLabel}>Role</label>
+					<Select<UserRole>
+						value={role}
+						options={ROLE_OPTIONS}
+						onChange={(v) => setRole(v)}
+					/>
+				</div>
+				{error ? <div class={styles.errorText}>{error}</div> : null}
+				<div class={styles.modalActions}>
+					<Button variant="secondary" type="button" onClick={onClose}>
+						Cancel
+					</Button>
+					<Button type="submit" disabled={submitting}>
+						{submitting ? 'Creating…' : 'Create'}
+					</Button>
+				</div>
+			</form>
+		</div>
+	);
+}
+
+function ResetPasswordModal({
+	user,
+	onClose,
+	onDone,
+}: {
+	user: UserRow;
+	onClose: () => void;
+	onDone: () => void;
+}) {
+	const [password, setPassword] = useState('');
+	const [error, setError] = useState('');
+	const [submitting, setSubmitting] = useState(false);
+
+	const submit = async (e: Event) => {
+		e.preventDefault();
+		if (!password) {
+			setError('Enter a new password');
+			return;
+		}
+		setError('');
+		setSubmitting(true);
+		try {
+			await api.patch(`/users/${user.id}`, { password });
+			notifySuccess(`Reset password for ${user.username}`);
+			onDone();
+		} catch (err: any) {
+			setError(err?.message ?? 'Failed to reset password');
+		} finally {
+			setSubmitting(false);
+		}
+	};
+
+	return (
+		<div class={styles.modalBackdrop} onClick={onClose}>
+			<form class={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+				<h3 class={styles.modalTitle}>Reset password — {user.username}</h3>
+				<div class={styles.formRow}>
+					<label class={styles.formLabel} for="reset-password">
+						New password
+					</label>
+					<input
+						id="reset-password"
+						type="password"
+						class={styles.input}
+						value={password}
+						onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
+						autoFocus
+					/>
+				</div>
+				{error ? <div class={styles.errorText}>{error}</div> : null}
+				<div class={styles.modalActions}>
+					<Button variant="secondary" type="button" onClick={onClose}>
+						Cancel
+					</Button>
+					<Button type="submit" disabled={submitting}>
+						{submitting ? 'Saving…' : 'Save'}
+					</Button>
+				</div>
+			</form>
+		</div>
+	);
+}

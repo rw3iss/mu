@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Logger, Param, Patch, Post, Put } from '@nestjs/common';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from './library.service.js';
@@ -18,18 +19,21 @@ export class LibraryController {
 
 	@Get()
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	findAll() {
 		return this.libraryService.getSources();
 	}
 
 	@Post()
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	create(@Body() body: { path: string; label?: string }) {
 		return this.libraryService.addSource(body.path, body.label);
 	}
 
 	@Patch(':id')
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	update(
 		@Param('id') id: string,
 		@Body() body: { label?: string; enabled?: boolean; scanIntervalHours?: number },
@@ -39,6 +43,7 @@ export class LibraryController {
 
 	@Delete(':id')
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	remove(@Param('id') id: string) {
 		this.libraryService.removeSource(id);
 		return { success: true };
@@ -46,18 +51,21 @@ export class LibraryController {
 
 	@Put('sync')
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	sync(@Body() body: { paths: string[] }) {
 		return this.libraryService.syncSources(body.paths);
 	}
 
 	@Get('scan-status')
 	@Roles('admin')
+	@RequireAction('view:library')
 	scanStatus() {
 		return this.libraryJobs.getScanStatus();
 	}
 
 	@Post('refresh-schedule')
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	refreshSchedule() {
 		this.libraryJobs.refreshAutoScanSchedule();
 		return this.libraryJobs.getScanStatus();
@@ -65,6 +73,7 @@ export class LibraryController {
 
 	@Post('scan')
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	async scanAll(@Body() body?: { reEncode?: boolean }) {
 		const sources = this.libraryService.getSources().filter((s) => s.enabled);
 
@@ -104,6 +113,7 @@ export class LibraryController {
 
 	@Post(':id/scan')
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	async scan(@Param('id') id: string) {
 		const source = this.libraryService.getSource(id);
 		const result = await this.scanner.scanSource(id);

@@ -74,6 +74,8 @@ export type { NewSearchCacheRow, SearchCacheRow } from './search-cache.ts';
 export { searchCache } from './search-cache.ts';
 export type { NewSetting, Setting } from './settings.ts';
 export { settings } from './settings.ts';
+export type { NewUserSetting, UserSetting } from './user-settings.ts';
+export { userSettings } from './user-settings.ts';
 export type { NewStreamSession, StreamSession } from './stream-sessions.ts';
 export { streamSessions } from './stream-sessions.ts';
 export type { NewTheme, Theme } from './themes.ts';

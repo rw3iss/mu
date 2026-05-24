@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
 import { Public } from '../common/decorators/public.decorator.js';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { ShareLinksService } from './share-links.service.js';
 
 interface CreateShareLinkBody {
@@ -15,6 +16,7 @@ export class ShareLinksController {
 	 * Create a share token + URL for a movie.
 	 * Requires normal authentication (the global JwtAuthGuard covers this).
 	 */
+	@RequireAction('edit:movie')
 	@Post()
 	create(@Body() body: CreateShareLinkBody, @Req() request: FastifyRequest) {
 		if (!body?.movieId || typeof body.movieId !== 'string') {

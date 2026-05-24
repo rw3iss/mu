@@ -1,5 +1,6 @@
 import { Controller, Delete, Get, Param, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { HistoryService } from './history.service.js';
 
 @Controller('history')
@@ -12,6 +13,7 @@ export class HistoryController {
 	 * once on app load + occasionally on focus, so movie cards in any
 	 * view can show the resume bar without a per-card request.
 	 */
+	@RequireAction('view:own-data')
 	@Get('positions')
 	getAllPositions(@CurrentUser('id') userId: string) {
 		return this.historyService.getAllPositions(userId);
@@ -23,6 +25,7 @@ export class HistoryController {
 	 * "Start from beginning". Idempotent — returns `{ cleared: false }`
 	 * if no row existed.
 	 */
+	@RequireAction('view:own-data')
 	@Delete('movies/:movieId/position')
 	clearPosition(
 		@CurrentUser('id') userId: string,
@@ -32,6 +35,7 @@ export class HistoryController {
 		return { success: true, cleared };
 	}
 
+	@RequireAction('view:own-data')
 	@Get()
 	getHistory(
 		@CurrentUser('id') userId: string,
@@ -45,23 +49,27 @@ export class HistoryController {
 		);
 	}
 
+	@RequireAction('view:own-data')
 	@Get('watched/count')
 	getWatchedCount(@CurrentUser('id') userId: string) {
 		return { count: this.historyService.getWatchedCount(userId) };
 	}
 
+	@RequireAction('view:own-data')
 	@Delete('watched')
 	clearWatched(@CurrentUser('id') userId: string) {
 		const cleared = this.historyService.clearWatchedFlags(userId);
 		return { success: true, clearedCount: cleared };
 	}
 
+	@RequireAction('view:own-data')
 	@Delete()
 	clearHistory(@CurrentUser('id') userId: string) {
 		this.historyService.clearHistory(userId);
 		return { success: true };
 	}
 
+	@RequireAction('view:own-data')
 	@Get('continue')
 	getContinueWatching(@CurrentUser('id') userId: string) {
 		return this.historyService.getContinueWatching(userId);

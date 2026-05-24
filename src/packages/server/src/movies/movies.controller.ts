@@ -1,6 +1,7 @@
 import type { MovieListQuery } from '@mu/shared';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { MetadataService } from '../metadata/metadata.service.js';
 import { RemoteService } from '../remote/remote.service.js';
@@ -18,6 +19,7 @@ export class MoviesController {
 		private readonly metadataService: MetadataService,
 	) {}
 
+	@RequireAction('view:library')
 	@Get()
 	async findAll(@Query() query: MovieListQuery, @CurrentUser('id') userId: string) {
 		const serverFilter = query.server;
@@ -128,35 +130,41 @@ export class MoviesController {
 		});
 	}
 
+	@RequireAction('view:library')
 	@Get('search')
 	search(@Query('q') q: string, @CurrentUser('id') userId: string) {
 		const results = this.moviesService.search(q ?? '', userId);
 		return { movies: results, total: results.length, page: 1, pageSize: results.length };
 	}
 
+	@RequireAction('view:library')
 	@Get('recent')
 	findRecent(@Query('limit') limit?: string) {
 		const movies = this.moviesService.findRecent(limit ? parseInt(limit, 10) : 20);
 		return { movies, total: movies.length, page: 1, pageSize: movies.length };
 	}
 
+	@RequireAction('view:library')
 	@Get('genres')
 	getGenres() {
 		return this.moviesService.getGenres();
 	}
 
+	@RequireAction('view:own-data')
 	@Get('continue-watching')
 	getContinueWatching(@CurrentUser('id') userId: string) {
 		const movies = this.historyService.getContinueWatching(userId);
 		return { movies, total: movies.length, page: 1, pageSize: movies.length };
 	}
 
+	@RequireAction('view:library')
 	@Get('trending')
 	getTrending(@Query('limit') limit?: string) {
 		const movies = this.moviesService.findRecent(limit ? parseInt(limit, 10) : 20);
 		return { movies, total: movies.length, page: 1, pageSize: movies.length };
 	}
 
+	@RequireAction('view:library')
 	@Get(':id')
 	findById(@Param('id') id: string, @CurrentUser('id') userId: string) {
 		// Accept library UUIDs, bookmark UUIDs, or namespaced keys like
@@ -167,12 +175,14 @@ export class MoviesController {
 
 	@Patch(':id')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	update(@Param('id') id: string, @Body() body: Record<string, unknown>) {
 		return this.moviesService.update(id, body as any);
 	}
 
 	@Post(':id/sanitize-title')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	async sanitizeTitle(@Param('id') id: string, @CurrentUser('id') userId: string) {
 		const result = this.moviesService.sanitizeMovieTitle(id);
 		// Always return the (possibly updated) full movie so the client
@@ -188,6 +198,7 @@ export class MoviesController {
 
 	@Post(':id/delete-files')
 	@Roles('admin')
+	@RequireAction('delete:movie')
 	async deleteFromDisk(
 		@Param('id') id: string,
 		@Body() body: { deleteEnclosingFolder?: boolean },
@@ -198,11 +209,13 @@ export class MoviesController {
 
 	@Delete(':id')
 	@Roles('admin')
+	@RequireAction('delete:movie')
 	remove(@Param('id') id: string) {
 		this.moviesService.remove(id);
 		return { success: true };
 	}
 
+	@RequireAction('view:own-data')
 	@Post(':id/rate')
 	rate(
 		@Param('id') movieId: string,
@@ -212,12 +225,14 @@ export class MoviesController {
 		return this.ratingsService.rate(userId, movieId, body.rating);
 	}
 
+	@RequireAction('view:own-data')
 	@Delete(':id/rate')
 	removeRating(@Param('id') movieId: string, @CurrentUser('id') userId: string) {
 		this.ratingsService.removeRating(userId, movieId);
 		return { success: true };
 	}
 
+	@RequireAction('view:own-data')
 	@Post(':id/watched')
 	markWatched(@Param('id') movieId: string, @CurrentUser('id') userId: string) {
 		this.historyService.markWatched(userId, movieId);
@@ -225,6 +240,7 @@ export class MoviesController {
 		return { success: true };
 	}
 
+	@RequireAction('view:own-data')
 	@Delete(':id/watched')
 	markUnwatched(@Param('id') movieId: string, @CurrentUser('id') userId: string) {
 		this.historyService.markUnwatched(userId, movieId);
@@ -234,6 +250,7 @@ export class MoviesController {
 
 	@Post('bulk')
 	@Roles('admin')
+	@RequireAction('delete:movie')
 	async bulkAction(
 		@Body()
 		body: {

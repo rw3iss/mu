@@ -1,5 +1,6 @@
 import { All, Controller, Get, NotFoundException, Param, Req } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import type { HttpMethod } from './plugin.interface.js';
 import { PluginApiRegistryService } from './plugin-api-registry.service.js';
 
@@ -8,18 +9,21 @@ export class PluginApiController {
 	constructor(private readonly apiRegistry: PluginApiRegistryService) {}
 
 	/** Schema endpoint for a single plugin — used by client codegen */
+	@RequireAction('view:library')
 	@Get(':name/schema')
 	getSchema(@Param('name') name: string) {
 		return this.apiRegistry.getSchema(name);
 	}
 
 	/** Schema endpoint for all registered plugins */
+	@RequireAction('view:library')
 	@Get('schemas/all')
 	getAllSchemas() {
 		return this.apiRegistry.getAllSchemas();
 	}
 
 	/** Catch-all for plugin API requests */
+	@RequireAction('view:library')
 	@All(':name/api/*')
 	async handlePluginApi(@Param('name') name: string, @Req() req: FastifyRequest) {
 		const method = req.method as HttpMethod;

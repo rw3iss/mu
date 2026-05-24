@@ -9,6 +9,7 @@ import {
 	Patch,
 	Post,
 } from '@nestjs/common';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { MatchCandidatesRepository } from '../metadata/match-candidates.repository.js';
 import { GroupingService } from './grouping.service.js';
@@ -36,6 +37,7 @@ export class GroupingController {
 		private readonly matchCandidates: MatchCandidatesRepository,
 	) {}
 
+	@RequireAction('view:library')
 	@Get()
 	listParents() {
 		const parents = this.repo.listParents();
@@ -60,11 +62,13 @@ export class GroupingController {
 		};
 	}
 
+	@RequireAction('view:library')
 	@Get('unsure')
 	listUnsure() {
 		return { groups: this.repo.listUnsure() };
 	}
 
+	@RequireAction('view:library')
 	@Get(':id')
 	getGroup(@Param('id') id: string) {
 		const group = this.repo.get(id);
@@ -79,6 +83,7 @@ export class GroupingController {
 		};
 	}
 
+	@RequireAction('view:library')
 	@Get(':id/movies')
 	listMovies(@Param('id') id: string) {
 		const group = this.repo.get(id);
@@ -97,6 +102,7 @@ export class GroupingController {
 		return { movies: out };
 	}
 
+	@RequireAction('edit:movie')
 	@Post(':id/confirm')
 	confirm(@Param('id') id: string) {
 		const group = this.repo.get(id);
@@ -105,6 +111,7 @@ export class GroupingController {
 		return { ok: true };
 	}
 
+	@RequireAction('edit:movie')
 	@Post(':id/reject')
 	reject(@Param('id') id: string) {
 		const group = this.repo.get(id);
@@ -113,6 +120,7 @@ export class GroupingController {
 		return { ok: true };
 	}
 
+	@RequireAction('edit:movie')
 	@Patch(':id')
 	patch(@Param('id') id: string, @Body() body: PatchGroupBody) {
 		const group = this.repo.get(id);
@@ -134,6 +142,7 @@ export class GroupingController {
 
 	@Delete(':id')
 	@Roles('admin')
+	@RequireAction('delete:movie')
 	remove(@Param('id') id: string) {
 		const group = this.repo.get(id);
 		if (!group) throw new NotFoundException(`Group ${id} not found`);
@@ -144,6 +153,7 @@ export class GroupingController {
 
 	@Post('admin/rebuild')
 	@Roles('admin')
+	@RequireAction('edit:app-settings')
 	async rebuild() {
 		// Returns immediately with a jobId; progress + final summary
 		// stream over the existing JOB_PROGRESS / JOB_COMPLETED WS
@@ -160,6 +170,7 @@ export class GroupingController {
 
 	@Post('admin/detect/:movieId')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	async detectOne(@Param('movieId') movieId: string) {
 		if (!movieId) throw new BadRequestException('movieId required');
 		const subgroupId = await this.groupingService.detectAndAttach(movieId);
@@ -171,6 +182,7 @@ export class GroupingController {
 	// belong to this module. The metadata module is a pure resolver and
 	// doesn't reach into this table.
 
+	@RequireAction('view:library')
 	@Get(':id/match-candidates')
 	listMatchCandidates(@Param('id') groupId: string) {
 		return { candidates: this.matchCandidates.list('group', groupId) };
@@ -178,6 +190,7 @@ export class GroupingController {
 
 	@Post(':id/match-candidates/apply')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	async applyMatchCandidate(@Param('id') groupId: string, @Body() body: ApplyCandidateBody) {
 		if (!body?.provider || !body?.externalId) {
 			throw new BadRequestException('provider and externalId required');
@@ -192,6 +205,7 @@ export class GroupingController {
 
 	@Delete(':id/match-candidates')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	clearMatchCandidates(@Param('id') groupId: string) {
 		this.matchCandidates.clear('group', groupId);
 		return { ok: true };
@@ -199,6 +213,7 @@ export class GroupingController {
 
 	@Post(':id/refresh-metadata')
 	@Roles('admin')
+	@RequireAction('edit:movie')
 	async refreshMetadata(@Param('id') groupId: string) {
 		const result = await this.groupingService.refreshGroupMetadata(groupId);
 		return result ?? { message: 'No metadata found' };

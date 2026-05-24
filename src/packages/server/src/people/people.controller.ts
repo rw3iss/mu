@@ -1,5 +1,6 @@
 import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { inArray } from 'drizzle-orm';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movies } from '../database/schema/index.js';
 import { PeopleService } from './people.service.js';
@@ -11,6 +12,7 @@ export class PeopleController {
 		private readonly database: DatabaseService,
 	) {}
 
+	@RequireAction('view:library')
 	@Get(':key')
 	async get(@Param('key') key: string) {
 		const person = await this.people.getOrFetch(key);

@@ -12,6 +12,7 @@ import {
 	Res,
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { RemoteService } from './remote.service.js';
 
@@ -22,6 +23,7 @@ export class RemoteController {
 	/**
 	 * GET /remote/servers — List configured remote servers.
 	 */
+	@RequireAction('view:library')
 	@Get('servers')
 	getServers() {
 		return this.remoteService.getServers();
@@ -32,6 +34,7 @@ export class RemoteController {
 	 */
 	@Post('servers')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	addServer(@Body() body: { url: string; password?: string; name?: string; enabled?: boolean }) {
 		return this.remoteService.addServer({
 			url: body.url,
@@ -46,6 +49,7 @@ export class RemoteController {
 	 */
 	@Put('servers/:id')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	updateServer(
 		@Param('id') id: string,
 		@Body() body: Partial<{ url: string; password: string; name: string; enabled: boolean }>,
@@ -60,6 +64,7 @@ export class RemoteController {
 	 */
 	@Delete('servers/:id')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	removeServer(@Param('id') id: string) {
 		const removed = this.remoteService.removeServer(id);
 		if (!removed) throw new NotFoundException(`Server ${id} not found`);
@@ -71,6 +76,7 @@ export class RemoteController {
 	 */
 	@Post('servers/test')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async testConnection(@Body() body: { url: string; password?: string }) {
 		try {
 			const info = await this.remoteService.testConnection(body.url, body.password);
@@ -83,6 +89,7 @@ export class RemoteController {
 	/**
 	 * GET /remote/movies — Fetch movies from all enabled remote servers.
 	 */
+	@RequireAction('view:library')
 	@Get('movies')
 	async getRemoteMovies(@Query() query: Record<string, string>) {
 		return this.remoteService.fetchAllRemoteMovies(query);
@@ -91,6 +98,7 @@ export class RemoteController {
 	/**
 	 * GET /remote/movies/:serverId/:movieId — Get a specific remote movie detail.
 	 */
+	@RequireAction('view:library')
 	@Get('movies/:serverId/:movieId')
 	async getRemoteMovie(@Param('serverId') serverId: string, @Param('movieId') movieId: string) {
 		return this.remoteService.fetchMovieDetail(serverId, movieId);
@@ -99,6 +107,7 @@ export class RemoteController {
 	/**
 	 * GET /remote/stream/:serverId/:movieId/start — Start stream on remote server.
 	 */
+	@RequireAction('view:library')
 	@Get('stream/:serverId/:movieId/start')
 	async startRemoteStream(
 		@Param('serverId') serverId: string,
@@ -111,6 +120,7 @@ export class RemoteController {
 	/**
 	 * GET /remote/stream/:serverId/:sessionId/manifest.m3u8 — Proxy HLS manifest.
 	 */
+	@RequireAction('view:library')
 	@Get('stream/:serverId/:sessionId/manifest.m3u8')
 	async proxyManifest(
 		@Param('serverId') serverId: string,
@@ -140,6 +150,7 @@ export class RemoteController {
 	 * GET /remote/stream/:serverId/direct/:fileId — Proxy direct play with range support.
 	 * Must be defined before the segment catch-all to avoid route conflict.
 	 */
+	@RequireAction('view:library')
 	@Get('stream/:serverId/direct/:fileId')
 	async proxyDirectPlay(
 		@Param('serverId') serverId: string,
@@ -189,6 +200,7 @@ export class RemoteController {
 	 * Tries the shared subtitle serve endpoint first (works for shared streams),
 	 * then falls back to the standard stream subtitle endpoint.
 	 */
+	@RequireAction('view:library')
 	@Get('stream/:serverId/:sessionId/subtitles/:trackFile')
 	async proxySubtitleVtt(
 		@Param('serverId') serverId: string,
@@ -233,6 +245,7 @@ export class RemoteController {
 	/**
 	 * GET /remote/stream/:serverId/:sessionId/:segmentFile — Proxy HLS segment.
 	 */
+	@RequireAction('view:library')
 	@Get('stream/:serverId/:sessionId/:segmentFile')
 	async proxySegment(
 		@Param('serverId') serverId: string,

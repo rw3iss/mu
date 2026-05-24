@@ -1,13 +1,17 @@
 import { nowISO } from '@mu/shared';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import bcrypt from 'bcrypt';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
+import { AuthCacheService } from '../common/permissions/auth-cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { users } from '../database/schema/index.js';
 
 @Injectable()
 export class UsersService {
-	constructor(private readonly database: DatabaseService) {}
+	constructor(
+		private readonly database: DatabaseService,
+		private readonly authCache: AuthCacheService,
+	) {}
 
 	private readonly publicColumns = {
 		id: users.id,
@@ -45,7 +49,7 @@ export class UsersService {
 				username: data.username,
 				email: data.email ?? null,
 				passwordHash,
-				role: data.role ?? 'user',
+				role: data.role ?? 'viewer',
 				createdAt: now,
 				updatedAt: now,
 			})
@@ -63,6 +67,11 @@ export class UsersService {
 			throw new NotFoundException(`User ${id} not found`);
 		}
 
+		// Last-admin protection: prevent demoting the only admin.
+		if (data.role !== undefined && data.role !== 'admin' && existing.role === 'admin') {
+			this.assertNotLastAdmin(id);
+		}
+
 		const updates: Record<string, unknown> = { updatedAt: nowISO() };
 
 		if (data.username !== undefined) updates.username = data.username;
@@ -73,6 +82,7 @@ export class UsersService {
 		}
 
 		this.database.db.update(users).set(updates).where(eq(users.id, id)).run();
+		this.authCache.invalidateUser(id);
 
 		return this.findById(id);
 	}
@@ -83,6 +93,28 @@ export class UsersService {
 			throw new NotFoundException(`User ${id} not found`);
 		}
 
+		// Last-admin protection: refuse to delete the last admin.
+		if (existing.role === 'admin') {
+			this.assertNotLastAdmin(id);
+		}
+
 		this.database.db.delete(users).where(eq(users.id, id)).run();
+		this.authCache.invalidateUser(id);
+	}
+
+	/**
+	 * Throw 409 if `excludeId` is the only remaining admin. Used by
+	 * both update (when demoting) and delete (when removing).
+	 */
+	private assertNotLastAdmin(excludeId: string): void {
+		const other = this.database.db
+			.select({ id: users.id })
+			.from(users)
+			.where(and(eq(users.role, 'admin'), ne(users.id, excludeId)))
+			.limit(1)
+			.get();
+		if (!other) {
+			throw new ConflictException('Cannot remove the last admin');
+		}
 	}
 }

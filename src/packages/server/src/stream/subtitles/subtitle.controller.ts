@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { FastifyReply } from 'fastify';
+import { RequireAction } from '../../common/decorators/require-action.decorator.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, streamSessions } from '../../database/schema/index.js';
 import { SubtitleService } from './subtitle.service.js';
@@ -16,6 +17,7 @@ export class SubtitleController {
 	/**
 	 * Serve a WebVTT subtitle file for a given stream session and track index.
 	 */
+	@RequireAction('view:library')
 	@Get(':sessionId/subtitles/:trackIndex.vtt')
 	async getSubtitle(
 		@Param('sessionId') sessionId: string,

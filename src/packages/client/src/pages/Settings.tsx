@@ -53,6 +53,7 @@ import { Plugins } from './Plugins';
 import styles from './Settings.module.scss';
 import { Connections } from './settings/Connections';
 import { Matching } from './settings/Matching';
+import { Users } from './settings/Users';
 
 function OverlayTimeoutSetting() {
 	const [val, setVal] = useUiSetting('overlay_hide_timeout', 2000);
@@ -219,6 +220,7 @@ type SettingsTab =
 	| 'notifications'
 	| 'plugins'
 	| 'admin'
+	| 'users'
 	| 'connections'
 	| 'matching'
 	| 'jobs'
@@ -233,6 +235,7 @@ const VALID_TABS: SettingsTab[] = [
 	'notifications',
 	'plugins',
 	'admin',
+	'users',
 	'connections',
 	'matching',
 	'jobs',
@@ -717,11 +720,12 @@ export function Settings(props: SettingsProps) {
 	const tabs: { id: SettingsTab; label: string }[] = [
 		{ id: 'general', label: 'General' },
 		{ id: 'playback', label: 'Playback' },
-		{ id: 'library', label: 'Library' },
 		{ id: 'appearance', label: 'Appearance' },
 		{ id: 'notifications', label: 'Notifications' },
 		...(isAdmin
 			? [
+					{ id: 'library' as SettingsTab, label: 'Library' },
+					{ id: 'users' as SettingsTab, label: 'Users' },
 					{ id: 'plugins' as SettingsTab, label: 'Plugins' },
 					{ id: 'admin' as SettingsTab, label: 'Admin' },
 					{ id: 'connections' as SettingsTab, label: 'Sources' },
@@ -2018,7 +2022,7 @@ export function Settings(props: SettingsProps) {
 					)}
 
 					{/* Library Tab */}
-					{activeTab === 'library' && (
+					{activeTab === 'library' && isAdmin && (
 						<div class={styles.panel}>
 							<h2 class={styles.panelTitle}>Library</h2>
 
@@ -2789,6 +2793,13 @@ export function Settings(props: SettingsProps) {
 					{activeTab === 'admin' && isAdmin && (
 						<div class={styles.panel}>
 							<AdminDashboard />
+						</div>
+					)}
+
+					{/* Users Tab (admin only) */}
+					{activeTab === 'users' && isAdmin && (
+						<div class={styles.panel}>
+							<Users />
 						</div>
 					)}
 

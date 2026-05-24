@@ -1,21 +1,25 @@
 import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { AudioProfilesService } from './audio-profiles.service.js';
 
 @Controller('audio-profiles')
 export class AudioProfilesController {
 	constructor(private readonly service: AudioProfilesService) {}
 
+	@RequireAction('view:own-data')
 	@Get()
 	findAll(@CurrentUser('id') userId: string) {
 		return this.service.findAll(userId);
 	}
 
+	@RequireAction('view:own-data')
 	@Get(':id')
 	findOne(@CurrentUser('id') userId: string, @Param('id') id: string) {
 		return this.service.findOne(userId, id);
 	}
 
+	@RequireAction('view:own-data')
 	@Post()
 	create(
 		@CurrentUser('id') userId: string,
@@ -24,6 +28,7 @@ export class AudioProfilesController {
 		return this.service.create(userId, body);
 	}
 
+	@RequireAction('view:own-data')
 	@Put(':id')
 	update(
 		@CurrentUser('id') userId: string,
@@ -33,6 +38,7 @@ export class AudioProfilesController {
 		return this.service.update(userId, id, body);
 	}
 
+	@RequireAction('view:own-data')
 	@Delete(':id')
 	remove(@CurrentUser('id') userId: string, @Param('id') id: string) {
 		this.service.remove(userId, id);

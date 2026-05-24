@@ -3,6 +3,7 @@ import path from 'node:path';
 import { nowISO } from '@mu/shared';
 import { Controller, Delete, Get, Logger, Param, Post, Query } from '@nestjs/common';
 import { desc, eq, sql } from 'drizzle-orm';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { DatabaseService } from '../database/database.service.js';
 import { jobHistory } from '../database/schema/index.js';
@@ -23,18 +24,21 @@ export class ServerController {
 
 	@Get('info')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async getServerInfo() {
 		return this.serverService.getServerInfo();
 	}
 
 	@Get('stats')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async getStats() {
 		return this.serverService.getStats();
 	}
 
 	@Post('restart')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async restart() {
 		this.logger.warn('Server restart requested via API');
 
@@ -92,6 +96,7 @@ export class ServerController {
 
 	@Get('logs')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	getLogs(@Query('lines') lines?: string, @Query('file') file?: string) {
 		const numLines = lines ? parseInt(lines, 10) : 200;
 		const logFile = file === 'transcode-debug' ? 'transcode-debug' : 'server';
@@ -104,6 +109,7 @@ export class ServerController {
 
 	@Get('jobs')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	listJobs(@Query('status') status?: string, @Query('type') type?: string) {
 		// Current in-memory jobs, sorted: running first (earliest), then pending, then completed/failed
 		const statusOrder: Record<string, number> = {
@@ -139,6 +145,7 @@ export class ServerController {
 
 	@Get('jobs/history')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	getJobHistory(
 		@Query('status') status?: string,
 		@Query('type') type?: string,
@@ -178,6 +185,7 @@ export class ServerController {
 
 	@Delete('jobs/history')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	clearJobHistory() {
 		const result = this.database.db.delete(jobHistory).run();
 		this.logger.warn(`Cleared job history: ${result.changes} rows deleted`);
@@ -186,6 +194,7 @@ export class ServerController {
 
 	@Post('encoder/reset')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	resetEncoder() {
 		this.serverService.resetHwAccelBroken();
 		return { success: true };
@@ -193,6 +202,7 @@ export class ServerController {
 
 	@Post('encoder/recycle')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async recycleEncoder() {
 		this.logger.warn('Hardware encoder recycle requested via API');
 		return this.serverService.recycleHwAccel();
@@ -200,6 +210,7 @@ export class ServerController {
 
 	@Post('jobs/:id/pause')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	pauseJob(@Param('id') id: string) {
 		const result = this.jobManager.pause(id);
 		return { success: result };
@@ -207,6 +218,7 @@ export class ServerController {
 
 	@Post('jobs/:id/resume')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	resumeJob(@Param('id') id: string) {
 		const result = this.jobManager.resume(id);
 		return { success: result };
@@ -214,6 +226,7 @@ export class ServerController {
 
 	@Post('jobs/:id/cancel')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	cancelJob(@Param('id') id: string) {
 		const result = this.jobManager.cancel(id);
 		return { success: result };
@@ -221,6 +234,7 @@ export class ServerController {
 
 	@Post('jobs/:id/prioritize')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	prioritizeJob(@Param('id') id: string) {
 		const result = this.jobManager.prioritize(id);
 		return { success: result };
@@ -228,6 +242,7 @@ export class ServerController {
 
 	@Post('jobs/:id/retry')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	retryJob(@Param('id') id: string) {
 		const result = this.jobManager.retry(id);
 		if (result.ok) {

@@ -13,6 +13,7 @@ import {
 	Req,
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
+import { RequireAction } from '../../common/decorators/require-action.decorator.js';
 import { SubtitleService } from './subtitle.service.js';
 import { SUBTITLE_EXTS, SubtitleIngestionService } from './subtitle-ingestion.service.js';
 import { SubtitleRemoteProxyService } from './subtitle-remote-proxy.service.js';
@@ -32,6 +33,7 @@ export class SubtitleManageController {
 	) {}
 
 	/** GET /subtitles/:movieId — List existing subtitle tracks for a movie */
+	@RequireAction('view:library')
 	@Get(':movieId')
 	async listSubtitles(
 		@Param('movieId') movieId: string,
@@ -59,6 +61,7 @@ export class SubtitleManageController {
 	}
 
 	/** POST /subtitles/:movieId/search — Search third-party APIs for subtitles */
+	@RequireAction('view:library')
 	@Post(':movieId/search')
 	async searchSubtitles(
 		@Param('movieId') movieId: string,
@@ -89,6 +92,7 @@ export class SubtitleManageController {
 	}
 
 	/** POST /subtitles/:movieId/download — Download from a provider and save it */
+	@RequireAction('edit:movie')
 	@Post(':movieId/download')
 	async downloadSubtitle(
 		@Param('movieId') movieId: string,
@@ -143,6 +147,7 @@ export class SubtitleManageController {
 	 * POST /subtitles/:movieId/upload — Upload a subtitle file manually
 	 * Expects multipart form with a single file field "subtitle"
 	 */
+	@RequireAction('edit:movie')
 	@Post(':movieId/upload')
 	async uploadSubtitle(
 		@Param('movieId') movieId: string,
@@ -199,6 +204,7 @@ export class SubtitleManageController {
 	}
 
 	/** DELETE /subtitles/:movieId/:trackIndex — Delete a subtitle track */
+	@RequireAction('edit:movie')
 	@Delete(':movieId/:trackIndex')
 	async deleteSubtitle(
 		@Param('movieId') movieId: string,

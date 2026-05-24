@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Logger, Post, Req, Res, UsePipes } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Public } from '../common/decorators/public.decorator.js';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { ConfigService } from '../config/config.service.js';
 import { LibraryService } from '../library/library.service.js';
@@ -72,6 +73,7 @@ export class AuthController {
 	}
 
 	@Post('logout')
+	@RequireAction('view:library')
 	async logout(@Res({ passthrough: true }) reply: any) {
 		reply.clearCookie('mu_access_token', {
 			httpOnly: true,
@@ -82,6 +84,7 @@ export class AuthController {
 	}
 
 	@Get('me')
+	@RequireAction('view:library')
 	async me(@CurrentUser() user: any) {
 		// JWT payload has { sub, role } — look up full user
 		const userId = user.sub ?? user.id;

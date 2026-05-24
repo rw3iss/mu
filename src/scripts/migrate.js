@@ -367,6 +367,19 @@ const tables = [
 		updated_at TEXT NOT NULL
 	)`,
 	`CREATE INDEX IF NOT EXISTS imdb_ratings_rating_idx ON imdb_ratings(average_rating, num_votes)`,
+	// Per-user setting overrides. (user_id, key) -> JSON value.
+	// Cascade-deleted with the user. Reads fall back to app-wide
+	// `settings` table. Allowlist of keys enforced in code; admins
+	// can override any key via `admin:any-user-setting` capability.
+	`CREATE TABLE IF NOT EXISTS user_settings (
+		user_id TEXT NOT NULL,
+		key TEXT NOT NULL,
+		value TEXT NOT NULL,
+		updated_at TEXT NOT NULL,
+		PRIMARY KEY (user_id, key),
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+	)`,
+	`CREATE INDEX IF NOT EXISTS user_settings_user_idx ON user_settings(user_id)`,
 ];
 
 for (const sql of tables) {
@@ -411,6 +424,18 @@ const alters = [
 
 for (const sql of alters) {
 	try { db.exec(sql); } catch (e) { /* column already exists */ }
+}
+
+// Role-enum migration: 'admin' | 'user' -> 'admin' | 'contributor' | 'viewer'.
+// Existing 'user' rows become 'viewer'. Idempotent — once renamed, no rows
+// match the WHERE clause on re-runs.
+try {
+	const renamed = db.prepare(`UPDATE users SET role = 'viewer' WHERE role = 'user'`).run();
+	if (renamed.changes > 0) {
+		console.log(`Migrated ${renamed.changes} user(s) from role 'user' to 'viewer'`);
+	}
+} catch (e) {
+	console.warn(`Role migration skipped: ${e.message}`);
 }
 
 // Seed built-in curated themes from the canonical catalogue.

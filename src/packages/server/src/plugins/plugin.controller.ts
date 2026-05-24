@@ -8,6 +8,7 @@ import {
 	Post,
 	Put,
 } from '@nestjs/common';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { PluginManagerService } from './plugin-manager.service.js';
 
@@ -17,12 +18,14 @@ export class PluginController {
 
 	@Get()
 	@Roles('admin')
+	@RequireAction('admin:plugins')
 	async listPlugins() {
 		return this.pluginManager.getDiscoveredPluginsWithStatus();
 	}
 
 	@Get(':name')
 	@Roles('admin')
+	@RequireAction('admin:plugins')
 	async getPlugin(@Param('name') name: string) {
 		const allPlugins = await this.pluginManager.getDiscoveredPluginsWithStatus();
 		const plugin = allPlugins.find((p) => p.name === name);
@@ -36,6 +39,7 @@ export class PluginController {
 
 	@Post(':name/install')
 	@Roles('admin')
+	@RequireAction('admin:plugins')
 	async installPlugin(@Param('name') name: string) {
 		try {
 			await this.pluginManager.installPlugin(name);
@@ -49,6 +53,7 @@ export class PluginController {
 
 	@Post(':name/uninstall')
 	@Roles('admin')
+	@RequireAction('admin:plugins')
 	async uninstallPlugin(@Param('name') name: string) {
 		try {
 			await this.pluginManager.uninstallPlugin(name);
@@ -62,6 +67,7 @@ export class PluginController {
 
 	@Post(':name/enable')
 	@Roles('admin')
+	@RequireAction('admin:plugins')
 	async enablePlugin(@Param('name') name: string) {
 		try {
 			await this.pluginManager.enablePlugin(name);
@@ -75,6 +81,7 @@ export class PluginController {
 
 	@Post(':name/disable')
 	@Roles('admin')
+	@RequireAction('admin:plugins')
 	async disablePlugin(@Param('name') name: string) {
 		try {
 			await this.pluginManager.disablePlugin(name);
@@ -88,6 +95,7 @@ export class PluginController {
 
 	@Get(':name/settings')
 	@Roles('admin')
+	@RequireAction('admin:plugins')
 	async getSettings(@Param('name') name: string) {
 		const definitions = this.pluginManager.getPluginSettingDefinitions(name);
 		const values = await this.pluginManager.getPluginSettings(name);
@@ -96,6 +104,7 @@ export class PluginController {
 
 	@Put(':name/settings')
 	@Roles('admin')
+	@RequireAction('admin:plugins')
 	async updateSettings(@Param('name') name: string, @Body() body: Record<string, unknown>) {
 		await this.pluginManager.updatePluginSettings(name, body);
 		return { success: true, message: `Settings updated for plugin "${name}"` };

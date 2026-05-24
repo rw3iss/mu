@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Put } from '@nestjs/common';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { ImdbDatasetsService } from './imdb-datasets.service.js';
 
@@ -8,6 +9,7 @@ export class ImdbDatasetsController {
 
 	@Get('status')
 	@Roles('admin')
+	@RequireAction('admin:datasets')
 	getStatus() {
 		return {
 			enabled: this.service.isEnabled(),
@@ -17,6 +19,7 @@ export class ImdbDatasetsController {
 
 	@Put('enabled')
 	@Roles('admin')
+	@RequireAction('admin:datasets')
 	setEnabled(@Body() body: { enabled: boolean }) {
 		this.service.setEnabled(!!body?.enabled);
 		return { enabled: this.service.isEnabled() };
@@ -28,6 +31,7 @@ export class ImdbDatasetsController {
 	 */
 	@Post('sync')
 	@Roles('admin')
+	@RequireAction('admin:datasets')
 	triggerSync() {
 		const jobId = this.service.triggerManualSync();
 		return { jobId };

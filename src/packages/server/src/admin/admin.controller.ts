@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { Controller, Delete, Get, Logger, Param, Post } from '@nestjs/common';
 import { eq, isNull } from 'drizzle-orm';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -43,6 +44,7 @@ export class AdminController {
 	 */
 	@Post('sanitize-titles')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	sanitizeTitles() {
 		return this.moviesService.sanitizeUnmatchedTitles();
 	}
@@ -52,6 +54,7 @@ export class AdminController {
 	 */
 	@Post('generate-missing-thumbnails')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async generateMissingThumbnails() {
 		const moviesWithoutThumbnails = this.database.db
 			.select({ id: movies.id, title: movies.title })
@@ -80,6 +83,7 @@ export class AdminController {
 	 */
 	@Post('fix-broken-thumbnails')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async fixBrokenThumbnails() {
 		const brokenIds = this.thumbnailService.getBrokenThumbnailMovieIds();
 		const count = brokenIds.length;
@@ -117,6 +121,7 @@ export class AdminController {
 	 */
 	@Post('generate-sprites')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async generateMissingSprites() {
 		const allMovies = this.database.db
 			.select({ id: movies.id, title: movies.title })
@@ -156,6 +161,7 @@ export class AdminController {
 	 */
 	@Delete('sessions/:sessionId')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async endSession(@Param('sessionId') sessionId: string) {
 		await this.streamService.endStream(sessionId);
 		return { success: true };
@@ -166,6 +172,7 @@ export class AdminController {
 	 */
 	@Delete('sessions')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async endAllSessions() {
 		const ended = await this.streamService.endAllSessions();
 		return { success: true, endedCount: ended };
@@ -176,6 +183,7 @@ export class AdminController {
 	 */
 	@Get('session-history')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	getSessionHistory() {
 		// Get current active session movie+user pairs to mark them
 		const activeSessionPairs = new Set(
@@ -219,6 +227,7 @@ export class AdminController {
 	 */
 	@Delete('session-history')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	clearSessionHistory() {
 		// Find history IDs belonging to active streams — preserve those
 		const activeStreams = this.database.db
@@ -267,6 +276,7 @@ export class AdminController {
 	 */
 	@Post('remove-broken-movies')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async removeBrokenMovies() {
 		const allMovies = this.database.db
 			.select({ id: movies.id, title: movies.title })

@@ -14,6 +14,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -44,6 +45,7 @@ export class StreamController {
 	 * Get stream mode info for a movie (whether it needs transcoding, has cache, etc.).
 	 * Used by the client to show indicators on movie cards.
 	 */
+	@RequireAction('view:library')
 	@Get('info/:movieId')
 	async getStreamInfo(@Param('movieId') movieId: string) {
 		const info = await this.streamService.getMovieStreamInfo(movieId);
@@ -56,6 +58,7 @@ export class StreamController {
 	/**
 	 * Start a new streaming session for a movie.
 	 */
+	@RequireAction('view:library')
 	@Get(':movieId/start')
 	async startStream(
 		@Param('movieId') movieId: string,
@@ -82,6 +85,7 @@ export class StreamController {
 	/**
 	 * Check readiness of a streaming session (is transcoding done / first segment available?).
 	 */
+	@RequireAction('view:library')
 	@Get(':sessionId/status')
 	async getStatus(@Param('sessionId') sessionId: string, @Res() reply: FastifyReply) {
 		const state = this.transcoderService.getTranscodeState(sessionId);
@@ -127,6 +131,7 @@ export class StreamController {
 	/**
 	 * Get the HLS manifest for an active transcoding session.
 	 */
+	@RequireAction('view:library')
 	@Get(':sessionId/manifest.m3u8')
 	async getManifest(@Param('sessionId') sessionId: string, @Res() reply: FastifyReply) {
 		const requestStart = Date.now();
@@ -170,6 +175,7 @@ export class StreamController {
 	/**
 	 * Get a specific HLS segment for an active transcoding session.
 	 */
+	@RequireAction('view:library')
 	@Get(':sessionId/:segmentFile')
 	async getSegment(
 		@Param('sessionId') sessionId: string,
@@ -253,6 +259,7 @@ export class StreamController {
 	/**
 	 * Update playback progress for an active session.
 	 */
+	@RequireAction('view:library')
 	@Post(':sessionId/progress')
 	async updateProgress(
 		@Param('sessionId') sessionId: string,
@@ -266,6 +273,7 @@ export class StreamController {
 	 * Restart transcoding from a new position (seek).
 	 * Stops the current FFmpeg process and starts a new one from the given time.
 	 */
+	@RequireAction('view:library')
 	@Post(':sessionId/seek')
 	async seekStream(
 		@Param('sessionId') sessionId: string,
@@ -278,6 +286,7 @@ export class StreamController {
 	/**
 	 * End a streaming session, stopping any active transcode and cleaning up resources.
 	 */
+	@RequireAction('view:library')
 	@Delete(':sessionId')
 	async endStream(@Param('sessionId') sessionId: string) {
 		await this.streamService.endStream(sessionId);
@@ -287,6 +296,7 @@ export class StreamController {
 	/**
 	 * Direct play / direct stream a file with HTTP range request support.
 	 */
+	@RequireAction('view:library')
 	@Get('direct/:fileId')
 	async directPlay(
 		@Param('fileId') fileId: string,
@@ -309,6 +319,7 @@ export class StreamController {
 	/**
 	 * Heartbeat endpoint — keeps session alive during pause.
 	 */
+	@RequireAction('view:library')
 	@Post(':sessionId/heartbeat')
 	heartbeat(@Param('sessionId') sessionId: string) {
 		this.streamService.touchSession(sessionId);
@@ -318,6 +329,7 @@ export class StreamController {
 	/**
 	 * List all active streaming sessions (admin endpoint).
 	 */
+	@RequireAction('admin:server')
 	@Get('sessions')
 	async getActiveSessions() {
 		return this.streamService.getActiveSessions();
@@ -328,6 +340,7 @@ export class StreamController {
 	 */
 	@Delete('cache/:movieId/:quality')
 	@Roles('admin')
+	@RequireAction('admin:server')
 	async deleteCachedVersion(
 		@Param('movieId') movieId: string,
 		@Param('quality') quality: string,

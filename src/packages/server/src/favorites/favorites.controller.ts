@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import {
 	type AddFavoriteInput,
 	FavoritesService,
@@ -10,17 +11,20 @@ import {
 export class FavoritesController {
 	constructor(private readonly favorites: FavoritesService) {}
 
+	@RequireAction('view:own-data')
 	@Get()
 	async list(@CurrentUser('id') userId: string) {
 		const items = await this.favorites.list(userId);
 		return { favorites: items };
 	}
 
+	@RequireAction('view:own-data')
 	@Get('keys')
 	keys(@CurrentUser('id') userId: string) {
 		return this.favorites.listKeys(userId);
 	}
 
+	@RequireAction('view:own-data')
 	@Post()
 	async add(@CurrentUser('id') userId: string, @Body() body: AddFavoriteInput) {
 		if (!body || (body.entityType !== 'person' && body.entityType !== 'movie')) {
@@ -36,6 +40,7 @@ export class FavoritesController {
 		return { favorite: fav, ok: true };
 	}
 
+	@RequireAction('view:own-data')
 	@Delete()
 	async remove(@CurrentUser('id') userId: string, @Body() body: RemoveFavoriteInput) {
 		if (!body || (body.entityType !== 'person' && body.entityType !== 'movie')) {

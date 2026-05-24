@@ -6,16 +6,17 @@ import {
 	UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { eq } from 'drizzle-orm';
 import { ConfigService } from '../../config/config.service.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, streamSessions, users } from '../../database/schema/index.js';
+import { eq } from 'drizzle-orm';
 import {
 	ALLOWED_SHARE_ROUTE_PREFIXES,
 	extractRouteIdsFromRequest,
 	extractShareTokenFromRequest,
 } from '../../share-links/share-token.constants.js';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
+import { AuthCacheService } from '../permissions/auth-cache.service.js';
 import { SessionRegistryService } from '../session-registry.service.js';
 import { ShareTokenVerifier } from '../share-token.verifier.js';
 
@@ -24,12 +25,21 @@ export const SHARE_USER_SENTINEL = '__share__';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+	/**
+	 * Cached "has the system been set up?" flag. Bootstrap-checked, then
+	 * flipped to true permanently the first time we observe a user row.
+	 * Once true, the localhost setup-bypass is disabled — even on
+	 * localhost, a valid JWT is required.
+	 */
+	private setupComplete: boolean | null = null;
+
 	constructor(
 		private reflector: Reflector,
 		private config: ConfigService,
 		private database: DatabaseService,
 		private shareVerifier: ShareTokenVerifier,
 		private sessionRegistry: SessionRegistryService,
+		private authCache: AuthCacheService,
 	) {}
 
 	async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -41,8 +51,8 @@ export class JwtAuthGuard implements CanActivate {
 
 		const request = context.switchToHttp().getRequest();
 
-		// 1. Share-token path — evaluated FIRST so localhost localBypass cannot
-		//    silently promote a share viewer into an admin.
+		// 1. Share-token path — evaluated FIRST so localhost setup-bypass
+		//    cannot silently promote a share viewer into an admin.
 		const shareToken = extractShareTokenFromRequest(request);
 		if (shareToken) {
 			const payload = this.shareVerifier.verify(shareToken, request.server);
@@ -50,7 +60,6 @@ export class JwtAuthGuard implements CanActivate {
 				throw new UnauthorizedException('Invalid or expired share token');
 			}
 
-			// Route-prefix allowlist: share tokens may only hit stream/movies/verify.
 			const url = (request.url || '') as string;
 			const urlPath = url.split('?')[0] ?? url;
 			const allowed = ALLOWED_SHARE_ROUTE_PREFIXES.some((prefix) =>
@@ -60,14 +69,11 @@ export class JwtAuthGuard implements CanActivate {
 				throw new ForbiddenException('Share token not allowed for this endpoint');
 			}
 
-			// Scope check: resolve route params to a movieId and compare.
 			const ids = extractRouteIdsFromRequest(request);
 			const resolvedMovieId = this.resolveMovieIdForShareScope(ids);
 			if (resolvedMovieId && resolvedMovieId !== payload.movieId) {
 				throw new ForbiddenException('Share token scope mismatch');
 			}
-			// If no id was resolvable, allow only for endpoints that don't need one
-			// (the allowlist already narrowed this to safe prefixes).
 
 			request.user = {
 				sub: SHARE_USER_SENTINEL,
@@ -79,53 +85,86 @@ export class JwtAuthGuard implements CanActivate {
 			return true;
 		}
 
-		// 2. Normal JWT via Authorization header
+		// 2. Normal JWT via Authorization header / cookie.
+		//    We hit the AuthCache first; on miss, verify and cache.
+		const rawToken = this.extractRawToken(request);
+		if (rawToken) {
+			const cached = this.authCache.getToken(rawToken);
+			if (cached) {
+				request.user = cached;
+				return true;
+			}
+		}
 		try {
 			await request.jwtVerify();
+			if (rawToken && request.user) {
+				this.authCache.setToken(rawToken, request.user);
+			}
 			return true;
 		} catch {
-			// JWT header failed — try query parameter token (for HLS.js / native video streams)
+			// JWT verify failed — try query token next
 		}
 
-		// 3. Query-string token (HLS.js, Safari native HLS, subtitle tracks)
+		// 3. Query-string token (HLS.js, Safari native HLS, subtitle tracks).
 		const queryToken = (request.query as Record<string, string>)?.token;
 		if (queryToken) {
 			try {
 				const decoded = request.server.jwt.verify(queryToken);
 				request.user = decoded;
+				this.authCache.setToken(queryToken, decoded);
 				return true;
 			} catch {
-				// Query token invalid — fall through to local bypass
+				// Fall through to setup-bypass
 			}
 		}
 
-		// 4. Local bypass: for localhost connections without a valid JWT,
-		//    look up the first admin user from the database
-		if (this.config.get<boolean>('auth.localBypass', true)) {
-			const ip = request.ip ?? request.socket?.remoteAddress;
-			if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') {
-				const admin = this.database.db
-					.select({ id: users.id, username: users.username, role: users.role })
-					.from(users)
-					.where(eq(users.role, 'admin'))
-					.limit(1)
-					.get();
-
-				if (admin) {
-					request.user = { sub: admin.id, role: admin.role };
-					return true;
-				}
+		// 4. Setup bypass: when *zero* users exist, localhost is allowed in
+		//    as a synthetic admin so the /auth/setup flow can run. Once a
+		//    real user exists, this branch is permanently disabled.
+		if (this.config.get<boolean>('auth.localBypass', true) && this.isLoopback(request)) {
+			if (!this.isSetupComplete()) {
+				request.user = { sub: '__setup__', role: 'admin' };
+				return true;
 			}
 		}
 
 		throw new UnauthorizedException('Invalid or expired token');
 	}
 
-	/**
-	 * Given whichever route param we have (movieId, sessionId, fileId),
-	 * resolve back to a movieId for share-token scope enforcement.
-	 * Returns undefined if no id was present.
-	 */
+	private extractRawToken(request: any): string | null {
+		const auth = request.headers?.authorization;
+		if (typeof auth === 'string' && auth.toLowerCase().startsWith('bearer ')) {
+			return auth.slice(7).trim() || null;
+		}
+		const cookieHeader = request.headers?.cookie;
+		if (typeof cookieHeader === 'string') {
+			const match = cookieHeader.match(/(?:^|;\s*)mu_access_token=([^;]+)/);
+			if (match?.[1]) return decodeURIComponent(match[1]);
+		}
+		return null;
+	}
+
+	private isLoopback(request: any): boolean {
+		const ip = request.ip ?? request.socket?.remoteAddress;
+		return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+	}
+
+	private isSetupComplete(): boolean {
+		if (this.setupComplete === true) return true;
+		const any = this.database.db.select({ id: users.id }).from(users).limit(1).get();
+		if (any) {
+			this.setupComplete = true;
+			return true;
+		}
+		this.setupComplete = false;
+		return false;
+	}
+
+	/** Called by AuthService.setup() once the first user exists. */
+	markSetupComplete(): void {
+		this.setupComplete = true;
+	}
+
 	private resolveMovieIdForShareScope(ids: {
 		movieId?: string;
 		sessionId?: string;
@@ -134,18 +173,14 @@ export class JwtAuthGuard implements CanActivate {
 		if (ids.movieId) return ids.movieId;
 
 		if (ids.sessionId) {
-			// Prefer in-memory registry (covers sessions skipped for share viewers too)
 			const registered = this.sessionRegistry.get(ids.sessionId);
 			if (registered) return registered.movieId;
-			// Fall back: direct DB lookup, in case a share viewer somehow reached a
-			// real user's session. Scope check will reject on mismatch.
 			const session = this.database.db
 				.select({ movieId: streamSessions.movieId })
 				.from(streamSessions)
 				.where(eq(streamSessions.id, ids.sessionId))
 				.get();
 			if (session?.movieId) return session.movieId;
-			// Session id provided but not resolvable → fail closed
 			return '__unresolvable__';
 		}
 
