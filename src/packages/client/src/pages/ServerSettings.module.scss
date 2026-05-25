@@ -132,6 +132,36 @@
 
 // ── Stats ──
 
+.statsLoading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.statsMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.statsMetaTime {
+  opacity: 0.85;
+}
+
+.statsMetaUpdating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.85;
+}
+
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

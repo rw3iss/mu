@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { nowISO } from '@mu/shared';
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, type OnModuleInit, Logger } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
@@ -20,13 +20,19 @@ interface DiskStats {
 	diskFree: number;
 }
 
+/** TTLs: how long a cached value is considered "fresh". After expiry,
+ *  callers still get the stale value immediately while a background
+ *  refresh runs — never blocks the request. */
 const DISK_CACHE_TTL_MS = 30_000;
-const DATA_DIR_CACHE_TTL_MS = 60_000;
+const DATA_DIR_CACHE_TTL_MS = 5 * 60_000; // 5 min — the scan is expensive
 
 @Controller('health')
-export class HealthController {
+export class HealthController implements OnModuleInit {
+	private readonly logger = new Logger('HealthStats');
 	private diskCache: { data: DiskStats; expiresAt: number } | null = null;
 	private dataDirCache: { size: number; expiresAt: number } | null = null;
+	private diskRefreshInFlight = false;
+	private dataDirRefreshInFlight = false;
 
 	constructor(
 		private readonly streamService: StreamService,
@@ -34,6 +40,17 @@ export class HealthController {
 		private readonly jobManager: JobManagerService,
 		private readonly config: ConfigService,
 	) {}
+
+	/**
+	 * Pre-warm the expensive caches at boot so the first user-facing
+	 * `/health/stats` request never blocks. Without this, the first
+	 * page-open after a server restart waits for a multi-GB data-dir
+	 * scan to complete before the spinner clears.
+	 */
+	onModuleInit(): void {
+		void this.refreshDataDirSize();
+		void this.refreshDiskStats();
+	}
 
 	@Get()
 	@Public()
@@ -51,12 +68,15 @@ export class HealthController {
 	@RequireAction('admin:server')
 	async getStats() {
 		const cpus = os.cpus();
-		const [sessions, disk, dataDirSize, appMemory] = await Promise.all([
+		// All synchronous reads — neither getDiskStats nor getDataDirSize
+		// blocks: each returns its cached value and kicks off a background
+		// refresh if expired. getActiveSessions + getAppMemory are fast.
+		const [sessions, appMemory] = await Promise.all([
 			this.streamService.getActiveSessions(),
-			this.getDiskStats(),
-			this.getDataDirSize(),
 			this.getAppMemory(),
 		]);
+		const disk = this.getDiskStatsCached();
+		const dataDirSize = this.getDataDirSizeCached();
 		return {
 			system: {
 				cpuCount: cpus.length,
@@ -65,9 +85,9 @@ export class HealthController {
 				memoryTotal: os.totalmem(),
 				memoryFree: os.freemem(),
 				appMemory,
-				diskTotal: disk.diskTotal,
-				diskFree: disk.diskFree,
-				dataDirSize,
+				diskTotal: disk?.diskTotal ?? null,
+				diskFree: disk?.diskFree ?? null,
+				dataDirSize, // null while the very first scan is still running
 				uptime: process.uptime(),
 				platform: os.platform(),
 			},
@@ -80,19 +100,30 @@ export class HealthController {
 		};
 	}
 
-	private async getDiskStats(): Promise<DiskStats> {
+	/**
+	 * Stale-while-revalidate: returns the last cached value synchronously
+	 * and schedules a background refresh if expired. `null` only on the
+	 * very first call before the pre-warm in {@link onModuleInit} completes.
+	 */
+	private getDiskStatsCached(): DiskStats | null {
 		const now = Date.now();
-		if (this.diskCache && now < this.diskCache.expiresAt) {
-			return this.diskCache.data;
+		const cached = this.diskCache;
+		if (!cached || now >= cached.expiresAt) {
+			void this.refreshDiskStats();
 		}
+		return cached?.data ?? null;
+	}
 
+	private async refreshDiskStats(): Promise<void> {
+		if (this.diskRefreshInFlight) return;
+		this.diskRefreshInFlight = true;
 		try {
 			const data = await this.queryDisk();
-			this.diskCache = { data, expiresAt: now + DISK_CACHE_TTL_MS };
-			return data;
-		} catch {
-			// Return last cached value on error, or zeros
-			return this.diskCache?.data ?? { diskTotal: 0, diskFree: 0 };
+			this.diskCache = { data, expiresAt: Date.now() + DISK_CACHE_TTL_MS };
+		} catch (err) {
+			this.logger.warn(`disk stats refresh failed: ${(err as Error).message}`);
+		} finally {
+			this.diskRefreshInFlight = false;
 		}
 	}
 
@@ -143,19 +174,38 @@ export class HealthController {
 		};
 	}
 
-	private async getDataDirSize(): Promise<number> {
+	/**
+	 * Same stale-while-revalidate pattern as {@link getDiskStatsCached},
+	 * but for the (much more expensive) data-dir size. On a populated
+	 * install the recursive scan walks the entire data dir — including
+	 * the SQLite DB, logs, and `transcode_cache` (10s of GB after a few
+	 * watched movies). Pre-warmed at boot; subsequent calls return the
+	 * cached value in microseconds.
+	 */
+	private getDataDirSizeCached(): number | null {
 		const now = Date.now();
-		if (this.dataDirCache && now < this.dataDirCache.expiresAt) {
-			return this.dataDirCache.size;
+		const cached = this.dataDirCache;
+		if (!cached || now >= cached.expiresAt) {
+			void this.refreshDataDirSize();
 		}
+		return cached?.size ?? null;
+	}
 
+	private async refreshDataDirSize(): Promise<void> {
+		if (this.dataDirRefreshInFlight) return;
+		this.dataDirRefreshInFlight = true;
+		const startedMs = Date.now();
 		try {
 			const dataDir = this.config.get<string>('dataDir', './data');
 			const size = await this.dirSize(dataDir);
-			this.dataDirCache = { size, expiresAt: now + DATA_DIR_CACHE_TTL_MS };
-			return size;
-		} catch {
-			return this.dataDirCache?.size ?? 0;
+			this.dataDirCache = { size, expiresAt: Date.now() + DATA_DIR_CACHE_TTL_MS };
+			this.logger.debug(
+				`data-dir scan: ${(size / 1e9).toFixed(2)} GB in ${Date.now() - startedMs}ms`,
+			);
+		} catch (err) {
+			this.logger.warn(`data-dir scan failed: ${(err as Error).message}`);
+		} finally {
+			this.dataDirRefreshInFlight = false;
 		}
 	}
 

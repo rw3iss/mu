@@ -277,22 +277,71 @@ function meterColor(ratio: number): string {
 	return '#f44336';
 }
 
+const STATS_CACHE_KEY = 'mu_server_stats_cache';
+
+function readCachedStats(): any | null {
+	try {
+		const raw = localStorage.getItem(STATS_CACHE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw);
+		// Guard against schema drift: require the basic shape we render.
+		if (parsed && parsed.system && parsed.services) return parsed;
+		return null;
+	} catch {
+		return null;
+	}
+}
+
 function StatsSection() {
-	const [stats, setStats] = useState<any>(null);
+	// Hydrate from localStorage so the spinner only shows on a true first
+	// visit ever — otherwise the user immediately sees last-session values
+	// while the live fetch runs in the background.
+	const [stats, setStats] = useState<any>(() => readCachedStats());
+	const [updating, setUpdating] = useState(false);
+	const [updatedAt, setUpdatedAt] = useState<number | null>(stats ? Date.now() : null);
 
 	useEffect(() => {
 		const load = async () => {
+			setUpdating(true);
 			try {
 				const data = await api.get('/health/stats');
-				setStats(data);
-			} catch {}
+				setStats((prev: any) => {
+					// Merge: if a server-side scan is still pending (field comes
+					// back null), keep the previously-known value rather than
+					// flashing "—" or a 0.
+					if (!prev) return data;
+					const sys = { ...prev.system, ...data.system };
+					if (data.system?.dataDirSize == null && prev.system?.dataDirSize != null) {
+						sys.dataDirSize = prev.system.dataDirSize;
+					}
+					if (data.system?.diskTotal == null && prev.system?.diskTotal != null) {
+						sys.diskTotal = prev.system.diskTotal;
+						sys.diskFree = prev.system.diskFree;
+					}
+					return { ...data, system: sys };
+				});
+				setUpdatedAt(Date.now());
+				try {
+					localStorage.setItem(STATS_CACHE_KEY, JSON.stringify(data));
+				} catch {}
+			} catch {
+				// Keep showing cached values on transient failures.
+			} finally {
+				setUpdating(false);
+			}
 		};
 		load();
 		const interval = setInterval(load, 5000);
 		return () => clearInterval(interval);
 	}, []);
 
-	if (!stats) return <Spinner size="sm" />;
+	if (!stats) {
+		return (
+			<div class={styles.statsLoading}>
+				<Spinner size="sm" /> Loading server stats…
+			</div>
+		);
+	}
 
 	const sys = stats.system;
 	const svc = stats.services;
@@ -304,8 +353,21 @@ function StatsSection() {
 	const appMemRatio = appMem / memTotal;
 
 	return (
-		<div class={styles.statsGrid}>
-			{/* CPU */}
+		<>
+			<div class={styles.statsMeta}>
+				<span class={styles.statsMetaTime}>
+					{updatedAt
+						? `Updated ${formatRelativeTime(updatedAt)}`
+						: 'Loading…'}
+				</span>
+				{updating && (
+					<span class={styles.statsMetaUpdating}>
+						<Spinner size="sm" /> Refreshing
+					</span>
+				)}
+			</div>
+			<div class={styles.statsGrid}>
+				{/* CPU */}
 			<div class={styles.statCard}>
 				<div class={styles.statCardHeader}>
 					<span class={styles.statLabel}>CPU Load</span>
@@ -357,7 +419,9 @@ function StatsSection() {
 								<span class={styles.statLabel}>Disk</span>
 							</div>
 							<div class={styles.statSegments}>
-								<span class={styles.statSegment}>App: {formatBytes(appSize)}</span>
+								<span class={styles.statSegment}>
+									App: {sys.dataDirSize == null ? 'measuring…' : formatBytes(appSize)}
+								</span>
 								<span class={styles.statSegment}>
 									Used: {formatBytes(diskUsed)}
 								</span>
@@ -400,8 +464,24 @@ function StatsSection() {
 					</div>
 				</div>
 			)}
-		</div>
+			</div>
+		</>
 	);
+}
+
+/**
+ * Format a wall-clock timestamp as "Xs ago" / "Xm ago" relative to now.
+ * Used by the stats meta row so the user can tell at a glance whether
+ * the displayed numbers are live or last-known.
+ */
+function formatRelativeTime(ts: number): string {
+	const deltaSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+	if (deltaSec < 5) return 'just now';
+	if (deltaSec < 60) return `${deltaSec}s ago`;
+	const m = Math.floor(deltaSec / 60);
+	if (m < 60) return `${m}m ago`;
+	const h = Math.floor(m / 60);
+	return `${h}h ago`;
 }
 
 // ============================================
