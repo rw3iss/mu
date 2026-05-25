@@ -5,6 +5,7 @@ import { getRatingColor } from '@/utils/rating-color';
 import { hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieListItem.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
+import { MovieScoreChips } from './MovieScoreChips';
 import { RatingBadge } from './RatingBadge';
 import type { MovieDisplayProps } from './types';
 import { useMovieCardBehavior } from './useMovieCardBehavior';
@@ -81,6 +82,7 @@ export function MovieListItem({
 							{'\u2605'} {rating.toFixed(1)}
 						</span>
 					)}
+					<MovieScoreChips movie={movie} />
 					{formattedDate && <span>{formattedDate}</span>}
 				</div>
 			</div>

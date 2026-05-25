@@ -127,10 +127,18 @@
   gap: var(--space-sm);
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
+  flex-wrap: wrap;
 
   span + span::before {
     content: '\00b7';
     margin-right: var(--space-sm);
+  }
+
+  // Score chips render an outer wrapper span containing inner brand
+  // tags — those inner spans shouldn't trigger the dot separator.
+  span > span::before {
+    content: none;
+    margin-right: 0;
   }
 }
 

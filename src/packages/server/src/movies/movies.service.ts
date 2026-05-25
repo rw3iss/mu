@@ -8,6 +8,7 @@ import { and, asc, count, desc, eq, inArray, like, sql } from 'drizzle-orm';
 import { parseJsonArray, parseJsonObject, stringifyJsonObject } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
+	imdbRatings,
 	jobHistory,
 	movieFiles,
 	movieMetadata,
@@ -167,6 +168,17 @@ export class MoviesService {
 			addedAt: movies.addedAt,
 			updatedAt: movies.updatedAt,
 			rating: userRatings.rating,
+			// External-rating fields powering card chips (IMDb / RT / MC).
+			// imdbRating / imdbVotes are pulled from movie_metadata first;
+			// the imdb_ratings dataset (synced daily from IMDB's public TSV)
+			// is joined as a fallback when movie has an imdbId but no OMDB
+			// fetch has populated movie_metadata yet.
+			metaImdbRating: movieMetadata.imdbRating,
+			metaImdbVotes: movieMetadata.imdbVotes,
+			datasetImdbRating: imdbRatings.averageRating,
+			datasetImdbVotes: imdbRatings.numVotes,
+			rtRating: movieMetadata.rottenTomatoesScore,
+			metacriticRating: movieMetadata.metacriticScore,
 			watchPosition: userWatchHistory.positionSeconds,
 			watchCompleted: userWatchHistory.completed,
 			durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
@@ -184,11 +196,15 @@ export class MoviesService {
 		let data;
 		let total: number;
 
+		// movie_metadata + imdb_ratings joins are applied unconditionally
+		// now — both feed the card-chip fields in selectFields. The genre
+		// branch additionally filters on metadata.genres.
 		if (query.genre) {
 			data = this.database.db
 				.select(selectFields)
 				.from(movies)
 				.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
+				.leftJoin(imdbRatings, eq(movies.imdbId, imdbRatings.tconst))
 				.leftJoin(userRatings, ratingJoinCond)
 				.leftJoin(userWatchHistory, historyJoinCond)
 				.where(where)
@@ -209,6 +225,8 @@ export class MoviesService {
 			data = this.database.db
 				.select(selectFields)
 				.from(movies)
+				.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
+				.leftJoin(imdbRatings, eq(movies.imdbId, imdbRatings.tconst))
 				.leftJoin(userRatings, ratingJoinCond)
 				.leftJoin(userWatchHistory, historyJoinCond)
 				.where(where)
@@ -250,8 +268,21 @@ export class MoviesService {
 		const result = {
 			movies: data.map((row) => {
 				const position = row.watchCompleted ? 0 : (row.watchPosition ?? 0);
+				// Coalesce IMDb rating/votes: prefer movie_metadata (richer,
+				// fetched from OMDB), fall back to the daily-synced IMDB
+				// dataset when metadata hasn't been populated yet. Drop the
+				// raw helper columns so they don't leak into the response.
+				const {
+					metaImdbRating,
+					metaImdbVotes,
+					datasetImdbRating,
+					datasetImdbVotes,
+					...rest
+				} = row;
 				return this.applyPosterFallback({
-					...row,
+					...rest,
+					imdbRating: metaImdbRating ?? datasetImdbRating ?? null,
+					imdbVotes: metaImdbVotes ?? datasetImdbVotes ?? null,
 					rating: row.rating ?? 0,
 					watchPosition: position,
 					durationSeconds: row.durationSeconds ?? 0,
