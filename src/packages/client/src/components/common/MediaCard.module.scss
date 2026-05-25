@@ -143,10 +143,7 @@
 // ── Info ──────────────────────────────────────────────────
 
 .info {
-	// 5px uniform — gives the title/meta row breathing room below the
-	// poster and matches the visual weight of the LargeCard/ListItem
-	// info blocks.
-	padding: 5px;
+	padding: 8px;
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
