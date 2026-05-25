@@ -4,13 +4,22 @@ import styles from './MovieScoreChips.module.scss';
 /**
  * Compact external-score chips for movie cards.
  *
- * Renders one inline span per source the movie has data for: IMDb (with
- * rating + abbreviated vote count), Rotten Tomatoes (critic %), Metacritic.
- * Returns null when no scores are available so callers don't have to gate.
+ * Each chip is a single brand-coloured pill containing ONLY the numeric
+ * score. The provider name + vote count live in the native browser
+ * tooltip (title attribute) so the row stays dense while still being
+ * discoverable on hover.
  *
- * The chips are intentionally text-only (no separators of their own) — the
- * surrounding meta row's adjacency rule (`span + span::before { content: '·' }`)
- * supplies the dots between them.
+ * Format inside the chip:
+ *   IMDb  → "7.3"           (0-10 scale)
+ *   RT    → "78"            (0-100 scale, % implied by red chip colour)
+ *   MC    → "75"            (0-100 scale, /100 implied by green chip colour)
+ *
+ * Tooltip:
+ *   "IMDB: 7.3 (40k votes)" / "IMDB: 7.3" if vote count missing
+ *   "RT: 78%"
+ *   "MC: 75/100"
+ *
+ * Returns null when no scores are available so callers don't have to gate.
  */
 interface MovieScoreChipsProps {
 	movie: Pick<Movie, 'imdbRating' | 'imdbVotes' | 'rtRating' | 'metacriticRating'>;
@@ -30,27 +39,23 @@ export function MovieScoreChips({ movie }: MovieScoreChipsProps) {
 		<>
 			{imdb != null && (
 				<span
-					class={styles.score}
+					class={`${styles.chip} ${styles.imdb}`}
 					title={
 						imdbVotes != null
-							? `IMDb ${imdb.toFixed(1)} from ${imdbVotes.toLocaleString()} votes`
-							: `IMDb ${imdb.toFixed(1)}`
+							? `IMDB: ${imdb.toFixed(1)} (${formatVotes(imdbVotes)} votes)`
+							: `IMDB: ${imdb.toFixed(1)}`
 					}
 				>
-					<span class={`${styles.tag} ${styles.imdb}`}>IMDb</span>
 					{imdb.toFixed(1)}
-					{imdbVotes != null && <span class={styles.votes}> ({formatVotes(imdbVotes)})</span>}
 				</span>
 			)}
 			{rt != null && (
-				<span class={styles.score} title={`Rotten Tomatoes ${rt}%`}>
-					<span class={`${styles.tag} ${styles.rt}`}>RT</span>
-					{rt}%
+				<span class={`${styles.chip} ${styles.rt}`} title={`RT: ${rt}%`}>
+					{rt}
 				</span>
 			)}
 			{mc != null && (
-				<span class={styles.score} title={`Metacritic ${mc}/100`}>
-					<span class={`${styles.tag} ${styles.mc}`}>MC</span>
+				<span class={`${styles.chip} ${styles.mc}`} title={`MC: ${mc}/100`}>
 					{mc}
 				</span>
 			)}
