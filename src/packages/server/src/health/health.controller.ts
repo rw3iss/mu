@@ -10,6 +10,7 @@ import { RequireAction } from '../common/decorators/require-action.decorator.js'
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { ConfigService } from '../config/config.service.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
+import { LibraryService } from '../library/library.service.js';
 import { StreamService } from '../stream/stream.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 
@@ -20,18 +21,72 @@ interface DiskStats {
 	diskFree: number;
 }
 
+/** Per-drive disk info returned in /health/stats. One entry per distinct
+ *  drive root across (a) the app data dir and (b) every configured media
+ *  source path. */
+export interface DiskInfo {
+	/** Canonical drive root used as the cache key. Windows: `C:\`. Unix: `/`. */
+	root: string;
+	/** Short display label. Windows: `C:`. Unix: `/`. */
+	label: string;
+	total: number | null;
+	free: number | null;
+	/** True if the app's `dataDir` lives on this drive. */
+	isAppDrive: boolean;
+	/** Bytes used by the app data dir — only populated for the app drive. */
+	appUsedBytes: number | null;
+	/** Sum of media_sources.total_size_bytes for sources on this drive.
+	 *  Free signal — scanner tracks it per source at scan time. */
+	mediaUsedBytes: number;
+	/** Media source paths grouped on this drive, for the hover tooltip. */
+	mediaSourcePaths: string[];
+}
+
 /** TTLs: how long a cached value is considered "fresh". After expiry,
  *  callers still get the stale value immediately while a background
  *  refresh runs — never blocks the request. */
 const DISK_CACHE_TTL_MS = 30_000;
 const DATA_DIR_CACHE_TTL_MS = 5 * 60_000; // 5 min — the scan is expensive
 
+/**
+ * Extract the canonical drive root from an absolute path. Used to
+ * group paths by physical drive so we can show one bar per disk.
+ *
+ * Windows variants we have to handle (Mu's prod is Windows + Git Bash):
+ *   - "C:\Users\rw3is\Movies"  → "C:\"
+ *   - "C:/Users/rw3is/Movies"  → "C:\"
+ *   - "/c/Users/rw3is/Movies"  → "C:\"   (Git Bash-style)
+ *   - "\\\\server\\share\\..."   → "\\\\server\\share\\"  (UNC)
+ *
+ * Anything we don't recognise (or Unix paths) falls back to "/".
+ */
+function getDriveRoot(p: string): string {
+	if (os.platform() === 'win32') {
+		const winLetter = p.match(/^([a-zA-Z]):[\\/]?/)?.[1];
+		if (winLetter) return `${winLetter.toUpperCase()}:\\`;
+		const gitBashLetter = p.match(/^\/([a-zA-Z])(?:\/|$)/)?.[1];
+		if (gitBashLetter) return `${gitBashLetter.toUpperCase()}:\\`;
+		const uncMatch = p.match(/^\\\\([^\\]+)\\([^\\]+)/);
+		if (uncMatch?.[1] && uncMatch?.[2]) return `\\\\${uncMatch[1]}\\${uncMatch[2]}\\`;
+	}
+	return '/';
+}
+
+/** Short user-facing label for a drive root. "C:\" → "C:" / "/" → "/". */
+function driveLabel(root: string): string {
+	const winLetter = root.match(/^([a-zA-Z]):/)?.[1];
+	if (winLetter) return `${winLetter.toUpperCase()}:`;
+	return root;
+}
+
 @Controller('health')
 export class HealthController implements OnModuleInit {
 	private readonly logger = new Logger('HealthStats');
-	private diskCache: { data: DiskStats; expiresAt: number } | null = null;
+	/** Per-drive disk cache keyed by canonical root (e.g. `C:\` / `D:\` / `/`). */
+	private diskCache = new Map<string, { data: DiskStats; expiresAt: number }>();
 	private dataDirCache: { size: number; expiresAt: number } | null = null;
-	private diskRefreshInFlight = false;
+	/** In-flight guard per drive root so we don't queue duplicate refreshes. */
+	private diskRefreshInFlight = new Set<string>();
 	private dataDirRefreshInFlight = false;
 
 	constructor(
@@ -39,6 +94,7 @@ export class HealthController implements OnModuleInit {
 		private readonly transcoderService: TranscoderService,
 		private readonly jobManager: JobManagerService,
 		private readonly config: ConfigService,
+		private readonly library: LibraryService,
 	) {}
 
 	/**
@@ -49,7 +105,17 @@ export class HealthController implements OnModuleInit {
 	 */
 	onModuleInit(): void {
 		void this.refreshDataDirSize();
-		void this.refreshDiskStats();
+		// Pre-warm disk stats for every drive we expect to surface
+		// (app drive + each media source drive). Fires async — each
+		// drive gets its own statfs in parallel.
+		try {
+			const roots = this.getRelevantDriveRoots();
+			for (const r of roots) {
+				void this.refreshDiskStats(r.root);
+			}
+		} catch (err) {
+			this.logger.warn(`disk pre-warm failed: ${(err as Error).message}`);
+		}
 	}
 
 	@Get()
@@ -75,8 +141,12 @@ export class HealthController implements OnModuleInit {
 			this.streamService.getActiveSessions(),
 			this.getAppMemory(),
 		]);
-		const disk = this.getDiskStatsCached();
 		const dataDirSize = this.getDataDirSizeCached();
+		const disks = this.getDisksCached(dataDirSize);
+		// Backward-compat singletons (the app drive's numbers). Older
+		// consumers in the codebase still reference these — kept so a
+		// missed call-site doesn't break.
+		const appDisk = disks.find((d) => d.isAppDrive) ?? null;
 		return {
 			system: {
 				cpuCount: cpus.length,
@@ -85,8 +155,9 @@ export class HealthController implements OnModuleInit {
 				memoryTotal: os.totalmem(),
 				memoryFree: os.freemem(),
 				appMemory,
-				diskTotal: disk?.diskTotal ?? null,
-				diskFree: disk?.diskFree ?? null,
+				disks,
+				diskTotal: appDisk?.total ?? null,
+				diskFree: appDisk?.free ?? null,
 				dataDirSize, // null while the very first scan is still running
 				uptime: process.uptime(),
 				platform: os.platform(),
@@ -101,77 +172,141 @@ export class HealthController implements OnModuleInit {
 	}
 
 	/**
-	 * Stale-while-revalidate: returns the last cached value synchronously
-	 * and schedules a background refresh if expired. `null` only on the
-	 * very first call before the pre-warm in {@link onModuleInit} completes.
+	 * Build the per-drive disk list:
+	 *   1. Enumerate distinct drive roots across the app data dir + every
+	 *      configured media source path.
+	 *   2. For each, read SWR-cached disk total/free (kicks a background
+	 *      refresh if stale).
+	 *   3. Attach app-used (only on the app drive) and media-used (sum of
+	 *      media_sources.totalSizeBytes per drive) for the hover tooltip.
 	 */
-	private getDiskStatsCached(): DiskStats | null {
-		const now = Date.now();
-		const cached = this.diskCache;
-		if (!cached || now >= cached.expiresAt) {
-			void this.refreshDiskStats();
+	private getDisksCached(dataDirSize: number | null): DiskInfo[] {
+		const sources = this.safelyGetSources();
+		const dataDir = this.config.get<string>('dataDir', './data');
+		const appRoot = getDriveRoot(dataDir);
+		// Group media sources by their drive root.
+		const byRoot = new Map<string, { paths: string[]; mediaUsed: number }>();
+		for (const s of sources) {
+			if (!s.path) continue;
+			const root = getDriveRoot(s.path);
+			const bucket = byRoot.get(root) ?? { paths: [], mediaUsed: 0 };
+			bucket.paths.push(s.path);
+			bucket.mediaUsed += s.totalSizeBytes ?? 0;
+			byRoot.set(root, bucket);
+		}
+		// Always include the app drive even if no media sources live on it.
+		if (!byRoot.has(appRoot)) byRoot.set(appRoot, { paths: [], mediaUsed: 0 });
+
+		const disks: DiskInfo[] = [];
+		for (const [root, bucket] of byRoot.entries()) {
+			const cached = this.getDiskStatsForRoot(root);
+			const isAppDrive = root === appRoot;
+			disks.push({
+				root,
+				label: driveLabel(root),
+				total: cached?.diskTotal ?? null,
+				free: cached?.diskFree ?? null,
+				isAppDrive,
+				appUsedBytes: isAppDrive ? dataDirSize : null,
+				mediaUsedBytes: bucket.mediaUsed,
+				mediaSourcePaths: bucket.paths,
+			});
+		}
+		// Stable order: app drive first, then by label ascending.
+		disks.sort((a, b) => {
+			if (a.isAppDrive !== b.isAppDrive) return a.isAppDrive ? -1 : 1;
+			return a.label.localeCompare(b.label);
+		});
+		return disks;
+	}
+
+	private safelyGetSources(): Array<{ path: string; totalSizeBytes: number | null }> {
+		try {
+			return this.library.getSources().map((s) => ({
+				path: s.path,
+				totalSizeBytes: s.totalSizeBytes ?? 0,
+			}));
+		} catch (err) {
+			this.logger.warn(`media source enumeration failed: ${(err as Error).message}`);
+			return [];
+		}
+	}
+
+	/** SWR per-drive cache. Returns last value immediately; refresh in bg. */
+	private getDiskStatsForRoot(root: string): DiskStats | null {
+		const cached = this.diskCache.get(root);
+		if (!cached || Date.now() >= cached.expiresAt) {
+			void this.refreshDiskStats(root);
 		}
 		return cached?.data ?? null;
 	}
 
-	private async refreshDiskStats(): Promise<void> {
-		if (this.diskRefreshInFlight) return;
-		this.diskRefreshInFlight = true;
+	private async refreshDiskStats(root: string): Promise<void> {
+		if (this.diskRefreshInFlight.has(root)) return;
+		this.diskRefreshInFlight.add(root);
 		try {
-			const data = await this.queryDisk();
-			this.diskCache = { data, expiresAt: Date.now() + DISK_CACHE_TTL_MS };
+			const data = await this.queryDiskForRoot(root);
+			this.diskCache.set(root, { data, expiresAt: Date.now() + DISK_CACHE_TTL_MS });
 		} catch (err) {
-			this.logger.warn(`disk stats refresh failed: ${(err as Error).message}`);
+			this.logger.warn(`disk stats refresh failed for ${root}: ${(err as Error).message}`);
 		} finally {
-			this.diskRefreshInFlight = false;
+			this.diskRefreshInFlight.delete(root);
 		}
 	}
 
-	private async queryDisk(): Promise<DiskStats> {
-		// Try Node's built-in statfs first (works on all platforms, Node 18.15+)
+	/** Enumerate the drive roots /health/stats should surface. */
+	private getRelevantDriveRoots(): Array<{ root: string }> {
+		const dataDir = this.config.get<string>('dataDir', './data');
+		const roots = new Set<string>([getDriveRoot(dataDir)]);
+		for (const s of this.safelyGetSources()) {
+			if (s.path) roots.add(getDriveRoot(s.path));
+		}
+		return [...roots].map((root) => ({ root }));
+	}
+
+	private async queryDiskForRoot(root: string): Promise<DiskStats> {
+		// Try Node's built-in statfs first (works on all platforms, Node 18.15+).
+		// Pass the drive root so it reports stats for THAT filesystem, not
+		// just `/` / `C:\`.
 		try {
-			const stats = await fs.statfs(os.platform() === 'win32' ? 'C:\\' : '/');
+			const stats = await fs.statfs(root);
 			return {
 				diskTotal: stats.bsize * stats.blocks,
 				diskFree: stats.bsize * stats.bavail,
 			};
 		} catch {
-			// statfs not available, fall back to platform commands
+			// statfs unavailable for this path (Windows UNC, network drive,
+			// missing volume) — fall back to platform-specific commands.
 		}
 
 		const platform = os.platform();
-
 		if (platform === 'win32') {
-			// PowerShell: get root drive free/total in bytes
+			// Get-PSDrive uses the bare letter (no colon / slash).
+			const letter = root.match(/^([a-zA-Z]):/)?.[1];
+			if (!letter) return { diskTotal: 0, diskFree: 0 };
 			try {
 				const { stdout } = await execFileAsync('powershell', [
 					'-NoProfile',
 					'-Command',
-					'Get-PSDrive C | Select-Object -ExpandProperty Free; Get-PSDrive C | Select-Object -ExpandProperty Used',
+					`Get-PSDrive ${letter} | Select-Object -ExpandProperty Free; Get-PSDrive ${letter} | Select-Object -ExpandProperty Used`,
 				]);
 				const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
 				const free = parseInt(lines[0] ?? '0', 10) || 0;
 				const used = parseInt(lines[1] ?? '0', 10) || 0;
 				return { diskTotal: free + used, diskFree: free };
 			} catch {
-				// PowerShell unavailable, return zeros
 				return { diskTotal: 0, diskFree: 0 };
 			}
 		}
 
-		// Unix/macOS: df for the root filesystem, output in 1K blocks
-		const { stdout } = await execFileAsync('df', ['-k', '/']);
+		// Unix/macOS: df for the specific path's filesystem.
+		const { stdout } = await execFileAsync('df', ['-k', root]);
 		const lines = stdout.trim().split('\n');
 		if (lines.length < 2) return { diskTotal: 0, diskFree: 0 };
-		const dataLine = lines[1] ?? '';
-		const cols = dataLine.split(/\s+/);
-		// df -k columns: Filesystem 1K-blocks Used Available Use% Mounted
+		const cols = (lines[1] ?? '').split(/\s+/);
 		const totalKb = parseInt(cols[1] ?? '0', 10) || 0;
 		const availKb = parseInt(cols[3] ?? '0', 10) || 0;
-		return {
-			diskTotal: totalKb * 1024,
-			diskFree: availKb * 1024,
-		};
+		return { diskTotal: totalKb * 1024, diskFree: availKb * 1024 };
 	}
 
 	/**

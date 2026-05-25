@@ -168,6 +168,153 @@
   gap: var(--space-md);
 }
 
+// ── Disk card: per-drive rows ──
+
+// Disk card spans the full grid width so multi-drive setups can breathe.
+.diskCard {
+  grid-column: 1 / -1;
+}
+
+.diskList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
+.diskRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.diskRowHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: var(--font-size-xs);
+}
+
+.diskRowLabel {
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-mono, monospace);
+  color: var(--color-text-primary);
+}
+
+.diskRowUsage {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+// Bar background = total disk capacity. Used + overlays paint on top.
+.diskRowBar {
+  position: relative;
+  height: 14px;
+  background: var(--color-bg-elevated, rgba(255, 255, 255, 0.05));
+  border-radius: 3px;
+  overflow: visible; // tooltip must escape the bar
+  cursor: help;
+}
+
+.diskRowUsedFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.diskRowOverlay {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+// Media overlay: accent colour, sits over the "used" fill.
+.diskRowMedia {
+  background: rgba(76, 175, 80, 0.55);
+  mix-blend-mode: screen;
+}
+
+// App-data overlay: subtle red so the user can see how much of "used"
+// is the app vs everything else on that drive.
+.diskRowApp {
+  background: rgba(244, 67, 54, 0.6);
+}
+
+// ── Disk hover tooltip ──
+// Pure CSS — opens on hover/focus of the bar. Uses a small delay so it
+// doesn't flicker when the cursor passes over multiple rows.
+.diskTooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  max-width: 360px;
+  padding: 10px 12px;
+  background: var(--color-bg-elevated, #1c1c1c);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-sm, 4px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  z-index: 50;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 120ms ease 80ms, transform 120ms ease 80ms,
+    visibility 0s linear 200ms;
+
+  .diskRowBar:hover &,
+  .diskRowBar:focus-within & {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition: opacity 120ms ease 80ms, transform 120ms ease 80ms,
+      visibility 0s linear 0s;
+  }
+}
+
+.diskTooltipRoot {
+  font-family: var(--font-mono, monospace);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: 6px;
+  word-break: break-all;
+}
+
+.diskTooltipDl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  row-gap: 2px;
+  margin: 0;
+
+  dt {
+    color: var(--color-text-muted);
+  }
+
+  dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+}
+
+.diskTooltipPaths {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono, monospace);
+  word-break: break-all;
+
+  li + li {
+    margin-top: 2px;
+  }
+}
+
 .statCard {
   padding: var(--space-md);
   background: var(--color-bg-elevated);

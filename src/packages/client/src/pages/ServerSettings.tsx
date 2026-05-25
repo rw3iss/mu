@@ -277,6 +277,112 @@ function meterColor(ratio: number): string {
 	return '#f44336';
 }
 
+interface DiskRowData {
+	root: string;
+	label: string;
+	total: number | null;
+	free: number | null;
+	isAppDrive: boolean;
+	appUsedBytes: number | null;
+	mediaUsedBytes: number;
+	mediaSourcePaths: string[];
+}
+
+/**
+ * One row per physical drive. Bar width is always 100% (= total disk).
+ * Layered fills, back to front:
+ *   - used-by-other:  total grey background fill (the rest of "used")
+ *   - app-data:       red-ish overlay sized to dataDirSize (app drive only)
+ *   - media:          accent-coloured overlay sized to media sources on
+ *                     this drive (every drive that has any)
+ * Hover reveals a tooltip with the precise breakdown.
+ */
+function DiskRow({ disk }: { disk: DiskRowData }) {
+	const total = disk.total ?? 0;
+	const free = disk.free ?? 0;
+	const known = total > 0;
+	const used = known ? total - free : 0;
+	const usedRatio = known ? used / total : 0;
+	const mediaRatio = known ? Math.min(disk.mediaUsedBytes / total, 1) : 0;
+	const appRatio =
+		known && disk.appUsedBytes != null ? Math.min(disk.appUsedBytes / total, 1) : 0;
+	const measuring = disk.isAppDrive && disk.appUsedBytes == null;
+
+	return (
+		<div class={styles.diskRow}>
+			<div class={styles.diskRowHeader}>
+				<span class={styles.diskRowLabel}>{disk.label}</span>
+				<span class={styles.diskRowUsage}>
+					{known ? (
+						<>
+							{formatBytes(used)} / {formatBytes(total)}
+						</>
+					) : (
+						'unavailable'
+					)}
+				</span>
+			</div>
+			<div class={styles.diskRowBar}>
+				{/* Background = total (full width); inner fills layer on top */}
+				<div
+					class={styles.diskRowUsedFill}
+					style={{
+						width: `${usedRatio * 100}%`,
+						background: meterColor(usedRatio),
+					}}
+				/>
+				{mediaRatio > 0 && (
+					<div
+						class={`${styles.diskRowOverlay} ${styles.diskRowMedia}`}
+						style={{ width: `${Math.max(mediaRatio * 100, 0.5)}%` }}
+					/>
+				)}
+				{appRatio > 0 && (
+					<div
+						class={`${styles.diskRowOverlay} ${styles.diskRowApp}`}
+						style={{ width: `${Math.max(appRatio * 100, 0.5)}%` }}
+					/>
+				)}
+				{/* Hover tooltip — pure CSS, only opens on bar hover */}
+				<div class={styles.diskTooltip} role="tooltip">
+					<div class={styles.diskTooltipRoot}>{disk.root}</div>
+					<dl class={styles.diskTooltipDl}>
+						<dt>Total</dt>
+						<dd>{known ? formatBytes(total) : '—'}</dd>
+						<dt>Used</dt>
+						<dd>{known ? formatBytes(used) : '—'}</dd>
+						<dt>Free</dt>
+						<dd>{known ? formatBytes(free) : '—'}</dd>
+						{disk.isAppDrive && (
+							<>
+								<dt>App data</dt>
+								<dd>
+									{measuring
+										? 'measuring…'
+										: formatBytes(disk.appUsedBytes ?? 0)}
+								</dd>
+							</>
+						)}
+						{disk.mediaUsedBytes > 0 && (
+							<>
+								<dt>Media</dt>
+								<dd>{formatBytes(disk.mediaUsedBytes)}</dd>
+							</>
+						)}
+					</dl>
+					{disk.mediaSourcePaths.length > 0 && (
+						<ul class={styles.diskTooltipPaths}>
+							{disk.mediaSourcePaths.map((p) => (
+								<li key={p}>{p}</li>
+							))}
+						</ul>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}
+
 const STATS_CACHE_KEY = 'mu_server_stats_cache';
 
 function readCachedStats(): any | null {
@@ -317,6 +423,23 @@ function StatsSection() {
 					if (data.system?.diskTotal == null && prev.system?.diskTotal != null) {
 						sys.diskTotal = prev.system.diskTotal;
 						sys.diskFree = prev.system.diskFree;
+					}
+					// For each disk in the new response, keep prev's total/free
+					// if the server returned null (still measuring this drive).
+					if (Array.isArray(data.system?.disks) && Array.isArray(prev.system?.disks)) {
+						const prevByRoot = new Map<string, any>(
+							prev.system.disks.map((d: any) => [d.root, d]),
+						);
+						sys.disks = data.system.disks.map((d: any) => {
+							const old = prevByRoot.get(d.root);
+							if (!old) return d;
+							return {
+								...d,
+								total: d.total ?? old.total,
+								free: d.free ?? old.free,
+								appUsedBytes: d.appUsedBytes ?? old.appUsedBytes,
+							};
+						});
 					}
 					return { ...data, system: sys };
 				});
@@ -405,46 +528,43 @@ function StatsSection() {
 				</div>
 			</div>
 
-			{/* Disk */}
-			{sys.diskTotal > 0 &&
-				(() => {
-					const diskTotal = sys.diskTotal || 1;
-					const diskUsed = diskTotal - sys.diskFree;
-					const diskRatio = diskUsed / diskTotal;
-					const appSize = sys.dataDirSize || 0;
-					const appDiskRatio = appSize / diskTotal;
-					return (
-						<div class={styles.statCard}>
-							<div class={styles.statCardHeader}>
-								<span class={styles.statLabel}>Disk</span>
-							</div>
-							<div class={styles.statSegments}>
-								<span class={styles.statSegment}>
-									App: {sys.dataDirSize == null ? 'measuring…' : formatBytes(appSize)}
-								</span>
-								<span class={styles.statSegment}>
-									Used: {formatBytes(diskUsed)}
-								</span>
-								<span class={styles.statSegment}>
-									Total: {formatBytes(diskTotal)}
-								</span>
-							</div>
-							<div class={styles.statBar}>
-								<div
-									class={styles.statBarFill}
-									style={{
-										width: `${diskRatio * 100}%`,
-										background: meterColor(diskRatio),
-									}}
-								/>
-								<div
-									class={`${styles.statBarFill} ${styles.statBarOverlay}`}
-									style={{ width: `${Math.max(appDiskRatio * 100, 0.5)}%` }}
-								/>
-							</div>
+			{/* Disks — one bar per distinct physical drive across app data
+			    dir + media source paths. Falls back to the legacy single
+			    pair (diskTotal/diskFree) for an old server that hasn't
+			    been upgraded yet. */}
+			{(() => {
+				const disks: any[] = Array.isArray(sys.disks) ? sys.disks : [];
+				const fallback =
+					disks.length === 0 && (sys.diskTotal ?? 0) > 0
+						? [
+								{
+									root: '/',
+									label: 'Disk',
+									total: sys.diskTotal,
+									free: sys.diskFree,
+									isAppDrive: true,
+									appUsedBytes: sys.dataDirSize ?? null,
+									mediaUsedBytes: 0,
+									mediaSourcePaths: [],
+								},
+						  ]
+						: disks;
+				if (fallback.length === 0) return null;
+				return (
+					<div class={`${styles.statCard} ${styles.diskCard}`}>
+						<div class={styles.statCardHeader}>
+							<span class={styles.statLabel}>
+								Disks{fallback.length > 1 ? ` (${fallback.length})` : ''}
+							</span>
 						</div>
-					);
-				})()}
+						<div class={styles.diskList}>
+							{fallback.map((d) => (
+								<DiskRow key={d.root} disk={d} />
+							))}
+						</div>
+					</div>
+				);
+			})()}
 
 			{/* Library */}
 			<div class={styles.statCard}>
