@@ -15,7 +15,32 @@ import {
 	activeEqProfileId,
 	activeVideoProfileId,
 } from './audio-profiles.state';
+import { audioOutputSuspect, requestAudioReset } from './audio-reset.state';
+import { notifyWarning } from './notifications.state';
 import { whenUserGestured } from './user-gesture.state';
+
+/**
+ * If the engine has flagged the output as suspect (post-attach heuristic
+ * or mid-session devicechange), warn the user the moment they try to
+ * engage Web Audio — that's exactly when the stuck-sink bug would
+ * silence them — with a one-click Reset Audio affordance.
+ */
+function warnIfAudioSuspect(): void {
+	const state = audioOutputSuspect.value;
+	if (!state.suspect) return;
+	notifyWarning(
+		`Audio output may be stuck (${state.reason ?? 'unknown reason'}). Enabling EQ/Compressor now may produce silence.`,
+		10000,
+		[
+			{
+				label: 'Reset Audio',
+				onClick: () => {
+					requestAudioReset();
+				},
+			},
+		],
+	);
+}
 import {
 	DEFAULT_VIDEO_EFFECTS,
 	type VideoEffectSettings,
@@ -278,6 +303,7 @@ export function setHrtfSurroundAmount(amount: number): void {
 
 export function toggleEq(): void {
 	const next = !eqEnabled.value;
+	if (next) warnIfAudioSuspect();
 	eqEnabled.value = next;
 	audioEngine.setEqEnabled(next);
 	setUiSetting('audio_eq_enabled', next);
@@ -455,6 +481,7 @@ export async function runAutoEq(): Promise<void> {
 
 export function toggleCompressor(): void {
 	const next = !compressorEnabled.value;
+	if (next) warnIfAudioSuspect();
 	compressorEnabled.value = next;
 	audioEngine.setCompressorEnabled(next);
 	setUiSetting('audio_compressor_enabled', next);

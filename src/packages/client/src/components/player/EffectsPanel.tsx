@@ -16,6 +16,7 @@ import {
 	activeVideoProfileId,
 	profiles,
 } from '@/state/audio-profiles.state';
+import { audioOutputSuspect, requestAudioReset } from '@/state/audio-reset.state';
 import { videoEnabled } from '@/state/video-effects.state';
 import styles from './EffectsPanel.module.scss';
 import { CompressorTab } from './effects/CompressorTab';
@@ -61,19 +62,34 @@ export function EffectsPanel() {
 		>
 			<div class={styles.header}>
 				<span class={styles.headerTitle}>Effects</span>
-				<button class={styles.closeBtn} onClick={toggleEffectsPanel} aria-label="Close">
-					<svg
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
+				<div class={styles.headerActions}>
+					<button
+						class={styles.resetAudioBtn}
+						onClick={requestAudioReset}
+						title={
+							audioOutputSuspect.value.suspect
+								? `Audio output may be stuck (${audioOutputSuspect.value.reason}). Click to reset.`
+								: 'Reset audio output — use if EQ/Compressor stops sound. Restarts the video at the current position.'
+						}
+						data-suspect={audioOutputSuspect.value.suspect ? 'true' : 'false'}
+						aria-label="Reset audio output"
 					>
-						<line x1="18" y1="6" x2="6" y2="18" />
-						<line x1="6" y1="6" x2="18" y2="18" />
-					</svg>
-				</button>
+						Reset Audio
+					</button>
+					<button class={styles.closeBtn} onClick={toggleEffectsPanel} aria-label="Close">
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<line x1="18" y1="6" x2="6" y2="18" />
+							<line x1="6" y1="6" x2="18" y2="18" />
+						</svg>
+					</button>
+				</div>
 			</div>
 
 			<div class={styles.tabs}>

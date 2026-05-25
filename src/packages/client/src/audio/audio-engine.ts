@@ -1,4 +1,5 @@
 import { debug } from 'dev-loggers';
+import { clearAudioSuspect, markAudioSuspect } from '@/state/audio-reset.state';
 
 /**
  * Audio processing engine using Web Audio API.
@@ -255,12 +256,43 @@ export class AudioEngine {
 		}
 
 		try {
-			this.ctx = new AudioContext({ latencyHint: 'playback' });
+			// Construct with explicit sampleRate. Chrome's no-arg AudioContext
+			// binds to the device's "preferred" rate at creation time, and
+			// when the device binding is half-initialized (post storage-clear,
+			// device hot-swap, focus-loss-during-sleep) it falls back to
+			// 44100 against a sink that silently drops samples. Passing an
+			// explicit rate routes through Chrome's internal resampler,
+			// which decouples ctx from the device's native clock and
+			// historically avoids that stuck-binding code path. 48000 is the
+			// industry standard for video; cost vs no-arg is one resample
+			// stage (~0.1% CPU).
+			this.ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'playback' });
 			debug('audio:attach', {
 				event: 'audio-context',
 				state: this.ctx.state,
 				sampleRate: this.ctx.sampleRate,
+				outputLatency:
+					(this.ctx as AudioContext & { outputLatency?: number }).outputLatency ?? null,
+				baseLatency:
+					(this.ctx as AudioContext & { baseLatency?: number }).baseLatency ?? null,
 			});
+			// Heuristic stuck-sink detection. We can't directly observe
+			// whether samples reach the speakers, but two signals correlate
+			// strongly with the failure mode: outputLatency==0 (ctx never
+			// bound to a real device) and sampleRate < 48000 (Chrome's safe
+			// fallback when device negotiation didn't complete). Flag for
+			// the UI; the user gets a "Reset Audio Output" affordance.
+			const outputLatency =
+				(this.ctx as AudioContext & { outputLatency?: number }).outputLatency ?? null;
+			if (outputLatency !== null && outputLatency <= 0) {
+				markAudioSuspect(`outputLatency=${outputLatency}`);
+			} else if (this.ctx.sampleRate < 48000) {
+				markAudioSuspect(`sampleRate=${this.ctx.sampleRate} (fallback)`);
+			} else {
+				// Fresh attach with healthy-looking signals — clear any
+				// stale suspect flag from a prior session.
+				clearAudioSuspect();
+			}
 			dlog(
 				`[audioEngine] new AudioContext → state=${this.ctx.state} sampleRate=${this.ctx.sampleRate}`,
 			);
@@ -346,14 +378,13 @@ export class AudioEngine {
 			this.pinOutputAudioToDefault();
 		}
 
-		// Pin `AudioContext.destination` to the OS default device. With
-		// direct routing this is what actually plays the audio; with
-		// MediaStream routing it's belt-and-suspenders (some Chrome
-		// builds gate stream production on destination state).
-		//
-		// History: briefly made opt-in (commit aeb9a4d) on a wrong
-		// diagnosis. Reverted — the unconditional call was working
-		// state for Titanic / Goliath / every movie yesterday.
+		// Re-pin only if a non-default sink was previously set (rare —
+		// only happens after the audio-device picker UI). Skips the
+		// no-op call in the common already-default case because
+		// setSinkId('') against an empty sinkId silences ctx.destination
+		// in some Chrome builds. The real recovery for the stuck-sink
+		// bug is requestAudioReset() (see audio-reset.state.ts), not
+		// this method — see pinSinkToDefault() comment.
 		this.pinSinkToDefault();
 
 		// Force the context to running state. Chrome may start it suspended
@@ -978,22 +1009,18 @@ export class AudioEngine {
 	// ── Private ──
 
 	/**
-	 * Force the AudioContext output to the system default sink.
+	 * Re-pin the AudioContext output to the system default sink — for
+	 * the rare case where something else (e.g. an explicit
+	 * `setOutputDevice(deviceId)` from the UI's audio-device picker)
+	 * set a non-default sink earlier. Skipped when the sink is already
+	 * empty/default: calling `setSinkId('')` against an already-empty
+	 * `sinkId` silences `ctx.destination` in affected Chrome builds.
 	 *
-	 * History: this method had a ping-pong between unconditional and
-	 * opt-in. The unconditional version silences `ctx.destination` in
-	 * some Chrome builds when the sink is *already* the default —
-	 * calling `setSinkId('')` against an already-empty `sinkId` flips
-	 * the engine from the implicit hardware path onto an internal
-	 * routing pipeline that has historically been broken. Commit
-	 * aeb9a4d found this; commit 51db222 reverted on a misread of
-	 * "every movie worked yesterday" (it worked on Chrome builds that
-	 * weren't affected, then a Chrome update / different OS audio
-	 * config re-exposed the bug).
-	 *
-	 * Compromise: skip the call entirely when the sink is already
-	 * default. We still pin in the (rare) case where something else
-	 * set a non-default sink first.
+	 * Note: this does NOT recover from the stuck-sink bug — once a
+	 * ctx is bound to a half-initialized device, `setSinkId` against
+	 * the same ctx can't fix it. The recovery path is `requestAudioReset()`
+	 * in audio-reset.state.ts, which tears down the ctx + swaps the
+	 * `<video>` element.
 	 */
 	private pinSinkToDefault(): void {
 		if (!this.ctx) {
@@ -1110,6 +1137,11 @@ export class AudioEngine {
 		if (navigator.mediaDevices && !this.deviceChangeListener) {
 			this.deviceChangeListener = () => {
 				if (!this.ctx) return;
+				// Device change while a MediaElementSource is bound is the
+				// canonical trigger for the stuck-sink bug — the ctx is
+				// still pointed at the now-stale device. Flag it so the
+				// next EQ/Comp toggle prompts the user to reset.
+				markAudioSuspect('audio device changed mid-session');
 				if (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted') {
 					this.ctx.resume().catch(() => {});
 				}

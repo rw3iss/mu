@@ -4,7 +4,9 @@ import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting } from '@/hooks/useUiSetting';
 import { streamService } from '@/services/stream.service';
 import { initAudioEffects } from '@/state/audio-effects.state';
+import { audioResetTrigger, clearAudioSuspect } from '@/state/audio-reset.state';
 import { globalMovieId } from '@/state/globalPlayer.state';
+import { notifyInfo } from '@/state/notifications.state';
 import {
 	currentSession,
 	currentTime,
@@ -148,11 +150,76 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		return BUFFER_CONFIGS[stored] || BUFFER_CONFIGS.normal;
 	}, []);
 
+	// Subscribe to the audio-reset trigger. Reading .value here registers
+	// the parent component (GlobalPlayer) with the signal so any bump from
+	// requestAudioReset() forces a re-render — which re-runs the mount
+	// useEffect below (whose dep list includes resetTick) and performs the
+	// swap-and-restore cycle.
+	const resetTick = audioResetTrigger.value;
+
 	// Attach event listeners to the shared video element on mount.
 	// The element itself is a module-level singleton — only the event
 	// listeners are per-mount, so refs captured in their closures stay fresh.
 	useEffect(() => {
 		if (!enabled) return;
+
+		// ── Audio-reset path ──
+		// When resetTick > 0, the previous run's cleanup has already
+		// detached hook listeners from the old element. Now: close the
+		// AudioContext, tear down HLS, throw away the old <video>, mint
+		// a fresh one in the same DOM slot, and re-init playback at the
+		// saved position. This is the only escape from Chrome's
+		// "stuck-sink" state — createMediaElementSource permanently
+		// re-routes the element away from native audio, and there's no
+		// API to un-bind. A new element gets a new MediaElementSource
+		// candidacy AND a fresh ctx that re-negotiates the sink.
+		if (resetTick > 0 && sharedVideoElement) {
+			const old = sharedVideoElement;
+			const parent = old.parentElement;
+			const snap = {
+				currentTime: old.currentTime,
+				paused: old.paused,
+				volume: old.volume,
+				muted: old.muted,
+				playbackRate: old.playbackRate,
+			};
+			audioEngine.destroy();
+			if (hlsRef.current) {
+				try {
+					hlsRef.current.destroy();
+				} catch {}
+				hlsRef.current = null;
+			}
+			old.pause();
+			old.removeAttribute('src');
+			old.load();
+			old.remove();
+			sharedVideoElement = null;
+			const fresh = getSharedVideoElement();
+			if (parent) parent.appendChild(fresh);
+			fresh.volume = snap.volume;
+			fresh.muted = snap.muted;
+			fresh.playbackRate = snap.playbackRate;
+			// Restart the stream at the saved offset. initPlayback is
+			// defined later in this hook via useCallback — it's already
+			// in lexical scope by the time this effect body runs (effects
+			// fire after render). Defer to a microtask anyway so the
+			// rest of the setup below (register + initAudioEffects) is
+			// in place before we kick playback.
+			queueMicrotask(() => {
+				const session = currentSession.value;
+				if (session) {
+					initPlayback(
+						session.streamUrl,
+						session.directPlay,
+						snap.currentTime,
+						!snap.paused,
+					);
+				}
+			});
+			clearAudioSuspect();
+			notifyInfo('Audio output reset.', 3000);
+		}
 
 		const video = getSharedVideoElement();
 		videoRef.current = video;
@@ -318,7 +385,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			video.removeEventListener('ended', onEnded);
 			videoRef.current = null;
 		};
-	}, [enabled]);
+	}, [enabled, resetTick]);
 
 	// Sync volume/mute state
 	useEffect(() => {

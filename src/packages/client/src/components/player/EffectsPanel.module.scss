@@ -30,6 +30,12 @@
   color: #fff;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .closeBtn {
   padding: 4px;
   color: var(--on-dark-text-muted);
@@ -37,6 +43,36 @@
 
   &:hover {
     color: #fff;
+  }
+}
+
+.resetAudioBtn {
+  padding: 4px 10px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--on-dark-text-muted);
+  background: var(--on-dark-overlay-1);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: color var(--transition-fast), background var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover {
+    color: #fff;
+    background: var(--on-dark-overlay-2, rgba(255, 255, 255, 0.12));
+  }
+
+  // When the engine has flagged the output as suspect, pulse the
+  // button so the user notices it without us hijacking the screen
+  // with a modal.
+  &[data-suspect='true'] {
+    color: #fff;
+    background: var(--color-warning, #c47f00);
+    border-color: var(--color-warning, #c47f00);
+
+    &:hover {
+      filter: brightness(1.1);
+    }
   }
 }
 
