@@ -6,6 +6,7 @@ import { getRatingColor } from '@/utils/rating-color';
 import { hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieLargeCard.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
+import { MovieScoreChips } from './MovieScoreChips';
 import { RatingBadge } from './RatingBadge';
 import type { MovieDisplayProps } from './types';
 import { useMovieCardBehavior } from './useMovieCardBehavior';
@@ -120,14 +121,6 @@ export function MovieLargeCard({
 						<RatingBadge value={rating} class={styles.ratingBadge} />
 
 						<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
-						{!selectionMode && !movie.remoteOrigin && (
-							<MovieOptionsMenu
-								movie={movie}
-								onMovieUpdate={onMovieUpdate}
-								onMovieRemoved={onMovieRemoved}
-								compact
-							/>
-						)}
 					</div>
 				</div>
 				<div class={styles.meta}>
@@ -138,7 +131,18 @@ export function MovieLargeCard({
 							{'\u2605'} {rating.toFixed(1)}
 						</span>
 					)}
+					<MovieScoreChips movie={movie} />
 					{formattedDate && <span>Added {formattedDate}</span>}
+					{!selectionMode && !movie.remoteOrigin && (
+						<span class={styles.metaOptions}>
+							<MovieOptionsMenu
+								movie={movie}
+								onMovieUpdate={onMovieUpdate}
+								onMovieRemoved={onMovieRemoved}
+								compact
+							/>
+						</span>
+					)}
 				</div>
 			</div>
 		</div>

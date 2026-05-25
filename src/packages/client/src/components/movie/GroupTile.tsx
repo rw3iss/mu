@@ -2,10 +2,20 @@ import { route } from 'preact-router';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import type { MovieGroup } from '@/services/groups.service';
+import type { ViewMode } from '@/state/library.state';
 import styles from './GroupTile.module.scss';
 
 interface GroupTileProps {
 	group: MovieGroup;
+	/**
+	 * View mode the tile is rendering inside. Drives the poster aspect:
+	 *   - `grid` (default): 2:3 portrait (matches MovieCard) — for the
+	 *     mid-sized grid.
+	 *   - `large`: 16:9 landscape with object-fit:contain — keeps every
+	 *     card the same height in the large grid, even if the group's
+	 *     poster is a tall format.
+	 */
+	viewMode?: ViewMode;
 }
 
 /**
@@ -18,7 +28,7 @@ interface GroupTileProps {
  * movie's poster when the group itself doesn't have one set, so
  * tiles look like normal MovieCards instead of empty placeholders.
  */
-export function GroupTile({ group }: GroupTileProps) {
+export function GroupTile({ group, viewMode = 'grid' }: GroupTileProps) {
 	const subCount = group.subgroupCount ?? 0;
 	const memberCount = group.totalMembers ?? 0;
 	const subLabel = subCount > 1 ? `${subCount} seasons` : subCount === 1 ? '1 season' : null;
@@ -39,7 +49,9 @@ export function GroupTile({ group }: GroupTileProps) {
 			}}
 			title={group.name}
 		>
-			<div class={styles.posterWrap}>
+			<div
+				class={`${styles.posterWrap} ${viewMode === 'large' ? styles.posterWrapLarge : ''}`}
+			>
 				<span class={styles.typeBadge}>
 					<Icon name="layers" size={11} />
 					{group.groupType === 'collection' ? 'Collection' : 'Series'}
@@ -47,7 +59,7 @@ export function GroupTile({ group }: GroupTileProps) {
 				<SmartImage
 					src={group.posterUrl ?? ''}
 					alt={group.name}
-					class={styles.poster}
+					class={`${styles.poster} ${viewMode === 'large' ? styles.posterLarge : ''}`}
 					fallback={
 						<div class={styles.posterFallback}>
 							{group.name.charAt(0).toUpperCase()}

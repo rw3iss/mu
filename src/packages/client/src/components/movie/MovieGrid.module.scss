@@ -17,6 +17,12 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
   gap: var(--item-gap);
+  // Items anchor to the top of their grid cell instead of stretching
+  // to the row's tallest height. Belt-and-suspenders alongside the
+  // fixed 16:9 thumbnail aspect: even if a card's info section grows
+  // by one line (long title that wraps), neighbours keep their natural
+  // height and don't fill with empty space.
+  align-items: start;
 
   @include mobile {
     grid-template-columns: 1fr;

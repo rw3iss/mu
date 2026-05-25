@@ -1,0 +1,39 @@
+.score {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.tag {
+	display: inline-block;
+	padding: 1px 5px;
+	border-radius: 3px;
+	font-size: 9px;
+	font-weight: var(--font-weight-bold);
+	letter-spacing: 0.04em;
+	color: #000;
+	line-height: 1.4;
+}
+
+// Brand-ish colours for each source so the chips are scannable at a glance.
+.imdb {
+	background: #f5c518; // IMDb yellow
+}
+
+.rt {
+	background: #fa320a; // Tomato red
+	color: #fff;
+}
+
+.mc {
+	background: #66cc33; // Metacritic green
+	color: #fff;
+}
+
+.votes {
+	opacity: 0.7;
+}

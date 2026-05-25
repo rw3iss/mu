@@ -222,14 +222,33 @@
   gap: var(--space-sm);
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+  flex-wrap: wrap;
 
   span + span::before {
     content: '\00b7';
     margin-right: var(--space-sm);
   }
+
+  // Score chips render an outer wrapper span containing the brand tag —
+  // those inner spans shouldn't trigger the dot separator.
+  span > span::before {
+    content: none;
+    margin-right: 0;
+  }
 }
 
 .userRating {
   font-weight: var(--font-weight-semibold);
+}
+
+// Push the options ellipsis to the far right of the meta row; suppress
+// the dot separator for it so it doesn't read as another meta item.
+.metaOptions {
+  margin-left: auto;
+
+  &::before {
+    content: none !important;
+    margin-right: 0 !important;
+  }
 }
 

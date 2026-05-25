@@ -155,7 +155,7 @@ export function MovieGrid({
 			<div class={`${styles.largeGrid} ${containerClass}`}>
 				{items.map((item) =>
 					item.kind === 'group' ? (
-						<GroupTile key={`g:${item.group.id}`} group={item.group} />
+						<GroupTile key={`g:${item.group.id}`} group={item.group} viewMode="large" />
 					) : (
 						<MovieLargeCard
 							key={item.movie.id}

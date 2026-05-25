@@ -8,6 +8,7 @@ import { getRatingColor } from '@/utils/rating-color';
 import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
 import styles from './MovieCard.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
+import { MovieScoreChips } from './MovieScoreChips';
 import { RatingBadge } from './RatingBadge';
 import type { MovieDisplayProps } from './types';
 import { useMovieCardBehavior } from './useMovieCardBehavior';
@@ -157,6 +158,7 @@ export function MovieCard({
 					{'★'} {rating.toFixed(1)}
 				</span>
 			)}
+			<MovieScoreChips movie={movie} />
 			<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
 			{!selectionMode && !movie.remoteOrigin && (
 				<span class={styles.optionsWrap}>
