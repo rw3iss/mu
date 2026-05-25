@@ -281,8 +281,30 @@
 .details {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
+  justify-content: space-between;
+  gap: var(--space-sm);
   flex-wrap: wrap;
+  // Fill the parent .subtitle wrapper so justify-content actually has
+  // room to distribute. Without this, the inner flex sizes to content
+  // and "space-between" / "margin-left: auto" both no-op.
+  width: 100%;
+}
+
+.detailsLeft,
+.detailsCenter,
+.detailsRight {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+// Belt-and-suspenders against the center group being empty (no user
+// rating + no IMDb/RT/MC data): without something pushing right, the
+// remaining two groups would collapse together via flex-shrink and the
+// options would end up next to the year again.
+.detailsRight {
+  margin-left: auto;
 }
 
 .year {
@@ -306,6 +328,3 @@
   white-space: nowrap;
 }
 
-.optionsWrap {
-  margin-left: auto;
-}

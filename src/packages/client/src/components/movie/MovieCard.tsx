@@ -142,34 +142,38 @@ export function MovieCard({
 
 	const subtitle = (
 		<div class={styles.details}>
-			{movie.year && <span class={styles.year}>{movie.year}</span>}
-			{movie.year && movie.runtime > 0 && <span class={styles.dot}>{'·'}</span>}
-			{movie.runtime > 0 && (
-				<span class={styles.runtime}>
-					{Math.floor(movie.runtime / 60)}h {movie.runtime % 60}m
-				</span>
-			)}
-			{rating > 0 && (
-				<span
-					class={styles.userRating}
-					style={{ color: ratingColor }}
-					title={`Your rating: ${rating.toFixed(1)}`}
-				>
-					{'★'} {rating.toFixed(1)}
-				</span>
-			)}
-			<MovieScoreChips movie={movie} />
-			<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
-			{!selectionMode && !movie.remoteOrigin && (
-				<span class={styles.optionsWrap}>
+			<span class={styles.detailsLeft}>
+				{movie.year && <span class={styles.year}>{movie.year}</span>}
+				{movie.year && movie.runtime > 0 && <span class={styles.dot}>{'·'}</span>}
+				{movie.runtime > 0 && (
+					<span class={styles.runtime}>
+						{Math.floor(movie.runtime / 60)}h {movie.runtime % 60}m
+					</span>
+				)}
+			</span>
+			<span class={styles.detailsCenter}>
+				{rating > 0 && (
+					<span
+						class={styles.userRating}
+						style={{ color: ratingColor }}
+						title={`Your rating: ${rating.toFixed(1)}`}
+					>
+						{'★'} {rating.toFixed(1)}
+					</span>
+				)}
+				<MovieScoreChips movie={movie} />
+			</span>
+			<span class={styles.detailsRight}>
+				<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
+				{!selectionMode && !movie.remoteOrigin && (
 					<MovieOptionsMenu
 						movie={movie}
 						onMovieUpdate={onMovieUpdate}
 						onMovieRemoved={onMovieRemoved}
 						compact
 					/>
-				</span>
-			)}
+				)}
+			</span>
 		</div>
 	);
 
