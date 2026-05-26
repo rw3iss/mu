@@ -1,7 +1,6 @@
 import { SmartImage } from '@/components/common/SmartImage';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
-import { getRatingColor } from '@/utils/rating-color';
 import { hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieListItem.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
@@ -28,7 +27,6 @@ export function MovieListItem({
 	} = useMovieCardBehavior(movie, selectionMode, onToggleSelect);
 
 	const rating = movie.rating ?? 0;
-	const ratingColor = getRatingColor(rating);
 
 	const formattedDate = movie.addedAt
 		? new Date(movie.addedAt).toLocaleDateString('en-US', {
@@ -77,11 +75,6 @@ export function MovieListItem({
 				<div class={styles.meta}>
 					{movie.year && <span>{movie.year}</span>}
 					{runtimeStr && <span>{runtimeStr}</span>}
-					{rating > 0 && (
-						<span class={styles.userRating} style={{ color: ratingColor }}>
-							{'\u2605'} {rating.toFixed(1)}
-						</span>
-					)}
 					<MovieScoreChips movie={movie} />
 					{formattedDate && <span>{formattedDate}</span>}
 				</div>

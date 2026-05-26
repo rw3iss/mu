@@ -4,7 +4,6 @@ import { useTranscodeStatus } from '@/hooks/useTranscodeStatus';
 import { useWatchPosition } from '@/hooks/useWatchPosition';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
-import { getRatingColor } from '@/utils/rating-color';
 import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
 import styles from './MovieCard.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
@@ -51,7 +50,6 @@ export function MovieCard({
 	}, []);
 
 	const rating = movie.rating ?? 0;
-	const ratingColor = getRatingColor(rating);
 	const transcodeNeeded = needsTranscode(movie);
 	const streamLabel = getStreamModeLabel(movie);
 	const { isProcessing, progress } = useTranscodeStatus(movie.id);
@@ -152,15 +150,6 @@ export function MovieCard({
 				)}
 			</span>
 			<span class={styles.detailsCenter}>
-				{rating > 0 && (
-					<span
-						class={styles.userRating}
-						style={{ color: ratingColor }}
-						title={`Your rating: ${rating.toFixed(1)}`}
-					>
-						{'★'} {rating.toFixed(1)}
-					</span>
-				)}
 				<MovieScoreChips movie={movie} />
 			</span>
 			<span class={styles.detailsRight}>

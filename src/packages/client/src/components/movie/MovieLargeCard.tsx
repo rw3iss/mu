@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from 'preact/hooks';
 import { SmartImage } from '@/components/common/SmartImage';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
-import { getRatingColor } from '@/utils/rating-color';
 import { hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieLargeCard.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
@@ -41,7 +40,6 @@ export function MovieLargeCard({
 	}, []);
 
 	const rating = movie.rating ?? 0;
-	const ratingColor = getRatingColor(rating);
 
 	const runtimeStr = movie.runtime
 		? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m`
@@ -126,11 +124,6 @@ export function MovieLargeCard({
 				<div class={styles.meta}>
 					{movie.year && <span>{movie.year}</span>}
 					{runtimeStr && <span>{runtimeStr}</span>}
-					{rating > 0 && (
-						<span class={styles.userRating} style={{ color: ratingColor }}>
-							{'\u2605'} {rating.toFixed(1)}
-						</span>
-					)}
 					<MovieScoreChips movie={movie} />
 					{formattedDate && <span>Added {formattedDate}</span>}
 					{!selectionMode && !movie.remoteOrigin && (
