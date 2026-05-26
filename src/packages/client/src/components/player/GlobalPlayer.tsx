@@ -93,7 +93,7 @@ export function GlobalPlayer() {
 	const resetControlsTimer = useCallback(() => {
 		showControls.value = true;
 		if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-		const timeout = Math.max(100, getUiSetting('overlay_hide_timeout', 2000));
+		const timeout = Math.max(100, getUiSetting('overlay_hide_timeout', 1000));
 		controlsTimerRef.current = setTimeout(() => {
 			if (!isHoveringControls.value) {
 				showControls.value = false;

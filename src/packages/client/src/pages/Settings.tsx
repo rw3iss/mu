@@ -56,7 +56,7 @@ import { Matching } from './settings/Matching';
 import { Users } from './settings/Users';
 
 function OverlayTimeoutSetting() {
-	const [val, setVal] = useUiSetting('overlay_hide_timeout', 2000);
+	const [val, setVal] = useUiSetting('overlay_hide_timeout', 1000);
 	return (
 		<div class={styles.settingRow}>
 			<div class={styles.settingInfo}>
