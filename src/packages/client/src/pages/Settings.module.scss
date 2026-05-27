@@ -131,11 +131,11 @@
   }
 }
 
-// Custom width override for the CRF Value select — the longest option
-// label ("23 — Balanced (default)") wouldn't fit in the row's default
-// trigger width and would render as "2..".
+// CRF trigger only needs to display a two-digit value — the descriptive
+// "Balanced (default)" text lives in each option's `description` field
+// so it shows inside the dropdown menu, not on the trigger button.
 .crfSelect {
-  min-width: 220px;
+  min-width: 80px;
 }
 
 .settingGroup {

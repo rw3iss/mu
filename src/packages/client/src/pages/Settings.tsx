@@ -1753,17 +1753,17 @@ export function Settings(props: SettingsProps) {
 										class={styles.crfSelect}
 										options={[
 											{ value: '17', label: '17' },
-											{ value: '18', label: '18 — Near Lossless' },
+											{ value: '18', label: '18', description: 'Near Lossless' },
 											{ value: '19', label: '19' },
-											{ value: '20', label: '20 — High Quality' },
+											{ value: '20', label: '20', description: 'High Quality' },
 											{ value: '21', label: '21' },
 											{ value: '22', label: '22' },
-											{ value: '23', label: '23 — Balanced (default)' },
+											{ value: '23', label: '23', description: 'Balanced (default)' },
 											{ value: '24', label: '24' },
 											{ value: '25', label: '25' },
-											{ value: '26', label: '26 — Smaller Files' },
+											{ value: '26', label: '26', description: 'Smaller Files' },
 											{ value: '27', label: '27' },
-											{ value: '28', label: '28 — Low Quality' },
+											{ value: '28', label: '28', description: 'Low Quality' },
 											{ value: '29', label: '29' },
 											{ value: '30', label: '30' },
 										]}
