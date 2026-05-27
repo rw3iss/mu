@@ -115,45 +115,6 @@ function OverlayTimeoutSetting() {
 	);
 }
 
-interface ServerStats {
-	system: {
-		cpuCount: number;
-		loadAvg: number[];
-		memoryUsed: number;
-		memoryTotal: number;
-		memoryFree: number;
-		appMemory: { main: number; children: number; total: number };
-		diskTotal: number;
-		diskFree: number;
-		dataDirSize: number;
-		uptime: number;
-		platform: string;
-	};
-	services: {
-		activeStreams: number;
-		activeTranscodes: number;
-		runningJobs: number;
-		pendingJobs: number;
-	};
-}
-
-function _formatUptime(seconds: number): string {
-	const d = Math.floor(seconds / 86400);
-	const h = Math.floor((seconds % 86400) / 3600);
-	const m = Math.floor((seconds % 3600) / 60);
-	const parts: string[] = [];
-	if (d > 0) parts.push(`${d}d`);
-	if (h > 0) parts.push(`${h}h`);
-	parts.push(`${m}m`);
-	return parts.join(' ');
-}
-
-function _meterColor(ratio: number): string {
-	if (ratio < 0.6) return 'var(--color-accent, #4caf50)';
-	if (ratio < 0.85) return '#ff9800';
-	return '#f44336';
-}
-
 function CollapsibleSubtitleSettings() {
 	const [open, setOpen] = useState(false);
 	return (
@@ -253,7 +214,6 @@ export function Settings(props: SettingsProps) {
 	const initialTab = isValidTab(props.tab) ? props.tab : 'general';
 	const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
 	const [isSaving, setIsSaving] = useState(false);
-	const [_isLoadingSettings, setIsLoadingSettings] = useState(true);
 
 	// Appearance settings
 	const [showRecentlyPlayed, setShowRecentlyPlayed] = useUiSetting('show_recently_played', true);
@@ -481,8 +441,6 @@ export function Settings(props: SettingsProps) {
 					.catch(() => {});
 			} catch {
 				// Settings may not exist yet — use defaults
-			} finally {
-				setIsLoadingSettings(false);
 			}
 		}
 		loadSettings();
@@ -675,36 +633,6 @@ export function Settings(props: SettingsProps) {
 
 	const nextScanText = autoScanEnabled ? formatNextScan(nextScanAt) : null;
 
-	// Server stats polling
-	const [_serverStats, setServerStats] = useState<ServerStats | null>(null);
-	const statsTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-	useEffect(() => {
-		if (activeTab !== 'about') {
-			// Clean up when leaving About tab
-			if (statsTimer.current) {
-				clearInterval(statsTimer.current);
-				statsTimer.current = null;
-			}
-			return;
-		}
-
-		const fetchStats = () => {
-			api.get<ServerStats>('/health/stats')
-				.then(setServerStats)
-				.catch(() => {});
-		};
-
-		fetchStats();
-		statsTimer.current = setInterval(fetchStats, 5000);
-
-		return () => {
-			if (statsTimer.current) {
-				clearInterval(statsTimer.current);
-				statsTimer.current = null;
-			}
-		};
-	}, [activeTab]);
 
 	const user = currentUser.value;
 	const isAdmin = user?.role === 'admin';
