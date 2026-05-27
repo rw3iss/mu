@@ -27,6 +27,29 @@ interface TranscodeOptions {
 	livePlayback?: boolean;
 }
 
+/**
+ * Take an FFmpeg bitrate string ("5M", "256k", "1000000") and return
+ * the same string scaled 2×. Used to derive a `bufsize` from a `maxrate`
+ * so CRF VBV constraints have ~2 seconds of headroom for legitimate
+ * peaks without blowing past the cap on the long-term average.
+ *
+ * Falls back to the input string unchanged if the value can't be parsed.
+ */
+function doubleBitrate(bitrate: string): string {
+	const m = bitrate.match(/^([\d.]+)\s*([kKmMgG]?)$/);
+	if (!m) return bitrate;
+	const n = parseFloat(m[1]!);
+	const unit = (m[2] || '').toLowerCase();
+	if (!Number.isFinite(n) || n <= 0) return bitrate;
+	const doubled = n * 2;
+	// Keep the unit suffix the caller used so the output reads sensibly
+	// in logs ("10M" not "10000000").
+	if (unit === 'g') return `${doubled}G`;
+	if (unit === 'm') return `${doubled}M`;
+	if (unit === 'k') return `${doubled}k`;
+	return String(Math.round(doubled));
+}
+
 type TranscodeState = 'running' | 'completed' | 'failed';
 
 @Injectable()
@@ -1232,9 +1255,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const segmentPattern = path.join(targetDir, 'segment_%04d.ts');
 		const enc = this.getEncodingSettings();
 		const segDuration = String(enc.segmentDuration);
-		// Force software settings — this is a SW fallback, ignore NVENC settings
-		const swRateOpts =
-			enc.rateControl === 'crf' ? ['-crf', String(enc.crf)] : ['-b:v', profile.videoBitrate];
+		// Force software settings — this is a SW fallback, ignore NVENC settings.
+		// Synthesize a shadow `enc` with hwAccel='none' so getRateControlOpts
+		// emits libx264 CRF + maxrate (not NVENC VBR) even when the global
+		// setting selects NVENC.
+		const swRateOpts = this.getRateControlOpts({ ...enc, hwAccel: 'none' }, profile.videoBitrate);
 		const swPreset = enc.hwAccel === 'nvenc' ? 'veryfast' : enc.preset;
 		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
 		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
@@ -1353,9 +1378,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			TRANSCODING_PROFILES['1080p'])!;
 		const enc = this.getEncodingSettings();
 		const segDuration = String(enc.segmentDuration);
-		// Force software settings — this is a SW fallback, ignore NVENC settings
-		const swRateOpts =
-			enc.rateControl === 'crf' ? ['-crf', String(enc.crf)] : ['-b:v', profile.videoBitrate];
+		// Force software settings — this is a SW fallback, ignore NVENC settings.
+		// Synthesize a shadow `enc` with hwAccel='none' so getRateControlOpts
+		// emits libx264 CRF + maxrate (not NVENC VBR) even when the global
+		// setting selects NVENC.
+		const swRateOpts = this.getRateControlOpts({ ...enc, hwAccel: 'none' }, profile.videoBitrate);
 		// Map NVENC presets back to libx264 presets
 		const swPreset = enc.hwAccel === 'nvenc' ? 'veryfast' : enc.preset;
 		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
@@ -1886,20 +1913,53 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	/**
-	 * Build rate-control FFmpeg options, mapping -crf to -cq for NVENC.
-	 * NVENC does not support -crf; it uses -cq (constant quality) instead.
+	 * Build rate-control FFmpeg options.
+	 *
+	 * For CRF mode we now ALSO emit `-maxrate` + `-bufsize` (set to the
+	 * profile's nominal video bitrate + 2× bufsize). This caps the burst
+	 * budget on complex/grainy scenes so a CRF-23 1080p movie can't blow
+	 * past ~5 Mbps and produce 4-5 GB files for a 90-minute runtime —
+	 * which was the previous behavior with uncapped CRF.
+	 *
+	 * For NVENC + CRF, we switch from `-rc constqp` (which is even more
+	 * bursty than libx264's CRF) to `-rc vbr -cq X -b:v 0 -maxrate Y -bufsize Z`.
+	 * VBR with a VBV cap delivers significantly tighter file sizes for
+	 * essentially the same perceptual quality. NVENC's `constqp` ignores
+	 * rate budgets entirely.
+	 *
+	 * For CBR mode the bitrate alone is sufficient — unchanged.
 	 */
 	getRateControlOpts(
 		enc: ReturnType<TranscoderService['getEncodingSettings']>,
-		fallbackBitrate: string,
+		videoBitrate: string,
 	): string[] {
 		if (enc.rateControl === 'crf') {
+			const maxrate = videoBitrate;
+			const bufsize = doubleBitrate(videoBitrate);
 			if (enc.hwAccel === 'nvenc') {
-				return ['-rc', 'constqp', '-cq', String(enc.crf)];
+				return [
+					'-rc',
+					'vbr',
+					'-cq',
+					String(enc.crf),
+					'-b:v',
+					'0',
+					'-maxrate',
+					maxrate,
+					'-bufsize',
+					bufsize,
+				];
 			}
-			return ['-crf', String(enc.crf)];
+			return [
+				'-crf',
+				String(enc.crf),
+				'-maxrate',
+				maxrate,
+				'-bufsize',
+				bufsize,
+			];
 		}
-		return ['-b:v', fallbackBitrate];
+		return ['-b:v', videoBitrate];
 	}
 
 	private getEncodingSettings() {
