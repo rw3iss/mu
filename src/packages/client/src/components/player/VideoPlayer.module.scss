@@ -64,8 +64,8 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  border: 3px solid #e55;
-  color: #e55;
+  border: 3px solid var(--color-error);
+  color: var(--color-error);
   font-size: 28px;
   font-weight: bold;
   display: flex;

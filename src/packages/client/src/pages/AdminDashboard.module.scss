@@ -260,7 +260,7 @@
 
 .actionRowDanger {
   .actionLabel {
-    color: var(--color-danger, #ef4444);
+    color: var(--color-error);
   }
 }
 
@@ -338,7 +338,7 @@
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   background: rgba(74, 222, 128, 0.15);
-  color: #4ade80;
+  color: var(--color-success);
   font-weight: var(--font-weight-semibold);
 }
 

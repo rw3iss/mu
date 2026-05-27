@@ -138,12 +138,12 @@
 
 .statusEnabled {
   background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
+  color: var(--color-success);
 }
 
 .statusActive {
   background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
+  color: var(--color-success);
 }
 
 .statusDisabled {
@@ -153,12 +153,12 @@
 
 .statusError {
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--color-error);
 }
 
 .errorMessage {
   font-size: var(--font-size-xs);
-  color: #ef4444;
+  color: var(--color-error);
   background: rgba(239, 68, 68, 0.08);
   border: 1px solid rgba(239, 68, 68, 0.2);
   border-radius: var(--radius-md);
@@ -322,7 +322,7 @@
 }
 
 .requiredIndicator {
-  color: #ef4444;
+  color: var(--color-error);
 }
 
 // ============================================

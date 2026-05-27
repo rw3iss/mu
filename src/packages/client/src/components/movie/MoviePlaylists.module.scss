@@ -80,7 +80,7 @@
   transition: color var(--transition-fast), background var(--transition-fast);
 
   &:hover {
-    color: #ef4444;
+    color: var(--color-error);
     background: var(--color-bg-surface);
   }
 }

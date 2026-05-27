@@ -90,7 +90,7 @@
 	}
 
 	&.danger {
-		color: var(--color-danger, #ef4444);
+		color: var(--color-error);
 	}
 }
 
@@ -105,7 +105,7 @@
 }
 
 .modal {
-	background: var(--color-bg-elevated, #1a1a1a);
+	background: var(--color-bg-elevated);
 	border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
 	border-radius: 8px;
 	padding: 1.25rem;
@@ -155,7 +155,7 @@
 }
 
 .errorText {
-	color: var(--color-danger, #ef4444);
+	color: var(--color-error);
 	font-size: 0.8rem;
 }
 

@@ -99,12 +99,12 @@
   }
 
   &.danger {
-    color: #ef4444;
+    color: var(--color-error);
     border-color: rgba(239, 68, 68, 0.3);
 
     &:hover:not(:disabled) {
       background: rgba(239, 68, 68, 0.1);
-      border-color: #ef4444;
+      border-color: var(--color-error);
     }
   }
 }
@@ -130,12 +130,12 @@
   border-radius: var(--radius-sm);
 
   &.success {
-    color: #4ade80;
+    color: var(--color-success);
     background: rgba(74, 222, 128, 0.1);
   }
 
   &.error {
-    color: #ef4444;
+    color: var(--color-error);
     background: rgba(239, 68, 68, 0.1);
   }
 }

@@ -67,8 +67,8 @@
   // with a modal.
   &[data-suspect='true'] {
     color: #fff;
-    background: var(--color-warning, #c47f00);
-    border-color: var(--color-warning, #c47f00);
+    background: var(--color-warning);
+    border-color: var(--color-warning);
 
     &:hover {
       filter: brightness(1.1);
@@ -277,7 +277,7 @@
   }
 
   &.danger {
-    color: #ef4444;
+    color: var(--color-error);
 
     &:hover {
       background: rgba(239, 68, 68, 0.15);

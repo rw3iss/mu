@@ -372,7 +372,7 @@
 	top: 0;
 	right: 0;
 	height: 100vh;
-	background: var(--color-bg, #0a0a0a);
+	background: var(--color-bg-primary);
 	// Below the video wrapper so video renders on top
 	z-index: var(--z-player-controls, 900);
 	display: flex;
@@ -411,7 +411,7 @@
 		width: 6px;
 		// Shift left by the growth (6 - 2 = 4px) so it expands leftward only
 		transform: translateX(-4px);
-		background: var(--color-accent, #646cff);
+		background: var(--color-accent);
 	}
 }
 

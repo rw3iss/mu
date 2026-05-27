@@ -21,7 +21,7 @@
 	transition: border-color 120ms ease, background 120ms ease;
 
 	&:hover {
-		border-color: var(--color-accent, #06b6d4);
+		border-color: var(--color-accent);
 		background: rgba(255, 255, 255, 0.05);
 	}
 }
@@ -34,7 +34,7 @@
 	height: 26px;
 	border-radius: 50%;
 	background: var(--color-accent-soft, rgba(6, 182, 212, 0.18));
-	color: var(--color-accent, #06b6d4);
+	color: var(--color-accent);
 	flex-shrink: 0;
 }
 
@@ -76,7 +76,7 @@
 .fallbackLink {
 	display: inline-block;
 	margin-top: 0.5rem;
-	color: var(--color-accent, #06b6d4);
+	color: var(--color-accent);
 	text-decoration: none;
 
 	&:hover {
@@ -108,7 +108,7 @@
 
 	&:hover .playOverlay {
 		background: rgba(0, 0, 0, 0.55);
-		color: var(--color-accent, #06b6d4);
+		color: var(--color-accent);
 	}
 }
 

@@ -183,18 +183,166 @@ accessibility gaps — over restructuring.
 1. ✅ **UI-2** — ToggleButton prop API unified (`class` rename, `style`, `loading`, `aria-busy`). Zero callers used the removed `className` prop, so non-breaking in practice.
 2. ✅ **UI-1** — Modal focus trap + initial focus + return focus on close. New a11y behavior; verified build.
 
-### Phase C — planned only (4 items — recommend `/implement` for each)
-1. **A-1** Settings.tsx decomposition — split into `pages/settings/{General,Playback,Account,Themes,Sources,Notifications}.tsx`. The two pre-existing sub-pages (`Matching.tsx`, `Users.tsx`) establish the convention.
-2. **A-2** PlayerControls.tsx decomposition — extract `SeekBar`, `VolumeControl`, `SettingsMenu`, `MobileOverflowMenu`.
-3. **A-3 + A-4** MovieDetail.tsx + GlobalPlayer.tsx decomposition — same pattern: extract sub-sections and custom hooks.
-4. **A-8** Introduce shared `usePopover` / `Menu` primitive and migrate the 4+ existing ad-hoc implementations to it.
+### Phase C — Implementation-ready plans (use `/implement` for each)
 
-### Deferred / not actioned
-- **A-5** Inline Icon styles — visual-delta risk needs verification.
-- **A-6** Cross-tier byte formatter — premature; one duplicate isn't enough to justify a shared module.
-- **A-7** Profile registry — speculative.
-- **S-3** Hex-color sweep — 237 hits is a focused half-day task on its own.
-- **UI-6** Caller-side spinner consolidation — 6 sites, low individual ROI.
+These four items were analysed by structure-analysis sub-agents and have
+file:line citations + ordering recommendations. The plans are
+self-contained — hand each to `/implement` for execution.
+
+#### C-1: Settings.tsx decomposition (2880L → ~180L orchestrator)
+
+**Status: 2/8 sub-pages extracted** (About, Notifications). 6 remain.
+
+Tabs to extract (in suggested commit order):
+
+1. ✅ **About.tsx** — done. Static project info, no state.
+2. ✅ **Notifications.tsx** — done. 2 toggles, localStorage only.
+3. **General.tsx** — Settings.tsx:676-754. State: `showExternalRatings`,
+   `showRecentlyPlayed`, `OverlayTimeoutSetting`. Save: `handleSaveRating`
+   (Settings.tsx:628-640). Service: `api.put('/settings/rating')`.
+4. **Appearance.tsx** — Settings.tsx:756-1538 (~470 lines). Includes the
+   theme editor IIFE. State: signal-driven via `theme`/`themesList`/etc.
+   Effects: `fetchThemes()` mount.
+5. **Playback.tsx** — Settings.tsx:~1540-2014 (~540 lines). Includes
+   Encoding subsection + Watch Tracking subsection. State: `defaultQuality`,
+   `preferredAudioLanguage`, `autoplay`, `bufferSize`, `skipTimes`, all
+   encoding state, `watchedThreshold`, `completedTail`. Save:
+   `handleSavePlayback`. APIs: `/settings/playback`, `/settings/encoding`,
+   `/settings/watchedThresholdSeconds`, `/settings/completedTailSeconds`.
+   **Move `reEncodeOnScan` to Library before this commit** — it leaks
+   across tabs today.
+6. **Library.tsx** — Settings.tsx:~2017-2719 (~620 lines, largest).
+   Subsections: Media Paths, Scan/Re-encode, Auto-scan, Thumbnail size,
+   Extended metadata, Sharing, Connected Servers. State: many. Service:
+   `sourcesService`, `/sources/scan`, `/settings/library`, `/settings/sharing`,
+   `/remote/servers`. Save: `handleSaveLibrary` + `handleScanNow`.
+7. **`_shared.tsx`** — `OverlayTimeoutSetting` from Settings.tsx:58-116.
+   `CollapsibleSubtitleSettings` from ~157-200 (move inline to Appearance
+   if not reused).
+
+**Risk callouts** documented during analysis:
+- `reEncodeOnScan` (Settings.tsx:311) is logically Encoding state but
+  only read by Library scan. Move into Library.
+- `totalMovies` prefetch (Settings.tsx:498-504) only serves Library's
+  thumbnail estimate — move there.
+- Each sub-page should fetch its own slice of `/settings` on mount;
+  cheaper + more isolated than a single parent fetch.
+- `_serverStats` polling + `_isLoadingSettings` dead state already
+  removed in the cleanup pass.
+
+#### C-2: PlayerControls.tsx decomposition (1524L → ~280-350L shell)
+
+Extract into `packages/client/src/components/player/controls/`:
+
+1. **Prep**: create `controls/` + extract `formatTime` (PlayerControls:193-204)
+   to `controls/utils/formatTime.ts`. Extract `useIsMobile` hook from
+   PlayerControls:230-255.
+2. **VolumeControl.tsx** — PlayerControls:946-975 + the `VolumeIcon`
+   sub-component at 481-562. State: `showVolume`, `volumeRef`,
+   `volumeHoverTimer`. Callbacks: `handleVolumeChange/Enter/Leave`
+   (414-427). Cleanup useEffect: 317-321. ~140 lines.
+3. **MobileOverflowMenu.tsx** — PlayerControls:1339-1454. State:
+   `showMobileOverflow`, `mobileOverflowRef`. Outside-click: 302-314.
+   Imports `VolumeIcon` from VolumeControl. ~140 lines.
+4. **SkipControls.tsx** — PlayerControls:690-871 (the back/forward IIFE
+   + play button). State: `skipBackOpen`, `skipFwdOpen`, hide timers.
+   Callbacks: `armSkip*AutoHide`, `skipBack`, `skipForward`. Parameterise
+   `direction: 'back' | 'forward'`. ~200 lines.
+5. **SeekBar.tsx** — PlayerControls:582-631. State: `seekHover`,
+   `seekHoverX`, `seekBarRect`, `isDragging`, `seekBarRef`, `dragLastSeek`.
+   Callbacks: 324-411. Move `renderSpritePortal` + `DRAG_THROTTLE_MS`.
+   ~220 lines.
+6. **SettingsMenu.tsx** — PlayerControls:977-1333 (heaviest at ~360
+   lines). Five sub-panels: main, quality, subtitles, subtitle-manage,
+   audio. The subtitle-manage panel (1148-1288) is itself a candidate
+   for a further `SubtitleManagePanel.tsx` split.
+
+**SCSS strategy**: Keep `PlayerControls.module.scss` as single source
+and import into each child. Don't split SCSS — descendant selectors
+(`.controls.miniMode .rightControls …`) would break.
+
+**Risks**: VolumeIcon is shared between VolumeControl + MobileOverflow.
+`isMobile` is shared — promote to hook. `session` prop flows into
+SettingsMenu in 3 places.
+
+#### C-3: MovieDetail.tsx decomposition (1207L → ~260L parent)
+
+Extract into `packages/client/src/components/movie/`:
+
+1. **PreviewActions.tsx** (already a sub-component in same file) —
+   MovieDetail.tsx:1139-1207. Pure relocation.
+2. **MovieTitleEditor.tsx** — lines 72-75, 326-372, 449-505. State:
+   `editingTitle`, `titleDraft`, `isSavingTitle`, `titleInputRef`.
+3. **MovieCastSection.tsx** — lines 261-264, 820-898. State: `showCast`.
+4. **MovieFileInfoSection.tsx** — lines 254, 256, 1035-1116. Delegates
+   to existing `FileInfoGrid` + `SubtitlePanel`.
+5. **`useMovieMatchCandidates.ts` hook** — lines 78-117, 119-144,
+   148-171. Encapsulates WS-driven candidate refresh + movie refetch
+   callback contract.
+6. **MoviePlaySettingsSection.tsx** — lines 254-255, 257, 266-318,
+   934-1033. State: `showPlaySettings`, `audioProfiles`, three
+   `selectedXProfile`. Effects: profile-load (271-277), sync-from-movie
+   (280-289). Risk: `updatePlaySetting` mutates parent — clear callback
+   contract `onPlaySettingsChange` required.
+7. **MovieActionsBar.tsx** (biggest, do last) — lines 205-252, 588-711.
+   State: `inWatchlist`, `showShareModal`, `transcodeProgress`. WS sub
+   at 174-203 moves in. Includes the ShareMovieModal (1122-1129).
+
+**Decisions to make up-front**: `onMovieUpdate(Movie)` vs
+`onMoviePatch(Partial<Movie>)` — pick one and use uniformly.
+
+#### C-4: GlobalPlayer.tsx decomposition (1206L → ~280L shell)
+
+Extract into `packages/client/src/components/player/hooks/` (and 2
+sibling components):
+
+1. **`useOverlayFade.ts`** — GlobalPlayer.tsx:80, 93-123. Returns
+   `{resetControlsTimer, cancelTimer}`. Used by SplitPanel below.
+2. **`useGlobalPlayerKeybinds.ts`** — lines 134-165.
+3. **`useGlobalPlayerEffects.ts`** (bundle of 4) — body scroll lock
+   (714-725), document title (168-178), outside-click panel close
+   (692-711), session heartbeat (364-374).
+4. **`useSubtitleAppearance.ts`** — lines 380-425. Pure DOM-style
+   injection.
+5. **`useVideoEffectsApplier.ts`** — lines 428-471 + SVG filter
+   constants at 754-767. Returns the slope/intercept/gamma/sharpen
+   values for the SVG filter block.
+6. **`useSubtitleTrackLoader.ts`** — lines 480-622. Refs:
+   `cueOriginalsRef`, `cueListRef`, `currentOffsetMsRef`. **Critical**:
+   Effect A + Effect B must stay in same hook (the cue WeakMap snapshot
+   pairing).
+7. **`useVideoElementInteractions.ts`** — lines 304-361. Refs:
+   `videoWrapperRef`, `videoClickTimerRef`.
+8. **`useFullscreenController.ts`** — lines 79, 625-684. Ref:
+   `preFullscreenModeRef`. Returns `handleToggleFullscreen`.
+9. **`PlayerHeader.tsx`** — lines 1079-1164. Pure markup.
+10. **`SplitPanel.tsx`** — lines 62-71 (move module-level
+    `splitWidthSaveTimer` into hook-local) + JSX 800-986. Owns drag-
+    handle mouse-capture loop.
+11. **`useStreamInitializer.ts`** (biggest, do last) — lines 75-76, 77,
+    182-301. The single biggest behavioural concentration; do not
+    split further. Touches `restoredAutoplay`, `forceStartPosition`,
+    `currentSession`, `streamService.waitForReady`, audio engine.
+
+**Caveat called out by analysis**: There's NO `useWatchProgressReporter`
+to extract — that logic lives in `useVideoEngine` / `player.state`, not
+in GlobalPlayer. Audit's original C-list mentioned this hook by name;
+it doesn't exist here.
+
+### Deferred items — status
+
+- ✅ **UI-6** (caller-side spinner consolidation) — done in Round 1
+  alongside the Icon cleanup.
+- ✅ **A-5** (Icon inline-style cleanup) — done in Round 1.
+- ✅ **A-8** (usePopover) — done in Round 2; migrated Select,
+  ColorPicker, EntitySearchInput. CastPhoto + MovieOptionsMenu +
+  GlobalPlayer settings menu deferred to the matching Phase C
+  decomposition (they're being restructured anyway).
+- 🔄 **S-3** (Hex-color sweep) — automated agent pass in progress.
+  Targets *.module.scss only, leaves brand identifiers and ambiguous
+  cases as literals.
+- **A-6** (Cross-tier byte formatter), **A-7** (Profile registry) —
+  still YAGNI / premature.
 
 ---
 

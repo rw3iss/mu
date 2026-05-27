@@ -38,7 +38,7 @@
 
 .fieldValue {
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-accent, #06b6d4);
+	color: var(--color-accent);
 	text-transform: none;
 	letter-spacing: 0;
 }
@@ -95,8 +95,8 @@
 
 	&.active {
 		background: var(--color-accent-soft, rgba(6, 182, 212, 0.2));
-		border-color: var(--color-accent, #06b6d4);
-		color: var(--color-accent, #06b6d4);
+		border-color: var(--color-accent);
+		color: var(--color-accent);
 	}
 }
 
@@ -133,12 +133,12 @@
 
 	&.active {
 		background: var(--color-accent-soft, rgba(6, 182, 212, 0.2));
-		border-color: var(--color-accent, #06b6d4);
-		color: var(--color-accent, #06b6d4);
+		border-color: var(--color-accent);
+		color: var(--color-accent);
 	}
 }
 
 input[type='range'] {
 	width: 100%;
-	accent-color: var(--color-accent, #06b6d4);
+	accent-color: var(--color-accent);
 }

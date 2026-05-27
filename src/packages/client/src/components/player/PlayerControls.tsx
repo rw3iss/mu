@@ -36,6 +36,7 @@ import {
 	volume,
 } from '@/state/player.state';
 import { shareMode } from '@/state/share.state';
+import { VolumeControl, VolumeIcon } from './controls/VolumeControl';
 import styles from './PlayerControls.module.scss';
 
 interface PlayerControlsProps {
@@ -222,7 +223,6 @@ export function PlayerControls({
 		'main' | 'quality' | 'subtitles' | 'subtitle-manage' | 'audio'
 	>('main');
 	const [seekHover, setSeekHover] = useState<number | null>(null);
-	const [showVolume, setShowVolume] = useState(false);
 	const [isDragging, setIsDragging] = useState(false);
 	const [skipBackOpen, setSkipBackOpen] = useState(false);
 	const [skipFwdOpen, setSkipFwdOpen] = useState(false);
@@ -233,8 +233,6 @@ export function PlayerControls({
 	const seekBarRef = useRef<HTMLDivElement>(null);
 	const settingsRef = useRef<HTMLDivElement>(null);
 	const mobileOverflowRef = useRef<HTMLDivElement>(null);
-	const volumeRef = useRef<HTMLDivElement>(null);
-	const volumeHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const dragLastSeek = useRef<number>(0);
 	/** Auto-hide timers for the mobile skip-extended overlays. Reset on
 	 * each interaction, default 3s, configurable via the
@@ -312,13 +310,6 @@ export function PlayerControls({
 		document.addEventListener('mousedown', handleClick);
 		return () => document.removeEventListener('mousedown', handleClick);
 	}, [showMobileOverflow]);
-
-	// Clean up volume hover timer on unmount
-	useEffect(() => {
-		return () => {
-			if (volumeHoverTimer.current) clearTimeout(volumeHoverTimer.current);
-		};
-	}, []);
 
 	// ── Seek bar: click ──
 	const seekFromEvent = useCallback((e: MouseEvent) => {
@@ -410,22 +401,6 @@ export function PlayerControls({
 		[onSeek],
 	);
 
-	// ── Volume ──
-	const handleVolumeChange = useCallback((e: Event) => {
-		const target = e.target as HTMLInputElement;
-		setVolume(parseFloat(target.value));
-	}, []);
-
-	const handleVolumeEnter = useCallback(() => {
-		if (volumeHoverTimer.current) clearTimeout(volumeHoverTimer.current);
-		volumeHoverTimer.current = setTimeout(() => setShowVolume(true), 100);
-	}, []);
-
-	const handleVolumeLeave = useCallback(() => {
-		if (volumeHoverTimer.current) clearTimeout(volumeHoverTimer.current);
-		volumeHoverTimer.current = setTimeout(() => setShowVolume(false), 200);
-	}, []);
-
 	// ── Skip ──
 	const skipBack = useCallback(
 		(seconds: number) => {
@@ -476,90 +451,6 @@ export function PlayerControls({
 		setShowSettingsMenu((v) => !v);
 		setSettingsPanel('main');
 	}, []);
-
-	// ── Volume SVG icons ──
-	const VolumeIcon = () => {
-		const v = volume.value;
-		const muted = isMuted.value || v === 0;
-
-		const speakerBody = (
-			<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="white" stroke="none" />
-		);
-
-		if (muted) {
-			return (
-				<svg
-					width="20"
-					height="20"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="white"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					{speakerBody}
-					<line x1="23" y1="9" x2="17" y2="15" />
-					<line x1="17" y1="9" x2="23" y2="15" />
-				</svg>
-			);
-		}
-
-		if (v <= 0.32) {
-			return (
-				<svg
-					width="20"
-					height="20"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="white"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					{speakerBody}
-					<path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-				</svg>
-			);
-		}
-
-		if (v <= 0.66) {
-			return (
-				<svg
-					width="20"
-					height="20"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="white"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					{speakerBody}
-					<path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-					<path d="M17.7 6.3a7.5 7.5 0 0 1 0 11.4" />
-				</svg>
-			);
-		}
-
-		return (
-			<svg
-				width="20"
-				height="20"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="white"
-				stroke-width="2"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				{speakerBody}
-				<path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-				<path d="M17.7 6.3a7.5 7.5 0 0 1 0 11.4" />
-				<path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-			</svg>
-		);
-	};
 
 	// Sprite preview tooltip rendered via portal so it escapes the
 	// player bar's backdrop-filter stacking context — see the
@@ -943,36 +834,7 @@ export function PlayerControls({
 							</div>
 
 							{/* Volume */}
-							<div
-								class={styles.volumeWrap}
-								ref={volumeRef}
-								onMouseEnter={handleVolumeEnter}
-								onMouseLeave={handleVolumeLeave}
-							>
-								<button
-									class={styles.controlBtn}
-									onClick={toggleMute}
-									aria-label={isMuted.value ? 'Unmute' : 'Mute'}
-								>
-									<VolumeIcon />
-								</button>
-
-								{showVolume && (
-									<div class={styles.volumePopup}>
-										<input
-											type="range"
-											class={styles.volumeSlider}
-											min="0"
-											max="1"
-											step="0.05"
-											value={isMuted.value ? 0 : volume.value}
-											onInput={handleVolumeChange}
-											aria-label="Volume"
-											orient="vertical"
-										/>
-									</div>
-								)}
-							</div>
+							<VolumeControl />
 
 							{/* Settings */}
 							<div class={styles.menuContainer} ref={settingsRef}>
