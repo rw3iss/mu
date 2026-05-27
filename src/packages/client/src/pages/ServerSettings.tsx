@@ -6,6 +6,7 @@ import { Select } from '@/components/common/Select';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { formatBytes } from '@/utils/format-bytes';
 import styles from './ServerSettings.module.scss';
 
 // ============================================
@@ -38,14 +39,6 @@ function Section({
 // ============================================
 // Helpers
 // ============================================
-
-function formatBytes(bytes: number): string {
-	if (bytes === 0) return '0 B';
-	const k = 1024;
-	const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-	const i = Math.floor(Math.log(bytes) / Math.log(k));
-	return `${(bytes / k ** i).toFixed(1)} ${sizes[i]}`;
-}
 
 function formatUptime(seconds: number): string {
 	const d = Math.floor(seconds / 86400);

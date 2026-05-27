@@ -54,3 +54,25 @@
   display: inline-flex;
   align-items: center;
 }
+
+// Loading state — circular spinner inside the icon slot. Matches the
+// existing autoSpinner / miniSpinner CSS used elsewhere so the spin
+// rhythm is consistent across surfaces.
+.loading {
+  cursor: progress;
+}
+
+.spinner {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: tb-spin 700ms linear infinite;
+}
+
+@keyframes tb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

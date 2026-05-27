@@ -45,6 +45,12 @@
   --color-warning: #fbbf24;
   --color-error: #f87171;
   --color-info: #4b93f5;
+  // Subtle tints — same hues at low alpha for badge halos / banner
+  // backgrounds. Mirror the --color-accent-subtle pattern.
+  --color-success-subtle: rgba(46, 204, 113, 0.2);
+  --color-warning-subtle: rgba(243, 156, 18, 0.2);
+  --color-error-subtle: rgba(248, 113, 113, 0.18);
+  --color-info-subtle: rgba(52, 152, 219, 0.2);
 
   // Borders
   --color-border: rgba(120, 140, 180, 0.07);
@@ -235,6 +241,13 @@
 
   --color-accent-secondary: #2563eb;
   --color-accent-secondary-hover: #3b82f6;
+
+  // Subtle semantic tints — slightly stronger alpha on light theme so
+  // tinted halos remain visible against the white background.
+  --color-success-subtle: rgba(46, 204, 113, 0.15);
+  --color-warning-subtle: rgba(243, 156, 18, 0.15);
+  --color-error-subtle: rgba(248, 113, 113, 0.14);
+  --color-info-subtle: rgba(52, 152, 219, 0.15);
 
   --color-border: rgba(0, 0, 0, 0.07);
   --color-border-strong: rgba(0, 0, 0, 0.14);

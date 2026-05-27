@@ -3,6 +3,7 @@ import { streamService } from '@/services/stream.service';
 import { currentUser } from '@/state/auth.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { formatBytes } from '@/utils/format-bytes';
 import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
 import styles from './FileInfoGrid.module.scss';
 
@@ -119,11 +120,7 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 				{fi.fileSize != null && fi.fileSize > 0 && (
 					<>
 						<span class={styles.label}>File Size</span>
-						<span class={styles.value}>
-							{fi.fileSize > 1_073_741_824
-								? `${(fi.fileSize / 1_073_741_824).toFixed(2)} GB`
-								: `${(fi.fileSize / 1_048_576).toFixed(0)} MB`}
-						</span>
+						<span class={styles.value}>{formatBytes(fi.fileSize, 2)}</span>
 					</>
 				)}
 				{fi.videoColorSpace && (
@@ -173,9 +170,7 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 									<span class={styles.trackCodec}>{v.quality.toUpperCase()}</span>
 									{v.sizeBytes != null && v.sizeBytes > 0 && (
 										<span class={styles.trackMeta}>
-											{v.sizeBytes > 1_073_741_824
-												? `${(v.sizeBytes / 1_073_741_824).toFixed(2)} GB`
-												: `${(v.sizeBytes / 1_048_576).toFixed(0)} MB`}
+											{formatBytes(v.sizeBytes, 2)}
 										</span>
 									)}
 									<span class={styles.trackMeta}>

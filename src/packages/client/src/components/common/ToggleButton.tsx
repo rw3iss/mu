@@ -1,4 +1,4 @@
-import type { ComponentChildren } from 'preact';
+import type { ComponentChildren, JSX } from 'preact';
 import styles from './ToggleButton.module.scss';
 
 interface ToggleButtonProps {
@@ -21,7 +21,14 @@ interface ToggleButtonProps {
 	/** Visual size variant. Defaults to `sm` to match Reset-style buttons. */
 	size?: 'sm' | 'md';
 	/** Custom class for one-off layout / spacing tweaks. */
-	className?: string;
+	class?: string;
+	/** Pass-through inline style — kept for the same one-off cases as `class`. */
+	style?: JSX.CSSProperties | string;
+	/**
+	 * When true, the button is disabled and a small spinner glyph replaces
+	 * the icon slot. Use for async toggles (e.g. "Sample" while running).
+	 */
+	loading?: boolean;
 	disabled?: boolean;
 	title?: string;
 }
@@ -41,7 +48,9 @@ export function ToggleButton({
 	children,
 	icon,
 	size = 'sm',
-	className,
+	class: className,
+	style,
+	loading = false,
 	disabled,
 	title,
 	'aria-label': ariaLabel,
@@ -51,6 +60,7 @@ export function ToggleButton({
 		styles.button,
 		styles[size],
 		pressed === true ? styles.pressed : '',
+		loading ? styles.loading : '',
 		className ?? '',
 	]
 		.filter(Boolean)
@@ -59,13 +69,19 @@ export function ToggleButton({
 		<button
 			type="button"
 			class={klass}
+			style={style}
 			onClick={onClick}
 			aria-pressed={isToggle ? pressed : undefined}
+			aria-busy={loading || undefined}
 			aria-label={ariaLabel}
-			disabled={disabled}
+			disabled={disabled || loading}
 			title={title}
 		>
-			{icon && <span class={styles.icon}>{icon}</span>}
+			{loading ? (
+				<span class={`${styles.icon} ${styles.spinner}`} aria-hidden="true" />
+			) : (
+				icon && <span class={styles.icon}>{icon}</span>
+			)}
 			<span>{children}</span>
 		</button>
 	);

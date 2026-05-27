@@ -11,8 +11,18 @@ interface ModalProps {
 	size?: 'sm' | 'md' | 'lg';
 }
 
+/** Selector matching every focusable descendant of the modal — used by
+ *  the focus trap to bracket Tab / Shift-Tab to the modal's contents. */
+const FOCUSABLE_SELECTOR =
+	'a[href], area[href], input:not([disabled]), select:not([disabled]), ' +
+	'textarea:not([disabled]), button:not([disabled]), iframe, object, embed, ' +
+	'[tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+
 export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
 	const overlayRef = useRef<HTMLDivElement>(null);
+	const modalRef = useRef<HTMLDivElement>(null);
+	// Element that had focus *before* the modal opened — restored on close.
+	const openerRef = useRef<HTMLElement | null>(null);
 
 	const handleBackdropClick = useCallback(
 		(e: MouseEvent) => {
@@ -26,18 +36,62 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 	useEffect(() => {
 		if (!isOpen) return;
 
-		function handleEscape(e: KeyboardEvent) {
+		// Capture the opener so we can return focus when the modal closes.
+		openerRef.current = (document.activeElement as HTMLElement) ?? null;
+
+		function handleKey(e: KeyboardEvent) {
 			if (e.key === 'Escape') {
 				onClose();
+				return;
+			}
+			if (e.key !== 'Tab') return;
+			// Focus trap — keep keyboard navigation inside the modal so Tab
+			// can't reach the page underneath.
+			const modal = modalRef.current;
+			if (!modal) return;
+			const focusables = modal.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+			if (focusables.length === 0) return;
+			const first = focusables[0]!;
+			const last = focusables[focusables.length - 1]!;
+			const active = document.activeElement as HTMLElement | null;
+			if (e.shiftKey) {
+				if (active === first || !modal.contains(active)) {
+					e.preventDefault();
+					last.focus();
+				}
+			} else {
+				if (active === last) {
+					e.preventDefault();
+					first.focus();
+				}
 			}
 		}
 
-		document.addEventListener('keydown', handleEscape);
+		document.addEventListener('keydown', handleKey);
 		document.body.style.overflow = 'hidden';
 
+		// Initial focus — pick the first focusable inside the modal, or
+		// fall back to the modal container itself so screen readers
+		// announce the dialog title.
+		// Defer to next microtask so the children are mounted.
+		queueMicrotask(() => {
+			const modal = modalRef.current;
+			if (!modal) return;
+			const focusables = modal.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+			(focusables[0] ?? modal).focus();
+		});
+
 		return () => {
-			document.removeEventListener('keydown', handleEscape);
+			document.removeEventListener('keydown', handleKey);
 			document.body.style.overflow = '';
+			// Return focus to whatever opened us, unless it's gone from DOM.
+			const opener = openerRef.current;
+			openerRef.current = null;
+			if (opener && document.contains(opener)) {
+				try {
+					opener.focus();
+				} catch {}
+			}
 		};
 	}, [isOpen, onClose]);
 
@@ -52,7 +106,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 			aria-modal="true"
 			aria-label={title}
 		>
-			<div class={`${styles.modal} ${styles[size]}`}>
+			<div ref={modalRef} class={`${styles.modal} ${styles[size]}`} tabIndex={-1}>
 				{title && (
 					<div class={styles.header}>
 						<h2 class={styles.title}>{title}</h2>

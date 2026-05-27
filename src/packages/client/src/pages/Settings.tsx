@@ -137,14 +137,6 @@ interface ServerStats {
 	};
 }
 
-function _formatBytes(bytes: number): string {
-	const gb = bytes / (1024 * 1024 * 1024);
-	if (gb >= 1000) {
-		return `${(gb / 1024).toFixed(1)} TB`;
-	}
-	return `${gb.toFixed(1)} GB`;
-}
-
 function _formatUptime(seconds: number): string {
 	const d = Math.floor(seconds / 86400);
 	const h = Math.floor((seconds % 86400) / 3600);

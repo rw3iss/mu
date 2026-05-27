@@ -8,6 +8,7 @@ import { api } from '@/services/api';
 import { groupsService } from '@/services/groups.service';
 import type { ActiveSession, SessionHistoryEntry } from '@/services/stream.service';
 import { streamService } from '@/services/stream.service';
+import { formatBytes } from '@/utils/format-bytes';
 import { wsService } from '@/services/websocket.service';
 import { fetchMovies } from '@/state/library.state';
 import {
@@ -417,13 +418,6 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 		const hours = Math.floor((seconds % 86400) / 3600);
 		const mins = Math.floor((seconds % 3600) / 60);
 		return `${days}d ${hours}h ${mins}m`;
-	}
-
-	function formatBytes(bytes: number): string {
-		if (bytes === 0) return '0 B';
-		const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-		const i = Math.floor(Math.log(bytes) / Math.log(1024));
-		return `${(bytes / 1024 ** i).toFixed(1)} ${sizes[i]}`;
 	}
 
 	return (
