@@ -1741,19 +1741,16 @@ export function Settings(props: SettingsProps) {
 									<div class={styles.settingInfo}>
 										<span class={styles.settingLabel}>CRF Value</span>
 										<span class={styles.settingDescription}>
-											Constant Rate Factor — the encoder targets a perceptual
-											quality level, not a fixed bitrate. Lower = better quality
-											+ larger files; higher = smaller files at the cost of
-											detail. Each +1 step typically shrinks the output by
-											~15%. 18 is visually lossless on most content; 23 is the
-											libx264 default; 28 starts to show visible artifacts.
-											Combined with the per-profile maxrate cap, scene-level
-											bursts stay bounded at every CRF.
+											Lower = better quality, bigger files. Each +1 ≈ 15%
+											smaller. 18 ≈ visually lossless, 23 default, 28+ shows
+											artifacts.
 										</span>
 									</div>
 									<Select
 										value={crfValue}
 										onChange={setCrfValue}
+										menuAlign="end"
+										class={styles.crfSelect}
 										options={[
 											{ value: '17', label: '17' },
 											{ value: '18', label: '18 — Near Lossless' },

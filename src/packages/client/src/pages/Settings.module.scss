@@ -131,6 +131,13 @@
   }
 }
 
+// Custom width override for the CRF Value select — the longest option
+// label ("23 — Balanced (default)") wouldn't fit in the row's default
+// trigger width and would render as "2..".
+.crfSelect {
+  min-width: 220px;
+}
+
 .settingGroup {
   display: flex;
   flex-direction: column;
