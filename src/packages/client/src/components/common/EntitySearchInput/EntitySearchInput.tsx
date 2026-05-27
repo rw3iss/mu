@@ -1,5 +1,6 @@
 import { route } from 'preact-router';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { usePopover } from '@/hooks/usePopover';
 import type {
 	MovieSearchHit,
 	PersonSearchHit,
@@ -92,13 +93,8 @@ export function EntitySearchInput({
 
 	const { results, isLoading, error } = useSearchStream(type, debounced);
 
-	useEffect(() => {
-		const onClick = (e: MouseEvent) => {
-			if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-		};
-		document.addEventListener('mousedown', onClick);
-		return () => document.removeEventListener('mousedown', onClick);
-	}, []);
+	const handleClose = useCallback(() => setOpen(false), []);
+	usePopover({ ref: wrapRef, open, onClose: handleClose });
 
 	const disabledSet = new Set(disabledKeys ?? []);
 	const visible = (results as SearchHit[]).filter(

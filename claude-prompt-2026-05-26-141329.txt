@@ -1,0 +1,1 @@
+In the default user settings for the app, for new users and in general, change the app Settings > General > Overlay Hide Timeout default value from 2000ms to 1000ms

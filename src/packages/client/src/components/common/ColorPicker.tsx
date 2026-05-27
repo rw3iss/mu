@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { usePopover } from '@/hooks/usePopover';
 import styles from './ColorPicker.module.scss';
 
 // ── Color conversion helpers ──
@@ -106,17 +107,9 @@ export function ColorPicker({ value, onChange, size }: ColorPickerProps) {
 		setHexError(false);
 	}, [value]);
 
-	// Close on outside click
-	useEffect(() => {
-		if (!open) return;
-		const handler = (e: MouseEvent) => {
-			if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
-				setOpen(false);
-			}
-		};
-		document.addEventListener('mousedown', handler);
-		return () => document.removeEventListener('mousedown', handler);
-	}, [open]);
+	// Close on outside click / Escape (via shared usePopover hook).
+	const handleClose = useCallback(() => setOpen(false), []);
+	usePopover({ ref: popupRef, open, onClose: handleClose });
 
 	// ── Draw saturation/brightness canvas ──
 	const drawSatCanvas = useCallback((hue: number) => {

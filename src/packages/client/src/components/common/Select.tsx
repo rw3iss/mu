@@ -1,5 +1,6 @@
 import type { JSX } from 'preact';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
+import { usePopover } from '@/hooks/usePopover';
 import { Icon } from './Icon';
 import styles from './Select.module.scss';
 
@@ -88,29 +89,14 @@ export function Select<T extends string | number = string>({
 		if (idx >= 0) setHighlightIndex(idx);
 	}, [value, options]);
 
-	// Close on outside click / Esc.
-	useEffect(() => {
-		if (!open) return;
-		const onDocPointer = (e: MouseEvent | TouchEvent) => {
-			if (!wrapRef.current) return;
-			if (!wrapRef.current.contains(e.target as Node)) setOpen(false);
-		};
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === 'Escape') {
-				e.preventDefault();
-				setOpen(false);
-				triggerRef.current?.focus();
-			}
-		};
-		document.addEventListener('mousedown', onDocPointer);
-		document.addEventListener('touchstart', onDocPointer, { passive: true });
-		document.addEventListener('keydown', onKey);
-		return () => {
-			document.removeEventListener('mousedown', onDocPointer);
-			document.removeEventListener('touchstart', onDocPointer);
-			document.removeEventListener('keydown', onKey);
-		};
-	}, [open]);
+	// Close on outside click / Esc. Wrapped in useCallback so the
+	// usePopover effect deps are stable — keeps the listeners from
+	// re-binding on every render.
+	const handleClose = useCallback(() => {
+		setOpen(false);
+		triggerRef.current?.focus();
+	}, []);
+	usePopover({ ref: wrapRef, open, onClose: handleClose });
 
 	// Scroll highlighted option into view when navigating.
 	useEffect(() => {
