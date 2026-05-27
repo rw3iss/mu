@@ -164,9 +164,20 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 					</h3>
 					<div class={styles.trackList}>
 						{(movie as any).cachedVersions.map(
-							(v: { quality: string; completedAt: string }) => (
+							(v: {
+								quality: string;
+								completedAt: string;
+								sizeBytes?: number | null;
+							}) => (
 								<div key={v.quality} class={styles.trackItem}>
 									<span class={styles.trackCodec}>{v.quality.toUpperCase()}</span>
+									{v.sizeBytes != null && v.sizeBytes > 0 && (
+										<span class={styles.trackMeta}>
+											{v.sizeBytes > 1_073_741_824
+												? `${(v.sizeBytes / 1_073_741_824).toFixed(2)} GB`
+												: `${(v.sizeBytes / 1_048_576).toFixed(0)} MB`}
+										</span>
+									)}
 									<span class={styles.trackMeta}>
 										{new Date(v.completedAt).toLocaleDateString()}
 									</span>

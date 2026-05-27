@@ -178,20 +178,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 
 					if (!existsSync(path.join(qPath, '.complete'))) continue;
 
-					// Check if already in DB
-					const existing = this.database.db
-						.select()
-						.from(transcodeCache)
-						.where(
-							and(
-								eq(transcodeCache.movieFileId, fileId),
-								eq(transcodeCache.quality, quality),
-							),
-						)
-						.get();
-					if (existing) continue;
-
-					// Count segments and size
+					// Count segments and size from disk first — both the
+					// insert path (new row) and the backfill path (existing
+					// row missing these fields) need the same numbers.
 					const segFiles = readdirSync(qPath).filter(
 						(f: string) => f.startsWith('segment_') && f.endsWith('.ts'),
 					);
@@ -202,7 +191,33 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						} catch {}
 					}
 
-					// Add to DB
+					// Existing row? Backfill sizeBytes / segmentCount if
+					// they're null — these columns were added after some
+					// rows already existed, so without this update the UI
+					// would never get a size for a cache created before
+					// the schema change.
+					const existing = this.database.db
+						.select()
+						.from(transcodeCache)
+						.where(
+							and(
+								eq(transcodeCache.movieFileId, fileId),
+								eq(transcodeCache.quality, quality),
+							),
+						)
+						.get();
+					if (existing) {
+						if (existing.sizeBytes == null || existing.segmentCount == null) {
+							this.database.db
+								.update(transcodeCache)
+								.set({ sizeBytes, segmentCount: segFiles.length })
+								.where(eq(transcodeCache.id, existing.id))
+								.run();
+						}
+						continue;
+					}
+
+					// New row — full insert.
 					const enc = this.getEncodingSettings();
 					this.database.db
 						.insert(transcodeCache)

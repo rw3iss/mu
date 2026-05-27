@@ -522,19 +522,34 @@ export class MoviesService {
 
 		const playSettings = parseJsonObject(movie.playSettings);
 
-		// Get cached transcode versions for this movie's files
-		const cachedVersions: { quality: string; completedAt: string }[] = [];
+		// Get cached transcode versions for this movie's files. sizeBytes
+		// + segmentCount are populated by the transcoder when each cache
+		// completes; both are nullable so older rows (pre-tracking) read
+		// as null and the client falls back to hiding the size column.
+		const cachedVersions: Array<{
+			quality: string;
+			completedAt: string;
+			sizeBytes: number | null;
+			segmentCount: number | null;
+		}> = [];
 		if (firstFile) {
 			const caches = this.database.db
 				.select({
 					quality: transcodeCache.quality,
 					completedAt: transcodeCache.completedAt,
+					sizeBytes: transcodeCache.sizeBytes,
+					segmentCount: transcodeCache.segmentCount,
 				})
 				.from(transcodeCache)
 				.where(eq(transcodeCache.movieFileId, firstFile.id))
 				.all();
 			for (const c of caches) {
-				cachedVersions.push({ quality: c.quality, completedAt: c.completedAt });
+				cachedVersions.push({
+					quality: c.quality,
+					completedAt: c.completedAt,
+					sizeBytes: c.sizeBytes ?? null,
+					segmentCount: c.segmentCount ?? null,
+				});
 			}
 		}
 
