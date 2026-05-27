@@ -1,0 +1,14 @@
+// Base layout for the SVG icon shell. The global reset sets
+// `svg { display: block }` which is right for hero media but wrong
+// for icons that sit next to text. This class restores inline-flow
+// behavior so the icon centers vertically inside buttons / labels
+// without callers needing inline `style`.
+//
+// Specificity: `svg.<class>` wins over the global `svg` selector,
+// so callers can override individual properties through their own
+// SCSS module class without `!important`.
+.icon {
+	display: inline-block;
+	vertical-align: -0.15em;
+	flex-shrink: 0;
+}

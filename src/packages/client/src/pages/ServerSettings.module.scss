@@ -113,23 +113,6 @@
   letter-spacing: 0.2px;
 }
 
-// Tiny spinner reused by the GPU encoder Restart button. Was
-// previously borrowing .jobRetrySpinner from the Jobs section;
-// kept here so the recycle button stays self-contained now that
-// JobsSection lives in components/admin/JobsPanel.
-.recycleSpinner {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  border-top-color: var(--color-accent);
-  animation: serverRecycleSpin 700ms linear infinite;
-}
-
-@keyframes serverRecycleSpin {
-  to { transform: rotate(360deg); }
-}
-
 // ── Stats ──
 
 .statsLoading {

@@ -728,20 +728,6 @@
   }
 }
 
-.autoSpinner {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  border: 2px solid var(--on-dark-text-muted);
-  border-top-color: #fff;
-  animation: autoSpin 700ms linear infinite;
-}
-
-@keyframes autoSpin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 @keyframes autoEqSlideIn {
   from {

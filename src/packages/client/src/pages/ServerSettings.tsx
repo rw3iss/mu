@@ -199,7 +199,7 @@ function ServerInfoSection() {
 							disabled={recycling}
 						>
 							{recycling ? (
-								<span class={styles.recycleSpinner} />
+								<Spinner size="xs" />
 							) : (
 								<svg
 									width="14"

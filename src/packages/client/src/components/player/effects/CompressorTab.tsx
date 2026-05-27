@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { audioEngine, type CompressorBand, type CompressorSettings } from '@/audio/audio-engine';
+import { Spinner } from '@/components/common/Spinner';
 import { ToggleButton } from '@/components/common/ToggleButton';
 import { useAnimationFrame } from '@/hooks/useAnimationFrame';
 import {
@@ -374,7 +375,7 @@ export function CompressorTab() {
 								aria-label="Run auto-Compressor sampler"
 							>
 								{autoRunning ? (
-									<span class={styles.autoSpinner} aria-hidden="true" />
+									<Spinner size="xs" />
 								) : (
 									<>
 										<svg

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { audioEngine } from '@/audio/audio-engine';
+import { Spinner } from '@/components/common/Spinner';
 import { useSubtitleSettings } from '@/components/movie/SubtitleAppearance';
 import { getUiSetting } from '@/hooks/useUiSetting';
 import { streamService } from '@/services/stream.service';
@@ -1013,7 +1014,7 @@ export function GlobalPlayer() {
 					<>
 						{preparingMessage && (
 							<div class={styles.miniSpinnerOverlay}>
-								<div class={styles.miniSpinner} />
+								<Spinner size="md" />
 							</div>
 						)}
 						<div class={styles.miniVideoOverlay}>

@@ -1,4 +1,5 @@
 import { JSX } from 'preact';
+import styles from './Icon.module.scss';
 
 /**
  * Single-color line icons used throughout the app. Each icon is a
@@ -314,20 +315,14 @@ export function Icon({
 	strokeWidth = 1.75,
 }: IconProps) {
 	const dim = size ?? '1em';
-	// The global reset sets `svg { display: block }` (good for media
-	// elements, bad for inline icons), so override here so the Icon sits
-	// happily next to text in buttons / labels. Callers can still pass a
-	// `style` to override.
-	const mergedStyle: JSX.CSSProperties = {
-		display: 'inline-block',
-		verticalAlign: '-0.15em',
-		flexShrink: 0,
-		...style,
-	};
+	// Layout (display/verticalAlign/flexShrink) now lives in Icon.module.scss
+	// `.icon` so callers can override it through their own SCSS module
+	// without `!important`. See Icon.module.scss for the rationale.
+	const klass = className ? `${styles.icon} ${className}` : styles.icon;
 	return (
 		<svg
-			class={className}
-			style={mergedStyle}
+			class={klass}
+			style={style}
 			width={dim}
 			height={dim}
 			viewBox="0 0 24 24"

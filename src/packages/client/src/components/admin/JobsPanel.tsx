@@ -3,6 +3,7 @@ import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Select } from '@/components/common/Select';
+import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import { moviesService } from '@/services/movies.service';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
@@ -642,7 +643,7 @@ export function JobsPanel() {
 											disabled={retryingIds.has(job.id)}
 										>
 											{retryingIds.has(job.id) ? (
-												<span class={styles.retrySpinner} />
+												<Spinner size="xs" />
 											) : (
 												<svg
 													width="14"

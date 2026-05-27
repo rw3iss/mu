@@ -1,3 +1,4 @@
+import { Spinner } from '@/components/common/Spinner';
 import { ToggleButton } from '@/components/common/ToggleButton';
 import {
 	autoEqFactor,
@@ -198,7 +199,7 @@ export function EqTab() {
 								aria-label="Run auto-EQ sampler"
 							>
 								{autoRunning ? (
-									<span class={styles.autoSpinner} aria-hidden="true" />
+									<Spinner size="xs" />
 								) : (
 									<>
 										<svg

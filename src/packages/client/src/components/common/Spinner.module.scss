@@ -3,6 +3,16 @@
   border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+// xs — for tight inline use (inside a small button, next to a one-line
+// status). Sized to match the existing ad-hoc spinners we replaced
+// (was 11-12px across 4 sites).
+.xs {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
 }
 
 .sm {
