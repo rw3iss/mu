@@ -1,5 +1,5 @@
 import { debug } from 'dev-loggers';
-import { clearAudioSuspect, markAudioSuspect } from '@/state/audio-reset.state';
+import { audioEffectsHlsBlocked, clearAudioSuspect, markAudioSuspect } from '@/state/audio-reset.state';
 
 /**
  * Audio processing engine using Web Audio API.
@@ -254,6 +254,26 @@ export class AudioEngine {
 			}
 			return;
 		}
+
+		// HARD GUARD: refuse to attach when the element is fed by an HLS
+		// MediaSource (blob: URL). `createMediaElementSource` on such an
+		// element produces SILENT output in Chrome (documented below) —
+		// once bound, the element's audio is captured by a Web Audio graph
+		// that emits nothing, and pausing/replaying makes the silence
+		// obvious. Leaving the engine UNATTACHED keeps audio on the native
+		// path, which works. The UI surfaces `audioEffectsHlsBlocked` so
+		// the user learns EQ/Compressor only work on direct-play files.
+		if (target.src?.startsWith('blob:')) {
+			debug('audio:attach', { event: 'attach', result: 'refused-hls-mediasource' });
+			dwarn(
+				'[audioEngine] attach() refused — element is HLS MediaSource-backed ' +
+					'(blob: src). createMediaElementSource would silence it in Chrome. ' +
+					'Audio stays on the native path; EQ/Compressor unavailable for this stream.',
+			);
+			audioEffectsHlsBlocked.value = true;
+			return;
+		}
+		audioEffectsHlsBlocked.value = false;
 
 		try {
 			// Construct with explicit sampleRate. Chrome's no-arg AudioContext

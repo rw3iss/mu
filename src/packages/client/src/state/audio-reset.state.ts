@@ -28,6 +28,17 @@ export const audioOutputSuspect = signal<AudioSuspectState>({
 });
 
 /**
+ * True when the user has EQ/Compressor enabled but the active stream is
+ * HLS-backed (a `blob:` MediaSource src). Chrome silences
+ * `createMediaElementSource` output on MediaSource-fed elements — there
+ * is no JS workaround — so the engine refuses to attach and audio stays
+ * on the native (working) path. This flag lets the UI explain why the
+ * effects aren't applying. Cleared when a non-HLS (direct-play) stream
+ * attaches successfully.
+ */
+export const audioEffectsHlsBlocked = signal(false);
+
+/**
  * Monotonic counter. Bumped by `requestAudioReset()`. `useVideoEngine`
  * subscribes via a useEffect on this signal — every increment triggers
  * one swap-and-restore cycle on the singleton video element.

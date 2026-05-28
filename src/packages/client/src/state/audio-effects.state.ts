@@ -1,4 +1,4 @@
-import { batch, signal } from '@preact/signals';
+import { batch, effect, signal } from '@preact/signals';
 import {
 	audioEngine,
 	type CompressorBand,
@@ -15,7 +15,7 @@ import {
 	activeEqProfileId,
 	activeVideoProfileId,
 } from './audio-profiles.state';
-import { audioOutputSuspect, requestAudioReset } from './audio-reset.state';
+import { audioEffectsHlsBlocked, audioOutputSuspect, requestAudioReset } from './audio-reset.state';
 import { notifyWarning } from './notifications.state';
 import { whenUserGestured } from './user-gesture.state';
 
@@ -41,6 +41,28 @@ function warnIfAudioSuspect(): void {
 		],
 	);
 }
+
+/**
+ * When the engine refuses to attach because the active stream is an HLS
+ * MediaSource (Chrome silences createMediaElementSource on blob: srcs),
+ * tell the user once — this covers the case where EQ was already enabled
+ * from a previous session and the deferred attach fires on first gesture
+ * (the toggle handler never runs, so we react to the engine's signal).
+ * Throttled to one toast per false→true transition.
+ */
+let hlsBlockedNotified = false;
+effect(() => {
+	if (audioEffectsHlsBlocked.value) {
+		if (hlsBlockedNotified) return;
+		hlsBlockedNotified = true;
+		notifyWarning(
+			'EQ / Compressor aren’t available for transcoded (HLS) streams — a Chrome limitation silences Web Audio on them. Audio is playing normally on the native path. These effects work on direct-play files.',
+			9000,
+		);
+	} else {
+		hlsBlockedNotified = false;
+	}
+});
 import {
 	DEFAULT_VIDEO_EFFECTS,
 	type VideoEffectSettings,
