@@ -104,10 +104,10 @@ export const spectrumEnabled = signal(false);
 // to "Spectrum"; expanding it shows a seconds input + apply button.
 export const autoEqOpen = signal(false);
 export const autoEqSampleSeconds = signal(2);
-// Factor multiplier applied to each band's correction. 1.0 = full
-// flatten, 0.3 = mild correction (default — full strength tends to
-// over-correct on dense source material), 0.1 = barely audible nudge.
-export const autoEqFactor = signal(0.3);
+// Factor multiplier applied to each band's correction. 0.8 = strong
+// flatten, 0.25 = mild correction (default — high strength tends to
+// over-correct on dense source material), 0.05 = barely audible nudge.
+export const autoEqFactor = signal(0.25);
 export const autoEqRunning = signal(false);
 
 // ============================================
@@ -386,9 +386,9 @@ export function setAutoEqSampleSeconds(n: number): void {
 
 export function setAutoEqFactor(n: number): void {
 	if (!Number.isFinite(n)) return;
-	// Clamp to 0.1..1.0 in 0.1 increments (the slider's resolution).
-	const clamped = Math.max(0.1, Math.min(1, n));
-	autoEqFactor.value = Math.round(clamped * 10) / 10;
+	// Clamp to 0.05..0.8 in 0.05 increments (the slider's resolution).
+	const clamped = Math.max(0.05, Math.min(0.8, n));
+	autoEqFactor.value = Math.round(clamped * 20) / 20;
 }
 
 /**

@@ -158,10 +158,10 @@ export function EqTab() {
 						<div class={`${styles.autoField} ${styles.autoFieldFactor}`}>
 							<label class={styles.autoLabel} for="autoEqFactor">
 								Factor
-								<span class={styles.autoValue}>{autoFactor.toFixed(1)}</span>
+								<span class={styles.autoValue}>{autoFactor.toFixed(2)}</span>
 								<span
 									class={styles.autoHelp}
-									title="Strength of the correction. 1.0 applies the full flattening offset to each band; 0.5 applies half (subtler); 0.1 is barely audible. Default 0.5 — full strength tends to over-correct."
+									title="Strength of the correction applied to each band. 0.80 = strong flattening; 0.25 = mild (default); 0.05 = barely audible nudge. Higher values tend to over-correct dense source material."
 								>
 									?
 								</span>
@@ -169,9 +169,9 @@ export function EqTab() {
 							<input
 								id="autoEqFactor"
 								type="range"
-								min={0.1}
-								max={1}
-								step={0.1}
+								min={0.05}
+								max={0.8}
+								step={0.05}
 								value={autoFactor}
 								disabled={autoRunning}
 								onInput={(e) =>
@@ -194,7 +194,7 @@ export function EqTab() {
 								title={
 									autoRunning
 										? 'Sampling…'
-										: `Sample for ${autoSeconds}s and apply correction at ${autoFactor.toFixed(1)}× strength`
+										: `Sample for ${autoSeconds}s and apply correction at ${autoFactor.toFixed(2)}× strength`
 								}
 								aria-label="Run auto-EQ sampler"
 							>
