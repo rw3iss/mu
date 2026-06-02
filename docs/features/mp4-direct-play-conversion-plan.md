@@ -11,7 +11,7 @@ Keep HLS strictly for the **live cold-path** (a movie played before its MP4 exis
 ## Decisions (confirmed)
 - **Smart convert**: H.264 → lossless remux always. Incompatible codecs
   (HEVC/AV1/VC-1/MPEG-4/Xvid) → re-encode to H.264, **but skip** when the
-  predicted output size exceeds `originalSize * growthThreshold` (default 1.05);
+  predicted output size exceeds `originalSize * growthThreshold` (default 1.25);
   skipped titles stay on on-demand HLS.
 - **Convert Original File**: ON by default. Re-encode/remux next to original →
   **ffprobe-verify** (duration within tolerance, size sane) → delete original →
@@ -58,7 +58,7 @@ Returns `{ action: 'remux' | 'reencode' | 'skip', reason, predictedBytes }`.
 5. **Settings** (`encoding`)
    - `convertOriginalFile: boolean = true`
    - `autoConvertToMp4: boolean = true`
-   - `conversionGrowthThreshold: number = 1.05`
+   - `conversionGrowthThreshold: number = 1.25`
 6. **Admin** (`admin.controller.ts`)
    - `POST /admin/convert-and-clear-cache` → `enqueueConvertJobs({ inPlace: true })`; returns count.
 

@@ -82,7 +82,7 @@ export class ConversionService {
 			// Both default ON (the destructive in-place replace was explicitly requested on).
 			convertOriginalFile: enc?.convertOriginalFile !== false,
 			autoConvertToMp4: enc?.autoConvertToMp4 !== false,
-			growthThreshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 1.05,
+			growthThreshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 1.25,
 		};
 	}
 

@@ -273,7 +273,7 @@ export function Settings(props: SettingsProps) {
 	// Direct-play MP4 conversion (default on)
 	const [autoConvertToMp4, setAutoConvertToMp4] = useState(true);
 	const [convertOriginalFile, setConvertOriginalFile] = useState(true);
-	const [conversionGrowthThreshold, setConversionGrowthThreshold] = useState('1.05');
+	const [conversionGrowthThreshold, setConversionGrowthThreshold] = useState('1.25');
 	const [reEncodeOnScan, setReEncodeOnScan] = useState(false);
 
 	// Sharing settings
@@ -493,7 +493,7 @@ export function Settings(props: SettingsProps) {
 					debugTranscoding,
 					autoConvertToMp4,
 					convertOriginalFile,
-					conversionGrowthThreshold: parseFloat(conversionGrowthThreshold) || 1.05,
+					conversionGrowthThreshold: parseFloat(conversionGrowthThreshold) || 1.25,
 				},
 			});
 
@@ -1963,7 +1963,7 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.settingDescription}>
 										Skip re-encoding when the estimated MP4 would exceed the
 										original size × this factor (protects efficient HEVC/AV1 from
-										bloating). 1.0 = never grow; 1.05 = allow 5% larger (default).
+										bloating). 1.0 = never grow; 1.25 = allow 25% larger (default).
 									</span>
 								</div>
 								<input
