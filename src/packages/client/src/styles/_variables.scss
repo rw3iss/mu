@@ -20,6 +20,17 @@
   --color-bg-hover: #161b27;
   --color-bg-overlay: rgba(2, 3, 6, 0.9);
 
+  // Semantic component colors — editable per theme. They default to existing
+  // palette vars so each theme tracks automatically (zero-regression); the
+  // theme editor overrides any of them. Resolution is at use-time, so the
+  // forward references to accent / text vars below are fine.
+  --color-label: var(--color-text-primary);        // section/field labels + headings
+  --color-btn-bg: var(--color-accent);             // filled (primary) button background
+  --color-btn-text: var(--color-text-inverse);     // text on filled buttons
+  --color-hover-text: var(--color-text-primary);   // foreground on hovered rows/items
+  --color-input-bg: var(--color-bg-elevated);      // input / select / textarea background
+  --color-input-text: var(--color-text-primary);   // input / select / textarea text
+
   --color-text-primary: #d8dee9;
   --color-text-secondary: #8892a8;
   --color-text-muted: #3d4560;

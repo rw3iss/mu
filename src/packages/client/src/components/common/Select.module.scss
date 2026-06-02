@@ -14,10 +14,10 @@
 	align-items: center;
 	gap: var(--space-sm);
 	padding: var(--space-sm) var(--space-md);
-	background: var(--color-bg-elevated);
+	background: var(--color-input-bg);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
-	color: var(--color-text-primary);
+	color: var(--color-input-text);
 	font-size: var(--font-size-sm);
 	font-family: inherit;
 	line-height: 1.2;
@@ -82,7 +82,7 @@
 	padding: var(--space-xs);
 	margin: 0;
 	list-style: none;
-	background: var(--color-bg-elevated);
+	background: var(--color-input-bg);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
 	box-shadow: var(--shadow-lg);
@@ -113,7 +113,7 @@
 	padding: var(--space-sm) calc(var(--space-md) + 18px) var(--space-sm) var(--space-md);
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-sm);
-	color: var(--color-text-primary);
+	color: var(--color-input-text);
 	cursor: pointer;
 	transition: background var(--transition-fast), color var(--transition-fast);
 }

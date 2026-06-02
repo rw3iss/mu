@@ -24,7 +24,7 @@
 .sectionTitle {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--color-label);
 }
 
 .arrow {
@@ -163,7 +163,7 @@
 
   &:hover:not(:disabled) {
     background: var(--on-dark-overlay-2);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 
   &:disabled {
@@ -204,7 +204,7 @@
   cursor: pointer;
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
     background: var(--on-dark-overlay-1);
   }
 }
@@ -255,7 +255,7 @@
   transition: color 120ms ease, background 120ms ease;
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
     background: var(--on-dark-overlay-1);
   }
 }

@@ -73,7 +73,7 @@
 
   &:hover {
     background: var(--color-bg-hover);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 
   &.active {
@@ -97,7 +97,7 @@
 .panelTitle {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
+  color: var(--color-label);
   margin-bottom: var(--space-xl);
   padding-bottom: var(--space-md);
   border-bottom: 1px solid var(--color-border);
@@ -106,7 +106,7 @@
 .sectionTitle {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
+  color: var(--color-label);
   margin-top: var(--space-xl);
   margin-bottom: var(--space-md);
   padding-top: var(--space-lg);
@@ -155,7 +155,7 @@
 .settingLabel {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
+  color: var(--color-label);
 }
 
 .settingDescription {
@@ -180,10 +180,10 @@
 
 .input {
   padding: var(--space-sm) var(--space-md);
-  background: var(--color-bg-elevated);
+  background: var(--color-input-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  color: var(--color-text-primary);
+  color: var(--color-input-text);
   font-size: var(--font-size-sm);
   outline: none;
   min-width: 240px;
@@ -206,10 +206,10 @@
 .skipTimeInput {
   width: 64px;
   padding: var(--space-sm);
-  background: var(--color-bg-elevated);
+  background: var(--color-input-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  color: var(--color-text-primary);
+  color: var(--color-input-text);
   font-size: var(--font-size-sm);
   text-align: center;
   outline: none;
@@ -239,7 +239,7 @@
 
   &:hover {
     border-color: var(--color-accent);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 }
 
@@ -257,7 +257,7 @@
 
   &:hover {
     border-color: var(--color-accent);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 }
 
@@ -339,7 +339,7 @@
   cursor: pointer;
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
     background: var(--color-bg-hover);
   }
 }
@@ -727,7 +727,7 @@
 
   &:hover {
     background: var(--color-bg-hover);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 
   &:disabled {

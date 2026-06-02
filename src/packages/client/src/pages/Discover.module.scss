@@ -56,7 +56,7 @@
 
 	&:hover:not(:disabled) {
 		border-color: var(--color-accent);
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 		background: var(--surface-overlay-1);
 	}
 

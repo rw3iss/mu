@@ -10,5 +10,12 @@ export const themesApi = {
 		api.put<ThemeRecord>(`/themes/${id}`, data),
 	remove: (id: string) => api.delete(`/themes/${id}`),
 	importTheme: (data: unknown) => api.post<ThemeRecord>('/themes/import', data),
-	exportUrl: (id: string) => `/api/v1/themes/${id}/export`,
+	// Opened via window.open(), which can't send the Authorization header —
+	// so the JWT rides along as a `?token=` query param (same pattern HLS.js /
+	// EventSource use; the auth guard checks `?token=` before cookies).
+	exportUrl: (id: string) => {
+		const token = localStorage.getItem('mu_token');
+		const q = token ? `?token=${encodeURIComponent(token)}` : '';
+		return `/api/v1/themes/${id}/export${q}`;
+	},
 };

@@ -24,6 +24,20 @@ export interface ThemeConfig {
 	 * tracks the elevated surface.
 	 */
 	hoverBg?: string;
+	/** Section/field label + heading text colour (`--color-label`). */
+	labelColor?: string;
+	/** General body / content text colour (overrides `--color-text-primary`). */
+	textColor?: string;
+	/** Filled (primary) button background (`--color-btn-bg`). */
+	buttonBg?: string;
+	/** Text on filled buttons (`--color-btn-text`). */
+	buttonText?: string;
+	/** Foreground colour on hovered rows/items (`--color-hover-text`). */
+	hoverText?: string;
+	/** Input / select / textarea background (`--color-input-bg`). */
+	inputBg?: string;
+	/** Input / select / textarea text (`--color-input-text`). */
+	inputText?: string;
 	itemSpacing: string;
 	itemRadius: number;
 	cardBorder: { width: number; color: string; opacity: number };
@@ -49,6 +63,13 @@ export const DEFAULT_DARK_CONFIG: ThemeConfig = {
 	pageBg: '#050709',
 	panelBg: '#090b12',
 	hoverBg: '#161b27',
+	labelColor: '#d8dee9',
+	textColor: '#d8dee9',
+	buttonBg: '#06b6d4',
+	buttonText: '#050709',
+	hoverText: '#d8dee9',
+	inputBg: '#10141e',
+	inputText: '#d8dee9',
 	itemSpacing: 'normal',
 	itemRadius: 3,
 	cardBorder: { width: 1, color: '#788cb4', opacity: 0.07 },
@@ -61,6 +82,13 @@ export const DEFAULT_LIGHT_CONFIG: ThemeConfig = {
 	pageBg: '#f8fafc',
 	panelBg: '#ffffff',
 	hoverBg: '#edf1f6',
+	labelColor: '#111827',
+	textColor: '#111827',
+	buttonBg: '#0891b2',
+	buttonText: '#ffffff',
+	hoverText: '#111827',
+	inputBg: '#f7f8fa',
+	inputText: '#111827',
 	itemSpacing: 'normal',
 	itemRadius: 3,
 	cardBorder: { width: 1, color: '#94a3b8', opacity: 0.15 },

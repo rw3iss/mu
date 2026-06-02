@@ -61,7 +61,7 @@
 
   &:hover:not(.active) {
     background: var(--color-bg-hover);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 }
 
@@ -88,7 +88,7 @@
 
   &:hover:not(.active) {
     background: var(--color-bg-hover);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 }
 

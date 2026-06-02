@@ -40,7 +40,7 @@
   transition: color var(--transition-fast);
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 }
 
@@ -518,7 +518,7 @@
 .sectionTitle {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
+  color: var(--color-label);
   margin-bottom: var(--space-md);
 }
 
@@ -662,7 +662,7 @@
   text-decoration: none;
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
     text-decoration: underline;
   }
 }
@@ -935,7 +935,7 @@
   &:hover {
     background: var(--color-bg-surface);
     border-color: var(--color-accent);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 }
 

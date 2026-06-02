@@ -87,7 +87,7 @@
 
 	&:hover {
 		background: var(--color-bg-hover);
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 	}
 
 	// When collapsed, fill the header width
@@ -125,7 +125,7 @@
 
 	&:hover {
 		background: var(--color-bg-hover);
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 	}
 
 	&.active {

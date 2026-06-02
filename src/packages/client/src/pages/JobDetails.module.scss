@@ -21,7 +21,7 @@
 	cursor: pointer;
 
 	&:hover {
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 		background: var(--surface-overlay-1);
 	}
 }
@@ -167,7 +167,7 @@
 	margin: 0;
 	font-size: var(--font-size-md);
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-text-primary);
+	color: var(--color-label);
 }
 
 .codeBlock {

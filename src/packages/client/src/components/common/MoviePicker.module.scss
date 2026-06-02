@@ -39,7 +39,7 @@
 
 	&:focus-within {
 		border-color: var(--color-accent);
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 	}
 }
 
@@ -48,7 +48,7 @@
 	min-width: 0;
 	background: transparent;
 	border: none;
-	color: var(--color-text-primary);
+	color: var(--color-input-text);
 	font-size: var(--font-size-md);
 	font-family: var(--font-family);
 	outline: none;
@@ -72,7 +72,7 @@
 	border-radius: 50%;
 
 	&:hover {
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 		background: var(--surface-overlay-2);
 	}
 }

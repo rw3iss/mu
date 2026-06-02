@@ -24,7 +24,7 @@
   transition: color var(--transition-fast), background var(--transition-fast);
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
     background: var(--color-bg-hover);
   }
 
@@ -70,7 +70,7 @@
 
   &:hover {
     background: var(--color-bg-hover);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
 
     .playBtn {
       opacity: 1;

@@ -34,10 +34,10 @@
 .searchInput {
   width: 100%;
   padding: var(--space-sm) var(--space-xl) var(--space-sm) var(--space-xl);
-  background: var(--color-bg-elevated);
+  background: var(--color-input-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
-  color: var(--color-text-primary);
+  color: var(--color-input-text);
   font-size: var(--font-size-sm);
   outline: none;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
@@ -75,7 +75,7 @@
   transition: color 120ms ease, background 120ms ease, transform 120ms ease;
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
     background: var(--surface-overlay-3);
   }
 
@@ -190,7 +190,7 @@
 
   &:hover {
     background: var(--color-bg-hover);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 
   &.danger {

@@ -29,9 +29,9 @@
   }
 
   &.pressed {
-    color: #fff;
-    background: var(--color-accent);
-    border-color: var(--color-accent);
+    color: var(--color-btn-text);
+    background: var(--color-btn-bg);
+    border-color: var(--color-btn-bg);
 
     &:hover:not(:disabled) {
       background: var(--color-accent-hover);

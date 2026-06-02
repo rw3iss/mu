@@ -27,7 +27,7 @@
 		transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
 	&:hover {
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 		border-color: var(--color-accent, rgba(255, 255, 255, 0.32));
 		background-color: var(--color-accent-subtle, rgba(255, 255, 255, 0.06));
 	}
@@ -53,14 +53,14 @@
 /* ── Active (favorited) state ──────────────────────────────────── */
 
 .active {
-	background-color: var(--color-accent);
-	border-color: var(--color-accent);
-	color: var(--color-text-inverse);
+	background-color: var(--color-btn-bg);
+	border-color: var(--color-btn-bg);
+	color: var(--color-btn-text);
 
 	&:hover {
-		background-color: var(--color-accent);
-		border-color: var(--color-accent);
-		color: var(--color-text-inverse);
+		background-color: var(--color-btn-bg);
+		border-color: var(--color-btn-bg);
+		color: var(--color-btn-text);
 		filter: brightness(1.06);
 	}
 

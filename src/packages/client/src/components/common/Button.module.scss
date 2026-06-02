@@ -51,8 +51,8 @@
 
 // Variants
 .primary {
-  background: var(--color-accent);
-  color: var(--color-text-inverse);
+  background: var(--color-btn-bg);
+  color: var(--color-btn-text);
 
   &:hover:not(:disabled) {
     background: var(--color-accent-hover);
@@ -85,7 +85,7 @@
 
   &:hover:not(:disabled) {
     background: var(--color-bg-hover);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 
   &:active:not(:disabled) {

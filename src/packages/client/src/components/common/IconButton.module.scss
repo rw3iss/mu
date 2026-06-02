@@ -67,7 +67,7 @@
 	color: var(--color-text-secondary);
 
 	&:hover {
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 		background: var(--color-bg-hover);
 	}
 }
@@ -77,16 +77,16 @@
 	border-color: var(--color-border);
 
 	&:hover {
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 		border-color: var(--color-border-strong);
 		background: var(--color-bg-hover);
 	}
 }
 
 .variant_solid {
-	color: var(--color-text-inverse);
-	background: var(--color-accent);
-	border-color: var(--color-accent);
+	color: var(--color-btn-text);
+	background: var(--color-btn-bg);
+	border-color: var(--color-btn-bg);
 
 	&:hover {
 		filter: brightness(1.07);

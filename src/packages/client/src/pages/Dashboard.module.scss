@@ -70,7 +70,7 @@
 .sectionTitle {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
+  color: var(--color-label);
 }
 
 .sectionActions {
@@ -101,7 +101,7 @@
   transition: background var(--transition-fast), color var(--transition-fast);
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 
   &.active {

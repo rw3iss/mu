@@ -1176,6 +1176,19 @@ export function Settings(props: SettingsProps) {
 												</div>
 											</div>
 
+											{/* Button Background */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>Button Background</span>
+													<span class={styles.settingDescription}>Filled / primary button background color</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={editConfig.buttonBg || editConfig.accentColor || '#06b6d4'}
+														onChange={(v) => updateEditConfig({ buttonBg: v })}
+													/>
+												</div>
+											</div>
 											{/* Hover Background */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
@@ -1197,6 +1210,90 @@ export function Settings(props: SettingsProps) {
 														onChange={(v) =>
 															updateEditConfig({ hoverBg: v })
 														}
+													/>
+												</div>
+											</div>
+
+											{/* Section Label */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>Section Label</span>
+													<span class={styles.settingDescription}>Field labels and section headings</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={editConfig.labelColor || editConfig.tokens?.['color-text-primary'] || '#d8dee9'}
+														onChange={(v) => updateEditConfig({ labelColor: v })}
+													/>
+												</div>
+											</div>
+
+											{/* Body Text */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>Body Text</span>
+													<span class={styles.settingDescription}>General page, card, and movie-detail text</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={editConfig.textColor || editConfig.tokens?.['color-text-primary'] || '#d8dee9'}
+														onChange={(v) => updateEditConfig({ textColor: v })}
+													/>
+												</div>
+											</div>
+
+											{/* Button Text */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>Button Text</span>
+													<span class={styles.settingDescription}>Text on filled buttons</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={editConfig.buttonText || editConfig.tokens?.['color-text-inverse'] || '#050709'}
+														onChange={(v) => updateEditConfig({ buttonText: v })}
+													/>
+												</div>
+											</div>
+
+											{/* Hover Text */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>Hover Text</span>
+													<span class={styles.settingDescription}>Text colour of hovered rows / items</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={editConfig.hoverText || editConfig.tokens?.['color-text-primary'] || '#d8dee9'}
+														onChange={(v) => updateEditConfig({ hoverText: v })}
+													/>
+												</div>
+											</div>
+
+											{/* Input Background */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>Input Background</span>
+													<span class={styles.settingDescription}>Text field, search, and dropdown background</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={editConfig.inputBg || editConfig.tokens?.['color-bg-elevated'] || '#10141e'}
+														onChange={(v) => updateEditConfig({ inputBg: v })}
+													/>
+												</div>
+											</div>
+
+											{/* Input Text */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>Input Text</span>
+													<span class={styles.settingDescription}>Text inside input / search fields</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={editConfig.inputText || editConfig.tokens?.['color-text-primary'] || '#d8dee9'}
+														onChange={(v) => updateEditConfig({ inputText: v })}
 													/>
 												</div>
 											</div>

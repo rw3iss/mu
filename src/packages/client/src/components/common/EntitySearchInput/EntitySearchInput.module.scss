@@ -5,10 +5,10 @@
 .input {
 	width: 100%;
 	padding: 8px 12px;
-	background: var(--surface-input, rgba(255, 255, 255, 0.05));
+	background: var(--color-input-bg);
 	border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
 	border-radius: 6px;
-	color: var(--text-primary, #fff);
+	color: var(--color-input-text);
 	font-size: 14px;
 
 	&::placeholder {

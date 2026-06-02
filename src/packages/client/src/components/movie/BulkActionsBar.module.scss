@@ -34,7 +34,7 @@
 
   &:hover {
     background: var(--color-bg-tertiary);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 }
 
@@ -59,7 +59,7 @@
   transition: all var(--transition-fast);
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
     background: var(--color-bg-surface);
   }
 }
@@ -89,7 +89,7 @@
 
   &:hover:not(:disabled) {
     background: var(--color-bg-tertiary);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
     border-color: var(--color-text-muted);
   }
 

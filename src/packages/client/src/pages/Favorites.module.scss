@@ -57,7 +57,7 @@
 
 	&:hover {
 		background-color: var(--color-bg-hover);
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 	}
 }
 
@@ -101,7 +101,7 @@
 	border-radius: 8px;
 	border: 1px solid var(--color-border-strong);
 	background: var(--color-bg-surface);
-	color: var(--color-text-primary);
+	color: var(--color-input-text);
 	font-size: 14px;
 	outline: none;
 
@@ -123,7 +123,7 @@
 	padding: 2px;
 
 	&:hover {
-		color: var(--color-text-primary);
+		color: var(--color-hover-text);
 	}
 }
 

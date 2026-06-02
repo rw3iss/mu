@@ -213,6 +213,28 @@ export function applyThemeConfig(config: ThemeConfig): void {
 		root.style.removeProperty('--color-bg-hover');
 	}
 
+	// Semantic component colors (editable per theme). Each falls back to a
+	// palette var via the SCSS default when unset; removeProperty resets the
+	// inline override on theme switch (guarded so a theme that set the key via
+	// `tokens` isn't wiped).
+	const applyOptional = (varName: string, tokenKey: string, value?: string) => {
+		if (value) root.style.setProperty(varName, value);
+		else if (!config.tokens?.[tokenKey]) root.style.removeProperty(varName);
+	};
+	applyOptional('--color-label', 'color-label', config.labelColor);
+	applyOptional('--color-btn-bg', 'color-btn-bg', config.buttonBg);
+	applyOptional('--color-btn-text', 'color-btn-text', config.buttonText);
+	applyOptional('--color-hover-text', 'color-hover-text', config.hoverText);
+	applyOptional('--color-input-bg', 'color-input-bg', config.inputBg);
+	applyOptional('--color-input-text', 'color-input-text', config.inputText);
+	// `textColor` overrides the base primary-text var (which themes set via
+	// tokens). Set when present, else leave the theme's token/default in place.
+	if (config.textColor) {
+		root.style.setProperty('--color-text-primary', config.textColor);
+	} else if (!config.tokens?.['color-text-primary']) {
+		root.style.removeProperty('--color-text-primary');
+	}
+
 	// Derive a coherent palette from `accentColor` for any variant the
 	// theme didn't supply explicitly. Theme `tokens` values still win
 	// when present — this is the fallback that keeps user-picked

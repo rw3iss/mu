@@ -100,7 +100,7 @@
     // surface-overlay-1 reads correctly on both light + dark themes
     // (was rgba(255,255,255,0.1) which only worked on dark).
     background: var(--surface-overlay-1, rgba(255, 255, 255, 0.1));
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 
   &:focus-visible {

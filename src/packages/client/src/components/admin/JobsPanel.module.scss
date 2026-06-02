@@ -49,7 +49,7 @@
   transition: color 120ms ease, border-color 120ms ease;
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 
   &.tabActive {
@@ -105,7 +105,7 @@
 
   &:hover {
     background: var(--color-bg-surface);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 }
 
@@ -169,7 +169,7 @@
 
   &:hover {
     background: var(--color-bg-hover);
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 
   &:disabled {
@@ -228,10 +228,10 @@
 .searchInput {
   width: 100%;
   padding: 6px 30px 6px 32px;
-  background: var(--color-bg-elevated);
+  background: var(--color-input-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  color: var(--color-text-primary);
+  color: var(--color-input-text);
   font-size: var(--font-size-sm);
   outline: none;
   transition: border-color 120ms ease;
@@ -259,7 +259,7 @@
   line-height: 1;
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
   }
 }
 
@@ -389,7 +389,7 @@
   transition: color 120ms ease, background 120ms ease;
 
   &:hover {
-    color: var(--color-text-primary);
+    color: var(--color-hover-text);
     background: var(--surface-overlay-1);
   }
 }
