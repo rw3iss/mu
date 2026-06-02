@@ -2,6 +2,7 @@ import type { UserRole } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Select } from '@/components/common/Select';
+import { useConfirm } from '@/hooks/useConfirm';
 import { api } from '@/services/api';
 import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
@@ -33,6 +34,7 @@ export function Users() {
 	const [busy, setBusy] = useState<string | null>(null);
 	const [showAdd, setShowAdd] = useState(false);
 	const [editPassword, setEditPassword] = useState<UserRow | null>(null);
+	const { confirm, dialog } = useConfirm();
 
 	const me = currentUser.value;
 
@@ -55,9 +57,12 @@ export function Users() {
 	const changeRole = async (u: UserRow, role: UserRole) => {
 		if (u.role === role) return;
 		if (u.role === 'admin' && role !== 'admin') {
-			const ok = confirm(
-				`Demote ${u.username} from admin to ${role}? If this is the last admin, the change will be refused.`,
-			);
+			const ok = await confirm({
+				title: 'Demote admin?',
+				message: `Demote ${u.username} from admin to ${role}? If this is the last admin, the change will be refused.`,
+				confirmLabel: 'Demote',
+				variant: 'danger',
+			});
 			if (!ok) return;
 		}
 		setBusy(u.id);
@@ -77,7 +82,12 @@ export function Users() {
 			notifyError('You can’t delete your own account from this page');
 			return;
 		}
-		const ok = confirm(`Delete user ${u.username}? This cannot be undone.`);
+		const ok = await confirm({
+			title: 'Delete user?',
+			message: `Delete user ${u.username}? This cannot be undone.`,
+			confirmLabel: 'Delete',
+			variant: 'danger',
+		});
 		if (!ok) return;
 		setBusy(u.id);
 		try {
@@ -176,6 +186,7 @@ export function Users() {
 					onDone={() => setEditPassword(null)}
 				/>
 			) : null}
+			{dialog}
 		</div>
 	);
 }

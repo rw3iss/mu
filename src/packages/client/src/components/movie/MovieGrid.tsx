@@ -130,7 +130,7 @@ export function MovieGrid({
 
 	if (viewMode === 'list') {
 		return (
-			<div class={`${styles.list} ${containerClass}`}>
+			<div class={`${styles.list} ${containerClass} stagger-rise`}>
 				{items.map((item) =>
 					item.kind === 'group' ? (
 						<GroupListItem key={`g:${item.group.id}`} group={item.group} />
@@ -152,7 +152,7 @@ export function MovieGrid({
 
 	if (viewMode === 'large') {
 		return (
-			<div class={`${styles.largeGrid} ${containerClass}`}>
+			<div class={`${styles.largeGrid} ${containerClass} stagger-rise`}>
 				{items.map((item) =>
 					item.kind === 'group' ? (
 						<GroupTile key={`g:${item.group.id}`} group={item.group} viewMode="large" />
@@ -173,7 +173,7 @@ export function MovieGrid({
 	}
 
 	return (
-		<div class={`${styles.grid} ${containerClass}`}>
+		<div class={`${styles.grid} ${containerClass} stagger-rise`}>
 			{items.map((item) =>
 				item.kind === 'group' ? (
 					<GroupTile key={`g:${item.group.id}`} group={item.group} />

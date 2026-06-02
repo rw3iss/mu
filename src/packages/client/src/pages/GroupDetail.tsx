@@ -12,6 +12,7 @@ import {
 	type MovieGroup,
 } from '@/services/groups.service';
 import type { MatchCandidate } from '@/services/movies.service';
+import { useConfirm } from '@/hooks/useConfirm';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './GroupDetail.module.scss';
 
@@ -42,6 +43,7 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 		{},
 	);
 	const [candidates, setCandidates] = useState<MatchCandidate[]>([]);
+	const { confirm, dialog } = useConfirm();
 
 	useEffect(() => {
 		if (!id) return;
@@ -165,8 +167,13 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 	}
 
 	async function handleReject(target: MovieGroup) {
-		if (!confirm(`Ungroup "${target.name}"? Its movies will return to the flat library.`))
-			return;
+		const ok = await confirm({
+			title: 'Ungroup?',
+			message: `Ungroup "${target.name}"? Its movies will return to the flat library.`,
+			confirmLabel: 'Ungroup',
+			variant: 'danger',
+		});
+		if (!ok) return;
 		setBusy(true);
 		try {
 			await groupsService.reject(target.id);
@@ -212,6 +219,7 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 
 	return (
 		<div class={styles.page}>
+			{dialog}
 			<div class={styles.header}>
 				<button class={styles.backLink} onClick={() => route('/library')}>
 					<Icon name="arrow-left" size={14} /> Library

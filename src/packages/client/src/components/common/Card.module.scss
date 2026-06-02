@@ -27,7 +27,7 @@ button.card {
 .variant_elevated {
 	background: var(--color-bg-elevated);
 	border-color: var(--color-border);
-	box-shadow: 0 4px 14px -10px rgba(0, 0, 0, 0.35);
+	box-shadow: var(--shadow-card);
 }
 
 .variant_outlined {
@@ -60,7 +60,7 @@ button.card {
 	&:hover {
 		transform: translateY(-2px);
 		border-color: var(--color-accent);
-		box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.4);
+		box-shadow: var(--shadow-card-hover);
 	}
 
 	&:active {

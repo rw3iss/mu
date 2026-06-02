@@ -15,6 +15,13 @@
     cursor: not-allowed;
   }
 
+  // Tactile press feedback — subtle scale-down on click. Sister of the
+  // global `.press` utility and IconButton's `:active` scale. Neutralised
+  // by reduce-motion via the global override.
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
   &:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;

@@ -2,12 +2,14 @@ import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
+import { Tooltip } from '@/components/common/Tooltip';
 import { MovieGrid } from '@/components/movie/MovieGrid';
 import { useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
 import { currentUser } from '@/state/auth.state';
+import { notifyError } from '@/state/notifications.state';
 import type { Movie, ViewMode } from '@/state/library.state';
 import styles from './Dashboard.module.scss';
 
@@ -32,11 +34,21 @@ export function Dashboard(_props: DashboardProps) {
 					moviesService.getTrending(12),
 				]);
 
+				const failed: string[] = [];
 				if (cwRes.status === 'fulfilled') setContinueWatching(cwRes.value.movies);
+				else failed.push('Continue Watching');
 				if (raRes.status === 'fulfilled') setRecentlyAdded(raRes.value.movies);
+				else failed.push('Recently Added');
 				if (trRes.status === 'fulfilled') setTrending(trRes.value.movies);
+				else failed.push('Trending');
+
+				if (failed.length > 0) {
+					console.error('Dashboard sections failed:', failed);
+					notifyError(`Couldn't load ${failed.join(', ')}. Try refreshing.`);
+				}
 			} catch (error) {
 				console.error('Failed to load dashboard:', error);
+				notifyError('Failed to load the dashboard. Try refreshing.');
 			} finally {
 				setIsLoading(false);
 			}
@@ -48,7 +60,7 @@ export function Dashboard(_props: DashboardProps) {
 	const user = currentUser.value;
 
 	return (
-		<div class={styles.dashboard}>
+		<div class={`${styles.dashboard} stagger-rise`}>
 			<PluginSlot name={UI.DASHBOARD_TOP} context={{}} />
 
 			{/* Compact welcome row: single-line text + inline link buttons.
@@ -84,24 +96,26 @@ export function Dashboard(_props: DashboardProps) {
 								role="group"
 								aria-label="Continue watching view"
 							>
-								<button
-									class={`${styles.viewBtn} ${cwView === 'grid' ? styles.active : ''}`}
-									onClick={() => setCwView('grid')}
-									aria-label="Grid view"
-									aria-pressed={cwView === 'grid'}
-									title="Grid"
-								>
-									<Icon name="view-grid" size={14} />
-								</button>
-								<button
-									class={`${styles.viewBtn} ${cwView === 'list' ? styles.active : ''}`}
-									onClick={() => setCwView('list')}
-									aria-label="List view"
-									aria-pressed={cwView === 'list'}
-									title="List"
-								>
-									<Icon name="view-list" size={14} />
-								</button>
+								<Tooltip label="Grid">
+									<button
+										class={`${styles.viewBtn} ${cwView === 'grid' ? styles.active : ''}`}
+										onClick={() => setCwView('grid')}
+										aria-label="Grid view"
+										aria-pressed={cwView === 'grid'}
+									>
+										<Icon name="view-grid" size={14} />
+									</button>
+								</Tooltip>
+								<Tooltip label="List">
+									<button
+										class={`${styles.viewBtn} ${cwView === 'list' ? styles.active : ''}`}
+										onClick={() => setCwView('list')}
+										aria-label="List view"
+										aria-pressed={cwView === 'list'}
+									>
+										<Icon name="view-list" size={14} />
+									</button>
+								</Tooltip>
 							</div>
 							<Button variant="ghost" size="sm" onClick={() => route('/history')}>
 								See All

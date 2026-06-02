@@ -1,5 +1,10 @@
+// Entrance choreography is handled by the global `.stagger-rise` utility
+// (applied alongside this class in Dashboard.tsx): the welcome row and each
+// section cascade in rather than the whole page fading as one block.
 .dashboard {
-  animation: fadeIn 300ms ease;
+  // Anchor `nth-child` stagger to real content even if a plugin slot
+  // renders an empty wrapper at the top.
+  display: block;
 }
 
 /* Compact welcome row — single-line: text + inline link buttons. */

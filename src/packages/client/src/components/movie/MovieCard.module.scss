@@ -21,6 +21,15 @@
     }
   }
 
+  // Subtle tactile press — keeps the hover lift, adds a tiny scale-down.
+  // Intentionally faint (the whole card is the click target and holds
+  // inner buttons). Neutralised by reduce-motion via the global override.
+  &:active {
+    :root:not([data-no-hover]) & {
+      transform: translateY(-4px) scale(0.985);
+    }
+  }
+
   &:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
