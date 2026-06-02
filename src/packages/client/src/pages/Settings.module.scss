@@ -72,7 +72,7 @@
   white-space: nowrap;
 
   &:hover {
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-hover);
     color: var(--color-text-primary);
   }
 
@@ -340,7 +340,7 @@
 
   &:hover {
     color: var(--color-text-primary);
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-hover);
   }
 }
 
@@ -726,7 +726,7 @@
   font-size: 14px;
 
   &:hover {
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-hover);
     color: var(--color-text-primary);
   }
 

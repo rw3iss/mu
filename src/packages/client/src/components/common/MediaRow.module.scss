@@ -13,11 +13,11 @@
 		opacity 140ms var(--ease-snap, ease-out);
 
 	&:hover {
-		background-color: var(--color-bg-elevated);
+		background-color: var(--color-bg-hover);
 	}
 
 	&:active {
-		background-color: var(--color-bg-tertiary, var(--color-bg-elevated));
+		background-color: var(--color-bg-tertiary, var(--color-bg-hover));
 	}
 
 	&:focus-visible {

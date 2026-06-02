@@ -17,6 +17,13 @@ export interface ThemeConfig {
 	accentColor: string;
 	pageBg: string;
 	panelBg: string;
+	/**
+	 * Hover-highlight background for rows, section headers, nav/sidebar items,
+	 * and menu entries (maps to `--color-bg-hover`). Optional for backward
+	 * compatibility — themes without it fall back to the SCSS default, which
+	 * tracks the elevated surface.
+	 */
+	hoverBg?: string;
 	itemSpacing: string;
 	itemRadius: number;
 	cardBorder: { width: number; color: string; opacity: number };
@@ -41,6 +48,7 @@ export const DEFAULT_DARK_CONFIG: ThemeConfig = {
 	accentColor: '#06b6d4',
 	pageBg: '#050709',
 	panelBg: '#090b12',
+	hoverBg: '#161b27',
 	itemSpacing: 'normal',
 	itemRadius: 3,
 	cardBorder: { width: 1, color: '#788cb4', opacity: 0.07 },
@@ -52,6 +60,7 @@ export const DEFAULT_LIGHT_CONFIG: ThemeConfig = {
 	accentColor: '#0891b2',
 	pageBg: '#f8fafc',
 	panelBg: '#ffffff',
+	hoverBg: '#edf1f6',
 	itemSpacing: 'normal',
 	itemRadius: 3,
 	cardBorder: { width: 1, color: '#94a3b8', opacity: 0.15 },

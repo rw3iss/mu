@@ -1176,6 +1176,31 @@ export function Settings(props: SettingsProps) {
 												</div>
 											</div>
 
+											{/* Hover Background */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Hover Background
+													</span>
+													<span class={styles.settingDescription}>
+														Highlight behind rows, section headers, and
+														sidebar/menu items on hover
+													</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={
+															editConfig.hoverBg ||
+															editConfig.panelBg ||
+															'#161b27'
+														}
+														onChange={(v) =>
+															updateEditConfig({ hoverBg: v })
+														}
+													/>
+												</div>
+											</div>
+
 											{/* Item Spacing */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>

@@ -95,7 +95,7 @@
 	transition: background 120ms ease, color 120ms ease;
 
 	&:hover {
-		background: var(--color-bg-elevated);
+		background: var(--color-bg-hover);
 		color: var(--color-text-primary);
 	}
 

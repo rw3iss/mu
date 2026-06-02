@@ -244,7 +244,7 @@
   }
 
   &:hover:not(:disabled) {
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-hover);
   }
 
   &:disabled {
@@ -313,7 +313,7 @@
   background: var(--color-bg-surface);
 
   &:hover {
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-hover);
   }
 }
 

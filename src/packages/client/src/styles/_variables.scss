@@ -13,6 +13,11 @@
   --color-bg-tertiary: #0b0e15;
   --color-bg-surface: #0d1018;
   --color-bg-elevated: #10141e;
+  // Hover-highlight background for rows, section headers, nav/sidebar items,
+  // and menu entries — themeable independently of elevated surfaces. Themes
+  // set this via the editor (config.hoverBg → --color-bg-hover); default sits
+  // a touch above elevated for a readable highlight.
+  --color-bg-hover: #161b27;
   --color-bg-overlay: rgba(2, 3, 6, 0.9);
 
   --color-text-primary: #d8dee9;
@@ -232,6 +237,7 @@
   --color-bg-tertiary: #e8ecf1;
   --color-bg-surface: #ffffff;
   --color-bg-elevated: #f7f8fa;
+  --color-bg-hover: #edf1f6;
   --color-bg-overlay: rgba(0, 0, 0, 0.4);
 
   --color-text-primary: #111827;

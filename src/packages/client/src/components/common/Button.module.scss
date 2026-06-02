@@ -84,7 +84,7 @@
   color: var(--color-text-secondary);
 
   &:hover:not(:disabled) {
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-hover);
     color: var(--color-text-primary);
   }
 

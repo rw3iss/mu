@@ -231,6 +231,30 @@ export class ThemesService implements OnModuleInit {
 
 		const catalogue = loadCatalogue(this.logger);
 		if (catalogue && catalogue.length > 0) {
+			// Backfill newly-added config keys (e.g. hoverBg) into existing
+			// built-in themes by name — additive only, never clobbers user
+			// edits. Lets shipped themes gain the new hover colour on upgrade
+			// without requiring a theme reset.
+			const catByName = new Map(catalogue.map((t) => [t.name, t]));
+			for (const row of existingRows) {
+				const cat = catByName.get(row.name);
+				if (!cat) continue;
+				let cfg: Record<string, unknown>;
+				try {
+					cfg = JSON.parse(row.config);
+				} catch {
+					continue;
+				}
+				if (cfg && cfg.hoverBg == null && cat.config.hoverBg != null) {
+					cfg.hoverBg = cat.config.hoverBg;
+					this.database.db
+						.update(themes)
+						.set({ config: JSON.stringify(cfg), updatedAt: nowISO() })
+						.where(eq(themes.id, row.id))
+						.run();
+				}
+			}
+
 			const toInsert = catalogue.filter((t) => !existingNames.has(t.name));
 			if (toInsert.length === 0) return;
 			this.logger.log(`Seeding ${toInsert.length} curated theme(s)`);

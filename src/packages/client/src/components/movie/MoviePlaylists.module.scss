@@ -51,7 +51,7 @@
   transition: background var(--transition-fast);
 
   &:hover {
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-hover);
 
     .playlistName {
       color: var(--color-accent);

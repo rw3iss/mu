@@ -203,6 +203,16 @@ export function applyThemeConfig(config: ThemeConfig): void {
 	root.style.setProperty('--item-gap', ITEM_GAP_MAP[config.itemSpacing] ?? ITEM_GAP_MAP.normal);
 	root.style.setProperty('--item-radius', `${config.itemRadius}px`);
 
+	// Hover-highlight background. When a theme defines it (config.hoverBg) it
+	// wins; otherwise clear the inline value so it falls back to the theme's
+	// `tokens` (if any) or the SCSS default — important so switching FROM a
+	// theme that set it TO one that didn't doesn't leak the old colour.
+	if (config.hoverBg) {
+		root.style.setProperty('--color-bg-hover', config.hoverBg);
+	} else if (!config.tokens?.['color-bg-hover']) {
+		root.style.removeProperty('--color-bg-hover');
+	}
+
 	// Derive a coherent palette from `accentColor` for any variant the
 	// theme didn't supply explicitly. Theme `tokens` values still win
 	// when present — this is the fallback that keeps user-picked

@@ -109,7 +109,7 @@
   svg { width: 18px; height: 18px; }
 
   &:hover {
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-hover);
     color: var(--color-accent);
   }
 }
@@ -189,7 +189,7 @@
   transition: all var(--transition-fast);
 
   &:hover {
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-hover);
     color: var(--color-text-primary);
   }
 

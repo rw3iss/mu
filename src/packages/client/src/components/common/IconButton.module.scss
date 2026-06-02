@@ -68,7 +68,7 @@
 
 	&:hover {
 		color: var(--color-text-primary);
-		background: var(--color-bg-elevated);
+		background: var(--color-bg-hover);
 	}
 }
 
@@ -79,7 +79,7 @@
 	&:hover {
 		color: var(--color-text-primary);
 		border-color: var(--color-border-strong);
-		background: var(--color-bg-elevated);
+		background: var(--color-bg-hover);
 	}
 }
 

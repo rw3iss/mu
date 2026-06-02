@@ -73,7 +73,7 @@
   transition: background var(--transition-fast), box-shadow var(--transition-fast);
 
   &:hover {
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-hover);
     box-shadow: var(--shadow-md);
   }
 }

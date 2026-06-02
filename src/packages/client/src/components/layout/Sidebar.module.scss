@@ -86,7 +86,7 @@
 	flex-shrink: 0;
 
 	&:hover {
-		background: var(--color-bg-elevated);
+		background: var(--color-bg-hover);
 		color: var(--color-text-primary);
 	}
 
@@ -124,7 +124,7 @@
 	white-space: nowrap;
 
 	&:hover {
-		background: var(--color-bg-elevated);
+		background: var(--color-bg-hover);
 		color: var(--color-text-primary);
 	}
 
@@ -214,7 +214,7 @@
 		color 150ms ease;
 
 	&:hover {
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--color-bg-hover);
 		color: var(--color-error);
 	}
 }
