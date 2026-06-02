@@ -56,6 +56,14 @@ type TranscodeState = 'running' | 'completed' | 'failed';
 export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger(TranscoderService.name);
 	private readonly activeProcesses = new Map<string, ChildProcess>();
+	/**
+	 * Active single-file MP4 conversions, keyed by an opaque conversion key
+	 * (see {@link remuxToMp4} / {@link transcodeToMp4}). Tracked separately
+	 * from {@link activeProcesses} (which is HLS-session keyed) so a convert
+	 * job can be cancelled via {@link cancelConversion} without touching live
+	 * streaming sessions.
+	 */
+	private readonly activeConversions = new Map<string, ReturnType<typeof ffmpeg>>();
 	/** Tracks the state of each transcode session (running / completed / failed) */
 	private readonly sessionStates = new Map<string, { state: TranscodeState; error?: string }>();
 	/** Sessions that have already retried with software encoding (prevents infinite loops) */
@@ -290,6 +298,44 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		return path.join(this.cacheDir, 'persistent', movieFileId, quality);
 	}
 
+	/** Root persistent-cache dir for a file (parent of all quality subdirs). */
+	getFilePersistentRoot(movieFileId: string): string {
+		return path.join(this.cacheDir, 'persistent', movieFileId);
+	}
+
+	/**
+	 * Path to a cache-mode direct-play MP4 for a file (written by
+	 * ConversionService when `convertOriginalFile` is OFF), or null if none.
+	 * When present it supersedes the source: the file can direct-play even if
+	 * its original codecs would otherwise require transcoding.
+	 */
+	getCachedDirectMp4(movieFileId: string): string | null {
+		const p = path.join(this.getPersistentDir(movieFileId, 'direct'), 'direct.mp4');
+		return existsSync(p) ? p : null;
+	}
+
+	/**
+	 * Remove every persistent quality cache for a file EXCEPT the given
+	 * quality subdir. Used by cache-mode conversion to drop stale HLS caches
+	 * while keeping the freshly-written direct-play MP4.
+	 */
+	async clearHlsCachesExcept(movieFileId: string, keepQuality: string): Promise<void> {
+		const root = this.getFilePersistentRoot(movieFileId);
+		let entries: string[] = [];
+		try {
+			entries = await readdir(root);
+		} catch {
+			return;
+		}
+		for (const entry of entries) {
+			if (entry === keepQuality) continue;
+			await rm(path.join(root, entry), { recursive: true, force: true }).catch(() => {});
+		}
+		for (const key of this.healthCache.keys()) {
+			if (key.includes(movieFileId)) this.healthCache.delete(key);
+		}
+	}
+
 	/**
 	 * Check whether a fully completed transcode cache exists.
 	 */
@@ -374,6 +420,231 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	 */
 	getTranscodeState(sessionId: string): { state: TranscodeState; error?: string } | undefined {
 		return this.sessionStates.get(sessionId);
+	}
+
+	// ====================================================================
+	// Single-file MP4 conversion (direct-play target)
+	// --------------------------------------------------------------------
+	// Unlike startTranscode/startRemux (which emit HLS segments for live or
+	// cached streaming), these produce one faststart .mp4 that the browser
+	// can direct-play natively — no MediaSource, so Web Audio EQ/Compressor
+	// work. Used by ConversionService for in-place original replacement and
+	// cached direct-play artifacts. These RESOLVE ON COMPLETION (not on
+	// ffmpeg start) because the caller needs the finished file to verify.
+	// ====================================================================
+
+	/**
+	 * ffprobe a media file. Returns null if it can't be probed (used to
+	 * verify a freshly-converted file before we trust/replace anything).
+	 */
+	async probeFile(filePath: string): Promise<{
+		durationSeconds: number | null;
+		sizeBytes: number;
+		codecVideo: string | null;
+		codecAudio: string | null;
+		videoWidth: number | null;
+		videoHeight: number | null;
+	} | null> {
+		try {
+			const sizeBytes = statSync(filePath).size;
+			const data = await new Promise<any>((resolve, reject) => {
+				ffmpeg.ffprobe(filePath, (err, d) => (err ? reject(err) : resolve(d)));
+			});
+			const streams: any[] = data?.streams ?? [];
+			const v = streams.find((s) => s.codec_type === 'video');
+			const a = streams.find((s) => s.codec_type === 'audio');
+			const dur = Number(data?.format?.duration);
+			return {
+				durationSeconds: Number.isFinite(dur) ? dur : null,
+				sizeBytes,
+				codecVideo: v?.codec_name ?? null,
+				codecAudio: a?.codec_name ?? null,
+				videoWidth: v?.width ?? null,
+				videoHeight: v?.height ?? null,
+			};
+		} catch (err) {
+			this.logger.warn(`probeFile failed for ${filePath}: ${err}`);
+			return null;
+		}
+	}
+
+	/**
+	 * Lossless container change: copy existing (already browser-compatible)
+	 * video+audio streams into a faststart MP4. Seconds of CPU, no re-encode,
+	 * identical quality and ~identical size.
+	 */
+	async remuxToMp4(
+		filePath: string,
+		outputPath: string,
+		onProgress?: (pct: number) => void,
+	): Promise<void> {
+		if (this.isFfmpegSpawnBroken()) {
+			throw new Error('FFmpeg spawn temporarily disabled (Windows DLL error cooldown)');
+		}
+		await mkdir(path.dirname(outputPath), { recursive: true });
+		const key = `remux-mp4:${outputPath}`;
+		return new Promise<void>((resolve, reject) => {
+			const command = this.createFfmpegCommand(filePath)
+				.outputOptions(['-map', '0:v:0', '-map', '0:a:0?'])
+				.videoCodec('copy')
+				.audioCodec('copy')
+				// Force the MP4 muxer so the output path's extension is free
+				// (callers write to a non-media temp name to dodge the scanner).
+				.outputOptions(['-f', 'mp4', '-movflags', '+faststart'])
+				.output(outputPath);
+			this.wireConversionEvents(command, key, onProgress, resolve, reject);
+			command.run();
+		});
+	}
+
+	/**
+	 * Re-encode to H.264/AAC in a faststart MP4. `preserveResolution` keeps the
+	 * source dimensions (used for in-place original replacement so we don't
+	 * downscale the master); otherwise the requested quality profile's scale is
+	 * applied. `nearLossless` biases toward CRF at a high-quality value since the
+	 * output may replace the original.
+	 */
+	async transcodeToMp4(
+		filePath: string,
+		outputPath: string,
+		opts: {
+			quality?: string;
+			preserveResolution?: boolean;
+			nearLossless?: boolean;
+			/** Copy the video stream untouched and only re-encode audio → AAC. */
+			videoCopy?: boolean;
+		} = {},
+		onProgress?: (pct: number) => void,
+	): Promise<void> {
+		if (this.isFfmpegSpawnBroken()) {
+			throw new Error('FFmpeg spawn temporarily disabled (Windows DLL error cooldown)');
+		}
+		await mkdir(path.dirname(outputPath), { recursive: true });
+
+		const quality = opts.quality || '1080p';
+		const profile =
+			TRANSCODING_PROFILES[quality as keyof typeof TRANSCODING_PROFILES] ??
+			TRANSCODING_PROFILES['1080p'];
+		if (!profile) {
+			throw new Error(`No transcoding profile found for quality "${quality}"`);
+		}
+		const enc = this.getEncodingSettings();
+		if (opts.nearLossless) {
+			// Replacing the master — bias toward quality. CRF with a high-quality
+			// value; cap at the user's configured CRF so they can go higher still.
+			enc.rateControl = 'crf';
+			enc.crf = Math.min(enc.crf, 20);
+		}
+		const hwAccel = enc.hwAccel;
+		const key = `transcode-mp4:${outputPath}`;
+
+		return new Promise<void>((resolve, reject) => {
+			let command = this.createFfmpegCommand(filePath);
+
+			if (opts.videoCopy) {
+				// Video is already browser-compatible (H.264) — copy it losslessly
+				// and only bring the audio to AAC. Fast, no video quality loss.
+				command = command
+					.videoCodec('copy')
+					.audioCodec('aac')
+					.outputOptions(['-ac', '2', '-b:a', profile.audioBitrate]);
+			} else {
+				const videoCodec = this.getVideoCodec(hwAccel);
+				const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
+				if (hwAccel === 'vaapi') {
+					command = command.inputOptions([
+						'-hwaccel',
+						'vaapi',
+						'-hwaccel_output_format',
+						'vaapi',
+						'-vaapi_device',
+						'/dev/dri/renderD128',
+					]);
+				} else if (hwAccel === 'qsv') {
+					command = command.inputOptions(['-hwaccel', 'qsv']);
+				}
+
+				command = command
+					.videoCodec(videoCodec)
+					.audioCodec('aac')
+					.outputOptions(['-ac', '2', '-b:a', profile.audioBitrate, ...videoRateOpts]);
+
+				if (!opts.preserveResolution) {
+					const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+					command = command.outputOptions(['-vf', scaleFilter]);
+				}
+
+				command = command.outputOptions([
+					'-preset',
+					enc.preset,
+					...(enc.pixFmt ? ['-pix_fmt', enc.pixFmt] : []),
+				]);
+			}
+
+			command = command
+				.outputOptions(['-map', '0:v:0', '-map', '0:a:0?'])
+				.outputOptions(['-f', 'mp4', '-movflags', '+faststart'])
+				.output(outputPath);
+
+			this.wireConversionEvents(command, key, onProgress, resolve, reject);
+			command.run();
+		});
+	}
+
+	/** Cancel an in-flight MP4 conversion by its output path. */
+	cancelConversionByOutput(outputPath: string): void {
+		this.cancelConversion(`remux-mp4:${outputPath}`);
+		this.cancelConversion(`transcode-mp4:${outputPath}`);
+	}
+
+	private cancelConversion(key: string): void {
+		const cmd = this.activeConversions.get(key);
+		if (cmd) {
+			try {
+				cmd.kill('SIGKILL');
+			} catch {
+				/* already gone */
+			}
+			this.activeConversions.delete(key);
+		}
+	}
+
+	/**
+	 * Shared event wiring for the single-file MP4 converters. Resolves on
+	 * `end` (completion) — not on `start` — so callers get a finished file.
+	 */
+	private wireConversionEvents(
+		command: ReturnType<typeof ffmpeg>,
+		key: string,
+		onProgress: ((pct: number) => void) | undefined,
+		resolve: () => void,
+		reject: (e: Error) => void,
+	): void {
+		this.activeConversions.set(key, command);
+		command
+			.on('start', (commandLine: string) => {
+				this.resetFfmpegSpawnFailCount();
+				this.logger.log(`MP4 conversion started: ${key}`);
+				this.logger.debug(`FFmpeg command: ${commandLine}`);
+			})
+			.on('progress', (progress: any) => {
+				if (onProgress && typeof progress?.percent === 'number') {
+					onProgress(Math.max(0, Math.min(100, progress.percent)));
+				}
+			})
+			.on('error', (err: Error) => {
+				this.activeConversions.delete(key);
+				if (this.isWindowsSpawnFailure(err)) {
+					this.markFfmpegSpawnBroken();
+				}
+				this.logger.error(`MP4 conversion failed (${key}): ${err.message}`);
+				reject(err);
+			})
+			.on('end', () => {
+				this.activeConversions.delete(key);
+				this.logger.log(`MP4 conversion finished: ${key}`);
+				resolve();
+			});
 	}
 
 	async startTranscode(

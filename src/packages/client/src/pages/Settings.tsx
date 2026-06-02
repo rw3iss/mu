@@ -270,6 +270,10 @@ export function Settings(props: SettingsProps) {
 	const [segmentDuration, setSegmentDuration] = useState('4');
 	const [useChunkedTranscoding, setUseChunkedTranscoding] = useState(false);
 	const [debugTranscoding, setDebugTranscoding] = useState(false);
+	// Direct-play MP4 conversion (default on)
+	const [autoConvertToMp4, setAutoConvertToMp4] = useState(true);
+	const [convertOriginalFile, setConvertOriginalFile] = useState(true);
+	const [conversionGrowthThreshold, setConversionGrowthThreshold] = useState('1.05');
 	const [reEncodeOnScan, setReEncodeOnScan] = useState(false);
 
 	// Sharing settings
@@ -374,6 +378,13 @@ export function Settings(props: SettingsProps) {
 						setUseChunkedTranscoding(!!encoding.useChunkedTranscoding);
 					if (encoding.debugTranscoding != null)
 						setDebugTranscoding(!!encoding.debugTranscoding);
+					// Default ON when the key is absent (existing installs).
+					if (typeof encoding.autoConvertToMp4 === 'boolean')
+						setAutoConvertToMp4(encoding.autoConvertToMp4);
+					if (typeof encoding.convertOriginalFile === 'boolean')
+						setConvertOriginalFile(encoding.convertOriginalFile);
+					if (encoding.conversionGrowthThreshold != null)
+						setConversionGrowthThreshold(String(encoding.conversionGrowthThreshold));
 				}
 
 				// Load sources from the API
@@ -480,6 +491,9 @@ export function Settings(props: SettingsProps) {
 					segmentDuration: parseInt(segmentDuration, 10),
 					useChunkedTranscoding,
 					debugTranscoding,
+					autoConvertToMp4,
+					convertOriginalFile,
+					conversionGrowthThreshold: parseFloat(conversionGrowthThreshold) || 1.05,
 				},
 			});
 
@@ -515,6 +529,9 @@ export function Settings(props: SettingsProps) {
 		segmentDuration,
 		useChunkedTranscoding,
 		debugTranscoding,
+		autoConvertToMp4,
+		convertOriginalFile,
+		conversionGrowthThreshold,
 		watchedThreshold,
 		completedTail,
 	]);
@@ -1859,6 +1876,85 @@ export function Settings(props: SettingsProps) {
 									/>
 									<span class={styles.toggleTrack} />
 								</label>
+							</div>
+
+							<h3 class={styles.sectionTitle}>Direct-Play Conversion</h3>
+
+							{/* Auto-convert to MP4 */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Auto-convert to MP4</span>
+									<span class={styles.settingDescription}>
+										When a movie needs transcoding, convert it to a native
+										direct-play MP4 instead of building an HLS cache. H.264 files
+										are remuxed losslessly; other codecs are re-encoded (cases
+										predicted to grow the file are skipped and stay on on-demand
+										HLS). Direct play also re-enables EQ/Compressor audio effects.
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={autoConvertToMp4}
+										onChange={(e) =>
+											setAutoConvertToMp4((e.target as HTMLInputElement).checked)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							{/* Convert Original File (in-place, destructive) */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Convert Original File</span>
+									<span class={styles.settingDescription}>
+										Replace the original file on disk with the converted MP4 (new
+										file is verified first, then the original is deleted and the
+										movie record repointed). Keeps the library slim and makes every
+										converted title direct-play natively. <strong>Irreversible —
+										originals are removed.</strong> When off, a cached copy is used
+										and originals are kept.
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={convertOriginalFile}
+										onChange={(e) =>
+											setConvertOriginalFile(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							{/* Growth threshold */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Re-encode Size Limit</span>
+									<span class={styles.settingDescription}>
+										Skip re-encoding when the estimated MP4 would exceed the
+										original size × this factor (protects efficient HEVC/AV1 from
+										bloating). 1.0 = never grow; 1.05 = allow 5% larger (default).
+									</span>
+								</div>
+								<input
+									type="number"
+									class={styles.select}
+									min={1}
+									max={3}
+									step={0.05}
+									value={conversionGrowthThreshold}
+									onInput={(e) =>
+										setConversionGrowthThreshold(
+											(e.target as HTMLInputElement).value,
+										)
+									}
+									style={{ width: '80px' }}
+								/>
 							</div>
 
 							<h3 class={styles.sectionTitle}>Watch Tracking</h3>

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { RemoteModule } from '../remote/remote.module.js';
+import { ConversionService } from './conversion/conversion.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { StreamController } from './stream.controller.js';
 import { StreamService } from './stream.service.js';
@@ -28,6 +29,7 @@ import { TranscoderService } from './transcoder/transcoder.service.js';
 	providers: [
 		StreamService,
 		TranscoderService,
+		ConversionService,
 		HlsGeneratorService,
 		ChunkManagerService,
 		ChunkManifestService,
@@ -42,6 +44,7 @@ import { TranscoderService } from './transcoder/transcoder.service.js';
 	exports: [
 		StreamService,
 		TranscoderService,
+		ConversionService,
 		DirectPlayService,
 		HlsGeneratorService,
 		ChunkManagerService,

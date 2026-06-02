@@ -48,6 +48,8 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	const [showRemoveBrokenConfirm, setShowRemoveBrokenConfirm] = useState(false);
 	const [clearingWatched, setClearingWatched] = useState(false);
 	const [showClearWatchedConfirm, setShowClearWatchedConfirm] = useState(false);
+	const [convertingCache, setConvertingCache] = useState(false);
+	const [showConvertCacheConfirm, setShowConvertCacheConfirm] = useState(false);
 	const [watchedMovieCount, setWatchedMovieCount] = useState(0);
 	const [sessionHistory, setSessionHistory] = useState<SessionHistoryEntry[]>([]);
 	const [clearingHistory, setClearingHistory] = useState(false);
@@ -258,6 +260,82 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 			if (progressToastId) removeNotification(progressToastId);
 			notifyError('Failed to start grouping');
 			setGroupingItems(false);
+		}
+	}, []);
+
+	const handleConvertAndClearCache = useCallback(async () => {
+		setConvertingCache(true);
+		const startedId = notifyInfo('Scanning library for movies to convert…', 0);
+		try {
+			const res = await api.post<{ message: string; queued: number }>(
+				'/sources/convert-and-clear-cache',
+			);
+			removeNotification(startedId);
+			const total = res.queued;
+			if (total === 0) {
+				notifySuccess('Everything is already direct-play — nothing to convert.');
+				setConvertingCache(false);
+				return;
+			}
+
+			let done = 0;
+			let failed = 0;
+			let progressToastId: string | null = notifyInfo(`Converting to MP4: 0/${total}…`, 0, [
+				jobListAction('convert-mp4'),
+			]);
+			let cleanup: (() => void) | null = null;
+
+			const finalize = () => {
+				if (progressToastId) {
+					removeNotification(progressToastId);
+					progressToastId = null;
+				}
+				const ok = done - failed;
+				if (failed > 0) {
+					notifyError(`Converted ${ok}/${total}; ${failed} failed. See the job queue.`, undefined, [
+						jobListAction('convert-mp4'),
+					]);
+				} else {
+					notifySuccess(
+						`Converted ${ok} movie${ok === 1 ? '' : 's'} to direct-play MP4 and cleared old caches.`,
+					);
+				}
+				cleanup?.();
+				setConvertingCache(false);
+				fetchMovies(1);
+			};
+
+			const bump = (isFail: boolean) => {
+				done++;
+				if (isFail) failed++;
+				if (progressToastId) {
+					removeNotification(progressToastId);
+					progressToastId = notifyInfo(`Converting to MP4: ${done}/${total}…`, 0, [
+						jobListAction('convert-mp4'),
+					]);
+				}
+				if (done >= total) finalize();
+			};
+
+			const onComplete = (data: unknown) => {
+				if ((data as { type?: string })?.type === 'convert-mp4') bump(false);
+			};
+			const onFailed = (data: unknown) => {
+				if ((data as { type?: string })?.type === 'convert-mp4') bump(true);
+			};
+			wsService.subscribe('job');
+			wsService.on('job:completed', onComplete);
+			wsService.on('job:failed', onFailed);
+			cleanup = () => {
+				wsService.off('job:completed', onComplete);
+				wsService.off('job:failed', onFailed);
+			};
+
+			notifyInfo(`Queued ${total} movie${total === 1 ? '' : 's'} for conversion.`, 4000);
+		} catch {
+			removeNotification(startedId);
+			notifyError('Failed to start conversion');
+			setConvertingCache(false);
 		}
 	}, []);
 
@@ -529,6 +607,13 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						loading={clearingWatched}
 						danger
 					/>
+					<ActionRow
+						label="Convert and Clear Cache"
+						description="Convert every movie to native direct-play MP4 (replacing originals) and remove all HLS/transcode caches, so nothing needs on-demand transcoding and audio effects work everywhere."
+						onClick={() => setShowConvertCacheConfirm(true)}
+						loading={convertingCache}
+						danger
+					/>
 				</ul>
 				<ConfirmDialog
 					isOpen={showSanitizeConfirm}
@@ -564,6 +649,15 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					title="Clear Watched History"
 					message={`This will reset the "watched" status for ${watchedMovieCount} movie(s). Resume positions will be preserved. This cannot be undone.`}
 					confirmLabel="Clear Watched History"
+					variant="danger"
+				/>
+				<ConfirmDialog
+					isOpen={showConvertCacheConfirm}
+					onClose={() => setShowConvertCacheConfirm(false)}
+					onConfirm={handleConvertAndClearCache}
+					title="Convert and Clear Cache"
+					message="Queues every convertible movie for conversion to a native direct-play MP4 and clears all HLS/transcode caches. With 'Convert Original File' enabled (Settings → Playback → Encoding), each original is verified-then-replaced on disk — irreversible. Files whose re-encode would grow the size are skipped and left on on-demand HLS. This runs in the background and can take a long time on large libraries."
+					confirmLabel="Convert Everything"
 					variant="danger"
 				/>
 			</details>

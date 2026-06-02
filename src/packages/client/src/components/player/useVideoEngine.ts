@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting } from '@/hooks/useUiSetting';
 import { streamService } from '@/services/stream.service';
+import { wsService } from '@/services/websocket.service';
 import { initAudioEffects } from '@/state/audio-effects.state';
 import { audioResetTrigger, clearAudioSuspect } from '@/state/audio-reset.state';
 import { globalMovieId } from '@/state/globalPlayer.state';
@@ -919,6 +920,42 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const setIntendedPlaying = useCallback((value: boolean) => {
 		intendedPlayingRef.current = value;
 	}, []);
+
+	/**
+	 * Server signalled that the movie we're playing was converted (its HLS
+	 * cache cleared / source replaced by a direct-play MP4). Re-fetch a fresh
+	 * session and reload the <video> at the current position so playback is
+	 * seamless — and, when the new source is direct-play, audio effects work.
+	 */
+	useEffect(() => {
+		const onSuperseded = (data: unknown) => {
+			const movieId = (data as { movieId?: string })?.movieId;
+			if (!movieId || movieId !== globalMovieId.value) return;
+			const video = sharedVideoElement;
+			const pos = video && Number.isFinite(video.currentTime) ? video.currentTime : 0;
+			const wasPlaying = intendedPlayingRef.current;
+			streamService
+				.startStream(movieId)
+				.then((session) => {
+					currentSession.value = session;
+					initPlayback(session.streamUrl, session.directPlay, pos > 0 ? pos : 0, wasPlaying);
+					notifyInfo(
+						session.directPlay
+							? 'Switched to direct play — audio effects are now available.'
+							: 'Stream source updated.',
+						4000,
+					);
+				})
+				.catch((err) => {
+					console.error('[stream:superseded] reload failed:', err);
+				});
+		};
+		wsService.subscribe('stream');
+		wsService.on('stream:superseded', onSuperseded);
+		return () => {
+			wsService.off('stream:superseded', onSuperseded);
+		};
+	}, [initPlayback]);
 
 	return {
 		videoRef,

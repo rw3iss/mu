@@ -1105,6 +1105,12 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	 * Decision hierarchy: DIRECT_PLAY → DIRECT_STREAM → TRANSCODE
 	 */
 	determineStreamMode(file: any): string {
+		// Cache-mode direct play: a converted MP4 in the persistent cache
+		// supersedes the source codecs. The direct route serves that file.
+		if (file?.id && this.transcoderService.getCachedDirectMp4(file.id)) {
+			return StreamMode.DIRECT_PLAY;
+		}
+
 		const filePath = (file.filePath || '').toLowerCase();
 		const videoCodec = (file.codecVideo || '').toLowerCase();
 		const audioCodec = (file.codecAudio || '').toLowerCase();

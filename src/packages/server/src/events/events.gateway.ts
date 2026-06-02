@@ -37,6 +37,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 			WsEvent.SCAN_ERROR,
 			WsEvent.STREAM_STARTED,
 			WsEvent.STREAM_ENDED,
+			WsEvent.STREAM_SUPERSEDED,
 			WsEvent.JOB_STARTED,
 			WsEvent.JOB_PROGRESS,
 			WsEvent.JOB_COMPLETED,

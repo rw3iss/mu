@@ -22,6 +22,7 @@ import { parseThumbnailSize, SpriteService } from '../media/sprite.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { MetadataService } from '../metadata/metadata.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { ConversionService } from '../stream/conversion/conversion.service.js';
 import { StreamService } from '../stream/stream.service.js';
 import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import { ChunkManagerService } from '../stream/transcoder/chunk-manager.service.js';
@@ -38,6 +39,8 @@ export const JOB_TYPE = {
 	SPRITE_SHEET: 'sprite-sheet',
 	CLEANUP: 'cleanup',
 	PRE_TRANSCODE: 'pre-transcode',
+	/** Convert a file to native direct-play MP4 (remux/re-encode + cleanup). */
+	CONVERT_MP4: 'convert-mp4',
 } as const;
 
 @Injectable()
@@ -59,6 +62,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		private readonly settings: SettingsService,
 		private readonly events: EventsService,
 		private readonly transcoderService: TranscoderService,
+		private readonly conversionService: ConversionService,
 		private readonly streamService: StreamService,
 		private readonly database: DatabaseService,
 		readonly _chunkManager: ChunkManagerService,
@@ -331,7 +335,80 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			},
 		);
 
+		// Convert a file to native direct-play MP4 (remux/re-encode + cleanup).
+		this.jobManager.registerHandler(
+			JOB_TYPE.CONVERT_MP4,
+			async (job: JobRecord, helpers: JobHelpers) => {
+				const { movieFileId, inPlace } = job.payload as {
+					movieFileId: string;
+					inPlace?: boolean;
+				};
+				const file = this.database.db
+					.select()
+					.from(movieFiles)
+					.where(eq(movieFiles.id, movieFileId))
+					.get();
+				if (!file) {
+					return { skipped: true, reason: 'file-missing' };
+				}
+
+				// Let the user cancel mid-encode — kills the ffmpeg process writing
+				// this file's temp output (tracked by ConversionService).
+				this.jobManager.setOnCancel(job.id, () => {
+					this.conversionService.cancel(movieFileId);
+				});
+
+				const result = await this.conversionService.convertFile(
+					file,
+					{ inPlace: inPlace ?? this.conversionService.getConfig().convertOriginalFile },
+					(percent) => helpers.reportProgress(percent),
+				);
+				helpers.reportProgress(100);
+				helpers.log(
+					`convert ${result.status}: ${result.action}${result.reason ? ` (${result.reason})` : ''}`,
+				);
+				return result;
+			},
+		);
+
 		this.logger.log('Job handlers registered');
+	}
+
+	/**
+	 * Enqueue convert-to-MP4 jobs for every file with actionable conversion
+	 * work (see ConversionService.eligibleFiles). Skips files that already have
+	 * a pending/running convert job. Returns the number queued.
+	 */
+	enqueueConvertJobs(opts: { inPlace?: boolean } = {}): number {
+		const inPlace = opts.inPlace ?? this.conversionService.getConfig().convertOriginalFile;
+
+		const pendingFileIds = new Set<string>();
+		for (const job of this.jobManager.listJobs({ type: JOB_TYPE.CONVERT_MP4 })) {
+			if (job.status === 'pending' || job.status === 'running') {
+				pendingFileIds.add(job.payload?.movieFileId as string);
+			}
+		}
+
+		const files = this.conversionService.eligibleFiles();
+		let queued = 0;
+		for (const file of files) {
+			if (pendingFileIds.has(file.id)) continue;
+			const movieRow = this.database.db
+				.select({ title: movies.title })
+				.from(movies)
+				.where(eq(movies.id, file.movieId))
+				.get();
+			const label = `Convert to MP4: ${movieRow?.title ?? file.fileName ?? file.id.slice(0, 8)}`;
+			this.jobManager.enqueue({
+				type: JOB_TYPE.CONVERT_MP4,
+				label,
+				payload: { movieFileId: file.id, movieId: file.movieId, inPlace },
+				priority: 55,
+			});
+			queued++;
+		}
+		this.logger.log(`Enqueued ${queued} MP4 conversion job(s) (inPlace=${inPlace})`);
+		return queued;
 	}
 
 	// ===========================================================
@@ -635,6 +712,33 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		for (const file of files) {
 			const mode = this.streamService.determineStreamMode(file);
 			if (mode !== StreamMode.TRANSCODE && mode !== StreamMode.DIRECT_STREAM) continue;
+
+			// Prefer converting to a native direct-play MP4 (remux when lossless,
+			// re-encode otherwise) over building an HLS cache — when enabled and
+			// the file is actionable. Would-grow / un-estimable files (plan
+			// 'skip') fall through to the HLS pre-transcode path below.
+			const convCfg = this.conversionService.getConfig();
+			if (
+				convCfg.autoConvertToMp4 &&
+				this.conversionService.planConversion(file).action !== 'skip'
+			) {
+				const alreadyConverting = this.jobManager
+					.listJobs({ type: JOB_TYPE.CONVERT_MP4 })
+					.some(
+						(j) =>
+							(j.status === 'pending' || j.status === 'running') &&
+							j.payload?.movieFileId === file.id,
+					);
+				if (!alreadyConverting) {
+					this.jobManager.enqueue({
+						type: JOB_TYPE.CONVERT_MP4,
+						label: `Convert to MP4: ${title}`,
+						payload: { movieFileId: file.id, movieId, inPlace: convCfg.convertOriginalFile },
+						priority: 45,
+					});
+				}
+				continue;
+			}
 
 			// Determine which qualities to encode
 			const qualities = new Set<string>([defaultQuality]);

@@ -30,6 +30,14 @@ export enum WsEvent {
 	SCAN_ERROR = 'scan:error',
 	STREAM_STARTED = 'stream:started',
 	STREAM_ENDED = 'stream:ended',
+	/**
+	 * A movie's stream was superseded — its source changed (e.g. a background
+	 * MP4 conversion replaced the original / produced a cached direct-play
+	 * file, and the old HLS cache was cleared). Clients currently playing that
+	 * movie should re-fetch the stream and reload the source at their current
+	 * position. Payload: { movieId, fileId }.
+	 */
+	STREAM_SUPERSEDED = 'stream:superseded',
 	PLUGIN_EVENT = 'plugin:event',
 	JOB_STARTED = 'job:started',
 	JOB_PROGRESS = 'job:progress',

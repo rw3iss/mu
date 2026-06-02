@@ -313,7 +313,11 @@ export class StreamController {
 		}
 
 		const file = fileRows[0]!;
-		return this.directPlayService.serveFile(file.filePath, request, reply);
+		// Prefer a cache-mode converted MP4 when present (convertOriginalFile OFF);
+		// otherwise serve the original file. In-place conversions update
+		// file.filePath directly, so this only matters for cache-mode.
+		const cached = this.transcoderService.getCachedDirectMp4(file.id);
+		return this.directPlayService.serveFile(cached ?? file.filePath, request, reply);
 	}
 
 	/**
