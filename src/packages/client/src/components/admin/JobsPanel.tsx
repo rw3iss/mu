@@ -163,25 +163,35 @@ export function JobsPanel() {
 	}, [filterOpen]);
 
 	useEffect(() => {
-		const load = async () => {
+		let cancelled = false;
+		const loadCurrent = async () => {
 			try {
-				if (tab === 'current') {
-					const data = await api.get<{ jobs: any[] }>('/admin/server/jobs');
-					setCurrentJobs(data.jobs);
-				} else {
-					const data = await api.get<{ jobs: any[] }>(
-						'/admin/server/jobs/history?limit=200',
-					);
-					setHistoryJobs(data.jobs);
-				}
+				const data = await api.get<{ jobs: any[] }>('/admin/server/jobs');
+				if (!cancelled) setCurrentJobs(data.jobs);
 			} catch {}
 		};
-		load();
-		const interval = tab === 'current' ? setInterval(load, 3000) : null;
-		return () => {
-			if (interval) clearInterval(interval);
+		const loadHistory = async () => {
+			try {
+				const data = await api.get<{ jobs: any[] }>('/admin/server/jobs/history?limit=200');
+				if (!cancelled) setHistoryJobs(data.jobs);
+			} catch {}
 		};
-	}, [tab]);
+		// Load BOTH up front (and keep both polling) so the tab counts are
+		// accurate immediately and stay live. Previously history was lazy-
+		// loaded only while its tab was active, so "History (N)" showed 0 the
+		// whole time you watched jobs on the Current tab — and never updated
+		// as jobs completed.
+		loadCurrent();
+		loadHistory();
+		const interval = setInterval(() => {
+			loadCurrent();
+			loadHistory();
+		}, 3000);
+		return () => {
+			cancelled = true;
+			clearInterval(interval);
+		};
+	}, []);
 
 	// Clear selection when switching tabs.
 	useEffect(() => setSelected(new Set()), [tab]);
