@@ -13,11 +13,13 @@ import { MatchCandidatesPanel } from '@/components/movie/MatchCandidatesPanel';
 import { MovieBreadcrumbs } from '@/components/movie/MovieBreadcrumbs';
 import { MovieOptionsMenu } from '@/components/movie/MovieOptionsMenu';
 import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
+import { PlaybackBadge } from '@/components/movie/PlaybackBadge';
 import { RatingWidget } from '@/components/movie/RatingWidget';
 import { ShareMovieModal } from '@/components/movie/ShareMovieModal';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { TrailerSection } from '@/components/movie/TrailerSection';
 import { useSeo } from '@/hooks/useSeo';
+import { useWatchPosition } from '@/hooks/useWatchPosition';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { type AudioProfile, audioProfilesService } from '@/services/audio-profiles.service';
@@ -31,7 +33,6 @@ import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { fetchProcessingMovies, processingMovieIds } from '@/state/processing.state';
-import { useWatchPosition } from '@/hooks/useWatchPosition';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieDetail.module.scss';
 
@@ -657,7 +658,9 @@ export function MovieDetail({ id }: MovieDetailProps) {
 												: undefined
 										}
 										tabIndex={
-											currentUser.value?.role === 'admin' && processingJobId ? 0 : undefined
+											currentUser.value?.role === 'admin' && processingJobId
+												? 0
+												: undefined
 										}
 										title={
 											currentUser.value?.role === 'admin' && processingJobId
@@ -1103,6 +1106,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									onClick={() => setShowFileInfo(!showFileInfo)}
 								>
 									<h2 class={styles.sectionTitle}>File Info</h2>
+									<PlaybackBadge movie={movie} />
 									<span class={styles.fileInfoArrow}>
 										<Icon
 											name={showFileInfo ? 'chevron-up' : 'chevron-down'}

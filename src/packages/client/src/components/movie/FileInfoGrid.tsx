@@ -4,8 +4,8 @@ import { currentUser } from '@/state/auth.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { formatBytes } from '@/utils/format-bytes';
-import { getStreamModeLabel, needsTranscode } from '@/utils/stream-mode';
 import styles from './FileInfoGrid.module.scss';
+import { PlaybackBadge } from './PlaybackBadge';
 
 interface FileInfoGridProps {
 	movie: Movie;
@@ -43,13 +43,7 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 			<div class={styles.grid}>
 				<span class={styles.label}>Playback</span>
 				<span class={styles.value}>
-					<span
-						class={`${styles.badge} ${
-							needsTranscode(movie) ? styles.badgeWarn : styles.badgeSuccess
-						}`}
-					>
-						{getStreamModeLabel(movie) ?? 'Unknown'}
-					</span>
+					<PlaybackBadge movie={movie} />
 				</span>
 
 				{fi.filePath && (

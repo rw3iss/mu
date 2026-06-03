@@ -6,6 +6,7 @@ import { SmartImage } from '@/components/common/SmartImage';
 import { CastPhoto } from '@/components/movie/CastPhoto';
 import { FileInfoGrid } from '@/components/movie/FileInfoGrid';
 import { MovieBreadcrumbs } from '@/components/movie/MovieBreadcrumbs';
+import { PlaybackBadge } from '@/components/movie/PlaybackBadge';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
@@ -280,6 +281,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										onClick={() => setShowFileInfo(!showFileInfo)}
 									>
 										<h3 class={styles.sectionTitle}>File Info</h3>
+										<PlaybackBadge movie={movie} />
 										<span class={styles.fileInfoArrow}>
 											<Icon
 												name={showFileInfo ? 'chevron-up' : 'chevron-down'}
@@ -498,6 +500,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									onClick={() => setShowFileInfo(!showFileInfo)}
 								>
 									<h3 class={styles.sectionTitle}>File Info</h3>
+									<PlaybackBadge movie={movie} />
 									<span class={styles.fileInfoArrow}>
 										<Icon
 											name={showFileInfo ? 'chevron-up' : 'chevron-down'}
