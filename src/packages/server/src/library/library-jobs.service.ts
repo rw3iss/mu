@@ -379,7 +379,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 	 * work (see ConversionService.eligibleFiles). Skips files that already have
 	 * a pending/running convert job. Returns the number queued.
 	 */
-	enqueueConvertJobs(opts: { inPlace?: boolean } = {}): number {
+	enqueueConvertJobs(opts: { inPlace?: boolean } = {}): { queued: number; cachesCleared: number } {
 		const inPlace = opts.inPlace ?? this.conversionService.getConfig().convertOriginalFile;
 
 		const pendingFileIds = new Set<string>();
@@ -429,7 +429,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		this.logger.log(
 			`Enqueued ${queued} MP4 conversion job(s) (inPlace=${inPlace}); cleared ${cachesCleared} stray cache(s)`,
 		);
-		return queued;
+		return { queued, cachesCleared };
 	}
 
 	// ===========================================================
@@ -905,7 +905,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		// With auto-convert on, "re-encode" means convert to direct-play MP4 and
 		// clear stray caches — never rebuild background HLS caches.
 		if (this.conversionService.getConfig().autoConvertToMp4) {
-			return this.enqueueConvertJobs();
+			return this.enqueueConvertJobs().queued;
 		}
 
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;

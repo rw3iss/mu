@@ -267,15 +267,24 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 		setConvertingCache(true);
 		const startedId = notifyInfo('Scanning library for movies to convert…', 0);
 		try {
-			const res = await api.post<{ message: string; queued: number }>(
+			const res = await api.post<{ message: string; queued: number; cachesCleared: number }>(
 				'/sources/convert-and-clear-cache',
 			);
 			removeNotification(startedId);
 			const total = res.queued;
 			if (total === 0) {
-				notifySuccess('Everything is already direct-play — nothing to convert.');
+				// No new conversions to queue — but the server still ran the
+				// stray-cache cleanup (and any already-queued jobs keep running).
+				// Use the server message so cleared caches are reported.
+				notifySuccess(res.message);
 				setConvertingCache(false);
 				return;
+			}
+			if (res.cachesCleared > 0) {
+				notifyInfo(
+					`Cleared ${res.cachesCleared} stray cache${res.cachesCleared === 1 ? '' : 's'}.`,
+					4000,
+				);
 			}
 
 			let done = 0;
