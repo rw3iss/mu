@@ -407,7 +407,28 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			});
 			queued++;
 		}
-		this.logger.log(`Enqueued ${queued} MP4 conversion job(s) (inPlace=${inPlace})`);
+
+		// Reclaim disk: clear stray background transcode caches for files we
+		// won't convert (would-grow / unprobed). Convertible files clear their
+		// own cache when the convert job finishes; direct-play files never had
+		// one. This makes "Convert and Clear Cache" leave no background caches.
+		let cachesCleared = 0;
+		const convertingIds = new Set(files.map((f) => f.id));
+		const allAvail = this.database.db
+			.select()
+			.from(movieFiles)
+			.where(eq(movieFiles.available, true))
+			.all();
+		for (const f of allAvail) {
+			if (convertingIds.has(f.id)) continue;
+			if (this.streamService.determineStreamMode(f) === StreamMode.DIRECT_PLAY) continue;
+			void this.transcoderService.clearCache(f.id);
+			cachesCleared++;
+		}
+
+		this.logger.log(
+			`Enqueued ${queued} MP4 conversion job(s) (inPlace=${inPlace}); cleared ${cachesCleared} stray cache(s)`,
+		);
 		return queued;
 	}
 
@@ -593,6 +614,37 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			const mode = this.streamService.determineStreamMode(file);
 			if (mode !== StreamMode.TRANSCODE && mode !== StreamMode.DIRECT_STREAM) continue;
 
+			// With auto-convert on, NEVER create background HLS caches on startup.
+			// Convertible files are converted to direct-play MP4 in place;
+			// non-convertible (would-grow / unprobed) files are left for on-demand
+			// transcode only — no background cache.
+			const convCfg = this.conversionService.getConfig();
+			if (convCfg.autoConvertToMp4) {
+				if (this.conversionService.planConversion(file).action !== 'skip') {
+					const alreadyConverting = this.jobManager
+						.listJobs({ type: JOB_TYPE.CONVERT_MP4 })
+						.some(
+							(j) =>
+								(j.status === 'pending' || j.status === 'running') &&
+								j.payload?.movieFileId === file.id,
+						);
+					if (!alreadyConverting) {
+						this.jobManager.enqueue({
+							type: JOB_TYPE.CONVERT_MP4,
+							label: `Convert to MP4: ${movieTitle || file.id.slice(0, 8)}`,
+							payload: {
+								movieFileId: file.id,
+								movieId: file.movieId,
+								inPlace: convCfg.convertOriginalFile,
+							},
+							priority: recentMovieIds.has(file.movieId) ? 35 : 45,
+						});
+						resumed++;
+					}
+				}
+				continue;
+			}
+
 			const qualities = new Set<string>([defaultQuality]);
 			if (encodeHighest && file.resolution) {
 				const nativeQuality = this.resolutionToQuality(file.resolution);
@@ -715,28 +767,29 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 
 			// Prefer converting to a native direct-play MP4 (remux when lossless,
 			// re-encode otherwise) over building an HLS cache — when enabled and
-			// the file is actionable. Would-grow / un-estimable files (plan
-			// 'skip') fall through to the HLS pre-transcode path below.
+			// the file is actionable.
 			const convCfg = this.conversionService.getConfig();
-			if (
-				convCfg.autoConvertToMp4 &&
-				this.conversionService.planConversion(file).action !== 'skip'
-			) {
-				const alreadyConverting = this.jobManager
-					.listJobs({ type: JOB_TYPE.CONVERT_MP4 })
-					.some(
-						(j) =>
-							(j.status === 'pending' || j.status === 'running') &&
-							j.payload?.movieFileId === file.id,
-					);
-				if (!alreadyConverting) {
-					this.jobManager.enqueue({
-						type: JOB_TYPE.CONVERT_MP4,
-						label: `Convert to MP4: ${title}`,
-						payload: { movieFileId: file.id, movieId, inPlace: convCfg.convertOriginalFile },
-						priority: 45,
-					});
+			if (convCfg.autoConvertToMp4) {
+				if (this.conversionService.planConversion(file).action !== 'skip') {
+					const alreadyConverting = this.jobManager
+						.listJobs({ type: JOB_TYPE.CONVERT_MP4 })
+						.some(
+							(j) =>
+								(j.status === 'pending' || j.status === 'running') &&
+								j.payload?.movieFileId === file.id,
+						);
+					if (!alreadyConverting) {
+						this.jobManager.enqueue({
+							type: JOB_TYPE.CONVERT_MP4,
+							label: `Convert to MP4: ${title}`,
+							payload: { movieFileId: file.id, movieId, inPlace: convCfg.convertOriginalFile },
+							priority: 45,
+						});
+					}
 				}
+				// Never fall through to background HLS pre-transcoding when
+				// auto-convert is on. Non-convertible (would-grow / unprobed)
+				// files are left untouched and transcoded on-demand only.
 				continue;
 			}
 
@@ -848,6 +901,12 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		const lib = this.settings.get<Record<string, unknown>>('library', {});
 		const persistEnabled = (lib as any)?.persistTranscodes !== false;
 		if (!persistEnabled) return 0;
+
+		// With auto-convert on, "re-encode" means convert to direct-play MP4 and
+		// clear stray caches — never rebuild background HLS caches.
+		if (this.conversionService.getConfig().autoConvertToMp4) {
+			return this.enqueueConvertJobs();
+		}
 
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const defaultQuality = enc?.quality || '1080p';
