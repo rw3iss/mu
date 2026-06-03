@@ -82,19 +82,13 @@ export class LibraryController {
 	@Roles('admin')
 	@RequireAction('edit:app-settings')
 	convertAndClearCache(@Body() body?: { inPlace?: boolean }) {
-		const { queued, cachesCleared } = this.libraryJobs.enqueueConvertJobs({
-			inPlace: body?.inPlace,
-		});
-		const parts: string[] = [];
-		if (queued > 0) parts.push(`queued ${queued} movie${queued === 1 ? '' : 's'} for conversion`);
-		if (cachesCleared > 0)
-			parts.push(`cleared ${cachesCleared} stray cache${cachesCleared === 1 ? '' : 's'}`);
+		const queued = this.libraryJobs.enqueueConvertJobs({ inPlace: body?.inPlace });
 		return {
-			message: parts.length
-				? `Convert and Clear Cache: ${parts.join(', ')}.`
-				: 'Nothing to do — everything is already direct-play with no caches.',
+			message:
+				queued > 0
+					? `Queued ${queued} movie${queued === 1 ? '' : 's'} for MP4 conversion.`
+					: 'No movies need conversion — everything is already direct-play.',
 			queued,
-			cachesCleared,
 		};
 	}
 
