@@ -1148,9 +1148,16 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				`ext=${ext}, browserAudio=${isBrowserAudio}, needsAudioTranscode=${needsAudioTranscode}`,
 		);
 
+		// AV1 is browser-universal (Chrome/Firefox/Edge, Safari 17.4+) — treat it
+		// like H.264 for direct play. Files we convert HEVC→AV1 land here.
+		const isAv1 = videoCodec === 'av1' || videoCodec === 'av01';
+
 		// If we have codec info, use it for precise decisions
 		if (videoCodec) {
 			if (isH264 && isBrowserContainer && isBrowserAudio && !needsAudioTranscode) {
+				return StreamMode.DIRECT_PLAY;
+			}
+			if (isAv1 && isBrowserContainer && isBrowserAudio && !needsAudioTranscode) {
 				return StreamMode.DIRECT_PLAY;
 			}
 			if (isH264 && isMkv && isBrowserAudio && !needsAudioTranscode) {

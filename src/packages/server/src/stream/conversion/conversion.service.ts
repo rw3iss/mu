@@ -11,7 +11,7 @@ import { SettingsService } from '../../settings/settings.service.js';
 import { TranscoderService } from '../transcoder/transcoder.service.js';
 
 /** What the planner decided to do with a file. */
-export type ConversionAction = 'remux' | 'reencode-audio' | 'reencode' | 'skip';
+export type ConversionAction = 'remux' | 'reencode-audio' | 'reencode' | 'reencode-av1' | 'skip';
 
 export interface ConversionPlan {
 	action: ConversionAction;
@@ -83,12 +83,25 @@ export class ConversionService {
 			convertOriginalFile: enc?.convertOriginalFile !== false,
 			autoConvertToMp4: enc?.autoConvertToMp4 !== false,
 			growthThreshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 1.25,
+			// Convert HEVC → AV1 MP4 (GPU). AV1 is browser-universal AND efficient
+			// (no doubling), but requires a working NVENC AV1 encoder. Default off.
+			convertHevcToAv1: enc?.convertHevcToAv1 === true,
 		};
+	}
+
+	/** True when an AV1-capable hardware encoder (NVENC) is actually usable. */
+	private nvencActive(): boolean {
+		return this.transcoder.getEffectiveHwAccel() === 'nvenc';
 	}
 
 	private isH264(codec?: string | null): boolean {
 		const c = (codec || '').toLowerCase();
 		return c === 'h264' || c === 'avc' || c === 'h.264';
+	}
+
+	private isHevc(codec?: string | null): boolean {
+		const c = (codec || '').toLowerCase();
+		return c === 'hevc' || c === 'h265' || c === 'h.265' || c === 'hvc1' || c === 'hev1';
 	}
 
 	private isBrowserAudio(codec?: string | null): boolean {
@@ -134,6 +147,14 @@ export class ConversionService {
 		}
 		if (h264 && !browserAudio) {
 			return { action: 'reencode-audio', reason: 'h264-incompatible-audio' };
+		}
+
+		// HEVC → AV1 (GPU): AV1 is browser-universal and ~as efficient as HEVC, so
+		// it doesn't bloat like H.264. Only when the setting is on AND an AV1-
+		// capable NVENC encoder is actually usable (else fall through to the
+		// would-grow guard, which skips HEVC and lets it transcode to H.264 HLS).
+		if (this.isHevc(videoCodec) && this.getConfig().convertHevcToAv1 && this.nvencActive()) {
+			return { action: 'reencode-av1', reason: 'hevc-to-av1' };
 		}
 
 		// Non-H.264 → full re-encode. Guard against growing the file.
@@ -255,6 +276,13 @@ export class ConversionService {
 				await this.transcoder.remuxToMp4(srcPath, tempPath, onProgress);
 			} else if (plan.action === 'reencode-audio') {
 				await this.transcoder.transcodeToMp4(srcPath, tempPath, { videoCopy: true }, onProgress);
+			} else if (plan.action === 'reencode-av1') {
+				await this.transcoder.transcodeToMp4(
+					srcPath,
+					tempPath,
+					{ preserveResolution: true, targetCodec: 'av1' },
+					onProgress,
+				);
 			} else {
 				await this.transcoder.transcodeToMp4(
 					srcPath,
@@ -295,7 +323,7 @@ export class ConversionService {
 					filePath: finalPath,
 					fileName: path.basename(finalPath),
 					fileSize: probe.sizeBytes,
-					codecVideo: 'h264',
+					codecVideo: probe.codecVideo ?? (plan.action === 'reencode-av1' ? 'av1' : 'h264'),
 					codecAudio: probe.codecAudio ?? 'aac',
 					containerFormat: 'mp4',
 					videoWidth: probe.videoWidth ?? file.videoWidth ?? null,

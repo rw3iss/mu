@@ -274,6 +274,8 @@ export function Settings(props: SettingsProps) {
 	const [autoConvertToMp4, setAutoConvertToMp4] = useState(true);
 	const [convertOriginalFile, setConvertOriginalFile] = useState(true);
 	const [conversionGrowthThreshold, setConversionGrowthThreshold] = useState('1.25');
+	const [convertHevcToAv1, setConvertHevcToAv1] = useState(false);
+	const [av1Cq, setAv1Cq] = useState('32');
 	const [reEncodeOnScan, setReEncodeOnScan] = useState(false);
 
 	// Sharing settings
@@ -385,6 +387,9 @@ export function Settings(props: SettingsProps) {
 						setConvertOriginalFile(encoding.convertOriginalFile);
 					if (encoding.conversionGrowthThreshold != null)
 						setConversionGrowthThreshold(String(encoding.conversionGrowthThreshold));
+					if (typeof encoding.convertHevcToAv1 === 'boolean')
+						setConvertHevcToAv1(encoding.convertHevcToAv1);
+					if (encoding.av1Cq != null) setAv1Cq(String(encoding.av1Cq));
 				}
 
 				// Load sources from the API
@@ -494,6 +499,8 @@ export function Settings(props: SettingsProps) {
 					autoConvertToMp4,
 					convertOriginalFile,
 					conversionGrowthThreshold: parseFloat(conversionGrowthThreshold) || 1.25,
+					convertHevcToAv1,
+					av1Cq: parseInt(av1Cq, 10) || 32,
 				},
 			});
 
@@ -532,6 +539,8 @@ export function Settings(props: SettingsProps) {
 		autoConvertToMp4,
 		convertOriginalFile,
 		conversionGrowthThreshold,
+		convertHevcToAv1,
+		av1Cq,
 		watchedThreshold,
 		completedTail,
 	]);
@@ -2075,6 +2084,54 @@ export function Settings(props: SettingsProps) {
 											(e.target as HTMLInputElement).value,
 										)
 									}
+									style={{ width: '80px' }}
+								/>
+							</div>
+
+							{/* Convert HEVC to AV1 (GPU) */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Convert HEVC to AV1 (GPU)</span>
+									<span class={styles.settingDescription}>
+										HEVC/H.265 movies can't play in most browsers. When a working
+										GPU AV1 encoder (NVENC) is available, convert them to AV1 MP4
+										in place instead of building an H.264 cache. AV1 plays in all
+										modern browsers and stays ~the same size as HEVC (no doubling
+										like H.264). Roughly 5–10 min per episode / 10–25 min per movie
+										on the GPU. Requires Hardware Acceleration = NVIDIA (NVENC) on
+										an interactive-session GPU; otherwise HEVC still transcodes to
+										H.264 as before.
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={convertHevcToAv1}
+										onChange={(e) =>
+											setConvertHevcToAv1((e.target as HTMLInputElement).checked)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							{/* AV1 quality (CQ) */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>AV1 Quality (CQ)</span>
+									<span class={styles.settingDescription}>
+										AV1 NVENC constant-quality (0–63; lower = better and larger).
+										~28 high quality, 32 balanced (default), 38 smaller.
+									</span>
+								</div>
+								<input
+									type="number"
+									class={styles.select}
+									min={18}
+									max={50}
+									step={1}
+									value={av1Cq}
+									onInput={(e) => setAv1Cq((e.target as HTMLInputElement).value)}
 									style={{ width: '80px' }}
 								/>
 							</div>

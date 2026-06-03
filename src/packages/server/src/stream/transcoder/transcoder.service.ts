@@ -513,6 +513,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			nearLossless?: boolean;
 			/** Copy the video stream untouched and only re-encode audio → AAC. */
 			videoCopy?: boolean;
+			/** Target video codec. 'av1' uses NVENC AV1 (requires a working GPU). */
+			targetCodec?: 'h264' | 'av1';
+			/** AV1 NVENC constant-quality value; overrides the encoding setting. */
+			av1Cq?: number;
 		} = {},
 		onProgress?: (pct: number) => void,
 	): Promise<void> {
@@ -541,7 +545,36 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		return new Promise<void>((resolve, reject) => {
 			let command = this.createFfmpegCommand(filePath);
 
-			if (opts.videoCopy) {
+			if (opts.targetCodec === 'av1') {
+				// GPU AV1 (NVENC). Browser-universal (Chrome/Firefox/Edge, modern
+				// Safari) AND ~as efficient as HEVC, so no H.264-style doubling.
+				// Constant-quality via -cq; preserves source resolution in-place.
+				const cq = opts.av1Cq ?? enc.av1Cq;
+				const av1Preset = /^p[1-7]$/.test(enc.preset) ? enc.preset : 'p5';
+				command = command
+					.videoCodec('av1_nvenc')
+					.audioCodec('aac')
+					.outputOptions([
+						'-ac',
+						'2',
+						'-b:a',
+						profile.audioBitrate,
+						'-preset',
+						av1Preset,
+						'-rc',
+						'vbr',
+						'-cq',
+						String(cq),
+						'-b:v',
+						'0',
+						'-pix_fmt',
+						'yuv420p',
+					]);
+				if (!opts.preserveResolution) {
+					const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+					command = command.outputOptions(['-vf', scaleFilter]);
+				}
+			} else if (opts.videoCopy) {
 				// Video is already browser-compatible (H.264) — copy it losslessly
 				// and only bring the audio to AAC. Fast, no video quality loss.
 				command = command
@@ -2233,6 +2266,16 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		return ['-b:v', videoBitrate];
 	}
 
+	/**
+	 * Effective hardware-accel mode after the broken-encoder guard. Returns
+	 * 'none' when hardware encoding has been marked broken (e.g. NVENC can't
+	 * init in a non-interactive session). Public so ConversionService can gate
+	 * the AV1 path on a genuinely-usable GPU encoder.
+	 */
+	getEffectiveHwAccel(): string {
+		return this.getEncodingSettings().hwAccel;
+	}
+
 	private getEncodingSettings() {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const configuredHwAccel = enc?.hwAccel || 'none';
@@ -2241,11 +2284,14 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		// NVENC uses different preset names: map libx264 presets to NVENC equivalents
 		const preset =
 			hwAccel === 'nvenc' ? this.mapNvencPreset(configuredPreset) : configuredPreset;
+		const av1Cq = Number(enc?.av1Cq);
 		return {
 			hwAccel,
 			preset,
 			rateControl: enc?.rateControl || 'cbr',
 			crf: enc?.crf ?? 23,
+			// AV1 NVENC constant-quality (0–63; ~32 is a good 1080p balance).
+			av1Cq: Number.isFinite(av1Cq) && av1Cq > 0 ? av1Cq : 32,
 			segmentDuration: enc?.segmentDuration ?? 4,
 			// Force 8-bit output for hardware encoders (NVENC doesn't support 10-bit H.264)
 			pixFmt: hwAccel !== 'none' ? 'yuv420p' : undefined,
