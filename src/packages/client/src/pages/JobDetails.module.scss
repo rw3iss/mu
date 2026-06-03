@@ -34,6 +34,13 @@
 	flex-wrap: wrap;
 }
 
+.actionBar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-sm);
+	align-items: center;
+}
+
 .eyebrow {
 	display: flex;
 	gap: var(--space-sm);

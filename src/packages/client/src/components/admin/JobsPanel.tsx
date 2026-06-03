@@ -132,6 +132,7 @@ export function JobsPanel() {
 	const [tab, setTab] = useState<'current' | 'history'>('current');
 	const [currentJobs, setCurrentJobs] = useState<any[]>([]);
 	const [historyJobs, setHistoryJobs] = useState<any[]>([]);
+	const [initialLoading, setInitialLoading] = useState(true);
 	const [expandedJob, setExpandedJob] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -181,8 +182,9 @@ export function JobsPanel() {
 		// loaded only while its tab was active, so "History (N)" showed 0 the
 		// whole time you watched jobs on the Current tab — and never updated
 		// as jobs completed.
-		loadCurrent();
-		loadHistory();
+		Promise.all([loadCurrent(), loadHistory()]).finally(() => {
+			if (!cancelled) setInitialLoading(false);
+		});
 		const interval = setInterval(() => {
 			loadCurrent();
 			loadHistory();
@@ -534,7 +536,12 @@ export function JobsPanel() {
 			</div>
 
 			<div class={styles.list}>
-				{filtered.length === 0 ? (
+				{initialLoading ? (
+					<div class={styles.loadingState}>
+						<Spinner size="lg" />
+						<span>Loading jobs…</span>
+					</div>
+				) : filtered.length === 0 ? (
 					<div class={styles.emptyText}>
 						{q || statusFilter || disabledTypes.size > 0
 							? 'No jobs match the current filters.'

@@ -81,11 +81,19 @@ export class JobController {
 					),
 				)
 			: undefined;
+		// Active job (any type — pre-transcode or convert-mp4) for this movie, so
+		// the UI can deep-link to its job-details page. Prefer a running job.
+		const anyActive = this.jobManager.findJobsByPayload('movieId', movieId, undefined, [
+			'pending',
+			'running',
+		]);
+		const jobId = (anyActive.find((j) => j.status === 'running') ?? anyActive[0])?.id ?? null;
 		return {
 			movieId,
 			running: isRunning,
 			progress,
 			pending: jobs.some((j) => j.status === 'pending'),
+			jobId,
 		};
 	}
 

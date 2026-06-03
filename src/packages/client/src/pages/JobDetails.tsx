@@ -24,7 +24,7 @@ export function JobDetails({ id }: JobDetailsProps) {
 	const [job, setJob] = useState<Job | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [cancelling, setCancelling] = useState(false);
+	const [busyAction, setBusyAction] = useState<string | null>(null);
 
 	const isAdmin = currentUser.value?.role === 'admin';
 
@@ -65,19 +65,26 @@ export function JobDetails({ id }: JobDetailsProps) {
 		};
 	}, [id, load]);
 
-	const handleCancel = useCallback(async () => {
-		if (!job) return;
-		setCancelling(true);
-		try {
-			await jobsService.cancel(job.id);
-			notifySuccess(`Cancel signal sent to job ${job.id.slice(0, 8)}…`);
-			load();
-		} catch (err: any) {
-			notifyError(`Failed to cancel: ${err?.message ?? 'unknown error'}`);
-		} finally {
-			setCancelling(false);
-		}
-	}, [job, load]);
+	const runAction = useCallback(
+		async (action: string, fn: () => Promise<unknown>, successMsg: string) => {
+			setBusyAction(action);
+			try {
+				const r = (await fn()) as { newJobId?: string | null } | undefined;
+				if (action === 'retry' && r?.newJobId) {
+					notifySuccess('Job re-queued');
+					route(`/admin/jobs/${r.newJobId}`);
+					return;
+				}
+				notifySuccess(successMsg);
+				load();
+			} catch (err: any) {
+				notifyError(`Failed to ${action}: ${err?.message ?? 'unknown error'}`);
+			} finally {
+				setBusyAction(null);
+			}
+		},
+		[load],
+	);
 
 	if (!isAdmin) {
 		return (
@@ -112,6 +119,8 @@ export function JobDetails({ id }: JobDetailsProps) {
 	}
 
 	const isLive = job.status === 'pending' || job.status === 'running';
+	const isCancellable = isLive || job.status === 'paused';
+	const movieId = typeof job.payload?.movieId === 'string' ? job.payload.movieId : null;
 	const durationMs =
 		job.completedAt && job.startedAt
 			? new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime()
@@ -138,16 +147,64 @@ export function JobDetails({ id }: JobDetailsProps) {
 						<code class={styles.id}>{job.id}</code>
 					</div>
 				</div>
-				{isLive && (
-					<Button
-						variant="danger"
-						onClick={handleCancel}
-						loading={cancelling}
-						disabled={cancelling}
-					>
-						<Icon name="x" size={14} /> Cancel
-					</Button>
-				)}
+				<div class={styles.actionBar}>
+					{movieId && (
+						<Button variant="ghost" onClick={() => route(`/movie/${movieId}`)}>
+							<Icon name="film" size={14} /> Movie
+						</Button>
+					)}
+					{job.status === 'pending' && (
+						<Button
+							variant="secondary"
+							loading={busyAction === 'prioritize'}
+							onClick={() =>
+								runAction(
+									'prioritize',
+									() => jobsService.prioritize(job.id),
+									'Moved to the front of the queue',
+								)
+							}
+						>
+							<Icon name="arrow-up" size={14} /> Prioritize
+						</Button>
+					)}
+					{job.status === 'running' && (
+						<Button
+							variant="secondary"
+							loading={busyAction === 'pause'}
+							onClick={() => runAction('pause', () => jobsService.pause(job.id), 'Job paused')}
+						>
+							<Icon name="pause" size={14} /> Pause
+						</Button>
+					)}
+					{job.status === 'paused' && (
+						<Button
+							variant="secondary"
+							loading={busyAction === 'resume'}
+							onClick={() => runAction('resume', () => jobsService.resume(job.id), 'Job resumed')}
+						>
+							<Icon name="play" size={14} /> Resume
+						</Button>
+					)}
+					{job.status === 'failed' && (
+						<Button
+							variant="secondary"
+							loading={busyAction === 'retry'}
+							onClick={() => runAction('retry', () => jobsService.retry(job.id), 'Job re-queued')}
+						>
+							<Icon name="refresh" size={14} /> Retry
+						</Button>
+					)}
+					{isCancellable && (
+						<Button
+							variant="danger"
+							loading={busyAction === 'cancel'}
+							onClick={() => runAction('cancel', () => jobsService.cancel(job.id), 'Cancel signal sent')}
+						>
+							<Icon name="x" size={14} /> Cancel
+						</Button>
+					)}
+				</div>
 			</header>
 
 			{typeof job.progress === 'number' && isLive && (

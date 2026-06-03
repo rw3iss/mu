@@ -481,6 +481,25 @@
   min-width: 180px;
 }
 
+// Admin: the processing indicator deep-links to the job-details page.
+.transcodeInfoLink {
+  cursor: pointer;
+  padding: var(--space-xs) var(--space-sm);
+  margin: calc(var(--space-xs) * -1) calc(var(--space-sm) * -1);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-hover-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
 .transcodeProgressBar {
   width: 120px;
   height: 6px;

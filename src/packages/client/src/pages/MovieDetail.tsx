@@ -22,8 +22,10 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { type AudioProfile, audioProfilesService } from '@/services/audio-profiles.service';
 import { bookmarksService } from '@/services/discover.service';
+import { jobsService } from '@/services/jobs.service';
 import { type MatchCandidate, moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
+import { currentUser } from '@/state/auth.state';
 import { personKeyFor } from '@/state/favorites.state';
 import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
@@ -67,6 +69,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 	// Transcode progress tracking
 	const [transcodeProgress, setTranscodeProgress] = useState<number | null>(null);
+	const [processingJobId, setProcessingJobId] = useState<string | null>(null);
 
 	// Inline title editing
 	const [editingTitle, setEditingTitle] = useState(false);
@@ -175,15 +178,22 @@ export function MovieDetail({ id }: MovieDetailProps) {
 		if (!id) return;
 
 		const onProgress = (data: unknown) => {
-			const ev = data as { type?: string; progress?: number; payload?: { movieId?: string } };
+			const ev = data as {
+				id?: string;
+				type?: string;
+				progress?: number;
+				payload?: { movieId?: string };
+			};
 			if (ev.type === 'pre-transcode' && ev.payload?.movieId === id) {
 				setTranscodeProgress(ev.progress ?? null);
+				if (ev.id) setProcessingJobId(ev.id);
 			}
 		};
 		const onDone = (data: unknown) => {
 			const ev = data as { type?: string; payload?: { movieId?: string } };
 			if (ev.type === 'pre-transcode' && ev.payload?.movieId === id) {
 				setTranscodeProgress(null);
+				setProcessingJobId(null);
 				// Re-fetch movie to update status
 				moviesService
 					.get(id)
@@ -201,6 +211,32 @@ export function MovieDetail({ id }: MovieDetailProps) {
 			wsService.off('job:failed', onDone);
 		};
 	}, [id]);
+
+	// Fetch the active job id for this movie so the "processing" indicator can
+	// deep-link to its job-details page immediately (even for a queued job that
+	// hasn't emitted a progress event yet). Admin-only feature, but the lookup
+	// is cheap and gated on the movie actually processing.
+	useEffect(() => {
+		if (!id || !movie) return;
+		const isProcessing =
+			movie.status === 'processing' ||
+			movie.status === 'processing_playable' ||
+			processingMovieIds.value.has(id);
+		if (!isProcessing) {
+			setProcessingJobId(null);
+			return;
+		}
+		let cancelled = false;
+		jobsService
+			.movieStatus(id)
+			.then((s) => {
+				if (!cancelled && s.jobId) setProcessingJobId(s.jobId);
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, [id, movie?.status]);
 
 	const handlePlay = useCallback(() => {
 		if (movie) {
@@ -609,7 +645,31 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											<Icon name="play" size={14} /> Play (live)
 										</Button>
 									)}
-									<div class={styles.transcodeInfo}>
+									<div
+										class={`${styles.transcodeInfo}${
+											currentUser.value?.role === 'admin' && processingJobId
+												? ` ${styles.transcodeInfoLink}`
+												: ''
+										}`}
+										role={
+											currentUser.value?.role === 'admin' && processingJobId
+												? 'button'
+												: undefined
+										}
+										tabIndex={
+											currentUser.value?.role === 'admin' && processingJobId ? 0 : undefined
+										}
+										title={
+											currentUser.value?.role === 'admin' && processingJobId
+												? 'Manage this job — prioritize, pause, or cancel'
+												: undefined
+										}
+										onClick={
+											currentUser.value?.role === 'admin' && processingJobId
+												? () => route(`/admin/jobs/${processingJobId}`)
+												: undefined
+										}
+									>
 										{transcodeProgress != null ? (
 											<>
 												<div class={styles.transcodeProgressBar}>
@@ -629,6 +689,9 @@ export function MovieDetail({ id }: MovieDetailProps) {
 												<Spinner size="sm" />
 												<span>Processing...</span>
 											</>
+										)}
+										{currentUser.value?.role === 'admin' && processingJobId && (
+											<Icon name="chevron-right" size={14} />
 										)}
 									</div>
 									<Button
