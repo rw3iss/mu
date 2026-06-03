@@ -65,6 +65,7 @@ export class StreamController {
 		@Query('quality') quality: string | undefined,
 		@Query('audioTrack') audioTrack: string | undefined,
 		@Query('subtitleTrack') subtitleTrack: string | undefined,
+		@Query('hevc') hevc: string | undefined,
 		@CurrentUser() user: any,
 		@Req() req: any,
 	) {
@@ -79,6 +80,7 @@ export class StreamController {
 			audioTrack: audioTrack ? parseInt(audioTrack, 10) : undefined,
 			subtitleTrack: subtitleTrack ? parseInt(subtitleTrack, 10) : undefined,
 			ipAddress,
+			clientHevc: hevc === '1',
 		});
 	}
 

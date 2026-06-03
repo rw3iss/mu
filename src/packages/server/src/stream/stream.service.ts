@@ -39,6 +39,9 @@ interface StartStreamOptions {
 	 * Fastify request. Persisted on the session row so the admin
 	 * panel can show where active streams are coming from. */
 	ipAddress?: string;
+	/** The requesting browser reports it can decode HEVC natively (from the
+	 * `?hevc=1` query). Lets HEVC-in-MP4 files direct-play instead of transcode. */
+	clientHevc?: boolean;
 }
 
 /**
@@ -304,8 +307,10 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			);
 		}
 
-		// Determine stream mode based on container, video codec, and audio codec
-		const mode = this.determineStreamMode(file);
+		// Determine stream mode based on container, video codec, and audio codec.
+		// Pass the client's HEVC capability so HEVC-in-MP4 can direct-play for
+		// browsers that can decode it (others still transcode).
+		const mode = this.determineStreamMode(file, { clientHevc: options.clientHevc });
 
 		// Resolve preferred audio track: explicit option > preferred language > default (0)
 		if (options.audioTrack == null) {
@@ -1104,7 +1109,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	 *
 	 * Decision hierarchy: DIRECT_PLAY → DIRECT_STREAM → TRANSCODE
 	 */
-	determineStreamMode(file: any): string {
+	determineStreamMode(file: any, opts: { clientHevc?: boolean } = {}): string {
 		// Cache-mode direct play: a converted MP4 in the persistent cache
 		// supersedes the source codecs. The direct route serves that file.
 		if (file?.id && this.transcoderService.getCachedDirectMp4(file.id)) {
@@ -1160,7 +1165,20 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				);
 				return StreamMode.TRANSCODE;
 			}
-			// HEVC, XviD, MPEG-4, etc. all need transcoding
+			// HEVC in an MP4 container can be DIRECT-PLAYED natively by clients
+			// that report HEVC decode support (Safari, Chrome/Edge on Windows
+			// with the HEVC Video Extensions, Macs). Background callers don't
+			// pass `clientHevc`, so HEVC still TRANSCODES by default — a cache is
+			// built for clients (e.g. Chrome on Linux) that can't decode it.
+			const isHevc =
+				videoCodec === 'hevc' ||
+				videoCodec === 'h265' ||
+				videoCodec === 'hvc1' ||
+				videoCodec === 'hev1';
+			if (opts.clientHevc && isHevc && isMp4 && isBrowserAudio && !needsAudioTranscode) {
+				return StreamMode.DIRECT_PLAY;
+			}
+			// HEVC (no client support), XviD, MPEG-4, etc. all need transcoding
 			return StreamMode.TRANSCODE;
 		}
 

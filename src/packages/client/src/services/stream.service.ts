@@ -73,6 +73,25 @@ export interface StreamInfo {
 	videoHeight: number | null;
 }
 
+/**
+ * Whether this browser can decode HEVC/H.265 natively (computed once).
+ * Safari, Chrome/Edge on Windows with the HEVC Video Extensions, and Macs
+ * return non-empty; Chrome/Firefox on Linux return ''. When true we tell the
+ * server (`?hevc=1`) so HEVC-in-MP4 files direct-play instead of transcoding.
+ */
+const SUPPORTS_HEVC: boolean = (() => {
+	try {
+		const v = document.createElement('video');
+		return (
+			v.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"') !== '' ||
+			v.canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"') !== '' ||
+			v.canPlayType('video/mp4; codecs="hvc1"') !== ''
+		);
+	} catch {
+		return false;
+	}
+})();
+
 export const streamService = {
 	/**
 	 * Get stream mode info for a movie (needs transcode, has cache, etc.)
@@ -108,6 +127,7 @@ export const streamService = {
 		}
 		const params = new URLSearchParams();
 		if (options?.audioTrack != null) params.set('audioTrack', String(options.audioTrack));
+		if (SUPPORTS_HEVC) params.set('hevc', '1');
 		const qs = params.toString();
 		return api.get<StreamSession>(`/stream/${movieId}/start${qs ? `?${qs}` : ''}`);
 	},
