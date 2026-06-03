@@ -49,6 +49,9 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 	/** Max concurrent jobs (default 2 to avoid saturating the system) */
 	private maxConcurrency = 2;
 
+	/** Set on shutdown so a job finishing after the DB closes can't re-enter the queue. */
+	private stopped = false;
+
 	/** Callback to get untranscoded movie IDs (registered by LibraryJobsService) */
 	private untranscodedMovieIdsFn: (() => string[]) | null = null;
 
@@ -420,8 +423,20 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 	// ===========================================================
 
 	private processQueue(): void {
-		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
-		const maxConcurrency = enc?.maxConcurrentJobs ?? this.maxConcurrency;
+		// After shutdown the DB is closed; a job's finally-block call to here would
+		// otherwise throw "database connection is not open" and crash the process.
+		if (this.stopped) return;
+		let maxConcurrency = this.maxConcurrency;
+		try {
+			const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+			maxConcurrency = enc?.maxConcurrentJobs ?? this.maxConcurrency;
+		} catch (err: any) {
+			// Transient DB error (locked / closing) — fall back to the default and
+			// don't take the whole process down over a queue-tick settings read.
+			this.logger.warn(
+				`processQueue: settings read failed, using default concurrency: ${err.message}`,
+			);
+		}
 		while (this.running.size < maxConcurrency && this.queue.length > 0) {
 			const jobId = this.queue.shift();
 			if (!jobId) break;
@@ -544,6 +559,10 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 	// ===========================================================
 
 	onModuleDestroy(): void {
+		// Stop the queue first so any job finishing mid-shutdown can't re-enter
+		// processQueue() and hit the about-to-close database.
+		this.stopped = true;
+
 		// Mark all running jobs as interrupted
 		const runningCount = this.running.size;
 		for (const jobId of [...this.running]) {
