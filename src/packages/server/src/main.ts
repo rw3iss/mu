@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import { join, resolve } from 'node:path';
@@ -63,8 +64,17 @@ function loadTlsCredentials(
 		const certExists = existsSync(certPath);
 		const keyExists = existsSync(keyPath);
 		if (certExists && keyExists) {
-			logger.log(`TLS: using certs from config (${certPath})`);
-			return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
+			try {
+				const cred = { cert: readFileSync(certPath), key: readFileSync(keyPath) };
+				logger.log(`TLS: using certs from config (${certPath})`);
+				return cred;
+			} catch (err: any) {
+				// e.g. a Certbot symlink swap mid-read — caller retries.
+				logger.warn(
+					`TLS: config certs present but unreadable (${certPath}): ${err.message}`,
+				);
+				return null;
+			}
 		}
 		logger.warn(
 			`TLS: config has certPath/keyPath but files not found (cert=${certExists}, key=${keyExists}): ${certPath}`,
@@ -89,18 +99,125 @@ function loadTlsCredentials(
 		const fullchain = join(dir, 'fullchain.pem');
 		const privkey = join(dir, 'privkey.pem');
 		if (existsSync(fullchain) && existsSync(privkey)) {
-			logger.log(`TLS: using Let's Encrypt certs from ${dir}`);
-			return { cert: readFileSync(fullchain), key: readFileSync(privkey) };
+			try {
+				const cred = { cert: readFileSync(fullchain), key: readFileSync(privkey) };
+				logger.log(`TLS: using Let's Encrypt certs from ${dir}`);
+				return cred;
+			} catch (err: any) {
+				logger.warn(
+					`TLS: Let's Encrypt certs present but unreadable in ${dir}: ${err.message}`,
+				);
+				return null;
+			}
 		}
 	}
 
 	return null;
 }
 
+/**
+ * True when TLS certs are *expected* (configured via certPath/keyPath or a
+ * hostname). Used to refuse a silent plain-HTTP fallback — clients hitting
+ * https:// would otherwise fail to connect with no obvious cause.
+ */
+function isTlsExpected(config: ConfigService): boolean {
+	const certPath = config.get<string | undefined>('tls.certPath');
+	const keyPath = config.get<string | undefined>('tls.keyPath');
+	const hostname = config.get<string>('tls.hostname', '');
+	return Boolean((certPath && keyPath) || hostname);
+}
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Kill any stale process LISTENING on `port` so a restart can rebind cleanly.
+ * On Windows only node.exe holders are killed (never an unrelated service that
+ * happens to hold the port).
+ */
+function reclaimPort(port: number, logger: Logger): void {
+	try {
+		if (process.platform === 'win32') {
+			const out = execSync('netstat -ano -p tcp', { encoding: 'utf8' });
+			const pids = new Set<string>();
+			for (const line of out.split('\n')) {
+				if (line.includes(`:${port} `) && /LISTENING/i.test(line)) {
+					const pid = line.trim().split(/\s+/).pop();
+					if (pid && /^\d+$/.test(pid) && pid !== '0') pids.add(pid);
+				}
+			}
+			for (const pid of pids) {
+				let image = '';
+				try {
+					image = execSync(`tasklist /FI "PID eq ${pid}" /FO csv /NH`, {
+						encoding: 'utf8',
+					});
+				} catch {}
+				if (!/node\.exe/i.test(image)) {
+					logger.warn(`Port ${port} held by non-node PID ${pid} — leaving it alone.`);
+					continue;
+				}
+				logger.warn(`Killing stale node PID ${pid} holding port ${port}`);
+				try {
+					execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
+				} catch {}
+			}
+		} else {
+			try {
+				execSync(`fuser -k ${port}/tcp`, { stdio: 'ignore' });
+			} catch {
+				try {
+					execSync(`lsof -ti tcp:${port} | xargs -r kill -9`, { stdio: 'ignore' });
+				} catch {}
+			}
+		}
+	} catch (err: any) {
+		logger.warn(`reclaimPort(${port}) failed: ${err.message}`);
+	}
+}
+
+/** Bind the HTTP server, reclaiming the port from a stale instance on EADDRINUSE. */
+async function listenWithReclaim(
+	app: NestFastifyApplication,
+	port: number,
+	host: string,
+	logger: Logger,
+): Promise<void> {
+	try {
+		await app.listen(port, host);
+	} catch (err: any) {
+		if (err?.code !== 'EADDRINUSE') throw err;
+		logger.warn(`Port ${port} in use — reclaiming from a stale instance...`);
+		reclaimPort(port, logger);
+		await delay(1500);
+		await app.listen(port, host);
+		logger.log(`Reclaimed port ${port} and bound successfully.`);
+	}
+}
+
 async function bootstrap() {
 	const preConfig = new ConfigService();
 	const bootstrapLogger = new Logger('Bootstrap');
-	const tls = loadTlsCredentials(preConfig, bootstrapLogger);
+	let tls = loadTlsCredentials(preConfig, bootstrapLogger);
+	// If TLS is configured but the certs momentarily can't be read (e.g. a
+	// Certbot symlink swap), retry before giving up. Never silently serve plain
+	// HTTP when HTTPS is expected — that leaves the site unreachable with no
+	// obvious cause. Exit instead so the launcher / scheduled task restarts us.
+	if (!tls && isTlsExpected(preConfig)) {
+		for (let attempt = 1; attempt <= 5 && !tls; attempt++) {
+			bootstrapLogger.warn(
+				`TLS is configured but certs not loaded — retry ${attempt}/5 in 1s (transient cert/symlink state?)`,
+			);
+			await delay(1000);
+			tls = loadTlsCredentials(preConfig, bootstrapLogger);
+		}
+		if (!tls) {
+			bootstrapLogger.error(
+				'FATAL: TLS is configured but certificates could not be loaded after 5 retries. ' +
+					'Refusing to start in plain HTTP (clients expect HTTPS). Exiting so the launcher can retry.',
+			);
+			process.exit(1);
+		}
+	}
 
 	const httpsOptions = tls ? { https: { cert: tls.cert, key: tls.key } } : {};
 
@@ -198,7 +315,12 @@ async function bootstrap() {
 			if (reply.statusCode === 404) {
 				try {
 					const rawHtml = readFileSync(indexHtmlPath, 'utf-8');
-					const html = await seoService.renderForUrl(url, rawHtml, request.server, origin);
+					const html = await seoService.renderForUrl(
+						url,
+						rawHtml,
+						request.server,
+						origin,
+					);
 					reply.status(200).header('Content-Type', 'text/html; charset=utf-8');
 					return html;
 				} catch {
@@ -212,7 +334,12 @@ async function bootstrap() {
 			if (reply.statusCode === 200 && contentType.startsWith('text/html')) {
 				try {
 					const rawHtml = readFileSync(indexHtmlPath, 'utf-8');
-					const html = await seoService.renderForUrl(url, rawHtml, request.server, origin);
+					const html = await seoService.renderForUrl(
+						url,
+						rawHtml,
+						request.server,
+						origin,
+					);
 					reply.header('Content-Type', 'text/html; charset=utf-8');
 					return html;
 				} catch {
@@ -233,7 +360,7 @@ async function bootstrap() {
 	const host = config.get<string>('server.host', '0.0.0.0');
 	const port = config.get<number>('server.port', 4000);
 
-	await app.listen(port, host);
+	await listenWithReclaim(app, port, host, logger);
 	const proto = tls ? 'https' : 'http';
 	logger.log(`Mu server v0.1.0 running at ${proto}://${host}:${port}`);
 
