@@ -143,6 +143,7 @@ export function JobDetails({ id }: JobDetailsProps) {
 						</span>
 					</div>
 					<h1 class={styles.title}>{job.label}</h1>
+					{job.details && <p class={styles.detailsLine}>{job.details}</p>}
 					<div class={styles.idRow}>
 						<code class={styles.id}>{job.id}</code>
 					</div>
@@ -172,7 +173,9 @@ export function JobDetails({ id }: JobDetailsProps) {
 						<Button
 							variant="secondary"
 							loading={busyAction === 'pause'}
-							onClick={() => runAction('pause', () => jobsService.pause(job.id), 'Job paused')}
+							onClick={() =>
+								runAction('pause', () => jobsService.pause(job.id), 'Job paused')
+							}
 						>
 							<Icon name="pause" size={14} /> Pause
 						</Button>
@@ -181,7 +184,9 @@ export function JobDetails({ id }: JobDetailsProps) {
 						<Button
 							variant="secondary"
 							loading={busyAction === 'resume'}
-							onClick={() => runAction('resume', () => jobsService.resume(job.id), 'Job resumed')}
+							onClick={() =>
+								runAction('resume', () => jobsService.resume(job.id), 'Job resumed')
+							}
 						>
 							<Icon name="play" size={14} /> Resume
 						</Button>
@@ -190,7 +195,9 @@ export function JobDetails({ id }: JobDetailsProps) {
 						<Button
 							variant="secondary"
 							loading={busyAction === 'retry'}
-							onClick={() => runAction('retry', () => jobsService.retry(job.id), 'Job re-queued')}
+							onClick={() =>
+								runAction('retry', () => jobsService.retry(job.id), 'Job re-queued')
+							}
 						>
 							<Icon name="refresh" size={14} /> Retry
 						</Button>
@@ -199,7 +206,13 @@ export function JobDetails({ id }: JobDetailsProps) {
 						<Button
 							variant="danger"
 							loading={busyAction === 'cancel'}
-							onClick={() => runAction('cancel', () => jobsService.cancel(job.id), 'Cancel signal sent')}
+							onClick={() =>
+								runAction(
+									'cancel',
+									() => jobsService.cancel(job.id),
+									'Cancel signal sent',
+								)
+							}
 						>
 							<Icon name="x" size={14} /> Cancel
 						</Button>

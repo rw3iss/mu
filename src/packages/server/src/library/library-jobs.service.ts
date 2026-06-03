@@ -257,6 +257,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 						.from(movieFiles)
 						.where(eq(movieFiles.id, movieFileId))
 						.get();
+					if (file) helpers.setDetails(this.preTranscodeDetails(file, quality));
 					const storedTracks = parseJsonArray<{
 						index: number;
 						language?: string;
@@ -352,6 +353,10 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					return { skipped: true, reason: 'file-missing' };
 				}
 
+				// Refine the details line with the action resolved against current
+				// settings (the enqueue-time plan may predate a settings change).
+				helpers.setDetails(this.conversionService.describePlan(file));
+
 				// Let the user cancel mid-encode — kills the ffmpeg process writing
 				// this file's temp output (tracked by ConversionService).
 				this.jobManager.setOnCancel(job.id, () => {
@@ -402,6 +407,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			this.jobManager.enqueue({
 				type: JOB_TYPE.CONVERT_MP4,
 				label,
+				details: this.conversionService.describePlan(file),
 				payload: { movieFileId: file.id, movieId: file.movieId, inPlace },
 				priority: 55,
 			});
@@ -589,6 +595,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		const pendingMonolithic: Array<{
 			type: string;
 			label: string;
+			details?: string;
 			payload: Record<string, unknown>;
 			priority: number;
 		}> = [];
@@ -600,7 +607,10 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			// NON-convertible files fall through to HLS pre-transcode below —
 			// they need the cache for smooth, seekable playback.
 			const convCfg = this.conversionService.getConfig();
-			if (convCfg.autoConvertToMp4 && this.conversionService.planConversion(file).action !== 'skip') {
+			if (
+				convCfg.autoConvertToMp4 &&
+				this.conversionService.planConversion(file).action !== 'skip'
+			) {
 				const alreadyConverting = this.jobManager
 					.listJobs({ type: JOB_TYPE.CONVERT_MP4 })
 					.some(
@@ -612,6 +622,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					this.jobManager.enqueue({
 						type: JOB_TYPE.CONVERT_MP4,
 						label: `Convert to MP4: ${movieTitle || file.id.slice(0, 8)}`,
+						details: this.conversionService.describePlan(file),
 						payload: {
 							movieFileId: file.id,
 							movieId: file.movieId,
@@ -664,6 +675,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				pendingMonolithic.push({
 					type: JOB_TYPE.PRE_TRANSCODE,
 					label: `Resume transcode: ${title} (${quality})`,
+					details: this.preTranscodeDetails(file, quality),
 					payload: {
 						movieId: file.movieId,
 						movieFileId: file.id,
@@ -687,6 +699,17 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				`Resumed ${resumed} incomplete transcode jobs on startup (${recentMovieIds.size} recently watched prioritized)`,
 			);
 		}
+	}
+
+	/**
+	 * Human-readable "input → output" summary for an HLS pre-transcode job.
+	 * Pre-transcode always produces H.264 in fragmented HLS (TS) segments, so
+	 * the only variable is the source codec/container and target quality —
+	 * e.g. "HEVC/MKV → H.264/HLS (1080p)".
+	 */
+	private preTranscodeDetails(file: any, quality: string): string {
+		const from = `${this.conversionService.codecLabel(file.codecVideo)}/${this.conversionService.containerLabel(file.filePath)}`;
+		return `${from} → H.264/HLS (${quality})`;
 	}
 
 	/**
@@ -751,7 +774,10 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			// transcoding, and the cache is what makes playback smooth + seekable
 			// (live on-demand transcode stutters and can't seek ahead).
 			const convCfg = this.conversionService.getConfig();
-			if (convCfg.autoConvertToMp4 && this.conversionService.planConversion(file).action !== 'skip') {
+			if (
+				convCfg.autoConvertToMp4 &&
+				this.conversionService.planConversion(file).action !== 'skip'
+			) {
 				const alreadyConverting = this.jobManager
 					.listJobs({ type: JOB_TYPE.CONVERT_MP4 })
 					.some(
@@ -763,7 +789,12 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					this.jobManager.enqueue({
 						type: JOB_TYPE.CONVERT_MP4,
 						label: `Convert to MP4: ${title}`,
-						payload: { movieFileId: file.id, movieId, inPlace: convCfg.convertOriginalFile },
+						details: this.conversionService.describePlan(file),
+						payload: {
+							movieFileId: file.id,
+							movieId,
+							inPlace: convCfg.convertOriginalFile,
+						},
 						priority: 45,
 					});
 				}
@@ -817,6 +848,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				this.jobManager.enqueue({
 					type: JOB_TYPE.PRE_TRANSCODE,
 					label: `Pre-transcode: ${title} (${quality})`,
+					details: this.preTranscodeDetails(file, quality),
 					payload: {
 						movieId,
 						movieFileId: file.id,
@@ -965,6 +997,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				this.jobManager.enqueue({
 					type: JOB_TYPE.PRE_TRANSCODE,
 					label: `Re-transcode: ${title} (${quality})`,
+					details: this.preTranscodeDetails(file, quality),
 					payload: {
 						movieId: file.movieId,
 						movieFileId: file.id,

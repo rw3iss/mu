@@ -94,6 +94,13 @@
 	color: var(--color-text-primary);
 }
 
+.detailsLine {
+	margin: var(--space-xs) 0 0;
+	font-family: var(--font-family-mono);
+	font-size: var(--font-size-sm);
+	color: var(--color-text-secondary);
+}
+
 .idRow {
 	margin-top: var(--space-xs);
 }

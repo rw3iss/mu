@@ -12,6 +12,8 @@ export interface Job {
 	progress?: number;
 	result?: unknown;
 	error?: string;
+	/** Human-readable summary of what the job is doing (codec/container in→out). */
+	details?: string;
 	createdAt: string;
 	startedAt?: string;
 	completedAt?: string;

@@ -10,6 +10,7 @@ export const jobHistory = sqliteTable('job_history', {
 	progress: real('progress').default(0),
 	result: text('result'),
 	error: text('error'),
+	details: text('details'),
 	createdAt: text('created_at').notNull(),
 	startedAt: text('started_at'),
 	completedAt: text('completed_at'),

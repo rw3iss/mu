@@ -160,7 +160,12 @@ export class ConversionService {
 		// Non-H.264 → full re-encode. Guard against growing the file.
 		const duration = Number(file.durationSeconds);
 		const originalBytes = Number(file.fileSize);
-		if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(originalBytes) || originalBytes <= 0) {
+		if (
+			!Number.isFinite(duration) ||
+			duration <= 0 ||
+			!Number.isFinite(originalBytes) ||
+			originalBytes <= 0
+		) {
 			return { action: 'skip', reason: 'cannot-estimate-size' };
 		}
 		const refVideo = this.h264RefBitrate(this.parseHeight(file));
@@ -171,6 +176,56 @@ export class ConversionService {
 			return { action: 'skip', reason: 'would-grow', predictedBytes };
 		}
 		return { action: 'reencode', reason: 'incompatible-codec', predictedBytes };
+	}
+
+	/** Pretty codec name for the Jobs UI — 'hevc' → 'HEVC', 'h264' → 'H.264'. */
+	codecLabel(codec?: string | null): string {
+		const c = (codec || '').toLowerCase();
+		if (!c) return '—';
+		if (this.isH264(c)) return 'H.264';
+		if (this.isHevc(c)) return 'HEVC';
+		if (c === 'av1' || c === 'av01') return 'AV1';
+		if (c === 'vp9') return 'VP9';
+		if (c === 'vp8') return 'VP8';
+		if (c.includes('mpeg4') || c === 'mp4v' || c === 'xvid' || c === 'divx') return 'MPEG-4';
+		if (c.includes('mpeg2')) return 'MPEG-2';
+		if (c === 'vc1' || c === 'vc-1') return 'VC-1';
+		return codec!.toUpperCase();
+	}
+
+	/** Uppercased container name from a file path — '.mkv' → 'MKV'. */
+	containerLabel(filePath?: string | null): string {
+		const ext = path
+			.extname(String(filePath ?? ''))
+			.replace('.', '')
+			.toUpperCase();
+		return ext || '—';
+	}
+
+	/**
+	 * Human-readable "input → output (action)" summary for a file's planned
+	 * conversion, shown under the job label in the Jobs UI. Pure / no side
+	 * effects — pass an already-computed plan to avoid re-evaluating.
+	 */
+	describePlan(file: any, plan: ConversionPlan = this.planConversion(file)): string {
+		const vIn = this.codecLabel(file.codecVideo);
+		const cIn = this.containerLabel(file.filePath);
+		const aIn = this.codecLabel(file.codecAudio);
+		const from = `${vIn}/${cIn}`;
+		switch (plan.action) {
+			case 'remux':
+				return `${from} → ${vIn}/MP4 (remux container, lossless)`;
+			case 'reencode-audio':
+				return `${from} (${aIn}) → ${vIn}/MP4 (copy video · re-encode audio → AAC)`;
+			case 'reencode-av1':
+				return `${from} → AV1/MP4 (GPU re-encode, CQ ${this.transcoder.getAv1Cq()})`;
+			case 'reencode':
+				return `${from} → H.264/MP4 (re-encode)`;
+			default:
+				return plan.reason === 'already-direct-play'
+					? `Already direct-play (${from})`
+					: `Keep as-is (${from}, ${plan.reason})`;
+		}
 	}
 
 	/** All available files that have actionable conversion work. */
@@ -195,7 +250,10 @@ export class ConversionService {
 	}
 
 	/** Verify a freshly-produced file before we trust it / delete the original. */
-	private verifyOutput(probe: NonNullable<Awaited<ReturnType<TranscoderService['probeFile']>>>, file: any): boolean {
+	private verifyOutput(
+		probe: NonNullable<Awaited<ReturnType<TranscoderService['probeFile']>>>,
+		file: any,
+	): boolean {
 		if (!(probe.sizeBytes > 1_000_000)) return false; // sanity: > 1 MB
 		const orig = Number(file.durationSeconds);
 		if (Number.isFinite(orig) && orig > 0 && probe.durationSeconds) {
@@ -256,11 +314,7 @@ export class ConversionService {
 			: this.transcoder.getPersistentDir(file.id, 'direct');
 		const baseName = inPlace ? this.sanitizeName(title, year) : 'direct';
 		let finalPath = path.join(dir, `${baseName}.mp4`);
-		if (
-			inPlace &&
-			existsSync(finalPath) &&
-			path.resolve(finalPath) !== path.resolve(srcPath)
-		) {
+		if (inPlace && existsSync(finalPath) && path.resolve(finalPath) !== path.resolve(srcPath)) {
 			finalPath = path.join(dir, `${baseName} (converted).mp4`);
 		}
 		// Non-media extension so a concurrent library scan can't index the
@@ -275,7 +329,12 @@ export class ConversionService {
 			if (plan.action === 'remux') {
 				await this.transcoder.remuxToMp4(srcPath, tempPath, onProgress);
 			} else if (plan.action === 'reencode-audio') {
-				await this.transcoder.transcodeToMp4(srcPath, tempPath, { videoCopy: true }, onProgress);
+				await this.transcoder.transcodeToMp4(
+					srcPath,
+					tempPath,
+					{ videoCopy: true },
+					onProgress,
+				);
 			} else if (plan.action === 'reencode-av1') {
 				await this.transcoder.transcodeToMp4(
 					srcPath,
@@ -323,7 +382,8 @@ export class ConversionService {
 					filePath: finalPath,
 					fileName: path.basename(finalPath),
 					fileSize: probe.sizeBytes,
-					codecVideo: probe.codecVideo ?? (plan.action === 'reencode-av1' ? 'av1' : 'h264'),
+					codecVideo:
+						probe.codecVideo ?? (plan.action === 'reencode-av1' ? 'av1' : 'h264'),
 					codecAudio: probe.codecAudio ?? 'aac',
 					containerFormat: 'mp4',
 					videoWidth: probe.videoWidth ?? file.videoWidth ?? null,

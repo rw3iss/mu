@@ -701,6 +701,7 @@ export function JobsPanel() {
 										</svg>
 									</button>
 								</div>
+								{job.details && <div class={styles.detailsLine}>{job.details}</div>}
 								{job.progress > 0 && job.status === 'running' && (
 									<div class={styles.progressBar}>
 										<div
@@ -726,7 +727,8 @@ export function JobsPanel() {
 																route(`/movie/${mid}`);
 															}}
 														>
-															{title || `(loading…) ${mid.slice(0, 8)}`}
+															{title ||
+																`(loading…) ${mid.slice(0, 8)}`}
 														</a>
 													</div>
 												);

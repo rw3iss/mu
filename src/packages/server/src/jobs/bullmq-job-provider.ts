@@ -138,6 +138,7 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 			status: 'pending',
 			payload: descriptor.payload ?? {},
 			priority: descriptor.priority ?? 10,
+			details: descriptor.details,
 			createdAt: now,
 		};
 		this.jobs.set(id, job);
@@ -152,6 +153,7 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 						type: descriptor.type,
 						label: job.label,
 						payload: job.payload,
+						details: job.details,
 					},
 				},
 				{
@@ -284,6 +286,7 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 				label: live.label,
 				payload: live.payload,
 				priority: live.priority,
+				details: live.details,
 			});
 			return { ok: true, newId };
 		}
@@ -304,6 +307,7 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 			label: row.label,
 			payload,
 			priority: row.priority ?? undefined,
+			details: row.details ?? undefined,
 		});
 		return { ok: true, newId };
 	}
@@ -416,6 +420,7 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 			status: 'running',
 			payload: descriptor.payload ?? {},
 			priority: descriptor.priority ?? 10,
+			details: descriptor.details,
 			createdAt: new Date(bullJob.timestamp ?? Date.now()).toISOString(),
 		};
 		job.status = 'running';
@@ -431,6 +436,10 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 			},
 			log: (msg: string) => {
 				this.logger.debug(`[${job.type}:${muJobId.slice(0, 8)}] ${msg}`);
+			},
+			setDetails: (details: string) => {
+				job.details = details;
+				this.emitJobEvent(WsEvent.JOB_PROGRESS, job);
 			},
 		};
 
@@ -495,6 +504,7 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 					progress: job.progress ?? 0,
 					result: job.result ? JSON.stringify(job.result) : null,
 					error: job.error ?? null,
+					details: job.details ?? null,
 					createdAt: job.createdAt,
 					startedAt: job.startedAt ?? null,
 					completedAt: job.completedAt ?? null,
@@ -518,6 +528,7 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 			status: job.status as JobStatus,
 			progress: job.progress,
 			error: job.error,
+			details: job.details,
 			payload: job.payload,
 			result: job.result,
 		});

@@ -162,6 +162,7 @@ const tables = [
 		progress REAL DEFAULT 0,
 		result TEXT,
 		error TEXT,
+		details TEXT,
 		created_at TEXT NOT NULL,
 		started_at TEXT,
 		completed_at TEXT,
@@ -420,6 +421,7 @@ const alters = [
 	'CREATE INDEX IF NOT EXISTS movies_group_id_idx ON movies(group_id)',
 	"ALTER TABLE movies ADD COLUMN source TEXT NOT NULL DEFAULT 'library'",
 	'CREATE INDEX IF NOT EXISTS movies_source_idx ON movies(source)',
+	'ALTER TABLE job_history ADD COLUMN details TEXT',
 ];
 
 for (const sql of alters) {

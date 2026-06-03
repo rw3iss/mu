@@ -322,6 +322,7 @@ export class DatabaseService implements OnModuleDestroy {
         progress REAL DEFAULT 0,
         result TEXT,
         error TEXT,
+        details TEXT,
         created_at TEXT NOT NULL,
         started_at TEXT,
         completed_at TEXT,
@@ -333,6 +334,11 @@ export class DatabaseService implements OnModuleDestroy {
       );
     `);
 		// Add columns that may not exist in older databases
+		try {
+			this.sqlite.exec(`ALTER TABLE job_history ADD COLUMN details TEXT`);
+		} catch {
+			// Column already exists
+		}
 		try {
 			this.sqlite.exec(`ALTER TABLE movies ADD COLUMN thumbnail_url TEXT`);
 		} catch {

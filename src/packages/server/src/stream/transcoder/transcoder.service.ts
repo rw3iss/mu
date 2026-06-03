@@ -2276,6 +2276,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		return this.getEncodingSettings().hwAccel;
 	}
 
+	/** Configured AV1 NVENC quality (CQ). Public accessor for UI/job summaries. */
+	getAv1Cq(): number {
+		return this.getEncodingSettings().av1Cq;
+	}
+
 	private getEncodingSettings() {
 		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 		const configuredHwAccel = enc?.hwAccel || 'none';

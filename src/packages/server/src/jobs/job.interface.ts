@@ -9,6 +9,12 @@ export interface JobDescriptor {
 	payload?: Record<string, unknown>;
 	/** Priority (lower = higher priority). Default 10 */
 	priority?: number;
+	/**
+	 * Human-readable summary of what the job is doing, shown under the label
+	 * in the Jobs UI — e.g. "HEVC/MKV → AV1/MP4 (GPU re-encode)". Set at enqueue
+	 * and refined at runtime via `helpers.setDetails()`.
+	 */
+	details?: string;
 }
 
 export interface JobRecord {
@@ -21,6 +27,7 @@ export interface JobRecord {
 	progress?: number;
 	result?: unknown;
 	error?: string;
+	details?: string;
 	createdAt: string;
 	startedAt?: string;
 	completedAt?: string;
@@ -33,6 +40,8 @@ export interface JobHelpers {
 	reportProgress(percent: number): void;
 	/** Log a message */
 	log(message: string): void;
+	/** Update the job's human-readable details line (what it's doing now). */
+	setDetails(details: string): void;
 }
 
 export interface ScheduledJobOptions {
