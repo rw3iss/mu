@@ -232,14 +232,19 @@ export async function playMovie(
 		}
 	}
 
-	// Stop old stream and destroy video engine before switching movies
+	// Stop old stream and destroy video engine before switching movies.
+	// Destroy UNCONDITIONALLY (even when there's no active session) — the prior
+	// movie may have ended / had its session cleared while minimized or during
+	// navigation, leaving its subtitle <track> + a frozen cue on the singleton
+	// <video>. destroy() removes those tracks; skipping it (the old
+	// `if (currentSession.value)` guard) is what left stale subtitles on screen.
+	const oldEngine = sharedVideoEngine.value;
+	if (oldEngine) oldEngine.destroy();
 	if (currentSession.value) {
-		const engine = sharedVideoEngine.value;
-		if (engine) engine.destroy();
 		await endStream();
-		currentSession.value = null;
-		subtitleTrack.value = null;
 	}
+	currentSession.value = null;
+	subtitleTrack.value = null;
 
 	// Set up new movie — preserve current mode (full/split)
 	globalMovieId.value = movieId;
