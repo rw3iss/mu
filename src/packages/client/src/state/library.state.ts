@@ -1,6 +1,6 @@
 import { computed, signal } from '@preact/signals';
 import { moviesService } from '@/services/movies.service';
-import { groupedOnly, groupViewEnabled } from './groups.state';
+import { groupedOnly, groupViewEnabled, pageGroups } from './groups.state';
 
 // ============================================
 // Types
@@ -191,10 +191,11 @@ export async function fetchMovies(page = 1): Promise<void> {
 		if (groupedOnly.value) {
 			params.groupedOnly = 'true';
 		} else if (groupViewEnabled.value) {
-			// Mixed view: ungrouped movies live in MovieGrid, parent groups
-			// render as tiles above. Server hides anything in a group so
-			// we don't duplicate items already represented by a tile.
-			params.excludeGrouped = 'true';
+			// Mixed view: the server interleaves ungrouped movies with collapsed
+			// group "stacks" in one sorted, paginated list and returns the page's
+			// groups inline — so groups slot into the results by date instead of
+			// piling up at the bottom of every page.
+			params.interleaveGroups = 'true';
 		}
 
 		const sf = serverFilter.value;
@@ -204,6 +205,8 @@ export async function fetchMovies(page = 1): Promise<void> {
 
 		const response = await moviesService.list(params);
 		movies.value = response.movies;
+		// Page's interleaved group stacks (mixed view). Empty for other modes.
+		pageGroups.value = response.groups ?? [];
 		totalMovies.value = response.total;
 		hiddenCount.value = response.hiddenCount ?? 0;
 		watchedCount.value = response.watchedCount ?? 0;

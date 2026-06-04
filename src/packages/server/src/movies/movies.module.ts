@@ -1,4 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
+import { GroupingModule } from '../grouping/grouping.module.js';
 import { LibraryModule } from '../library/library.module.js';
 import { MediaModule } from '../media/media.module.js';
 import { MetadataModule } from '../metadata/metadata.module.js';
@@ -18,6 +19,7 @@ import { WatchlistService } from './watchlist.service.js';
 @Module({
 	imports: [
 		forwardRef(() => LibraryModule),
+		GroupingModule,
 		MediaModule,
 		MetadataModule,
 		RemoteModule,

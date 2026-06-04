@@ -18,6 +18,7 @@ import {
 	groupsLoaded,
 	groupViewEnabled,
 	invalidateGroups,
+	pageGroups,
 	parentGroups,
 	toggleGroupedOnly,
 	toggleGroupView,
@@ -568,11 +569,11 @@ export function Library(_props: LibraryProps) {
 			    2. groupedOnly=true  + groupViewEnabled=false → flat MovieGrid of every
 			       group member; server filters via ?groupedOnly=true
 			    3. groupedOnly=false + groupViewEnabled=true  → MIXED: parent groups
-			       interleaved with ungrouped movies in one sorted grid. Groups render
-			       as cards that match MovieCard dimensions, sorted by their latest
-			       member's addedAt (or whichever sort key is active). Server hides
-			       grouped movies via ?excludeGrouped=true so we don't double-render
-			       members already represented by their group card.
+			       interleaved with ungrouped movies in one sorted, paginated grid.
+			       The server (?interleaveGroups=true) unions ungrouped movies + group
+			       stacks, sorts them together (groups keyed on latest member addedAt /
+			       earliest year / name), paginates, and returns this page's groups
+			       inline as `pageGroups`. MovieGrid re-sorts the page identically.
 			    4. groupedOnly=false + groupViewEnabled=false → full library, every movie
 			       individually (grouped + ungrouped). No group cards. */}
 			{(() => {
@@ -624,7 +625,9 @@ export function Library(_props: LibraryProps) {
 				return (
 					<MovieGrid
 						movies={movies.value}
-						groups={mixed ? visibleParents : undefined}
+						// Mixed view: groups are paginated + interleaved server-side
+						// and returned per-page (pageGroups) — not the full set.
+						groups={mixed ? pageGroups.value : undefined}
 						sortBy={filters.value.sortBy}
 						sortOrder={filters.value.sortOrder}
 						isLoading={isLoading.value}

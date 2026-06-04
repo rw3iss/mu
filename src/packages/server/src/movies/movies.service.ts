@@ -19,6 +19,7 @@ import {
 	userWatchHistory,
 	userWatchlist,
 } from '../database/schema/index.js';
+import { GroupsRepository } from '../grouping/groups.repository.js';
 import { buildPrettyTitle, isDirtyTitle } from '../grouping/title-sanitiser.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from '../library/library.service.js';
@@ -43,6 +44,7 @@ export class MoviesService {
 		private readonly subtitleService: SubtitleService,
 		private readonly tmdb: TmdbProvider,
 		private readonly metadataService: MetadataService,
+		private readonly groupsRepo: GroupsRepository,
 	) {}
 
 	private readonly listCache = new Map<string, { data: any; expires: number }>();
@@ -63,6 +65,17 @@ export class MoviesService {
 		const cached = this.listCache.get(cacheKey);
 		if (cached && cached.expires > Date.now()) {
 			return cached.data;
+		}
+
+		// Mixed Library view: interleave ungrouped movies with collapsed group
+		// "stacks" in one server-paginated, sorted list (groups sorted by their
+		// latest member's addedAt / earliest year / name). Keeps pagination and
+		// sort order consistent across pages instead of dumping every group at
+		// the end of each page.
+		if (String((query as { interleaveGroups?: string }).interleaveGroups) === 'true') {
+			const result = this.computeInterleaved(query, userId);
+			this.cacheResult(cacheKey, result);
+			return result;
 		}
 
 		const { page, pageSize, offset } = paginationDefaults(query);
@@ -149,40 +162,7 @@ export class MoviesService {
 				orderBy = desc(movies.addedAt);
 		}
 
-		const selectFields = {
-			id: movies.id,
-			title: movies.title,
-			originalTitle: movies.originalTitle,
-			year: movies.year,
-			overview: movies.overview,
-			runtimeMinutes: movies.runtimeMinutes,
-			posterUrl: movies.posterUrl,
-			thumbnailUrl: movies.thumbnailUrl,
-			backdropUrl: movies.backdropUrl,
-			imdbId: movies.imdbId,
-			tmdbId: movies.tmdbId,
-			contentRating: movies.contentRating,
-			hidden: movies.hidden,
-			groupId: movies.groupId,
-			groupEpisodeOrdinal: movies.groupEpisodeOrdinal,
-			addedAt: movies.addedAt,
-			updatedAt: movies.updatedAt,
-			rating: userRatings.rating,
-			// External-rating fields powering card chips (IMDb / RT / MC).
-			// imdbRating / imdbVotes are pulled from movie_metadata first;
-			// the imdb_ratings dataset (synced daily from IMDB's public TSV)
-			// is joined as a fallback when movie has an imdbId but no OMDB
-			// fetch has populated movie_metadata yet.
-			metaImdbRating: movieMetadata.imdbRating,
-			metaImdbVotes: movieMetadata.imdbVotes,
-			datasetImdbRating: imdbRatings.averageRating,
-			datasetImdbVotes: imdbRatings.numVotes,
-			rtRating: movieMetadata.rottenTomatoesScore,
-			metacriticRating: movieMetadata.metacriticScore,
-			watchPosition: userWatchHistory.positionSeconds,
-			watchCompleted: userWatchHistory.completed,
-			durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
-		};
+		const selectFields = this.movieSelectFields();
 
 		// Build query — always left-join userRatings for the current user
 		const ratingJoinCond = userId
@@ -266,29 +246,7 @@ export class MoviesService {
 		const watchedCount = watchedCountResult?.count ?? 0;
 
 		const result = {
-			movies: data.map((row) => {
-				const position = row.watchCompleted ? 0 : (row.watchPosition ?? 0);
-				// Coalesce IMDb rating/votes: prefer movie_metadata (richer,
-				// fetched from OMDB), fall back to the daily-synced IMDB
-				// dataset when metadata hasn't been populated yet. Drop the
-				// raw helper columns so they don't leak into the response.
-				const {
-					metaImdbRating,
-					metaImdbVotes,
-					datasetImdbRating,
-					datasetImdbVotes,
-					...rest
-				} = row;
-				return this.applyPosterFallback({
-					...rest,
-					imdbRating: metaImdbRating ?? datasetImdbRating ?? null,
-					imdbVotes: metaImdbVotes ?? datasetImdbVotes ?? null,
-					rating: row.rating ?? 0,
-					watchPosition: position,
-					durationSeconds: row.durationSeconds ?? 0,
-					watched: !!row.watchCompleted,
-				});
-			}),
+			movies: data.map((row) => this.mapMovieRow(row)),
 			total,
 			hiddenCount,
 			watchedCount,
@@ -297,7 +255,12 @@ export class MoviesService {
 			totalPages: Math.ceil(total / pageSize),
 		};
 
-		// Evict oldest entries if over max
+		this.cacheResult(cacheKey, result);
+		return result;
+	}
+
+	/** Cache a list result, evicting the oldest entry when at capacity. */
+	private cacheResult(cacheKey: string, result: any): void {
 		if (this.listCache.size >= MoviesService.CACHE_MAX_ENTRIES) {
 			const firstKey = this.listCache.keys().next().value;
 			if (firstKey) this.listCache.delete(firstKey);
@@ -306,8 +269,239 @@ export class MoviesService {
 			data: result,
 			expires: Date.now() + MoviesService.CACHE_TTL_MS,
 		});
+	}
 
-		return result;
+	/** SELECT shape shared by the flat list and the by-id hydration query. */
+	private movieSelectFields() {
+		return {
+			id: movies.id,
+			title: movies.title,
+			originalTitle: movies.originalTitle,
+			year: movies.year,
+			overview: movies.overview,
+			runtimeMinutes: movies.runtimeMinutes,
+			posterUrl: movies.posterUrl,
+			thumbnailUrl: movies.thumbnailUrl,
+			backdropUrl: movies.backdropUrl,
+			imdbId: movies.imdbId,
+			tmdbId: movies.tmdbId,
+			contentRating: movies.contentRating,
+			hidden: movies.hidden,
+			groupId: movies.groupId,
+			groupEpisodeOrdinal: movies.groupEpisodeOrdinal,
+			addedAt: movies.addedAt,
+			updatedAt: movies.updatedAt,
+			rating: userRatings.rating,
+			// External-rating fields powering card chips (IMDb / RT / MC).
+			metaImdbRating: movieMetadata.imdbRating,
+			metaImdbVotes: movieMetadata.imdbVotes,
+			datasetImdbRating: imdbRatings.averageRating,
+			datasetImdbVotes: imdbRatings.numVotes,
+			rtRating: movieMetadata.rottenTomatoesScore,
+			metacriticRating: movieMetadata.metacriticScore,
+			watchPosition: userWatchHistory.positionSeconds,
+			watchCompleted: userWatchHistory.completed,
+			durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
+		};
+	}
+
+	/** Map a raw movie row (from movieSelectFields) into the API movie shape. */
+	private mapMovieRow(row: any) {
+		const position = row.watchCompleted ? 0 : (row.watchPosition ?? 0);
+		// Coalesce IMDb rating/votes: prefer movie_metadata (richer, from OMDB),
+		// fall back to the daily-synced IMDB dataset. Drop the raw helper columns.
+		const { metaImdbRating, metaImdbVotes, datasetImdbRating, datasetImdbVotes, ...rest } = row;
+		return this.applyPosterFallback({
+			...rest,
+			imdbRating: metaImdbRating ?? datasetImdbRating ?? null,
+			imdbVotes: metaImdbVotes ?? datasetImdbVotes ?? null,
+			rating: row.rating ?? 0,
+			watchPosition: position,
+			durationSeconds: row.durationSeconds ?? 0,
+			watched: !!row.watchCompleted,
+		});
+	}
+
+	/** Fully hydrate a set of movies by id (same shape as the flat list rows). */
+	private getMoviesByIds(ids: string[], userId?: string) {
+		if (ids.length === 0) return [];
+		const ratingJoinCond = userId
+			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
+			: eq(movies.id, userRatings.movieId);
+		const historyJoinCond = userId
+			? and(eq(movies.id, userWatchHistory.movieId), eq(userWatchHistory.userId, userId))
+			: eq(movies.id, userWatchHistory.movieId);
+		const rows = this.database.db
+			.select(this.movieSelectFields())
+			.from(movies)
+			.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
+			.leftJoin(imdbRatings, eq(movies.imdbId, imdbRatings.tconst))
+			.leftJoin(userRatings, ratingJoinCond)
+			.leftJoin(userWatchHistory, historyJoinCond)
+			.where(inArray(movies.id, ids))
+			.all();
+		return rows.map((r) => this.mapMovieRow(r));
+	}
+
+	/** Sort key for a movie row in the interleaved view (mirrors the client's
+	 *  MovieGrid item-sort so page windows line up with on-screen order). */
+	private movieSortKey(m: any, sortBy?: string): number | string {
+		switch (sortBy) {
+			case 'title':
+				return (m.title ?? '').toLowerCase();
+			case 'year':
+				return m.year ?? 0;
+			case 'runtime':
+				return m.runtime ?? 0;
+			case 'rating':
+				return m.rating ?? 0;
+			case 'fileSize':
+				return m.fileSize ?? 0;
+			default:
+				return m.addedAt ?? '';
+		}
+	}
+
+	/** Sort key for a group "stack" in the interleaved view. Groups have no
+	 *  rating/runtime/size, so non-date sorts fall back to the group's date. */
+	private groupSortKey(g: any, sortBy?: string): number | string {
+		switch (sortBy) {
+			case 'title':
+				return (g.name ?? '').toLowerCase();
+			case 'year':
+				return g.earliestYear ?? 0;
+			default:
+				return g.latestMemberAddedAt ?? g.updatedAt ?? '';
+		}
+	}
+
+	/**
+	 * Build one paginated, sorted page that interleaves ungrouped movies with
+	 * collapsed parent-group stacks. Returns the page's movies + the groups that
+	 * fall in the same window; `total` counts movies + groups so pagination is
+	 * correct. The client (MovieGrid) re-sorts the page with the same keys.
+	 */
+	private computeInterleaved(query: MovieListQuery, userId?: string) {
+		const { page, pageSize, offset } = paginationDefaults(query);
+		const sortBy = query.sortBy;
+		const dir = query.sortOrder === 'asc' ? 1 : -1;
+		const search = (query.search ?? '').trim().toLowerCase();
+
+		// --- ungrouped movie sort-keys ---
+		const conds = [
+			sql`(${movies.source} IS NULL OR ${movies.source} = 'library')`,
+			sql`${movies.groupId} IS NULL`,
+		];
+		if (String(query.showHidden) !== 'true') {
+			conds.push(sql`(${movies.hidden} IS NULL OR ${movies.hidden} = 0)`);
+		}
+		if (query.search) conds.push(like(movies.title, `%${query.search}%`));
+		if (query.yearFrom) conds.push(sql`${movies.year} >= ${query.yearFrom}`);
+		if (query.yearTo) conds.push(sql`${movies.year} <= ${query.yearTo}`);
+
+		const ratingJoinCond = userId
+			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
+			: eq(movies.id, userRatings.movieId);
+
+		const movieKeys = this.database.db
+			.select({
+				id: movies.id,
+				title: movies.title,
+				year: movies.year,
+				addedAt: movies.addedAt,
+				runtime: movies.runtimeMinutes,
+				rating: userRatings.rating,
+				fileSize: sql<number>`(SELECT mf.file_size FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
+			})
+			.from(movies)
+			.leftJoin(userRatings, ratingJoinCond)
+			.where(and(...conds))
+			.all();
+
+		// --- parent group stacks (with sort summary), same shape the /groups
+		// endpoint returns so the client renders them identically ---
+		const parents = this.groupsRepo.listParents();
+		const groupById = new Map<string, any>();
+		for (const p of parents) {
+			const summary = this.groupsRepo.getParentSummary(p.id);
+			if (summary.totalMembers <= 0) continue;
+			if (search && !(p.name ?? '').toLowerCase().includes(search)) continue;
+			groupById.set(p.id, {
+				...p,
+				subgroupCount: this.groupsRepo.listChildren(p.id).length,
+				totalMembers: summary.totalMembers,
+				posterUrl: p.posterUrl ?? summary.representativePosterUrl,
+				latestMemberAddedAt: summary.latestMemberAddedAt,
+				earliestYear: summary.earliestYear,
+			});
+		}
+
+		// --- combine + sort (mirrors MovieGrid.interleave) ---
+		type Item = { kind: 'movie' | 'group'; id: string; key: number | string };
+		const items: Item[] = [
+			...movieKeys.map(
+				(m): Item => ({ kind: 'movie', id: m.id, key: this.movieSortKey(m, sortBy) }),
+			),
+			...[...groupById.values()].map(
+				(g): Item => ({ kind: 'group', id: g.id, key: this.groupSortKey(g, sortBy) }),
+			),
+		];
+		items.sort((a, b) => {
+			const ka = a.key;
+			const kb = b.key;
+			if (typeof ka === 'number' && typeof kb === 'number') return (ka - kb) * dir;
+			return String(ka).localeCompare(String(kb)) * dir;
+		});
+
+		const total = items.length;
+		const windowItems = items.slice(offset, offset + pageSize);
+
+		// --- hydrate the window ---
+		const movieIds = windowItems.filter((i) => i.kind === 'movie').map((i) => i.id);
+		const fullMovies = this.getMoviesByIds(movieIds, userId);
+		const movieById = new Map(fullMovies.map((m) => [m.id, m]));
+
+		const pageMovies: any[] = [];
+		const pageGroups: any[] = [];
+		for (const it of windowItems) {
+			if (it.kind === 'movie') {
+				const m = movieById.get(it.id);
+				if (m) pageMovies.push(m);
+			} else {
+				const g = groupById.get(it.id);
+				if (g) pageGroups.push(g);
+			}
+		}
+
+		const hiddenCount =
+			this.database.db
+				.select({ count: count() })
+				.from(movies)
+				.where(sql`${movies.hidden} = 1`)
+				.get()?.count ?? 0;
+		const watchedCount = userId
+			? (this.database.db
+					.select({ count: count() })
+					.from(userWatchHistory)
+					.where(
+						and(
+							eq(userWatchHistory.userId, userId),
+							eq(userWatchHistory.completed, true),
+						),
+					)
+					.get()?.count ?? 0)
+			: 0;
+
+		return {
+			movies: pageMovies,
+			groups: pageGroups,
+			total,
+			hiddenCount,
+			watchedCount,
+			page,
+			pageSize,
+			totalPages: Math.ceil(total / pageSize),
+		};
 	}
 
 	/**

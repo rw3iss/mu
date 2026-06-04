@@ -45,6 +45,14 @@ export function toggleGroupedOnly(): void {
 export const parentGroups = signal<MovieGroup[]>([]);
 export const groupsLoaded = signal<boolean>(false);
 
+/**
+ * Groups (stacks) that fall within the CURRENT library page, returned inline by
+ * the movies list endpoint when `interleaveGroups=true`. Unlike `parentGroups`
+ * (all groups, used by the collections-only tile grid), this is paginated +
+ * sorted alongside the page's ungrouped movies for the mixed view.
+ */
+export const pageGroups = signal<MovieGroup[]>([]);
+
 export async function fetchParentGroups(): Promise<void> {
 	try {
 		const { groups } = await groupsService.listParents();

@@ -1,5 +1,6 @@
 import type { Movie } from '@/state/library.state';
 import { api } from './api';
+import type { MovieGroup } from './groups.service';
 
 // ============================================
 // Types
@@ -7,6 +8,8 @@ import { api } from './api';
 
 export interface MovieListResponse {
 	movies: Movie[];
+	/** Group "stacks" interleaved into this page (only when interleaveGroups=true). */
+	groups?: MovieGroup[];
 	total: number;
 	hiddenCount?: number;
 	watchedCount?: number;
