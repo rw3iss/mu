@@ -116,8 +116,7 @@ export function GlobalPlayer() {
 	 */
 	useEffect(() => {
 		const inOverlayMode =
-			playerMode.value === 'full' ||
-			(playerMode.value === 'split' && splitExclusive.value);
+			playerMode.value === 'full' || (playerMode.value === 'split' && splitExclusive.value);
 		if (inOverlayMode || isFullscreen.value) {
 			resetControlsTimer();
 		}
@@ -916,7 +915,11 @@ export function GlobalPlayer() {
 						class={`${isExclusive && !showControls.value ? styles.splitBarHidden : ''}`}
 					>
 						<PlayerControls
-							visible
+							// In isolated (exclusive) split mode the controls auto-hide
+							// on mouse-leave — tie the whole controls block (incl. the
+							// seek bar inside it) to that state so nothing lingers below
+							// the video. Normal split mode keeps controls always visible.
+							visible={!isExclusive || showControls.value}
 							isSplit
 							onTogglePlay={engine.togglePlay}
 							onSeek={engine.seek}

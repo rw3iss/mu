@@ -46,6 +46,35 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 					<PlaybackBadge movie={movie} />
 				</span>
 
+				{(() => {
+					// Status indicator: only shown when there's something to say —
+					// the file hasn't been probed yet, or it has been transcoded
+					// (cached HLS versions exist). Nothing when it's done / direct-play.
+					const unprobed = !fi.codecVideo;
+					const cached = (movie as any).cachedVersions as unknown[] | undefined;
+					const transcoded = !!cached && cached.length > 0;
+					if (!unprobed && !transcoded) return null;
+					return (
+						<>
+							<span class={styles.label}>Status</span>
+							<span class={styles.value}>
+								{unprobed ? (
+									<span class={`${styles.statusBadge} ${styles.statusPending}`}>
+										Not yet probed — codec will be checked
+									</span>
+								) : (
+									<span
+										class={`${styles.statusBadge} ${styles.statusTranscoded}`}
+									>
+										Transcoded · {cached!.length} cached version
+										{cached!.length > 1 ? 's' : ''}
+									</span>
+								)}
+							</span>
+						</>
+					);
+				})()}
+
 				{fi.filePath && (
 					<>
 						<span class={styles.label}>Location</span>
