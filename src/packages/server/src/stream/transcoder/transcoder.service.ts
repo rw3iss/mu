@@ -69,6 +69,13 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	/** Sessions that have already retried with software encoding (prevents infinite loops) */
 	private readonly swFallbackAttempted = new Set<string>();
 	/**
+	 * Sessions we deliberately killed (seek-restart / stop / cancel / supersede).
+	 * Their FFmpeg exits non-zero with the encoder name still in stderr, which
+	 * must NOT be misread as a hardware-encoder failure. Checked + cleared in the
+	 * 'error' handler.
+	 */
+	private readonly intentionallyStopped = new Set<string>();
+	/**
 	 * Rolling buffer of the last N stderr lines per active session, used by
 	 * {@link isHardwareEncoderFailure} to distinguish real GPU failures from
 	 * input-path / IO errors. Bounded to keep memory predictable.
@@ -844,6 +851,21 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					this.activeProcesses.delete(sessionId);
 					const stderrLines = this.sessionStderr.get(sessionId) ?? [];
 
+					// Deliberate kill (seek-restart / stop / cancel)? Then this isn't a
+					// failure — the process exited because WE terminated it. Never flip
+					// hwAccelBroken or retry software here; just clean up. Without this,
+					// scrubbing a video repeatedly killed the nvenc FFmpeg and the leftover
+					// "nvenc" in its stderr was misread as a GPU failure, disabling
+					// hardware encoding for everyone until a manual recycle.
+					if (this.intentionallyStopped.has(sessionId)) {
+						this.intentionallyStopped.delete(sessionId);
+						this.sessionStderr.delete(sessionId);
+						this.swFallbackAttempted.delete(sessionId);
+						this.sessionStates.set(sessionId, { state: 'failed', error: 'stopped' });
+						reject(err);
+						return;
+					}
+
 					// Windows DLL init failure with NVENC — likely NVIDIA DLLs can't load
 					// in non-interactive session. Fall through to software retry first.
 					if (this.isWindowsSpawnFailure(err) && hwAccel === 'none') {
@@ -1460,6 +1482,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	stopTranscode(sessionId: string): void {
 		const proc = this.activeProcesses.get(sessionId);
 		if (proc) {
+			// Mark as a deliberate kill so the 'error' handler doesn't mistake the
+			// resulting non-zero exit for a hardware-encoder failure (the killed
+			// process's stderr still contains the encoder name, e.g. h264_nvenc).
+			this.intentionallyStopped.add(sessionId);
 			this.logger.log(
 				`Stopping transcode for session ${this.guidResolver.resolve(sessionId)}`,
 			);
@@ -1563,7 +1589,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		// Synthesize a shadow `enc` with hwAccel='none' so getRateControlOpts
 		// emits libx264 CRF + maxrate (not NVENC VBR) even when the global
 		// setting selects NVENC.
-		const swRateOpts = this.getRateControlOpts({ ...enc, hwAccel: 'none' }, profile.videoBitrate);
+		const swRateOpts = this.getRateControlOpts(
+			{ ...enc, hwAccel: 'none' },
+			profile.videoBitrate,
+		);
 		const swPreset = enc.hwAccel === 'nvenc' ? 'veryfast' : enc.preset;
 		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
 		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
@@ -1686,7 +1715,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		// Synthesize a shadow `enc` with hwAccel='none' so getRateControlOpts
 		// emits libx264 CRF + maxrate (not NVENC VBR) even when the global
 		// setting selects NVENC.
-		const swRateOpts = this.getRateControlOpts({ ...enc, hwAccel: 'none' }, profile.videoBitrate);
+		const swRateOpts = this.getRateControlOpts(
+			{ ...enc, hwAccel: 'none' },
+			profile.videoBitrate,
+		);
 		// Map NVENC presets back to libx264 presets
 		const swPreset = enc.hwAccel === 'nvenc' ? 'veryfast' : enc.preset;
 		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
@@ -1939,6 +1971,19 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	): boolean {
 		if (hwAccel === 'none') return false;
 		const haystack = `${errMessage}\n${stderrLines.join('\n')}`.toLowerCase();
+		// A process terminated by signal (a seek-restart / stop / cancel we issued)
+		// is never a GPU failure — its stderr just still mentions the encoder name.
+		// Backstop to the intentionallyStopped guard for kills via other paths.
+		if (
+			haystack.includes('killed with signal') ||
+			haystack.includes('sigkill') ||
+			haystack.includes('sigterm') ||
+			haystack.includes('signal 15') ||
+			haystack.includes('signal 9') ||
+			haystack.includes('received signal')
+		) {
+			return false;
+		}
 		// Generic "input file is bad" markers — these are NEVER the
 		// encoder's fault; bail out before the hardware check.
 		if (
@@ -1949,25 +1994,29 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		) {
 			return false;
 		}
-		// Hardware-specific failure markers. Lower-cased haystack so
-		// the patterns match across FFmpeg versions and capitalisations.
-		const hwMarkers = [
-			'nvenc',
-			'nv_enc',
-			'openencodesession',
-			'cannot load nvencodeapi',
-			'cuda',
-			'cuvid',
-			'qsv',
-			'vaapi',
-			'dxva',
-			'd3d11va',
-			'no nvenc capable devices',
+		// Only PERSISTENT hardware / driver / DLL failures globally disable the
+		// GPU. We deliberately do NOT match the bare encoder name ('nvenc' /
+		// 'gpu' / 'cuda') — those appear in normal FFmpeg output, so a killed or
+		// interrupted nvenc encode used to trip a false "GPU broken" and disable
+		// hardware encoding for everyone. Transient / load failures (session
+		// limit, out of memory) are also excluded — they fail just that one job,
+		// not the whole GPU.
+		const brokenMarkers = [
 			'no capable devices found',
+			'no nvenc capable devices',
+			'cannot load nvcuda',
+			'cannot load nvencodeapi',
+			'cannot load library',
 			'driver does not support',
-			'gpu',
+			'the minimum required nvidia driver',
+			'incompatible client key',
+			'nvenc api version',
+			'0xc0000142',
+			'3221225794',
+			'failed to initialise vaapi',
+			'error initializing the mfx session',
 		];
-		return hwMarkers.some((m) => haystack.includes(m));
+		return brokenMarkers.some((m) => haystack.includes(m));
 	}
 
 	/**
@@ -2254,14 +2303,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					bufsize,
 				];
 			}
-			return [
-				'-crf',
-				String(enc.crf),
-				'-maxrate',
-				maxrate,
-				'-bufsize',
-				bufsize,
-			];
+			return ['-crf', String(enc.crf), '-maxrate', maxrate, '-bufsize', bufsize];
 		}
 		return ['-b:v', videoBitrate];
 	}

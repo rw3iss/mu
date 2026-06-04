@@ -126,6 +126,9 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 	/** Maps sessionId → the directory where HLS segments live (persistent or ephemeral) */
 	private readonly sessionDirs = new Map<string, string>();
+	/** Pending seek-restart timers per session — debounces rapid scrubbing so we
+	 *  don't spawn/kill a burst of FFmpeg/NVENC sessions while the user drags. */
+	private readonly seekDebounce = new Map<string, ReturnType<typeof setTimeout>>();
 	/** Track movieFileId and quality per session for chunk manager lookups */
 	private readonly sessionInfo = new Map<string, { movieFileId: string; quality: string }>();
 	/** Track last progress position/time per session for cumulative watch time calculation */
@@ -682,11 +685,43 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			}
 		}
 
+		// Debounce rapid scrubbing: only restart the transcode once the user
+		// settles on a position (~250ms). Dragging the seek bar fires many seeks;
+		// restarting (kill + respawn FFmpeg) on each one churns NVENC sessions and
+		// only the final landing position matters. Returns immediately — the
+		// client polls the playlist for the new segments.
+		const pending = this.seekDebounce.get(sessionId);
+		if (pending) clearTimeout(pending);
+		this.seekDebounce.set(
+			sessionId,
+			setTimeout(() => {
+				this.seekDebounce.delete(sessionId);
+				this.performSeekRestart(sessionId, movieFile, quality, positionSeconds, mode).catch(
+					(err) =>
+						this.logger.warn(
+							`Seek-restart failed for ${this.guidResolver.resolve(sessionId)}: ${err.message}`,
+						),
+				);
+			}, 250),
+		);
+	}
+
+	/** Stop the current transcode and restart it from `positionSeconds`. Invoked
+	 *  (debounced) by seekStream once the user settles on a seek position. */
+	private async performSeekRestart(
+		sessionId: string,
+		movieFile: { id: string; filePath: string },
+		quality: string,
+		positionSeconds: number,
+		mode: string,
+	): Promise<void> {
+		// Bail if the session was torn down while the debounce timer was pending.
+		if (!this.sessionDirs.has(sessionId)) return;
+
 		// Stop current transcode
 		this.transcoderService.stopTranscode(sessionId);
 
 		// Clean up ephemeral session dir (not persistent cache)
-		const _sessionDir = this.transcoderService.getSessionDir(sessionId);
 		const currentDir = this.sessionDirs.get(sessionId);
 		const persistDir = this.transcoderService.getPersistentDir(movieFile.id, quality);
 
@@ -781,10 +816,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// default of 300s (5 min) covers most credit sequences — users
 		// who stop during credits naturally have their history cleared.
 		// Configurable in Settings → Playback → Watch Tracking.
-		const completedTailSeconds = this.settings.get<number>(
-			'completedTailSeconds',
-			300,
-		);
+		const completedTailSeconds = this.settings.get<number>('completedTailSeconds', 300);
 		const completedNow =
 			movieDurationSeconds != null && movieDurationSeconds > 0
 				? positionSeconds >= movieDurationSeconds - completedTailSeconds
@@ -853,6 +885,13 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		}
 
 		const session = sessions[0]!;
+
+		// Cancel any pending debounced seek-restart so it can't fire after teardown.
+		const pendingSeek = this.seekDebounce.get(sessionId);
+		if (pendingSeek) {
+			clearTimeout(pendingSeek);
+			this.seekDebounce.delete(sessionId);
+		}
 
 		// Stop any active transcode
 		if (session.transcoding) {
