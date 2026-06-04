@@ -41,6 +41,8 @@ export const JOB_TYPE = {
 	PRE_TRANSCODE: 'pre-transcode',
 	/** Convert a file to native direct-play MP4 (remux/re-encode + cleanup). */
 	CONVERT_MP4: 'convert-mp4',
+	/** Backfill ffprobe codec info for files that were never probed (null codec). */
+	PROBE_UNPROBED: 'probe-unprobed',
 } as const;
 
 @Injectable()
@@ -82,6 +84,11 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 		// Resume after HTTP is fully listening so the site is immediately accessible.
 		// Long delay to let the HTTP server be fully accessible before heavy disk I/O.
 		setTimeout(() => this.resumeIncompleteTranscodes(), 60000);
+
+		// Backfill codecs for any never-probed files so the stream decision can
+		// direct-play them (instead of conservatively transcoding an unknown
+		// codec to HLS). Runs once, shortly after boot, off the hot path.
+		setTimeout(() => this.enqueueProbeUnprobed(), 30000);
 
 		// Sweep orphan movies (rows with no available file) created by past
 		// scanner/watcher races. Cheap query — runs once shortly after boot.
@@ -250,6 +257,50 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					`Pre-transcoding ${this.guidResolver.resolve(movieFileId)} (${mode}, ${quality})`,
 				);
 
+				// Probe-on-demand: an unprobed file has an unknown codec, so the
+				// stream decision conservatively chose TRANSCODE. Probe it now — if
+				// it's actually directly playable (e.g. H.264/AAC MP4), skip building
+				// an HLS cache entirely. Avoids needless HLS for unknown-codec files.
+				{
+					const unprobed = this.database.db
+						.select()
+						.from(movieFiles)
+						.where(eq(movieFiles.id, movieFileId))
+						.get();
+					if (unprobed && !unprobed.codecVideo) {
+						helpers.setDetails('Probing codec…');
+						const did = await this.scanner.reprobeFileRow(unprobed);
+						if (did) {
+							const probed = this.database.db
+								.select()
+								.from(movieFiles)
+								.where(eq(movieFiles.id, movieFileId))
+								.get();
+							const newMode = probed
+								? this.streamService.determineStreamMode(probed)
+								: mode;
+							helpers.log(
+								`Probed → codec=${probed?.codecVideo}/${probed?.codecAudio}, mode=${newMode}`,
+							);
+							if (newMode === StreamMode.DIRECT_PLAY) {
+								if (movieId) {
+									this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+										movieId,
+										source: 'probe',
+									});
+								}
+								helpers.reportProgress(100);
+								return {
+									movieFileId,
+									quality,
+									skipped: true,
+									reason: 'direct-play-after-probe',
+								};
+							}
+						}
+					}
+				}
+
 				// Pre-extract subtitles so they're cached when the user plays
 				try {
 					const file = this.database.db
@@ -353,9 +404,24 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					return { skipped: true, reason: 'file-missing' };
 				}
 
+				// Probe-on-demand: an unprobed file has an unknown codec, so
+				// planConversion would 'skip' it. Probe now so we decide correctly.
+				let resolved = file;
+				if (!resolved.codecVideo) {
+					helpers.setDetails('Probing codec…');
+					if (await this.scanner.reprobeFileRow(resolved)) {
+						resolved =
+							this.database.db
+								.select()
+								.from(movieFiles)
+								.where(eq(movieFiles.id, movieFileId))
+								.get() ?? resolved;
+					}
+				}
+
 				// Refine the details line with the action resolved against current
 				// settings (the enqueue-time plan may predate a settings change).
-				helpers.setDetails(this.conversionService.describePlan(file));
+				helpers.setDetails(this.conversionService.describePlan(resolved));
 
 				// Let the user cancel mid-encode — kills the ffmpeg process writing
 				// this file's temp output (tracked by ConversionService).
@@ -364,7 +430,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 				});
 
 				const result = await this.conversionService.convertFile(
-					file,
+					resolved,
 					{ inPlace: inPlace ?? this.conversionService.getConfig().convertOriginalFile },
 					(percent) => helpers.reportProgress(percent),
 				);
@@ -376,7 +442,73 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			},
 		);
 
+		// Backfill ffprobe codec info for files that were never probed.
+		this.jobManager.registerHandler(
+			JOB_TYPE.PROBE_UNPROBED,
+			async (_job: JobRecord, helpers: JobHelpers) => {
+				const files = this.scanner.listUnprobedFiles();
+				helpers.log(`Probing ${files.length} unprobed file(s)`);
+				let probed = 0;
+				let directPlayable = 0;
+				for (let i = 0; i < files.length; i++) {
+					const f = files[i]!;
+					helpers.setDetails(`Probing ${i + 1}/${files.length}`);
+					try {
+						if (await this.scanner.reprobeFileRow(f)) {
+							probed++;
+							const row = this.database.db
+								.select()
+								.from(movieFiles)
+								.where(eq(movieFiles.id, f.id))
+								.get();
+							if (
+								row &&
+								this.streamService.determineStreamMode(row) ===
+									StreamMode.DIRECT_PLAY
+							) {
+								directPlayable++;
+							}
+							if (f.movieId) {
+								this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
+									movieId: f.movieId,
+									source: 'probe',
+								});
+							}
+						}
+					} catch (err: any) {
+						helpers.log(`Probe failed for ${f.id}: ${err.message}`);
+					}
+					helpers.reportProgress(Math.round(((i + 1) / Math.max(1, files.length)) * 100));
+				}
+				this.logger.log(
+					`Probe backfill: ${probed}/${files.length} probed, ${directPlayable} now direct-play`,
+				);
+				return { total: files.length, probed, directPlayable };
+			},
+		);
+
 		this.logger.log('Job handlers registered');
+	}
+
+	/**
+	 * Queue the unprobed-file backfill (one job). No-op when nothing is
+	 * unprobed or a backfill is already pending/running.
+	 */
+	enqueueProbeUnprobed(): number {
+		const pending = this.jobManager
+			.listJobs({ type: JOB_TYPE.PROBE_UNPROBED })
+			.some((j) => j.status === 'pending' || j.status === 'running');
+		if (pending) return 0;
+		const count = this.scanner.listUnprobedFiles().length;
+		if (count === 0) return 0;
+		this.jobManager.enqueue({
+			type: JOB_TYPE.PROBE_UNPROBED,
+			label: `Probe ${count} unprobed file(s)`,
+			details: `${count} file(s) with unknown codec → ffprobe`,
+			priority: 25,
+		});
+		this.logger.log(`Enqueued probe backfill for ${count} unprobed file(s)`);
+		return count;
 	}
 
 	/**

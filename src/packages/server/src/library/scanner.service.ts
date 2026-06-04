@@ -448,43 +448,64 @@ export class ScannerService {
 		const results: { fileId: string; fileName: string | null; updated: boolean }[] = [];
 
 		for (const file of files) {
-			const probeInfo = await this.probeFile(file.filePath);
-			if (probeInfo.codecVideo || probeInfo.codecAudio || probeInfo.resolution) {
-				this.database.db
-					.update(movieFiles)
-					.set({
-						codecVideo: probeInfo.codecVideo ?? null,
-						codecAudio: probeInfo.codecAudio ?? null,
-						resolution: probeInfo.resolution ?? file.resolution,
-						durationSeconds: probeInfo.durationSeconds ?? null,
-						bitrate: probeInfo.bitrate ?? null,
-						videoWidth: probeInfo.videoWidth ?? null,
-						videoHeight: probeInfo.videoHeight ?? null,
-						videoBitDepth: probeInfo.videoBitDepth ?? null,
-						videoFrameRate: probeInfo.videoFrameRate ?? null,
-						videoProfile: probeInfo.videoProfile ?? null,
-						videoColorSpace: probeInfo.videoColorSpace ?? null,
-						hdr: probeInfo.hdr ?? false,
-						containerFormat: probeInfo.containerFormat ?? null,
-						audioTracks: probeInfo.audioTracks
-							? JSON.stringify(probeInfo.audioTracks)
-							: '[]',
-						subtitleTracks: probeInfo.subtitleTracks
-							? JSON.stringify(probeInfo.subtitleTracks)
-							: '[]',
-					})
-					.where(eq(movieFiles.id, file.id))
-					.run();
-				results.push({ fileId: file.id, fileName: file.fileName, updated: true });
-			} else {
-				results.push({ fileId: file.id, fileName: file.fileName, updated: false });
-			}
+			const updated = await this.reprobeFileRow(file);
+			results.push({ fileId: file.id, fileName: file.fileName, updated });
 		}
 
 		this.logger.log(
 			`Rescanned ${results.length} file(s) for movie ${this.guidResolver.resolve(movieId)}`,
 		);
 		return { files: results };
+	}
+
+	/**
+	 * Re-probe a single movie_files row in place and persist the codec/stream
+	 * fields. Returns true when the probe yields usable info and the row is
+	 * updated. Shared by rescanMovie, the unprobed-file backfill, and the
+	 * probe-on-demand path that runs before a transcode/convert job decides.
+	 */
+	async reprobeFileRow(file: {
+		id: string;
+		filePath: string;
+		resolution?: string | null;
+	}): Promise<boolean> {
+		const probeInfo = await this.probeFile(file.filePath);
+		if (!(probeInfo.codecVideo || probeInfo.codecAudio || probeInfo.resolution)) {
+			return false;
+		}
+		this.database.db
+			.update(movieFiles)
+			.set({
+				codecVideo: probeInfo.codecVideo ?? null,
+				codecAudio: probeInfo.codecAudio ?? null,
+				resolution: probeInfo.resolution ?? file.resolution ?? null,
+				durationSeconds: probeInfo.durationSeconds ?? null,
+				bitrate: probeInfo.bitrate ?? null,
+				videoWidth: probeInfo.videoWidth ?? null,
+				videoHeight: probeInfo.videoHeight ?? null,
+				videoBitDepth: probeInfo.videoBitDepth ?? null,
+				videoFrameRate: probeInfo.videoFrameRate ?? null,
+				videoProfile: probeInfo.videoProfile ?? null,
+				videoColorSpace: probeInfo.videoColorSpace ?? null,
+				hdr: probeInfo.hdr ?? false,
+				containerFormat: probeInfo.containerFormat ?? null,
+				audioTracks: probeInfo.audioTracks ? JSON.stringify(probeInfo.audioTracks) : '[]',
+				subtitleTracks: probeInfo.subtitleTracks
+					? JSON.stringify(probeInfo.subtitleTracks)
+					: '[]',
+			})
+			.where(eq(movieFiles.id, file.id))
+			.run();
+		return true;
+	}
+
+	/** Available files that were never successfully probed (null codec_video). */
+	listUnprobedFiles() {
+		return this.database.db
+			.select()
+			.from(movieFiles)
+			.where(and(eq(movieFiles.available, true), isNull(movieFiles.codecVideo)))
+			.all();
 	}
 
 	/**

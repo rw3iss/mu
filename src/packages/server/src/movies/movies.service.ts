@@ -11,6 +11,7 @@ import {
 	imdbRatings,
 	jobHistory,
 	movieFiles,
+	movieGroups,
 	movieMetadata,
 	movies,
 	playlistMovies,
@@ -19,7 +20,6 @@ import {
 	userWatchHistory,
 	userWatchlist,
 } from '../database/schema/index.js';
-import { GroupsRepository } from '../grouping/groups.repository.js';
 import { buildPrettyTitle, isDirtyTitle } from '../grouping/title-sanitiser.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from '../library/library.service.js';
@@ -44,7 +44,6 @@ export class MoviesService {
 		private readonly subtitleService: SubtitleService,
 		private readonly tmdb: TmdbProvider,
 		private readonly metadataService: MetadataService,
-		private readonly groupsRepo: GroupsRepository,
 	) {}
 
 	private readonly listCache = new Map<string, { data: any; expires: number }>();
@@ -376,6 +375,41 @@ export class MoviesService {
 	}
 
 	/**
+	 * Parent groups with the sort/render summary the /groups endpoint exposes
+	 * (totalMembers, representative poster, latest-member addedAt, earliest year).
+	 * Queried inline to avoid a cross-module dependency on the grouping module.
+	 */
+	private listParentGroupsWithSummary(): any[] {
+		const parents = this.database.db
+			.select()
+			.from(movieGroups)
+			.where(eq(movieGroups.type, 'parent'))
+			.all();
+		return parents.map((p) => {
+			const summary = this.database.db
+				.select({
+					totalMembers: sql<number>`COUNT(${movies.id})`,
+					poster: sql<
+						string | null
+					>`(SELECT poster_url FROM movies WHERE group_id IN (SELECT id FROM movie_groups WHERE parent_group_id = ${p.id}) AND poster_url IS NOT NULL ORDER BY group_episode_ordinal LIMIT 1)`,
+					latestAdded: sql<string | null>`MAX(${movies.addedAt})`,
+					earliestYear: sql<number | null>`MIN(${movies.year})`,
+				})
+				.from(movies)
+				.innerJoin(movieGroups, eq(movieGroups.id, movies.groupId))
+				.where(eq(movieGroups.parentGroupId, p.id))
+				.get();
+			return {
+				...p,
+				totalMembers: summary?.totalMembers ?? 0,
+				posterUrl: p.posterUrl ?? summary?.poster ?? null,
+				latestMemberAddedAt: summary?.latestAdded ?? null,
+				earliestYear: summary?.earliestYear ?? null,
+			};
+		});
+	}
+
+	/**
 	 * Build one paginated, sorted page that interleaves ungrouped movies with
 	 * collapsed parent-group stacks. Returns the page's movies + the groups that
 	 * fall in the same window; `total` counts movies + groups so pagination is
@@ -420,20 +454,11 @@ export class MoviesService {
 
 		// --- parent group stacks (with sort summary), same shape the /groups
 		// endpoint returns so the client renders them identically ---
-		const parents = this.groupsRepo.listParents();
 		const groupById = new Map<string, any>();
-		for (const p of parents) {
-			const summary = this.groupsRepo.getParentSummary(p.id);
-			if (summary.totalMembers <= 0) continue;
-			if (search && !(p.name ?? '').toLowerCase().includes(search)) continue;
-			groupById.set(p.id, {
-				...p,
-				subgroupCount: this.groupsRepo.listChildren(p.id).length,
-				totalMembers: summary.totalMembers,
-				posterUrl: p.posterUrl ?? summary.representativePosterUrl,
-				latestMemberAddedAt: summary.latestMemberAddedAt,
-				earliestYear: summary.earliestYear,
-			});
+		for (const g of this.listParentGroupsWithSummary()) {
+			if (g.totalMembers <= 0) continue;
+			if (search && !(g.name ?? '').toLowerCase().includes(search)) continue;
+			groupById.set(g.id, g);
 		}
 
 		// --- combine + sort (mirrors MovieGrid.interleave) ---
