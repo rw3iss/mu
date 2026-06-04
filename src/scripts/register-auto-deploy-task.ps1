@@ -33,7 +33,14 @@ $scriptMsys = "/$drive$rest/src/scripts/auto-deploy-watch.sh"
 Write-Host "Bash:    $bash"
 Write-Host "Watcher: $scriptMsys"
 
-$action = New-ScheduledTaskAction -Execute $bash -Argument "-lc `"$scriptMsys`""
+# Run via cmd.exe so Task Scheduler launches it reliably and we capture all
+# output (the bare `bash.exe -lc <path>` action exits 1 under Task Scheduler
+# with no diagnostics). `-l` gives a login shell so node/pnpm/git are on PATH.
+$winLog = Join-Path $DeployDir 'data\logs\auto-deploy-task.log'
+$null = New-Item -ItemType Directory -Force -Path (Split-Path $winLog) -ErrorAction SilentlyContinue
+$inner = "`"$bash`" -l `"$scriptMsys`" >> `"$winLog`" 2>&1"
+$action = New-ScheduledTaskAction -Execute "$env:ComSpec" -Argument "/c `"$inner`""
+Write-Host "Action:  $env:ComSpec /c `"$inner`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Highest
 # Long-running loop: no time limit, restart if it ever dies, only on AC is fine
