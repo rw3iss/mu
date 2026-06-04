@@ -999,6 +999,46 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 	// ===========================================================
 
 	/**
+	 * Move this movie's pending processing job(s) — convert-to-MP4 or
+	 * pre-transcode — to the FRONT of the queue (priority 1) so a user-triggered
+	 * rescan jumps the line. Keeps any already-scheduled job (just bumps it);
+	 * running jobs are already executing so they're left alone. `jobManager.
+	 * prioritize` removes the job from its slot, sets priority 1 and unshifts it,
+	 * so the most-recently-prioritized movie runs next — no manual counter needed.
+	 * Returns how many jobs were bumped.
+	 */
+	prioritizeMovieJobs(movieId: string): number {
+		const fileIds = new Set(
+			this.database.db
+				.select({ id: movieFiles.id })
+				.from(movieFiles)
+				.where(eq(movieFiles.movieId, movieId))
+				.all()
+				.map((r) => r.id),
+		);
+		if (fileIds.size === 0) return 0;
+
+		let bumped = 0;
+		for (const type of [JOB_TYPE.CONVERT_MP4, JOB_TYPE.PRE_TRANSCODE]) {
+			for (const job of this.jobManager.listJobs({ type })) {
+				if (
+					job.status === 'pending' &&
+					fileIds.has(job.payload?.movieFileId as string) &&
+					this.jobManager.prioritize(job.id)
+				) {
+					bumped++;
+				}
+			}
+		}
+		if (bumped > 0) {
+			this.logger.log(
+				`Prioritized ${bumped} processing job(s) for movie ${movieId} to front`,
+			);
+		}
+		return bumped;
+	}
+
+	/**
 	 * Enqueue a scan job for a source.
 	 */
 	enqueueScan(sourceId: string, label?: string): string {

@@ -167,7 +167,10 @@ export function MovieOptionsMenu({
 				).length;
 				await refreshMovie();
 				setRescanState('complete');
-				notifySuccess(`Re-scanned ${result.files.length} file(s), ${updatedCount} updated`);
+				const bumped = result.prioritized ? ' · processing moved to front of queue' : '';
+				notifySuccess(
+					`Re-scanned ${result.files.length} file(s), ${updatedCount} updated${bumped}`,
+				);
 				setTimeout(() => setRescanState('idle'), 3000);
 			} catch {
 				setRescanState('idle');

@@ -331,9 +331,13 @@ export class MetadataController {
 		// Enqueue pre-transcode jobs if needed (file available but no valid cached transcode)
 		let transcoding = false;
 		const movieTitle = movie?.title || 'Unknown';
+		let prioritized = 0;
 		try {
 			await this.libraryJobs.enqueuePreTranscodeIfNeeded(movieId, movieTitle);
 			transcoding = true;
+			// User-triggered rescan: jump this movie's processing job (existing or
+			// freshly enqueued above) to the front of the queue.
+			prioritized = this.libraryJobs.prioritizeMovieJobs(movieId);
 		} catch (err: any) {
 			this.logger.warn(`Failed to enqueue pre-transcode during rescan: ${err.message}`);
 		}
@@ -345,6 +349,6 @@ export class MetadataController {
 		// Emit WebSocket event
 		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'rescan' });
 
-		return { files: results, thumbnailUrl, transcoding };
+		return { files: results, thumbnailUrl, transcoding, prioritized };
 	}
 }

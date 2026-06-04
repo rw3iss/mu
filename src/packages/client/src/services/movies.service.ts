@@ -196,9 +196,12 @@ export const moviesService = {
 	/**
 	 * Re-scan movie file(s) — re-probes codecs, resolution, duration
 	 */
-	rescan(
-		movieId: string,
-	): Promise<{ files: { fileId: string; fileName: string; updated: boolean }[] }> {
+	rescan(movieId: string): Promise<{
+		files: { fileId: string; fileName: string; updated: boolean }[];
+		transcoding?: boolean;
+		/** How many of this movie's processing jobs were bumped to the front. */
+		prioritized?: number;
+	}> {
 		return api.post(`/movies/${movieId}/rescan`);
 	},
 
