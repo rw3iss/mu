@@ -16,6 +16,14 @@
 # Env overrides: MU_DEPLOY_POLL_SECONDS (default 60), MU_DEPLOY_DIR, MU_TASK_NAME.
 set -u
 
+# Survive console control events. Restarting the server (killing node +
+# re-running the "Mu Server" task) propagates a CTRL_C / CTRL_BREAK to every
+# process sharing this task's console — which would otherwise SIGINT this
+# watcher mid-deploy (seen as a `^C` in the log) and stop the loop. Ignore them
+# so the watcher keeps polling after each deploy. A hard `schtasks /end` (used
+# to stop the watcher deliberately) is uncatchable and still works.
+trap '' INT HUP
+
 DEPLOY_DIR="${MU_DEPLOY_DIR:-/c/Users/rw3is/Documents/Sites/other/mu}"
 SRC_DIR="$DEPLOY_DIR/src"
 TASK="${MU_TASK_NAME:-Mu Server}"
@@ -30,11 +38,11 @@ restart_server() {
 	# End the running task instance, kill any stray node holding the port, then
 	# re-run the interactive task so the new process lands in Session 1 (GPU).
 	# MSYS_NO_PATHCONV stops Git Bash mangling the /flags (e.g. /run -> R:/un).
-	MSYS_NO_PATHCONV=1 schtasks /end /tn "$TASK" >/dev/null 2>&1 || true
+	MSYS_NO_PATHCONV=1 schtasks /end /tn "$TASK" </dev/null >/dev/null 2>&1 || true
 	sleep 1
-	powershell -NoProfile -Command "Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force" >/dev/null 2>&1 || true
+	powershell -NoProfile -Command "Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force" </dev/null >/dev/null 2>&1 || true
 	sleep 2
-	MSYS_NO_PATHCONV=1 schtasks /run /tn "$TASK" >/dev/null 2>&1
+	MSYS_NO_PATHCONV=1 schtasks /run /tn "$TASK" </dev/null >/dev/null 2>&1
 }
 
 deploy() {
