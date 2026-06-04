@@ -2,7 +2,13 @@ import { nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movieExternalRecs, movies, type NewMovie } from '../database/schema/index.js';
+import {
+	movieExternalRecs,
+	movieMetadata,
+	movies,
+	type NewMovie,
+	type NewMovieMetadata,
+} from '../database/schema/index.js';
 
 export interface ExternalCandidate {
 	movieId: string;
@@ -130,8 +136,14 @@ export class ExternalCandidatesService {
 
 		const accum = new Map<string, ExternalCandidate>();
 		const stubsToCreate: NewMovie[] = [];
+		// TMDB rec rows carry vote_average / vote_count in `raw`; capture
+		// them per resolved movieId so we can seed a partial metadata row
+		// and surface ratings in the immediate Discover results (before the
+		// async enrichment job upgrades the stub with full TMDB+OMDB data).
+		const ratingByMovieId = new Map<string, { tmdbRating: number; tmdbVotes: number | null }>();
 
 		for (const row of recRows) {
+			const raw = parseRaw(row.raw);
 			let movieRow: {
 				id: string;
 				title: string;
@@ -150,7 +162,6 @@ export class ExternalCandidatesService {
 				// external recs from TMDB / Trakt — skip rows without it.
 				if (row.targetTmdb == null) continue;
 				const id = crypto.randomUUID();
-				const raw = parseRaw(row.raw);
 				const posterUrl = raw?.poster_path
 					? `https://image.tmdb.org/t/p/w500${raw.poster_path}`
 					: null;
@@ -181,6 +192,18 @@ export class ExternalCandidatesService {
 			// Skip library candidates — caller handles those through the
 			// normal in-library pipeline.
 			if (movieRow.source === 'library') continue;
+
+			// Record TMDB rating from the rec payload (first non-null wins).
+			if (
+				raw?.vote_average != null &&
+				raw.vote_average > 0 &&
+				!ratingByMovieId.has(movieRow.id)
+			) {
+				ratingByMovieId.set(movieRow.id, {
+					tmdbRating: raw.vote_average,
+					tmdbVotes: raw.vote_count ?? null,
+				});
+			}
 
 			const current = accum.get(movieRow.id);
 			if (current) {
@@ -227,7 +250,57 @@ export class ExternalCandidatesService {
 			}
 		}
 
+		// Seed a partial metadata row (TMDB rating/votes) for any candidate
+		// that has rating data from the rec payload but no metadata row yet,
+		// so ratings show immediately. Enrichment later upserts the full row.
+		this.seedRatingsForUnenriched(ratingByMovieId);
+
 		return Array.from(accum.values());
+	}
+
+	/**
+	 * Inserts a minimal `movie_metadata` row (TMDB rating + votes only) for
+	 * external candidates that carry rating data in their rec payload but
+	 * don't have a metadata row yet. This makes ratings visible in the
+	 * immediate Discover results instead of waiting for the async
+	 * enrichment job. Enrichment later upserts the same row with the full
+	 * TMDB+OMDB detail (cast, genres, IMDB rating, …), so this never blocks
+	 * or duplicates that path. Existing metadata rows are left untouched.
+	 */
+	private seedRatingsForUnenriched(
+		ratingByMovieId: ReadonlyMap<string, { tmdbRating: number; tmdbVotes: number | null }>,
+	): void {
+		if (ratingByMovieId.size === 0) return;
+		const ids = Array.from(ratingByMovieId.keys());
+		const withMeta = new Set(
+			this.database.db
+				.select({ movieId: movieMetadata.movieId })
+				.from(movieMetadata)
+				.where(inArray(movieMetadata.movieId, ids))
+				.all()
+				.map((r) => r.movieId),
+		);
+		const now = nowISO();
+		const toInsert: NewMovieMetadata[] = [];
+		for (const [movieId, rating] of ratingByMovieId) {
+			if (withMeta.has(movieId)) continue;
+			toInsert.push({
+				id: crypto.randomUUID(),
+				movieId,
+				tmdbRating: rating.tmdbRating,
+				tmdbVotes: rating.tmdbVotes,
+				source: 'tmdb-rec',
+				fetchedAt: now,
+				updatedAt: now,
+			});
+		}
+		if (toInsert.length === 0) return;
+		try {
+			this.database.db.insert(movieMetadata).values(toInsert).run();
+			this.logger.debug(`Seeded TMDB ratings for ${toInsert.length} external candidate(s)`);
+		} catch (err: any) {
+			this.logger.warn(`Rating seed insert failed: ${err?.message ?? err}`);
+		}
 	}
 
 	/**
@@ -257,7 +330,13 @@ export class ExternalCandidatesService {
 	}
 }
 
-function parseRaw(raw: string | null): { poster_path?: string } | null {
+interface RawTmdbItem {
+	poster_path?: string;
+	vote_average?: number;
+	vote_count?: number;
+}
+
+function parseRaw(raw: string | null): RawTmdbItem | null {
 	if (!raw) return null;
 	try {
 		return JSON.parse(raw);

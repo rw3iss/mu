@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
-import type { MovieListQuery } from '@mu/shared';
-import { nowISO, paginationDefaults } from '@mu/shared';
+import type { LibraryContentType, MovieListQuery } from '@mu/shared';
+import { classifyGroupType, nowISO, paginationDefaults } from '@mu/shared';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, asc, count, desc, eq, inArray, like, sql } from 'drizzle-orm';
 import { parseJsonArray, parseJsonObject, stringifyJsonObject } from '../common/json-fields.js';
@@ -415,11 +415,32 @@ export class MoviesService {
 	 * fall in the same window; `total` counts movies + groups so pagination is
 	 * correct. The client (MovieGrid) re-sorts the page with the same keys.
 	 */
+	/**
+	 * Parses the `type` query param (comma-separated {@link LibraryContentType})
+	 * into a Set. Returns `null` when no/empty filter is given, meaning "all
+	 * types" — callers treat null as no restriction.
+	 */
+	private parseTypeFilter(query: MovieListQuery): Set<LibraryContentType> | null {
+		const raw = (query as { type?: string }).type;
+		if (!raw) return null;
+		const valid = new Set<LibraryContentType>(['movie', 'series', 'collection']);
+		const picked = new Set<LibraryContentType>();
+		for (const part of raw.split(',')) {
+			const t = part.trim() as LibraryContentType;
+			if (valid.has(t)) picked.add(t);
+		}
+		return picked.size > 0 ? picked : null;
+	}
+
 	private computeInterleaved(query: MovieListQuery, userId?: string) {
 		const { page, pageSize, offset } = paginationDefaults(query);
 		const sortBy = query.sortBy;
 		const dir = query.sortOrder === 'asc' ? 1 : -1;
 		const search = (query.search ?? '').trim().toLowerCase();
+		// Type filter: null = all. When set, standalone movies are included only
+		// if 'movie' is selected, and each parent group only if its classified
+		// type (series / collection) is selected.
+		const types = this.parseTypeFilter(query);
 
 		// --- ungrouped movie sort-keys ---
 		const conds = [
@@ -437,20 +458,23 @@ export class MoviesService {
 			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
 			: eq(movies.id, userRatings.movieId);
 
-		const movieKeys = this.database.db
-			.select({
-				id: movies.id,
-				title: movies.title,
-				year: movies.year,
-				addedAt: movies.addedAt,
-				runtime: movies.runtimeMinutes,
-				rating: userRatings.rating,
-				fileSize: sql<number>`(SELECT mf.file_size FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
-			})
-			.from(movies)
-			.leftJoin(userRatings, ratingJoinCond)
-			.where(and(...conds))
-			.all();
+		const includeMovies = !types || types.has('movie');
+		const movieKeys = includeMovies
+			? this.database.db
+					.select({
+						id: movies.id,
+						title: movies.title,
+						year: movies.year,
+						addedAt: movies.addedAt,
+						runtime: movies.runtimeMinutes,
+						rating: userRatings.rating,
+						fileSize: sql<number>`(SELECT mf.file_size FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
+					})
+					.from(movies)
+					.leftJoin(userRatings, ratingJoinCond)
+					.where(and(...conds))
+					.all()
+			: [];
 
 		// --- parent group stacks (with sort summary), same shape the /groups
 		// endpoint returns so the client renders them identically ---
@@ -458,6 +482,7 @@ export class MoviesService {
 		for (const g of this.listParentGroupsWithSummary()) {
 			if (g.totalMembers <= 0) continue;
 			if (search && !(g.name ?? '').toLowerCase().includes(search)) continue;
+			if (types && !types.has(classifyGroupType(g.groupType))) continue;
 			groupById.set(g.id, g);
 		}
 

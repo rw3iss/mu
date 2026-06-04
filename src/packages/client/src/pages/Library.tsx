@@ -1,7 +1,9 @@
+import type { LibraryContentType } from '@mu/shared';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { currentPath, currentUrl } from '@/app';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
+import { MultiSelect, type MultiSelectOption } from '@/components/common/MultiSelect';
 import { Select } from '@/components/common/Select';
 import type { BulkAction } from '@/components/movie/BulkActionsBar';
 import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
@@ -12,19 +14,10 @@ import { UI } from '@/plugins/ui-slots';
 import { libraryEvents } from '@/services/library-events.service';
 import { moviesService } from '@/services/movies.service';
 import { sourcesService } from '@/services/sources.service';
-import {
-	fetchParentGroups,
-	groupedOnly,
-	groupsLoaded,
-	groupViewEnabled,
-	invalidateGroups,
-	pageGroups,
-	parentGroups,
-	toggleGroupedOnly,
-	toggleGroupView,
-} from '@/state/groups.state';
+import { pageGroups } from '@/state/groups.state';
 import type { LibraryFilters } from '@/state/library.state';
 import {
+	ALL_LIBRARY_TYPES,
 	currentPage,
 	fetchMovies,
 	filters,
@@ -42,9 +35,11 @@ import {
 	saveLibraryScroll,
 	searchMovies,
 	searchQuery,
+	selectedTypes,
 	serverFilter,
 	setFilters,
 	setPageSize,
+	setSelectedTypes,
 	setServerFilter,
 	setViewMode,
 	showHidden,
@@ -58,6 +53,18 @@ import {
 import styles from './Library.module.scss';
 
 const PAGE_SIZE_OPTIONS = [20, 40, 60, 80, 100];
+
+/** Content-type checklist options for the Library toolbar dropdown. */
+const TYPE_OPTIONS: MultiSelectOption<LibraryContentType>[] = [
+	{ value: 'movie', label: 'Movies', description: 'Standalone films', icon: 'film' },
+	{ value: 'series', label: 'TV Series', description: 'Shows & seasons', icon: 'monitor' },
+	{
+		value: 'collection',
+		label: 'Collections',
+		description: 'Trilogies, sagas & sets',
+		icon: 'layers',
+	},
+];
 
 /** Update URL query params without triggering a full navigation. */
 function syncUrlParams(page: number, size: number, q?: string) {
@@ -188,14 +195,6 @@ export function Library(_props: LibraryProps) {
 			}
 		});
 		loadGenres();
-
-		// Any view that renders group tiles needs the parent list — that's
-		// both the collections-only mode and the mixed mode (tiles above
-		// ungrouped movies). Skip the fetch only when groups are hidden
-		// entirely (groupViewEnabled=false).
-		if (groupViewEnabled.value) {
-			void fetchParentGroups();
-		}
 
 		// Subscribe to live library events so new movies appear automatically
 		libraryEvents.start();
@@ -435,63 +434,29 @@ export function Library(_props: LibraryProps) {
 						</button>
 					</div>
 
-					<button
-						class={`${styles.editBtn} ${groupViewEnabled.value ? styles.active : ''}`}
-						onClick={() => {
-							toggleGroupView();
-							// The "collapse groups" toggle changes what gets
-							// rendered in BOTH groupedOnly modes:
-							//   - groupedOnly=true:  flips tile grid ⇄ flat movies
-							//   - groupedOnly=false: flips mixed (tiles + ungrouped)
-							//                        ⇄ all-individual
-							// Each shape needs its own fetch.
-							if (groupViewEnabled.value) {
-								invalidateGroups();
-								void fetchParentGroups();
-							}
-							// Movies always refetch — the server filter
-							// (groupedOnly vs excludeGrouped vs nothing) changes
-							// with this toggle.
+					<MultiSelect<LibraryContentType>
+						options={TYPE_OPTIONS}
+						selected={selectedTypes.value}
+						onChange={(types) => {
+							setSelectedTypes(types);
 							fetchMovies(1);
 						}}
-						aria-label="Toggle group view"
-						title={
-							groupViewEnabled.value
-								? 'Collapsing groups — click to show every item individually'
-								: 'Showing items individually — click to collapse groups'
+						allOption={{ label: 'All', description: 'Everything in the library' }}
+						leadingIcon="layers"
+						size="sm"
+						menuAlign="start"
+						aria-label="Filter by type"
+						triggerLabel={(sel) =>
+							sel.length === 0
+								? 'Nothing'
+								: sel.length === ALL_LIBRARY_TYPES.length
+									? 'All types'
+									: sel.length === 1
+										? (TYPE_OPTIONS.find((o) => o.value === sel[0])?.label ??
+											'1 type')
+										: `${sel.length} types`
 						}
-					>
-						<Icon name="layers" />
-					</button>
-
-					<button
-						class={`${styles.editBtn} ${groupedOnly.value ? styles.active : ''}`}
-						onClick={() => {
-							toggleGroupedOnly();
-							if (groupedOnly.value) {
-								// Switching into collections-only mode. If grouped
-								// view is on we want the tile grid; otherwise we
-								// want a flat MovieGrid of every group member.
-								if (groupViewEnabled.value) {
-									invalidateGroups();
-									void fetchParentGroups();
-								} else {
-									fetchMovies(1);
-								}
-							} else {
-								// Back to normal library: refetch movies.
-								fetchMovies(1);
-							}
-						}}
-						aria-label="Show only grouped items"
-						title={
-							groupedOnly.value
-								? 'Showing series / collections — click to show every item individually'
-								: 'Click to show series / collections as tiles'
-						}
-					>
-						<Icon name="film" />
-					</button>
+					/>
 
 					<button
 						class={`${styles.editBtn} ${editMode ? styles.active : ''}`}
@@ -563,88 +528,36 @@ export function Library(_props: LibraryProps) {
 				/>
 			)}
 
-			{/* Four rendering modes — driven by the two independent toggles:
-			    1. groupedOnly=true  + groupViewEnabled=true  → tile-only grid of parent
-			       groups (collections-only view, collapsed)
-			    2. groupedOnly=true  + groupViewEnabled=false → flat MovieGrid of every
-			       group member; server filters via ?groupedOnly=true
-			    3. groupedOnly=false + groupViewEnabled=true  → MIXED: parent groups
-			       interleaved with ungrouped movies in one sorted, paginated grid.
-			       The server (?interleaveGroups=true) unions ungrouped movies + group
-			       stacks, sorts them together (groups keyed on latest member addedAt /
-			       earliest year / name), paginates, and returns this page's groups
-			       inline as `pageGroups`. MovieGrid re-sorts the page identically.
-			    4. groupedOnly=false + groupViewEnabled=false → full library, every movie
-			       individually (grouped + ungrouped). No group cards. */}
-			{(() => {
-				const q = searchQuery.value.trim().toLowerCase();
-				const visibleParents = q
-					? parentGroups.value.filter((g) => g.name.toLowerCase().includes(q))
-					: parentGroups.value;
-				const tilesOnly = groupedOnly.value && groupViewEnabled.value;
-				const mixed = !groupedOnly.value && groupViewEnabled.value;
-
-				if (tilesOnly) {
-					if (!groupsLoaded.value && parentGroups.value.length === 0) {
-						return <div class={styles.groupsLoading}>Loading collections…</div>;
+			{/* The Library always renders the MIXED, grouped view: the server
+			    (?interleaveGroups=true) unions ungrouped movies with collapsed
+			    parent-group stacks, sorts them together, paginates, and returns
+			    this page's groups inline as `pageGroups`. The type-filter
+			    dropdown narrows which of {movies, series, collections} appear.
+			    With no type selected, nothing is fetched — show a prompt. */}
+			{selectedTypes.value.length === 0 ? (
+				<div class={styles.groupsEmpty}>
+					No types selected. Choose at least one type from the dropdown to show results.
+				</div>
+			) : (
+				<MovieGrid
+					movies={movies.value}
+					// Groups are paginated + interleaved server-side and returned
+					// per-page (pageGroups) — not the full set.
+					groups={pageGroups.value}
+					sortBy={filters.value.sortBy}
+					sortOrder={filters.value.sortOrder}
+					isLoading={isLoading.value}
+					viewMode={viewMode.value}
+					selectionMode={editMode}
+					selectedIds={selectedIds}
+					onToggleSelect={handleToggleSelect}
+					emptyMessage={
+						searchQuery.value
+							? `No results for "${searchQuery.value}"`
+							: 'Your library is empty'
 					}
-					if (parentGroups.value.length === 0) {
-						return (
-							<div class={styles.groupsEmpty}>
-								No collections yet. Run{' '}
-								<strong>Settings → Admin → Group Similar Items</strong> to detect
-								series + collections from your library.
-							</div>
-						);
-					}
-					if (visibleParents.length === 0) {
-						return (
-							<div class={styles.groupsEmpty}>
-								No collections match &ldquo;{searchQuery.value}&rdquo;.
-							</div>
-						);
-					}
-					// Reuse MovieGrid layout for the tile-only view so the grid
-					// dimensions match. Movies array stays empty.
-					return (
-						<MovieGrid
-							movies={[]}
-							groups={visibleParents}
-							sortBy={filters.value.sortBy}
-							sortOrder={filters.value.sortOrder}
-							isLoading={false}
-							viewMode={viewMode.value}
-							selectionMode={editMode}
-							selectedIds={selectedIds}
-							onToggleSelect={handleToggleSelect}
-							emptyMessage=""
-						/>
-					);
-				}
-
-				return (
-					<MovieGrid
-						movies={movies.value}
-						// Mixed view: groups are paginated + interleaved server-side
-						// and returned per-page (pageGroups) — not the full set.
-						groups={mixed ? pageGroups.value : undefined}
-						sortBy={filters.value.sortBy}
-						sortOrder={filters.value.sortOrder}
-						isLoading={isLoading.value}
-						viewMode={viewMode.value}
-						selectionMode={editMode}
-						selectedIds={selectedIds}
-						onToggleSelect={handleToggleSelect}
-						emptyMessage={
-							searchQuery.value
-								? `No results for "${searchQuery.value}"`
-								: groupedOnly.value
-									? 'No movies belong to a collection yet.'
-									: 'Your library is empty'
-						}
-					/>
-				);
-			})()}
+				/>
+			)}
 
 			{/* Pagination */}
 			{totalPages.value > 1 && (

@@ -20,6 +20,36 @@ export interface PaginationQuery {
 	sortOrder?: 'asc' | 'desc';
 }
 
+/**
+ * Library content types a movie / group can be classified as. Used by the
+ * Library type-filter dropdown and the `type` query param.
+ *  - `movie`      — standalone film (no group)
+ *  - `series`     — member/stack of a TV series group (series/show/tv/season)
+ *  - `collection` — member/stack of a collection group (collection/trilogy/saga/franchise)
+ */
+export type LibraryContentType = 'movie' | 'series' | 'collection';
+
+export const LIBRARY_CONTENT_TYPES: readonly LibraryContentType[] = [
+	'movie',
+	'series',
+	'collection',
+];
+
+/** Group `groupType` values classified as collections; everything else is a series. */
+export const COLLECTION_GROUP_TYPES: ReadonlySet<string> = new Set([
+	'collection',
+	'trilogy',
+	'saga',
+	'franchise',
+]);
+
+/** Classify a group's `groupType` hint into a {@link LibraryContentType}. */
+export function classifyGroupType(groupType: string | null | undefined): 'series' | 'collection' {
+	return groupType && COLLECTION_GROUP_TYPES.has(groupType.toLowerCase())
+		? 'collection'
+		: 'series';
+}
+
 export interface MovieListQuery extends PaginationQuery {
 	search?: string;
 	genre?: string;
@@ -33,6 +63,12 @@ export interface MovieListQuery extends PaginationQuery {
 	watchedOnly?: boolean;
 	hasSubtitles?: boolean;
 	showHidden?: boolean;
+	/**
+	 * Comma-separated {@link LibraryContentType} list to restrict results to
+	 * (e.g. `movie,series`). Omitted/empty = all types. Only meaningful for the
+	 * interleaved Library view (`interleaveGroups=true`).
+	 */
+	type?: string;
 	/** Filter by media server: 'local', 'all', or a specific remote server ID */
 	server?: string;
 }

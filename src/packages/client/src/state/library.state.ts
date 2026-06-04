@@ -1,6 +1,8 @@
+import type { LibraryContentType } from '@mu/shared';
 import { computed, signal } from '@preact/signals';
+import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
 import { moviesService } from '@/services/movies.service';
-import { groupedOnly, groupViewEnabled, pageGroups } from './groups.state';
+import { pageGroups } from './groups.state';
 
 // ============================================
 // Types
@@ -136,6 +138,29 @@ export const serverFilter = signal(localStorage.getItem('mu_server_filter') || '
 export const hasRemoteServers = signal(false);
 export const remoteServerList = signal<{ id: string; name: string }[]>([]);
 
+/**
+ * Library content-type filter (the toolbar checklist dropdown). Persisted
+ * per-user. Default: all types selected (no `type` param sent → server
+ * returns everything). An empty array means "show nothing" — the page
+ * clears results and skips the request entirely until a type is chosen.
+ */
+export const ALL_LIBRARY_TYPES: readonly LibraryContentType[] = ['movie', 'series', 'collection'];
+
+export const selectedTypes = signal<LibraryContentType[]>(
+	normalizeTypes(getUiSetting<LibraryContentType[]>('library_types', [...ALL_LIBRARY_TYPES])),
+);
+
+function normalizeTypes(types: LibraryContentType[]): LibraryContentType[] {
+	// Keep canonical order + drop anything unrecognised / duplicated.
+	return ALL_LIBRARY_TYPES.filter((t) => types.includes(t));
+}
+
+export function setSelectedTypes(types: LibraryContentType[]): void {
+	const norm = normalizeTypes(types);
+	selectedTypes.value = norm;
+	setUiSetting('library_types', norm);
+}
+
 export const filters = signal<LibraryFilters>({
 	genres: [],
 	yearRange: null,
@@ -151,8 +176,19 @@ export const totalPages = computed(() => Math.ceil(totalMovies.value / pageSize.
 // ============================================
 
 export async function fetchMovies(page = 1): Promise<void> {
-	isLoading.value = true;
 	currentPage.value = page;
+
+	// No type selected → show nothing and skip the request entirely. Keeps the
+	// API simple (we never send an empty `type`) and avoids a pointless call.
+	if (selectedTypes.value.length === 0) {
+		movies.value = [];
+		pageGroups.value = [];
+		totalMovies.value = 0;
+		isLoading.value = false;
+		return;
+	}
+
+	isLoading.value = true;
 
 	try {
 		const params: Record<string, string> = {
@@ -188,14 +224,16 @@ export async function fetchMovies(page = 1): Promise<void> {
 			params.hideWatched = 'true';
 		}
 
-		if (groupedOnly.value) {
-			params.groupedOnly = 'true';
-		} else if (groupViewEnabled.value) {
-			// Mixed view: the server interleaves ungrouped movies with collapsed
-			// group "stacks" in one sorted, paginated list and returns the page's
-			// groups inline — so groups slot into the results by date instead of
-			// piling up at the bottom of every page.
-			params.interleaveGroups = 'true';
+		// The Library always renders series / collections as collapsed group
+		// "stacks" (never flattened to individual members), so we always use the
+		// interleaved view: the server unions ungrouped movies with group stacks
+		// in one sorted, paginated list and returns the page's groups inline.
+		params.interleaveGroups = 'true';
+
+		// Type filter. All types selected → send nothing (server returns all).
+		// A subset → send the explicit list; the empty case returned early above.
+		if (selectedTypes.value.length < ALL_LIBRARY_TYPES.length) {
+			params.type = selectedTypes.value.join(',');
 		}
 
 		const sf = serverFilter.value;
