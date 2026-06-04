@@ -206,7 +206,33 @@ echo 'command here' | ssh rw3iss@192.168.50.211
 
 ### Deploying
 
-**ALWAYS use `src/scripts/deploy-remote.sh` — never improvise.**
+> **⚠️ Current prod (Windows) does NOT use `deploy-remote.sh`'s restart path.**
+> Prod runs in the **interactive desktop session (Session 1)** so NVENC can reach
+> the GPU; the NSSM `mu-server` service was **deleted**. `deploy-remote.sh` /
+> `deploy.sh` restart via `nssm restart mu-server`, which no longer exists and
+> would relaunch in Session 0 (no GPU, wrong port). The canonical script below is
+> kept for reference / the eventual Linux host, but on the current box deploy =
+> sync + build + migrate, then **restart via the interactive "Mu Server" Task**
+> (it executes in Session 1 even when triggered from SSH):
+> ```bash
+> # On prod, after git is synced + built + migrated:
+> MSYS_NO_PATHCONV=1 schtasks /end /tn "Mu Server" 2>/dev/null || true; sleep 1
+> powershell -NoProfile -Command "Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force"; sleep 2
+> MSYS_NO_PATHCONV=1 schtasks /run /tn "Mu Server"   # lands in Session 1 (GPU)
+> ```
+>
+> **Auto-deploy (push-to-deploy):** `src/scripts/auto-deploy-watch.sh` polls
+> `origin/main` on the prod box and runs the full sync→install→build (with the
+> Turbo-cache `vite build` fallback)→migrate→restart flow on every new commit.
+> It's wired up as the **"Mu Auto Deploy"** logon Task via
+> `src/scripts/register-auto-deploy-task.ps1` (run once:
+> `powershell -ExecutionPolicy Bypass -File <path>\register-auto-deploy-task.ps1 -Start`).
+> Log: `data/logs/auto-deploy.log`. With it running, just `git push` — prod
+> updates itself within the poll interval (default 60s). This whole dance goes
+> away on a Linux host (systemd + headless NVENC); see
+> `docs/fedora-migration-plan.md`.
+
+**The canonical script (reference / future Linux host) — `src/scripts/deploy-remote.sh`:**
 
 ```bash
 # Canonical deploy: push current branch + remote deploy + external verify
