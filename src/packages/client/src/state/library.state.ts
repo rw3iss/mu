@@ -1,5 +1,6 @@
 import type { LibraryContentType } from '@mu/shared';
 import { computed, signal } from '@preact/signals';
+import { route } from 'preact-router';
 import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
 import { moviesService } from '@/services/movies.service';
 import { pageGroups } from './groups.state';
@@ -137,6 +138,44 @@ export const localOnly = signal(localStorage.getItem('mu_local_only') === 'true'
 export const serverFilter = signal(localStorage.getItem('mu_server_filter') || 'all');
 export const hasRemoteServers = signal(false);
 export const remoteServerList = signal<{ id: string; name: string }[]>([]);
+
+/**
+ * Stack of previous distinct searches the Library "back" arrow can return to.
+ * Maintained by the header search input (TopBar) as the user settles on
+ * different searches; consumed by the back arrow next to the Library title.
+ */
+export const searchBackStack = signal<string[]>([]);
+
+/**
+ * Navigate the Library to a search query (or clear it). Replaces history while
+ * already on /library so auto-search-as-you-type doesn't spam browser history;
+ * pushes a real entry when arriving at /library from another page.
+ */
+export function navToLibrary(value: string): void {
+	const trimmed = value.trim();
+	const target = trimmed ? `/library?q=${encodeURIComponent(trimmed)}` : '/library';
+	const current = window.location.pathname + window.location.search;
+	if (current === target) return;
+	const onLibrary = window.location.pathname === '/library';
+	route(target, onLibrary);
+}
+
+/**
+ * Library "back" action: return to the previous distinct search, or — when the
+ * stack is empty — clear the search and show all results. The URL change is
+ * picked up by both the Library page and the header input, so no local state
+ * needs threading. Used by the back arrow beside the Library title.
+ */
+export function libraryBack(): void {
+	const stack = searchBackStack.value;
+	if (stack.length > 0) {
+		const prev = stack[stack.length - 1]!;
+		searchBackStack.value = stack.slice(0, -1);
+		navToLibrary(prev);
+	} else {
+		navToLibrary('');
+	}
+}
 
 /**
  * Library content-type filter (the toolbar checklist dropdown). Persisted

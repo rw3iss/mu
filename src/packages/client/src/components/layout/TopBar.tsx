@@ -1,26 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { route } from 'preact-router';
 import { currentPath, currentUrl } from '@/app';
 import { Icon } from '@/components/common/Icon';
 import { useDebounce } from '@/hooks/useDebounce';
+// The back-stack lives in library.state so the Library page's own back arrow
+// (next to its title) can consume it; the header input only maintains it.
+import { navToLibrary, searchBackStack } from '@/state/library.state';
 import { theme, toggleTheme } from '@/state/theme.state';
 import { type Throttled, throttle } from '@/utils/throttle';
 
 import styles from './TopBar.module.scss';
-
-/**
- * Navigate the Library to a search query (or clear it). Replaces history while
- * already on /library so auto-search-as-you-type doesn't spam browser history;
- * pushes a real entry when arriving at /library from another page.
- */
-function navToLibrary(value: string): void {
-	const trimmed = value.trim();
-	const target = trimmed ? `/library?q=${encodeURIComponent(trimmed)}` : '/library';
-	const current = window.location.pathname + window.location.search;
-	if (current === target) return;
-	const onLibrary = window.location.pathname === '/library';
-	route(target, onLibrary);
-}
 
 /**
  * Two queries are "related" when one is a prefix of the other — i.e. the user
@@ -33,8 +21,6 @@ function related(a: string, b: string): boolean {
 
 export function TopBar() {
 	const [searchValue, setSearchValue] = useState('');
-	// Stack of previous distinct searches the back arrow can return to.
-	const [backStack, setBackStack] = useState<string[]>([]);
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	// Auto-search throttle (leading + trailing, 100ms) — created once.
@@ -47,9 +33,6 @@ export function TopBar() {
 	const lastSettledRef = useRef('');
 	const skipSettleRef = useRef(false);
 	const settled = useDebounce(searchValue.trim(), 450);
-
-	const onLibrary = currentPath.value === '/library';
-	const showBack = onLibrary && searchValue.trim() !== '';
 
 	// Sync the input from the URL ?q= when on /library and not actively typing
 	// (browser back/forward, deep links, the page's own URL updates).
@@ -76,12 +59,13 @@ export function TopBar() {
 		const prev = lastSettledRef.current;
 		if (settled === prev) return;
 		if (settled === '') {
-			setBackStack([]);
+			searchBackStack.value = [];
 			lastSettledRef.current = '';
 			return;
 		}
 		if (prev && !related(prev, settled)) {
-			setBackStack((s) => (s[s.length - 1] === prev ? s : [...s, prev]));
+			const s = searchBackStack.value;
+			if (s[s.length - 1] !== prev) searchBackStack.value = [...s, prev];
 		}
 		lastSettledRef.current = settled;
 	}, [settled]);
@@ -114,45 +98,15 @@ export function TopBar() {
 		throttledNavRef.current?.cancel();
 		skipSettleRef.current = true;
 		lastSettledRef.current = '';
-		setBackStack([]);
+		searchBackStack.value = [];
 		setSearchValue('');
 		navToLibrary('');
 	}, []);
-
-	// Back arrow: pop to the previous search, or — when the stack is empty —
-	// clear the search entirely (reset the library + the header input).
-	const handleBack = useCallback(() => {
-		throttledNavRef.current?.cancel();
-		skipSettleRef.current = true;
-		if (backStack.length > 0) {
-			const prev = backStack[backStack.length - 1]!;
-			lastSettledRef.current = prev.trim();
-			setBackStack(backStack.slice(0, -1));
-			setSearchValue(prev);
-			navToLibrary(prev);
-		} else {
-			lastSettledRef.current = '';
-			setSearchValue('');
-			navToLibrary('');
-			inputRef.current?.blur();
-		}
-	}, [backStack]);
 
 	const themeLabel = theme.value === 'dark' ? 'Dark' : theme.value === 'light' ? 'Light' : 'Auto';
 
 	return (
 		<header class={styles.topbar}>
-			{showBack && (
-				<button
-					type="button"
-					class={styles.backButton}
-					onClick={handleBack}
-					title={backStack.length > 0 ? 'Back to previous search' : 'Clear search'}
-					aria-label={backStack.length > 0 ? 'Back to previous search' : 'Clear search'}
-				>
-					<Icon name="arrow-left" size={18} />
-				</button>
-			)}
 			<form class={styles.searchForm} onSubmit={handleSubmit}>
 				<span class={styles.searchIcon}>
 					<svg

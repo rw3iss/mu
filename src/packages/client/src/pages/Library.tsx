@@ -28,11 +28,13 @@ import {
 	initSortPrefs,
 	initViewMode,
 	isLoading,
+	libraryBack,
 	movies,
 	pageSize,
 	remoteServerList,
 	restoreLibraryScroll,
 	saveLibraryScroll,
+	searchBackStack,
 	searchMovies,
 	searchQuery,
 	selectedTypes,
@@ -337,6 +339,25 @@ export function Library(_props: LibraryProps) {
 			{/* Header — title on the left, all toolbar controls on the right */}
 			<div class={styles.header}>
 				<div class={styles.headerLeft}>
+					{searchQuery.value.trim() !== '' && (
+						<button
+							type="button"
+							class={styles.backButton}
+							onClick={libraryBack}
+							title={
+								searchBackStack.value.length > 0
+									? 'Back to previous search'
+									: 'Show all movies'
+							}
+							aria-label={
+								searchBackStack.value.length > 0
+									? 'Back to previous search'
+									: 'Show all movies'
+							}
+						>
+							<Icon name="arrow-left" size={18} />
+						</button>
+					)}
 					<h1 class={styles.title}>Library</h1>
 					<span class={styles.count}>
 						{totalMovies.value} movies
@@ -350,6 +371,29 @@ export function Library(_props: LibraryProps) {
 				</div>
 
 				<div class={styles.headerActions}>
+					<MultiSelect<LibraryContentType>
+						options={TYPE_OPTIONS}
+						selected={selectedTypes.value}
+						onChange={(types) => {
+							setSelectedTypes(types);
+							fetchMovies(1);
+						}}
+						allOption={{ label: 'All', description: 'Everything in the library' }}
+						leadingIcon="layers"
+						menuAlign="start"
+						aria-label="Filter by type"
+						triggerLabel={(sel) =>
+							sel.length === 0
+								? 'Nothing'
+								: sel.length === ALL_LIBRARY_TYPES.length
+									? 'All types'
+									: sel.length === 1
+										? (TYPE_OPTIONS.find((o) => o.value === sel[0])?.label ??
+											'1 type')
+										: `${sel.length} types`
+						}
+					/>
+
 					{(hasRemoteServers.value || remoteServerList.value.length > 0) && (
 						<Select
 							value={serverFilter.value}
@@ -433,30 +477,6 @@ export function Library(_props: LibraryProps) {
 							<Icon name="view-list" />
 						</button>
 					</div>
-
-					<MultiSelect<LibraryContentType>
-						options={TYPE_OPTIONS}
-						selected={selectedTypes.value}
-						onChange={(types) => {
-							setSelectedTypes(types);
-							fetchMovies(1);
-						}}
-						allOption={{ label: 'All', description: 'Everything in the library' }}
-						leadingIcon="layers"
-						size="sm"
-						menuAlign="start"
-						aria-label="Filter by type"
-						triggerLabel={(sel) =>
-							sel.length === 0
-								? 'Nothing'
-								: sel.length === ALL_LIBRARY_TYPES.length
-									? 'All types'
-									: sel.length === 1
-										? (TYPE_OPTIONS.find((o) => o.value === sel[0])?.label ??
-											'1 type')
-										: `${sel.length} types`
-						}
-					/>
 
 					<button
 						class={`${styles.editBtn} ${editMode ? styles.active : ''}`}
