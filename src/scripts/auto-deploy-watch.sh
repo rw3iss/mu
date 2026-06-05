@@ -35,14 +35,12 @@ mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
 restart_server() {
-	# End the running task instance, kill any stray node holding the port, then
-	# re-run the interactive task so the new process lands in Session 1 (GPU).
-	# MSYS_NO_PATHCONV stops Git Bash mangling the /flags (e.g. /run -> R:/un).
-	MSYS_NO_PATHCONV=1 schtasks /end /tn "$TASK" </dev/null >/dev/null 2>&1 || true
-	sleep 1
-	powershell -NoProfile -Command "Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force" </dev/null >/dev/null 2>&1 || true
-	sleep 2
-	MSYS_NO_PATHCONV=1 schtasks /run /tn "$TASK" </dev/null >/dev/null 2>&1
+	# Restart the "Mu Server" task DETACHED — in its own hidden console — so the
+	# console control events from ending/(re)starting it can't propagate back and
+	# kill this watcher (the cmd.exe wrapper would otherwise exit 0xC000013A /
+	# CONTROL_C_EXIT). start-mu.cmd already taskkills the old node on launch, so
+	# we only end + re-run the interactive task; it relands in Session 1 (GPU).
+	powershell -NoProfile -Command "Start-Process cmd -WindowStyle Hidden -ArgumentList '/c','schtasks /end /tn \"Mu Server\" & timeout /t 2 /nobreak >NUL & schtasks /run /tn \"Mu Server\"'" </dev/null >/dev/null 2>&1 || true
 }
 
 deploy() {

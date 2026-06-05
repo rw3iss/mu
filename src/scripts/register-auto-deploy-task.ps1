@@ -16,6 +16,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Clean slate: stop the task and kill any lingering watcher instances so we
+# never accumulate duplicates (concurrent watchers race on `git fetch` and on
+# the server restart). Matches bash processes whose command line runs the
+# watcher script. Safe — it won't touch unrelated bash/SSH sessions.
+try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue } catch {}
+Get-CimInstance Win32_Process -Filter "Name='bash.exe'" |
+	Where-Object { $_.CommandLine -like '*auto-deploy-watch*' } |
+	ForEach-Object {
+		try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } catch {}
+	}
+
 # Locate Git Bash.
 $bashCandidates = @(
 	'C:\Program Files\Git\bin\bash.exe',
