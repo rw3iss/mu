@@ -772,7 +772,11 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								<Icon name="search" size={14} /> See Similar
 							</Button>
 							{!isRemote && !isPreview && (
-								<MovieOptionsMenu movie={movie} onMovieUpdate={handleMovieUpdate} />
+								<MovieOptionsMenu
+									movie={movie}
+									onMovieUpdate={handleMovieUpdate}
+									onMovieRemoved={() => route('/library')}
+								/>
 							)}
 						</div>
 
