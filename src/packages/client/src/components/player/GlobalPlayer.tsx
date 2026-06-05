@@ -677,11 +677,22 @@ export function GlobalPlayer() {
 				}
 			} else {
 				isFullscreen.value = true;
+				// Entering fullscreen — especially via a double-click on a window
+				// that wasn't focused beforehand — can drop the controls bar's
+				// `mouseleave`, leaving `isHoveringControls` stuck `true` so the
+				// auto-hide timer's callback never hides the overlay (no further
+				// "mouse off" event arrives over the fixed video element). Force a
+				// clean "not hovering" state and arm the hide as if the mouse had
+				// just moved off, so the controls reliably auto-hide after going
+				// fullscreen in all cases; a real mouse-over still re-shows them and
+				// the normal hover / auto-hide cycle resumes.
+				isHoveringControls.value = false;
+				resetControlsTimer();
 			}
 		};
 		document.addEventListener('fullscreenchange', handleFullscreenChange);
 		return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-	}, [engine]);
+	}, [engine, resetControlsTimer]);
 
 	// Info panel toggle
 	const handleToggleInfo = useCallback(() => {
