@@ -110,6 +110,8 @@ NestJS modules in `packages/server/src/`:
 | `people` | Canonical person rows (TMDB-backed, cached). Powers `/person/:key` detail page; key format: `tmdb:<id>` or `name:<slug>`. |
 | `favorites` | Polymorphic favorites (person/movie). Per-user in-memory key cache busted on mutation; `GET /favorites/keys` for client hydration. |
 | `search` | Federated search (movies + people) over local DB + TMDB + OMDB + Trakt. SSE-streaming via `@Sse('/search/{movies\|people}/stream?q=')` with JSON fallback. Persistent 7d `search_cache` table keyed by (type, normalized_query, source). |
+| `feedback` | User feedback. `POST /feedback` (any authed user, multipart with optional `screenshot` image stored inline as a base64 data URL); `GET/DELETE /feedback[/:id]` admin-only (`admin:server`). New feedback fires an `EmailService` admin notification (fire-and-forget). `feedback` table. |
+| `email` | Outbound email (global module). `EmailService.sendFeedbackNotification` renders a local HTML template (`email/templates/*.template.ts` via `renderTemplate`) and sends through Brevo's transactional API (fetch, no extra dep). No-op stub until `email.enabled` + `email.adminEmail` + provider key are set in `config.yml`; never throws. |
 
 ### Job Backend (pluggable)
 
@@ -174,6 +176,7 @@ Server config at `data/config/config.yml` (created on first run or by install sc
 - API keys (TMDB, OMDB, OpenSubtitles)
 - Media source paths
 - Auth settings
+- `email` (optional): `enabled`, `provider` (`brevo`), `fromAddress`, `fromName`, `adminEmail`, `brevoApiKey` — for admin feedback notifications. Off by default; the Brevo key is a runtime secret kept here (config.yml is not committed).
 
 ## FFmpeg
 

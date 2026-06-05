@@ -1,0 +1,113 @@
+.form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-md);
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+}
+
+.label {
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-medium);
+	color: var(--color-text-secondary);
+}
+
+.req {
+	color: var(--color-error);
+}
+
+.input,
+.textarea {
+	width: 100%;
+	padding: var(--space-sm) var(--space-md);
+	background: var(--color-input-bg);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	color: var(--color-input-text);
+	font-size: var(--font-size-sm);
+	font-family: inherit;
+	outline: none;
+	transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+
+	&:focus {
+		border-color: var(--color-accent);
+		box-shadow: 0 0 0 3px var(--color-accent-subtle);
+	}
+}
+
+.textarea {
+	resize: vertical;
+	min-height: 120px;
+	line-height: 1.5;
+}
+
+.dropzone {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-sm);
+	padding: var(--space-lg);
+	border: 1px dashed var(--color-border);
+	border-radius: var(--radius-md);
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+	cursor: pointer;
+	transition: border-color var(--transition-fast), color var(--transition-fast),
+		background var(--transition-fast);
+
+	&:hover {
+		border-color: var(--color-accent);
+		color: var(--color-text-secondary);
+		background: var(--surface-overlay-2);
+	}
+}
+
+.fileInput {
+	display: none;
+}
+
+.previewWrap {
+	position: relative;
+	display: inline-block;
+	max-width: 100%;
+}
+
+.preview {
+	max-width: 100%;
+	max-height: 220px;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--color-border);
+	display: block;
+}
+
+.removeShot {
+	position: absolute;
+	top: var(--space-xs);
+	right: var(--space-xs);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	border-radius: var(--radius-full);
+	border: none;
+	background: rgba(0, 0, 0, 0.6);
+	color: #fff;
+	cursor: pointer;
+	transition: background var(--transition-fast);
+
+	&:hover {
+		background: var(--color-error);
+	}
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-sm);
+	margin-top: var(--space-xs);
+}

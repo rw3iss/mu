@@ -1,6 +1,7 @@
 import { DEFAULT_THUMBNAIL_SIZE, type ThemeConfig, type ThumbnailSize } from '@mu/shared';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { FeedbackAdmin } from '@/components/admin/FeedbackAdmin';
 import { JobsPanel } from '@/components/admin/JobsPanel';
 import { Button } from '@/components/common/Button';
 import { ColorPicker } from '@/components/common/ColorPicker';
@@ -31,12 +32,11 @@ import {
 	setReduceMotion,
 } from '@/state/appearance.state';
 import { currentUser } from '@/state/auth.state';
+import { totalMovies } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
 import type { Theme } from '@/state/theme.state';
-import { totalMovies } from '@/state/library.state';
 import { setTheme, theme } from '@/state/theme.state';
-import { estimateSpriteLibrarySize } from '@/utils/sprite-size-estimate';
 import {
 	applyActiveTheme,
 	applyThemeConfig,
@@ -48,6 +48,7 @@ import {
 	setSelectedLightId,
 	themesList,
 } from '@/state/themes.state';
+import { estimateSpriteLibrarySize } from '@/utils/sprite-size-estimate';
 import { AdminDashboard } from './AdminDashboard';
 import { Plugins } from './Plugins';
 import styles from './Settings.module.scss';
@@ -180,6 +181,7 @@ type SettingsTab =
 	| 'matching'
 	| 'jobs'
 	| 'server'
+	| 'feedback'
 	| 'about';
 
 const VALID_TABS: SettingsTab[] = [
@@ -195,6 +197,7 @@ const VALID_TABS: SettingsTab[] = [
 	'matching',
 	'jobs',
 	'server',
+	'feedback',
 	'about',
 ];
 
@@ -654,7 +657,6 @@ export function Settings(props: SettingsProps) {
 
 	const nextScanText = autoScanEnabled ? formatNextScan(nextScanAt) : null;
 
-
 	const user = currentUser.value;
 	const isAdmin = user?.role === 'admin';
 
@@ -673,6 +675,7 @@ export function Settings(props: SettingsProps) {
 					{ id: 'matching' as SettingsTab, label: 'Matching' },
 					{ id: 'jobs' as SettingsTab, label: 'Jobs' },
 					{ id: 'server' as SettingsTab, label: 'Server' },
+					{ id: 'feedback' as SettingsTab, label: 'Feedback' },
 				]
 			: []),
 		{ id: 'about', label: 'About' },
@@ -1188,13 +1191,23 @@ export function Settings(props: SettingsProps) {
 											{/* Button Background */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>Button Background</span>
-													<span class={styles.settingDescription}>Filled / primary button background color</span>
+													<span class={styles.settingLabel}>
+														Button Background
+													</span>
+													<span class={styles.settingDescription}>
+														Filled / primary button background color
+													</span>
 												</div>
 												<div class={styles.settingControl}>
 													<ColorPicker
-														value={editConfig.buttonBg || editConfig.accentColor || '#06b6d4'}
-														onChange={(v) => updateEditConfig({ buttonBg: v })}
+														value={
+															editConfig.buttonBg ||
+															editConfig.accentColor ||
+															'#06b6d4'
+														}
+														onChange={(v) =>
+															updateEditConfig({ buttonBg: v })
+														}
 													/>
 												</div>
 											</div>
@@ -1226,13 +1239,25 @@ export function Settings(props: SettingsProps) {
 											{/* Section Label */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>Section Label</span>
-													<span class={styles.settingDescription}>Field labels and section headings</span>
+													<span class={styles.settingLabel}>
+														Section Label
+													</span>
+													<span class={styles.settingDescription}>
+														Field labels and section headings
+													</span>
 												</div>
 												<div class={styles.settingControl}>
 													<ColorPicker
-														value={editConfig.labelColor || editConfig.tokens?.['color-text-primary'] || '#d8dee9'}
-														onChange={(v) => updateEditConfig({ labelColor: v })}
+														value={
+															editConfig.labelColor ||
+															editConfig.tokens?.[
+																'color-text-primary'
+															] ||
+															'#d8dee9'
+														}
+														onChange={(v) =>
+															updateEditConfig({ labelColor: v })
+														}
 													/>
 												</div>
 											</div>
@@ -1240,13 +1265,25 @@ export function Settings(props: SettingsProps) {
 											{/* Body Text */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>Body Text</span>
-													<span class={styles.settingDescription}>General page, card, and movie-detail text</span>
+													<span class={styles.settingLabel}>
+														Body Text
+													</span>
+													<span class={styles.settingDescription}>
+														General page, card, and movie-detail text
+													</span>
 												</div>
 												<div class={styles.settingControl}>
 													<ColorPicker
-														value={editConfig.textColor || editConfig.tokens?.['color-text-primary'] || '#d8dee9'}
-														onChange={(v) => updateEditConfig({ textColor: v })}
+														value={
+															editConfig.textColor ||
+															editConfig.tokens?.[
+																'color-text-primary'
+															] ||
+															'#d8dee9'
+														}
+														onChange={(v) =>
+															updateEditConfig({ textColor: v })
+														}
 													/>
 												</div>
 											</div>
@@ -1254,13 +1291,25 @@ export function Settings(props: SettingsProps) {
 											{/* Button Text */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>Button Text</span>
-													<span class={styles.settingDescription}>Text on filled buttons</span>
+													<span class={styles.settingLabel}>
+														Button Text
+													</span>
+													<span class={styles.settingDescription}>
+														Text on filled buttons
+													</span>
 												</div>
 												<div class={styles.settingControl}>
 													<ColorPicker
-														value={editConfig.buttonText || editConfig.tokens?.['color-text-inverse'] || '#050709'}
-														onChange={(v) => updateEditConfig({ buttonText: v })}
+														value={
+															editConfig.buttonText ||
+															editConfig.tokens?.[
+																'color-text-inverse'
+															] ||
+															'#050709'
+														}
+														onChange={(v) =>
+															updateEditConfig({ buttonText: v })
+														}
 													/>
 												</div>
 											</div>
@@ -1268,13 +1317,25 @@ export function Settings(props: SettingsProps) {
 											{/* Hover Text */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>Hover Text</span>
-													<span class={styles.settingDescription}>Text colour of hovered rows / items</span>
+													<span class={styles.settingLabel}>
+														Hover Text
+													</span>
+													<span class={styles.settingDescription}>
+														Text colour of hovered rows / items
+													</span>
 												</div>
 												<div class={styles.settingControl}>
 													<ColorPicker
-														value={editConfig.hoverText || editConfig.tokens?.['color-text-primary'] || '#d8dee9'}
-														onChange={(v) => updateEditConfig({ hoverText: v })}
+														value={
+															editConfig.hoverText ||
+															editConfig.tokens?.[
+																'color-text-primary'
+															] ||
+															'#d8dee9'
+														}
+														onChange={(v) =>
+															updateEditConfig({ hoverText: v })
+														}
 													/>
 												</div>
 											</div>
@@ -1282,13 +1343,25 @@ export function Settings(props: SettingsProps) {
 											{/* Input Background */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>Input Background</span>
-													<span class={styles.settingDescription}>Text field, search, and dropdown background</span>
+													<span class={styles.settingLabel}>
+														Input Background
+													</span>
+													<span class={styles.settingDescription}>
+														Text field, search, and dropdown background
+													</span>
 												</div>
 												<div class={styles.settingControl}>
 													<ColorPicker
-														value={editConfig.inputBg || editConfig.tokens?.['color-bg-elevated'] || '#10141e'}
-														onChange={(v) => updateEditConfig({ inputBg: v })}
+														value={
+															editConfig.inputBg ||
+															editConfig.tokens?.[
+																'color-bg-elevated'
+															] ||
+															'#10141e'
+														}
+														onChange={(v) =>
+															updateEditConfig({ inputBg: v })
+														}
 													/>
 												</div>
 											</div>
@@ -1296,13 +1369,25 @@ export function Settings(props: SettingsProps) {
 											{/* Input Text */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>Input Text</span>
-													<span class={styles.settingDescription}>Text inside input / search fields</span>
+													<span class={styles.settingLabel}>
+														Input Text
+													</span>
+													<span class={styles.settingDescription}>
+														Text inside input / search fields
+													</span>
 												</div>
 												<div class={styles.settingControl}>
 													<ColorPicker
-														value={editConfig.inputText || editConfig.tokens?.['color-text-primary'] || '#d8dee9'}
-														onChange={(v) => updateEditConfig({ inputText: v })}
+														value={
+															editConfig.inputText ||
+															editConfig.tokens?.[
+																'color-text-primary'
+															] ||
+															'#d8dee9'
+														}
+														onChange={(v) =>
+															updateEditConfig({ inputText: v })
+														}
 													/>
 												</div>
 											</div>
@@ -1901,17 +1986,37 @@ export function Settings(props: SettingsProps) {
 										class={styles.crfSelect}
 										options={[
 											{ value: '17', label: '17' },
-											{ value: '18', label: '18', description: 'Near Lossless' },
+											{
+												value: '18',
+												label: '18',
+												description: 'Near Lossless',
+											},
 											{ value: '19', label: '19' },
-											{ value: '20', label: '20', description: 'High Quality' },
+											{
+												value: '20',
+												label: '20',
+												description: 'High Quality',
+											},
 											{ value: '21', label: '21' },
 											{ value: '22', label: '22' },
-											{ value: '23', label: '23', description: 'Balanced (default)' },
+											{
+												value: '23',
+												label: '23',
+												description: 'Balanced (default)',
+											},
 											{ value: '24', label: '24' },
 											{ value: '25', label: '25' },
-											{ value: '26', label: '26', description: 'Smaller Files' },
+											{
+												value: '26',
+												label: '26',
+												description: 'Smaller Files',
+											},
 											{ value: '27', label: '27' },
-											{ value: '28', label: '28', description: 'Low Quality' },
+											{
+												value: '28',
+												label: '28',
+												description: 'Low Quality',
+											},
 											{ value: '29', label: '29' },
 											{ value: '30', label: '30' },
 										]}
@@ -2017,10 +2122,11 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.settingLabel}>Auto-convert to MP4</span>
 									<span class={styles.settingDescription}>
 										When a movie needs transcoding, convert it to a native
-										direct-play MP4 instead of building an HLS cache. H.264 files
-										are remuxed losslessly; other codecs are re-encoded (cases
-										predicted to grow the file are skipped and stay on on-demand
-										HLS). Direct play also re-enables EQ/Compressor audio effects.
+										direct-play MP4 instead of building an HLS cache. H.264
+										files are remuxed losslessly; other codecs are re-encoded
+										(cases predicted to grow the file are skipped and stay on
+										on-demand HLS). Direct play also re-enables EQ/Compressor
+										audio effects.
 									</span>
 								</div>
 								<label class={styles.toggle}>
@@ -2028,7 +2134,9 @@ export function Settings(props: SettingsProps) {
 										type="checkbox"
 										checked={autoConvertToMp4}
 										onChange={(e) =>
-											setAutoConvertToMp4((e.target as HTMLInputElement).checked)
+											setAutoConvertToMp4(
+												(e.target as HTMLInputElement).checked,
+											)
 										}
 									/>
 									<span class={styles.toggleTrack} />
@@ -2040,12 +2148,12 @@ export function Settings(props: SettingsProps) {
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Convert Original File</span>
 									<span class={styles.settingDescription}>
-										Replace the original file on disk with the converted MP4 (new
-										file is verified first, then the original is deleted and the
-										movie record repointed). Keeps the library slim and makes every
-										converted title direct-play natively. <strong>Irreversible —
-										originals are removed.</strong> When off, a cached copy is used
-										and originals are kept.
+										Replace the original file on disk with the converted MP4
+										(new file is verified first, then the original is deleted
+										and the movie record repointed). Keeps the library slim and
+										makes every converted title direct-play natively.{' '}
+										<strong>Irreversible — originals are removed.</strong> When
+										off, a cached copy is used and originals are kept.
 									</span>
 								</div>
 								<label class={styles.toggle}>
@@ -2068,8 +2176,9 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.settingLabel}>Re-encode Size Limit</span>
 									<span class={styles.settingDescription}>
 										Skip re-encoding when the estimated MP4 would exceed the
-										original size × this factor (protects efficient HEVC/AV1 from
-										bloating). 1.0 = never grow; 1.25 = allow 25% larger (default).
+										original size × this factor (protects efficient HEVC/AV1
+										from bloating). 1.0 = never grow; 1.25 = allow 25% larger
+										(default).
 									</span>
 								</div>
 								<input
@@ -2091,16 +2200,18 @@ export function Settings(props: SettingsProps) {
 							{/* Convert HEVC to AV1 (GPU) */}
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Convert HEVC to AV1 (GPU)</span>
+									<span class={styles.settingLabel}>
+										Convert HEVC to AV1 (GPU)
+									</span>
 									<span class={styles.settingDescription}>
-										HEVC/H.265 movies can't play in most browsers. When a working
-										GPU AV1 encoder (NVENC) is available, convert them to AV1 MP4
-										in place instead of building an H.264 cache. AV1 plays in all
-										modern browsers and stays ~the same size as HEVC (no doubling
-										like H.264). Roughly 5–10 min per episode / 10–25 min per movie
-										on the GPU. Requires Hardware Acceleration = NVIDIA (NVENC) on
-										an interactive-session GPU; otherwise HEVC still transcodes to
-										H.264 as before.
+										HEVC/H.265 movies can't play in most browsers. When a
+										working GPU AV1 encoder (NVENC) is available, convert them
+										to AV1 MP4 in place instead of building an H.264 cache. AV1
+										plays in all modern browsers and stays ~the same size as
+										HEVC (no doubling like H.264). Roughly 5–10 min per episode
+										/ 10–25 min per movie on the GPU. Requires Hardware
+										Acceleration = NVIDIA (NVENC) on an interactive-session GPU;
+										otherwise HEVC still transcodes to H.264 as before.
 									</span>
 								</div>
 								<label class={styles.toggle}>
@@ -2108,7 +2219,9 @@ export function Settings(props: SettingsProps) {
 										type="checkbox"
 										checked={convertHevcToAv1}
 										onChange={(e) =>
-											setConvertHevcToAv1((e.target as HTMLInputElement).checked)
+											setConvertHevcToAv1(
+												(e.target as HTMLInputElement).checked,
+											)
 										}
 									/>
 									<span class={styles.toggleTrack} />
@@ -2120,8 +2233,9 @@ export function Settings(props: SettingsProps) {
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>AV1 Quality (CQ)</span>
 									<span class={styles.settingDescription}>
-										AV1 NVENC constant-quality (0–63; lower = better and larger).
-										~28 high quality, 32 balanced (default), 38 smaller.
+										AV1 NVENC constant-quality (0–63; lower = better and
+										larger). ~28 high quality, 32 balanced (default), 38
+										smaller.
 									</span>
 								</div>
 								<input
@@ -2181,8 +2295,8 @@ export function Settings(props: SettingsProps) {
 										Once playback is within this many seconds of a movie's end
 										(i.e. during the credits), it's considered fully watched —
 										history is cleared and the resume bar disappears. Default
-										300s (5 minutes) covers most credit sequences. Range:
-										0–3600 seconds.
+										300s (5 minutes) covers most credit sequences. Range: 0–3600
+										seconds.
 									</span>
 								</div>
 								<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2349,10 +2463,12 @@ export function Settings(props: SettingsProps) {
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Thumbnail Size</span>
 									<span class={styles.settingDescription}>
-										Seek-bar preview thumbnails.{' '}
-										{(() => {
+										Seek-bar preview thumbnails. {(() => {
 											const count = totalMovies.value;
-											const est = estimateSpriteLibrarySize(count, thumbnailSize);
+											const est = estimateSpriteLibrarySize(
+												count,
+												thumbnailSize,
+											);
 											return (
 												<>
 													~{est.perMovieLabel}/movie
@@ -2368,14 +2484,24 @@ export function Settings(props: SettingsProps) {
 								<Select
 									value={thumbnailSize}
 									onChange={(v) => setThumbnailSize(v as ThumbnailSize)}
-									options={(
-										[
-											{ value: 'small' as ThumbnailSize, label: 'Small (120 × 68)' },
-											{ value: 'medium' as ThumbnailSize, label: 'Medium (240 × 135)' },
-											{ value: 'large' as ThumbnailSize, label: 'Large (360 × 203)' },
-											{ value: 'xlarge' as ThumbnailSize, label: 'Extra Large (480 × 270)' },
-										]
-									).map((o) => ({
+									options={[
+										{
+											value: 'small' as ThumbnailSize,
+											label: 'Small (120 × 68)',
+										},
+										{
+											value: 'medium' as ThumbnailSize,
+											label: 'Medium (240 × 135)',
+										},
+										{
+											value: 'large' as ThumbnailSize,
+											label: 'Large (360 × 203)',
+										},
+										{
+											value: 'xlarge' as ThumbnailSize,
+											label: 'Extra Large (480 × 270)',
+										},
+									].map((o) => ({
 										value: o.value,
 										label: `${o.label} · ~${estimateSpriteLibrarySize(0, o.value).perMovieLabel}/movie`,
 									}))}
@@ -2980,6 +3106,14 @@ export function Settings(props: SettingsProps) {
 						<div class={styles.panel}>
 							<h2 class={styles.panelTitle}>Server</h2>
 							<ServerSettings />
+						</div>
+					)}
+
+					{/* Feedback Tab (admin only) */}
+					{activeTab === 'feedback' && isAdmin && (
+						<div class={styles.panel}>
+							<h2 class={styles.panelTitle}>Feedback</h2>
+							<FeedbackAdmin />
 						</div>
 					)}
 

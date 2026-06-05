@@ -7,6 +7,7 @@ import { Changelog } from '@/pages/Changelog';
 import { Dashboard } from '@/pages/Dashboard';
 import { Discover } from '@/pages/Discover';
 import { Favorites } from '@/pages/Favorites';
+import { Feedback } from '@/pages/Feedback';
 import { GroupDetail } from '@/pages/GroupDetail';
 import { History } from '@/pages/History';
 import { JobDetails } from '@/pages/JobDetails';
@@ -38,12 +39,12 @@ import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { wsService } from '@/services/websocket.service';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
-import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
-import { fetchWatchPositions } from '@/state/watchPositions.state';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
+import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
 import { initProcessingState } from '@/state/processing.state';
 import { fetchThemes } from '@/state/themes.state';
 import { installUserGestureListener } from '@/state/user-gesture.state';
+import { fetchWatchPositions } from '@/state/watchPositions.state';
 import { initConsoleDebug } from '@/utils/console-debug';
 import { initDebugPanel } from '@/utils/debug-panel';
 
@@ -217,6 +218,7 @@ export function App() {
 						<Discover path="/discover" />
 						<Redirect path="/search" to="/library" preserveQuery />
 						<Settings path="/settings/:tab?" />
+						<Feedback path="/feedback" />
 						<Changelog path="/changelog" />
 						<Redirect path="/plugins" to="/settings/plugins" />
 						<Redirect path="/admin" to="/settings/admin" />

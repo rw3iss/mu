@@ -1,0 +1,44 @@
+.page {
+	max-width: 960px;
+	margin: 0 auto;
+	padding: var(--space-lg);
+	animation: fadeIn 300ms ease;
+}
+
+.header {
+	margin-bottom: var(--space-lg);
+}
+
+.title {
+	font-size: var(--font-size-2xl);
+	font-weight: var(--font-weight-bold);
+	color: var(--color-text-primary);
+}
+
+.subtitle {
+	margin-top: var(--space-xs);
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.denied {
+	max-width: 480px;
+	margin: var(--space-2xl) auto;
+	padding: var(--space-2xl);
+	text-align: center;
+	color: var(--color-text-muted);
+
+	h2 {
+		color: var(--color-text-primary);
+		margin-bottom: var(--space-sm);
+	}
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}

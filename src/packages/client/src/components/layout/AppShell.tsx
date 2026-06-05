@@ -1,5 +1,7 @@
 import { signal } from '@preact/signals';
 import { ComponentChildren } from 'preact';
+import { FeedbackModal } from '@/components/feedback/FeedbackModal';
+import { closeFeedbackModal, feedbackModalOpen } from '@/state/feedback.state';
 import { isPlayerActive, playerMode, splitWidth } from '@/state/globalPlayer.state';
 import styles from './AppShell.module.scss';
 import { EncoderHealthBanner } from './EncoderHealthBanner';
@@ -32,6 +34,7 @@ export function AppShell({ children }: AppShellProps) {
 			</div>
 			<MobileNav />
 			<EncoderHealthBanner />
+			<FeedbackModal isOpen={feedbackModalOpen.value} onClose={closeFeedbackModal} />
 		</div>
 	);
 }

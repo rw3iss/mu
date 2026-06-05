@@ -11,12 +11,15 @@ import { RequireActionGuard } from './common/guards/require-action.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { EmailModule } from './email/email.module.js';
 import { EmbeddingsModule } from './embeddings/embeddings.module.js';
 import { EventsModule } from './events/events.module.js';
 import { FavoritesModule } from './favorites/favorites.module.js';
+import { FeedbackModule } from './feedback/feedback.module.js';
 import { FilesystemModule } from './filesystem/filesystem.module.js';
 import { GroupingModule } from './grouping/grouping.module.js';
 import { HealthModule } from './health/health.module.js';
+import { ImdbDatasetsModule } from './imdb-datasets/imdb-datasets.module.js';
 import { JobModule } from './jobs/job.module.js';
 import { LibraryModule } from './library/library.module.js';
 import { LlmModule } from './llm/llm.module.js';
@@ -29,10 +32,9 @@ import { ProvidersModule } from './providers/providers.module.js';
 import { RecommendationsModule } from './recommendations/recommendations.module.js';
 import { RemoteModule } from './remote/remote.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
-import { SettingsModule } from './settings/settings.module.js';
-import { ImdbDatasetsModule } from './imdb-datasets/imdb-datasets.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SeoModule } from './seo/seo.module.js';
+import { SettingsModule } from './settings/settings.module.js';
 import { ShareLinksModule } from './share-links/share-links.module.js';
 import { SharingModule } from './sharing/sharing.module.js';
 import { StreamModule } from './stream/stream.module.js';
@@ -73,6 +75,8 @@ import { UsersModule } from './users/users.module.js';
 		GroupingModule,
 		PeopleModule,
 		FavoritesModule,
+		EmailModule,
+		FeedbackModule,
 		SearchModule,
 		SeoModule,
 		ImdbDatasetsModule,

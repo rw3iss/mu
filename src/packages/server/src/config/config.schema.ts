@@ -162,5 +162,24 @@ export const configSchema = z.object({
 		})
 		.default(() => ({}) as any),
 
+	/**
+	 * Outbound email (currently: admin feedback notifications). Disabled by
+	 * default — a no-op stub until a provider + admin address are configured.
+	 * Lives in config.yml (runtime, not committed); the Brevo API key is a secret
+	 * the self-host operator supplies there.
+	 */
+	email: z
+		.object({
+			enabled: z.boolean().default(false),
+			provider: z.enum(['brevo', 'smtp']).default('brevo'),
+			fromAddress: z.string().default('noreply@mu.local'),
+			fromName: z.string().default('Mu'),
+			/** Where admin notifications (e.g. new feedback) are sent. */
+			adminEmail: z.string().default(''),
+			/** Brevo (https://www.brevo.com) transactional email API key. */
+			brevoApiKey: z.string().default(''),
+		})
+		.default(() => ({}) as any),
+
 	dataDir: z.string().default('../../data'),
 });

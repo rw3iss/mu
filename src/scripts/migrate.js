@@ -316,6 +316,22 @@ const tables = [
 	`CREATE UNIQUE INDEX IF NOT EXISTS favorites_unique_idx ON favorites(user_id, entity_type, entity_id)`,
 	`CREATE INDEX IF NOT EXISTS favorites_user_idx ON favorites(user_id)`,
 	`CREATE INDEX IF NOT EXISTS favorites_user_type_idx ON favorites(user_id, entity_type)`,
+	// User-submitted feedback (any authenticated user); managed by admins.
+	`CREATE TABLE IF NOT EXISTS feedback (
+		id TEXT PRIMARY KEY,
+		name TEXT,
+		user_id TEXT,
+		email TEXT,
+		description TEXT NOT NULL,
+		screenshot_data TEXT,
+		screenshot_name TEXT,
+		page_url TEXT,
+		user_agent TEXT,
+		status TEXT NOT NULL DEFAULT 'new',
+		created_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS feedback_created_idx ON feedback(created_at)`,
+	`CREATE INDEX IF NOT EXISTS feedback_status_idx ON feedback(status)`,
 	// Multi-source identity registry: one row per (source, externalId)
 	// pointing back at the canonical movie. Adding a new source means
 	// inserting rows here — no schema migration needed.
