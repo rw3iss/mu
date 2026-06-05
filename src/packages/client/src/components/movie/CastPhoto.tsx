@@ -155,6 +155,14 @@ export function CastPhoto({
 						}}
 						onMouseEnter={cancelClose}
 						onMouseLeave={scheduleClose}
+						onMouseDown={(e: MouseEvent) => {
+							// The popout is portaled to document.body, i.e. OUTSIDE
+							// [data-player-panel]. The player's global mousedown
+							// dismiss handler (GlobalPlayer) would otherwise treat a
+							// click here as "outside the panel" and close the whole
+							// flyout. Swallow mousedown so only the popout collapses.
+							e.stopPropagation();
+						}}
 						onClick={(e: MouseEvent) => {
 							// Click on the popout closes it — same effect as the
 							// hover-out grace timer firing. Swallow propagation so
