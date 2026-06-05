@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
+import { EditableTitle } from '@/components/common/EditableTitle';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { Spinner } from '@/components/common/Spinner';
 import { MatchCandidatesPanel } from '@/components/movie/MatchCandidatesPanel';
 import { MovieListItem } from '@/components/movie/MovieListItem';
+import { useConfirm } from '@/hooks/useConfirm';
 import {
 	type GroupDetailResponse,
 	groupsService,
 	type MovieGroup,
 } from '@/services/groups.service';
 import type { MatchCandidate } from '@/services/movies.service';
-import { useConfirm } from '@/hooks/useConfirm';
+import { can } from '@/state/auth.state';
+import { invalidateGroups } from '@/state/groups.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './GroupDetail.module.scss';
 
@@ -166,6 +169,21 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 		}
 	}
 
+	async function renameGroup(next: string) {
+		if (!id) return;
+		try {
+			await groupsService.patch(id, { name: next });
+			setData((d) => (d ? { ...d, group: { ...d.group, name: next } } : d));
+			// The library list (and its server cache) now holds a stale name —
+			// drop the client groups cache so it re-fetches on return.
+			invalidateGroups();
+			notifySuccess('Title updated');
+		} catch {
+			notifyError('Failed to update title');
+			throw new Error('rename failed');
+		}
+	}
+
 	async function handleReject(target: MovieGroup) {
 		const ok = await confirm({
 			title: 'Ungroup?',
@@ -178,9 +196,16 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 		try {
 			await groupsService.reject(target.id);
 			notifySuccess(`${target.name} ungrouped`);
-			// If we rejected the page's own group, bail to the library.
+			// The library results + their server cache still reference this group;
+			// the server busts its list cache on the reject, drop the client groups
+			// cache too so the library re-fetches fresh on return.
+			invalidateGroups();
+			// If we ungrouped the page's own group, leave it — go back to where the
+			// user was in the library (preserving their search / scroll), falling
+			// back to /library for deep links with no history.
 			if (target.id === id) {
-				route('/library');
+				if (window.history.length > 1) window.history.back();
+				else route('/library');
 				return;
 			}
 			const fresh = await groupsService.get(id!);
@@ -239,7 +264,14 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 
 					<div class={styles.infoColumn}>
 						<div class={styles.titleRow}>
-							<h1 class={styles.title}>{data.group.name}</h1>
+							<EditableTitle
+								value={data.group.name}
+								canEdit={can('edit:movie')}
+								onSave={renameGroup}
+								level={1}
+								class={styles.title}
+								aria-label="Edit group title"
+							/>
 							<span class={styles.groupTypeBadge}>{data.group.groupType}</span>
 							{data.group.status === 'confirmed' && (
 								<span class={styles.confirmedBadge}>Confirmed</span>

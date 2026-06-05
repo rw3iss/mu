@@ -3,7 +3,13 @@ import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { LibraryContentType, MovieListQuery } from '@mu/shared';
 import { classifyGroupType, nowISO, paginationDefaults } from '@mu/shared';
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+	BadRequestException,
+	Injectable,
+	Logger,
+	NotFoundException,
+	type OnModuleInit,
+} from '@nestjs/common';
 import { and, asc, count, desc, eq, inArray, like, sql } from 'drizzle-orm';
 import { parseJsonArray, parseJsonObject, stringifyJsonObject } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -20,6 +26,7 @@ import {
 	userWatchHistory,
 	userWatchlist,
 } from '../database/schema/index.js';
+import { EventsService } from '../events/events.service.js';
 import { buildPrettyTitle, isDirtyTitle } from '../grouping/title-sanitiser.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from '../library/library.service.js';
@@ -31,7 +38,7 @@ import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 
 @Injectable()
-export class MoviesService {
+export class MoviesService implements OnModuleInit {
 	private readonly logger = new Logger('MoviesService');
 
 	constructor(
@@ -44,7 +51,15 @@ export class MoviesService {
 		private readonly subtitleService: SubtitleService,
 		private readonly tmdb: TmdbProvider,
 		private readonly metadataService: MetadataService,
+		private readonly events: EventsService,
 	) {}
+
+	onModuleInit(): void {
+		// Group mutations (ungroup, rename, confirm, re-match) change what the
+		// interleaved library list returns. The grouping module emits this on any
+		// such change so the cached list doesn't serve a stale / deleted group.
+		this.events.on('groups:changed', () => this.invalidateListCache());
+	}
 
 	private readonly listCache = new Map<string, { data: any; expires: number }>();
 	private static readonly CACHE_TTL_MS = 60_000; // 60 seconds

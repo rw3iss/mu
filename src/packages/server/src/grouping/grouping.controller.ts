@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { EventsService } from '../events/events.service.js';
 import { MatchCandidatesRepository } from '../metadata/match-candidates.repository.js';
 import { GroupingService } from './grouping.service.js';
 import { GroupsRepository } from './groups.repository.js';
@@ -35,7 +36,17 @@ export class GroupingController {
 		private readonly groupingService: GroupingService,
 		private readonly repo: GroupsRepository,
 		private readonly matchCandidates: MatchCandidatesRepository,
+		private readonly events: EventsService,
 	) {}
+
+	/**
+	 * Notify listeners (notably MoviesService, which busts its list cache) that
+	 * groups changed — membership or display — so the interleaved library list
+	 * doesn't serve a stale or just-deleted group.
+	 */
+	private groupsChanged(): void {
+		this.events.emit('groups:changed');
+	}
 
 	@RequireAction('view:library')
 	@Get()
@@ -108,6 +119,7 @@ export class GroupingController {
 		const group = this.repo.get(id);
 		if (!group) throw new NotFoundException(`Group ${id} not found`);
 		this.groupingService.confirmGroup(id);
+		this.groupsChanged();
 		return { ok: true };
 	}
 
@@ -117,6 +129,7 @@ export class GroupingController {
 		const group = this.repo.get(id);
 		if (!group) throw new NotFoundException(`Group ${id} not found`);
 		this.groupingService.rejectGroup(id);
+		this.groupsChanged();
 		return { ok: true };
 	}
 
@@ -137,6 +150,7 @@ export class GroupingController {
 		if (body.backdropUrl !== undefined) patch.backdropUrl = body.backdropUrl;
 		if (body.overview !== undefined) patch.overview = body.overview;
 		if (Object.keys(patch).length > 0) this.repo.update(id, patch);
+		this.groupsChanged();
 		return { ok: true };
 	}
 
@@ -148,6 +162,7 @@ export class GroupingController {
 		if (!group) throw new NotFoundException(`Group ${id} not found`);
 		// Delegates to service for proper cleanup (detach + prune).
 		this.groupingService.rejectGroup(id);
+		this.groupsChanged();
 		return { ok: true };
 	}
 

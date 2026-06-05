@@ -1,0 +1,83 @@
+.viewWrap {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-sm);
+
+	.heading {
+		cursor: pointer;
+	}
+
+	&:hover .editIcon {
+		opacity: 1;
+	}
+}
+
+.editIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--color-text-muted);
+	opacity: 0;
+	cursor: pointer;
+	flex-shrink: 0;
+	transition: opacity var(--transition-fast), color var(--transition-fast);
+
+	&:hover {
+		color: var(--color-accent);
+	}
+}
+
+.editRow {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-sm);
+	min-width: 0;
+}
+
+// Font (size / weight / colour) comes from the host's title class merged on top.
+.input {
+	color: var(--color-text-primary);
+	background: var(--color-bg-elevated);
+	border: 1px solid var(--color-accent);
+	border-radius: var(--radius-md);
+	padding: var(--space-xs) var(--space-sm);
+	outline: none;
+	min-width: 0;
+}
+
+.saveBtn,
+.cancelBtn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--color-border);
+	background: var(--color-bg-elevated);
+	font-size: var(--font-size-lg);
+	cursor: pointer;
+	flex-shrink: 0;
+	transition: background var(--transition-fast), border-color var(--transition-fast);
+
+	&:hover {
+		border-color: var(--color-accent);
+		background: var(--color-bg-surface);
+	}
+
+	&:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+}
+
+.saveBtn {
+	color: var(--color-success);
+}
+
+.cancelBtn {
+	color: var(--color-text-muted);
+}
