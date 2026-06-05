@@ -79,7 +79,12 @@ deploy() {
 	fi
 }
 
-log "auto-deploy watcher started (dir=$DEPLOY_DIR task='$TASK' poll=${INTERVAL}s)"
+# Record our Windows PID so re-registration can reliably kill this instance
+# (CIM command-line matching is unreliable across sessions).
+WINPID="$(cat /proc/$$/winpid 2>/dev/null || echo "$$")"
+echo "$WINPID" >"$DEPLOY_DIR/data/auto-deploy.pid" 2>/dev/null || true
+
+log "auto-deploy watcher started (dir=$DEPLOY_DIR task='$TASK' winpid=$WINPID poll=${INTERVAL}s)"
 while true; do
 	if git -C "$DEPLOY_DIR" fetch origin main >/dev/null 2>&1; then
 		local_head="$(git -C "$DEPLOY_DIR" rev-parse HEAD 2>/dev/null)"

@@ -16,11 +16,19 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Clean slate: stop the task and kill any lingering watcher instances so we
-# never accumulate duplicates (concurrent watchers race on `git fetch` and on
-# the server restart). Matches bash processes whose command line runs the
-# watcher script. Safe — it won't touch unrelated bash/SSH sessions.
+# Clean slate: stop the task and kill any lingering watcher instance so we never
+# accumulate duplicates (concurrent watchers race on `git fetch` and on the
+# server restart). Primary: the PID the watcher recorded. Fallback: bash
+# processes whose command line runs the watcher script. Safe — neither touches
+# unrelated bash/SSH sessions.
 try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue } catch {}
+$pidFile = Join-Path $DeployDir 'data\auto-deploy.pid'
+if (Test-Path $pidFile) {
+	$oldPid = Get-Content $pidFile -ErrorAction SilentlyContinue | Select-Object -First 1
+	if ($oldPid) {
+		try { Stop-Process -Id ([int]$oldPid) -Force -ErrorAction SilentlyContinue } catch {}
+	}
+}
 Get-CimInstance Win32_Process -Filter "Name='bash.exe'" |
 	Where-Object { $_.CommandLine -like '*auto-deploy-watch*' } |
 	ForEach-Object {
@@ -44,14 +52,18 @@ $scriptMsys = "/$drive$rest/src/scripts/auto-deploy-watch.sh"
 Write-Host "Bash:    $bash"
 Write-Host "Watcher: $scriptMsys"
 
-# Run via cmd.exe so Task Scheduler launches it reliably and we capture all
-# output (the bare `bash.exe -lc <path>` action exits 1 under Task Scheduler
-# with no diagnostics). `-l` gives a login shell so node/pnpm/git are on PATH.
-$winLog = Join-Path $DeployDir 'data\logs\auto-deploy-task.log'
-$null = New-Item -ItemType Directory -Force -Path (Split-Path $winLog) -ErrorAction SilentlyContinue
-$inner = "`"$bash`" -l `"$scriptMsys`" >> `"$winLog`" 2>&1"
-$action = New-ScheduledTaskAction -Execute "$env:ComSpec" -Argument "/c `"$inner`""
-Write-Host "Action:  $env:ComSpec /c `"$inner`""
+# Launch the watcher fully DETACHED, in its own hidden console, via
+# Start-Process. This is the crucial bit: a cmd-wrapped action shares a console
+# with whatever triggers it, so an SSH-triggered Start-ScheduledTask tearing
+# down — or the server restart's console CTRL_C — kills the watcher (exits
+# 0xC000013A / CONTROL_C_EXIT right after "watcher started"). Detached, nothing
+# can signal it. The task action exits immediately (task shows Ready); the
+# watcher keeps running independently and logs to data/logs/auto-deploy.log.
+# `-l` gives a login shell so node / pnpm / git are on PATH.
+$psLaunch = "Start-Process -FilePath '$bash' -ArgumentList @('-l','$scriptMsys') -WindowStyle Hidden"
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' `
+	-Argument "-NoProfile -WindowStyle Hidden -Command `"$psLaunch`""
+Write-Host "Action:  powershell -Command $psLaunch"
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Highest
 # Long-running loop: no time limit, restart if it ever dies, only on AC is fine
