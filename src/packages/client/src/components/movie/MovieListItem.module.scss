@@ -2,19 +2,26 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  // Each row is its own floating card — surface, border, radius — rather than a
+  // line in a shared bordered container. The list container provides the gap.
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: background var(--transition-fast), opacity var(--transition-fast);
+  transition: background var(--transition-fast), border-color var(--transition-fast),
+    box-shadow var(--transition-fast), opacity var(--transition-fast);
 
   &:hover {
     background: var(--color-bg-hover);
+    border-color: var(--color-accent);
+    box-shadow: var(--shadow-md);
   }
 
   &:focus-visible {
     outline: 2px solid var(--color-accent);
-    outline-offset: -2px;
+    outline-offset: 2px;
   }
 
   &.hidden {
@@ -27,18 +34,18 @@
 
   &.selectable {
     user-select: none;
-    padding-left: calc(var(--space-md) + 36px);
+    padding-left: calc(var(--space-lg) + 36px);
   }
 
   &.selected {
     background: rgba(var(--color-accent-rgb, 99, 102, 241), 0.08);
-    border-left: 2px solid var(--color-accent);
+    border-color: var(--color-accent);
   }
 }
 
 .checkbox {
   position: absolute;
-  left: var(--space-md);
+  left: var(--space-lg);
   top: 50%;
   transform: translateY(-50%);
   width: 22px;
@@ -63,9 +70,9 @@
 .poster {
   position: relative;
   flex-shrink: 0;
-  width: 60px;
-  height: 90px;
-  border-radius: var(--radius-sm);
+  width: 80px;
+  height: 120px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-bg-elevated);
 }
@@ -114,18 +121,18 @@
 
 .title {
   display: block;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   @include truncate(1);
-  margin-bottom: 2px;
+  margin-bottom: var(--space-xs);
 }
 
 .meta {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   flex-wrap: wrap;
 
@@ -154,9 +161,9 @@
 }
 
 .ratingBadge {
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
   color: #ffffff;
   margin-right: var(--space-md);
@@ -174,20 +181,3 @@
   vertical-align: middle;
 }
 
-.playButton,
-.resumeButton {
-  padding: 4px 12px;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  transition: color var(--transition-fast), background var(--transition-fast);
-
-  &:hover {
-    color: #ffffff;
-    background: var(--color-accent);
-    border-color: var(--color-accent);
-  }
-}

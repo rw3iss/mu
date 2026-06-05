@@ -1,10 +1,10 @@
 import { SmartImage } from '@/components/common/SmartImage';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
-import { hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieListItem.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
 import { MovieScoreChips } from './MovieScoreChips';
+import { PlayResumeButton } from './PlayResumeButton';
 import { RatingBadge } from './RatingBadge';
 import type { MovieDisplayProps } from './types';
 import { useMovieCardBehavior } from './useMovieCardBehavior';
@@ -86,22 +86,12 @@ export function MovieListItem({
 				<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
 				{!selectionMode && (
 					<>
-						<button
-							class={styles.playButton}
-							onClick={handlePlay}
-							aria-label={`Play ${movie.title}`}
-						>
-							Play
-						</button>
-						{hasWatchProgress(movie) && (
-							<button
-								class={styles.resumeButton}
-								onClick={handleResume}
-								aria-label={`Resume ${movie.title}`}
-							>
-								Resume
-							</button>
-						)}
+						<PlayResumeButton
+							movie={movie}
+							size="md"
+							onPlay={handlePlay}
+							onResume={handleResume}
+						/>
 						{!movie.remoteOrigin && (
 							<MovieOptionsMenu
 								movie={movie}

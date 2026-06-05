@@ -32,19 +32,10 @@
 .list {
   display: flex;
   flex-direction: column;
+  // Rows float as individual cards (styled in MovieListItem.module.scss),
+  // separated by the theme's configurable item gap — no shared container
+  // chrome or dividers.
   gap: var(--item-gap);
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-
-  > :first-child {
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  }
-
-  > :last-child {
-    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-    border-bottom: none;
-  }
 }
 
 .selectionMode {
