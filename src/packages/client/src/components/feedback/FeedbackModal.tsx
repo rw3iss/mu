@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { Modal } from '@/components/common/Modal';
 import { feedbackService } from '@/services/feedback.service';
 import { currentUser } from '@/state/auth.state';
-import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { notifyError } from '@/state/notifications.state';
 import styles from './FeedbackModal.module.scss';
 
 interface FeedbackModalProps {
@@ -26,6 +26,8 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 	const [screenshot, setScreenshot] = useState<File | null>(null);
 	const [preview, setPreview] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
+	const [submitted, setSubmitted] = useState(false);
+	const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	// Reset to a clean form (prefilled from the account) each time it opens.
 	useEffect(() => {
@@ -35,8 +37,16 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 		setDescription('');
 		setScreenshot(null);
 		setPreview(null);
+		setSubmitted(false);
 		// eslint-disable-next-line react-hooks/exhaustive-deps -- prefill only on open
 	}, [isOpen]);
+
+	// Clean up the auto-close timer on unmount.
+	useEffect(() => {
+		return () => {
+			if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+		};
+	}, []);
 
 	// Revoke object URLs to avoid leaks.
 	useEffect(() => {
@@ -84,8 +94,12 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 				description: desc,
 				screenshot,
 			});
-			notifySuccess('Thanks! Your feedback was submitted.');
-			onClose();
+			// Swap the form for a thank-you message, then auto-close after 2s.
+			setSubmitted(true);
+			closeTimerRef.current = setTimeout(() => {
+				closeTimerRef.current = null;
+				onClose();
+			}, 2000);
 		} catch (err: any) {
 			notifyError(err?.message || 'Failed to submit feedback');
 		} finally {
@@ -95,80 +109,93 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
 	return (
 		<Modal isOpen={isOpen} onClose={onClose} title="Send Feedback" size="md">
-			{/* biome-ignore lint/a11y/noStaticElementInteractions: paste-to-attach convenience */}
-			<div class={styles.form} onPaste={onPaste}>
-				<div class={styles.field}>
-					<span class={styles.label}>Name</span>
-					<input
-						class={styles.input}
-						type="text"
-						value={name}
-						onInput={(e) => setName((e.target as HTMLInputElement).value)}
-						placeholder="Your name"
-					/>
-				</div>
-				<div class={styles.field}>
-					<span class={styles.label}>Email (optional)</span>
-					<input
-						class={styles.input}
-						type="email"
-						value={email}
-						onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
-						placeholder="So we can follow up"
-					/>
-				</div>
-				<div class={styles.field}>
-					<span class={styles.label}>
-						Feedback <span class={styles.req}>*</span>
+			{submitted ? (
+				<div class={styles.success}>
+					<span class={styles.successIcon}>
+						<Icon name="check-circle" size={40} />
 					</span>
-					<textarea
-						class={styles.textarea}
-						value={description}
-						onInput={(e) => setDescription((e.target as HTMLTextAreaElement).value)}
-						placeholder="What's working, what's broken, or an idea…"
-						rows={6}
-					/>
+					<p class={styles.successText}>Feedback submitted! Thanks!</p>
 				</div>
+			) : (
+				// biome-ignore lint/a11y/noStaticElementInteractions: paste-to-attach convenience
+				<div class={styles.form} onPaste={onPaste}>
+					<div class={styles.field}>
+						<span class={styles.label}>Name</span>
+						<input
+							class={styles.input}
+							type="text"
+							value={name}
+							onInput={(e) => setName((e.target as HTMLInputElement).value)}
+							placeholder="Your name"
+						/>
+					</div>
+					<div class={styles.field}>
+						<span class={styles.label}>Email (optional)</span>
+						<input
+							class={styles.input}
+							type="email"
+							value={email}
+							onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
+							placeholder="So we can follow up"
+						/>
+					</div>
+					<div class={styles.field}>
+						<span class={styles.label}>
+							Feedback <span class={styles.req}>*</span>
+						</span>
+						<textarea
+							class={styles.textarea}
+							value={description}
+							onInput={(e) => setDescription((e.target as HTMLTextAreaElement).value)}
+							placeholder="What's working, what's broken, or an idea…"
+							rows={6}
+						/>
+					</div>
 
-				<div class={styles.field}>
-					<span class={styles.label}>Screenshot (optional)</span>
-					{preview ? (
-						<div class={styles.previewWrap}>
-							<img src={preview} alt="Screenshot preview" class={styles.preview} />
-							<button
-								type="button"
-								class={styles.removeShot}
-								onClick={() => pickFile(null)}
-								aria-label="Remove screenshot"
-							>
-								<Icon name="x" size={14} />
-							</button>
-						</div>
-					) : (
-						<label class={styles.dropzone}>
-							<Icon name="image" size={18} />
-							<span>Click to attach, or paste an image</span>
-							<input
-								type="file"
-								accept="image/*"
-								class={styles.fileInput}
-								onChange={(e) =>
-									pickFile((e.target as HTMLInputElement).files?.[0] ?? null)
-								}
-							/>
-						</label>
-					)}
-				</div>
+					<div class={styles.field}>
+						<span class={styles.label}>Screenshot (optional)</span>
+						{preview ? (
+							<div class={styles.previewWrap}>
+								<img
+									src={preview}
+									alt="Screenshot preview"
+									class={styles.preview}
+								/>
+								<button
+									type="button"
+									class={styles.removeShot}
+									onClick={() => pickFile(null)}
+									aria-label="Remove screenshot"
+								>
+									<Icon name="x" size={14} />
+								</button>
+							</div>
+						) : (
+							<label class={styles.dropzone}>
+								<Icon name="image" size={18} />
+								<span>Click to attach, or paste an image</span>
+								<input
+									type="file"
+									accept="image/*"
+									class={styles.fileInput}
+									onChange={(e) =>
+										pickFile((e.target as HTMLInputElement).files?.[0] ?? null)
+									}
+								/>
+							</label>
+						)}
+					</div>
 
-				<div class={styles.actions}>
-					<Button variant="ghost" onClick={onClose} disabled={submitting}>
-						Cancel
-					</Button>
-					<Button variant="primary" onClick={submit} loading={submitting}>
-						Send Feedback
-					</Button>
+					<div class={styles.actions}>
+						<Button variant="ghost" onClick={onClose} disabled={submitting}>
+							Cancel
+						</Button>
+						<Button variant="primary" onClick={submit} loading={submitting}>
+							Send Feedback
+						</Button>
+					</div>
 				</div>
-			</div>
+			)}
 		</Modal>
 	);
 }
