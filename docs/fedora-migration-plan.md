@@ -189,6 +189,21 @@ optional/cleanup code touches:
 
 Assume Fedora Workstation/Server with a GeForce/Quadro NVIDIA card.
 
+> **Automated path:** `src/scripts/setup-fedora.sh` performs everything in this
+> section (and §4 config, the DB init, §5 systemd service, §3e firewall) against
+> a cloned repo, idempotently. Typical migration from a previous box:
+> ```bash
+> # clone, copy your old data dir (incl. db/mu.db) into ./data (or wherever MU_DATA_DIR points),
+> # then from the repo:
+> ./src/scripts/setup-fedora.sh --env /path/to/old/.env --service
+> ```
+> It installs Node/pnpm/build-tools, enables RPM Fusion + the NVENC ffmpeg,
+> installs the NVIDIA driver, adds the run user to video/render, imports the given
+> `.env`, leaves a copied `config.yml`/`mu.db` untouched, runs `db:migrate` (schema
+> only — a fresh DB creates its admin via the Setup page, never a default
+> password), smoke-tests NVENC, opens the firewall, and installs `mu.service`. The
+> manual steps below document what it does / fallbacks if a step needs attention.
+
 ### 3a. NVIDIA driver (RPM Fusion)
 
 ```bash

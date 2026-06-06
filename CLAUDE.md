@@ -182,7 +182,7 @@ Server config at `data/config/config.yml` (created on first run or by install sc
 
 Required for transcoding. On Windows, auto-detected at `C:/ffmpeg/ffmpeg.exe`. On Linux/macOS, must be on PATH or at `/usr/bin/ffmpeg`.
 
-Install scripts at `src/scripts/install.sh` (Unix) and `src/scripts/install.ps1` (Windows).
+Install scripts: `src/scripts/install.sh` (Unix release installer), `src/scripts/install.ps1` (Windows), and **`src/scripts/setup-fedora.sh`** — the full Fedora/NVIDIA workstation setup that operates on a cloned repo (RPM Fusion + NVENC ffmpeg, NVIDIA driver, `video`/`render` groups, `.env` import, schema migrate, NVENC smoke test, firewall, `mu.service`). Idempotent; checks the DB and only creates the schema if missing (a copied `mu.db` is preserved). Both Unix installers now run `db:migrate` so the schema exists before first start (a fresh DB's admin is created via the Setup page — no default credentials are seeded).
 
 ## Production Server
 

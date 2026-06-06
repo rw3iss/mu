@@ -211,7 +211,29 @@ install_ffmpeg() {
         linux)
             case "${PKG_MGR:-}" in
                 apt)    sudo apt-get install -y ffmpeg ;;
-                dnf)    sudo dnf install -y ffmpeg ;;
+                dnf)
+                    # Fedora's default ffmpeg-free has NO nvenc encoders. Enable
+                    # RPM Fusion and install/swap to the full build so hardware
+                    # encoding works. (See scripts/setup-fedora.sh for the full
+                    # Fedora/NVIDIA setup.)
+                    if ! rpm -q rpmfusion-free-release &>/dev/null; then
+                        local fv; fv="$(rpm -E %fedora)"
+                        sudo dnf install -y \
+                            "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${fv}.noarch.rpm" \
+                            "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${fv}.noarch.rpm" \
+                            2>/dev/null || warn "Could not enable RPM Fusion — ffmpeg may lack nvenc"
+                    fi
+                    if rpm -q ffmpeg-free &>/dev/null; then
+                        sudo dnf swap -y ffmpeg-free ffmpeg --allowerasing
+                    else
+                        sudo dnf install -y ffmpeg --allowerasing
+                    fi
+                    if ffmpeg -hide_banner -encoders 2>/dev/null | grep -q nvenc; then
+                        log "ffmpeg installed with NVENC encoders"
+                    else
+                        warn "ffmpeg installed but without nvenc (still ffmpeg-free?). Run: sudo dnf swap ffmpeg-free ffmpeg --allowerasing"
+                    fi
+                    ;;
                 pacman) sudo pacman -S --noconfirm ffmpeg ;;
                 *)      warn "Cannot auto-install FFmpeg. Install it manually." ;;
             esac
@@ -633,6 +655,37 @@ YAML
     log "Configuration saved to ${config_dir}/config.yml"
 }
 
+# ── Phase 7b: Database init ──────────────────────────────────────────────────
+# Create the schema. Migrations are additive + idempotent, so a database copied
+# in from a previous install is upgraded in place, never clobbered. A fresh DB
+# gets the schema only — the admin account is created on first visit via the
+# Setup page (no weak default credentials are seeded).
+
+init_database() {
+    step "Phase 8: Initializing database"
+    cd "$INSTALL_DIR"
+
+    # Resolve DATA_DIR to an absolute path and pin the exact DB file so migrate
+    # targets the right place regardless of cwd/layout.
+    local data_dir_abs="$DATA_DIR"
+    case "$data_dir_abs" in
+        /*) ;;
+        *)  data_dir_abs="$(cd "$INSTALL_DIR" && mkdir -p "$DATA_DIR" && cd "$DATA_DIR" && pwd)" ;;
+    esac
+    local db_file="${data_dir_abs}/db/mu.db"
+
+    if [ -f "$db_file" ] && [ "$(wc -c < "$db_file" 2>/dev/null || echo 0)" -gt 65536 ]; then
+        info "Existing database found ($db_file) — migrating in place"
+    else
+        info "No database yet — creating the schema (admin is created via the Setup page on first visit)"
+    fi
+
+    info "Applying schema (db:migrate)..."
+    MU_DATABASE_SQLITE_PATH="$db_file" MU_DATA_DIR="$data_dir_abs" pnpm db:migrate 2>&1 | tail -4 \
+        || warn "Migration reported issues"
+    log "Database ready"
+}
+
 # ── Phase 7: API Keys ────────────────────────────────────────────────────────
 
 # Global API key variables
@@ -807,10 +860,16 @@ After=network.target
 [Service]
 Type=simple
 User=${current_user}
+# GPU device access for headless NVENC/NVDEC (/dev/nvidia*, /dev/dri/renderD*).
+# Harmless on boxes without a GPU. Ensure the user is in these groups:
+#   sudo usermod -aG video,render ${current_user}
+SupplementaryGroups=video render
 WorkingDirectory=${INSTALL_DIR}
 ExecStart=${node_path} packages/server/dist/main.js
 Restart=on-failure
 RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
 Environment=NODE_ENV=production
 Environment=MU_DATA_DIR=${DATA_DIR}
 
@@ -871,6 +930,7 @@ main() {
     download_release
     build_project
     generate_config
+    init_database
     configure_firewall
     install_systemd_service
     show_success
