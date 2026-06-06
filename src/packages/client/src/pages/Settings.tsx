@@ -181,6 +181,7 @@ type SettingsTab =
 	| 'matching'
 	| 'jobs'
 	| 'server'
+	| 'encoding'
 	| 'feedback'
 	| 'about';
 
@@ -197,6 +198,7 @@ const VALID_TABS: SettingsTab[] = [
 	'matching',
 	'jobs',
 	'server',
+	'encoding',
 	'feedback',
 	'about',
 ];
@@ -256,6 +258,7 @@ export function Settings(props: SettingsProps) {
 	const [fetchExtendedMetadata, setFetchExtendedMetadata] = useState(true);
 	const [persistTranscodes, setPersistTranscodes] = useState(true);
 	const [cacheDir, setCacheDir] = useState('');
+	const [dbPath, setDbPath] = useState('');
 	const [isCacheBrowseOpen, setIsCacheBrowseOpen] = useState(false);
 	const [autoScanEnabled, setAutoScanEnabled] = useState(true);
 	const [minFileSizeMB, setMinFileSizeMB] = useState('50');
@@ -330,23 +333,36 @@ export function Settings(props: SettingsProps) {
 
 	useEffect(() => {
 		async function loadSettings() {
+			// Per-user playback preferences (general + watch tracking) — available
+			// to every role, loaded from the current user's own settings (not global).
+			try {
+				const pb = await api.get<Record<string, unknown>>('/settings/playback');
+				if (pb) {
+					if (typeof pb.defaultQuality === 'string') setDefaultQuality(pb.defaultQuality);
+					if (typeof pb.preferredAudioLanguage === 'string')
+						setPreferredAudioLanguage(pb.preferredAudioLanguage);
+					if (typeof pb.autoplay === 'boolean') setAutoplay(pb.autoplay);
+					if (typeof pb.bufferSize === 'string') setBufferSizeSetting(pb.bufferSize);
+					if (Array.isArray(pb.skipTimes) && pb.skipTimes.length === 3)
+						setSkipTimes(pb.skipTimes as number[]);
+					if (typeof pb.watchedThresholdSeconds === 'number')
+						setWatchedThreshold(pb.watchedThresholdSeconds);
+					if (typeof pb.completedTailSeconds === 'number')
+						setCompletedTail(pb.completedTailSeconds);
+				}
+			} catch {
+				// keep defaults
+			}
+
 			try {
 				const data = await api.get<Record<string, unknown>>('/settings');
 
-				const playback = data.playback as Record<string, unknown> | undefined;
-				if (playback) {
-					if (typeof playback.defaultQuality === 'string')
-						setDefaultQuality(playback.defaultQuality);
-					if (typeof playback.preferredAudioLanguage === 'string')
-						setPreferredAudioLanguage(playback.preferredAudioLanguage);
-					if (typeof playback.autoplay === 'boolean') setAutoplay(playback.autoplay);
-					if (typeof playback.bufferSize === 'string') {
-						setBufferSizeSetting(playback.bufferSize);
-					}
-					if (Array.isArray(playback.skipTimes) && playback.skipTimes.length === 3) {
-						setSkipTimes(playback.skipTimes as number[]);
-					}
-				}
+				// Resolved SQLite file the server is using (read-only display).
+				api.get<{ dbPath?: string }>('/admin/server/info')
+					.then((info) => {
+						if (info?.dbPath) setDbPath(info.dbPath);
+					})
+					.catch(() => {});
 
 				const library = data.library as Record<string, unknown> | undefined;
 				if (library) {
@@ -447,17 +463,7 @@ export function Settings(props: SettingsProps) {
 						setShowExternalRatings(rating.showExternalRatings);
 				}
 
-				// Load watch-tracking thresholds
-				api.get<{ value: number }>('/settings/watchedThresholdSeconds')
-					.then((res) => {
-						if (res?.value) setWatchedThreshold(res.value);
-					})
-					.catch(() => {});
-				api.get<{ value: number }>('/settings/completedTailSeconds')
-					.then((res) => {
-						if (res?.value) setCompletedTail(res.value);
-					})
-					.catch(() => {});
+				// (Watch-tracking thresholds load with the per-user playback blob above.)
 			} catch {
 				// Settings may not exist yet — use defaults
 			}
@@ -476,16 +482,45 @@ export function Settings(props: SettingsProps) {
 		}
 	}, []);
 
+	// Playback + watch-tracking are PER-USER (saved to the current user's
+	// settings, not global) — one blob via PUT /settings/playback.
 	const handleSavePlayback = useCallback(async () => {
 		setIsSaving(true);
 		try {
 			await api.put('/settings/playback', {
-				value: { defaultQuality, preferredAudioLanguage, autoplay, bufferSize, skipTimes },
+				value: {
+					defaultQuality,
+					preferredAudioLanguage,
+					autoplay,
+					bufferSize,
+					skipTimes,
+					watchedThresholdSeconds: Math.max(4, Math.min(1800, watchedThreshold)),
+					completedTailSeconds: Math.max(0, Math.min(3600, completedTail)),
+				},
 			});
 			setBufferSizeSetting(bufferSize);
 			setSkipTimes(skipTimes);
+			void fetchPlaybackSettings();
+			notifySuccess('Playback settings saved');
+		} catch {
+			notifyError('Failed to save settings');
+		} finally {
+			setIsSaving(false);
+		}
+	}, [
+		defaultQuality,
+		preferredAudioLanguage,
+		autoplay,
+		bufferSize,
+		skipTimes,
+		watchedThreshold,
+		completedTail,
+	]);
 
-			// Save encoding settings (now in Playback tab)
+	// Encoding settings are GLOBAL and admin-only (PUT /settings/encoding).
+	const handleSaveEncoding = useCallback(async () => {
+		setIsSaving(true);
+		try {
 			await api.put('/settings/encoding', {
 				value: {
 					hwAccel,
@@ -506,28 +541,13 @@ export function Settings(props: SettingsProps) {
 					av1Cq: parseInt(av1Cq, 10) || 32,
 				},
 			});
-
-			// Watch tracking thresholds (Playback tab)
-			await api.put('/settings/watchedThresholdSeconds', {
-				value: Math.max(4, Math.min(1800, watchedThreshold)),
-			});
-			await api.put('/settings/completedTailSeconds', {
-				value: Math.max(0, Math.min(3600, completedTail)),
-			});
-			void fetchPlaybackSettings();
-
-			notifySuccess('Playback settings saved');
+			notifySuccess('Encoding settings saved');
 		} catch {
-			notifyError('Failed to save settings');
+			notifyError('Failed to save encoding settings');
 		} finally {
 			setIsSaving(false);
 		}
 	}, [
-		defaultQuality,
-		preferredAudioLanguage,
-		autoplay,
-		bufferSize,
-		skipTimes,
 		hwAccel,
 		encodingPreset,
 		encodeQuality,
@@ -544,8 +564,6 @@ export function Settings(props: SettingsProps) {
 		conversionGrowthThreshold,
 		convertHevcToAv1,
 		av1Cq,
-		watchedThreshold,
-		completedTail,
 	]);
 
 	const handleSaveLibrary = useCallback(async () => {
@@ -675,6 +693,7 @@ export function Settings(props: SettingsProps) {
 					{ id: 'matching' as SettingsTab, label: 'Matching' },
 					{ id: 'jobs' as SettingsTab, label: 'Jobs' },
 					{ id: 'server' as SettingsTab, label: 'Server' },
+					{ id: 'encoding' as SettingsTab, label: 'Encoding' },
 					{ id: 'feedback' as SettingsTab, label: 'Feedback' },
 				]
 			: []),
@@ -1838,7 +1857,101 @@ export function Settings(props: SettingsProps) {
 								</div>
 							</div>
 
-							<h3 class={styles.encodingSectionTitle}>Encoding</h3>
+							<h3 class={styles.sectionTitle}>Watch Tracking</h3>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Minimum Watch Time</span>
+									<span class={styles.settingDescription}>
+										Minimum cumulative play time before a resume position is
+										recorded. Sub-threshold clicks (e.g. preview taps) don't
+										clutter your history. Range: 4–1800 seconds.
+									</span>
+								</div>
+								<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+									<input
+										type="number"
+										class={styles.select}
+										min={4}
+										max={1800}
+										value={watchedThreshold}
+										onInput={(e) => {
+											const val = parseInt(
+												(e.target as HTMLInputElement).value,
+												10,
+											);
+											if (!Number.isNaN(val)) setWatchedThreshold(val);
+										}}
+										style={{ width: '80px' }}
+									/>
+									<span
+										style={{
+											fontSize: 'var(--font-size-sm)',
+											color: 'var(--color-text-secondary)',
+										}}
+									>
+										seconds
+									</span>
+								</div>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Completed Tail</span>
+									<span class={styles.settingDescription}>
+										Once playback is within this many seconds of a movie's end
+										(i.e. during the credits), it's considered fully watched —
+										history is cleared and the resume bar disappears. Default
+										300s (5 minutes) covers most credit sequences. Range: 0–3600
+										seconds.
+									</span>
+								</div>
+								<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+									<input
+										type="number"
+										class={styles.select}
+										min={0}
+										max={3600}
+										value={completedTail}
+										onInput={(e) => {
+											const val = parseInt(
+												(e.target as HTMLInputElement).value,
+												10,
+											);
+											if (!Number.isNaN(val)) setCompletedTail(val);
+										}}
+										style={{ width: '80px' }}
+									/>
+									<span
+										style={{
+											fontSize: 'var(--font-size-sm)',
+											color: 'var(--color-text-secondary)',
+										}}
+									>
+										seconds
+									</span>
+								</div>
+							</div>
+
+							<div class={styles.actions}>
+								<Button
+									variant="primary"
+									loading={isSaving}
+									onClick={handleSavePlayback}
+								>
+									Save Changes
+								</Button>
+							</div>
+						</div>
+					)}
+
+					{/* Encoding Tab (admin only) */}
+					{activeTab === 'encoding' && isAdmin && (
+						<div class={styles.panel}>
+							<h2 class={styles.panelTitle}>Encoding</h2>
+							<p class={styles.settingDescription}>
+								Global transcoding settings — apply to all users (admin only).
+							</p>
 
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
@@ -2250,87 +2363,11 @@ export function Settings(props: SettingsProps) {
 								/>
 							</div>
 
-							<h3 class={styles.sectionTitle}>Watch Tracking</h3>
-
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Minimum Watch Time</span>
-									<span class={styles.settingDescription}>
-										Minimum cumulative play time before a resume position is
-										recorded. Sub-threshold clicks (e.g. preview taps) don't
-										clutter your history. Range: 4–1800 seconds.
-									</span>
-								</div>
-								<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-									<input
-										type="number"
-										class={styles.select}
-										min={4}
-										max={1800}
-										value={watchedThreshold}
-										onInput={(e) => {
-											const val = parseInt(
-												(e.target as HTMLInputElement).value,
-												10,
-											);
-											if (!Number.isNaN(val)) setWatchedThreshold(val);
-										}}
-										style={{ width: '80px' }}
-									/>
-									<span
-										style={{
-											fontSize: 'var(--font-size-sm)',
-											color: 'var(--color-text-secondary)',
-										}}
-									>
-										seconds
-									</span>
-								</div>
-							</div>
-
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Completed Tail</span>
-									<span class={styles.settingDescription}>
-										Once playback is within this many seconds of a movie's end
-										(i.e. during the credits), it's considered fully watched —
-										history is cleared and the resume bar disappears. Default
-										300s (5 minutes) covers most credit sequences. Range: 0–3600
-										seconds.
-									</span>
-								</div>
-								<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-									<input
-										type="number"
-										class={styles.select}
-										min={0}
-										max={3600}
-										value={completedTail}
-										onInput={(e) => {
-											const val = parseInt(
-												(e.target as HTMLInputElement).value,
-												10,
-											);
-											if (!Number.isNaN(val)) setCompletedTail(val);
-										}}
-										style={{ width: '80px' }}
-									/>
-									<span
-										style={{
-											fontSize: 'var(--font-size-sm)',
-											color: 'var(--color-text-secondary)',
-										}}
-									>
-										seconds
-									</span>
-								</div>
-							</div>
-
 							<div class={styles.actions}>
 								<Button
 									variant="primary"
 									loading={isSaving}
-									onClick={handleSavePlayback}
+									onClick={handleSaveEncoding}
 								>
 									Save Changes
 								</Button>
@@ -2357,6 +2394,25 @@ export function Settings(props: SettingsProps) {
 								/>
 							</div>
 
+							<div class={styles.settingGroup}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Database File</span>
+									<span class={styles.settingDescription}>
+										SQLite database the server is currently using (set via{' '}
+										<code>MU_DATABASE_SQLITE_PATH</code> /{' '}
+										<code>MU_DATA_DIR</code> in the environment). Read-only.
+									</span>
+								</div>
+								<input
+									class={styles.input}
+									type="text"
+									value={dbPath}
+									readOnly
+									spellcheck={false}
+									onFocus={(e) => (e.target as HTMLInputElement).select()}
+								/>
+							</div>
+
 							<div class={styles.scanRow}>
 								<Button
 									variant="secondary"
@@ -2367,7 +2423,7 @@ export function Settings(props: SettingsProps) {
 								</Button>
 								<label
 									class={styles.toggle}
-									title="Re-encode existing movies whose cached transcode doesn't match the encoding settings above"
+									title="Re-encode existing movies whose cached transcode doesn't match the current Encoding settings (Settings → Encoding)"
 								>
 									<input
 										type="checkbox"

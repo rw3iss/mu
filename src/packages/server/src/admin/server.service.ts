@@ -54,6 +54,7 @@ export class ServerService {
 			processMemory: process.memoryUsage(),
 			pid: process.pid,
 			serverVersion: '0.1.0',
+			dbPath: this.database.getDbPath(),
 			hwAccel: enc?.hwAccel || 'none',
 			hwAccelBroken,
 			hwAccelBrokenSince,

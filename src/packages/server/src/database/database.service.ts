@@ -26,11 +26,17 @@ export class DatabaseService implements OnModuleDestroy {
 	private readonly logger = new Logger('Database');
 	private sqlite!: Database.Database;
 	private _db!: BetterSQLite3Database<typeof schema>;
+	private _dbPath = '';
 
 	constructor(private config: ConfigService) {}
 
 	get db() {
 		return this._db;
+	}
+
+	/** Absolute path of the SQLite file the server actually opened. */
+	getDbPath(): string {
+		return this._dbPath;
 	}
 
 	async initialize() {
@@ -60,6 +66,7 @@ export class DatabaseService implements OnModuleDestroy {
 			mkdirSync(dbDir, { recursive: true });
 		}
 
+		this._dbPath = dbPath;
 		this.sqlite = new Database(dbPath);
 		this.sqlite.pragma('journal_mode = WAL');
 		this.sqlite.pragma('foreign_keys = ON');

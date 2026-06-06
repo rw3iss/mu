@@ -5,6 +5,9 @@
  * the actor has `admin:any-user-setting` (support escape hatch).
  */
 export const USER_SETTING_KEYS = [
+	// Consolidated per-user playback preferences blob (general + watch tracking),
+	// written by the Settings → Playback tab via PUT /settings/playback.
+	'playback',
 	// Playback
 	'playback.preferredAudioLang',
 	'playback.preferredSubtitleLang',

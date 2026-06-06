@@ -1,8 +1,8 @@
 import { networkInterfaces } from 'node:os';
-import { Body, Controller, Delete, Get, Param, Put } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Put } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
-import { Roles } from '../common/decorators/roles.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
+import { Roles } from '../common/decorators/roles.decorator.js';
 import type { JwtUser } from '../common/permissions/index.js';
 import { ConfigService } from '../config/config.service.js';
 import { SettingsService } from './settings.service.js';
@@ -15,26 +15,47 @@ export class SettingsController {
 	) {}
 
 	/**
-	 * Watch-tracking thresholds. Returned as the per-user merged values
-	 * so a user override takes precedence over the app default. Share
-	 * tokens get the app default (no user id available).
+	 * Per-user playback preferences (general + watch-tracking). Stored as one
+	 * `playback` blob in user_settings; falls back to any global `playback` blob,
+	 * then app defaults. The watch-tracking fields keep their legacy global-key
+	 * fallbacks so existing app-wide values carry over as the per-user default.
+	 * Open to every authenticated user (their own settings); share tokens get
+	 * app defaults.
 	 */
 	@Get('playback')
 	@RequireAction('view:library')
 	getPlayback(@CurrentUser() user: JwtUser) {
 		const userId = user?.role !== 'share' ? (user?.sub ?? user?.id ?? null) : null;
-		return {
-			watchedThresholdSeconds: this.settingsService.getForUser<number>(
-				'playback.watchedThresholdSeconds',
-				userId,
-				this.settingsService.get<number>('watchedThresholdSeconds', 30),
+		const defaults = {
+			defaultQuality: 'auto',
+			preferredAudioLanguage: 'eng',
+			autoplay: true,
+			bufferSize: 'normal',
+			skipTimes: [5, 10, 20],
+			watchedThresholdSeconds: this.settingsService.get<number>(
+				'watchedThresholdSeconds',
+				30,
 			),
-			completedTailSeconds: this.settingsService.getForUser<number>(
-				'playback.completedTailSeconds',
-				userId,
-				this.settingsService.get<number>('completedTailSeconds', 300),
-			),
+			completedTailSeconds: this.settingsService.get<number>('completedTailSeconds', 300),
 		};
+		const blob =
+			(userId
+				? this.settingsService.getForUser<Record<string, unknown>>('playback', userId, {})
+				: this.settingsService.get<Record<string, unknown>>('playback', {})) ?? {};
+		return { ...defaults, ...blob };
+	}
+
+	/**
+	 * Save the current user's playback preferences (per-user, not global).
+	 * Declared before `@Put(':key')` so it isn't captured by the admin route.
+	 */
+	@Put('playback')
+	@RequireAction('edit:own-settings')
+	setPlayback(@CurrentUser() user: JwtUser, @Body() body: { value: Record<string, unknown> }) {
+		const userId = user?.sub ?? user?.id;
+		if (!userId || user?.role === 'share') throw new ForbiddenException('No user context');
+		this.settingsService.setForUser('playback', body?.value ?? {}, userId);
+		return { ok: true };
 	}
 
 	/**
@@ -58,10 +79,7 @@ export class SettingsController {
 				},
 			),
 			mmrLambda: this.settingsService.get<number>('recommendations.mmrLambda', 0.7),
-			qualityFloor: this.settingsService.get<number>(
-				'recommendations.qualityFloor',
-				0,
-			),
+			qualityFloor: this.settingsService.get<number>('recommendations.qualityFloor', 0),
 			excludeSameGroup: this.settingsService.get<boolean>(
 				'recommendations.excludeSameGroup',
 				true,
@@ -70,10 +88,7 @@ export class SettingsController {
 				'recommendations.excludeWatched',
 				false,
 			),
-			perDirectorCap: this.settingsService.get<number>(
-				'recommendations.perDirectorCap',
-				2,
-			),
+			perDirectorCap: this.settingsService.get<number>('recommendations.perDirectorCap', 2),
 			multiInputPolicy: this.settingsService.get<'centroid' | 'union' | 'auto'>(
 				'recommendations.multiInputPolicy',
 				'auto',
