@@ -1,7 +1,6 @@
-import { useCallback } from 'preact/hooks';
-import { route } from 'preact-router';
 import { currentPath } from '@/app';
 import { Icon, type IconName } from '@/components/common/Icon';
+import { Link } from '@/components/common/Link';
 import styles from './MobileNav.module.scss';
 
 interface NavTab {
@@ -20,17 +19,13 @@ const tabs: NavTab[] = [
 export function MobileNav() {
 	const activePath = currentPath.value;
 
-	const handleNav = useCallback((path: string) => {
-		route(path);
-	}, []);
-
 	return (
 		<nav class={styles.mobileNav} aria-label="Mobile navigation">
 			{tabs.map((tab) => (
-				<button
+				<Link
 					key={tab.path}
+					href={tab.path}
 					class={`${styles.tab} ${activePath === tab.path ? styles.active : ''}`}
-					onClick={() => handleNav(tab.path)}
 					aria-label={tab.label}
 					aria-current={activePath === tab.path ? 'page' : undefined}
 				>
@@ -38,7 +33,7 @@ export function MobileNav() {
 						<Icon name={tab.icon} />
 					</span>
 					<span class={styles.label}>{tab.label}</span>
-				</button>
+				</Link>
 			))}
 		</nav>
 	);

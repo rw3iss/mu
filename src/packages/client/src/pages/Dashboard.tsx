@@ -9,8 +9,9 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
 import { currentUser } from '@/state/auth.state';
-import { notifyError } from '@/state/notifications.state';
 import type { Movie, ViewMode } from '@/state/library.state';
+import { notifyError } from '@/state/notifications.state';
+import { newTabNav } from '@/utils/navigation';
 import styles from './Dashboard.module.scss';
 
 interface DashboardProps {
@@ -76,10 +77,16 @@ export function Dashboard(_props: DashboardProps) {
 					)}
 				</p>
 				<span class={styles.welcomeLinks}>
-					<button class={styles.welcomeLink} onClick={() => route('/library')}>
+					<button
+						class={styles.welcomeLink}
+						{...newTabNav('/library', () => route('/library'))}
+					>
 						Browse Library
 					</button>
-					<button class={styles.welcomeLink} onClick={() => route('/discover')}>
+					<button
+						class={styles.welcomeLink}
+						{...newTabNav('/discover', () => route('/discover'))}
+					>
 						Discover
 					</button>
 				</span>

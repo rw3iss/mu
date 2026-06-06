@@ -9,6 +9,7 @@ import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { invalidatePlaylists } from '@/state/playlists.state';
+import { newTabNav } from '@/utils/navigation';
 import styles from './PlaylistDetail.module.scss';
 
 // ============================================
@@ -210,7 +211,9 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 
 							<div
 								class={styles.moviePoster}
-								onClick={() => route(`/movie/${movie.movieId}`)}
+								{...newTabNav(`/movie/${movie.movieId}`, () =>
+									route(`/movie/${movie.movieId}`),
+								)}
 								role="button"
 								tabIndex={0}
 							>
@@ -228,7 +231,9 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 
 							<div
 								class={styles.movieInfo}
-								onClick={() => route(`/movie/${movie.movieId}`)}
+								{...newTabNav(`/movie/${movie.movieId}`, () =>
+									route(`/movie/${movie.movieId}`),
+								)}
 								role="button"
 								tabIndex={0}
 							>

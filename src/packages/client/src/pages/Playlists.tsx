@@ -12,6 +12,7 @@ import { api } from '@/services/api';
 import type { Playlist, PlaylistMovieSummary } from '@/services/playlists.service';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { invalidatePlaylists } from '@/state/playlists.state';
+import { newTabNav, openInNewTab } from '@/utils/navigation';
 import styles from './Playlists.module.scss';
 
 type PlaylistSortBy = 'updated' | 'created' | 'name' | 'movieCount' | 'lastPlayed';
@@ -60,13 +61,27 @@ interface MoviePosterItemProps {
 function MoviePosterItem({ movie, variant = 'strip', class: className }: MoviePosterItemProps) {
 	const poster = movie.posterUrl || movie.thumbnailUrl;
 
+	const movieHref = `/movie/${movie.movieId}`;
 	const handleClick = useCallback(
-		(e: Event) => {
-			e.preventDefault();
+		(e: MouseEvent) => {
+			// stopPropagation so a poster inside a playlist card navigates to the
+			// movie, not the playlist.
 			e.stopPropagation();
-			route(`/movie/${movie.movieId}`);
+			e.preventDefault();
+			if (e.metaKey || e.ctrlKey || e.shiftKey) openInNewTab(movieHref);
+			else route(movieHref);
 		},
-		[movie.movieId],
+		[movieHref],
+	);
+	const handleAux = useCallback(
+		(e: MouseEvent) => {
+			if (e.button === 1) {
+				e.preventDefault();
+				e.stopPropagation();
+				openInNewTab(movieHref);
+			}
+		},
+		[movieHref],
 	);
 
 	const variantClass = variant === 'grid' ? styles.posterItemGrid : styles.posterItemStrip;
@@ -75,6 +90,7 @@ function MoviePosterItem({ movie, variant = 'strip', class: className }: MoviePo
 		<div
 			class={`${styles.posterItem} ${variantClass} ${className || ''}`}
 			onClick={handleClick}
+			onAuxClick={handleAux}
 			role="link"
 			tabIndex={0}
 		>
@@ -327,7 +343,9 @@ export function Playlists(_props: PlaylistsProps) {
 							<div
 								key={playlist.id}
 								class={styles.card}
-								onClick={() => route(`/playlists/${playlist.id}`)}
+								{...newTabNav(`/playlists/${playlist.id}`, () =>
+									route(`/playlists/${playlist.id}`),
+								)}
 								role="button"
 								tabIndex={0}
 							>
@@ -377,7 +395,9 @@ export function Playlists(_props: PlaylistsProps) {
 							<div class={styles.listItemHeader}>
 								<h3
 									class={styles.listItemName}
-									onClick={() => route(`/playlists/${playlist.id}`)}
+									{...newTabNav(`/playlists/${playlist.id}`, () =>
+										route(`/playlists/${playlist.id}`),
+									)}
 									role="link"
 									tabIndex={0}
 								>

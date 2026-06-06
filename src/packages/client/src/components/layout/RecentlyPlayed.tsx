@@ -3,6 +3,7 @@ import { route } from 'preact-router';
 import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
 import { playMovie } from '@/state/globalPlayer.state';
 import { fetchHistory, historyEntries } from '@/state/history.state';
+import { newTabNav } from '@/utils/navigation';
 import styles from './RecentlyPlayed.module.scss';
 
 const MAX_ITEMS = 20;
@@ -52,7 +53,7 @@ export function RecentlyPlayed() {
 						<button
 							key={movie.id}
 							class={styles.item}
-							onClick={() => route(`/movie/${movie.id}`)}
+							{...newTabNav(`/movie/${movie.id}`, () => route(`/movie/${movie.id}`))}
 						>
 							<div class={styles.poster}>
 								{movie.posterUrl ? (

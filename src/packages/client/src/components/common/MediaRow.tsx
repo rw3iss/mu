@@ -1,4 +1,5 @@
 import type { ComponentChildren, JSX, VNode } from 'preact';
+import { newTabNav } from '@/utils/navigation';
 import styles from './MediaRow.module.scss';
 import { SmartImage } from './SmartImage';
 
@@ -47,6 +48,8 @@ export interface MediaRowProps {
 	children?: ComponentChildren;
 
 	onClick?: (e: MouseEvent) => void;
+	/** Detail URL. When set, middle-click / ctrl-/cmd-click opens it in a new tab. */
+	href?: string;
 	disabled?: boolean;
 	selected?: boolean;
 	dim?: boolean;
@@ -70,6 +73,7 @@ export function MediaRow({
 	actions,
 	children,
 	onClick,
+	href,
 	disabled,
 	selected,
 	dim,
@@ -91,12 +95,14 @@ export function MediaRow({
 
 	const handleClick = disabled ? undefined : onClick;
 	const showThumb = thumbShape !== 'none' && thumbUrl !== undefined;
+	const navHandlers =
+		handleClick && href ? newTabNav(href, handleClick) : { onClick: handleClick };
 
 	return (
 		<div
 			class={classes}
 			style={style}
-			onClick={handleClick}
+			{...navHandlers}
 			role={handleClick ? 'button' : undefined}
 			tabIndex={handleClick ? 0 : undefined}
 			aria-disabled={disabled || undefined}

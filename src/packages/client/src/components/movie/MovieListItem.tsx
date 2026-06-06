@@ -1,6 +1,7 @@
 import { SmartImage } from '@/components/common/SmartImage';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { newTabNav } from '@/utils/navigation';
 import styles from './MovieListItem.module.scss';
 import { MovieOptionsMenu } from './MovieOptionsMenu';
 import { MovieScoreChips } from './MovieScoreChips';
@@ -24,7 +25,9 @@ export function MovieListItem({
 		onCardClick: handleClick,
 		onPlayFromStart: handlePlay,
 		onResume: handleResume,
+		href,
 	} = useMovieCardBehavior(movie, selectionMode, onToggleSelect);
+	const navHandlers = href ? newTabNav(href, handleClick) : { onClick: handleClick };
 
 	const rating = movie.rating ?? 0;
 
@@ -43,7 +46,7 @@ export function MovieListItem({
 	return (
 		<div
 			class={`${styles.row} ${movie.hidden ? styles.hidden : ''} ${selectionMode ? styles.selectable : ''} ${selected ? styles.selected : ''}`}
-			onClick={handleClick}
+			{...navHandlers}
 			role="button"
 			tabIndex={0}
 		>

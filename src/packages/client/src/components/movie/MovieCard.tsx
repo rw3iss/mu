@@ -35,6 +35,7 @@ export function MovieCard({
 		onCardClick: handleClick,
 		onPlayFromStart: handlePlay,
 		onResume: handleResume,
+		href,
 	} = useMovieCardBehavior(movie, selectionMode, onToggleSelect);
 
 	const [tooltipVisible, setTooltipVisible] = useState(false);
@@ -101,9 +102,7 @@ export function MovieCard({
 				class={`${styles.playButton} ${isProcessing ? styles.playButtonProcessing : ''}`}
 				onClick={handlePlay}
 				aria-label={
-					isProcessing
-						? `Play ${movie.title} (still transcoding)`
-						: `Play ${movie.title}`
+					isProcessing ? `Play ${movie.title} (still transcoding)` : `Play ${movie.title}`
 				}
 				title={playTooltip}
 			>
@@ -173,6 +172,7 @@ export function MovieCard({
 			fallbackLabel={movie.title}
 			posterShape="poster"
 			onClick={handleClick}
+			href={href}
 			processing={isProcessing}
 			selected={selected}
 			hidden={movie.hidden}

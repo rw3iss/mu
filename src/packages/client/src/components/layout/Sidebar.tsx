@@ -2,6 +2,7 @@ import { JSX } from 'preact';
 import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import { currentPath } from '@/app';
+import { Link } from '@/components/common/Link';
 import { currentUser, logout } from '@/state/auth.state';
 import { openFeedbackModal } from '@/state/feedback.state';
 import { isPlayerActive, playerMode } from '@/state/globalPlayer.state';
@@ -194,9 +195,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 			class={`${styles.sidebar} ${collapsed ? styles.collapsed : ''} ${showMiniPlayer ? styles.withMiniPlayer : ''}`}
 		>
 			<div class={styles.header}>
-				<button class={styles.logo} onClick={() => handleNav('/')}>
+				<Link href="/" onNavigate={() => handleNav('/')} class={styles.logo}>
 					<img src="/mu_logo_small.png" alt="Mu" class={styles.logoImage} />
-				</button>
+				</Link>
 				<button
 					class={styles.toggle}
 					onClick={onToggle}
@@ -207,18 +208,37 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 			</div>
 
 			<ul class={styles.nav}>
-				{filteredItems.map((item) => (
-					<li key={item.path}>
-						<button
-							class={`${styles.navItem} ${activePath === item.path || (item.path !== '/' && !item.action && activePath.startsWith(item.path)) ? styles.active : ''}`}
-							onClick={() => (item.action ? item.action() : handleNav(item.path))}
-							title={collapsed ? item.label : undefined}
-						>
+				{filteredItems.map((item) => {
+					const navClass = `${styles.navItem} ${activePath === item.path || (item.path !== '/' && !item.action && activePath.startsWith(item.path)) ? styles.active : ''}`;
+					const inner = (
+						<>
 							<span class={styles.navIcon}>{item.icon}</span>
 							{!collapsed && <span class={styles.navLabel}>{item.label}</span>}
-						</button>
-					</li>
-				))}
+						</>
+					);
+					return (
+						<li key={item.path}>
+							{item.action ? (
+								<button
+									class={navClass}
+									onClick={item.action}
+									title={collapsed ? item.label : undefined}
+								>
+									{inner}
+								</button>
+							) : (
+								<Link
+									href={item.path}
+									onNavigate={() => handleNav(item.path)}
+									class={navClass}
+									title={collapsed ? item.label : undefined}
+								>
+									{inner}
+								</Link>
+							)}
+						</li>
+					);
+				})}
 			</ul>
 
 			{!collapsed && <RecentlyPlayed />}

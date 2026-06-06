@@ -2,6 +2,7 @@ import { route } from 'preact-router';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import type { MovieGroup } from '@/services/groups.service';
+import { newTabNav } from '@/utils/navigation';
 import styles from './MovieListItem.module.scss';
 
 interface GroupListItemProps {
@@ -27,7 +28,7 @@ export function GroupListItem({ group }: GroupListItemProps) {
 	return (
 		<div
 			class={styles.row}
-			onClick={open}
+			{...newTabNav(`/group/${group.id}`, open)}
 			role="button"
 			tabIndex={0}
 			onKeyDown={(e) => {

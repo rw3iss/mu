@@ -226,6 +226,11 @@ function personHref(entry: FavoriteEntry): string {
 
 function FavoriteCard({ entry }: { entry: FavoriteEntry }) {
 	const isPerson = entry.entityType === 'person';
+	const href = isPerson
+		? personHref(entry)
+		: entry.movie
+			? `/movie/${entry.movie.id}`
+			: undefined;
 	const onClick = () => {
 		if (isPerson) route(personHref(entry));
 		else if (entry.movie) route(`/movie/${entry.movie.id}`);
@@ -257,6 +262,7 @@ function FavoriteCard({ entry }: { entry: FavoriteEntry }) {
 			fallbackLabel={name}
 			posterShape={isPerson ? 'portrait' : 'poster'}
 			onClick={onClick}
+			href={href}
 			class={styles.mediaCard}
 			topRight={topRight}
 			title={name}
@@ -303,6 +309,11 @@ function FavoriteRowSkeleton() {
 
 function FavoriteRow({ entry }: { entry: FavoriteEntry }) {
 	const isPerson = entry.entityType === 'person';
+	const href = isPerson
+		? personHref(entry)
+		: entry.movie
+			? `/movie/${entry.movie.id}`
+			: undefined;
 	const onClick = () => {
 		if (isPerson) route(personHref(entry));
 		else if (entry.movie) route(`/movie/${entry.movie.id}`);
@@ -337,6 +348,7 @@ function FavoriteRow({ entry }: { entry: FavoriteEntry }) {
 			subtitle={subtitle}
 			actions={actions}
 			onClick={onClick}
+			href={href}
 		/>
 	);
 }

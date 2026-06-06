@@ -51,5 +51,9 @@ export function useMovieCardBehavior(
 		[movie.id, selectionMode],
 	);
 
-	return { onCardClick, onPlayFromStart, onResume };
+	// Detail URL for middle-click / ctrl-click "open in new tab" — only when not
+	// selecting (in selection mode a click toggles the row instead of navigating).
+	const href = selectionMode ? undefined : `/movie/${movie.id}`;
+
+	return { onCardClick, onPlayFromStart, onResume, href };
 }

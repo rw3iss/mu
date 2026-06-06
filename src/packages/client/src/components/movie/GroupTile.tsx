@@ -3,6 +3,7 @@ import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import type { MovieGroup } from '@/services/groups.service';
 import type { ViewMode } from '@/state/library.state';
+import { newTabNav } from '@/utils/navigation';
 import styles from './GroupTile.module.scss';
 
 interface GroupTileProps {
@@ -40,7 +41,7 @@ export function GroupTile({ group, viewMode = 'grid' }: GroupTileProps) {
 			class={styles.tile}
 			role="button"
 			tabIndex={0}
-			onClick={() => route(`/group/${group.id}`)}
+			{...newTabNav(`/group/${group.id}`, () => route(`/group/${group.id}`))}
 			onKeyDown={(e) => {
 				if (e.key === 'Enter' || e.key === ' ') {
 					e.preventDefault();

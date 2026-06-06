@@ -64,10 +64,8 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 	const scorePct = Math.round(movie.score * 100);
 	const reason = movie.explanation[0];
 	const fullExplanation = movie.explanation.join('\n• ');
-	const tmdb =
-		movie.tmdbRating != null && movie.tmdbRating > 0 ? movie.tmdbRating : null;
-	const imdb =
-		movie.imdbRating != null && movie.imdbRating > 0 ? movie.imdbRating : null;
+	const tmdb = movie.tmdbRating != null && movie.tmdbRating > 0 ? movie.tmdbRating : null;
+	const imdb = movie.imdbRating != null && movie.imdbRating > 0 ? movie.imdbRating : null;
 	// Top-right poster badge highlights the *highest* available rating
 	// so the card has a single eye-catching number; the subtitle row
 	// shows the full breakdown.
@@ -137,7 +135,11 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 			{primaryGenre && (
 				<span
 					class={styles.metaPillMuted}
-					title={movie.genres && movie.genres.length > 1 ? movie.genres.join(' · ') : primaryGenre}
+					title={
+						movie.genres && movie.genres.length > 1
+							? movie.genres.join(' · ')
+							: primaryGenre
+					}
 				>
 					{primaryGenre}
 				</span>
@@ -154,10 +156,7 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 			)}
 			{votesLabel && <span class={styles.metaPillMuted}>{votesLabel} votes</span>}
 			{movie.usedSources.length > 0 && (
-				<span
-					class={styles.sources}
-					title={movie.usedSources.join(' · ')}
-				>
+				<span class={styles.sources} title={movie.usedSources.join(' · ')}>
 					{movie.usedSources.slice(0, 2).join(' · ')}
 					{movie.usedSources.length > 2 ? ` +${movie.usedSources.length - 2}` : ''}
 				</span>
@@ -172,6 +171,7 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 			fallbackLabel={movie.title.charAt(0)}
 			posterShape="poster"
 			onClick={goToDetail}
+			href={`/movie/${movie.movieId}`}
 			dim={!isOwned}
 			class={styles.card}
 			topLeft={topLeft}
@@ -180,10 +180,7 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 			belowPoster={
 				watch?.hasProgress ? (
 					<div class={styles.progressBar}>
-						<div
-							class={styles.progressFill}
-							style={{ width: `${watch.percent}%` }}
-						/>
+						<div class={styles.progressFill} style={{ width: `${watch.percent}%` }} />
 					</div>
 				) : null
 			}
@@ -191,13 +188,7 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 			subtitle={subtitle}
 			caption={
 				reason ? (
-					<span
-						title={
-							movie.explanation.length > 1
-								? `• ${fullExplanation}`
-								: reason
-						}
-					>
+					<span title={movie.explanation.length > 1 ? `• ${fullExplanation}` : reason}>
 						{reason}
 						{movie.explanation.length > 1 ? (
 							<span class={styles.moreReasonsHint}>

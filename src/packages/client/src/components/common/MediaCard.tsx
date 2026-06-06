@@ -1,4 +1,5 @@
 import type { ComponentChildren, JSX, VNode } from 'preact';
+import { newTabNav } from '@/utils/navigation';
 import styles from './MediaCard.module.scss';
 import { SmartImage } from './SmartImage';
 
@@ -71,6 +72,8 @@ export interface MediaCardProps {
 
 	/** Click on the whole card (typically navigates to detail). */
 	onClick?: (e: MouseEvent) => void;
+	/** Detail URL. When set, middle-click / ctrl-/cmd-click opens it in a new tab. */
+	href?: string;
 	/** Disables click behaviour and dims the card. */
 	disabled?: boolean;
 	/** Visual cue: this item is muted (e.g. "not in library"). */
@@ -105,6 +108,7 @@ export function MediaCard({
 	belowPoster,
 	preInfo,
 	onClick,
+	href,
 	disabled,
 	dim,
 	processing,
@@ -128,12 +132,17 @@ export function MediaCard({
 		.join(' ');
 
 	const handleClick = disabled ? undefined : onClick;
+	// When an href is known, middle-click / ctrl-/cmd-click opens it in a new
+	// tab; plain clicks keep the existing SPA navigation. Stays a <div> so nested
+	// action buttons don't trigger anchor navigation.
+	const navHandlers =
+		handleClick && href ? newTabNav(href, handleClick) : { onClick: handleClick };
 
 	return (
 		<div
 			class={classes}
 			style={style}
-			onClick={handleClick}
+			{...navHandlers}
 			role={handleClick ? 'button' : undefined}
 			tabIndex={handleClick ? 0 : undefined}
 			aria-disabled={disabled || undefined}
