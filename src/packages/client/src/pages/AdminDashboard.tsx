@@ -8,6 +8,7 @@ import { api } from '@/services/api';
 import { groupsService } from '@/services/groups.service';
 import type { ActiveSession, SessionHistoryEntry } from '@/services/stream.service';
 import { streamService } from '@/services/stream.service';
+import { subtitlesService } from '@/services/subtitles.service';
 import { formatBytes } from '@/utils/format-bytes';
 import { wsService } from '@/services/websocket.service';
 import { fetchMovies } from '@/state/library.state';
@@ -50,6 +51,8 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 	const [showClearWatchedConfirm, setShowClearWatchedConfirm] = useState(false);
 	const [convertingCache, setConvertingCache] = useState(false);
 	const [showConvertCacheConfirm, setShowConvertCacheConfirm] = useState(false);
+	const [cleaningSubtitles, setCleaningSubtitles] = useState(false);
+	const [showCleanupSubtitlesConfirm, setShowCleanupSubtitlesConfirm] = useState(false);
 	const [watchedMovieCount, setWatchedMovieCount] = useState(0);
 	const [sessionHistory, setSessionHistory] = useState<SessionHistoryEntry[]>([]);
 	const [clearingHistory, setClearingHistory] = useState(false);
@@ -260,6 +263,24 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 			if (progressToastId) removeNotification(progressToastId);
 			notifyError('Failed to start grouping');
 			setGroupingItems(false);
+		}
+	}, []);
+
+	const handleCleanupSubtitles = useCallback(async () => {
+		setCleaningSubtitles(true);
+		try {
+			const res = await subtitlesService.cleanupUnused();
+			if (res.filesRemoved === 0) {
+				notifySuccess('No unused subtitle files to clean up.');
+			} else {
+				notifySuccess(
+					`Removed ${res.filesRemoved} unused subtitle file(s) across ${res.moviesTouched} movie(s).`,
+				);
+			}
+		} catch {
+			notifyError('Failed to clean up subtitles.');
+		} finally {
+			setCleaningSubtitles(false);
 		}
 	}, []);
 
@@ -614,6 +635,13 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						loading={convertingCache}
 						danger
 					/>
+					<ActionRow
+						label="Clean Up Unused Subtitles"
+						description="For every movie that has a default subtitle set, delete the other downloaded subtitle files left over from testing. Embedded tracks and the chosen default are kept."
+						onClick={() => setShowCleanupSubtitlesConfirm(true)}
+						loading={cleaningSubtitles}
+						danger
+					/>
 				</ul>
 				<ConfirmDialog
 					isOpen={showSanitizeConfirm}
@@ -649,6 +677,15 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					title="Clear Watched History"
 					message={`This will reset the "watched" status for ${watchedMovieCount} movie(s). Resume positions will be preserved. This cannot be undone.`}
 					confirmLabel="Clear Watched History"
+					variant="danger"
+				/>
+				<ConfirmDialog
+					isOpen={showCleanupSubtitlesConfirm}
+					onClose={() => setShowCleanupSubtitlesConfirm(false)}
+					onConfirm={handleCleanupSubtitles}
+					title="Clean Up Unused Subtitles"
+					message="For every movie where you've set a default subtitle, this deletes the OTHER downloaded subtitle files (the leftover candidates from 'Search Online' testing). Embedded subtitles and the chosen default are kept. This cannot be undone."
+					confirmLabel="Clean Up Subtitles"
 					variant="danger"
 				/>
 				<ConfirmDialog

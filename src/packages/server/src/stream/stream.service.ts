@@ -379,13 +379,17 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 		// Extract subtitles — use stored track info from DB to skip FFprobe
 		let subtitleTracks: { index: number; language: string; title: string }[] = [];
+		// Index of the user-chosen default subtitle (persisted in the tracks JSON).
+		let defaultSubIndex: number | null = null;
 		try {
 			const storedTracks = parseJsonArray<{
 				index: number;
 				language?: string;
 				title?: string;
 				codec?: string;
+				default?: boolean;
 			}>(file.subtitleTracks as string | null | undefined);
+			defaultSubIndex = storedTracks.find((t) => t.default)?.index ?? null;
 			subtitleTracks = await this.subtitleService.extractSubtitles(
 				file.filePath,
 				file.id,
@@ -627,6 +631,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				label: this.buildSubtitleLabel(t, i),
 				language: t.language,
 				url: `/api/v1/stream/${sessionId}/subtitles/${t.index}.vtt`,
+				default: defaultSubIndex != null && t.index === defaultSubIndex,
 			})),
 			audioTracks,
 			qualities,

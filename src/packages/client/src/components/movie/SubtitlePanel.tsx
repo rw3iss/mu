@@ -80,6 +80,19 @@ export function SubtitlePanel({
 		[movieId, refreshTracks, onTrackDeleted],
 	);
 
+	const handleSetDefault = useCallback(
+		async (track: MovieSubtitleInfo) => {
+			setError(null);
+			try {
+				await subtitlesService.setDefault(movieId, track.index);
+				await refreshTracks();
+			} catch (err: any) {
+				setError(err.message || 'Failed to set default subtitle');
+			}
+		},
+		[movieId, refreshTracks],
+	);
+
 	const handleSearchClick = useCallback(async () => {
 		if (searchOpen && !searchDone) {
 			// Toggle closed if no search has happened
@@ -221,10 +234,23 @@ export function SubtitlePanel({
 									{(t.language || 'und').toUpperCase()}
 								</span>
 								<span class={styles.trackLabel}>{t.label}</span>
+								{t.default && <span class={styles.badgeDefault}>Default</span>}
 								{t.external && <span class={styles.badge}>External</span>}
 								{t.forced && <span class={styles.badge}>Forced</span>}
 								{t.codec && (
 									<span class={styles.badgeMuted}>{t.codec.toUpperCase()}</span>
+								)}
+								{!t.default && (
+									<button
+										class={styles.setDefaultBtn}
+										onClick={(e) => {
+											e.stopPropagation();
+											handleSetDefault(t);
+										}}
+										title="Set as default subtitle"
+									>
+										Set default
+									</button>
 								)}
 								<button
 									class={styles.deleteTrackBtn}

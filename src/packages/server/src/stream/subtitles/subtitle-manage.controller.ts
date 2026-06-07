@@ -10,15 +10,17 @@ import {
 	NotFoundException,
 	Param,
 	Post,
+	Put,
 	Req,
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 import { RequireAction } from '../../common/decorators/require-action.decorator.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
 import { SubtitleService } from './subtitle.service.js';
 import { SUBTITLE_EXTS, SubtitleIngestionService } from './subtitle-ingestion.service.js';
 import { SubtitleRemoteProxyService } from './subtitle-remote-proxy.service.js';
 import { SubtitleSearchService } from './subtitle-search.service.js';
-import { SubtitleTracksRepository } from './subtitle-tracks.repository.js';
+import { SubtitleTrackRow, SubtitleTracksRepository } from './subtitle-tracks.repository.js';
 
 @Controller('subtitles')
 export class SubtitleManageController {
@@ -56,8 +58,32 @@ export class SubtitleManageController {
 				codec: t.codec,
 				forced: t.forced ?? false,
 				external: t.external ?? false,
+				default: t.default ?? false,
 			})),
 		};
+	}
+
+	/**
+	 * PUT /subtitles/:movieId/:trackIndex/default — mark a track as the movie's
+	 * default subtitle (persisted server-side; used to auto-select on play and
+	 * by the admin "clean up unused subtitles" action).
+	 */
+	@RequireAction('edit:movie')
+	@Put(':movieId/:trackIndex/default')
+	async setDefaultSubtitle(
+		@Param('movieId') movieId: string,
+		@Param('trackIndex') trackIndex: string,
+	): Promise<{ success: boolean }> {
+		const idx = parseInt(trackIndex, 10);
+		if (Number.isNaN(idx) || idx < 0) throw new BadRequestException('Invalid track index');
+
+		if (this.remoteProxy.parseRemoteId(movieId)) {
+			throw new BadRequestException('Default subtitle is not supported for remote movies');
+		}
+
+		const file = await this.tracksRepo.getAvailableMovieFile(movieId);
+		await this.tracksRepo.setDefault(file.id, idx);
+		return { success: true };
 	}
 
 	/** POST /subtitles/:movieId/search — Search third-party APIs for subtitles */
@@ -250,6 +276,82 @@ export class SubtitleManageController {
 		});
 
 		return { success: true };
+	}
+
+	/**
+	 * POST /subtitles/admin/cleanup-unused — admin maintenance. For every movie
+	 * that has a default subtitle set, delete any OTHER downloaded (external)
+	 * subtitle files — the leftover candidates from search-online testing.
+	 * Embedded tracks and the chosen default are kept.
+	 */
+	@Roles('admin')
+	@RequireAction('edit:app-settings')
+	@Post('admin/cleanup-unused')
+	async cleanupUnused(): Promise<{ moviesTouched: number; filesRemoved: number }> {
+		const files = this.tracksRepo.getAllFilesWithSubtitles();
+		let moviesTouched = 0;
+		let filesRemoved = 0;
+
+		for (const file of files) {
+			const tracks = this.tracksRepo.parseTracks(file.subtitleTracks);
+			const def = tracks.find((t) => t.default);
+			if (!def) continue; // only movies the user has set a default on
+
+			const defLang = def.language || '';
+			const defExternal = def.external ?? false;
+			const toRemove = tracks.filter(
+				(t) =>
+					(t.external ?? false) &&
+					t.index !== def.index &&
+					// Never touch a file sharing the default's language (safety).
+					!(defExternal && (t.language || '') === defLang),
+			);
+			if (toRemove.length === 0) continue;
+
+			for (const t of toRemove) {
+				await this.deleteExternalSidecars(file.filePath, t.language || 'en');
+			}
+
+			// Rebuild tracks + VTT cache from what's left on disk, then re-apply
+			// the default flag (matched by external-flag + language).
+			await this.subtitleService.clearCache(file.id);
+			let rebuilt: SubtitleTrackRow[] | null = null;
+			try {
+				rebuilt = (await this.subtitleService.extractSubtitles(
+					file.filePath,
+					file.id,
+				)) as SubtitleTrackRow[];
+			} catch {
+				rebuilt = null;
+			}
+
+			if (rebuilt && rebuilt.length > 0) {
+				const match =
+					rebuilt.find(
+						(t) =>
+							(t.external ?? false) === defExternal &&
+							(t.language || '') === defLang,
+					) ?? null;
+				await this.tracksRepo.setTracks(
+					file.id,
+					rebuilt.map((t) => ({ ...t, default: match ? t.index === match.index : false })),
+				);
+			} else {
+				const removeIdx = new Set(toRemove.map((t) => t.index));
+				const remaining = tracks
+					.filter((t) => !removeIdx.has(t.index))
+					.map((t, i) => ({ ...t, index: i }));
+				await this.tracksRepo.setTracks(file.id, remaining);
+			}
+
+			moviesTouched++;
+			filesRemoved += toRemove.length;
+		}
+
+		this.logger.log(
+			`Subtitle cleanup: removed ${filesRemoved} unused file(s) across ${moviesTouched} movie(s)`,
+		);
+		return { moviesTouched, filesRemoved };
 	}
 
 	// ── Private helpers ──────────────────────────────────────────────

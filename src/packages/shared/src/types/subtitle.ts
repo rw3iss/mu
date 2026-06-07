@@ -34,6 +34,8 @@ export interface MovieSubtitleInfo {
 	codec?: string;
 	forced?: boolean;
 	external?: boolean;
+	/** Marked as this movie's default subtitle (persisted server-side). */
+	default?: boolean;
 	/** Available when there's an active stream session */
 	url?: string;
 }

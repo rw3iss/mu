@@ -10,6 +10,8 @@ export interface SubtitleTrackRow {
 	codec?: string;
 	forced?: boolean;
 	external?: boolean;
+	/** This movie's chosen default subtitle (at most one true). */
+	default?: boolean;
 }
 
 /**
@@ -68,10 +70,26 @@ export class SubtitleTracksRepository {
 						language: t.language,
 						title: t.title,
 						external: t.external ?? false,
+						// Preserve the default flag (only set when true to keep the JSON lean).
+						...(t.default ? { default: true } : {}),
 					})),
 				),
 			})
 			.where(eq(movieFiles.id, fileId));
+	}
+
+	/**
+	 * Mark one track as the movie's default subtitle (clearing it on all
+	 * others). Returns the updated track list. Throws if the index is unknown.
+	 */
+	async setDefault(fileId: string, index: number): Promise<SubtitleTrackRow[]> {
+		const tracks = this.getPersistedTracks(fileId);
+		if (!tracks.some((t) => t.index === index)) {
+			throw new NotFoundException(`Subtitle track ${index} not found`);
+		}
+		const updated = tracks.map((t) => ({ ...t, default: t.index === index }));
+		await this.setTracks(fileId, updated);
+		return updated;
 	}
 
 	/** Refetch the persisted tracks for a file (used after extractSubtitles returns empty). */
@@ -82,5 +100,18 @@ export class SubtitleTracksRepository {
 			.where(eq(movieFiles.id, fileId))
 			.get();
 		return this.parseTracks(row?.subtitleTracks ?? null);
+	}
+
+	/** Every movie file that has at least one persisted subtitle track. */
+	getAllFilesWithSubtitles(): { id: string; filePath: string; subtitleTracks: string | null }[] {
+		return this.database.db
+			.select({
+				id: movieFiles.id,
+				filePath: movieFiles.filePath,
+				subtitleTracks: movieFiles.subtitleTracks,
+			})
+			.from(movieFiles)
+			.all()
+			.filter((r) => !!r.subtitleTracks && r.subtitleTracks !== '[]');
 	}
 }

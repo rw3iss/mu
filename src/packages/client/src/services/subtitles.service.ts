@@ -33,6 +33,18 @@ export const subtitlesService = {
 		return api.delete<{ success: boolean }>(`/subtitles/${movieId}/${trackIndex}`);
 	},
 
+	/** Mark a track as the movie's default subtitle (persisted server-side). */
+	setDefault(movieId: string, trackIndex: number): Promise<{ success: boolean }> {
+		return api.put<{ success: boolean }>(`/subtitles/${movieId}/${trackIndex}/default`, {});
+	},
+
+	/** Admin: delete leftover downloaded subtitle files on movies with a default set. */
+	cleanupUnused(): Promise<{ moviesTouched: number; filesRemoved: number }> {
+		return api.post<{ moviesTouched: number; filesRemoved: number }>(
+			'/subtitles/admin/cleanup-unused',
+		);
+	},
+
 	/** Upload a subtitle file manually */
 	async upload(movieId: string, file: File): Promise<{ subtitle: MovieSubtitleInfo }> {
 		const formData = new FormData();

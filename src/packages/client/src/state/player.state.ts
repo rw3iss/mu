@@ -26,6 +26,8 @@ export interface SubtitleTrack {
 	label: string;
 	language: string;
 	url: string;
+	/** Server-persisted default for this movie. */
+	default?: boolean;
 }
 
 export interface AudioTrack {
@@ -75,6 +77,11 @@ export function restoreSubtitleChoice(movieId: string, availableTracks: Subtitle
 		const saved = localStorage.getItem(`mu_subtitle_${movieId}`);
 		if (saved && availableTracks.some((t) => t.id === saved)) {
 			subtitleTrack.value = saved;
+		} else if (saved == null) {
+			// No explicit per-browser choice — fall back to the movie's
+			// server-side default subtitle if one is set.
+			const def = availableTracks.find((t) => t.default);
+			subtitleTrack.value = def ? def.id : null;
 		} else {
 			subtitleTrack.value = null;
 		}

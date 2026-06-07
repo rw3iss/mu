@@ -121,6 +121,35 @@
   flex-shrink: 0;
 }
 
+.badgeDefault {
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  background: var(--color-accent);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.setDefaultBtn {
+  flex-shrink: 0;
+  // Reserve the spot the hover-only delete button occupies on the right.
+  margin-right: 26px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 3px;
+  background: var(--on-dark-overlay-2);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+
+  &:hover {
+    background: var(--color-accent);
+    color: #fff;
+  }
+}
+
 .badgeAccent {
   padding: 1px 6px;
   font-size: 10px;
