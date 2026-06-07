@@ -389,11 +389,21 @@ Workers boot the same NestJS DI graph as the main server, so handlers and config
 git clone https://github.com/rw3iss/mu.git
 cd mu/src
 
+# One command: checks prerequisites, installs deps, builds, applies the DB
+# schema, then optionally installs Mu as a system service. Safe to re-run.
+pnpm setup
+
+# ...or, for day-to-day development by hand:
 pnpm install
 pnpm dev          # server + client with hot reload
 ```
 
 The dev server runs at `http://localhost:4000`.
+
+Before first run, set your storage locations in `src/.env` (copied from
+`.env.example`) — at minimum `MU_DATA_DIR` (database, config, thumbnails) and
+optionally `MU_CACHE_DIR` (transcode/image/hot caches). See
+[Configuration](#configuration).
 
 ### Commands
 
@@ -422,14 +432,25 @@ pnpm settings get <key>       # get a setting value
 pnpm settings set <key> <val> # set a setting
 pnpm settings delete <key>    # delete a setting
 
+# First-time setup
+pnpm setup                    # prereqs -> install -> build -> migrate -> (offer service)
+
+# Service management (Linux / systemd user service) — see "Running Mu as a service" below
+pnpm service install          # install + enable + start (boot-start via linger); no sudo
+pnpm service status           # service state + port + health
+pnpm service start            # (also: stop | restart)
+pnpm service enable           # (also: disable) — start-on-boot on/off
+pnpm service logs             # follow the journal (journalctl --user -u mu-server)
+pnpm service uninstall        # remove the service ONLY (keeps app + data)
+
 # Server management
 pnpm status                   # show server mode, health, uptime
 pnpm logs                     # tail local server log
 pnpm logs:prod                # tail production server log via SSH
 pnpm fix:ffmpeg               # kill orphaned FFmpeg, clear flags, restart
-pnpm setup:service            # auto-start on boot (NSSM/systemd/launchd)
+pnpm setup:service            # cross-platform autostart (NSSM/systemd/launchd)
 pnpm update                   # fetch latest release, migrate, restart
-pnpm uninstall                # remove services and app
+pnpm uninstall                # remove services AND app (full uninstall)
 
 # Plugins
 pnpm plugin:generate <id>     # scaffold a new plugin
@@ -531,6 +552,69 @@ pnpm setup:service
 ```
 
 **Note:** The service account needs "Log on as a service" rights, which NSSM grants automatically. On Linux, systemd services already run as the installing user with full GPU access.
+
+### Running Mu as a service (Linux / systemd)
+
+`pnpm service <command>` manages Mu as a **systemd _user_ service** (`mu-server.service` under `~/.config/systemd/user/`). Run from `src/`:
+
+| Command | What it does |
+|---|---|
+| `pnpm service install` | Write the unit, `enable --now` (start now **and** on boot), enable linger |
+| `pnpm service status` | Service state, port 4000, and a health check |
+| `pnpm service start` / `stop` / `restart` | Control the running service |
+| `pnpm service enable` / `disable` | Toggle start-on-boot |
+| `pnpm service logs` | Follow the journal (`journalctl --user -u mu-server -f`) |
+| `pnpm service uninstall` | Remove the unit **only** — app, database, and data dir are left intact |
+
+> **Why a _user_ service, not a system one?** When the app lives under your home directory (e.g. `~/Sites/mu`), SELinux (Enforcing on Fedora) forbids a **system** service — which runs in the `init_t` domain — from executing the nvm `node` binary or reading files labeled `user_home_t` (you get `status=203/EXEC` and AVC denials, even as `root` — SELinux gates on the domain, not the Unix user). A **user** service runs in your unconfined user context, so it works in place with no relabeling and no `sudo` for management. `pnpm service install` enables **linger** (`loginctl enable-linger`) so it still starts at boot without an interactive login. (To run a true system service instead, put the install + data outside `/home`, e.g. `/opt/mu` + `/var/lib/mu`.)
+
+Run `pnpm build` (or `pnpm setup`) first — the service runs the **built** server. The generated unit:
+
+- runs as **you** (user service), so the nvm `node` and GPU/NVENC access work;
+- loads `src/.env` (`MU_DATA_DIR`, `MU_CACHE_DIR`, …) via `EnvironmentFile`;
+- declares `RequiresMountsFor` on the data and cache directories, so at boot it **waits for removable/USB drives to mount** instead of silently creating a cache folder that shadows the unmounted mount point;
+- logs to the **systemd journal** — view with `pnpm service logs` or `journalctl --user -u mu-server -f` (we don't write a log file under `/home`, which SELinux would block for `StandardOutput`);
+- restarts on failure.
+
+Re-running `pnpm service install` safely rewrites the unit — do this after moving the data dir, upgrading node, or changing `.env`. No `sudo` needed except a one-time linger enable. (`pnpm status` / `pnpm logs` target the legacy file-based / Windows run modes; for the systemd user service use `pnpm service status` / `pnpm service logs`.)
+
+> **Cross-platform alternative:** `pnpm setup:service` installs the autostart service on **Windows (NSSM)**, **macOS (launchd)**, or **Linux (systemd)**. On Linux, prefer `pnpm service` for everyday management. To tear down the *entire* installation (not just the service), use `pnpm uninstall`.
+
+### Exposing Mu on a domain (nginx + HTTPS)
+
+`pnpm nginx:setup` creates an nginx reverse-proxy site for a domain, optionally obtaining a Let's Encrypt certificate. Interactive, or fully driven by flags:
+
+```bash
+# Interactive (prompts for domain, port, client dir, Let's Encrypt)
+pnpm nginx:setup
+
+# Non-interactive
+pnpm nginx:setup -- --domain mu.example.com --port 4000 --letsencrypt --email you@example.com --yes
+```
+
+| Flag | Meaning |
+|---|---|
+| `--domain <fqdn>` | The domain to serve (e.g. `mu.example.com`) |
+| `--port <n>` | App port to proxy to (default `4000`) |
+| `--client-dir <path>` | Built web client dir (default: auto-detected `packages/client/dist`) |
+| `--letsencrypt` | Install certbot and obtain a cert (adds HTTPS + HTTP→HTTPS redirect) |
+| `--email <addr>` | Registration/expiry email for Let's Encrypt |
+| `--no-static` | Pure reverse proxy (don't try to serve `/assets/` from disk) |
+| `--yes`, `-y` | Non-interactive; use defaults for anything not passed |
+
+What it does (platform priority: **Fedora/RHEL → Debian/Ubuntu → macOS → Windows** best-effort):
+
+- Installs nginx if missing, writes a site to `conf.d/<domain>.conf`, tests, and reloads.
+- Opens ports 80/443 (firewalld or ufw).
+- On **SELinux** (Fedora/RHEL) sets `httpd_can_network_connect` so the proxy doesn't `502`.
+- Serves the client's immutable `/assets/` straight from disk **when nginx can read them** — and automatically **falls back to a pure proxy** when it can't (e.g. the app lives under a `0700` home dir / `user_home_t`, where the system nginx user has no access; the Mu node server then serves its own static files). Everything else (SPA shell + SSR, REST API, WebSockets, HLS/streaming) is proxied to the app, with WebSocket upgrade, `proxy_buffering off`, and long timeouts for streaming.
+- With `--letsencrypt`, installs certbot + the nginx plugin and runs `certbot --nginx` (auto-renew via certbot's systemd timer).
+
+> **Let's Encrypt prerequisites:** the domain's DNS must point at your public IP, and your router must forward **ports 80 _and_ 443** to this host (HTTP-01 validates over port 80). If the cert step fails (e.g. "Timeout during connect"), the HTTP site keeps serving — fix forwarding/DNS and re-run just the cert step:
+> ```bash
+> sudo certbot --nginx -d mu.example.com --redirect -m you@example.com
+> ```
+> The app's own `tls.*` config (in `config.yml`) should stay disabled when nginx terminates TLS — let nginx handle HTTPS and proxy plain HTTP to the app.
 
 ### Restart Windows service/server:
 nssm stop mu-server      # stop the service

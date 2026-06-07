@@ -1,4 +1,4 @@
-import { createReadStream, createWriteStream, existsSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync, statSync } from 'node:fs';
 import { mkdir, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -191,17 +191,16 @@ export class MediaCacheService implements OnModuleInit {
 	}
 
 	/**
-	 * Stage only files worth staging: source must be on a slow drive and not
-	 * already on the cache drive. With `slowDrives` configured we match those
-	 * prefixes exactly; otherwise we stage anything not already on the cache
-	 * drive (best-effort — set `slowDrives` for precise control).
+	 * Stage only files worth staging: source must not already sit on the cache
+	 * drive. With `slowDrives` configured we match those prefixes exactly;
+	 * otherwise we stage anything not already on the cache drive.
 	 */
 	private shouldStage(sourcePath: string): boolean {
 		const src = sourcePath.toLowerCase();
-		// Never copy a file that already lives under the cache dir / cache drive.
-		const cacheDrive = this.driveOf(this.hotDir);
-		if (cacheDrive && this.driveOf(sourcePath) === cacheDrive) return false;
+		// Never copy a file that already lives under the cache dir...
 		if (this.hotDir && src.startsWith(this.hotDir.toLowerCase())) return false;
+		// ...or already sits on the same physical drive/filesystem as the cache.
+		if (this.onCacheDrive(sourcePath)) return false;
 
 		if (this.slowDrives.length > 0) {
 			return this.slowDrives.some((d) => src.startsWith(d));
@@ -210,7 +209,29 @@ export class MediaCacheService implements OnModuleInit {
 		return true;
 	}
 
-	/** Lowercased drive prefix, e.g. "d:" on Windows or "/" on POSIX. */
+	/**
+	 * True when `sourcePath` lives on the same drive/filesystem as the hot-cache
+	 * dir (so staging would only copy within one disk). On Windows we compare
+	 * drive letters; on POSIX every absolute path shares "/", so a string prefix
+	 * is useless — we compare the underlying filesystem device id from stat(),
+	 * which correctly distinguishes a slow media-HDD mount from the cache mount.
+	 */
+	private onCacheDrive(sourcePath: string): boolean {
+		if (!this.hotDir) return false;
+		if (process.platform === 'win32') {
+			const a = this.driveOf(sourcePath);
+			const b = this.driveOf(this.hotDir);
+			return Boolean(a && b && a === b);
+		}
+		try {
+			return statSync(sourcePath).dev === statSync(this.hotDir).dev;
+		} catch {
+			// Can't stat the source (missing / unmounted) → don't try to stage it.
+			return true;
+		}
+	}
+
+	/** Lowercased Windows drive prefix, e.g. "d:"; empty on POSIX. */
 	private driveOf(p: string): string {
 		const m = /^([a-zA-Z]):/.exec(p);
 		if (m) return `${m[1]!.toLowerCase()}:`;

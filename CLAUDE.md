@@ -186,6 +186,14 @@ Required for transcoding. On Windows, auto-detected at `C:/ffmpeg/ffmpeg.exe`. O
 
 Install scripts: `src/scripts/install.sh` (Unix release installer), `src/scripts/install.ps1` (Windows), and **`src/scripts/setup-fedora.sh`** — the full Fedora/NVIDIA workstation setup that operates on a cloned repo (RPM Fusion + NVENC ffmpeg, NVIDIA driver, `video`/`render` groups, `.env` import, schema migrate, NVENC smoke test, firewall, `mu.service`). Idempotent; checks the DB and only creates the schema if missing (a copied `mu.db` is preserved). Both Unix installers now run `db:migrate` so the schema exists before first start (a fresh DB's admin is created via the Setup page — no default credentials are seeded).
 
+## Setup, Service & nginx Scripts
+
+Self-host convenience scripts (run from `src/`; documented in `README.md`):
+
+- **`setup.sh`** (`pnpm setup`) — one-shot from a fresh clone: prereq checks → `pnpm install` → `pnpm build` → `pnpm db:migrate` → optional service install.
+- **`scripts/service.sh`** (`pnpm service <install|uninstall|status|start|stop|restart|enable|disable|logs>`) — manages Mu as a systemd **user** service (`~/.config/systemd/user/mu-server.service`). User-scoped because the app lives under `/home` (`user_home_t`): SELinux forbids a **system** service (`init_t`) from exec'ing the nvm node / reading `.env` there (`203/EXEC`), even as root. Linger (`loginctl enable-linger`) gives boot-start; logs to the journal; unit uses `RequiresMountsFor` on data+cache so it waits for removable drives instead of shadowing an unmounted mount. `uninstall` removes only the unit (not app/data) — distinct from `scripts/uninstall.sh` which removes the whole install.
+- **`scripts/nginx-setup.sh`** (`pnpm nginx:setup -- [--domain --port --client-dir --letsencrypt --email --no-static --yes]`) — creates an nginx reverse-proxy site, optional Let's Encrypt via `certbot --nginx`. Fedora-first (then Debian/Ubuntu, macOS, Windows best-effort). Sets the `httpd_can_network_connect` SELinux boolean (else proxy 502s); serves the client's `/assets/` from disk **only when the nginx user can read them**, else auto-falls back to pure proxy (the home-dir / `user_home_t` case — the node server serves its own static). LE needs DNS→host + router-forwarded **80 and 443**.
+
 ## Production Server
 
 ### Connection

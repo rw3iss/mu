@@ -34,6 +34,9 @@
     "status": "bash scripts/status.sh",
     "logs": "bash scripts/logs.sh",
     "logs:prod": "bash scripts/logs-prod.sh",
+    "setup": "bash setup.sh",
+    "service": "bash scripts/service.sh",
+    "nginx:setup": "bash scripts/nginx-setup.sh",
     "setup:service": "bash scripts/setup-service.sh",
     "uninstall": "bash scripts/uninstall.sh",
     "update": "bash scripts/update.sh"
