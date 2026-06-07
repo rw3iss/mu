@@ -125,6 +125,8 @@ export function MediaCard({
 	style,
 	...rest
 }: MediaCardProps) {
+	const overlayInfo = infoOverlay && !children;
+
 	const classes = [
 		styles.card,
 		styles[`shape_${posterShape}`],
@@ -151,7 +153,6 @@ export function MediaCard({
 			{extra}
 		</>
 	);
-	const overlayInfo = infoOverlay && !children;
 
 	const handleClick = disabled ? undefined : onClick;
 	// When an href is known, middle-click / ctrl-/cmd-click opens it in a new
