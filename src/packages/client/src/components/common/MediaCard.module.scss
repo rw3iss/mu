@@ -104,7 +104,8 @@
 	position: absolute;
 	top: 6px;
 	left: 6px;
-	z-index: 2;
+	// Above the floating title scrim (z 4) so corner badges stay visible.
+	z-index: 5;
 	display: flex;
 	gap: 4px;
 }
@@ -113,7 +114,7 @@
 	position: absolute;
 	top: 6px;
 	right: 6px;
-	z-index: 2;
+	z-index: 5;
 	display: flex;
 	gap: 4px;
 }
@@ -150,16 +151,39 @@
 	min-width: 0;
 }
 
-// Floating info variant — title/subtitle/extra sit over the bottom of the
-// poster with a themed bottom-up gradient scrim. Sits above the hover overlay
-// (z 3) so the options menu stays clickable on hover.
+// Floating info variant — the title floats over the TOP of the poster and the
+// meta row over the BOTTOM, each with its own gradient scrim (mirrored). Both
+// sit above the hover overlay (z 3) so the options menu stays clickable.
+.infoOverlayTop {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	z-index: 4;
+	// Reserve room on the right so the title clears the top-right rating badge.
+	padding: 8px 46px 26px 8px;
+	min-width: 0;
+	background: linear-gradient(
+		to bottom,
+		color-mix(in srgb, var(--color-bg-primary) 90%, transparent) 0%,
+		color-mix(in srgb, var(--color-bg-primary) 66%, transparent) 40%,
+		color-mix(in srgb, var(--color-bg-primary) 26%, transparent) 74%,
+		transparent 100%
+	);
+	pointer-events: none;
+
+	> * {
+		pointer-events: auto;
+	}
+}
+
 .infoOverlayBlock {
 	position: absolute;
 	left: 0;
 	right: 0;
 	bottom: 0;
 	z-index: 4;
-	padding: 30px 8px 8px;
+	padding: 26px 8px 8px;
 	display: flex;
 	flex-direction: column;
 	gap: 2px;

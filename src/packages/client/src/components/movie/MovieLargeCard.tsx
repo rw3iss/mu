@@ -108,27 +108,25 @@ export function MovieLargeCard({
 				fillClass={styles.progressFill}
 			/>
 
-			<div class={styles.info}>
-				<div class={styles.infoTop}>
-					<h3
-						class={styles.title}
-						onMouseEnter={handleTitleMouseEnter}
-						onMouseLeave={handleTitleMouseLeave}
-					>
-						{movie.title}
-						{tooltipVisible && <span class={styles.titleTooltip}>{movie.title}</span>}
-					</h3>
-					<div class={styles.infoRight}>
-						<RatingBadge value={rating} class={styles.ratingBadge} />
+			<div class={styles.infoTopOverlay}>
+				<h3
+					class={styles.title}
+					onMouseEnter={handleTitleMouseEnter}
+					onMouseLeave={handleTitleMouseLeave}
+				>
+					{movie.title}
+					{tooltipVisible && <span class={styles.titleTooltip}>{movie.title}</span>}
+				</h3>
+			</div>
 
-						<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
-					</div>
-				</div>
+			<div class={styles.info}>
 				<div class={styles.meta}>
+					<RatingBadge value={rating} class={styles.ratingBadge} />
 					{movie.year && <span>{movie.year}</span>}
 					{runtimeStr && <span>{runtimeStr}</span>}
 					<MovieScoreChips movie={movie} />
 					{formattedDate && <span>Added {formattedDate}</span>}
+					<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
 					{!selectionMode && !movie.remoteOrigin && (
 						<span class={styles.metaOptions}>
 							<MovieOptionsMenu

@@ -141,14 +141,16 @@ export function MediaCard({
 		.filter(Boolean)
 		.join(' ');
 
-	const infoContent = (
+	const titleEl =
+		title != null ? (
+			typeof title === 'string' || typeof title === 'number' ? (
+				<h3 class={styles.title}>{title}</h3>
+			) : (
+				title
+			)
+		) : null;
+	const metaEl = (
 		<>
-			{title != null &&
-				(typeof title === 'string' || typeof title === 'number' ? (
-					<h3 class={styles.title}>{title}</h3>
-				) : (
-					title
-				))}
 			{subtitle && <div class={styles.subtitle}>{subtitle}</div>}
 			{extra}
 		</>
@@ -183,11 +185,23 @@ export function MediaCard({
 				{topRight && <div class={styles.topRight}>{topRight}</div>}
 				{posterBadges}
 				{hoverOverlay && <div class={styles.hoverOverlay}>{hoverOverlay}</div>}
-				{overlayInfo && <div class={styles.infoOverlayBlock}>{infoContent}</div>}
+				{overlayInfo && (
+					<>
+						{titleEl && <div class={styles.infoOverlayTop}>{titleEl}</div>}
+						<div class={styles.infoOverlayBlock}>{metaEl}</div>
+						{belowPoster}
+					</>
+				)}
 			</div>
-			{belowPoster}
+			{!overlayInfo && belowPoster}
 			{preInfo}
-			{children ?? (overlayInfo ? null : <div class={styles.info}>{infoContent}</div>)}
+			{children ??
+				(overlayInfo ? null : (
+					<div class={styles.info}>
+						{titleEl}
+						{metaEl}
+					</div>
+				))}
 			{caption && <div class={styles.caption}>{caption}</div>}
 		</div>
 	);

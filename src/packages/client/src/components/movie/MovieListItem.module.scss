@@ -1,7 +1,7 @@
 .row {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-lg);
   padding: var(--space-md) var(--space-lg);
   // Each row is its own floating card — surface, border, radius — rather than a
@@ -117,15 +117,20 @@
 .info {
   flex: 1;
   min-width: 0;
+  // Spread the title to the top of the row and the meta to the bottom; the row
+  // stretches to the poster height so there's room to separate them.
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-xs);
 }
 
 .title {
   display: block;
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   @include truncate(1);
-  margin-bottom: var(--space-xs);
 }
 
 .meta {
@@ -158,6 +163,9 @@
   align-items: center;
   gap: var(--space-sm);
   flex-shrink: 0;
+  // Keep the options/play controls vertically centered even though the row now
+  // stretches title-top / meta-bottom.
+  align-self: center;
 }
 
 .ratingBadge {

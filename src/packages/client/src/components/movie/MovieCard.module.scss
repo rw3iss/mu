@@ -192,17 +192,15 @@
 }
 
 .progressBar {
-  /* Slightly inset from the card edge + centered, so the rounded
-   * pill sits inside the card's curve instead of fighting it. */
-  width: 98%;
-  margin: 0 auto;
+  /* Pinned to the very bottom of the poster (inside the overflow-clipped,
+   * rounded poster wrap) so it never adds card height or pushes the row. */
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   height: 3px;
-  background: var(--color-bg-surface);
-  /* Round only the bottom corners — top stays flush against the
-   * poster. Overflow:hidden clips the fill so its left edge
-   * inherits the same radius. */
-  border-bottom-left-radius: 5px;
-  border-bottom-right-radius: 5px;
+  background: rgba(255, 255, 255, 0.18);
+  z-index: 5;
   overflow: hidden;
 }
 
