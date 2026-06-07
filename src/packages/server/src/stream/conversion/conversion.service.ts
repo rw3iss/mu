@@ -11,7 +11,13 @@ import { SettingsService } from '../../settings/settings.service.js';
 import { TranscoderService } from '../transcoder/transcoder.service.js';
 
 /** What the planner decided to do with a file. */
-export type ConversionAction = 'remux' | 'reencode-audio' | 'reencode' | 'reencode-av1' | 'skip';
+export type ConversionAction =
+	| 'remux'
+	| 'reencode-audio'
+	| 'reencode'
+	| 'reencode-av1'
+	| 'shrink'
+	| 'skip';
 
 export interface ConversionPlan {
 	action: ConversionAction;
@@ -86,7 +92,22 @@ export class ConversionService {
 			// Convert HEVC → AV1 MP4 (GPU). AV1 is browser-universal AND efficient
 			// (no doubling), but requires a working NVENC AV1 encoder. Default off.
 			convertHevcToAv1: enc?.convertHevcToAv1 === true,
+			// Re-encode (shrink) any file whose overall bitrate exceeds this many
+			// Mbps. Targets bloated H.264 BluRay rips. 0 = off. AV1 (GPU) when
+			// available, else H.264 CRF.
+			reencodeAboveMbps: (() => {
+				const v = Number(enc?.reencodeAboveMbps);
+				return Number.isFinite(v) && v > 0 ? v : 0;
+			})(),
 		};
+	}
+
+	/** Overall bitrate in Mbps (whole-file: video+audio), or 0 if unknown. */
+	private bitrateMbps(file: any): number {
+		const bytes = Number(file.fileSize);
+		const dur = Number(file.durationSeconds);
+		if (!Number.isFinite(bytes) || bytes <= 0 || !Number.isFinite(dur) || dur <= 0) return 0;
+		return (bytes * 8) / dur / 1_000_000;
 	}
 
 	/** True when an AV1-capable hardware encoder (NVENC) is actually usable. */
@@ -138,6 +159,32 @@ export class ConversionService {
 		const h264 = this.isH264(videoCodec);
 		const isMp4 = ext === '.mp4' || ext === '.m4v';
 		const browserAudio = this.isBrowserAudio(audioCodec);
+
+		// Oversized H.264 → re-encode the *video* to shrink it (the only path
+		// that touches H.264 video; remux/reencode-audio copy it verbatim, so a
+		// 22 Mbps BluRay rip stays huge). Gated on `reencodeAboveMbps` and only
+		// when it would actually shrink. Takes precedence over the direct-play
+		// skip and the audio-only paths below.
+		const shrinkMbps = this.getConfig().reencodeAboveMbps;
+		if (h264 && shrinkMbps > 0) {
+			const mbps = this.bitrateMbps(file);
+			const duration = Number(file.durationSeconds);
+			const originalBytes = Number(file.fileSize);
+			if (
+				mbps > shrinkMbps &&
+				Number.isFinite(duration) &&
+				duration > 0 &&
+				Number.isFinite(originalBytes) &&
+				originalBytes > 0
+			) {
+				// Conservative predicted size (H.264 reference; AV1 lands lower).
+				const refVideo = this.h264RefBitrate(this.parseHeight(file));
+				const predictedBytes = Math.round(((refVideo + 256_000) / 8) * duration);
+				if (predictedBytes < originalBytes) {
+					return { action: 'shrink', reason: 'oversized', predictedBytes };
+				}
+			}
+		}
 
 		if (h264 && isMp4 && browserAudio) {
 			return { action: 'skip', reason: 'already-direct-play' };
@@ -219,6 +266,11 @@ export class ConversionService {
 				return `${from} (${aIn}) → ${vIn}/MP4 (copy video · re-encode audio → AAC)`;
 			case 'reencode-av1':
 				return `${from} → AV1/MP4 (GPU re-encode, CQ ${this.transcoder.getAv1Cq()})`;
+			case 'shrink': {
+				const target = this.nvencActive() ? `AV1/MP4 (GPU, CQ ${this.transcoder.getAv1Cq()})` : 'H.264/MP4 (CRF)';
+				const mbps = this.bitrateMbps(file);
+				return `${from} ${mbps ? `~${mbps.toFixed(0)} Mbps ` : ''}→ ${target} (shrink oversized)`;
+			}
 			case 'reencode':
 				return `${from} → H.264/MP4 (re-encode)`;
 			default:
@@ -313,9 +365,16 @@ export class ConversionService {
 			? path.dirname(srcPath)
 			: this.transcoder.getPersistentDir(file.id, 'direct');
 		const baseName = inPlace ? this.sanitizeName(title, year) : 'direct';
-		let finalPath = path.join(dir, `${baseName}.mp4`);
+		const finalPath = path.join(dir, `${baseName}.mp4`);
+		// The canonical target already exists and isn't our source — a prior
+		// conversion (or a duplicate file row) already produced it. Writing a
+		// "(converted).mp4" sibling here would be re-indexed by the scanner as a
+		// duplicate movie, so skip instead of forking the file.
 		if (inPlace && existsSync(finalPath) && path.resolve(finalPath) !== path.resolve(srcPath)) {
-			finalPath = path.join(dir, `${baseName} (converted).mp4`);
+			this.logger.warn(
+				`Skipping conversion of ${path.basename(srcPath)} — target ${path.basename(finalPath)} already exists`,
+			);
+			return { ...base, status: 'skipped', reason: 'target-exists' };
 		}
 		// Non-media extension so a concurrent library scan can't index the
 		// half-written file. The MP4 muxer is forced via `-f mp4` in the
@@ -340,6 +399,19 @@ export class ConversionService {
 					srcPath,
 					tempPath,
 					{ preserveResolution: true, targetCodec: 'av1' },
+					onProgress,
+				);
+			} else if (plan.action === 'shrink') {
+				// Re-encode the video to shrink an oversized file. Prefer AV1 (GPU,
+				// browser-universal, most efficient); fall back to H.264 CRF when no
+				// usable NVENC. Quality-targeted (NOT near-lossless) so it actually
+				// gets smaller.
+				await this.transcoder.transcodeToMp4(
+					srcPath,
+					tempPath,
+					this.nvencActive()
+						? { preserveResolution: true, targetCodec: 'av1' }
+						: { preserveResolution: true, targetCodec: 'h264' },
 					onProgress,
 				);
 			} else {
@@ -383,7 +455,11 @@ export class ConversionService {
 					fileName: path.basename(finalPath),
 					fileSize: probe.sizeBytes,
 					codecVideo:
-						probe.codecVideo ?? (plan.action === 'reencode-av1' ? 'av1' : 'h264'),
+						probe.codecVideo ??
+						(plan.action === 'reencode-av1' ||
+						(plan.action === 'shrink' && this.nvencActive())
+							? 'av1'
+							: 'h264'),
 					codecAudio: probe.codecAudio ?? 'aac',
 					containerFormat: 'mp4',
 					videoWidth: probe.videoWidth ?? file.videoWidth ?? null,

@@ -282,6 +282,9 @@ export function Settings(props: SettingsProps) {
 	const [conversionGrowthThreshold, setConversionGrowthThreshold] = useState('1.25');
 	const [convertHevcToAv1, setConvertHevcToAv1] = useState(false);
 	const [av1Cq, setAv1Cq] = useState('32');
+	// Shrink oversized H.264 files: re-encode any whose bitrate exceeds this many
+	// Mbps. 0 = off.
+	const [reencodeAboveMbps, setReencodeAboveMbps] = useState('0');
 	// Scheduled, time-boxed library conversion sweep (admin).
 	const [convertSweepEnabled, setConvertSweepEnabled] = useState(false);
 	const [convertSweepStartTime, setConvertSweepStartTime] = useState('02:00');
@@ -413,6 +416,8 @@ export function Settings(props: SettingsProps) {
 					if (typeof encoding.convertHevcToAv1 === 'boolean')
 						setConvertHevcToAv1(encoding.convertHevcToAv1);
 					if (encoding.av1Cq != null) setAv1Cq(String(encoding.av1Cq));
+					if (encoding.reencodeAboveMbps != null)
+						setReencodeAboveMbps(String(encoding.reencodeAboveMbps));
 					const sweep = encoding.convertSweep as Record<string, unknown> | undefined;
 					if (sweep) {
 						if (typeof sweep.enabled === 'boolean')
@@ -552,6 +557,7 @@ export function Settings(props: SettingsProps) {
 					conversionGrowthThreshold: parseFloat(conversionGrowthThreshold) || 1.25,
 					convertHevcToAv1,
 					av1Cq: parseInt(av1Cq, 10) || 32,
+					reencodeAboveMbps: parseFloat(reencodeAboveMbps) || 0,
 					convertSweep: {
 						enabled: convertSweepEnabled,
 						startTime: convertSweepStartTime,
@@ -582,6 +588,7 @@ export function Settings(props: SettingsProps) {
 		conversionGrowthThreshold,
 		convertHevcToAv1,
 		av1Cq,
+		reencodeAboveMbps,
 		convertSweepEnabled,
 		convertSweepStartTime,
 		convertSweepDurationHours,
@@ -2304,15 +2311,16 @@ export function Settings(props: SettingsProps) {
 								</label>
 							</div>
 
-							{/* Growth threshold */}
+							{/* Growth guard */}
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Re-encode Size Limit</span>
+									<span class={styles.settingLabel}>Re-encode Growth Limit</span>
 									<span class={styles.settingDescription}>
-										Skip re-encoding when the estimated MP4 would exceed the
-										original size × this factor (protects efficient HEVC/AV1
-										from bloating). 1.0 = never grow; 1.25 = allow 25% larger
-										(default).
+										Safety guard, not a trigger: skip a re-encode when the
+										estimated MP4 would exceed the original size × this factor,
+										so already-efficient HEVC/AV1 files aren't bloated. 1.0 =
+										never grow; 1.25 = allow up to 25% larger (default). To
+										actively shrink large files, use “Shrink Files Above” below.
 									</span>
 								</div>
 								<input
@@ -2326,6 +2334,33 @@ export function Settings(props: SettingsProps) {
 										setConversionGrowthThreshold(
 											(e.target as HTMLInputElement).value,
 										)
+									}
+									style={{ width: '80px' }}
+								/>
+							</div>
+
+							{/* Shrink oversized files */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Shrink Files Above</span>
+									<span class={styles.settingDescription}>
+										Re-encode any file whose overall bitrate exceeds this many
+										Mbps to shrink it — including already-playable H.264 (which
+										is otherwise copied verbatim, so a 22 Mbps BluRay rip stays
+										huge). Uses AV1 on the GPU when available, else H.264 CRF.
+										Only proceeds when it would actually get smaller. 0 = off;
+										~12 is a good ceiling for 1080p.
+									</span>
+								</div>
+								<input
+									type="number"
+									class={styles.select}
+									min={0}
+									max={100}
+									step={1}
+									value={reencodeAboveMbps}
+									onInput={(e) =>
+										setReencodeAboveMbps((e.target as HTMLInputElement).value)
 									}
 									style={{ width: '80px' }}
 								/>
