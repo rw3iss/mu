@@ -69,6 +69,12 @@ export interface MediaCardProps {
 	belowPoster?: ComponentChildren;
 	/** Rendered above the info block (e.g. checkbox in selection mode). */
 	preInfo?: ComponentChildren;
+	/**
+	 * Float the title/subtitle/extra block over the bottom of the poster with a
+	 * gradient scrim instead of stacking it below. Ignored when `children`
+	 * replaces the info block.
+	 */
+	infoOverlay?: boolean;
 
 	/** Click on the whole card (typically navigates to detail). */
 	onClick?: (e: MouseEvent) => void;
@@ -107,6 +113,7 @@ export function MediaCard({
 	hoverOverlay,
 	belowPoster,
 	preInfo,
+	infoOverlay,
 	onClick,
 	href,
 	disabled,
@@ -126,10 +133,25 @@ export function MediaCard({
 		selected ? styles.selected : '',
 		hidden ? styles.hiddenState : '',
 		disabled ? styles.disabled : '',
+		overlayInfo ? styles.hasInfoOverlay : '',
 		className,
 	]
 		.filter(Boolean)
 		.join(' ');
+
+	const infoContent = (
+		<>
+			{title != null &&
+				(typeof title === 'string' || typeof title === 'number' ? (
+					<h3 class={styles.title}>{title}</h3>
+				) : (
+					title
+				))}
+			{subtitle && <div class={styles.subtitle}>{subtitle}</div>}
+			{extra}
+		</>
+	);
+	const overlayInfo = infoOverlay && !children;
 
 	const handleClick = disabled ? undefined : onClick;
 	// When an href is known, middle-click / ctrl-/cmd-click opens it in a new
@@ -160,21 +182,11 @@ export function MediaCard({
 				{topRight && <div class={styles.topRight}>{topRight}</div>}
 				{posterBadges}
 				{hoverOverlay && <div class={styles.hoverOverlay}>{hoverOverlay}</div>}
+				{overlayInfo && <div class={styles.infoOverlayBlock}>{infoContent}</div>}
 			</div>
 			{belowPoster}
 			{preInfo}
-			{children ?? (
-				<div class={styles.info}>
-					{title != null &&
-						(typeof title === 'string' || typeof title === 'number' ? (
-							<h3 class={styles.title}>{title}</h3>
-						) : (
-							title
-						))}
-					{subtitle && <div class={styles.subtitle}>{subtitle}</div>}
-					{extra}
-				</div>
-			)}
+			{children ?? (overlayInfo ? null : <div class={styles.info}>{infoContent}</div>)}
 			{caption && <div class={styles.caption}>{caption}</div>}
 		</div>
 	);

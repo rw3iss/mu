@@ -150,6 +150,34 @@
 	min-width: 0;
 }
 
+// Floating info variant — title/subtitle/extra sit over the bottom of the
+// poster with a themed bottom-up gradient scrim. Sits above the hover overlay
+// (z 3) so the options menu stays clickable on hover.
+.infoOverlayBlock {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 4;
+	padding: 30px 8px 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	background: linear-gradient(
+		to top,
+		color-mix(in srgb, var(--color-bg-primary) 90%, transparent) 0%,
+		color-mix(in srgb, var(--color-bg-primary) 66%, transparent) 40%,
+		color-mix(in srgb, var(--color-bg-primary) 26%, transparent) 74%,
+		transparent 100%
+	);
+	pointer-events: none;
+
+	> * {
+		pointer-events: auto;
+	}
+}
+
 .title {
 	font-size: 14px;
 	font-weight: 500;

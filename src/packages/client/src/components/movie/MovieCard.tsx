@@ -182,6 +182,7 @@ export function MovieCard({
 			posterBadges={posterBadges}
 			hoverOverlay={hoverOverlay}
 			preInfo={preInfo}
+			infoOverlay
 			belowPoster={
 				<WatchProgressBar
 					movie={movie}
