@@ -1,6 +1,7 @@
 import { useEffect } from 'preact/hooks';
 import { route } from 'preact-router';
 import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
+import { currentUser } from '@/state/auth.state';
 import { playMovie } from '@/state/globalPlayer.state';
 import { fetchHistory, historyEntries } from '@/state/history.state';
 import { newTabNav } from '@/utils/navigation';
@@ -11,12 +12,15 @@ const MAX_ITEMS = 20;
 export function RecentlyPlayed() {
 	const [collapsed, setCollapsed] = useUiSetting('recently_played_collapsed', false);
 	const showSetting = getUiSetting('show_recently_played', true);
+	// Re-fetch when the logged-in user changes so we never render the previous
+	// user's history (logout/login resets the cache to null; this refills it).
+	const userId = currentUser.value?.id;
 
 	useEffect(() => {
-		if (showSetting && !historyEntries.value) {
+		if (showSetting && userId && !historyEntries.value) {
 			fetchHistory();
 		}
-	}, [showSetting]);
+	}, [showSetting, userId]);
 
 	if (!showSetting) return null;
 

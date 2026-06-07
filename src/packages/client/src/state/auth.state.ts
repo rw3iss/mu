@@ -3,6 +3,7 @@ import { computed, signal } from '@preact/signals';
 import { route } from 'preact-router';
 import { api } from '@/services/api';
 import { invalidateFavorites } from '@/state/favorites.state';
+import { resetHistoryCache } from '@/state/history.state';
 import { fetchUserSettings, userSettings } from '@/state/userSettings.state';
 
 // ============================================
@@ -57,6 +58,8 @@ export async function login(username: string, password: string): Promise<void> {
 	});
 
 	localStorage.setItem('mu_token', response.accessToken);
+	// Drop any prior session's cached history before the new user's UI loads.
+	resetHistoryCache();
 	currentUser.value = response.user;
 	await fetchUserSettings();
 }
@@ -73,6 +76,7 @@ export async function logout(): Promise<void> {
 		currentUser.value = null;
 		userSettings.value = {};
 		invalidateFavorites();
+		resetHistoryCache();
 		route('/login');
 	}
 }

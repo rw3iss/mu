@@ -130,8 +130,23 @@ export function pushToHistory(movie: {
 }
 
 /**
- * Clear the cached history.
+ * Clear the cached history after the user wiped their own history. Marks the
+ * cache as loaded-but-empty so the History page shows the empty state without
+ * an extra round-trip.
  */
 export function clearHistoryCache(): void {
+	optimisticIds.clear();
 	historyEntries.value = [];
+}
+
+/**
+ * Drop all cached history on a user change (login / logout). Resets to the
+ * not-loaded state (`null`) so the next viewer triggers a fresh, per-user
+ * fetch — never showing the previous user's recently-watched list. Per-user
+ * scoping is enforced on the server (`/history` filters by the JWT user id);
+ * this just prevents the SPA's in-memory cache from leaking across a switch.
+ */
+export function resetHistoryCache(): void {
+	optimisticIds.clear();
+	historyEntries.value = null;
 }
