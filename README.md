@@ -616,6 +616,19 @@ What it does (platform priority: **Fedora/RHEL → Debian/Ubuntu → macOS → W
 > ```
 > The app's own `tls.*` config (in `config.yml`) should stay disabled when nginx terminates TLS — let nginx handle HTTPS and proxy plain HTTP to the app.
 
+### Auto-deploy (push-to-deploy)
+
+Make the box update itself on every `git push` to `origin/main`:
+
+```bash
+pnpm autodeploy install     # install + start the mu-autodeploy user service
+pnpm autodeploy status      # state + recent deploy log
+pnpm autodeploy logs        # follow data/logs/auto-deploy.log
+pnpm autodeploy uninstall   # stop + remove the watcher
+```
+
+`scripts/auto-deploy-watch.sh` polls `origin/main` (default every 60s, `MU_DEPLOY_POLL_SECONDS`); on a new commit it runs `git reset --hard` → `pnpm install` → `pnpm build` → `pnpm db:migrate`, then **restarts the `mu-server` user service** and health-checks it. The old server keeps serving until a build succeeds, so a broken build never takes the site down. It **skips the deploy if the working tree is dirty**, so uncommitted local edits are never clobbered — commit or stash first. (On Windows it restarts the legacy "Mu Server" scheduled task instead.)
+
 ### Restart Windows service/server:
 nssm stop mu-server      # stop the service
 nssm start mu-server     # start the service

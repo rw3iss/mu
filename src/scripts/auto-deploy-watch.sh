@@ -1,46 +1,68 @@
 #!/usr/bin/env bash
 #
-# auto-deploy-watch.sh — poll origin/main and auto-deploy on the WINDOWS prod box.
+# auto-deploy-watch.sh — poll origin/main and auto-deploy on push.
 #
-# Why this exists: prod runs in the interactive desktop session (Session 1) so
-# NVENC can reach the GPU. A GitHub-hosted runner can't reach this LAN box, and a
-# self-hosted runner installed as a service runs in Session 0 (no GPU). This
-# watcher closes the gap: it builds headlessly, then restarts the server via the
-# interactive "Mu Server" scheduled task — which executes in Session 1 even when
-# triggered from a Session-0 / SSH context.
+# Linux (primary, this box): builds headlessly, then restarts the systemd USER
+#   service `mu-server` (see scripts/service.sh). Runs as the `mu-autodeploy`
+#   user service — install with `pnpm autodeploy install` (scripts/autodeploy.sh).
+# Windows (legacy prod): restarts via the interactive "Mu Server" scheduled task
+#   (Session 1, so NVENC reaches the GPU). Installed via register-auto-deploy-task.ps1.
 #
-# Run it as a logon scheduled task (see register-auto-deploy-task.ps1). It loops:
-# fetch origin/main; if HEAD differs, deploy (reset → install → build → migrate)
-# and restart. One sequential loop, so deploys never overlap.
+# Loop: fetch origin/main; if HEAD differs AND the working tree is clean, deploy
+# (reset → install → build → migrate) and restart. A DIRTY tree is skipped so an
+# in-progress local checkout is never clobbered by `git reset --hard`. One
+# sequential loop, so deploys never overlap.
 #
-# Env overrides: MU_DEPLOY_POLL_SECONDS (default 60), MU_DEPLOY_DIR, MU_TASK_NAME.
+# Env overrides: MU_DEPLOY_POLL_SECONDS (60), MU_DEPLOY_DIR, MU_SERVICE_NAME
+#   (mu-server), MU_TASK_NAME (Windows: "Mu Server"), MU_HEALTH_URL.
 set -u
 
-# Survive console control events. Restarting the server (killing node +
-# re-running the "Mu Server" task) propagates a CTRL_C / CTRL_BREAK to every
-# process sharing this task's console — which would otherwise SIGINT this
-# watcher mid-deploy (seen as a `^C` in the log) and stop the loop. Ignore them
-# so the watcher keeps polling after each deploy. A hard `schtasks /end` (used
-# to stop the watcher deliberately) is uncatchable and still works.
+# Survive console/hangup signals. On Windows, restarting the server propagates a
+# CTRL_C/CTRL_BREAK to everything sharing the task console; on Linux a stray HUP
+# (e.g. session teardown) would otherwise kill the watcher. A hard stop
+# (systemctl stop / schtasks /end) is still uncatchable and works.
 trap '' INT HUP
 
-DEPLOY_DIR="${MU_DEPLOY_DIR:-/c/Users/rw3is/Documents/Sites/other/mu}"
+case "$(uname -s)" in
+	Linux*)               PLATFORM=linux ;;
+	Darwin*)              PLATFORM=macos ;;
+	MINGW*|MSYS*|CYGWIN*) PLATFORM=windows ;;
+	*)                    PLATFORM=linux ;;
+esac
+
+# Default DEPLOY_DIR = repo root derived from this script's path
+# (<repo>/src/scripts/auto-deploy-watch.sh → <repo>); override with MU_DEPLOY_DIR.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+DEFAULT_DEPLOY_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+[ "$PLATFORM" = windows ] && DEFAULT_DEPLOY_DIR="/c/Users/rw3is/Documents/Sites/other/mu"
+
+DEPLOY_DIR="${MU_DEPLOY_DIR:-$DEFAULT_DEPLOY_DIR}"
 SRC_DIR="$DEPLOY_DIR/src"
 TASK="${MU_TASK_NAME:-Mu Server}"
+SERVICE_NAME="${MU_SERVICE_NAME:-mu-server}"
 INTERVAL="${MU_DEPLOY_POLL_SECONDS:-60}"
 LOG="$DEPLOY_DIR/data/logs/auto-deploy.log"
+if [ "$PLATFORM" = windows ]; then
+	HEALTH_URL="${MU_HEALTH_URL:-https://localhost:4000/}"
+else
+	HEALTH_URL="${MU_HEALTH_URL:-http://127.0.0.1:4000/}"
+fi
+
+# `systemctl --user` needs XDG_RUNTIME_DIR in a non-login context.
+[ -n "${XDG_RUNTIME_DIR:-}" ] || export XDG_RUNTIME_DIR="/run/user/$(id -u 2>/dev/null || echo 1000)"
 
 mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
-
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 
 restart_server() {
-	# Restart the "Mu Server" task DETACHED — in its own hidden console — so the
-	# console control events from ending/(re)starting it can't propagate back and
-	# kill this watcher (the cmd.exe wrapper would otherwise exit 0xC000013A /
-	# CONTROL_C_EXIT). start-mu.cmd already taskkills the old node on launch, so
-	# we only end + re-run the interactive task; it relands in Session 1 (GPU).
-	powershell -NoProfile -Command "Start-Process cmd -WindowStyle Hidden -ArgumentList '/c','schtasks /end /tn \"Mu Server\" & timeout /t 2 /nobreak >NUL & schtasks /run /tn \"Mu Server\"'" </dev/null >/dev/null 2>&1 || true
+	if [ "$PLATFORM" = windows ]; then
+		# Restart the interactive "Mu Server" task DETACHED (own hidden console) so
+		# its console control events can't propagate back and kill this watcher.
+		powershell -NoProfile -Command "Start-Process cmd -WindowStyle Hidden -ArgumentList '/c','schtasks /end /tn \"$TASK\" & timeout /t 2 /nobreak >NUL & schtasks /run /tn \"$TASK\"'" </dev/null >/dev/null 2>&1 || true
+	else
+		systemctl --user restart "$SERVICE_NAME" >>"$LOG" 2>&1 \
+			|| log "WARN: 'systemctl --user restart $SERVICE_NAME' failed"
+	fi
 }
 
 deploy() {
@@ -66,32 +88,39 @@ deploy() {
 
 	pnpm db:migrate >>"$LOG" 2>&1 || log "WARN: db:migrate non-zero ($sha) — continuing"
 
-	# Old server keeps serving old code until here; only restart once the build
-	# is known good, so a broken build never takes prod down.
+	# Old server keeps serving until here; only restart once the build is good so
+	# a broken build never takes the running server down.
 	restart_server
 	sleep 10
 	local code
-	code="$(curl -sk -o /dev/null -w '%{http_code}' https://localhost:4000/ 2>/dev/null || echo 000)"
-	if [ "$code" = "200" ]; then
-		log "OK: deployed $sha — local HTTP 200"
+	code="$(curl -sk -o /dev/null -w '%{http_code}' "$HEALTH_URL" 2>/dev/null || echo 000)"
+	# 200 (root SPA) or 401 (auth-gated) both mean the server is up and serving.
+	if [ "$code" = "200" ] || [ "$code" = "401" ]; then
+		log "OK: deployed $sha — local HTTP $code"
 	else
-		log "WARN: deployed $sha but local HTTP $code (check server.log)"
+		log "WARN: deployed $sha but local HTTP $code (check the server log)"
 	fi
 }
 
-# Record our Windows PID so re-registration can reliably kill this instance
-# (CIM command-line matching is unreliable across sessions).
-WINPID="$(cat /proc/$$/winpid 2>/dev/null || echo "$$")"
-echo "$WINPID" >"$DEPLOY_DIR/data/auto-deploy.pid" 2>/dev/null || true
+if [ "$PLATFORM" = windows ]; then
+	PID_VAL="$(cat /proc/$$/winpid 2>/dev/null || echo "$$")"
+else
+	PID_VAL="$$"
+fi
+echo "$PID_VAL" >"$DEPLOY_DIR/data/auto-deploy.pid" 2>/dev/null || true
 
-log "auto-deploy watcher started (dir=$DEPLOY_DIR task='$TASK' winpid=$WINPID poll=${INTERVAL}s)"
+log "auto-deploy watcher started (platform=$PLATFORM dir=$DEPLOY_DIR svc='$SERVICE_NAME' poll=${INTERVAL}s)"
 while true; do
 	if git -C "$DEPLOY_DIR" fetch origin main >/dev/null 2>&1; then
 		local_head="$(git -C "$DEPLOY_DIR" rev-parse HEAD 2>/dev/null)"
 		remote_head="$(git -C "$DEPLOY_DIR" rev-parse origin/main 2>/dev/null)"
 		if [ -n "$remote_head" ] && [ "$local_head" != "$remote_head" ]; then
-			log "New commit on origin/main ($local_head -> $remote_head)"
-			deploy || log "Deploy failed; old server left running, will not retry this commit until a new push"
+			if [ -n "$(git -C "$DEPLOY_DIR" status --porcelain 2>/dev/null)" ]; then
+				log "New commit ($local_head → $remote_head) but working tree is DIRTY — skipping deploy (won't clobber local changes)."
+			else
+				log "New commit on origin/main ($local_head → $remote_head)"
+				deploy || log "Deploy failed; previous build left running, won't retry this commit until a new push"
+			fi
 		fi
 	else
 		log "WARN: git fetch failed (network/auth?) — retrying next poll"

@@ -36,6 +36,7 @@
     "logs:prod": "bash scripts/logs-prod.sh",
     "setup": "bash setup.sh",
     "service": "bash scripts/service.sh",
+    "autodeploy": "bash scripts/autodeploy.sh",
     "nginx:setup": "bash scripts/nginx-setup.sh",
     "setup:service": "bash scripts/setup-service.sh",
     "uninstall": "bash scripts/uninstall.sh",

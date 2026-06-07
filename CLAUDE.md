@@ -192,7 +192,8 @@ Self-host convenience scripts (run from `src/`; documented in `README.md`):
 
 - **`setup.sh`** (`pnpm setup`) — one-shot from a fresh clone: prereq checks → `pnpm install` → `pnpm build` → `pnpm db:migrate` → optional service install.
 - **`scripts/service.sh`** (`pnpm service <install|uninstall|status|start|stop|restart|enable|disable|logs>`) — manages Mu as a systemd **user** service (`~/.config/systemd/user/mu-server.service`). User-scoped because the app lives under `/home` (`user_home_t`): SELinux forbids a **system** service (`init_t`) from exec'ing the nvm node / reading `.env` there (`203/EXEC`), even as root. Linger (`loginctl enable-linger`) gives boot-start; logs to the journal; unit uses `RequiresMountsFor` on data+cache so it waits for removable drives instead of shadowing an unmounted mount. `uninstall` removes only the unit (not app/data) — distinct from `scripts/uninstall.sh` which removes the whole install.
-- **`scripts/nginx-setup.sh`** (`pnpm nginx:setup -- [--domain --port --client-dir --letsencrypt --email --no-static --yes]`) — creates an nginx reverse-proxy site, optional Let's Encrypt via `certbot --nginx`. Fedora-first (then Debian/Ubuntu, macOS, Windows best-effort). Sets the `httpd_can_network_connect` SELinux boolean (else proxy 502s); serves the client's `/assets/` from disk **only when the nginx user can read them**, else auto-falls back to pure proxy (the home-dir / `user_home_t` case — the node server serves its own static). LE needs DNS→host + router-forwarded **80 and 443**.
+- **`scripts/nginx-setup.sh`** (`pnpm nginx:setup -- [--domain --port --client-dir --letsencrypt --email --no-static --yes]`) — creates an nginx reverse-proxy site, optional Let's Encrypt (webroot authenticator: `^~ /.well-known/acme-challenge/` served from `/var/www/certbot`, since the catch-all proxy would otherwise return the SPA to the challenge). Fedora-first (then Debian/Ubuntu, macOS, Windows best-effort). Sets the `httpd_can_network_connect` SELinux boolean (else proxy 502s); serves the client's `/assets/` from disk **only when the nginx user can read them**, else auto-falls back to pure proxy (the home-dir / `user_home_t` case — the node server serves its own static). LE needs DNS→host + router-forwarded **80 and 443 (pointed at nginx, not the app port)**.
+- **`scripts/autodeploy.sh`** (`pnpm autodeploy <install|uninstall|status|start|stop|restart|logs|run>`) — installs the `mu-autodeploy` user service running `auto-deploy-watch.sh` (push-to-deploy; see Production Server § below). Cross-platform watcher; restarts the `mu-server` user service on Linux. Skips deploy when the working tree is dirty.
 
 ## Production Server
 
@@ -235,15 +236,22 @@ echo 'command here' | ssh rw3iss@192.168.50.211
 > ```
 >
 > **Auto-deploy (push-to-deploy):** `src/scripts/auto-deploy-watch.sh` polls
-> `origin/main` on the prod box and runs the full sync→install→build (with the
-> Turbo-cache `vite build` fallback)→migrate→restart flow on every new commit.
-> It's wired up as the **"Mu Auto Deploy"** logon Task via
-> `src/scripts/register-auto-deploy-task.ps1` (run once:
-> `powershell -ExecutionPolicy Bypass -File <path>\register-auto-deploy-task.ps1 -Start`).
-> Log: `data/logs/auto-deploy.log`. With it running, just `git push` — prod
-> updates itself within the poll interval (default 60s). This whole dance goes
-> away on a Linux host (systemd + headless NVENC); see
-> `docs/fedora-migration-plan.md`.
+> `origin/main` and runs the full sync→install→build (with the Turbo-cache
+> `vite build` fallback)→migrate→restart flow on every new commit. It is
+> **cross-platform**: on **Linux** it restarts the `mu-server` systemd *user*
+> service and health-checks `http://127.0.0.1:4000/`; on **Windows (legacy)** it
+> restarts the interactive "Mu Server" task. It **skips a deploy when the working
+> tree is dirty** so local edits are never clobbered by `git reset --hard`.
+>
+> - **Linux (this box):** install as the `mu-autodeploy` user service with
+>   `pnpm autodeploy install` (`scripts/autodeploy.sh` — also `uninstall|status|
+>   start|stop|restart|logs|run`). Linger gives boot-start; it drives
+>   `systemctl --user restart mu-server`.
+> - **Windows (legacy):** wired as the "Mu Auto Deploy" logon Task via
+>   `src/scripts/register-auto-deploy-task.ps1`.
+>
+> Log: `data/logs/auto-deploy.log`. With it running, just `git push` and the box
+> updates itself within the poll interval (default 60s; `MU_DEPLOY_POLL_SECONDS`).
 
 **The canonical script (reference / future Linux host) — `src/scripts/deploy-remote.sh`:**
 
