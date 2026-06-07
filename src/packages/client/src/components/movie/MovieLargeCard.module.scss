@@ -261,12 +261,18 @@
   flex-shrink: 0;
 }
 
+// Personal rating — chip-shaped like the score chips, a touch larger (12px
+// vs the chips' 10px).
 .ratingBadge {
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 3px;
   font-size: var(--font-size-xs);
+  line-height: 1.5;
   font-weight: var(--font-weight-bold);
   color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 

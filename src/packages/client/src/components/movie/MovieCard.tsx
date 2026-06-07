@@ -68,19 +68,22 @@ export function MovieCard({
 
 	// ── Slot contents ──────────────────────────────────────
 
-	const topRight = (
-		<>
-			{movie.remoteOrigin && (
-				<span class={styles.remoteBadge} title={`From: ${movie.remoteOrigin.serverName}`}>
-					{movie.remoteOrigin.serverName}
-				</span>
-			)}
-			{transcodeNeeded && streamLabel && (
-				<span class={styles.transcodeBadge}>{streamLabel}</span>
-			)}
-			<RatingBadge value={rating} class={styles.ratingBadge} />
-		</>
-	);
+	const topRight =
+		movie.remoteOrigin || (transcodeNeeded && streamLabel) ? (
+			<>
+				{movie.remoteOrigin && (
+					<span
+						class={styles.remoteBadge}
+						title={`From: ${movie.remoteOrigin.serverName}`}
+					>
+						{movie.remoteOrigin.serverName}
+					</span>
+				)}
+				{transcodeNeeded && streamLabel && (
+					<span class={styles.transcodeBadge}>{streamLabel}</span>
+				)}
+			</>
+		) : null;
 
 	const topLeft = movie.hidden ? <span class={styles.hiddenLabel}>Hidden</span> : null;
 
@@ -143,7 +146,8 @@ export function MovieCard({
 
 	const subtitle = (
 		<div class={styles.details}>
-			<span class={styles.detailsCenter}>
+			<span class={styles.detailsLeft}>
+				<RatingBadge value={rating} class={styles.ratingChip} />
 				<MovieScoreChips movie={movie} />
 			</span>
 			<span class={styles.detailsRight}>

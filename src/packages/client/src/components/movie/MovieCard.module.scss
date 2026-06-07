@@ -179,16 +179,18 @@
   }
 }
 
-.ratingBadge {
-  position: absolute;
-  top: var(--space-sm);
-  right: var(--space-sm);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
+// Personal rating, shown first in the bottom ratings row alongside the score
+// chips — same chip shape, a touch larger (12px vs the chips' 10px).
+.ratingChip {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 1.5;
   font-weight: var(--font-weight-bold);
   color: #ffffff;
-  z-index: 2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .progressBar {

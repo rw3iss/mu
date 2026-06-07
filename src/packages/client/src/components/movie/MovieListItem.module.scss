@@ -125,12 +125,24 @@
   gap: var(--space-xs);
 }
 
+.titleRow {
+  min-width: 0;
+}
+
 .title {
   display: block;
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   @include truncate(1);
+}
+
+// Year sits under the title at the top of the row (matching the cards).
+.year {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 .meta {
@@ -168,13 +180,18 @@
   align-self: center;
 }
 
-.ratingBadge {
-  padding: 3px 10px;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-sm);
+// Personal rating shown first in the meta row, a bit bigger than the 10px
+// score chips.
+.ratingChip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 13px;
+  line-height: 1.5;
   font-weight: var(--font-weight-bold);
   color: #ffffff;
-  margin-right: var(--space-md);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .hiddenTag {

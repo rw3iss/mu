@@ -71,21 +71,22 @@ export function MovieListItem({
 			</div>
 
 			<div class={styles.info}>
-				<span class={styles.title}>
-					{movie.title}
-					{movie.hidden && <span class={styles.hiddenTag}>Hidden</span>}
-				</span>
+				<div class={styles.titleRow}>
+					<span class={styles.title}>
+						{movie.title}
+						{movie.hidden && <span class={styles.hiddenTag}>Hidden</span>}
+					</span>
+					{movie.year && <span class={styles.year}>{movie.year}</span>}
+				</div>
 				<div class={styles.meta}>
-					{movie.year && <span>{movie.year}</span>}
-					{runtimeStr && <span>{runtimeStr}</span>}
+					<RatingBadge value={rating} class={styles.ratingChip} />
 					<MovieScoreChips movie={movie} />
+					{runtimeStr && <span>{runtimeStr}</span>}
 					{formattedDate && <span>{formattedDate}</span>}
 				</div>
 			</div>
 
 			<div class={styles.actions}>
-				<RatingBadge value={rating} class={styles.ratingBadge} />
-
 				<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
 				{!selectionMode && (
 					<>
