@@ -51,6 +51,18 @@ fi
 # `systemctl --user` needs XDG_RUNTIME_DIR in a non-login context.
 [ -n "${XDG_RUNTIME_DIR:-}" ] || export XDG_RUNTIME_DIR="/run/user/$(id -u 2>/dev/null || echo 1000)"
 
+# The systemd user service runs with a minimal PATH that lacks the nvm-managed
+# toolchain, so `pnpm`/`corepack` aren't found and the build silently fails.
+# Prepend every installed node bin dir (version-agnostic) so the build resolves.
+for _nodebin in "$HOME"/.nvm/versions/node/*/bin; do
+	[ -d "$_nodebin" ] && PATH="$_nodebin:$PATH"
+done
+# Common non-nvm install locations too (corepack/pnpm standalone).
+for _extra in "$HOME/.local/share/pnpm" "/usr/local/bin"; do
+	[ -d "$_extra" ] && PATH="$_extra:$PATH"
+done
+export PATH
+
 mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 

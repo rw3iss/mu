@@ -34,6 +34,17 @@ done
 echo "=== Mu Deploy ==="
 echo "Platform: $($IS_WINDOWS && echo 'Windows' || echo 'Unix')"
 
+# Linux: prefer the `mu-server` systemd USER service (matches the auto-deploy
+# watcher) instead of forking a raw restart.sh node that would fight systemd
+# for port 4000. `systemctl --user` needs XDG_RUNTIME_DIR in a non-login SSH
+# context (as run by the GitHub Action / deploy-remote).
+MU_SYSTEMD_SERVICE="${MU_SERVICE_NAME:-mu-server}"
+[ -n "${XDG_RUNTIME_DIR:-}" ] || export XDG_RUNTIME_DIR="/run/user/$(id -u 2>/dev/null || echo 1000)"
+use_systemd_service() {
+    [ "$IS_WINDOWS" = false ] && command -v systemctl &>/dev/null && \
+        systemctl --user list-unit-files "${MU_SYSTEMD_SERVICE}.service" &>/dev/null
+}
+
 # ── 1. Stop server FIRST (before pull/build) ──
 echo "--- stopping server ---"
 if $IS_WINDOWS && command -v nssm &>/dev/null && nssm status mu-server &>/dev/null; then
@@ -44,6 +55,8 @@ if $IS_WINDOWS && command -v nssm &>/dev/null && nssm status mu-server &>/dev/nu
     # from this file mid-execution, but `bash scripts/kill-orphans.sh`
     # is a fresh process that always reads the latest version.
     nssm stop mu-server 2>/dev/null || true
+elif use_systemd_service; then
+    systemctl --user stop "$MU_SYSTEMD_SERVICE" 2>/dev/null || true
 else
     source "$SRC_DIR/stop.sh" 2>/dev/null || true
 fi
@@ -143,6 +156,8 @@ start_and_verify() {
     echo "--- starting server (attempt $attempt) ---"
     if $IS_WINDOWS && command -v nssm &>/dev/null && nssm status mu-server &>/dev/null; then
         nssm start mu-server 2>/dev/null || true
+    elif use_systemd_service; then
+        systemctl --user restart "$MU_SYSTEMD_SERVICE" 2>/dev/null || true
     else
         bash "$SRC_DIR/restart.sh" 2>/dev/null || true
     fi
