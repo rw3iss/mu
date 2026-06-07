@@ -166,13 +166,17 @@
   }
 }
 
-// Title floats over the TOP of the thumbnail with a top-down gradient scrim.
+// Title (+ year under it) floats over the TOP of the thumbnail with a
+// top-down gradient scrim.
 .infoTopOverlay {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   padding: var(--space-sm) var(--space-md) calc(var(--space-lg) + 4px);
   background: linear-gradient(
     to bottom,
@@ -221,6 +225,13 @@
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
   @include truncate(2);
   min-width: 0;
+}
+
+// Year line under the title — same size it had in the meta row (sm).
+.year {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .titleTooltip {

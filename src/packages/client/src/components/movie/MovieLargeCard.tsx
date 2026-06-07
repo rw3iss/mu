@@ -44,18 +44,6 @@ export function MovieLargeCard({
 
 	const rating = movie.rating ?? 0;
 
-	const runtimeStr = movie.runtime
-		? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m`
-		: null;
-
-	const formattedDate = movie.addedAt
-		? new Date(movie.addedAt).toLocaleDateString('en-US', {
-				month: 'short',
-				day: 'numeric',
-				year: 'numeric',
-			})
-		: null;
-
 	// Prefer backdrop/thumbnail (16:9) over poster for this view
 	const imageUrl = movie.backdropUrl || movie.thumbnailUrl || movie.posterUrl;
 
@@ -117,15 +105,13 @@ export function MovieLargeCard({
 					{movie.title}
 					{tooltipVisible && <span class={styles.titleTooltip}>{movie.title}</span>}
 				</h3>
+				{movie.year && <span class={styles.year}>{movie.year}</span>}
 			</div>
 
 			<div class={styles.info}>
 				<div class={styles.meta}>
 					<RatingBadge value={rating} class={styles.ratingBadge} />
-					{movie.year && <span>{movie.year}</span>}
-					{runtimeStr && <span>{runtimeStr}</span>}
 					<MovieScoreChips movie={movie} />
-					{formattedDate && <span>Added {formattedDate}</span>}
 					<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
 					{!selectionMode && !movie.remoteOrigin && (
 						<span class={styles.metaOptions}>

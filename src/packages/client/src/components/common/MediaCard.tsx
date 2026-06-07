@@ -49,6 +49,8 @@ export interface MediaCardProps {
 	title?: ComponentChildren;
 	/** Subtitle / meta — typically a render-prop returning year · runtime · etc. */
 	subtitle?: ComponentChildren;
+	/** Rendered directly under the title (in the top scrim when `infoOverlay`). */
+	topMeta?: ComponentChildren;
 	/** Extra row rendered inside `.info` below subtitle (e.g. options menu). */
 	extra?: ComponentChildren;
 	/** Caption rendered below `.info` full-width (e.g. discover explanation). */
@@ -104,6 +106,7 @@ export function MediaCard({
 	posterShape = 'poster',
 	title,
 	subtitle,
+	topMeta,
 	extra,
 	caption,
 	children,
@@ -187,7 +190,12 @@ export function MediaCard({
 				{hoverOverlay && <div class={styles.hoverOverlay}>{hoverOverlay}</div>}
 				{overlayInfo && (
 					<>
-						{titleEl && <div class={styles.infoOverlayTop}>{titleEl}</div>}
+						{(titleEl || topMeta) && (
+							<div class={styles.infoOverlayTop}>
+								{titleEl}
+								{topMeta}
+							</div>
+						)}
 						<div class={styles.infoOverlayBlock}>{metaEl}</div>
 						{belowPoster}
 					</>
@@ -199,6 +207,7 @@ export function MediaCard({
 				(overlayInfo ? null : (
 					<div class={styles.info}>
 						{titleEl}
+						{topMeta}
 						{metaEl}
 					</div>
 				))}

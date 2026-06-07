@@ -163,6 +163,9 @@
 	// Reserve room on the right so the title clears the top-right rating badge.
 	padding: 8px 46px 26px 8px;
 	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
 	background: linear-gradient(
 		to bottom,
 		color-mix(in srgb, var(--color-bg-primary) 90%, transparent) 0%,

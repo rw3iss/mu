@@ -137,17 +137,12 @@ export function MovieCard({
 		</h3>
 	);
 
+	// Year sits under the title in the top scrim; the bottom scrim keeps just
+	// the ratings (score chips) and the options menu.
+	const topMeta = movie.year ? <span class={styles.year}>{movie.year}</span> : null;
+
 	const subtitle = (
 		<div class={styles.details}>
-			<span class={styles.detailsLeft}>
-				{movie.year && <span class={styles.year}>{movie.year}</span>}
-				{movie.year && movie.runtime > 0 && <span class={styles.dot}>{'·'}</span>}
-				{movie.runtime > 0 && (
-					<span class={styles.runtime}>
-						{Math.floor(movie.runtime / 60)}h {movie.runtime % 60}m
-					</span>
-				)}
-			</span>
 			<span class={styles.detailsCenter}>
 				<MovieScoreChips movie={movie} />
 			</span>
@@ -191,6 +186,7 @@ export function MovieCard({
 				/>
 			}
 			title={titleNode}
+			topMeta={topMeta}
 			subtitle={subtitle}
 		/>
 	);
