@@ -26,6 +26,7 @@ import {
 import { EventsService } from '../events/events.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
+import { MediaCacheService } from './media-cache/media-cache.service.js';
 import { SubtitleService } from './subtitles/subtitle.service.js';
 import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
@@ -152,6 +153,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		private readonly transcodeDebugger: TranscodeDebuggerService,
 		private readonly guidResolver: GuidResolverService,
 		private readonly sessionRegistry: SessionRegistryService,
+		private readonly mediaCache: MediaCacheService,
 	) {}
 
 	onModuleInit(): void {
@@ -592,6 +594,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			movieId,
 			userId,
 			mode,
+			fileId: file.id,
 		});
 
 		const resolvedDir =
@@ -842,6 +845,9 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			);
 
 		if (completedNow) {
+			// Tell the hot cache this file was watched to the end so it can be
+			// evicted sooner (watchedTtl vs the longer unwatched window).
+			this.mediaCache.markWatchedFully(session.movieFileId);
 			if (existing.length > 0) {
 				await this.database.db
 					.delete(userWatchHistory)

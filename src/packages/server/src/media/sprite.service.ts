@@ -100,8 +100,15 @@ export class SpriteService {
 		if (explicit) {
 			return isAbsolute(explicit) ? explicit : resolve(PROJECT_ROOT, explicit);
 		}
-		const dataDir =
-			this.config.get<string>('dataDir') || this.config.get<string>('datadir');
+		// Sprites are cache; when a cache root is configured (e.g. an NVMe), put
+		// them there too so all heavy cache I/O stays off the media HDD.
+		const cacheDir = this.config.get<string>('cache.dir', '');
+		if (cacheDir) {
+			return isAbsolute(cacheDir)
+				? join(cacheDir, 'sprites')
+				: join(resolve(PROJECT_ROOT, cacheDir), 'sprites');
+		}
+		const dataDir = this.config.get<string>('dataDir') || this.config.get<string>('datadir');
 		if (dataDir) {
 			const root = isAbsolute(dataDir) ? dataDir : resolve(PROJECT_ROOT, dataDir);
 			return join(root, 'sprites');
@@ -209,19 +216,20 @@ export class SpriteService {
 	 */
 	async generateForMovie(
 		movieId: string,
-		sizeOrOpts: ThumbnailSize | { size?: ThumbnailSize; onProgress?: (p: number) => void } = 'large',
+		sizeOrOpts:
+			| ThumbnailSize
+			| { size?: ThumbnailSize; onProgress?: (p: number) => void } = 'large',
 		legacyOnProgress?: (percent: number) => void,
 	): Promise<SpriteMeta | null> {
 		// Backwards-compat: old signature was (movieId, onProgress?).
 		// If sizeOrOpts is a function it's actually the progress callback.
 		const size: ThumbnailSize =
-			typeof sizeOrOpts === 'string'
-				? sizeOrOpts
-				: (sizeOrOpts.size ?? 'large');
+			typeof sizeOrOpts === 'string' ? sizeOrOpts : (sizeOrOpts.size ?? 'large');
 		const onProgress: ((p: number) => void) | undefined =
 			typeof sizeOrOpts === 'function'
 				? (sizeOrOpts as (p: number) => void)
-				: (legacyOnProgress ?? (typeof sizeOrOpts === 'object' ? sizeOrOpts.onProgress : undefined));
+				: (legacyOnProgress ??
+					(typeof sizeOrOpts === 'object' ? sizeOrOpts.onProgress : undefined));
 		const frameWidth = THUMBNAIL_SIZE_WIDTHS[size];
 		const file = this.database.db
 			.select()

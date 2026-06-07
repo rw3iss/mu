@@ -332,6 +332,21 @@ const tables = [
 	)`,
 	`CREATE INDEX IF NOT EXISTS feedback_created_idx ON feedback(created_at)`,
 	`CREATE INDEX IF NOT EXISTS feedback_status_idx ON feedback(status)`,
+	// NVMe "hot" cache index: one row per movie file staged to the fast drive.
+	`CREATE TABLE IF NOT EXISTS media_cache (
+		movie_file_id TEXT PRIMARY KEY,
+		movie_id TEXT NOT NULL,
+		source_path TEXT NOT NULL,
+		cache_path TEXT NOT NULL,
+		size_bytes INTEGER DEFAULT 0,
+		staged_at TEXT,
+		last_access_at TEXT NOT NULL,
+		complete INTEGER DEFAULT 0,
+		watched_fully INTEGER DEFAULT 0,
+		watched_at TEXT
+	)`,
+	`CREATE INDEX IF NOT EXISTS media_cache_access_idx ON media_cache(last_access_at)`,
+	`CREATE INDEX IF NOT EXISTS media_cache_movie_idx ON media_cache(movie_id)`,
 	// Multi-source identity registry: one row per (source, externalId)
 	// pointing back at the canonical movie. Adding a new source means
 	// inserting rows here — no schema migration needed.

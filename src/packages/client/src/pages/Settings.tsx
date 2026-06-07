@@ -249,7 +249,7 @@ export function Settings(props: SettingsProps) {
 	const [defaultQuality, setDefaultQuality] = useState('auto');
 	const [preferredAudioLanguage, setPreferredAudioLanguage] = useState('eng');
 	const [autoplay, setAutoplay] = useState(true);
-	const [bufferSize, setBufferSizeSetting] = useUiSetting('buffer_size', 'normal');
+	const [bufferSize, setBufferSizeSetting] = useUiSetting('buffer_size', 'large');
 	const [skipTimes, setSkipTimes] = useUiSetting<number[]>('skip_times', [5, 10, 20]);
 
 	// Library settings
@@ -282,6 +282,10 @@ export function Settings(props: SettingsProps) {
 	const [conversionGrowthThreshold, setConversionGrowthThreshold] = useState('1.25');
 	const [convertHevcToAv1, setConvertHevcToAv1] = useState(false);
 	const [av1Cq, setAv1Cq] = useState('32');
+	// Scheduled, time-boxed library conversion sweep (admin).
+	const [convertSweepEnabled, setConvertSweepEnabled] = useState(false);
+	const [convertSweepStartTime, setConvertSweepStartTime] = useState('02:00');
+	const [convertSweepDurationHours, setConvertSweepDurationHours] = useState('4');
 	const [reEncodeOnScan, setReEncodeOnScan] = useState(false);
 
 	// Sharing settings
@@ -409,6 +413,15 @@ export function Settings(props: SettingsProps) {
 					if (typeof encoding.convertHevcToAv1 === 'boolean')
 						setConvertHevcToAv1(encoding.convertHevcToAv1);
 					if (encoding.av1Cq != null) setAv1Cq(String(encoding.av1Cq));
+					const sweep = encoding.convertSweep as Record<string, unknown> | undefined;
+					if (sweep) {
+						if (typeof sweep.enabled === 'boolean')
+							setConvertSweepEnabled(sweep.enabled);
+						if (typeof sweep.startTime === 'string')
+							setConvertSweepStartTime(sweep.startTime);
+						if (sweep.durationHours != null)
+							setConvertSweepDurationHours(String(sweep.durationHours));
+					}
 				}
 
 				// Load sources from the API
@@ -539,6 +552,11 @@ export function Settings(props: SettingsProps) {
 					conversionGrowthThreshold: parseFloat(conversionGrowthThreshold) || 1.25,
 					convertHevcToAv1,
 					av1Cq: parseInt(av1Cq, 10) || 32,
+					convertSweep: {
+						enabled: convertSweepEnabled,
+						startTime: convertSweepStartTime,
+						durationHours: parseFloat(convertSweepDurationHours) || 4,
+					},
 				},
 			});
 			notifySuccess('Encoding settings saved');
@@ -564,6 +582,9 @@ export function Settings(props: SettingsProps) {
 		conversionGrowthThreshold,
 		convertHevcToAv1,
 		av1Cq,
+		convertSweepEnabled,
+		convertSweepStartTime,
+		convertSweepDurationHours,
 	]);
 
 	const handleSaveLibrary = useCallback(async () => {
@@ -1801,17 +1822,17 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.settingLabel}>Buffer Size</span>
 									<span class={styles.settingDescription}>
 										Amount of video to pre-load. Larger buffers improve
-										stability on slow connections.
+										stability on slow connections or a busy media drive.
 									</span>
 								</div>
 								<Select
 									value={bufferSize}
 									onChange={setBufferSizeSetting}
 									options={[
-										{ value: 'small', label: 'Small (10s)' },
-										{ value: 'normal', label: 'Normal (30s)' },
-										{ value: 'large', label: 'Large (60s)' },
-										{ value: 'max', label: 'Maximum (120s)' },
+										{ value: 'small', label: 'Small (20s)' },
+										{ value: 'normal', label: 'Normal (45s)' },
+										{ value: 'large', label: 'Large (90s)' },
+										{ value: 'max', label: 'Maximum (180s)' },
 									]}
 								/>
 							</div>
@@ -2362,6 +2383,83 @@ export function Settings(props: SettingsProps) {
 									style={{ width: '80px' }}
 								/>
 							</div>
+
+							{/* Scheduled conversion sweep */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Scheduled Conversion Window
+									</span>
+									<span class={styles.settingDescription}>
+										Run the library-wide MP4/AV1 conversion only inside a
+										nightly window instead of 24/7, so it doesn't saturate the
+										media drive while people are watching. Pending jobs are
+										cancelled when the window closes.
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={convertSweepEnabled}
+										onChange={(e) =>
+											setConvertSweepEnabled(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							{convertSweepEnabled && (
+								<>
+									<div class={styles.settingRow}>
+										<div class={styles.settingInfo}>
+											<span class={styles.settingLabel}>Start Time</span>
+											<span class={styles.settingDescription}>
+												Local time of day the conversion window opens.
+											</span>
+										</div>
+										<input
+											type="time"
+											class={styles.select}
+											value={convertSweepStartTime}
+											onInput={(e) =>
+												setConvertSweepStartTime(
+													(e.target as HTMLInputElement).value,
+												)
+											}
+											style={{ width: '120px' }}
+										/>
+									</div>
+
+									<div class={styles.settingRow}>
+										<div class={styles.settingInfo}>
+											<span class={styles.settingLabel}>
+												Duration (hours)
+											</span>
+											<span class={styles.settingDescription}>
+												How long the window stays open before remaining
+												conversions are cancelled until the next night.
+											</span>
+										</div>
+										<input
+											type="number"
+											class={styles.select}
+											min={1}
+											max={12}
+											step={0.5}
+											value={convertSweepDurationHours}
+											onInput={(e) =>
+												setConvertSweepDurationHours(
+													(e.target as HTMLInputElement).value,
+												)
+											}
+											style={{ width: '80px' }}
+										/>
+									</div>
+								</>
+							)}
 
 							<div class={styles.actions}>
 								<Button

@@ -33,9 +33,45 @@ export const configSchema = z.object({
 		.object({
 			maxSize: z.coerce.number().int().positive().default(500),
 			ttlSeconds: z.coerce.number().int().positive().default(3600),
+			/**
+			 * Cache root. When set (env `MU_CACHE_DIR` or `cache.dir` in
+			 * config.yml), every cache subdir (streams, images, sprites,
+			 * subtitles, hot) anchors under it — point this at a fast SSD/NVMe
+			 * to keep transient cache + staged movies off a slow media HDD.
+			 * Empty → `<dataDir>/cache`.
+			 */
+			dir: z.string().default(''),
 			imageDir: z.string().default('./data/cache/images'),
 			streamDir: z.string().default('./data/cache/streams'),
+			/** Resolved at load time from the cache root; usually leave empty. */
+			subtitleDir: z.string().default(''),
 			persistTranscodes: z.boolean().default(true),
+			/**
+			 * NVMe "hot" cache: pre-stage the full source file of a movie to a
+			 * fast drive on play-start so playback (and concurrent streams) stop
+			 * thrashing the media HDD. LRU + age eviction keeps it bounded.
+			 */
+			hot: z
+				.object({
+					enabled: z.boolean().default(false),
+					/** Override the staged-file dir. Empty → `<cacheRoot>/hot`. */
+					dir: z.string().default(''),
+					/** Max total size of staged files before LRU eviction (GB). */
+					maxGb: z.coerce.number().nonnegative().default(300),
+					/** Evict a fully-watched movie this many hours after last access. */
+					watchedTtlHours: z.coerce.number().positive().default(24),
+					/** Evict a not-fully-watched movie this many hours after staging. */
+					unwatchedTtlHours: z.coerce.number().positive().default(48),
+					/** Hard idle cap: evict anything untouched this many hours. */
+					idleTtlHours: z.coerce.number().positive().default(168),
+					/**
+					 * Only stage files whose path starts with one of these prefixes
+					 * (the slow drives, e.g. `["D:"]`). Empty → auto-detect HDDs on
+					 * Windows; otherwise stage from any non-cache drive.
+					 */
+					slowDrives: z.array(z.string()).default([]),
+				})
+				.default(() => ({}) as any),
 		})
 		.default(() => ({}) as any),
 

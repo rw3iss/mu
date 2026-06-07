@@ -19,19 +19,17 @@ import {
 	volume,
 } from '@/state/player.state';
 import { shareToken } from '@/state/share.state';
-import {
-	clearWatchPosition,
-	setLocalPosition,
-} from '@/state/watchPositions.state';
+import { clearWatchPosition, setLocalPosition } from '@/state/watchPositions.state';
 
 const BUFFER_CONFIGS: Record<
 	string,
 	{ maxBufferLength: number; maxMaxBufferLength: number; maxBufferSize: number }
 > = {
-	small: { maxBufferLength: 10, maxMaxBufferLength: 20, maxBufferSize: 15 * 1024 * 1024 },
-	normal: { maxBufferLength: 30, maxMaxBufferLength: 60, maxBufferSize: 60 * 1024 * 1024 },
-	large: { maxBufferLength: 60, maxMaxBufferLength: 120, maxBufferSize: 120 * 1024 * 1024 },
-	max: { maxBufferLength: 120, maxMaxBufferLength: 240, maxBufferSize: 250 * 1024 * 1024 },
+	// Bumped: deeper buffers absorb the seek stalls a busy media HDD induces.
+	small: { maxBufferLength: 20, maxMaxBufferLength: 40, maxBufferSize: 30 * 1024 * 1024 },
+	normal: { maxBufferLength: 45, maxMaxBufferLength: 90, maxBufferSize: 90 * 1024 * 1024 },
+	large: { maxBufferLength: 90, maxMaxBufferLength: 180, maxBufferSize: 180 * 1024 * 1024 },
+	max: { maxBufferLength: 180, maxMaxBufferLength: 360, maxBufferSize: 400 * 1024 * 1024 },
 };
 
 /**
@@ -147,8 +145,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const [hlsStatus, setHlsStatus] = useState<HlsStatus>(null);
 
 	const bufferConfig = useMemo(() => {
-		const stored = getUiSetting('buffer_size', 'normal');
-		return BUFFER_CONFIGS[stored] || BUFFER_CONFIGS.normal;
+		const stored = getUiSetting('buffer_size', 'large');
+		return BUFFER_CONFIGS[stored] || BUFFER_CONFIGS.large;
 	}, []);
 
 	// Subscribe to the audio-reset trigger. Reading .value here registers
@@ -315,11 +313,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				savePositionLocally(t);
 				const movieId = globalMovieId.value;
 				if (movieId) {
-					setLocalPosition(
-						movieId,
-						t,
-						Number.isFinite(duration) ? duration : null,
-					);
+					setLocalPosition(movieId, t, Number.isFinite(duration) ? duration : null);
 				}
 			}
 		}, 3000);
@@ -611,9 +605,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 						})
 						.catch((err) => {
 							console.error('[HLS] Reconnect failed:', err);
-							setPlaybackError(
-								'Stream session expired. Click play to restart.',
-							);
+							setPlaybackError('Stream session expired. Click play to restart.');
 						});
 				};
 
@@ -938,7 +930,12 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				.startStream(movieId)
 				.then((session) => {
 					currentSession.value = session;
-					initPlayback(session.streamUrl, session.directPlay, pos > 0 ? pos : 0, wasPlaying);
+					initPlayback(
+						session.streamUrl,
+						session.directPlay,
+						pos > 0 ? pos : 0,
+						wasPlaying,
+					);
 					notifyInfo(
 						session.directPlay
 							? 'Switched to direct play — audio effects are now available.'

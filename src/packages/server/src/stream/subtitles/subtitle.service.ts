@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import ffmpeg from 'fluent-ffmpeg';
 import { GuidResolverService } from '../../common/guid-resolver.service.js';
+import { ConfigService } from '../../config/config.service.js';
 
 interface SubtitleTrack {
 	index: number;
@@ -19,8 +20,16 @@ export class SubtitleService {
 	private readonly logger = new Logger(SubtitleService.name);
 	private readonly cacheDir: string;
 
-	constructor(private readonly guidResolver: GuidResolverService) {
-		this.cacheDir = path.resolve('data/cache/subtitles');
+	constructor(
+		private readonly guidResolver: GuidResolverService,
+		private readonly config: ConfigService,
+	) {
+		// Anchor under the configurable cache root (cache.subtitleDir is resolved
+		// from cache.dir at load time); fall back to the legacy relative path.
+		const configured = this.config.get<string>('cache.subtitleDir', '');
+		this.cacheDir = configured
+			? path.resolve(configured)
+			: path.resolve('data/cache/subtitles');
 	}
 
 	/**

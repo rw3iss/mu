@@ -197,36 +197,54 @@ export function loadConfig(): MuConfig {
 	// Validate against the schema.
 	const parsed = configSchema.parse(merged);
 
-	// When MU_DATA_DIR is set, override default relative paths in database/cache
-	// so everything lives under the custom data directory
+	const resolvedDataDir = resolve(parsed.dataDir);
+
+	// When MU_DATA_DIR is set, override default relative paths in database/media
+	// so everything lives under the custom data directory.
 	if (process.env.MU_DATA_DIR || process.env.MU_DATADIR) {
-		const resolvedData = resolve(parsed.dataDir);
 		// Only override if still at Zod defaults (relative paths)
 		if (parsed.database.path === './data/db/mu.db') {
-			parsed.database.path = join(resolvedData, 'db', 'mu.db');
-		}
-		if (parsed.cache.streamDir === './data/cache/streams') {
-			parsed.cache.streamDir = join(resolvedData, 'cache', 'streams');
-		}
-		if (parsed.cache.imageDir === './data/cache/images') {
-			parsed.cache.imageDir = join(resolvedData, 'cache', 'images');
+			parsed.database.path = join(resolvedDataDir, 'db', 'mu.db');
 		}
 		if (parsed.media.thumbnailDir === './data/thumbnails') {
-			parsed.media.thumbnailDir = join(resolvedData, 'thumbnails');
+			parsed.media.thumbnailDir = join(resolvedDataDir, 'thumbnails');
 		}
 	}
 
+	// Resolve the cache root. Precedence: explicit `cache.dir` (env MU_CACHE_DIR)
+	// → `<dataDir>/cache`. Every cache subdir anchors under it unless the operator
+	// set an explicit non-default override for that subdir. This lets a single
+	// `MU_CACHE_DIR=/mnt/nvme/mu-cache` move streams/images/sprites/subtitles/hot
+	// off a slow media HDD in one shot.
+	const cacheRoot = parsed.cache.dir ? resolve(parsed.cache.dir) : join(resolvedDataDir, 'cache');
+	parsed.cache.dir = cacheRoot;
+	if (parsed.cache.streamDir === './data/cache/streams') {
+		parsed.cache.streamDir = join(cacheRoot, 'streams');
+	}
+	if (parsed.cache.imageDir === './data/cache/images') {
+		parsed.cache.imageDir = join(cacheRoot, 'images');
+	}
+	if (!parsed.cache.subtitleDir) {
+		parsed.cache.subtitleDir = join(cacheRoot, 'subtitles');
+	}
+	if (!parsed.cache.hot.dir) {
+		parsed.cache.hot.dir = join(cacheRoot, 'hot');
+	}
+
 	// Ensure all required data directories exist.
-	const resolvedDataDir = resolve(parsed.dataDir);
 	const dirs = [
 		resolvedDataDir,
 		resolve(resolvedDataDir, 'db'),
-		resolve(resolvedDataDir, 'cache'),
-		resolve(resolvedDataDir, 'cache', 'images'),
-		resolve(resolvedDataDir, 'cache', 'streams'),
 		resolve(resolvedDataDir, 'config'),
 		resolve(resolvedDataDir, 'thumbnails'),
+		cacheRoot,
+		parsed.cache.streamDir,
+		parsed.cache.imageDir,
+		parsed.cache.subtitleDir,
 	];
+	if (parsed.cache.hot.enabled) {
+		dirs.push(parsed.cache.hot.dir);
+	}
 
 	for (const dir of dirs) {
 		ensureDir(dir);

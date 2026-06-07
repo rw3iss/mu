@@ -248,6 +248,16 @@ jobs:
   bullmq:
     queueName: mu-jobs
     concurrency: 2
+
+cache:
+  dir: ""                       # cache root — point at a fast SSD/NVMe (see below)
+  hot:
+    enabled: false              # NVMe "hot" cache: stage played movies off the HDD
+    maxGb: 300                  # size cap before LRU eviction
+    slowDrives: []              # e.g. ["D:"] — only stage sources on these drives
+    watchedTtlHours: 24         # evict a fully-watched movie this long after last play
+    unwatchedTtlHours: 48       # evict a partially-watched movie this long after staging
+    idleTtlHours: 168           # hard cap: evict anything untouched this long (7d)
 ```
 
 **Required:** `auth.jwtSecret` and `auth.cookieSecret` are the only required settings -- both are auto-generated on first run.
@@ -267,11 +277,36 @@ Override any config value with `MU_` prefixed env vars. Use double underscores f
 | `MU_THIRD_PARTY__OMDB__API_KEY` | -- | OMDB API key |
 | `MU_THIRD_PARTY__OPENSUBTITLES__API_KEY` | -- | OpenSubtitles API key |
 | `MU_DATA_DIR` | `./data` | Data directory path |
-| `MU_CACHE__STREAMDIR` | `./data/cache/streams` | Transcode cache directory |
+| `MU_CACHE_DIR` | `<dataDir>/cache` | Cache root — anchors streams, images, sprites, subtitles, hot cache |
+| `MU_CACHE__STREAMDIR` | `<cacheRoot>/streams` | Transcode cache directory (overrides the streams subdir only) |
 | `MU_JOBS__BACKEND` | `in-memory` | Job queue: `in-memory` (default) or `bullmq` (Redis) |
 | `MU_JOBS__REDIS__URL` | `redis://localhost:6379` | Redis URL (BullMQ only) |
 | `MU_JOBS__BULLMQ__QUEUE_NAME` | `mu-jobs` | BullMQ queue name |
 | `MU_JOBS__BULLMQ__CONCURRENCY` | `2` | Worker concurrency |
+
+### Caching & Storage Tiers
+
+If your media lives on a spinning HDD, put the cache on a fast SSD/NVMe. A single setting moves **all** caches (HLS segments, images, sprites, subtitles, and the hot cache) onto the fast drive:
+
+```yaml
+cache:
+  dir: "/mnt/nvme/mu-cache"     # or e.g. "B:\\mu-cache" on Windows
+```
+
+…or `MU_CACHE_DIR=/mnt/nvme/mu-cache`. Everything anchors under that root; the HDD is then touched only for the original source files.
+
+**NVMe hot cache (`cache.hot`).** A spinning disk serves one stream fine but thrashes under concurrent reads (two viewers + a conversion = seek storms → buffering). With the hot cache enabled, the first time a movie is direct-played its source file is sequentially copied to the fast drive, and that copy serves all subsequent reads — so concurrent streams and background conversions stop fighting over the HDD heads. It's bounded by `maxGb` (LRU eviction) plus age rules: a fully-watched title is dropped `watchedTtlHours` after its last play, a partially-watched one after `unwatchedTtlHours`, and anything idle past `idleTtlHours` is purged. Set `slowDrives` (e.g. `["D:"]`) so only HDD-sourced files are staged — files already on a fast drive are served in place.
+
+```yaml
+cache:
+  dir: "/mnt/nvme/mu-cache"
+  hot:
+    enabled: true
+    maxGb: 300
+    slowDrives: ["D:"]          # only stage from the media HDD
+```
+
+**Scheduled conversion window.** The library-wide MP4/AV1 conversion sweep (Settings → Admin → *Convert and Clear Cache*, or `autoConvertToMp4`) is disk-heavy. Rather than run it 24/7, confine it to an off-peak window in **Settings → Encoding → Scheduled Conversion Window**: pick a start time and a duration (hours). Conversions are enqueued when the window opens and any still-pending/running are cancelled when it closes, leaving the disk free for viewers the rest of the day.
 
 ### Job Backends
 

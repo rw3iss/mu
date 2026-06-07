@@ -12,6 +12,8 @@ export type { ImdbRating, NewImdbRating } from './imdb-ratings.ts';
 export { imdbRatings } from './imdb-ratings.ts';
 export type { JobHistoryEntry, NewJobHistoryEntry } from './job-history.ts';
 export { jobHistory } from './job-history.ts';
+export type { MediaCacheEntry, NewMediaCacheEntry } from './media-cache.ts';
+export { mediaCache } from './media-cache.ts';
 export type { MediaSource, NewMediaSource } from './media-sources.ts';
 export { mediaSources } from './media-sources.ts';
 export type {
@@ -27,10 +29,6 @@ export type {
 	NewMovieExternalRec,
 } from './movie-external-recs.ts';
 export { movieExternalRecs } from './movie-external-recs.ts';
-export type { MovieIdentity, NewMovieIdentity } from './movie-identities.ts';
-export { movieIdentities } from './movie-identities.ts';
-export type { MovieSourcePayload, NewMovieSourcePayload } from './movie-source-payloads.ts';
-export { movieSourcePayloads } from './movie-source-payloads.ts';
 export type { MovieFile, NewMovieFile } from './movie-files.ts';
 export { movieFiles } from './movie-files.ts';
 export type {
@@ -40,6 +38,8 @@ export type {
 	NewMovieGroup,
 } from './movie-groups.ts';
 export { movieGroups } from './movie-groups.ts';
+export type { MovieIdentity, NewMovieIdentity } from './movie-identities.ts';
+export { movieIdentities } from './movie-identities.ts';
 export type {
 	MovieLlmFeatures,
 	NewMovieLlmFeatures,
@@ -52,6 +52,8 @@ export type {
 	NewMovieRecExplanation,
 } from './movie-rec-explanations.ts';
 export { movieRecExplanations } from './movie-rec-explanations.ts';
+export type { MovieSourcePayload, NewMovieSourcePayload } from './movie-source-payloads.ts';
+export { movieSourcePayloads } from './movie-source-payloads.ts';
 export type { Movie, NewMovie } from './movies.ts';
 export { movies } from './movies.ts';
 export type { NewPerson, Person } from './people.ts';
@@ -76,8 +78,6 @@ export type { NewSearchCacheRow, SearchCacheRow } from './search-cache.ts';
 export { searchCache } from './search-cache.ts';
 export type { NewSetting, Setting } from './settings.ts';
 export { settings } from './settings.ts';
-export type { NewUserSetting, UserSetting } from './user-settings.ts';
-export { userSettings } from './user-settings.ts';
 export type { NewStreamSession, StreamSession } from './stream-sessions.ts';
 export { streamSessions } from './stream-sessions.ts';
 export type { NewTheme, Theme } from './themes.ts';
@@ -86,6 +86,8 @@ export type { NewTranscodeCacheEntry, TranscodeCacheEntry } from './transcode-ca
 export { transcodeCache } from './transcode-cache.ts';
 export type { NewUserRating, UserRating } from './user-ratings.ts';
 export { userRatings } from './user-ratings.ts';
+export type { NewUserSetting, UserSetting } from './user-settings.ts';
+export { userSettings } from './user-settings.ts';
 export type { NewUserWatchHistory, UserWatchHistory } from './user-watch-history.ts';
 export { userWatchHistory } from './user-watch-history.ts';
 export type { NewUserWatchlistEntry, UserWatchlistEntry } from './user-watchlist.ts';

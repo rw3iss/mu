@@ -20,6 +20,7 @@ import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles } from '../database/schema/index.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
+import { MediaCacheService } from './media-cache/media-cache.service.js';
 import { StreamService } from './stream.service.js';
 import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
@@ -39,6 +40,7 @@ export class StreamController {
 		private readonly db: DatabaseService,
 		private readonly transcodeDebugger: TranscodeDebuggerService,
 		private readonly guidResolver: GuidResolverService,
+		private readonly mediaCache: MediaCacheService,
 	) {}
 
 	/**
@@ -315,10 +317,14 @@ export class StreamController {
 		}
 
 		const file = fileRows[0]!;
-		// Prefer a cache-mode converted MP4 when present (convertOriginalFile OFF);
-		// otherwise serve the original file. In-place conversions update
-		// file.filePath directly, so this only matters for cache-mode.
-		const cached = this.transcoderService.getCachedDirectMp4(file.id);
+		// Serving precedence:
+		//   1. NVMe hot-cache copy (staged source on the fast drive) — best for
+		//      concurrency, keeps reads off the media HDD.
+		//   2. Cache-mode converted MP4 (convertOriginalFile OFF).
+		//   3. The original file. In-place conversions update file.filePath
+		//      directly, so this only matters for cache-mode.
+		const hot = this.mediaCache.getHotPath(file.id);
+		const cached = hot ?? this.transcoderService.getCachedDirectMp4(file.id);
 		return this.directPlayService.serveFile(cached ?? file.filePath, request, reply);
 	}
 

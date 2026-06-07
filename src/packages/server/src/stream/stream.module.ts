@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { RemoteModule } from '../remote/remote.module.js';
 import { ConversionService } from './conversion/conversion.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
+import { MediaCacheService } from './media-cache/media-cache.service.js';
 import { StreamController } from './stream.controller.js';
 import { StreamService } from './stream.service.js';
 import { SubtitleController } from './subtitles/subtitle.controller.js';
@@ -34,6 +35,7 @@ import { TranscoderService } from './transcoder/transcoder.service.js';
 		ChunkManagerService,
 		ChunkManifestService,
 		DirectPlayService,
+		MediaCacheService,
 		SubtitleService,
 		SubtitleSearchService,
 		SubtitleRemoteProxyService,
