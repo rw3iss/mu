@@ -9,6 +9,16 @@
 	<link rel="apple-touch-icon" href="/mu_logo_small.png" />
 	<link rel="manifest" href="/manifest.json" />
 	<meta name="theme-color" content="#000000" />
+	<!-- Load the UI font as early as possible (parse-time, before the CSS @import)
+	     so it's ready before first paint/interaction. A late font swap reflows
+	     text and can disrupt an in-flight hover transition — an intermittent
+	     first-hover glitch that depends on (random) font-load timing. -->
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link
+		rel="stylesheet"
+		href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap"
+	/>
 	<!-- SEO_HEAD_START -->
 	<title>Mu</title>
 	<meta name="description" content="Self-hosted movie streaming and management." />

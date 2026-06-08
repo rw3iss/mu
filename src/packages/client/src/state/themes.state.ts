@@ -130,6 +130,23 @@ function deriveAccentVariants(hex: string): {
 }
 
 /**
+ * The crossfade is only armed AFTER the initial theme load has settled (see
+ * fetchThemes). The bootstrap applies the theme MORE THAN ONCE (the themesList
+ * effect, then fetchThemes' explicit apply), and a crossfade window opened by
+ * that load races the user's very first hover — producing the intermittent
+ * first-hover "blink" on refresh (intermittent because whether the hover lands
+ * inside the ~250ms window depends on load timing). Keeping it disarmed during
+ * load means a page load NEVER opens a transition window; only genuine,
+ * user-initiated theme switches crossfade.
+ */
+let crossfadeArmed = false;
+
+/** Called once the initial theme load is done, so later switches can crossfade. */
+export function armThemeCrossfade(): void {
+	crossfadeArmed = true;
+}
+
+/**
  * Briefly flip a `data-theme-transitioning` attribute on <html> so the
  * global crossfade rule in global.scss activates for one swap window.
  * Without this, switching themes snaps every color instantly across
@@ -137,6 +154,8 @@ function deriveAccentVariants(hex: string): {
  */
 function flashThemeTransition(): void {
 	if (typeof document === 'undefined') return;
+	// No crossfade during/around the initial load — see crossfadeArmed above.
+	if (!crossfadeArmed) return;
 	const root = document.documentElement;
 	// Read the computed duration so we don't drop the flag mid-fade.
 	const durStr = getComputedStyle(root).getPropertyValue('--theme-transition-duration').trim();
@@ -329,6 +348,16 @@ export async function fetchThemes(): Promise<void> {
 		applyActiveTheme();
 	} catch {
 		// Theme API may not be available yet — ignore
+	} finally {
+		// Arm the crossfade only AFTER this load's applies have run (they happen
+		// synchronously above). A microtask/tick later, so any straggler apply in
+		// the same load tick still counts as "load" and stays snap-instant; from
+		// here on, real user theme switches crossfade normally.
+		if (typeof window !== 'undefined') {
+			window.setTimeout(armThemeCrossfade, 0);
+		} else {
+			armThemeCrossfade();
+		}
 	}
 }
 
