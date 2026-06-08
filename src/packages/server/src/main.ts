@@ -355,7 +355,39 @@ async function bootstrap() {
 		exclude: ['health'],
 	});
 
-	app.enableShutdownHooks();
+	// Bounded shutdown. Nest's enableShutdownHooks() registers SIGTERM/SIGINT
+	// handlers that call app.close() — but close() can hang indefinitely here:
+	// long-lived handles (the toad-scheduler, chokidar watchers, ffmpeg stdio
+	// pipes, the WS server) keep the event loop alive, so the process never
+	// exits. systemd then waits out its TimeoutStopSec, SIGABRTs, waits again,
+	// and finally SIGKILLs — ~90s of dead air on every deploy. Instead we run the
+	// lifecycle hooks via close() but force-exit after a short grace window so a
+	// restart frees port 4000 in seconds. SQLite (WAL) is crash-safe, so a hard
+	// exit mid-shutdown can't corrupt the DB.
+	const SHUTDOWN_GRACE_MS = Number(process.env.MU_SHUTDOWN_GRACE_MS) || 5000;
+	let shuttingDown = false;
+	const shutdown = (signal: string) => {
+		if (shuttingDown) return;
+		shuttingDown = true;
+		logger.log(`${signal} received — shutting down (force-exit in ${SHUTDOWN_GRACE_MS}ms)`);
+		const forceExit = setTimeout(() => {
+			logger.warn('Graceful shutdown exceeded grace window — forcing exit.');
+			process.exit(0);
+		}, SHUTDOWN_GRACE_MS);
+		forceExit.unref();
+		app.close()
+			.then(() => {
+				clearTimeout(forceExit);
+				process.exit(0);
+			})
+			.catch((err) => {
+				logger.error(`Error during shutdown: ${err?.message ?? err}`);
+				clearTimeout(forceExit);
+				process.exit(0);
+			});
+	};
+	process.once('SIGTERM', () => shutdown('SIGTERM'));
+	process.once('SIGINT', () => shutdown('SIGINT'));
 
 	const host = config.get<string>('server.host', '0.0.0.0');
 	const port = config.get<number>('server.port', 4000);

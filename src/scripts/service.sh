@@ -121,6 +121,10 @@ Environment=NODE_ENV=production
 ExecStart=$node_path $MAIN_JS
 Restart=on-failure
 RestartSec=5
+# The app force-exits within ~5s of SIGTERM (see main.ts). This is only a
+# backstop: if that ever fails, SIGKILL after 15s instead of the 90s default
+# (45s SIGTERM + 45s SIGABRT) so a deploy restart never hangs prod.
+TimeoutStopSec=15
 SyslogIdentifier=$SERVICE_NAME
 
 [Install]
