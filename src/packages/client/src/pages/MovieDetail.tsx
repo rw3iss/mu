@@ -30,7 +30,8 @@ import { wsService } from '@/services/websocket.service';
 import { currentUser } from '@/state/auth.state';
 import { personKeyFor } from '@/state/favorites.state';
 import { playMovie } from '@/state/globalPlayer.state';
-import type { Movie } from '@/state/library.state';
+import { updateMovieInHistory } from '@/state/history.state';
+import { type Movie, updateMovieInList } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { fetchProcessingMovies, processingMovieIds } from '@/state/processing.state';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
@@ -165,7 +166,12 @@ export function MovieDetail({ id }: MovieDetailProps) {
 					.catch(() => {});
 				moviesService
 					.get(id)
-					.then((updated) => setMovie(updated))
+					.then((updated) => {
+						setMovie(updated);
+						// Keep the library grid + history/recent views in sync too.
+						updateMovieInList(updated);
+						updateMovieInHistory(updated);
+					})
 					.catch(() => {});
 			}
 		};
@@ -356,6 +362,10 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 	const handleMovieUpdate = useCallback((updated: Movie) => {
 		setMovie(updated);
+		// Propagate to the global caches so the library grid and the recent /
+		// history views show the refreshed poster/title without a manual reload.
+		updateMovieInList(updated);
+		updateMovieInHistory(updated);
 	}, []);
 
 	// -- Title editing --

@@ -59,6 +59,12 @@ export class MoviesService implements OnModuleInit {
 		// interleaved library list returns. The grouping module emits this on any
 		// such change so the cached list doesn't serve a stale / deleted group.
 		this.events.on('groups:changed', () => this.invalidateListCache());
+
+		// Any single-movie change (Refresh Metadata, rescan, clear-metadata,
+		// poster/backdrop swap) updates the movies row but would otherwise keep
+		// serving a stale cached list — even across a hard reload — until the 60s
+		// TTL lapsed. Bust the list cache so the new poster/title/etc. appear at once.
+		this.events.on('library:movie-updated', () => this.invalidateListCache());
 	}
 
 	private readonly listCache = new Map<string, { data: any; expires: number }>();

@@ -33,6 +33,26 @@ export const historyLoading = signal(false);
 /** Movie IDs that were optimistically pushed during this session. */
 const optimisticIds = new Set<string>();
 
+/**
+ * Patch display fields (poster, title, year) of a cached history entry after a
+ * movie is updated elsewhere (e.g. Refresh Metadata), so the History page /
+ * recent sidebar reflects the new poster without waiting for a full refetch.
+ */
+export function updateMovieInHistory(updated: Movie): void {
+	if (historyEntries.value == null) return;
+	historyEntries.value = historyEntries.value.map((m) =>
+		m.id === updated.id
+			? {
+					...m,
+					title: updated.title ?? m.title,
+					year: updated.year ?? m.year,
+					posterUrl: updated.posterUrl || updated.thumbnailUrl || m.posterUrl,
+					backdropUrl: updated.backdropUrl || m.backdropUrl,
+				}
+			: m,
+	);
+}
+
 // ============================================
 // Actions
 // ============================================
