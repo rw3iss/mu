@@ -83,6 +83,17 @@ export class SubtitleManageController {
 		}
 
 		const file = await this.tracksRepo.getAvailableMovieFile(movieId);
+		// If the requested index isn't in the persisted list, re-sync from the
+		// live file first (covers a stale DB vs. embedded/sidecar tracks the
+		// player surfaced) before failing.
+		if (!this.tracksRepo.getPersistedTracks(file.id).some((t) => t.index === idx)) {
+			try {
+				const live = await this.subtitleService.extractSubtitles(file.filePath, file.id);
+				if (live.length > 0) await this.tracksRepo.setTracks(file.id, live);
+			} catch {
+				// fall through — setDefault throws a clean 404 if still missing
+			}
+		}
 		await this.tracksRepo.setDefault(file.id, idx);
 		return { success: true };
 	}

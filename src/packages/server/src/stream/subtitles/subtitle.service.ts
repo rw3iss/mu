@@ -50,6 +50,8 @@ export class SubtitleService {
 			title?: string;
 			codec?: string;
 			forced?: boolean;
+			external?: boolean;
+			fileName?: string;
 		}[],
 	): Promise<SubtitleTrack[]> {
 		const outputDir = this.getSubtitleDir(movieFileId);
@@ -62,34 +64,45 @@ export class SubtitleService {
 			for (let i = 0; i < storedTracks.length; i++) {
 				const track = storedTracks[i]!;
 				const outputPath = path.join(outputDir, `${i}.vtt`);
-
-				// Skip extraction if VTT already exists from a previous session
-				try {
-					await access(outputPath);
+				const pushStored = () =>
 					tracks.push({
 						index: i,
 						language: track.language || 'und',
 						title: track.title || `Track ${i}`,
 						forced: track.forced,
 						codec: track.codec,
+						external: track.external,
+						fileName: track.fileName,
 					});
+
+				// Skip extraction if VTT already exists from a previous session
+				try {
+					await access(outputPath);
+					pushStored();
 					continue;
 				} catch {
 					// Not yet extracted
 				}
 
 				try {
-					await this.extractTrack(filePath, track.index, outputPath);
-					tracks.push({
-						index: i,
-						language: track.language || 'und',
-						title: track.title || `Track ${i}`,
-						forced: track.forced,
-						codec: track.codec,
-					});
+					if (track.external) {
+						// External tracks live in a sidecar file, not an embedded
+						// stream — convert that, don't ffmpeg-extract from the video.
+						const sidecar = this.resolveSidecarPath(filePath, track);
+						if (!sidecar) {
+							this.logger.warn(
+								`External subtitle sidecar missing for stored track ${i} (${track.fileName || track.language})`,
+							);
+							continue;
+						}
+						await this.convertToVtt(sidecar, outputPath);
+					} else {
+						await this.extractTrack(filePath, track.index, outputPath);
+					}
+					pushStored();
 				} catch (err) {
 					this.logger.warn(
-						`Failed to extract subtitle track ${i} from ${path.basename(filePath)}: ${err}`,
+						`Failed to prepare subtitle track ${i} from ${path.basename(filePath)}: ${err}`,
 					);
 				}
 			}
@@ -133,10 +146,20 @@ export class SubtitleService {
 			}
 		}
 
-		// Discover and convert external subtitle files
+		// Discover and convert external subtitle files — but skip any sidecar
+		// already represented by a stored track, otherwise external subs get
+		// duplicated (the stored list already includes them, which then renders
+		// a phantom second entry whose index doesn't exist in the DB).
+		const knownSidecars = new Set<string>();
+		for (const t of storedTracks ?? []) {
+			if (!t.external) continue;
+			const p = this.resolveSidecarPath(filePath, t);
+			if (p) knownSidecars.add(path.basename(p).toLowerCase());
+		}
 		try {
 			const externalFiles = await this.findExternalSubtitles(filePath);
 			for (const extFile of externalFiles) {
+				if (knownSidecars.has(path.basename(extFile).toLowerCase())) continue;
 				const idx = tracks.length;
 				const parsed = this.parseSubtitleFilename(extFile);
 				const outputPath = path.join(outputDir, `${idx}.vtt`);
@@ -321,6 +344,28 @@ export class SubtitleService {
 		if (forced) title += ' (Forced)';
 		if (extras.length) title += ` · ${extras.join('.')}`;
 		return { language, title, forced };
+	}
+
+	/**
+	 * Locate the sidecar file for a stored external track: the exact `fileName`
+	 * when present, else the legacy `<base>.<lang>.<ext>` convention.
+	 */
+	private resolveSidecarPath(
+		videoFilePath: string,
+		track: { language?: string; fileName?: string },
+	): string | null {
+		const dir = path.dirname(videoFilePath);
+		if (track.fileName) {
+			const p = path.join(dir, track.fileName);
+			return existsSync(p) ? p : null;
+		}
+		const base = path.basename(videoFilePath, path.extname(videoFilePath));
+		const lang = track.language || 'en';
+		for (const ext of ['.srt', '.vtt', '.ass', '.ssa', '.sub']) {
+			const p = path.join(dir, `${base}.${lang}${ext}`);
+			if (existsSync(p)) return p;
+		}
+		return null;
 	}
 
 	/**

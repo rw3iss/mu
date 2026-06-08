@@ -1,5 +1,5 @@
 import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
-import { useCallback, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Icon } from '@/components/common/Icon';
 import { subtitlesService } from '@/services/subtitles.service';
@@ -61,6 +61,14 @@ export function SubtitlePanel({
 			// Silently fail
 		}
 	}, [movieId, onSubtitlesChanged]);
+
+	// Load the authoritative track list (real DB indices, fileName, default flag)
+	// on mount — the `existingTracks` prop is session-derived and uses array
+	// positions, which don't line up with the indices the server expects.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: run once per movie
+	useEffect(() => {
+		refreshTracks();
+	}, [movieId]);
 
 	const handleDelete = useCallback(
 		async (track: MovieSubtitleInfo) => {

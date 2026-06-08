@@ -388,6 +388,8 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				title?: string;
 				codec?: string;
 				default?: boolean;
+				external?: boolean;
+				fileName?: string;
 			}>(file.subtitleTracks as string | null | undefined);
 			defaultSubIndex = storedTracks.find((t) => t.default)?.index ?? null;
 			subtitleTracks = await this.subtitleService.extractSubtitles(
