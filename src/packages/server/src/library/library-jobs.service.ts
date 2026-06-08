@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { nowISO, StreamMode, WsEvent } from '@mu/shared';
 import {
@@ -44,6 +44,18 @@ export const JOB_TYPE = {
 	/** Backfill ffprobe codec info for files that were never probed (null codec). */
 	PROBE_UNPROBED: 'probe-unprobed',
 } as const;
+
+/**
+ * A pre-transcode error that will recur identically on every retry — a missing
+ * encoder (no libx264 in this ffmpeg build, NVENC with no driver), an unknown
+ * codec, or an unreadable/corrupt source. When one of these is the FINAL error
+ * (after the in-job software fallback has also failed), we write a `.failed`
+ * marker so resumeIncompleteTranscodes stops re-spawning the same doomed job on
+ * every startup. Transient failures (GPU busy, a job killed by a deploy/restart)
+ * do NOT match, so they still retry.
+ */
+const PERMANENT_TRANSCODE_ERROR =
+	/not available|Encoder not found|Unknown encoder|No capable devices|Cannot load|No such file|Invalid data found|moov atom not found|Permission denied|does not contain|Decoder.*not found/i;
 
 @Injectable()
 export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap {
@@ -358,13 +370,37 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					await this.transcoderService.clearCache(movieFileId);
 				}
 
-				await this.transcoderService.preTranscode(
-					movieFileId,
-					filePath,
-					mode,
-					quality,
-					(percent) => helpers.reportProgress(percent),
-				);
+				try {
+					await this.transcoderService.preTranscode(
+						movieFileId,
+						filePath,
+						mode,
+						quality,
+						(percent) => helpers.reportProgress(percent),
+					);
+				} catch (err: any) {
+					const msg = err?.message ?? String(err);
+					// Permanently-doomed jobs (missing encoder, corrupt source) leave a
+					// `.failed` marker so the startup resume skips them instead of
+					// re-spawning ffmpeg every boot. The marker is cleared on an
+					// explicit re-enqueue (enqueuePreTranscodeIfNeeded), so fixing the
+					// environment + a rescan retries. Transient failures are re-thrown
+					// without a marker so they retry normally.
+					if (PERMANENT_TRANSCODE_ERROR.test(msg)) {
+						try {
+							writeFileSync(
+								path.join(persistDir, '.failed'),
+								`${new Date().toISOString()} ${quality}: ${msg.slice(0, 500)}`,
+							);
+							helpers.log(
+								`Marked permanently failed (won't auto-retry): ${msg.slice(0, 200)}`,
+							);
+						} catch {
+							// best-effort marker write
+						}
+					}
+					throw err;
+				}
 				this.recordTranscodeCache(movieFileId, quality);
 
 				// Notify clients so movie cards/detail pages update and active
@@ -975,6 +1011,21 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 						`Skipping pre-transcode for ${title} (${quality}) — job already queued`,
 					);
 					continue;
+				}
+
+				// Explicit (re-)enqueue: drop any stale `.failed` marker so a job
+				// that was previously marked permanently-failed gets another chance
+				// (e.g. after the ffmpeg encoder / GPU driver is fixed + a rescan).
+				const failedMarker = path.join(
+					this.transcoderService.getPersistentDir(file.id, quality),
+					'.failed',
+				);
+				if (existsSync(failedMarker)) {
+					try {
+						rmSync(failedMarker, { force: true });
+					} catch {
+						// best-effort
+					}
 				}
 
 				this.jobManager.enqueue({
