@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { basename, extname } from 'node:path';
 import { SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
 import {
@@ -210,7 +211,34 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
+	/**
+	 * True when the media source that should contain `targetPath` has gone
+	 * OFFLINE — its root directory no longer exists, i.e. the drive was
+	 * unmounted/detached. chokidar fires unlink/unlinkDir for EVERY file when a
+	 * drive drops, which previously made the watcher purge the entire library
+	 * (movies, files, metadata, watch history). The files reappear on remount,
+	 * so removals under an offline source are ignored. A genuine single-file
+	 * delete (source still mounted) is unaffected. This guards against catastrophic
+	 * data loss on a removable-drive hiccup.
+	 */
+	private sourceOffline(targetPath: string): boolean {
+		const sources = this.database.db.select().from(mediaSources).all();
+		const owning = sources.find(
+			(s) => targetPath.startsWith(s.path) || s.path.startsWith(targetPath),
+		);
+		// Unknown path (not under any source) — let normal handling proceed.
+		if (!owning) return false;
+		return !existsSync(owning.path);
+	}
+
 	private async handleFileRemoved(filePath: string) {
+		if (this.sourceOffline(filePath)) {
+			this.logger.warn(
+				`Ignoring removal of ${basename(filePath)} — its media source is offline (drive unmounted?). Not purging.`,
+			);
+			return;
+		}
+
 		const file = this.database.db
 			.select()
 			.from(movieFiles)
@@ -252,6 +280,12 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	private async handleDirectoryRemoved(dirPath: string) {
+		if (this.sourceOffline(dirPath)) {
+			this.logger.warn(
+				`Ignoring directory removal ${dirPath} — its media source is offline (drive unmounted?). Not purging.`,
+			);
+			return;
+		}
 		this.logger.log(`Directory removed: ${dirPath}`);
 
 		// Find all available files whose path starts with the removed directory
