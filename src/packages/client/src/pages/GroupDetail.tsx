@@ -5,6 +5,7 @@ import { EditableTitle } from '@/components/common/EditableTitle';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { Spinner } from '@/components/common/Spinner';
+import { GroupOptionsMenu } from '@/components/movie/GroupOptionsMenu';
 import { MatchCandidatesPanel } from '@/components/movie/MatchCandidatesPanel';
 import { MovieListItem } from '@/components/movie/MovieListItem';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -100,22 +101,6 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 		}
 	}
 
-	async function handleRefreshGroupMetadata() {
-		if (!id) return;
-		setBusy(true);
-		try {
-			await groupsService.refreshMetadata(id);
-			const fresh = await groupsService.get(id);
-			setData(fresh);
-			const res = await groupsService.listMatchCandidates(id);
-			setCandidates(res.candidates ?? []);
-			notifySuccess('Group metadata refreshed.');
-		} catch (err: any) {
-			notifyError(`Refresh failed: ${err?.message ?? 'unknown error'}`);
-		} finally {
-			setBusy(false);
-		}
-	}
 
 	async function expandChild(child: MovieGroup) {
 		if (expanded[child.id]) {
@@ -315,23 +300,24 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 									<Icon name="check" size={14} /> Confirm grouping
 								</Button>
 							)}
-							{data.group.type === 'parent' && (
-								<Button
-									variant="ghost"
-									onClick={handleRefreshGroupMetadata}
-									disabled={busy}
-									title="Re-fetch poster / overview / IDs from TMDB"
-								>
-									<Icon name="refresh" size={14} /> Refresh metadata
-								</Button>
-							)}
-							<Button
-								variant="ghost"
-								onClick={() => handleReject(data.group)}
-								disabled={busy}
-							>
-								<Icon name="x" size={14} /> Ungroup
-							</Button>
+							<GroupOptionsMenu
+								group={data.group as unknown as MovieGroup}
+								onConfirmed={async () => {
+									const fresh = await groupsService.get(id!);
+									setData(fresh);
+								}}
+								onRefreshed={async () => {
+									if (!id) return;
+									const fresh = await groupsService.get(id);
+									setData(fresh);
+									const res = await groupsService.listMatchCandidates(id);
+									setCandidates(res.candidates ?? []);
+								}}
+								onRemoved={() => {
+									if (window.history.length > 1) window.history.back();
+									else route('/library');
+								}}
+							/>
 						</div>
 					</div>
 				</div>

@@ -64,7 +64,7 @@ export class MetadataService {
 	 *      preferred for ratings / IMDB ID, TMDB preferred for structured
 	 *      data (cast, posters, trailers, keywords).
 	 */
-	async fetchForMovie(movieId: string): Promise<any> {
+	async fetchForMovie(movieId: string, opts: { overwriteTitle?: boolean } = {}): Promise<any> {
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
 		if (!movie) {
 			throw new NotFoundException(`Movie ${movieId} not found`);
@@ -101,6 +101,7 @@ export class MetadataService {
 				tmdbId: movie.tmdbId ?? null,
 				imdbId: movie.imdbId ?? null,
 				priorYear: resolvedYear,
+				overwriteTitle: opts.overwriteTitle,
 			});
 			if (result) {
 				this.matchCandidates.clear('movie', movieId);
@@ -196,6 +197,7 @@ export class MetadataService {
 					tmdbId: winner.tmdbId ?? null,
 					imdbId: winner.imdbId ?? null,
 					priorYear: resolvedYear,
+					overwriteTitle: opts.overwriteTitle,
 				});
 				if (result) {
 					this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, {
@@ -492,6 +494,9 @@ export class MetadataService {
 		tmdbId: number | null;
 		imdbId: string | null;
 		priorYear: number | null;
+		/** When true, write the merged title back too (user-triggered refresh).
+		 * Off by default so background fetches never clobber a manual title. */
+		overwriteTitle?: boolean;
 	}): Promise<any> {
 		const { movieId, priorYear } = opts;
 		let { tmdbId, imdbId } = opts;
@@ -651,6 +656,10 @@ export class MetadataService {
 		setIf('backdropUrl', m.backdropUrl);
 		setIf('trailerUrl', m.trailerUrl);
 		setIf('contentRating', m.contentRating);
+		// Title is normally left alone so refreshes don't clobber manual edits;
+		// a user-triggered "Refresh Metadata" opts in to pulling the real title
+		// back (the merge engine still respects a `user`-provenance title).
+		if (opts.overwriteTitle) setIf('title', m.title);
 
 		this.database.db.update(movies).set(movieUpdate).where(eq(movies.id, movieId)).run();
 
@@ -719,7 +728,7 @@ export class MetadataService {
 			.get();
 	}
 
-	async refreshMetadata(movieId: string) {
+	async refreshMetadata(movieId: string, opts: { overwriteTitle?: boolean } = {}) {
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
 		if (!movie) {
 			throw new NotFoundException(`Movie ${movieId} not found`);
@@ -742,7 +751,7 @@ export class MetadataService {
 			`omdb:search:${movie.title}:${movie.year ?? ''}`,
 		);
 
-		return this.fetchForMovie(movieId);
+		return this.fetchForMovie(movieId, opts);
 	}
 
 	async bulkFetch(movieIds: string[], concurrency: number = 3) {

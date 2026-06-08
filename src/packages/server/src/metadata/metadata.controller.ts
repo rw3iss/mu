@@ -104,7 +104,11 @@ export class MetadataController {
 	@Roles('admin')
 	@RequireAction('edit:movie')
 	async refreshMetadata(@Param('id') movieId: string) {
-		const metadata = await this.metadataService.refreshMetadata(movieId);
+		// User-triggered refresh: pull the real title back too (overwriting a
+		// manual edit). The user can re-edit afterwards if they want.
+		const metadata = await this.metadataService.refreshMetadata(movieId, {
+			overwriteTitle: true,
+		});
 		return metadata ?? { message: 'No metadata found' };
 	}
 

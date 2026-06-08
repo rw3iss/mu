@@ -12,6 +12,12 @@ interface GroupOptionsMenuProps {
 	group: MovieGroup;
 	/** Renders the smaller card-corner trigger. */
 	compact?: boolean;
+	/** Called after the group is confirmed (e.g. to refresh a detail view). */
+	onConfirmed?: () => void;
+	/** Called after group metadata is refreshed (e.g. to re-fetch a detail view). */
+	onRefreshed?: () => void;
+	/** Called after the group is ungrouped or deleted (it no longer exists). */
+	onRemoved?: () => void;
 }
 
 /**
@@ -20,7 +26,13 @@ interface GroupOptionsMenuProps {
  * available on the GroupDetail page: Confirm (when unsure), Refresh metadata
  * (parent groups), and Ungroup.
  */
-export function GroupOptionsMenu({ group, compact }: GroupOptionsMenuProps) {
+export function GroupOptionsMenu({
+	group,
+	compact,
+	onConfirmed,
+	onRefreshed,
+	onRemoved,
+}: GroupOptionsMenuProps) {
 	const { open, setOpen, ref, menuRef, pos } = useMenuOpen();
 	const [busy, setBusy] = useState(false);
 	const [showDelete, setShowDelete] = useState(false);
@@ -49,6 +61,7 @@ export function GroupOptionsMenu({ group, compact }: GroupOptionsMenuProps) {
 			updateInSignals({ status: 'confirmed' });
 			invalidateGroups();
 			notifySuccess(`${group.name} confirmed`);
+			onConfirmed?.();
 		} catch {
 			notifyError('Failed to confirm group');
 		} finally {
@@ -62,7 +75,8 @@ export function GroupOptionsMenu({ group, compact }: GroupOptionsMenuProps) {
 		try {
 			await groupsService.refreshMetadata(group.id);
 			invalidateGroups();
-			notifySuccess('Refreshing group metadata…');
+			notifySuccess('Group metadata refreshed');
+			onRefreshed?.();
 		} catch {
 			notifyError('Failed to refresh group metadata');
 		} finally {
@@ -80,6 +94,7 @@ export function GroupOptionsMenu({ group, compact }: GroupOptionsMenuProps) {
 			notifySuccess(`${group.name} ungrouped`);
 			// Bring the freed movies back into the flat library view.
 			await fetchMovies(1).catch(() => {});
+			onRemoved?.();
 		} catch {
 			notifyError('Failed to ungroup');
 		} finally {
@@ -109,6 +124,7 @@ export function GroupOptionsMenu({ group, compact }: GroupOptionsMenuProps) {
 				`Deleted ${res.deleted} item(s) from disk${res.failed ? ` (${res.failed} failed)` : ''}`,
 			);
 			await fetchMovies(1).catch(() => {});
+			onRemoved?.();
 		} catch {
 			notifyError('Failed to delete group from disk');
 		} finally {
