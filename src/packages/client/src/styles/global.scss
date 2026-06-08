@@ -28,25 +28,32 @@ body {
 // active transitions the rest of the time.
 //
 // `--theme-transition-duration` is tokenised (0 disables, e.g. for
-// reduce-motion paths). Scoped via `:where()` so component CSS keeps
-// its own per-rule timings during regular interaction — this block
-// only kicks in while `<html data-theme-transitioning='true'>` is
-// set by the theme apply runtime (one tick around the switch).
+// reduce-motion paths). The rule only kicks in while
+// `<html data-theme-transitioning='true'>` is set by the theme apply
+// runtime (one tick around the switch).
 //
-// `:not(:hover)` is critical: the actively-hovered element keeps its OWN
-// hover transition during the crossfade window. Without it, hovering an
-// item (e.g. a sidebar link) right after a theme save/refresh would start
-// its hover fade under this `!important` timing, then get interrupted when
-// the attribute is removed mid-transition — a visible flash-off-then-on on
-// the first hover. Excluding `:hover` means a hovered element's transition
-// is never swapped out from under it, so hovers stay silky smooth.
-html[data-theme-transitioning='true'] :where(*):not(:hover) {
+// CRITICAL — zero specificity, NO `!important`. Verified via live transition
+// event capture: the first-hover "flash off then on" was the transition
+// DEFINITION swapping. With an `!important` crossfade, a sidebar item's
+// transition was forced to the crossfade timing while idle, then swapped to
+// its own 150ms the instant it was hovered (or when the attribute dropped) —
+// and a `transition` property changing mid-interaction cancels + restarts the
+// running transition, which is the visible flash.
+//
+// Wrapping the whole selector in `:where()` makes it 0,0,0 specificity, so any
+// component rule that declares its own `transition` (`.navItem`, buttons, …)
+// ALWAYS wins. Those elements therefore keep ONE constant transition timing —
+// never swapped — so hovers stay perfectly smooth. Elements WITHOUT their own
+// transition still pick up this crossfade (only rule that matches) and fade
+// into the new palette. Elements that DO transition simply crossfade their
+// resting colours via their own timing instead. No swap anywhere → no glitch.
+:where(html[data-theme-transitioning='true']) :where(*) {
   transition:
     background-color var(--theme-transition-duration, 0ms) ease,
     color var(--theme-transition-duration, 0ms) ease,
     border-color var(--theme-transition-duration, 0ms) ease,
     fill var(--theme-transition-duration, 0ms) ease,
-    stroke var(--theme-transition-duration, 0ms) ease !important;
+    stroke var(--theme-transition-duration, 0ms) ease;
 }
 
 // ============================================

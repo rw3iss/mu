@@ -1,0 +1,919 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e94]:
+    - navigation [ref=e95]:
+      - generic [ref=e96]:
+        - link "Mu" [ref=e97] [cursor=pointer]:
+          - /url: /
+          - img "Mu" [ref=e98]
+        - button "Collapse sidebar" [ref=e99] [cursor=pointer]:
+          - img [ref=e100]
+      - list [ref=e101]:
+        - listitem [ref=e102]:
+          - link "Dashboard" [ref=e103] [cursor=pointer]:
+            - /url: /
+            - img [ref=e105]
+            - generic [ref=e108]: Dashboard
+        - listitem [ref=e109]:
+          - link "Library" [ref=e110] [cursor=pointer]:
+            - /url: /library
+            - img [ref=e112]
+            - generic [ref=e115]: Library
+        - listitem [ref=e116]:
+          - link "Discover" [ref=e117] [cursor=pointer]:
+            - /url: /discover
+            - img [ref=e119]
+            - generic [ref=e121]: Discover
+        - listitem [ref=e122]:
+          - link "Playlists" [ref=e123] [cursor=pointer]:
+            - /url: /playlists
+            - img [ref=e125]
+            - generic [ref=e128]: Playlists
+        - listitem [ref=e129]:
+          - link "Watchlist" [ref=e130] [cursor=pointer]:
+            - /url: /watchlist
+            - img [ref=e132]
+            - generic [ref=e134]: Watchlist
+        - listitem [ref=e135]:
+          - link "Favorites" [ref=e136] [cursor=pointer]:
+            - /url: /favorites
+            - img [ref=e138]
+            - generic [ref=e140]: Favorites
+        - listitem [ref=e141]:
+          - link "History" [ref=e142] [cursor=pointer]:
+            - /url: /history
+            - img [ref=e144]
+            - generic [ref=e147]: History
+        - listitem [ref=e148]:
+          - button "Feedback" [ref=e149] [cursor=pointer]:
+            - img [ref=e151]
+            - generic [ref=e153]: Feedback
+        - listitem [ref=e154]:
+          - link "Settings" [ref=e155] [cursor=pointer]:
+            - /url: /settings
+            - img [ref=e157]
+            - generic [ref=e160]: Settings
+      - generic [ref=e1288]:
+        - button "RECENT" [ref=e161] [cursor=pointer]:
+          - generic [ref=e162]: RECENT
+          - img [ref=e163]
+        - generic [ref=e1289]:
+          - button "Peterloo Peterloo 2018 Peterloo" [ref=e165] [cursor=pointer]:
+            - img "Peterloo" [ref=e167]
+            - generic [ref=e168]:
+              - generic [ref=e169]: Peterloo
+              - generic [ref=e170]: "2018"
+            - generic:
+              - generic: Peterloo
+            - button "Play" [ref=e171]:
+              - img [ref=e172]
+          - button "The Aeronauts The Aeronauts 2019 The Aeronauts" [ref=e174] [cursor=pointer]:
+            - img "The Aeronauts" [ref=e176]
+            - generic [ref=e177]:
+              - generic [ref=e178]: The Aeronauts
+              - generic [ref=e179]: "2019"
+            - generic:
+              - generic: The Aeronauts
+            - button "Play" [ref=e180]:
+              - img [ref=e181]
+          - button "Wakefield - S01E02 - Episode 2 Wakefield - S01E02 - Episode 2 2021 Wakefield - S01E02 - Episode 2" [ref=e183] [cursor=pointer]:
+            - img "Wakefield - S01E02 - Episode 2" [ref=e185]
+            - generic [ref=e186]:
+              - generic [ref=e187]: Wakefield - S01E02 - Episode 2
+              - generic [ref=e188]: "2021"
+            - generic:
+              - generic: Wakefield - S01E02 - Episode 2
+            - button "Play" [ref=e189]:
+              - img [ref=e190]
+          - button "The Jesus Rolls The Jesus Rolls 2019 The Jesus Rolls" [ref=e192] [cursor=pointer]:
+            - img "The Jesus Rolls" [ref=e194]
+            - generic [ref=e195]:
+              - generic [ref=e196]: The Jesus Rolls
+              - generic [ref=e197]: "2019"
+            - generic:
+              - generic: The Jesus Rolls
+            - button "Play" [ref=e198]:
+              - img [ref=e199]
+          - button "True Stories True Stories 1986 True Stories" [ref=e201] [cursor=pointer]:
+            - img "True Stories" [ref=e203]
+            - generic [ref=e204]:
+              - generic [ref=e205]: True Stories
+              - generic [ref=e206]: "1986"
+            - generic:
+              - generic: True Stories
+            - button "Play" [ref=e207]:
+              - img [ref=e208]
+          - button "Train Dreams Train Dreams 2025 Train Dreams" [ref=e210] [cursor=pointer]:
+            - img "Train Dreams" [ref=e212]
+            - generic [ref=e213]:
+              - generic [ref=e214]: Train Dreams
+              - generic [ref=e215]: "2025"
+            - generic:
+              - generic: Train Dreams
+            - button "Play" [ref=e216]:
+              - img [ref=e217]
+          - button "Black Bag Black Bag 2025 Black Bag" [ref=e219] [cursor=pointer]:
+            - img "Black Bag" [ref=e221]
+            - generic [ref=e222]:
+              - generic [ref=e223]: Black Bag
+              - generic [ref=e224]: "2025"
+            - generic:
+              - generic: Black Bag
+            - button "Play" [ref=e225]:
+              - img [ref=e226]
+          - button "Good Night, and Good Luck. Good Night, and Good Luck. 2005 Good Night, and Good Luck." [ref=e228] [cursor=pointer]:
+            - img "Good Night, and Good Luck." [ref=e230]
+            - generic [ref=e231]:
+              - generic [ref=e232]: Good Night, and Good Luck.
+              - generic [ref=e233]: "2005"
+            - generic:
+              - generic: Good Night, and Good Luck.
+            - button "Play" [ref=e234]:
+              - img [ref=e235]
+          - button "The Comedy The Comedy 2012 The Comedy" [ref=e237] [cursor=pointer]:
+            - img "The Comedy" [ref=e239]
+            - generic [ref=e240]:
+              - generic [ref=e241]: The Comedy
+              - generic [ref=e242]: "2012"
+            - generic:
+              - generic: The Comedy
+            - button "Play" [ref=e243]:
+              - img [ref=e244]
+          - button "A Brief History of Time A Brief History of Time 1991 A Brief History of Time" [ref=e246] [cursor=pointer]:
+            - img "A Brief History of Time" [ref=e248]
+            - generic [ref=e249]:
+              - generic [ref=e250]: A Brief History of Time
+              - generic [ref=e251]: "1991"
+            - generic:
+              - generic: A Brief History of Time
+            - button "Play" [ref=e252]:
+              - img [ref=e253]
+          - button "Blood Simple Blood Simple 1985 Blood Simple" [ref=e255] [cursor=pointer]:
+            - img "Blood Simple" [ref=e257]
+            - generic [ref=e258]:
+              - generic [ref=e259]: Blood Simple
+              - generic [ref=e260]: "1985"
+            - generic:
+              - generic: Blood Simple
+            - button "Play" [ref=e261]:
+              - img [ref=e262]
+          - button "Better Off Dead Better Off Dead 1985 Better Off Dead" [ref=e264] [cursor=pointer]:
+            - img "Better Off Dead" [ref=e266]
+            - generic [ref=e267]:
+              - generic [ref=e268]: Better Off Dead
+              - generic [ref=e269]: "1985"
+            - generic:
+              - generic: Better Off Dead
+            - button "Play" [ref=e270]:
+              - img [ref=e271]
+          - button "The Hangover The Hangover 2009 The Hangover" [ref=e273] [cursor=pointer]:
+            - img "The Hangover" [ref=e275]
+            - generic [ref=e276]:
+              - generic [ref=e277]: The Hangover
+              - generic [ref=e278]: "2009"
+            - generic:
+              - generic: The Hangover
+            - button "Play" [ref=e279]:
+              - img [ref=e280]
+          - button "28 Years Later 28 Years Later 2025 28 Years Later" [ref=e282] [cursor=pointer]:
+            - img "28 Years Later" [ref=e284]
+            - generic [ref=e285]:
+              - generic [ref=e286]: 28 Years Later
+              - generic [ref=e287]: "2025"
+            - generic:
+              - generic: 28 Years Later
+            - button "Play" [ref=e288]:
+              - img [ref=e289]
+          - button "Battle Royale Battle Royale 2000 Battle Royale" [ref=e291] [cursor=pointer]:
+            - img "Battle Royale" [ref=e293]
+            - generic [ref=e294]:
+              - generic [ref=e295]: Battle Royale
+              - generic [ref=e296]: "2000"
+            - generic:
+              - generic: Battle Royale
+            - button "Play" [ref=e297]:
+              - img [ref=e298]
+          - button "Walkabout Walkabout 1971 Walkabout" [ref=e300] [cursor=pointer]:
+            - img "Walkabout" [ref=e302]
+            - generic [ref=e303]:
+              - generic [ref=e304]: Walkabout
+              - generic [ref=e305]: "1971"
+            - generic:
+              - generic: Walkabout
+            - button "Play" [ref=e306]:
+              - img [ref=e307]
+          - button "High Flying Bird High Flying Bird 2019 High Flying Bird" [ref=e309] [cursor=pointer]:
+            - img "High Flying Bird" [ref=e311]
+            - generic [ref=e312]:
+              - generic [ref=e313]: High Flying Bird
+              - generic [ref=e314]: "2019"
+            - generic:
+              - generic: High Flying Bird
+            - button "Play" [ref=e315]:
+              - img [ref=e316]
+      - generic [ref=e318]:
+        - generic [ref=e319]: A
+        - generic [ref=e320]:
+          - generic [ref=e321]: admin
+          - generic [ref=e322]: admin
+        - button "Logout" [ref=e323] [cursor=pointer]:
+          - img [ref=e324]
+    - generic [ref=e327]:
+      - banner [ref=e328]:
+        - generic [ref=e329]:
+          - generic:
+            - img
+          - textbox "Search movies" [ref=e330]:
+            - /placeholder: Search movies...
+        - button "Toggle theme (currently Dark)" [ref=e332] [cursor=pointer]:
+          - img [ref=e333]
+      - main [ref=e335]:
+        - generic [ref=e336]:
+          - generic [ref=e337]:
+            - paragraph [ref=e338]: Welcome back, admin
+            - generic [ref=e339]:
+              - button "Browse Library" [ref=e340] [cursor=pointer]
+              - button "Discover" [ref=e341] [cursor=pointer]
+          - generic [ref=e342]:
+            - generic [ref=e343]:
+              - heading "Continue Watching" [level=2] [ref=e344]
+              - generic [ref=e345]:
+                - group "Continue watching view" [ref=e346]:
+                  - button "Grid view" [pressed] [ref=e348] [cursor=pointer]:
+                    - img [ref=e349]
+                  - button "List view" [ref=e355] [cursor=pointer]:
+                    - img [ref=e356]
+                - button "See All" [ref=e357] [cursor=pointer]:
+                  - generic [ref=e358]: See All
+            - generic [ref=e359]:
+              - button "Peterloo poster Play Peterloo Resume Peterloo Peterloo 2018 Movie options" [ref=e360] [cursor=pointer]:
+                - generic [ref=e361]:
+                  - img "Peterloo poster" [ref=e363]
+                  - generic:
+                    - button "Play Peterloo": Play
+                    - button "Resume Peterloo": Resume
+                  - generic:
+                    - heading "Peterloo" [level=3] [ref=e364]
+                    - generic [ref=e365]: "2018"
+                  - button "Movie options" [ref=e370]:
+                    - img [ref=e371]
+              - button "The Aeronauts poster Play The Aeronauts Resume The Aeronauts The Aeronauts 2019 Movie options" [ref=e377] [cursor=pointer]:
+                - generic [ref=e378]:
+                  - img "The Aeronauts poster" [ref=e380]
+                  - generic:
+                    - button "Play The Aeronauts": Play
+                    - button "Resume The Aeronauts": Resume
+                  - generic:
+                    - heading "The Aeronauts" [level=3] [ref=e381]
+                    - generic [ref=e382]: "2019"
+                  - button "Movie options" [ref=e387]:
+                    - img [ref=e388]
+              - button "Wakefield - S01E02 - Episode 2 poster Play Wakefield - S01E02 - Episode 2 Wakefield - S01E02 - Episode 2 2021 Movie options" [ref=e394] [cursor=pointer]:
+                - generic [ref=e395]:
+                  - img "Wakefield - S01E02 - Episode 2 poster" [ref=e397]
+                  - generic:
+                    - button "Play Wakefield - S01E02 - Episode 2": Play
+                  - generic:
+                    - heading "Wakefield - S01E02 - Episode 2" [level=3] [ref=e398]
+                    - generic [ref=e399]: "2021"
+                  - button "Movie options" [ref=e404]:
+                    - img [ref=e405]
+              - button "The Jesus Rolls poster Play The Jesus Rolls Resume The Jesus Rolls The Jesus Rolls 2019 Movie options" [ref=e409] [cursor=pointer]:
+                - generic [ref=e410]:
+                  - img "The Jesus Rolls poster" [ref=e412]
+                  - generic:
+                    - button "Play The Jesus Rolls": Play
+                    - button "Resume The Jesus Rolls": Resume
+                  - generic:
+                    - heading "The Jesus Rolls" [level=3] [ref=e413]
+                    - generic [ref=e414]: "2019"
+                  - button "Movie options" [ref=e419]:
+                    - img [ref=e420]
+              - button "True Stories poster Play True Stories Resume True Stories True Stories 1986 Movie options" [ref=e426] [cursor=pointer]:
+                - generic [ref=e427]:
+                  - img "True Stories poster" [ref=e429]
+                  - generic:
+                    - button "Play True Stories": Play
+                    - button "Resume True Stories": Resume
+                  - generic:
+                    - heading "True Stories" [level=3] [ref=e430]
+                    - generic [ref=e431]: "1986"
+                  - button "Movie options" [ref=e436]:
+                    - img [ref=e437]
+              - button "Train Dreams poster Play Train Dreams Train Dreams 2025 Movie options" [ref=e443] [cursor=pointer]:
+                - generic [ref=e444]:
+                  - img "Train Dreams poster" [ref=e446]
+                  - generic:
+                    - button "Play Train Dreams": Play
+                  - generic:
+                    - heading "Train Dreams" [level=3] [ref=e447]
+                    - generic [ref=e448]: "2025"
+                  - button "Movie options" [ref=e453]:
+                    - img [ref=e454]
+              - button "Black Bag poster Play Black Bag Black Bag 2025 Movie options" [ref=e458] [cursor=pointer]:
+                - generic [ref=e459]:
+                  - img "Black Bag poster" [ref=e461]
+                  - generic:
+                    - button "Play Black Bag": Play
+                  - generic:
+                    - heading "Black Bag" [level=3] [ref=e462]
+                    - generic [ref=e463]: "2025"
+                  - button "Movie options" [ref=e468]:
+                    - img [ref=e469]
+              - button "Good Night, and Good Luck. poster Play Good Night, and Good Luck. Resume Good Night, and Good Luck. Good Night, and Good Luck. 2005 Movie options" [ref=e473] [cursor=pointer]:
+                - generic [ref=e474]:
+                  - img "Good Night, and Good Luck. poster" [ref=e476]
+                  - generic:
+                    - button "Play Good Night, and Good Luck.": Play
+                    - button "Resume Good Night, and Good Luck.": Resume
+                  - generic:
+                    - heading "Good Night, and Good Luck." [level=3] [ref=e477]
+                    - generic [ref=e478]: "2005"
+                  - button "Movie options" [ref=e483]:
+                    - img [ref=e484]
+              - button "The Comedy poster Play The Comedy Resume The Comedy The Comedy 2012 Movie options" [ref=e490] [cursor=pointer]:
+                - generic [ref=e491]:
+                  - img "The Comedy poster" [ref=e493]
+                  - generic:
+                    - button "Play The Comedy": Play
+                    - button "Resume The Comedy": Resume
+                  - generic:
+                    - heading "The Comedy" [level=3] [ref=e494]
+                    - generic [ref=e495]: "2012"
+                  - button "Movie options" [ref=e500]:
+                    - img [ref=e501]
+              - button "A Brief History of Time poster Play A Brief History of Time A Brief History of Time 1991 Movie options" [ref=e507] [cursor=pointer]:
+                - generic [ref=e508]:
+                  - img "A Brief History of Time poster" [ref=e510]
+                  - generic:
+                    - button "Play A Brief History of Time": Play
+                  - generic:
+                    - heading "A Brief History of Time" [level=3] [ref=e511]
+                    - generic [ref=e512]: "1991"
+                  - button "Movie options" [ref=e517]:
+                    - img [ref=e518]
+              - button "Blood Simple poster Play Blood Simple Resume Blood Simple Blood Simple 1985 Movie options" [ref=e522] [cursor=pointer]:
+                - generic [ref=e523]:
+                  - img "Blood Simple poster" [ref=e525]
+                  - generic:
+                    - button "Play Blood Simple": Play
+                    - button "Resume Blood Simple": Resume
+                  - generic:
+                    - heading "Blood Simple" [level=3] [ref=e526]
+                    - generic [ref=e527]: "1985"
+                  - button "Movie options" [ref=e532]:
+                    - img [ref=e533]
+              - button "Better Off Dead poster Play Better Off Dead Resume Better Off Dead Better Off Dead 1985 Movie options" [ref=e539] [cursor=pointer]:
+                - generic [ref=e540]:
+                  - img "Better Off Dead poster" [ref=e542]
+                  - generic:
+                    - button "Play Better Off Dead": Play
+                    - button "Resume Better Off Dead": Resume
+                  - generic:
+                    - heading "Better Off Dead" [level=3] [ref=e543]
+                    - generic [ref=e544]: "1985"
+                  - button "Movie options" [ref=e549]:
+                    - img [ref=e550]
+              - button "The Hangover poster Play The Hangover Resume The Hangover The Hangover 2009 Movie options" [ref=e556] [cursor=pointer]:
+                - generic [ref=e557]:
+                  - img "The Hangover poster" [ref=e559]
+                  - generic:
+                    - button "Play The Hangover": Play
+                    - button "Resume The Hangover": Resume
+                  - generic:
+                    - heading "The Hangover" [level=3] [ref=e560]
+                    - generic [ref=e561]: "2009"
+                  - button "Movie options" [ref=e566]:
+                    - img [ref=e567]
+              - button "28 Years Later poster Play 28 Years Later 28 Years Later 2025 Movie options" [ref=e573] [cursor=pointer]:
+                - generic [ref=e574]:
+                  - img "28 Years Later poster" [ref=e576]
+                  - generic:
+                    - button "Play 28 Years Later": Play
+                  - generic:
+                    - heading "28 Years Later" [level=3] [ref=e577]
+                    - generic [ref=e578]: "2025"
+                  - button "Movie options" [ref=e583]:
+                    - img [ref=e584]
+              - button "Battle Royale poster Play Battle Royale Resume Battle Royale Battle Royale 2000 Movie options" [ref=e588] [cursor=pointer]:
+                - generic [ref=e589]:
+                  - img "Battle Royale poster" [ref=e591]
+                  - generic:
+                    - button "Play Battle Royale": Play
+                    - button "Resume Battle Royale": Resume
+                  - generic:
+                    - heading "Battle Royale" [level=3] [ref=e592]
+                    - generic [ref=e593]: "2000"
+                  - button "Movie options" [ref=e598]:
+                    - img [ref=e599]
+              - button "Walkabout poster Play Walkabout Resume Walkabout Walkabout 1971 Movie options" [ref=e605] [cursor=pointer]:
+                - generic [ref=e606]:
+                  - img "Walkabout poster" [ref=e608]
+                  - generic:
+                    - button "Play Walkabout": Play
+                    - button "Resume Walkabout": Resume
+                  - generic:
+                    - heading "Walkabout" [level=3] [ref=e609]
+                    - generic [ref=e610]: "1971"
+                  - button "Movie options" [ref=e615]:
+                    - img [ref=e616]
+              - button "High Flying Bird poster Play High Flying Bird Resume High Flying Bird High Flying Bird 2019 Movie options" [ref=e622] [cursor=pointer]:
+                - generic [ref=e623]:
+                  - img "High Flying Bird poster" [ref=e625]
+                  - generic:
+                    - button "Play High Flying Bird": Play
+                    - button "Resume High Flying Bird": Resume
+                  - generic:
+                    - heading "High Flying Bird" [level=3] [ref=e626]
+                    - generic [ref=e627]: "2019"
+                  - button "Movie options" [ref=e632]:
+                    - img [ref=e633]
+          - generic [ref=e639]:
+            - generic [ref=e640]:
+              - heading "Recently Added" [level=2] [ref=e641]
+              - button "See All" [ref=e642] [cursor=pointer]:
+                - generic [ref=e643]: See All
+            - generic [ref=e644]:
+              - button "Peterloo poster Play Peterloo Resume Peterloo Peterloo 2018 6.5 67 66 Movie options" [ref=e645] [cursor=pointer]:
+                - generic [ref=e646]:
+                  - img "Peterloo poster" [ref=e648]
+                  - generic:
+                    - button "Play Peterloo": Play
+                    - button "Resume Peterloo": Resume
+                  - generic:
+                    - heading "Peterloo" [level=3] [ref=e649]
+                    - generic [ref=e650]: "2018"
+                  - generic [ref=e652]:
+                    - generic [ref=e653]:
+                      - 'generic "IMDB: 6.5 (6k votes)" [ref=e654]': "6.5"
+                      - 'generic "RT: 67%" [ref=e655]': "67"
+                      - 'generic "MC: 66/100" [ref=e656]': "66"
+                    - button "Movie options" [ref=e659]:
+                      - img [ref=e660]
+              - button "James Bond On Her Majestys Secret Service poster Play James Bond On Her Majestys Secret Service James Bond On Her Majestys Secret Service 1969 6.7 81 61 Movie options" [ref=e666] [cursor=pointer]:
+                - generic [ref=e667]:
+                  - img "James Bond On Her Majestys Secret Service poster" [ref=e669]
+                  - generic:
+                    - button "Play James Bond On Her Majestys Secret Service": Play
+                  - generic:
+                    - heading "James Bond On Her Majestys Secret Service" [level=3] [ref=e670]
+                    - generic [ref=e671]: "1969"
+                  - generic [ref=e673]:
+                    - generic [ref=e674]:
+                      - 'generic "IMDB: 6.7 (109k votes)" [ref=e675]': "6.7"
+                      - 'generic "RT: 81%" [ref=e676]': "81"
+                      - 'generic "MC: 61/100" [ref=e677]': "61"
+                    - button "Movie options" [ref=e680]:
+                      - img [ref=e681]
+              - button "Sweeney Todd poster Play Sweeney Todd Sweeney Todd 2007 7.3 86 83 Movie options" [ref=e685] [cursor=pointer]:
+                - generic [ref=e686]:
+                  - img "Sweeney Todd poster" [ref=e688]
+                  - generic:
+                    - button "Play Sweeney Todd": Play
+                  - generic:
+                    - heading "Sweeney Todd" [level=3] [ref=e689]
+                    - generic [ref=e690]: "2007"
+                  - generic [ref=e692]:
+                    - generic [ref=e693]:
+                      - 'generic "IMDB: 7.3 (407k votes)" [ref=e694]': "7.3"
+                      - 'generic "RT: 86%" [ref=e695]': "86"
+                      - 'generic "MC: 83/100" [ref=e696]': "83"
+                    - button "Movie options" [ref=e699]:
+                      - img [ref=e700]
+              - button "Eraserhead poster Play Eraserhead Eraserhead 1977 7.2 87 87 Movie options" [ref=e704] [cursor=pointer]:
+                - generic [ref=e705]:
+                  - img "Eraserhead poster" [ref=e707]
+                  - generic:
+                    - button "Play Eraserhead": Play
+                  - generic:
+                    - heading "Eraserhead" [level=3] [ref=e708]
+                    - generic [ref=e709]: "1977"
+                  - generic [ref=e711]:
+                    - generic [ref=e712]:
+                      - 'generic "IMDB: 7.2 (144k votes)" [ref=e713]': "7.2"
+                      - 'generic "RT: 87%" [ref=e714]': "87"
+                      - 'generic "MC: 87/100" [ref=e715]': "87"
+                    - button "Movie options" [ref=e718]:
+                      - img [ref=e719]
+              - button "James Bond A View To A Kill poster Play James Bond A View To A Kill James Bond A View To A Kill 1985 Movie options" [ref=e723] [cursor=pointer]:
+                - generic [ref=e724]:
+                  - img "James Bond A View To A Kill poster" [ref=e726]
+                  - generic:
+                    - button "Play James Bond A View To A Kill": Play
+                  - generic:
+                    - heading "James Bond A View To A Kill" [level=3] [ref=e727]
+                    - generic [ref=e728]: "1985"
+                  - button "Movie options" [ref=e733]:
+                    - img [ref=e734]
+              - button "James Bond Tomorrow Never Dies poster Play James Bond Tomorrow Never Dies James Bond Tomorrow Never Dies 1997 6.5 58 52 Movie options" [ref=e738] [cursor=pointer]:
+                - generic [ref=e739]:
+                  - img "James Bond Tomorrow Never Dies poster" [ref=e741]
+                  - generic:
+                    - button "Play James Bond Tomorrow Never Dies": Play
+                  - generic:
+                    - heading "James Bond Tomorrow Never Dies" [level=3] [ref=e742]
+                    - generic [ref=e743]: "1997"
+                  - generic [ref=e745]:
+                    - generic [ref=e746]:
+                      - 'generic "IMDB: 6.5 (216k votes)" [ref=e747]': "6.5"
+                      - 'generic "RT: 58%" [ref=e748]': "58"
+                      - 'generic "MC: 52/100" [ref=e749]': "52"
+                    - button "Movie options" [ref=e752]:
+                      - img [ref=e753]
+              - button "James Bond GoldenEye poster Play James Bond GoldenEye James Bond GoldenEye 1995 7.2 81 65 Movie options" [ref=e757] [cursor=pointer]:
+                - generic [ref=e758]:
+                  - img "James Bond GoldenEye poster" [ref=e760]
+                  - generic:
+                    - button "Play James Bond GoldenEye": Play
+                  - generic:
+                    - heading "James Bond GoldenEye" [level=3] [ref=e761]
+                    - generic [ref=e762]: "1995"
+                  - generic [ref=e764]:
+                    - generic [ref=e765]:
+                      - 'generic "IMDB: 7.2 (287k votes)" [ref=e766]': "7.2"
+                      - 'generic "RT: 81%" [ref=e767]': "81"
+                      - 'generic "MC: 65/100" [ref=e768]': "65"
+                    - button "Movie options" [ref=e771]:
+                      - img [ref=e772]
+              - button "Skyfall poster Play Skyfall Skyfall 2012 7.8 92 81 Movie options" [ref=e776] [cursor=pointer]:
+                - generic [ref=e777]:
+                  - img "Skyfall poster" [ref=e779]
+                  - generic:
+                    - button "Play Skyfall": Play
+                  - generic:
+                    - heading "Skyfall" [level=3] [ref=e780]
+                    - generic [ref=e781]: "2012"
+                  - generic [ref=e783]:
+                    - generic [ref=e784]:
+                      - 'generic "IMDB: 7.8 (774k votes)" [ref=e785]': "7.8"
+                      - 'generic "RT: 92%" [ref=e786]': "92"
+                      - 'generic "MC: 81/100" [ref=e787]': "81"
+                    - button "Movie options" [ref=e790]:
+                      - img [ref=e791]
+              - button "From Russia with Love poster Play From Russia with Love From Russia with Love 1963 7.3 97 83 Movie options" [ref=e795] [cursor=pointer]:
+                - generic [ref=e796]:
+                  - img "From Russia with Love poster" [ref=e798]
+                  - generic:
+                    - button "Play From Russia with Love": Play
+                  - generic:
+                    - heading "From Russia with Love" [level=3] [ref=e799]
+                    - generic [ref=e800]: "1963"
+                  - generic [ref=e802]:
+                    - generic [ref=e803]:
+                      - 'generic "IMDB: 7.3 (159k votes)" [ref=e804]': "7.3"
+                      - 'generic "RT: 97%" [ref=e805]': "97"
+                      - 'generic "MC: 83/100" [ref=e806]': "83"
+                    - button "Movie options" [ref=e809]:
+                      - img [ref=e810]
+              - button "Dr No poster Play Dr No Dr No 1962 7.2 95 78 Movie options" [ref=e814] [cursor=pointer]:
+                - generic [ref=e815]:
+                  - img "Dr No poster" [ref=e817]
+                  - generic:
+                    - button "Play Dr No": Play
+                  - generic:
+                    - heading "Dr No" [level=3] [ref=e818]
+                    - generic [ref=e819]: "1962"
+                  - generic [ref=e821]:
+                    - generic [ref=e822]:
+                      - 'generic "IMDB: 7.2 (196k votes)" [ref=e823]': "7.2"
+                      - 'generic "RT: 95%" [ref=e824]': "95"
+                      - 'generic "MC: 78/100" [ref=e825]': "78"
+                    - button "Movie options" [ref=e828]:
+                      - img [ref=e829]
+              - button "James Bond Live And Let Die poster Play James Bond Live And Let Die James Bond Live And Let Die 1973 6.7 67 55 Movie options" [ref=e833] [cursor=pointer]:
+                - generic [ref=e834]:
+                  - img "James Bond Live And Let Die poster" [ref=e836]
+                  - generic:
+                    - button "Play James Bond Live And Let Die": Play
+                  - generic:
+                    - heading "James Bond Live And Let Die" [level=3] [ref=e837]
+                    - generic [ref=e838]: "1973"
+                  - generic [ref=e840]:
+                    - generic [ref=e841]:
+                      - 'generic "IMDB: 6.7 (125k votes)" [ref=e842]': "6.7"
+                      - 'generic "RT: 67%" [ref=e843]': "67"
+                      - 'generic "MC: 55/100" [ref=e844]': "55"
+                    - button "Movie options" [ref=e847]:
+                      - img [ref=e848]
+              - button "James Bond Octopussy poster Play James Bond Octopussy James Bond Octopussy 1983 6.5 41 63 Movie options" [ref=e852] [cursor=pointer]:
+                - generic [ref=e853]:
+                  - img "James Bond Octopussy poster" [ref=e855]
+                  - generic:
+                    - button "Play James Bond Octopussy": Play
+                  - generic:
+                    - heading "James Bond Octopussy" [level=3] [ref=e856]
+                    - generic [ref=e857]: "1983"
+                  - generic [ref=e859]:
+                    - generic [ref=e860]:
+                      - 'generic "IMDB: 6.5 (120k votes)" [ref=e861]': "6.5"
+                      - 'generic "RT: 41%" [ref=e862]': "41"
+                      - 'generic "MC: 63/100" [ref=e863]': "63"
+                    - button "Movie options" [ref=e866]:
+                      - img [ref=e867]
+              - button "James Bond Moonraker poster Play James Bond Moonraker James Bond Moonraker 1979 6.3 59 66 Movie options" [ref=e871] [cursor=pointer]:
+                - generic [ref=e872]:
+                  - img "James Bond Moonraker poster" [ref=e874]
+                  - generic:
+                    - button "Play James Bond Moonraker": Play
+                  - generic:
+                    - heading "James Bond Moonraker" [level=3] [ref=e875]
+                    - generic [ref=e876]: "1979"
+                  - generic [ref=e878]:
+                    - generic [ref=e879]:
+                      - 'generic "IMDB: 6.3 (118k votes)" [ref=e880]': "6.3"
+                      - 'generic "RT: 59%" [ref=e881]': "59"
+                      - 'generic "MC: 66/100" [ref=e882]': "66"
+                    - button "Movie options" [ref=e885]:
+                      - img [ref=e886]
+              - button "Diamonds Are Forever poster Play Diamonds Are Forever Diamonds Are Forever 1971 6.5 64 59 Movie options" [ref=e890] [cursor=pointer]:
+                - generic [ref=e891]:
+                  - img "Diamonds Are Forever poster" [ref=e893]
+                  - generic:
+                    - button "Play Diamonds Are Forever": Play
+                  - generic:
+                    - heading "Diamonds Are Forever" [level=3] [ref=e894]
+                    - generic [ref=e895]: "1971"
+                  - generic [ref=e897]:
+                    - generic [ref=e898]:
+                      - 'generic "IMDB: 6.5 (123k votes)" [ref=e899]': "6.5"
+                      - 'generic "RT: 64%" [ref=e900]': "64"
+                      - 'generic "MC: 59/100" [ref=e901]': "59"
+                    - button "Movie options" [ref=e904]:
+                      - img [ref=e905]
+              - button "American History X poster Play American History X American History X 1998 8.5 84 62 Movie options" [ref=e909] [cursor=pointer]:
+                - generic [ref=e910]:
+                  - img "American History X poster" [ref=e912]
+                  - generic:
+                    - button "Play American History X": Play
+                  - generic:
+                    - heading "American History X" [level=3] [ref=e913]
+                    - generic [ref=e914]: "1998"
+                  - generic [ref=e916]:
+                    - generic [ref=e917]:
+                      - 'generic "IMDB: 8.5 (1.3M votes)" [ref=e918]': "8.5"
+                      - 'generic "RT: 84%" [ref=e919]': "84"
+                      - 'generic "MC: 62/100" [ref=e920]': "62"
+                    - button "Movie options" [ref=e923]:
+                      - img [ref=e924]
+              - button "Thunderball poster Play Thunderball Thunderball 1965 6.9 85 64 Movie options" [ref=e928] [cursor=pointer]:
+                - generic [ref=e929]:
+                  - img "Thunderball poster" [ref=e931]
+                  - generic:
+                    - button "Play Thunderball": Play
+                  - generic:
+                    - heading "Thunderball" [level=3] [ref=e932]
+                    - generic [ref=e933]: "1965"
+                  - generic [ref=e935]:
+                    - generic [ref=e936]:
+                      - 'generic "IMDB: 6.9 (138k votes)" [ref=e937]': "6.9"
+                      - 'generic "RT: 85%" [ref=e938]': "85"
+                      - 'generic "MC: 64/100" [ref=e939]': "64"
+                    - button "Movie options" [ref=e942]:
+                      - img [ref=e943]
+              - button "Darby O'Gill And The Little People poster Play Darby O'Gill And The Little People Darby O'Gill And The Little People 1959 7.1 100 80 Movie options" [ref=e947] [cursor=pointer]:
+                - generic [ref=e948]:
+                  - img "Darby O'Gill And The Little People poster" [ref=e950]
+                  - generic:
+                    - button "Play Darby O'Gill And The Little People": Play
+                  - generic:
+                    - heading "Darby O'Gill And The Little People" [level=3] [ref=e951]
+                    - generic [ref=e952]: "1959"
+                  - generic [ref=e954]:
+                    - generic [ref=e955]:
+                      - 'generic "IMDB: 7.1 (10k votes)" [ref=e956]': "7.1"
+                      - 'generic "RT: 100%" [ref=e957]': "100"
+                      - 'generic "MC: 80/100" [ref=e958]': "80"
+                    - button "Movie options" [ref=e961]:
+                      - img [ref=e962]
+              - button "Clockers poster Play Clockers Clockers 1995 6.9 75 71 Movie options" [ref=e966] [cursor=pointer]:
+                - generic [ref=e967]:
+                  - img "Clockers poster" [ref=e969]
+                  - generic:
+                    - button "Play Clockers": Play
+                  - generic:
+                    - heading "Clockers" [level=3] [ref=e970]
+                    - generic [ref=e971]: "1995"
+                  - generic [ref=e973]:
+                    - generic [ref=e974]:
+                      - 'generic "IMDB: 6.9 (25k votes)" [ref=e975]': "6.9"
+                      - 'generic "RT: 75%" [ref=e976]': "75"
+                      - 'generic "MC: 71/100" [ref=e977]': "71"
+                    - button "Movie options" [ref=e980]:
+                      - img [ref=e981]
+              - button "You Only Live Twice poster Play You Only Live Twice You Only Live Twice 1967 6.8 73 61 Movie options" [ref=e985] [cursor=pointer]:
+                - generic [ref=e986]:
+                  - img "You Only Live Twice poster" [ref=e988]
+                  - generic:
+                    - button "Play You Only Live Twice": Play
+                  - generic:
+                    - heading "You Only Live Twice" [level=3] [ref=e989]
+                    - generic [ref=e990]: "1967"
+                  - generic [ref=e992]:
+                    - generic [ref=e993]:
+                      - 'generic "IMDB: 6.8 (128k votes)" [ref=e994]': "6.8"
+                      - 'generic "RT: 73%" [ref=e995]': "73"
+                      - 'generic "MC: 61/100" [ref=e996]': "61"
+                    - button "Movie options" [ref=e999]:
+                      - img [ref=e1000]
+              - button "Casino Royale poster Play Casino Royale Casino Royale 2006 8.0 94 80 Movie options" [ref=e1004] [cursor=pointer]:
+                - generic [ref=e1005]:
+                  - img "Casino Royale poster" [ref=e1007]
+                  - generic:
+                    - button "Play Casino Royale": Play
+                  - generic:
+                    - heading "Casino Royale" [level=3] [ref=e1008]
+                    - generic [ref=e1009]: "2006"
+                  - generic [ref=e1011]:
+                    - generic [ref=e1012]:
+                      - 'generic "IMDB: 8.0 (746k votes)" [ref=e1013]': "8.0"
+                      - 'generic "RT: 94%" [ref=e1014]': "94"
+                      - 'generic "MC: 80/100" [ref=e1015]': "80"
+                    - button "Movie options" [ref=e1018]:
+                      - img [ref=e1019]
+              - button "James Bond For Your Eyes Only poster Play James Bond For Your Eyes Only James Bond For Your Eyes Only 1981 6.7 69 54 Movie options" [ref=e1023] [cursor=pointer]:
+                - generic [ref=e1024]:
+                  - img "James Bond For Your Eyes Only poster" [ref=e1026]
+                  - generic:
+                    - button "Play James Bond For Your Eyes Only": Play
+                  - generic:
+                    - heading "James Bond For Your Eyes Only" [level=3] [ref=e1027]
+                    - generic [ref=e1028]: "1981"
+                  - generic [ref=e1030]:
+                    - generic [ref=e1031]:
+                      - 'generic "IMDB: 6.7 (117k votes)" [ref=e1032]': "6.7"
+                      - 'generic "RT: 69%" [ref=e1033]': "69"
+                      - 'generic "MC: 54/100" [ref=e1034]': "54"
+                    - button "Movie options" [ref=e1037]:
+                      - img [ref=e1038]
+              - button "James Bond The Living Daylights poster Play James Bond The Living Daylights James Bond The Living Daylights 1987 6.7 73 59 Movie options" [ref=e1042] [cursor=pointer]:
+                - generic [ref=e1043]:
+                  - img "James Bond The Living Daylights poster" [ref=e1045]
+                  - generic:
+                    - button "Play James Bond The Living Daylights": Play
+                  - generic:
+                    - heading "James Bond The Living Daylights" [level=3] [ref=e1046]
+                    - generic [ref=e1047]: "1987"
+                  - generic [ref=e1049]:
+                    - generic [ref=e1050]:
+                      - 'generic "IMDB: 6.7 (115k votes)" [ref=e1051]': "6.7"
+                      - 'generic "RT: 73%" [ref=e1052]': "73"
+                      - 'generic "MC: 59/100" [ref=e1053]': "59"
+                    - button "Movie options" [ref=e1056]:
+                      - img [ref=e1057]
+              - button "No Time To Die poster Play No Time To Die No Time To Die 2021 7.3 83 68 Movie options" [ref=e1061] [cursor=pointer]:
+                - generic [ref=e1062]:
+                  - img "No Time To Die poster" [ref=e1064]
+                  - generic:
+                    - button "Play No Time To Die": Play
+                  - generic:
+                    - heading "No Time To Die" [level=3] [ref=e1065]
+                    - generic [ref=e1066]: "2021"
+                  - generic [ref=e1068]:
+                    - generic [ref=e1069]:
+                      - 'generic "IMDB: 7.3 (489k votes)" [ref=e1070]': "7.3"
+                      - 'generic "RT: 83%" [ref=e1071]': "83"
+                      - 'generic "MC: 68/100" [ref=e1072]': "68"
+                    - button "Movie options" [ref=e1075]:
+                      - img [ref=e1076]
+              - button "James Bond The Man With The Golden Gun poster Play James Bond The Man With The Golden Gun James Bond The Man With The Golden Gun 1974 6.7 40 43 Movie options" [ref=e1080] [cursor=pointer]:
+                - generic [ref=e1081]:
+                  - img "James Bond The Man With The Golden Gun poster" [ref=e1083]
+                  - generic:
+                    - button "Play James Bond The Man With The Golden Gun": Play
+                  - generic:
+                    - heading "James Bond The Man With The Golden Gun" [level=3] [ref=e1084]
+                    - generic [ref=e1085]: "1974"
+                  - generic [ref=e1087]:
+                    - generic [ref=e1088]:
+                      - 'generic "IMDB: 6.7 (122k votes)" [ref=e1089]': "6.7"
+                      - 'generic "RT: 40%" [ref=e1090]': "40"
+                      - 'generic "MC: 43/100" [ref=e1091]': "43"
+                    - button "Movie options" [ref=e1094]:
+                      - img [ref=e1095]
+          - generic [ref=e1099]:
+            - generic [ref=e1100]:
+              - heading "Trending" [level=2] [ref=e1101]
+              - button "See All" [ref=e1102] [cursor=pointer]:
+                - generic [ref=e1103]: See All
+            - generic [ref=e1104]:
+              - button "Peterloo poster Play Peterloo Resume Peterloo Peterloo 2018 Movie options" [ref=e1105] [cursor=pointer]:
+                - generic [ref=e1106]:
+                  - img "Peterloo poster" [ref=e1108]
+                  - generic:
+                    - button "Play Peterloo": Play
+                    - button "Resume Peterloo": Resume
+                  - generic:
+                    - heading "Peterloo" [level=3] [ref=e1109]
+                    - generic [ref=e1110]: "2018"
+                  - button "Movie options" [ref=e1115]:
+                    - img [ref=e1116]
+              - button "James Bond On Her Majestys Secret Service poster Play James Bond On Her Majestys Secret Service James Bond On Her Majestys Secret Service 1969 Movie options" [ref=e1122] [cursor=pointer]:
+                - generic [ref=e1123]:
+                  - img "James Bond On Her Majestys Secret Service poster" [ref=e1125]
+                  - generic:
+                    - button "Play James Bond On Her Majestys Secret Service": Play
+                  - generic:
+                    - heading "James Bond On Her Majestys Secret Service" [level=3] [ref=e1126]
+                    - generic [ref=e1127]: "1969"
+                  - button "Movie options" [ref=e1132]:
+                    - img [ref=e1133]
+              - button "Sweeney Todd poster Play Sweeney Todd Sweeney Todd 2007 Movie options" [ref=e1137] [cursor=pointer]:
+                - generic [ref=e1138]:
+                  - img "Sweeney Todd poster" [ref=e1140]
+                  - generic:
+                    - button "Play Sweeney Todd": Play
+                  - generic:
+                    - heading "Sweeney Todd" [level=3] [ref=e1141]
+                    - generic [ref=e1142]: "2007"
+                  - button "Movie options" [ref=e1147]:
+                    - img [ref=e1148]
+              - button "Eraserhead poster Play Eraserhead Eraserhead 1977 Movie options" [ref=e1152] [cursor=pointer]:
+                - generic [ref=e1153]:
+                  - img "Eraserhead poster" [ref=e1155]
+                  - generic:
+                    - button "Play Eraserhead": Play
+                  - generic:
+                    - heading "Eraserhead" [level=3] [ref=e1156]
+                    - generic [ref=e1157]: "1977"
+                  - button "Movie options" [ref=e1162]:
+                    - img [ref=e1163]
+              - button "James Bond A View To A Kill poster Play James Bond A View To A Kill James Bond A View To A Kill 1985 Movie options" [ref=e1167] [cursor=pointer]:
+                - generic [ref=e1168]:
+                  - img "James Bond A View To A Kill poster" [ref=e1170]
+                  - generic:
+                    - button "Play James Bond A View To A Kill": Play
+                  - generic:
+                    - heading "James Bond A View To A Kill" [level=3] [ref=e1171]
+                    - generic [ref=e1172]: "1985"
+                  - button "Movie options" [ref=e1177]:
+                    - img [ref=e1178]
+              - button "James Bond Tomorrow Never Dies poster Play James Bond Tomorrow Never Dies James Bond Tomorrow Never Dies 1997 Movie options" [ref=e1182] [cursor=pointer]:
+                - generic [ref=e1183]:
+                  - img "James Bond Tomorrow Never Dies poster" [ref=e1185]
+                  - generic:
+                    - button "Play James Bond Tomorrow Never Dies": Play
+                  - generic:
+                    - heading "James Bond Tomorrow Never Dies" [level=3] [ref=e1186]
+                    - generic [ref=e1187]: "1997"
+                  - button "Movie options" [ref=e1192]:
+                    - img [ref=e1193]
+              - button "James Bond GoldenEye poster Play James Bond GoldenEye James Bond GoldenEye 1995 Movie options" [ref=e1197] [cursor=pointer]:
+                - generic [ref=e1198]:
+                  - img "James Bond GoldenEye poster" [ref=e1200]
+                  - generic:
+                    - button "Play James Bond GoldenEye": Play
+                  - generic:
+                    - heading "James Bond GoldenEye" [level=3] [ref=e1201]
+                    - generic [ref=e1202]: "1995"
+                  - button "Movie options" [ref=e1207]:
+                    - img [ref=e1208]
+              - button "Skyfall poster Play Skyfall Skyfall 2012 Movie options" [ref=e1212] [cursor=pointer]:
+                - generic [ref=e1213]:
+                  - img "Skyfall poster" [ref=e1215]
+                  - generic:
+                    - button "Play Skyfall": Play
+                  - generic:
+                    - heading "Skyfall" [level=3] [ref=e1216]
+                    - generic [ref=e1217]: "2012"
+                  - button "Movie options" [ref=e1222]:
+                    - img [ref=e1223]
+              - button "From Russia with Love poster Play From Russia with Love From Russia with Love 1963 Movie options" [ref=e1227] [cursor=pointer]:
+                - generic [ref=e1228]:
+                  - img "From Russia with Love poster" [ref=e1230]
+                  - generic:
+                    - button "Play From Russia with Love": Play
+                  - generic:
+                    - heading "From Russia with Love" [level=3] [ref=e1231]
+                    - generic [ref=e1232]: "1963"
+                  - button "Movie options" [ref=e1237]:
+                    - img [ref=e1238]
+              - button "Dr No poster Play Dr No Dr No 1962 Movie options" [ref=e1242] [cursor=pointer]:
+                - generic [ref=e1243]:
+                  - img "Dr No poster" [ref=e1245]
+                  - generic:
+                    - button "Play Dr No": Play
+                  - generic:
+                    - heading "Dr No" [level=3] [ref=e1246]
+                    - generic [ref=e1247]: "1962"
+                  - button "Movie options" [ref=e1252]:
+                    - img [ref=e1253]
+              - button "James Bond Live And Let Die poster Play James Bond Live And Let Die James Bond Live And Let Die 1973 Movie options" [ref=e1257] [cursor=pointer]:
+                - generic [ref=e1258]:
+                  - img "James Bond Live And Let Die poster" [ref=e1260]
+                  - generic:
+                    - button "Play James Bond Live And Let Die": Play
+                  - generic:
+                    - heading "James Bond Live And Let Die" [level=3] [ref=e1261]
+                    - generic [ref=e1262]: "1973"
+                  - button "Movie options" [ref=e1267]:
+                    - img [ref=e1268]
+              - button "James Bond Octopussy poster Play James Bond Octopussy James Bond Octopussy 1983 Movie options" [ref=e1272] [cursor=pointer]:
+                - generic [ref=e1273]:
+                  - img "James Bond Octopussy poster" [ref=e1275]
+                  - generic:
+                    - button "Play James Bond Octopussy": Play
+                  - generic:
+                    - heading "James Bond Octopussy" [level=3] [ref=e1276]
+                    - generic [ref=e1277]: "1983"
+                  - button "Movie options" [ref=e1282]:
+                    - img [ref=e1283]
+  - generic [ref=e1290] [cursor=pointer]: HOVER TEST 2
