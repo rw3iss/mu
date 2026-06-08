@@ -1,7 +1,10 @@
 .recentlyPlayed {
   display: flex;
   flex-direction: column;
-  margin-top: auto;
+  // Bottom-anchoring is handled by the sidebar nav's `margin-bottom: auto`
+  // (see Sidebar.module.scss). This list just sits in the bottom group above
+  // the user row; when collapsed it stays its natural (short) height instead
+  // of being pushed to the middle by a competing auto margin.
   min-height: 0;
   overflow: hidden;
   max-height: calc(100% - 56px);

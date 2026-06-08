@@ -103,7 +103,13 @@
 .nav {
 	flex-shrink: 0;
 	padding: 0;
-	margin: 0;
+	// Single bottom-anchor for the sidebar: this auto bottom-margin absorbs all
+	// free space below the nav, so everything after it (RecentlyPlayed + the
+	// user/logout row) sits at the BOTTOM. Keeping the anchor here — on an
+	// always-present element — avoids competing `margin-top:auto` declarations
+	// on RecentlyPlayed and .userInfo (two of those split the gap and left the
+	// collapsed "RECENT" bar floating in the middle).
+	margin: 0 0 auto;
 	list-style: none;
 
 	li {
@@ -168,11 +174,6 @@
 	padding: var(--space-md);
 	border-top: 1px solid var(--color-border);
 	flex-shrink: 0;
-	// Pin to the bottom of the sidebar regardless of whether RecentlyPlayed is
-	// shown. When "Show recently played" is off the list is removed, leaving no
-	// flex-grow sibling to push this down; the auto top margin absorbs the free
-	// space so the user/logout row stays anchored at the bottom.
-	margin-top: auto;
 }
 
 .avatar {
