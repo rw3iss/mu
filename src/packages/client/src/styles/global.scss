@@ -42,18 +42,25 @@ body {
 //
 // Wrapping the whole selector in `:where()` makes it 0,0,0 specificity, so any
 // component rule that declares its own `transition` (`.navItem`, buttons, …)
-// ALWAYS wins. Those elements therefore keep ONE constant transition timing —
-// never swapped — so hovers stay perfectly smooth. Elements WITHOUT their own
-// transition still pick up this crossfade (only rule that matches) and fade
-// into the new palette. Elements that DO transition simply crossfade their
-// resting colours via their own timing instead. No swap anywhere → no glitch.
+// ALWAYS wins and keeps ONE constant timing — never swapped.
+//
+// Only NON-INHERITED properties are crossfaded (`background-color`,
+// `border-color`). `color` / `fill` / `stroke` are deliberately excluded:
+// they're inherited, so a hover target (e.g. `.navItem`) that animates `color`
+// over its own 150ms passes the animating value down to its children (icon
+// `<svg>`, label `<span>`). Those children have no transition of their own, so
+// during the crossfade window this rule was the only match and gave them a
+// COMPETING 220ms `color` transition on the SAME inherited value — the browser
+// cancelled + restarted it mid-hover, which is the first-hover flash. Verified
+// live via transition-event capture on the real sidebar: dropping the inherited
+// properties removes the child `color` transitions entirely and the flash with
+// them. Text/icon colours simply snap on a theme switch (the background fade is
+// the dominant crossfade visual); interactive elements still fade their own
+// colours via their own transitions.
 :where(html[data-theme-transitioning='true']) :where(*) {
   transition:
     background-color var(--theme-transition-duration, 0ms) ease,
-    color var(--theme-transition-duration, 0ms) ease,
-    border-color var(--theme-transition-duration, 0ms) ease,
-    fill var(--theme-transition-duration, 0ms) ease,
-    stroke var(--theme-transition-duration, 0ms) ease;
+    border-color var(--theme-transition-duration, 0ms) ease;
 }
 
 // ============================================
