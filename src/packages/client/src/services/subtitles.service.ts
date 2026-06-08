@@ -20,11 +20,13 @@ export const subtitlesService = {
 		provider: string,
 		fileId: string,
 		language?: string,
+		releaseName?: string,
 	): Promise<{ subtitle: MovieSubtitleInfo }> {
 		return api.post<{ subtitle: MovieSubtitleInfo }>(`/subtitles/${movieId}/download`, {
 			provider,
 			fileId,
 			language,
+			releaseName,
 		});
 	},
 

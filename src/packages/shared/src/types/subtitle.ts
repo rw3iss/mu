@@ -36,6 +36,9 @@ export interface MovieSubtitleInfo {
 	external?: boolean;
 	/** Marked as this movie's default subtitle (persisted server-side). */
 	default?: boolean;
+	/** Source sidecar filename (external tracks) — shown on hover to
+	 * distinguish multiple downloads of the same language. */
+	fileName?: string;
 	/** Available when there's an active stream session */
 	url?: string;
 }

@@ -12,6 +12,8 @@ export interface SubtitleTrackRow {
 	external?: boolean;
 	/** This movie's chosen default subtitle (at most one true). */
 	default?: boolean;
+	/** Source sidecar filename (external tracks). */
+	fileName?: string;
 }
 
 /**
@@ -72,6 +74,7 @@ export class SubtitleTracksRepository {
 						external: t.external ?? false,
 						// Preserve the default flag (only set when true to keep the JSON lean).
 						...(t.default ? { default: true } : {}),
+						...(t.fileName ? { fileName: t.fileName } : {}),
 					})),
 				),
 			})

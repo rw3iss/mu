@@ -13,6 +13,9 @@ interface SubtitleTrack {
 	external?: boolean;
 	forced?: boolean;
 	codec?: string;
+	/** Source sidecar filename (external tracks) — distinguishes multiple
+	 * downloads of the same language and drives precise deletion. */
+	fileName?: string;
 }
 
 @Injectable()
@@ -145,6 +148,7 @@ export class SubtitleService {
 						language: parsed.language,
 						title: parsed.title,
 						external: true,
+						fileName: path.basename(extFile),
 					});
 					this.logger.debug(`Converted external subtitle: ${path.basename(extFile)}`);
 				} catch (err) {
@@ -295,16 +299,27 @@ export class SubtitleService {
 		]);
 
 		let language = 'und';
+		let langIdx = -1;
 		for (let i = parts.length - 1; i >= 1; i--) {
 			const part = parts[i]!.toLowerCase();
 			if (part === 'forced') continue;
 			if (langCodes.has(part)) {
 				language = part;
+				langIdx = i;
 				break;
 			}
 		}
 
-		const title = forced ? `${language.toUpperCase()} (Forced)` : language.toUpperCase();
+		// Any segments AFTER the language code are a distinguishing tag (e.g. the
+		// release name we attach on download), so multiple same-language
+		// subtitles don't all collapse to a bare "EN".
+		const extras =
+			langIdx >= 0
+				? parts.slice(langIdx + 1).filter((p) => p && p.toLowerCase() !== 'forced')
+				: [];
+		let title = language.toUpperCase();
+		if (forced) title += ' (Forced)';
+		if (extras.length) title += ` · ${extras.join('.')}`;
 		return { language, title, forced };
 	}
 

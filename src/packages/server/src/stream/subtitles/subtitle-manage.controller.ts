@@ -59,6 +59,7 @@ export class SubtitleManageController {
 				forced: t.forced ?? false,
 				external: t.external ?? false,
 				default: t.default ?? false,
+				fileName: t.fileName,
 			})),
 		};
 	}
@@ -122,7 +123,8 @@ export class SubtitleManageController {
 	@Post(':movieId/download')
 	async downloadSubtitle(
 		@Param('movieId') movieId: string,
-		@Body() body: { provider: string; fileId: string; language?: string },
+		@Body()
+		body: { provider: string; fileId: string; language?: string; releaseName?: string },
 	): Promise<{ subtitle: MovieSubtitleInfo }> {
 		if (!body.provider || !body.fileId) {
 			throw new BadRequestException('provider and fileId are required');
@@ -144,11 +146,15 @@ export class SubtitleManageController {
 		);
 
 		const lang = body.language || 'en';
+		// Tag the file with a slug of the release name so multiple same-language
+		// downloads coexist as distinct files instead of overwriting one another.
+		const tag = this.ingestion.slugTag(body.releaseName);
 		const subFilePath = await this.ingestion.writeSidecar(
 			file.filePath,
 			lang,
 			`.${format}`,
 			data,
+			tag,
 		);
 		this.logger.log(`Saved subtitle: ${subFilePath} (${data.length} bytes)`);
 
@@ -165,6 +171,7 @@ export class SubtitleManageController {
 				language: lang,
 				label: newTrack.title || `${lang.toUpperCase()} (Downloaded)`,
 				external: true,
+				fileName: newTrack.fileName,
 			},
 		};
 	}
@@ -209,7 +216,16 @@ export class SubtitleManageController {
 		const parsed = this.subtitleService.parseSubtitleFilename(originalName);
 		const lang = parsed.language !== 'und' ? parsed.language : 'en';
 
-		const subFilePath = await this.ingestion.writeSidecar(file.filePath, lang, ext, fileBuffer);
+		// Tag with the uploaded file's base name so multiple same-language
+		// uploads don't overwrite one another.
+		const tag = this.ingestion.slugTag(path.basename(originalName, ext));
+		const subFilePath = await this.ingestion.writeSidecar(
+			file.filePath,
+			lang,
+			ext,
+			fileBuffer,
+			tag,
+		);
 		this.logger.log(`Uploaded subtitle: ${subFilePath} (${fileBuffer.length} bytes)`);
 
 		const newTrack = await this.ingestion.registerExternal({
@@ -225,6 +241,7 @@ export class SubtitleManageController {
 				language: lang,
 				label: newTrack.title || `${lang.toUpperCase()} (Uploaded)`,
 				external: true,
+				fileName: newTrack.fileName,
 			},
 		};
 	}
@@ -260,9 +277,15 @@ export class SubtitleManageController {
 		const vttPath = this.subtitleService.getSubtitleFile(file.id, idx);
 		await this.unlinkQuietly(vttPath);
 
-		// External tracks own a sidecar file on disk — clean it up too
+		// External tracks own a sidecar file on disk — clean it up too. Prefer the
+		// exact stored filename (multiple same-language sidecars now coexist);
+		// fall back to the legacy language-pattern sweep for older rows.
 		if (track.external) {
-			await this.deleteExternalSidecars(file.filePath, track.language || 'en');
+			if (track.fileName) {
+				await this.unlinkQuietly(path.join(path.dirname(file.filePath), track.fileName));
+			} else {
+				await this.deleteExternalSidecars(file.filePath, track.language || 'en');
+			}
 		}
 
 		// Remove the row and re-index remaining tracks contiguously
@@ -299,17 +322,23 @@ export class SubtitleManageController {
 
 			const defLang = def.language || '';
 			const defExternal = def.external ?? false;
+			// Every downloaded (external) track that isn't the default — including
+			// same-language duplicates, which we can now delete precisely by their
+			// own filename without touching the default.
 			const toRemove = tracks.filter(
-				(t) =>
-					(t.external ?? false) &&
-					t.index !== def.index &&
-					// Never touch a file sharing the default's language (safety).
-					!(defExternal && (t.language || '') === defLang),
+				(t) => (t.external ?? false) && t.index !== def.index,
 			);
 			if (toRemove.length === 0) continue;
 
+			const dir = path.dirname(file.filePath);
 			for (const t of toRemove) {
-				await this.deleteExternalSidecars(file.filePath, t.language || 'en');
+				if (t.fileName) {
+					await this.unlinkQuietly(path.join(dir, t.fileName));
+				} else if (!(defExternal && (t.language || '') === defLang)) {
+					// Legacy row without a stored filename — fall back to the
+					// language sweep, but never when it shares the default's language.
+					await this.deleteExternalSidecars(file.filePath, t.language || 'en');
+				}
 			}
 
 			// Rebuild tracks + VTT cache from what's left on disk, then re-apply

@@ -151,6 +151,7 @@ export function SubtitlePanel({
 					result.provider,
 					result.fileId,
 					result.language,
+					result.releaseName || result.label,
 				);
 				await refreshTracks();
 				onTrackAdded?.(subtitle);
@@ -229,11 +230,14 @@ export function SubtitlePanel({
 								class={styles.trackItem}
 								onClick={() => onSelect?.(t)}
 								role={onSelect ? 'button' : undefined}
+								title={t.fileName || t.label}
 							>
 								<span class={styles.trackLang}>
 									{(t.language || 'und').toUpperCase()}
 								</span>
-								<span class={styles.trackLabel}>{t.label}</span>
+								<span class={styles.trackLabel} title={t.fileName || t.label}>
+									{t.label}
+								</span>
 								{t.default && <span class={styles.badgeDefault}>Default</span>}
 								{t.external && <span class={styles.badge}>External</span>}
 								{t.forced && <span class={styles.badge}>Forced</span>}

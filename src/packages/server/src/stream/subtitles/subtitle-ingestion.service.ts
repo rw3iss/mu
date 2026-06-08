@@ -26,16 +26,42 @@ export class SubtitleIngestionService {
 		private readonly tracksRepo: SubtitleTracksRepository,
 	) {}
 
-	/** Compose `<dir>/<base>.<lang><ext>` next to the movie file. */
-	sidecarPath(moviePath: string, lang: string, ext: string): string {
-		const dir = path.dirname(moviePath);
-		const base = path.basename(moviePath, path.extname(moviePath));
-		return path.join(dir, `${base}.${lang}${ext}`);
+	/**
+	 * Slugify a release/source name into a single dot-free filename token so it
+	 * survives `parseSubtitleFilename` (which splits on dots and would otherwise
+	 * mistake a token for a language code). Returns '' when there's nothing left.
+	 */
+	slugTag(raw: string | undefined | null): string {
+		if (!raw) return '';
+		return raw
+			.normalize('NFKD')
+			.replace(/\.(srt|vtt|ass|ssa|sub)$/i, '')
+			.replace(/[^a-zA-Z0-9]+/g, '-')
+			.replace(/^-+|-+$/g, '')
+			.slice(0, 40);
 	}
 
-	/** Write a subtitle sidecar next to the movie file, returns the absolute path. */
-	async writeSidecar(moviePath: string, lang: string, ext: string, buf: Buffer): Promise<string> {
-		const out = this.sidecarPath(moviePath, lang, ext);
+	/** Compose `<dir>/<base>.<lang>[.<tag>]<ext>` next to the movie file. */
+	sidecarPath(moviePath: string, lang: string, ext: string, tag = ''): string {
+		const dir = path.dirname(moviePath);
+		const base = path.basename(moviePath, path.extname(moviePath));
+		const tagPart = tag ? `.${tag}` : '';
+		return path.join(dir, `${base}.${lang}${tagPart}${ext}`);
+	}
+
+	/**
+	 * Write a subtitle sidecar next to the movie file, returns the absolute path.
+	 * `tag` (a slugified release name) keeps multiple same-language downloads as
+	 * distinct files instead of overwriting one another.
+	 */
+	async writeSidecar(
+		moviePath: string,
+		lang: string,
+		ext: string,
+		buf: Buffer,
+		tag = '',
+	): Promise<string> {
+		const out = this.sidecarPath(moviePath, lang, ext, tag);
 		await writeFile(out, buf);
 		return out;
 	}
@@ -65,7 +91,10 @@ export class SubtitleIngestionService {
 
 		if (tracks.length > 0) {
 			await this.tracksRepo.setTracks(fileId, tracks);
-			return tracks[tracks.length - 1]!;
+			// Return the track for the file we just wrote (it may not be last now
+			// that same-language downloads coexist), matched by filename.
+			const wanted = path.basename(subFilePath);
+			return tracks.find((t) => t.fileName === wanted) ?? tracks[tracks.length - 1]!;
 		}
 
 		// Fallback path — manually register + convert
@@ -77,6 +106,7 @@ export class SubtitleIngestionService {
 			language: lang,
 			title: label,
 			external: true,
+			fileName: path.basename(subFilePath),
 		};
 		existing.push(newTrack);
 		await this.tracksRepo.setTracks(fileId, existing);
