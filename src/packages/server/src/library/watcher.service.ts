@@ -67,7 +67,9 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 		this.scanner
 			.scanSource(payload.id)
 			.catch((err) =>
-				this.logger.error(`Auto-scan failed for ${payload.path}: ${(err as Error).message}`),
+				this.logger.error(
+					`Auto-scan failed for ${payload.path}: ${(err as Error).message}`,
+				),
 			);
 	}
 

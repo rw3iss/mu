@@ -122,6 +122,8 @@ NestJS modules in `packages/server/src/`:
 
 Selected at bootstrap via `jobs.backend` in `config.yml` (`in-memory` or `bullmq`). The factory in `JobModule` instantiates the chosen backend; callers always inject `JobManagerService` and never know which one is active.
 
+**Two-tier concurrency (in-memory provider).** `encoding.maxConcurrentJobs` (default 2) caps total running jobs; `encoding.maxConcurrentIoJobs` (default **1**) is a *second, lower* cap that applies only to whole-file disk-heavy types (`sprite-sheet`, `pre-transcode`, `convert-mp4`). `processQueue` scans the priority queue and skips a heavy job that's blocked by the I/O cap, still running light jobs (metadata/scan) past it — so a fresh-scan burst of sprite/transcode work serializes off one HDD instead of thrashing it and starving playback. Both are set in `Settings → Encoding`. (BullMQ uses its own per-queue concurrency and ignores these.)
+
 To run additional worker processes (BullMQ only):
 ```bash
 cd packages/server && pnpm worker:prod    # local

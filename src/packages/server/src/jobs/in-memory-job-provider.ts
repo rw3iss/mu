@@ -49,6 +49,22 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 	/** Max concurrent jobs (default 2 to avoid saturating the system) */
 	private maxConcurrency = 2;
 
+	/**
+	 * Job types that read an entire movie file off disk (whole-file decode /
+	 * re-encode / thousands of seek-extracts). Running several of these at once
+	 * thrashes the media drive and starves playback, so they get their own,
+	 * much lower concurrency cap (`encoding.maxConcurrentIoJobs`, default 1) on
+	 * TOP of the global one. Light jobs (metadata, scan, cleanup) are unaffected.
+	 */
+	private static readonly IO_HEAVY_TYPES: ReadonlySet<string> = new Set([
+		'sprite-sheet',
+		'pre-transcode',
+		'convert-mp4',
+	]);
+
+	/** Default heavy-I/O concurrency when the setting is unset — serialize. */
+	private maxIoConcurrency = 1;
+
 	/** Set on shutdown so a job finishing after the DB closes can't re-enter the queue. */
 	private stopped = false;
 
@@ -427,9 +443,11 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 		// otherwise throw "database connection is not open" and crash the process.
 		if (this.stopped) return;
 		let maxConcurrency = this.maxConcurrency;
+		let maxIoConcurrency = this.maxIoConcurrency;
 		try {
 			const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
 			maxConcurrency = enc?.maxConcurrentJobs ?? this.maxConcurrency;
+			maxIoConcurrency = enc?.maxConcurrentIoJobs ?? this.maxIoConcurrency;
 		} catch (err: any) {
 			// Transient DB error (locked / closing) — fall back to the default and
 			// don't take the whole process down over a queue-tick settings read.
@@ -437,12 +455,35 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 				`processQueue: settings read failed, using default concurrency: ${err.message}`,
 			);
 		}
-		while (this.running.size < maxConcurrency && this.queue.length > 0) {
-			const jobId = this.queue.shift();
-			if (!jobId) break;
+		// Heavy-I/O cap is meaningless above the global cap; never exceed it.
+		const ioCap = Math.max(1, Math.min(maxIoConcurrency, maxConcurrency));
 
-			const job = this.jobs.get(jobId);
-			if (!job || job.status !== 'pending') continue;
+		let heavyRunning = this.countRunningHeavy();
+
+		// Scan the priority-ordered queue rather than always shifting the head: a
+		// heavy job that's blocked by the I/O cap is LEFT in place while we look
+		// further down for a light job that can still run. This serializes
+		// sprite/transcode/convert work without idling the box on metadata/scans.
+		let idx = 0;
+		while (this.running.size < maxConcurrency && idx < this.queue.length) {
+			const jobId = this.queue[idx];
+			const job = jobId ? this.jobs.get(jobId) : undefined;
+
+			// Drop stale/cancelled entries in place.
+			if (!job || job.status !== 'pending') {
+				this.queue.splice(idx, 1);
+				continue;
+			}
+
+			const isHeavy = InMemoryJobProvider.IO_HEAVY_TYPES.has(job.type);
+			if (isHeavy && heavyRunning >= ioCap) {
+				// Can't start another heavy job yet — skip past it (stays queued).
+				idx++;
+				continue;
+			}
+
+			// Eligible: remove from the queue (next job shifts into this index).
+			this.queue.splice(idx, 1);
 
 			const handler = this.handlers.get(job.type);
 			if (!handler) {
@@ -454,8 +495,19 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 				continue;
 			}
 
+			if (isHeavy) heavyRunning++;
 			this.runJob(job, handler);
 		}
+	}
+
+	/** Count currently-running jobs that are heavy disk-I/O (see IO_HEAVY_TYPES). */
+	private countRunningHeavy(): number {
+		let n = 0;
+		for (const id of this.running) {
+			const job = this.jobs.get(id);
+			if (job && InMemoryJobProvider.IO_HEAVY_TYPES.has(job.type)) n++;
+		}
+		return n;
 	}
 
 	private async runJob(job: JobRecord, handler: JobHandler): Promise<void> {

@@ -273,6 +273,7 @@ export function Settings(props: SettingsProps) {
 	const [rateControl, setRateControl] = useState('cbr');
 	const [crfValue, setCrfValue] = useState('23');
 	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState('2');
+	const [maxConcurrentIoJobs, setMaxConcurrentIoJobs] = useState('1');
 	const [segmentDuration, setSegmentDuration] = useState('4');
 	const [useChunkedTranscoding, setUseChunkedTranscoding] = useState(false);
 	const [debugTranscoding, setDebugTranscoding] = useState(false);
@@ -400,6 +401,8 @@ export function Settings(props: SettingsProps) {
 					if (encoding.crf != null) setCrfValue(String(encoding.crf));
 					if (encoding.maxConcurrentJobs != null)
 						setMaxConcurrentJobs(String(encoding.maxConcurrentJobs));
+					if (encoding.maxConcurrentIoJobs != null)
+						setMaxConcurrentIoJobs(String(encoding.maxConcurrentIoJobs));
 					if (encoding.segmentDuration != null)
 						setSegmentDuration(String(encoding.segmentDuration));
 					if (encoding.useChunkedTranscoding != null)
@@ -549,6 +552,7 @@ export function Settings(props: SettingsProps) {
 					rateControl,
 					crf: parseInt(crfValue, 10),
 					maxConcurrentJobs: parseInt(maxConcurrentJobs, 10),
+					maxConcurrentIoJobs: parseInt(maxConcurrentIoJobs, 10),
 					segmentDuration: parseInt(segmentDuration, 10),
 					useChunkedTranscoding,
 					debugTranscoding,
@@ -580,6 +584,7 @@ export function Settings(props: SettingsProps) {
 		rateControl,
 		crfValue,
 		maxConcurrentJobs,
+		maxConcurrentIoJobs,
 		segmentDuration,
 		useChunkedTranscoding,
 		debugTranscoding,
@@ -2169,7 +2174,8 @@ export function Settings(props: SettingsProps) {
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Max Concurrent Jobs</span>
 									<span class={styles.settingDescription}>
-										Background encoding jobs that can run simultaneously
+										Total background jobs (metadata, scans, encoding, sprites)
+										that can run at once
 									</span>
 								</div>
 								<Select
@@ -2182,6 +2188,29 @@ export function Settings(props: SettingsProps) {
 										{ value: '4', label: '4' },
 										{ value: '6', label: '6' },
 										{ value: '8', label: '8' },
+									]}
+								/>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Max Concurrent Disk-Heavy Jobs
+									</span>
+									<span class={styles.settingDescription}>
+										How many whole-file jobs (sprite previews, transcoding, MP4
+										conversion) read a movie off disk at once. Keep at 1 on a
+										single HDD so new-movie processing doesn’t starve playback.
+									</span>
+								</div>
+								<Select
+									value={maxConcurrentIoJobs}
+									onChange={setMaxConcurrentIoJobs}
+									options={[
+										{ value: '1', label: '1 (Serialize — recommended)' },
+										{ value: '2', label: '2' },
+										{ value: '3', label: '3' },
+										{ value: '4', label: '4' },
 									]}
 								/>
 							</div>
