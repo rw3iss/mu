@@ -112,6 +112,9 @@ export class LibraryService {
 			.where(eq(mediaSources.id, id))
 			.run();
 
+		// Enable/disable (and other edits) change which paths the watcher covers.
+		this.events.emit('library:source-updated', { id, path: existing.path });
+
 		return this.getSource(id);
 	}
 }

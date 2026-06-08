@@ -24,6 +24,7 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger('WatcherService');
 	private watchers = new Map<string, FSWatcher>();
 	private debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private readonly extSet = new Set(SUPPORTED_VIDEO_EXTENSIONS.map((e) => e.toLowerCase()));
 
 	constructor(
@@ -38,6 +39,17 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 	) {}
 
 	async onModuleInit() {
+		// React to media-source changes made in Settings → Library so EVERY
+		// configured path is covered, not just the ones present at boot. Adding a
+		// source auto-scans it and (re)builds watchers across all sources; removing
+		// or toggling a source just rebuilds watchers. Subscribed unconditionally so
+		// auto-scan-on-add still works even when live watching is disabled.
+		this.events.on('library:source-added', (payload) =>
+			this.onSourceAdded(payload as { id: string; path: string }),
+		);
+		this.events.on('library:source-removed', () => this.scheduleWatcherRefresh());
+		this.events.on('library:source-updated', () => this.scheduleWatcherRefresh());
+
 		const watchEnabled = this.config.get<boolean>('library.watchEnabled', true);
 		if (!watchEnabled) {
 			this.logger.log('File watching disabled by configuration');
@@ -46,6 +58,33 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 
 		await this.refreshWatchers();
 		this.logger.log('File watcher service initialized');
+	}
+
+	/** A new media source appeared — scan it and re-watch all configured paths. */
+	private onSourceAdded(payload: { id: string; path: string }) {
+		this.scheduleWatcherRefresh();
+		this.logger.log(`New media source added (${payload.path}) — scanning…`);
+		this.scanner
+			.scanSource(payload.id)
+			.catch((err) =>
+				this.logger.error(`Auto-scan failed for ${payload.path}: ${(err as Error).message}`),
+			);
+	}
+
+	/**
+	 * Debounced rebuild of the watcher set. Bulk source edits (e.g. PUT /sources/sync
+	 * adding several paths at once) emit one event per source; coalesce them into a
+	 * single refresh so we don't tear down and recreate every watcher repeatedly.
+	 */
+	private scheduleWatcherRefresh() {
+		if (!this.config.get<boolean>('library.watchEnabled', true)) return;
+		if (this.refreshTimer) clearTimeout(this.refreshTimer);
+		this.refreshTimer = setTimeout(() => {
+			this.refreshTimer = null;
+			this.refreshWatchers().catch((err) =>
+				this.logger.error(`Failed to refresh watchers: ${(err as Error).message}`),
+			);
+		}, 1500);
 	}
 
 	onModuleDestroy() {
@@ -59,6 +98,11 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 			clearTimeout(timer);
 		}
 		this.debounceTimers.clear();
+
+		if (this.refreshTimer) {
+			clearTimeout(this.refreshTimer);
+			this.refreshTimer = null;
+		}
 	}
 
 	async refreshWatchers() {
