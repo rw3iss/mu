@@ -55,6 +55,18 @@
 	animation: menuFadeIn 120ms ease;
 }
 
+// Rendered through a portal to <body> so the card's overflow:hidden can't clip
+// it; positioned via inline fixed top/right computed from the trigger.
+.menuPortal {
+	position: fixed;
+	top: auto;
+	z-index: var(--z-overlay, 1000);
+}
+
+.compactMenu {
+	min-width: 200px;
+}
+
 @keyframes menuFadeIn {
 	from {
 		opacity: 0;

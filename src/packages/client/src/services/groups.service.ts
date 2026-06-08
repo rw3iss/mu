@@ -70,6 +70,16 @@ export const groupsService = {
 		return api.post(`/groups/${id}/reject`, {});
 	},
 
+	/** Preview an on-disk group deletion: member count + common folder. */
+	deletePreview(id: string): Promise<{ name: string; count: number; folder: string | null }> {
+		return api.get(`/groups/${id}/delete-preview`);
+	},
+
+	/** Delete every member movie of a group from disk, then remove the group. */
+	deleteFromDisk(id: string): Promise<{ deleted: number; failed: number; total: number }> {
+		return api.post(`/groups/${id}/delete-files`, {});
+	},
+
 	patch(
 		id: string,
 		body: Partial<{

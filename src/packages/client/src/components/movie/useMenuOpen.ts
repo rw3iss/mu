@@ -1,42 +1,63 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
+export interface MenuPosition {
+	/** Fixed-position top (px) — just below the trigger. */
+	top: number;
+	/** Fixed-position right inset (px) — aligns the menu's right edge to the trigger. */
+	right: number;
+}
+
 /**
- * Open / close state for an inline pop-out menu (e.g. the
- * three-dot options menu on a movie card). Handles two pieces
- * of plumbing every such menu needs:
+ * Open / close state for a pop-out menu (the three-dot options menu on a card).
  *
- * 1. Outside-click closes the menu.
- * 2. While open, raises the nearest "card" ancestor (anything with
- *    `role="button"`) above its siblings so the menu doesn't get
- *    clipped or overlap-hidden by neighbouring cards in the grid.
+ * The dropdown is meant to be rendered through a portal to `document.body` and
+ * positioned with `position: fixed` from `pos`, so it can never be clipped by a
+ * card's `overflow: hidden` (the movie/group cards now overlay their info on the
+ * poster, which clips). Plumbing handled here:
  *
- * The ref returned must be attached to the menu's outermost element
- * so the outside-click handler knows what counts as "inside".
+ *  1. `pos` — measured from the trigger (`ref`) each time the menu opens.
+ *  2. Outside-click closes the menu — counting BOTH the trigger (`ref`) and the
+ *     portaled menu (`menuRef`) as "inside".
+ *  3. Scroll / resize closes the menu (a fixed-position dropdown would otherwise
+ *     drift away from its trigger).
+ *
+ * Attach `ref` to the trigger's container and `menuRef` to the portaled menu.
  */
 export function useMenuOpen() {
 	const [open, setOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
+	const menuRef = useRef<HTMLDivElement>(null);
+	const [pos, setPos] = useState<MenuPosition | null>(null);
 
 	useEffect(() => {
-		if (!open) return;
+		if (!open) {
+			setPos(null);
+			return;
+		}
 
-		const card = ref.current?.closest('[role="button"]') as HTMLElement | null;
-		if (card) {
-			card.style.zIndex = '50';
-			card.style.position = 'relative';
+		const el = ref.current;
+		if (el) {
+			const r = el.getBoundingClientRect();
+			setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
 		}
 
 		const onMouseDown = (e: MouseEvent) => {
-			if (ref.current && !ref.current.contains(e.target as Node)) {
-				setOpen(false);
-			}
+			const t = e.target as Node;
+			if (ref.current?.contains(t) || menuRef.current?.contains(t)) return;
+			setOpen(false);
 		};
+		const dismiss = () => setOpen(false);
+
 		document.addEventListener('mousedown', onMouseDown);
+		window.addEventListener('resize', dismiss);
+		// capture-phase so it fires for scrolls inside any ancestor too.
+		window.addEventListener('scroll', dismiss, true);
 		return () => {
 			document.removeEventListener('mousedown', onMouseDown);
-			if (card) card.style.zIndex = '';
+			window.removeEventListener('resize', dismiss);
+			window.removeEventListener('scroll', dismiss, true);
 		};
 	}, [open]);
 
-	return { open, setOpen, ref };
+	return { open, setOpen, ref, menuRef, pos };
 }

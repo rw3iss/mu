@@ -1,3 +1,4 @@
+import { createPortal } from 'preact/compat';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
@@ -47,7 +48,7 @@ export function MovieOptionsMenu({
 	onMovieRemoved,
 	compact,
 }: MovieOptionsMenuProps) {
-	const { open, setOpen, ref: menuRef } = useMenuOpen();
+	const { open, setOpen, ref: containerRef, menuRef: dropdownRef, pos } = useMenuOpen();
 	const [rescanState, setRescanState] = useState<AsyncActionState>('idle');
 	const [refreshState, setRefreshState] = useState<AsyncActionState>('idle');
 	const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
@@ -361,7 +362,7 @@ export function MovieOptionsMenu({
 	}
 
 	return (
-		<div class={`${styles.container} ${compact ? styles.compact : ''}`} ref={menuRef}>
+		<div class={`${styles.container} ${compact ? styles.compact : ''}`} ref={containerRef}>
 			<button
 				class={styles.trigger}
 				onClick={toggleMenu}
@@ -375,9 +376,15 @@ export function MovieOptionsMenu({
 				</svg>
 			</button>
 
-			{open && (
-				<div class={styles.menu} onClick={(e: Event) => e.stopPropagation()}>
-					<button
+			{open &&
+				createPortal(
+					<div
+						ref={dropdownRef}
+						class={`${styles.menu} ${styles.menuPortal} ${compact ? styles.compactMenu : ''}`}
+						style={pos ? { top: `${pos.top}px`, right: `${pos.right}px` } : undefined}
+						onClick={(e: Event) => e.stopPropagation()}
+					>
+						<button
 						class={styles.menuItem}
 						onClick={handleRescan}
 						disabled={rescanState !== 'idle'}
@@ -545,8 +552,9 @@ export function MovieOptionsMenu({
 						</span>
 						Delete from Disk
 					</button>
-				</div>
-			)}
+				</div>,
+					document.body,
+				)}
 
 			<ConfirmDialog
 				isOpen={showClearMetaConfirm}

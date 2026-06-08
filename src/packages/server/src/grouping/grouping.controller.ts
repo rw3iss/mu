@@ -13,6 +13,7 @@ import { RequireAction } from '../common/decorators/require-action.decorator.js'
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { EventsService } from '../events/events.service.js';
 import { MatchCandidatesRepository } from '../metadata/match-candidates.repository.js';
+import { MoviesService } from '../movies/movies.service.js';
 import { GroupingService } from './grouping.service.js';
 import { GroupsRepository } from './groups.repository.js';
 
@@ -37,6 +38,7 @@ export class GroupingController {
 		private readonly repo: GroupsRepository,
 		private readonly matchCandidates: MatchCandidatesRepository,
 		private readonly events: EventsService,
+		private readonly moviesService: MoviesService,
 	) {}
 
 	/**
@@ -131,6 +133,40 @@ export class GroupingController {
 		this.groupingService.rejectGroup(id);
 		this.groupsChanged();
 		return { ok: true };
+	}
+
+	/** Preview the on-disk deletion of a whole group (member count + folder). */
+	@Roles('admin')
+	@RequireAction('delete:movie')
+	@Get(':id/delete-preview')
+	deletePreview(@Param('id') id: string) {
+		const preview = this.groupingService.getDeletePreview(id);
+		if (!preview) throw new NotFoundException(`Group ${id} not found`);
+		return preview;
+	}
+
+	/** Delete every member movie of a group from disk, then remove the group. */
+	@Roles('admin')
+	@RequireAction('delete:movie')
+	@Post(':id/delete-files')
+	async deleteFromDisk(@Param('id') id: string) {
+		const group = this.repo.get(id);
+		if (!group) throw new NotFoundException(`Group ${id} not found`);
+		const ids = this.groupingService.getMemberMovieIds(id);
+		let deleted = 0;
+		let failed = 0;
+		for (const movieId of ids) {
+			try {
+				await this.moviesService.deleteFromDisk(movieId, false);
+				deleted++;
+			} catch {
+				failed++;
+			}
+		}
+		// Members are gone — drop the (now empty) group rows too.
+		this.groupingService.rejectGroup(id);
+		this.groupsChanged();
+		return { deleted, failed, total: ids.length };
 	}
 
 	@RequireAction('edit:movie')

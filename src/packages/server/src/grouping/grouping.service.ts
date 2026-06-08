@@ -3,7 +3,7 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { WsEvent } from '@mu/shared';
 import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { type Movie, movieFiles, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -479,6 +479,41 @@ export class GroupingService implements OnModuleInit {
 		this.repo.update(id, { status: 'confirmed', altParents: null });
 	}
 
+	/**
+	 * All member movie IDs of a group — for a parent, across every subgroup;
+	 * for a subgroup, its direct members. Empty when the group is unknown.
+	 */
+	getMemberMovieIds(groupId: string): string[] {
+		const group = this.repo.get(groupId);
+		if (!group) return [];
+		const ids: string[] = [];
+		if (group.type === 'parent') {
+			for (const child of this.repo.listChildren(groupId)) {
+				for (const m of this.repo.listMoviesInSubgroup(child.id)) ids.push(m.id);
+			}
+		} else {
+			for (const m of this.repo.listMoviesInSubgroup(groupId)) ids.push(m.id);
+		}
+		return ids;
+	}
+
+	/** Preview for "delete group from disk": member count + common folder. */
+	getDeletePreview(groupId: string): { name: string; count: number; folder: string | null } | null {
+		const group = this.repo.get(groupId);
+		if (!group) return null;
+		const ids = this.getMemberMovieIds(groupId);
+		const paths = ids.length
+			? this.database.db
+					.select({ p: movieFiles.filePath })
+					.from(movieFiles)
+					.where(inArray(movieFiles.movieId, ids))
+					.all()
+					.map((r) => r.p)
+					.filter((p): p is string => !!p)
+			: [];
+		return { name: group.name, count: ids.length, folder: commonParentFolder(paths) };
+	}
+
 	rejectGroup(id: string): void {
 		// Detach all members, delete the group, prune parent if now empty.
 		const group = this.repo.get(id);
@@ -636,4 +671,18 @@ function bucketByCount(subgroups: Array<{ memberCount: number }>): {
 		else large++;
 	}
 	return { singletons, pairs, small, large };
+}
+
+/** Longest shared parent directory across a set of file paths, or null. */
+function commonParentFolder(paths: string[]): string | null {
+	if (paths.length === 0) return null;
+	const dirs = paths.map((p) => p.replace(/\\/g, '/').split('/').slice(0, -1));
+	let common = dirs[0]!;
+	for (const d of dirs.slice(1)) {
+		let i = 0;
+		while (i < common.length && i < d.length && common[i] === d[i]) i++;
+		common = common.slice(0, i);
+		if (common.length === 0) break;
+	}
+	return common.length ? common.join('/') : null;
 }

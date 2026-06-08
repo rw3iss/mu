@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { EventsModule } from '../events/events.module.js';
 import { MetadataModule } from '../metadata/metadata.module.js';
+import { MoviesModule } from '../movies/movies.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { FolderTreeDetector } from './detectors/folder-tree-detector.js';
 import { FuzzyTitleDetector } from './detectors/fuzzy-title-detector.js';
@@ -20,7 +21,7 @@ import { GroupsRepository } from './groups.repository.js';
  * registering it inside GroupingService's constructor.
  */
 @Module({
-	imports: [SettingsModule, EventsModule, MetadataModule],
+	imports: [SettingsModule, EventsModule, MetadataModule, forwardRef(() => MoviesModule)],
 	controllers: [GroupingController],
 	providers: [
 		GroupsRepository,

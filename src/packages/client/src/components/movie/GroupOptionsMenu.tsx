@@ -1,4 +1,6 @@
+import { createPortal } from 'preact/compat';
 import { useState } from 'preact/hooks';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { groupsService, type MovieGroup } from '@/services/groups.service';
 import { invalidateGroups, pageGroups, parentGroups } from '@/state/groups.state';
 import { fetchMovies } from '@/state/library.state';
@@ -19,11 +21,14 @@ interface GroupOptionsMenuProps {
  * (parent groups), and Ungroup.
  */
 export function GroupOptionsMenu({ group, compact }: GroupOptionsMenuProps) {
-	const { open, setOpen, ref } = useMenuOpen();
+	const { open, setOpen, ref, menuRef, pos } = useMenuOpen();
 	const [busy, setBusy] = useState(false);
+	const [showDelete, setShowDelete] = useState(false);
+	const [preview, setPreview] = useState<{ count: number; folder: string | null } | null>(null);
 
 	const isUnsure = group.status === 'unsure';
 	const isParent = group.type === 'parent';
+	const typeLabel = group.groupType === 'collection' ? 'collection' : 'series';
 
 	const dropFromSignals = () => {
 		pageGroups.value = pageGroups.value.filter((g) => g.id !== group.id);
@@ -82,6 +87,35 @@ export function GroupOptionsMenu({ group, compact }: GroupOptionsMenuProps) {
 		}
 	}
 
+	async function handleDeleteClick() {
+		setOpen(false);
+		try {
+			const p = await groupsService.deletePreview(group.id);
+			setPreview({ count: p.count, folder: p.folder });
+		} catch {
+			setPreview({ count: group.totalMembers ?? 0, folder: null });
+		}
+		setShowDelete(true);
+	}
+
+	async function handleDeleteConfirm() {
+		setShowDelete(false);
+		setBusy(true);
+		try {
+			const res = await groupsService.deleteFromDisk(group.id);
+			dropFromSignals();
+			invalidateGroups();
+			notifySuccess(
+				`Deleted ${res.deleted} item(s) from disk${res.failed ? ` (${res.failed} failed)` : ''}`,
+			);
+			await fetchMovies(1).catch(() => {});
+		} catch {
+			notifyError('Failed to delete group from disk');
+		} finally {
+			setBusy(false);
+		}
+	}
+
 	return (
 		<div
 			class={`${styles.container} ${compact ? styles.compact : ''}`}
@@ -104,27 +138,75 @@ export function GroupOptionsMenu({ group, compact }: GroupOptionsMenuProps) {
 				</svg>
 			</button>
 
-			{open && (
-				<div class={styles.menu} onClick={(e: Event) => e.stopPropagation()}>
-					{isUnsure && (
-						<button class={styles.menuItem} onClick={handleConfirm} disabled={busy}>
-							Confirm Group
-						</button>
-					)}
-					{isParent && (
-						<button class={styles.menuItem} onClick={handleRefreshMetadata} disabled={busy}>
-							Refresh Metadata
-						</button>
-					)}
-					<button
-						class={`${styles.menuItem} ${styles.danger}`}
-						onClick={handleUngroup}
-						disabled={busy}
+			{open &&
+				createPortal(
+					<div
+						ref={menuRef}
+						class={`${styles.menu} ${styles.menuPortal} ${compact ? styles.compactMenu : ''}`}
+						style={pos ? { top: `${pos.top}px`, right: `${pos.right}px` } : undefined}
+						onClick={(e: Event) => e.stopPropagation()}
 					>
-						Ungroup
-					</button>
-				</div>
-			)}
+						{isUnsure && (
+							<button class={styles.menuItem} onClick={handleConfirm} disabled={busy}>
+								Confirm Group
+							</button>
+						)}
+						{isParent && (
+							<button
+								class={styles.menuItem}
+								onClick={handleRefreshMetadata}
+								disabled={busy}
+							>
+								Refresh Metadata
+							</button>
+						)}
+						<button
+							class={styles.menuItem}
+							onClick={handleUngroup}
+							disabled={busy}
+						>
+							Ungroup
+						</button>
+						<div class={styles.menuDivider} />
+						<button
+							class={`${styles.menuItem} ${styles.danger}`}
+							onClick={handleDeleteClick}
+							disabled={busy}
+						>
+							Delete from Disk
+						</button>
+					</div>,
+					document.body,
+				)}
+
+			<ConfirmDialog
+				isOpen={showDelete}
+				onClose={() => setShowDelete(false)}
+				onConfirm={handleDeleteConfirm}
+				title={`Delete ${typeLabel} from disk`}
+				confirmLabel="Delete from Disk"
+				variant="danger"
+				message={
+					<span>
+						Permanently delete{' '}
+						<strong>
+							{preview?.count ?? group.totalMembers ?? 0} item
+							{(preview?.count ?? group.totalMembers ?? 0) === 1 ? '' : 's'}
+						</strong>{' '}
+						in “{group.name}” from disk?
+						{preview?.folder && (
+							<>
+								<br />
+								<br />
+								Folder: <code>{preview.folder}</code>
+							</>
+						)}
+						<br />
+						<br />
+						This removes the movie files from disk and cannot be undone.
+					</span>
+				}
+			/>
 		</div>
 	);
 }
