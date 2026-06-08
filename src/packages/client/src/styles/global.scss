@@ -32,7 +32,15 @@ body {
 // its own per-rule timings during regular interaction — this block
 // only kicks in while `<html data-theme-transitioning='true'>` is
 // set by the theme apply runtime (one tick around the switch).
-html[data-theme-transitioning='true'] :where(*) {
+//
+// `:not(:hover)` is critical: the actively-hovered element keeps its OWN
+// hover transition during the crossfade window. Without it, hovering an
+// item (e.g. a sidebar link) right after a theme save/refresh would start
+// its hover fade under this `!important` timing, then get interrupted when
+// the attribute is removed mid-transition — a visible flash-off-then-on on
+// the first hover. Excluding `:hover` means a hovered element's transition
+// is never swapped out from under it, so hovers stay silky smooth.
+html[data-theme-transitioning='true'] :where(*):not(:hover) {
   transition:
     background-color var(--theme-transition-duration, 0ms) ease,
     color var(--theme-transition-duration, 0ms) ease,

@@ -1200,6 +1200,7 @@ export function Settings(props: SettingsProps) {
 												</div>
 											</div>
 
+											<div class={styles.themeGroupHeader}>Backgrounds</div>
 											{/* Page Background */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
@@ -1263,31 +1264,7 @@ export function Settings(props: SettingsProps) {
 													/>
 												</div>
 											</div>
-											{/* Hover Background */}
-											<div class={styles.settingRow}>
-												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>
-														Hover Background
-													</span>
-													<span class={styles.settingDescription}>
-														Highlight behind rows, section headers, and
-														sidebar/menu items on hover
-													</span>
-												</div>
-												<div class={styles.settingControl}>
-													<ColorPicker
-														value={
-															editConfig.hoverBg ||
-															editConfig.panelBg ||
-															'#161b27'
-														}
-														onChange={(v) =>
-															updateEditConfig({ hoverBg: v })
-														}
-													/>
-												</div>
-											</div>
-
+											<div class={styles.themeGroupHeader}>Text</div>
 											{/* Section Label */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
@@ -1366,84 +1343,7 @@ export function Settings(props: SettingsProps) {
 												</div>
 											</div>
 
-											{/* Hover Text */}
-											<div class={styles.settingRow}>
-												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>
-														Hover Text
-													</span>
-													<span class={styles.settingDescription}>
-														Text colour of hovered rows / items
-													</span>
-												</div>
-												<div class={styles.settingControl}>
-													<ColorPicker
-														value={
-															editConfig.hoverText ||
-															editConfig.tokens?.[
-																'color-text-primary'
-															] ||
-															'#d8dee9'
-														}
-														onChange={(v) =>
-															updateEditConfig({ hoverText: v })
-														}
-													/>
-												</div>
-											</div>
-
-											{/* Input Background */}
-											<div class={styles.settingRow}>
-												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>
-														Input Background
-													</span>
-													<span class={styles.settingDescription}>
-														Text field, search, and dropdown background
-													</span>
-												</div>
-												<div class={styles.settingControl}>
-													<ColorPicker
-														value={
-															editConfig.inputBg ||
-															editConfig.tokens?.[
-																'color-bg-elevated'
-															] ||
-															'#10141e'
-														}
-														onChange={(v) =>
-															updateEditConfig({ inputBg: v })
-														}
-													/>
-												</div>
-											</div>
-
-											{/* Input Text */}
-											<div class={styles.settingRow}>
-												<div class={styles.settingInfo}>
-													<span class={styles.settingLabel}>
-														Input Text
-													</span>
-													<span class={styles.settingDescription}>
-														Text inside input / search fields
-													</span>
-												</div>
-												<div class={styles.settingControl}>
-													<ColorPicker
-														value={
-															editConfig.inputText ||
-															editConfig.tokens?.[
-																'color-text-primary'
-															] ||
-															'#d8dee9'
-														}
-														onChange={(v) =>
-															updateEditConfig({ inputText: v })
-														}
-													/>
-												</div>
-											</div>
-
+											<div class={styles.themeGroupHeader}>Items</div>
 											{/* Item Spacing */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
@@ -1626,6 +1526,112 @@ export function Settings(props: SettingsProps) {
 												</div>
 											)}
 
+											<div class={styles.themeGroupHeader}>Hover</div>
+											{/* Hover Background */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Hover Background
+													</span>
+													<span class={styles.settingDescription}>
+														Highlight behind rows, section headers, and
+														sidebar/menu items on hover
+													</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={
+															editConfig.hoverBg ||
+															editConfig.panelBg ||
+															'#161b27'
+														}
+														onChange={(v) =>
+															updateEditConfig({ hoverBg: v })
+														}
+													/>
+												</div>
+											</div>
+
+											{/* Hover Text */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Hover Text
+													</span>
+													<span class={styles.settingDescription}>
+														Text colour of hovered rows / items
+													</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={
+															editConfig.hoverText ||
+															editConfig.tokens?.[
+																'color-text-primary'
+															] ||
+															'#d8dee9'
+														}
+														onChange={(v) =>
+															updateEditConfig({ hoverText: v })
+														}
+													/>
+												</div>
+											</div>
+
+											<div class={styles.themeGroupHeader}>Inputs</div>
+											{/* Input Background */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Input Background
+													</span>
+													<span class={styles.settingDescription}>
+														Text field, search, and dropdown background
+													</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={
+															editConfig.inputBg ||
+															editConfig.tokens?.[
+																'color-bg-elevated'
+															] ||
+															'#10141e'
+														}
+														onChange={(v) =>
+															updateEditConfig({ inputBg: v })
+														}
+													/>
+												</div>
+											</div>
+
+											{/* Input Text */}
+											<div class={styles.settingRow}>
+												<div class={styles.settingInfo}>
+													<span class={styles.settingLabel}>
+														Input Text
+													</span>
+													<span class={styles.settingDescription}>
+														Text inside input / search fields
+													</span>
+												</div>
+												<div class={styles.settingControl}>
+													<ColorPicker
+														value={
+															editConfig.inputText ||
+															editConfig.tokens?.[
+																'color-text-primary'
+															] ||
+															'#d8dee9'
+														}
+														onChange={(v) =>
+															updateEditConfig({ inputText: v })
+														}
+													/>
+												</div>
+											</div>
+
+											<div class={styles.themeGroupHeader}>Text Size</div>
 											{/* Theme Font Scale (multiplier on top of base) */}
 											<div class={styles.settingRow}>
 												<div class={styles.settingInfo}>
