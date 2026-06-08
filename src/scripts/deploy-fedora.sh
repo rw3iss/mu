@@ -96,7 +96,17 @@ pnpm db:migrate >/tmp/mu-deploy-migrate.log 2>&1 || echo "WARN: db:migrate non-z
 
 echo ">> restarting mu-server (fast)…"
 RESTART_START=$(date +%s)
-systemctl --user restart mu-server || { echo "FATAL: systemctl restart"; exit 1; }
+# The restart can be "canceled" if the auto-deploy watcher (paused above, but it
+# may have already begun its own deploy from the same push) issues a competing
+# restart. reset-failed + one retry makes the manual deploy self-heal instead of
+# leaving the service down.
+systemctl --user reset-failed mu-server 2>/dev/null || true
+if ! systemctl --user restart mu-server 2>/dev/null; then
+	echo ">> restart interrupted (autodeploy race?) — retrying once…"
+	sleep 2
+	systemctl --user reset-failed mu-server 2>/dev/null || true
+	systemctl --user restart mu-server || { echo "FATAL: systemctl restart"; exit 1; }
+fi
 
 # Wait for the new process to bind + serve (200 SPA or 401 auth-gated both = up).
 UP=false
