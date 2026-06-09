@@ -510,6 +510,28 @@ export class MoviesService implements OnModuleInit {
 		if (query.search) conds.push(like(movies.title, `%${query.search}%`));
 		if (query.yearFrom) conds.push(sql`${movies.year} >= ${query.yearFrom}`);
 		if (query.yearTo) conds.push(sql`${movies.year} <= ${query.yearTo}`);
+		// Rating/votes/runtime — same self-contained conditions as findAll(), so
+		// they apply to the interleaved library view (the path the client uses).
+		if (query.minRating != null && Number(query.minRating) > 0) {
+			conds.push(sql`COALESCE(
+				(SELECT ${movieMetadata.imdbRating} FROM ${movieMetadata} WHERE ${movieMetadata.movieId} = ${movies.id}),
+				(SELECT ${imdbRatings.averageRating} FROM ${imdbRatings} WHERE ${imdbRatings.tconst} = ${movies.imdbId}),
+				0
+			) >= ${Number(query.minRating)}`);
+		}
+		if (query.minVotes != null && Number(query.minVotes) > 0) {
+			conds.push(sql`COALESCE(
+				(SELECT ${movieMetadata.imdbVotes} FROM ${movieMetadata} WHERE ${movieMetadata.movieId} = ${movies.id}),
+				(SELECT ${imdbRatings.numVotes} FROM ${imdbRatings} WHERE ${imdbRatings.tconst} = ${movies.imdbId}),
+				0
+			) >= ${Math.floor(Number(query.minVotes))}`);
+		}
+		if (query.minRuntime != null && Number(query.minRuntime) > 0) {
+			conds.push(sql`${movies.runtimeMinutes} >= ${Math.floor(Number(query.minRuntime))}`);
+		}
+		if (query.maxRuntime != null && Number(query.maxRuntime) > 0) {
+			conds.push(sql`${movies.runtimeMinutes} <= ${Math.floor(Number(query.maxRuntime))}`);
+		}
 
 		const ratingJoinCond = userId
 			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
