@@ -62,6 +62,8 @@ export interface ProfileHistoryItem {
 	positionSeconds: number;
 	durationSeconds: number | null;
 	completed: boolean;
+	/** This user's own internal (mu) rating for the movie, if they rated it. */
+	rating: number | null;
 }
 
 /** The "Watching Now" tout — the user's most recent movie with a live session. */
@@ -74,6 +76,8 @@ export interface CurrentlyWatching {
 	positionSeconds: number;
 	durationSeconds: number | null;
 	startedAt: string;
+	/** This user's own internal (mu) rating for the movie, if they rated it. */
+	rating: number | null;
 }
 
 /** Full profile payload returned by GET /profile/me and /profile/:username. */

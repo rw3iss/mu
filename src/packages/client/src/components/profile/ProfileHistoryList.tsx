@@ -1,4 +1,5 @@
 import type { ProfileHistoryItem } from '@mu/shared';
+import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { clockFromSeconds, relativeTime } from '@/utils/time-format';
 import styles from './ProfileHistoryList.module.scss';
@@ -43,6 +44,12 @@ export function ProfileHistoryList({ history }: ProfileHistoryListProps) {
 									<span class={styles.title}>{item.title}</span>
 									{item.year ? <span class={styles.year}>{item.year}</span> : null}
 									{item.completed && <span class={styles.done}>Watched</span>}
+									{item.rating != null && (
+										<span class={styles.rating} title={`Rated ${item.rating.toFixed(1)} / 10`}>
+											<Icon name="star-filled" size={12} />
+											{item.rating.toFixed(1)}
+										</span>
+									)}
 								</div>
 								<div class={styles.meta}>
 									<span class={styles.when}>{relativeTime(item.watchedAt)}</span>

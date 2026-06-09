@@ -1,5 +1,4 @@
 import { resolveDisplayName } from '@mu/shared';
-import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
@@ -27,6 +26,8 @@ export function Dashboard(_props: DashboardProps) {
 	const [isLoading, setIsLoading] = useState(true);
 	// One shared view mode for all three columns (was per-section).
 	const [view, setView] = useUiSetting<ViewMode>('dashboard_view', 'grid');
+	// Which section is shown in single-column / mobile mode (tab selector).
+	const [activeTab, setActiveTab] = useState(0);
 
 	useEffect(() => {
 		async function load() {
@@ -62,8 +63,33 @@ export function Dashboard(_props: DashboardProps) {
 	}, []);
 
 	const user = currentUser.value;
-	// One card per column in grid view; list view renders short rows.
-	const gridColumns = view === 'grid' ? 1 : undefined;
+
+	const sections = [
+		{
+			key: 'cw',
+			title: 'Continue Watching',
+			icon: 'play' as const,
+			seeAll: '/history',
+			movies: continueWatching,
+			empty: 'Nothing in progress yet',
+		},
+		{
+			key: 'ra',
+			title: 'Recently Added',
+			icon: 'list-plus' as const,
+			seeAll: '/library',
+			movies: recentlyAdded,
+			empty: 'No movies in your library yet',
+		},
+		{
+			key: 'tr',
+			title: 'Trending',
+			icon: 'arrow-up-right' as const,
+			seeAll: '/discover',
+			movies: trending,
+			empty: 'Nothing trending yet',
+		},
+	];
 
 	return (
 		<div class={`${styles.dashboard} stagger-rise`}>
@@ -119,63 +145,50 @@ export function Dashboard(_props: DashboardProps) {
 				</div>
 			</div>
 
-			{/* Three columns: Continue Watching · Recently Added · Trending. */}
-			<div class={styles.columns}>
-				<DashColumn title="Continue Watching" onSeeAll={() => route('/history')}>
-					<MovieGrid
-						movies={continueWatching}
-						isLoading={isLoading}
-						viewMode={view}
-						gridColumns={gridColumns}
-						emptyMessage="Nothing in progress yet"
-					/>
-				</DashColumn>
+			{/* Three columns (Continue Watching · Recently Added · Trending). In
+			    single-column mode the tab bar picks which one is visible. The
+			    layout is driven by the container width, not the viewport, so it
+			    stays correct regardless of the sidebar. */}
+			<div class={styles.columnsWrap}>
+				<div class={styles.tabs} role="tablist" aria-label="Dashboard sections">
+					{sections.map((s, i) => (
+						<button
+							key={s.key}
+							class={`${styles.tab} ${activeTab === i ? styles.tabActive : ''}`}
+							onClick={() => setActiveTab(i)}
+							role="tab"
+							aria-selected={activeTab === i}
+						>
+							<Icon name={s.icon} size={16} />
+							<span>{s.title}</span>
+						</button>
+					))}
+				</div>
 
-				<DashColumn title="Recently Added" onSeeAll={() => route('/library')}>
-					<MovieGrid
-						movies={recentlyAdded}
-						isLoading={isLoading}
-						viewMode={view}
-						gridColumns={gridColumns}
-						emptyMessage="No movies in your library yet"
-					/>
-				</DashColumn>
-
-				<DashColumn title="Trending" onSeeAll={() => route('/discover')}>
-					<MovieGrid
-						movies={trending}
-						isLoading={isLoading}
-						viewMode={view}
-						gridColumns={gridColumns}
-						emptyMessage="Nothing trending yet"
-					/>
-				</DashColumn>
+				<div class={styles.columns}>
+					{sections.map((s, i) => (
+						<section
+							key={s.key}
+							class={`${styles.column} ${activeTab === i ? styles.activeColumn : ''}`}
+						>
+							<div class={styles.sectionHeader}>
+								<h2 class={styles.sectionTitle}>{s.title}</h2>
+								<Button variant="ghost" size="sm" onClick={() => route(s.seeAll)}>
+									See All
+								</Button>
+							</div>
+							<MovieGrid
+								movies={s.movies}
+								isLoading={isLoading}
+								viewMode={view}
+								emptyMessage={s.empty}
+							/>
+						</section>
+					))}
+				</div>
 			</div>
 
 			<PluginSlot name={UI.DASHBOARD_BOTTOM} context={{}} />
 		</div>
-	);
-}
-
-/** One dashboard column: a titled section with a "See All" link and its body. */
-function DashColumn({
-	title,
-	onSeeAll,
-	children,
-}: {
-	title: string;
-	onSeeAll: () => void;
-	children: ComponentChildren;
-}) {
-	return (
-		<section class={styles.column}>
-			<div class={styles.sectionHeader}>
-				<h2 class={styles.sectionTitle}>{title}</h2>
-				<Button variant="ghost" size="sm" onClick={onSeeAll}>
-					See All
-				</Button>
-			</div>
-			{children}
-		</section>
 	);
 }

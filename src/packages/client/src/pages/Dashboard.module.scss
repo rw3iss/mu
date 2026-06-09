@@ -68,24 +68,78 @@
 }
 
 /* Three side-by-side feeds (Continue Watching · Recently Added · Trending).
-   Collapses to a single column on narrower viewports. */
+   Layout is driven by the CONTAINER width (not the viewport) so it's correct
+   regardless of the sidebar: 3 columns when there's room for at least one card
+   each, otherwise a single column with a tab selector. */
+.columnsWrap {
+  container-type: inline-size;
+  container-name: dash;
+}
+
+/* Section selector — only shown in single-column mode (see @container below). */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--surface-overlay-1);
+  border: var(--card-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover {
+    color: var(--color-text-primary);
+  }
+
+  &.tabActive {
+    background: var(--color-bg-elevated);
+    border-color: var(--color-border-strong);
+    color: var(--color-accent);
+  }
+}
+
 .columns {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-xl);
   align-items: start;
-
-  // Three columns, each capped to a single sensible card width and centered as
-  // a group — so cards stay their normal size rather than stretching to a third
-  // of the page. Shrinks to fit, then collapses to one column under 1024px.
-  @media (min-width: 1024px) {
-    grid-template-columns: repeat(3, minmax(0, 300px));
-    justify-content: center;
-  }
 }
 
 .column {
   min-width: 0;
+}
+
+/* Default = single-column mode: show only the active section, keep tabs. */
+.column:not(.activeColumn) {
+  display: none;
+}
+
+/* Enough room for three columns of cards → show all three, hide the tabs. */
+@container dash (min-width: 720px) {
+  .tabs {
+    display: none;
+  }
+
+  .columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .column:not(.activeColumn) {
+    display: block;
+  }
 }
 
 .sectionHeader {

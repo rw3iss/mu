@@ -24,10 +24,6 @@ interface MovieGridProps {
 	isLoading?: boolean;
 	emptyMessage?: string;
 	viewMode?: ViewMode;
-	/** Force a fixed column count in grid view (overrides the responsive
-	 *  auto-fill). Used by the dashboard's per-section columns to keep one
-	 *  card per row. Ignored in list/large views. */
-	gridColumns?: number;
 	selectionMode?: boolean;
 	selectedIds?: Set<string>;
 	onToggleSelect?: (id: string) => void;
@@ -107,7 +103,6 @@ export function MovieGrid({
 	isLoading = false,
 	emptyMessage = 'No movies found',
 	viewMode = 'grid',
-	gridColumns,
 	selectionMode = false,
 	selectedIds,
 	onToggleSelect,
@@ -178,14 +173,7 @@ export function MovieGrid({
 	}
 
 	return (
-		<div
-			class={`${styles.grid} ${containerClass} stagger-rise`}
-			style={
-				gridColumns
-					? { gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))` }
-					: undefined
-			}
-		>
+		<div class={`${styles.grid} ${containerClass} stagger-rise`}>
 			{items.map((item) =>
 				item.kind === 'group' ? (
 					<GroupTile key={`g:${item.group.id}`} group={item.group} />

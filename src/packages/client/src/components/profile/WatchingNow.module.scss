@@ -100,6 +100,18 @@
 	font-weight: var(--font-weight-normal);
 }
 
+.rating {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	margin-left: var(--space-sm);
+	font-size: var(--font-size-md);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-warning, #f5c518);
+	vertical-align: middle;
+	font-variant-numeric: tabular-nums;
+}
+
 .progress {
 	display: flex;
 	align-items: center;

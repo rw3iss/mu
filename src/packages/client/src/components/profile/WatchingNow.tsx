@@ -1,4 +1,5 @@
 import type { CurrentlyWatching } from '@mu/shared';
+import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { clockFromSeconds } from '@/utils/time-format';
 import styles from './WatchingNow.module.scss';
@@ -37,6 +38,12 @@ export function WatchingNow({ watching }: WatchingNowProps) {
 				<h3 class={styles.title}>
 					{watching.title}
 					{watching.year ? <span class={styles.year}> · {watching.year}</span> : null}
+					{watching.rating != null && (
+						<span class={styles.rating} title={`Rated ${watching.rating.toFixed(1)} / 10`}>
+							<Icon name="star-filled" size={13} />
+							{watching.rating.toFixed(1)}
+						</span>
+					)}
 				</h3>
 				<div class={styles.progress}>
 					<div class={styles.bar}>

@@ -16,10 +16,16 @@ import {
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
-import { and, desc, eq, gt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { AuthCacheService } from '../common/permissions/auth-cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { favorites as favoritesTable, movies, streamSessions, users } from '../database/schema/index.js';
+import {
+	favorites as favoritesTable,
+	movies,
+	streamSessions,
+	userRatings,
+	users,
+} from '../database/schema/index.js';
 import { FavoritesService } from '../favorites/favorites.service.js';
 import { HistoryService } from '../movies/history.service.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -259,6 +265,10 @@ export class ProfileService {
 	private mapHistory(userId: string): ProfileHistoryItem[] {
 		// Pull the user's full history (most-recent first from the service).
 		const { data } = this.history.getHistory(userId, 1, 1000);
+		const ratings = this.getUserRatings(
+			userId,
+			data.map((h) => h.movieId),
+		);
 		return data.map((h) => ({
 			movieId: h.movieId,
 			title: h.movieTitle,
@@ -268,7 +278,21 @@ export class ProfileService {
 			positionSeconds: h.positionSeconds ?? 0,
 			durationSeconds: h.movieDurationSeconds ?? null,
 			completed: !!h.completed,
+			rating: ratings.get(h.movieId) ?? null,
 		}));
+	}
+
+	/** Map of movieId → this user's own (mu) rating, for the given movies. */
+	private getUserRatings(userId: string, movieIds: string[]): Map<string, number> {
+		const map = new Map<string, number>();
+		if (movieIds.length === 0) return map;
+		const rows = this.database.db
+			.select({ movieId: userRatings.movieId, rating: userRatings.rating })
+			.from(userRatings)
+			.where(and(eq(userRatings.userId, userId), inArray(userRatings.movieId, movieIds)))
+			.all();
+		for (const r of rows) map.set(r.movieId, r.rating);
+		return map;
 	}
 
 	private getCurrentlyWatching(userId: string): CurrentlyWatching | null {
@@ -301,6 +325,7 @@ export class ProfileService {
 			positionSeconds: row.positionSeconds ?? 0,
 			durationSeconds: row.durationSeconds ?? null,
 			startedAt: row.startedAt,
+			rating: this.getUserRatings(userId, [row.movieId]).get(row.movieId) ?? null,
 		};
 	}
 

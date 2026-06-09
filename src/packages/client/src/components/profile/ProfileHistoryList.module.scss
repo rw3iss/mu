@@ -72,6 +72,18 @@
 	font-weight: var(--font-weight-medium);
 }
 
+.rating {
+	flex-shrink: 0;
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	font-size: var(--font-size-xs);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-warning, #f5c518);
+	font-variant-numeric: tabular-nums;
+}
+
 .meta {
 	display: flex;
 	gap: var(--space-md);
