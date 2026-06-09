@@ -1,4 +1,3 @@
-import { DISPLAY_NAME_MAX, PROFILE_DESCRIPTION_MAX } from '@mu/shared';
 import type {
 	CurrentlyWatching,
 	MemberSummary,
@@ -10,6 +9,7 @@ import type {
 	ProfileView,
 	UpdateProfileInput,
 } from '@mu/shared';
+import { DISPLAY_NAME_MAX, PROFILE_DESCRIPTION_MAX } from '@mu/shared';
 import {
 	BadRequestException,
 	ConflictException,
@@ -100,7 +100,13 @@ export class ProfileService {
 			.all();
 
 		return rows.map((u) => {
-			const stats = this.computeStats(u.id, u.createdAt, u.lastLoginAt ?? null, u.lastLogoutAt ?? null);
+			const stats = this.computeStats(
+				u.id,
+				u.createdAt,
+				u.lastLoginAt ?? null,
+				u.lastLogoutAt ?? null,
+				u.lastSeenAt ?? null,
+			);
 			const summary: MemberSummary = {
 				id: u.id,
 				username: u.username,
@@ -131,16 +137,21 @@ export class ProfileService {
 		if (patch.description !== undefined) {
 			const desc = (patch.description ?? '').toString();
 			if (desc.length > PROFILE_DESCRIPTION_MAX) {
-				throw new BadRequestException(`Description must be ${PROFILE_DESCRIPTION_MAX} characters or fewer`);
+				throw new BadRequestException(
+					`Description must be ${PROFILE_DESCRIPTION_MAX} characters or fewer`,
+				);
 			}
 			update.description = desc.trim() || null;
 		}
 		if (patch.profilePublic !== undefined) update.profilePublic = !!patch.profilePublic;
-		if (patch.avatarUrl !== undefined) update.avatarUrl = patch.avatarUrl?.toString().trim() || null;
+		if (patch.avatarUrl !== undefined)
+			update.avatarUrl = patch.avatarUrl?.toString().trim() || null;
 		if (patch.displayName !== undefined) {
 			const name = (patch.displayName ?? '').toString().trim();
 			if (name.length > DISPLAY_NAME_MAX) {
-				throw new BadRequestException(`Display name must be ${DISPLAY_NAME_MAX} characters or fewer`);
+				throw new BadRequestException(
+					`Display name must be ${DISPLAY_NAME_MAX} characters or fewer`,
+				);
 			}
 			update.displayName = name || null;
 		}
@@ -170,7 +181,11 @@ export class ProfileService {
 	 * Store an uploaded avatar image and point the user's row at it, removing
 	 * the previous uploaded avatar (if any) so old files don't accumulate.
 	 */
-	async setUploadedAvatar(userId: string, buffer: Buffer, mimetype: string): Promise<ProfileView> {
+	async setUploadedAvatar(
+		userId: string,
+		buffer: Buffer,
+		mimetype: string,
+	): Promise<ProfileView> {
 		const user = this.findUserById(userId);
 		if (!user) throw new NotFoundException('User not found');
 		if (!this.uploads.isSupportedImage(mimetype)) {
@@ -217,7 +232,12 @@ export class ProfileService {
 		]);
 		const currentlyWatching = this.getCurrentlyWatching(user.id);
 
-		const presence = this.getPresence(user.id, user.lastLoginAt ?? null, user.lastLogoutAt ?? null);
+		const presence = this.getPresence(
+			user.id,
+			user.lastLoginAt ?? null,
+			user.lastLogoutAt ?? null,
+			user.lastSeenAt ?? null,
+		);
 		const stats: ProfileStats = {
 			favoritesCount: favorites.length,
 			watchedCount: this.history.getHistoryCount(user.id),
@@ -226,7 +246,14 @@ export class ProfileService {
 			loggedOutAt: presence.loggedOutAt,
 		};
 
-		return { user: profileUser, stats, favorites, history, currentlyWatching, editable: opts.editable };
+		return {
+			user: profileUser,
+			stats,
+			favorites,
+			history,
+			currentlyWatching,
+			editable: opts.editable,
+		};
 	}
 
 	private async mapFavorites(userId: string): Promise<ProfileFavorite[]> {
@@ -309,12 +336,17 @@ export class ProfileService {
 				year: movies.year,
 				posterUrl: movies.posterUrl,
 				backdropUrl: movies.backdropUrl,
-				durationSeconds: sql<number | null>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${streamSessions.movieId} LIMIT 1)`,
+				durationSeconds: sql<
+					number | null
+				>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${streamSessions.movieId} LIMIT 1)`,
 			})
 			.from(streamSessions)
 			.leftJoin(movies, eq(streamSessions.movieId, movies.id))
-			.where(and(eq(streamSessions.userId, userId), gt(streamSessions.lastActiveAt, since)))
-			.orderBy(desc(streamSessions.lastActiveAt))
+			// "Watching now" requires recent PROGRESS, not just session liveness —
+			// a paused player keeps heartbeating (lastActiveAt) but stops
+			// advancing (lastProgressAt), so it correctly drops out of the window.
+			.where(and(eq(streamSessions.userId, userId), gt(streamSessions.lastProgressAt, since)))
+			.orderBy(desc(streamSessions.lastProgressAt))
 			.limit(1)
 			.get();
 
@@ -337,13 +369,14 @@ export class ProfileService {
 		createdAt: string,
 		lastLoginAt: string | null,
 		lastLogoutAt: string | null,
+		lastSeenAt: string | null = null,
 	): ProfileStats {
 		const fav = this.database.db
 			.select({ c: sql<number>`COUNT(*)` })
 			.from(favoritesTable)
 			.where(eq(favoritesTable.userId, userId))
 			.get();
-		const presence = this.getPresence(userId, lastLoginAt, lastLogoutAt);
+		const presence = this.getPresence(userId, lastLoginAt, lastLogoutAt, lastSeenAt);
 		return {
 			favoritesCount: fav?.c ?? 0,
 			watchedCount: this.history.getHistoryCount(userId),
@@ -362,14 +395,22 @@ export class ProfileService {
 		userId: string,
 		lastLoginAt: string | null,
 		lastLogoutAt: string | null,
+		lastSeenAt: string | null = null,
 	): { lastActiveAt: string | null; loggedOutAt: string | null } {
-		const lastActiveAt = this.getLastActiveAt(userId, lastLoginAt);
+		const lastActiveAt = this.getLastActiveAt(userId, lastLoginAt, lastSeenAt);
 		const loggedOut = !!lastLogoutAt && (!lastActiveAt || lastLogoutAt > lastActiveAt);
 		return { lastActiveAt, loggedOutAt: loggedOut ? lastLogoutAt : null };
 	}
 
-	/** Latest of: last login, most-recent watch, most-recent stream session. */
-	private getLastActiveAt(userId: string, lastLoginAt: string | null): string | null {
+	/**
+	 * Latest of: last login, last "seen" (any authed request), most-recent
+	 * watch, most-recent stream session.
+	 */
+	private getLastActiveAt(
+		userId: string,
+		lastLoginAt: string | null,
+		lastSeenAt: string | null = null,
+	): string | null {
 		const session = this.database.db
 			.select({ at: streamSessions.lastActiveAt })
 			.from(streamSessions)
@@ -377,7 +418,12 @@ export class ProfileService {
 			.orderBy(desc(streamSessions.lastActiveAt))
 			.limit(1)
 			.get();
-		const candidates = [lastLoginAt, this.history.getLastWatchedAt(userId), session?.at ?? null];
+		const candidates = [
+			lastLoginAt,
+			lastSeenAt,
+			this.history.getLastWatchedAt(userId),
+			session?.at ?? null,
+		];
 		return candidates.reduce<string | null>(
 			(best, cur) => (cur && (!best || cur > best) ? cur : best),
 			null,

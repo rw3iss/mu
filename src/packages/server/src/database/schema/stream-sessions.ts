@@ -16,6 +16,10 @@ export const streamSessions = sqliteTable('stream_sessions', {
 	transcoding: integer('transcoding', { mode: 'boolean' }).default(false),
 	startedAt: text('started_at').notNull(),
 	lastActiveAt: text('last_active_at').notNull(),
+	/** Updated only when playback position actually advances (real watching),
+	 *  NOT by pause-time heartbeats — so "watching now" reflects active viewing
+	 *  rather than an open-but-idle player. */
+	lastProgressAt: text('last_progress_at'),
 	positionSeconds: integer('position_seconds').default(0),
 	bandwidthBytes: integer('bandwidth_bytes').default(0),
 	/** Originating IP captured at session start. Honors X-Forwarded-For

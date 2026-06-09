@@ -223,7 +223,13 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 					onClick={onToggle}
 					aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
 				>
-					<Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={20} />
+					{/* Local Icon takes a path `d`, not a `name` — passing `name`
+					    left the path empty, so the chevron was invisible. */}
+					<Icon
+						d={collapsed ? 'M9 18l6-6-6-6' : 'M15 18l-6-6 6-6'}
+						size={20}
+						stroke={2}
+					/>
 				</button>
 			</div>
 

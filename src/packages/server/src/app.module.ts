@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AdminModule } from './admin/admin.module.js';
 import { AudioProfilesModule } from './audio-profiles/audio-profiles.module.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -9,6 +9,7 @@ import { CommonModule } from './common/common.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RequireActionGuard } from './common/guards/require-action.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
+import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor.js';
 import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EmailModule } from './email/email.module.js';
@@ -35,13 +36,13 @@ import { RemoteModule } from './remote/remote.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SeoModule } from './seo/seo.module.js';
-import { MemoryCacheModule } from './stream/memory-cache/memory-cache.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { ShareLinksModule } from './share-links/share-links.module.js';
-import { UploadsModule } from './uploads/uploads.module.js';
 import { SharingModule } from './sharing/sharing.module.js';
+import { MemoryCacheModule } from './stream/memory-cache/memory-cache.module.js';
 import { StreamModule } from './stream/stream.module.js';
 import { ThemesModule } from './themes/themes.module.js';
+import { UploadsModule } from './uploads/uploads.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -99,6 +100,10 @@ import { UsersModule } from './users/users.module.js';
 		{
 			provide: APP_GUARD,
 			useClass: RequireActionGuard,
+		},
+		{
+			provide: APP_INTERCEPTOR,
+			useClass: LastSeenInterceptor,
 		},
 	],
 })

@@ -841,11 +841,17 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 		const session = sessions[0]!;
 
+		// Only stamp lastProgressAt when the position actually changed — i.e.
+		// playback is moving (or the user seeked), not just an idle/paused
+		// player sending the same position. "Watching now" keys off this, so a
+		// paused movie drops out of the active window instead of lingering.
+		const moved = positionSeconds !== (session.positionSeconds ?? 0);
 		await this.database.db
 			.update(streamSessions)
 			.set({
 				positionSeconds,
 				lastActiveAt: nowISO(),
+				...(moved ? { lastProgressAt: nowISO() } : {}),
 			})
 			.where(eq(streamSessions.id, sessionId));
 

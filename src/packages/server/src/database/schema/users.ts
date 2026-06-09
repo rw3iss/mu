@@ -24,6 +24,9 @@ export const users = sqliteTable('users', {
 	/** Updated on explicit logout; when newer than last activity, the profile
 	 *  shows "Logged out" instead of "Active …". */
 	lastLogoutAt: text('last_logout_at'),
+	/** Bumped (throttled) on any authenticated request so presence ("Active …")
+	 *  reflects general app use, not just login / playback. */
+	lastSeenAt: text('last_seen_at'),
 	createdAt: text('created_at').notNull(),
 	updatedAt: text('updated_at').notNull(),
 });

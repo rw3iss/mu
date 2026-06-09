@@ -15,6 +15,10 @@ html {
   -webkit-text-size-adjust: 100%;
   -moz-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  // Always reserve space for the vertical scrollbar so the layout doesn't
+  // shift horizontally between pages that scroll and pages that don't (e.g.
+  // the centered Settings block jumping a few px between tabs).
+  scrollbar-gutter: stable;
 }
 
 body {
