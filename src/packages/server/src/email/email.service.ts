@@ -111,6 +111,9 @@ export class EmailService {
 				subject: `New feedback from ${data.name || 'a user'}`,
 				html,
 				attachments,
+				// Reply-To the submitter so the admin can answer them directly from
+				// the notification (falls back to the configured reply-to).
+				replyTo: data.email || this.config.get<string>('email.replyTo') || undefined,
 			});
 			this.logger.log(`Sent feedback notification to ${adminEmail}`);
 		} catch (err: any) {

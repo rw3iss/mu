@@ -194,6 +194,23 @@ export function loadConfig(): MuConfig {
 		(merged.logs as Record<string, unknown>).dir = envLogsDir;
 	}
 
+	// Email env overrides — the generic parser lowercases camelCase keys, so map
+	// the email fields explicitly. Lets the operator keep email config (incl. the
+	// secret API key) in `.env` instead of config.yml.
+	const E = process.env;
+	const emailEnv: Record<string, unknown> = {};
+	if (E.MU_EMAIL_ENABLED != null) emailEnv.enabled = E.MU_EMAIL_ENABLED === 'true';
+	if (E.MU_EMAIL_PROVIDER) emailEnv.provider = E.MU_EMAIL_PROVIDER;
+	if (E.MU_EMAIL_FROM_ADDRESS) emailEnv.fromAddress = E.MU_EMAIL_FROM_ADDRESS;
+	if (E.MU_EMAIL_FROM_NAME) emailEnv.fromName = E.MU_EMAIL_FROM_NAME;
+	if (E.MU_EMAIL_REPLY_TO) emailEnv.replyTo = E.MU_EMAIL_REPLY_TO;
+	if (E.MU_EMAIL_ADMIN_EMAIL) emailEnv.adminEmail = E.MU_EMAIL_ADMIN_EMAIL;
+	if (E.MU_EMAIL_RESEND_API_KEY) emailEnv.resendApiKey = E.MU_EMAIL_RESEND_API_KEY;
+	if (E.MU_EMAIL_BREVO_API_KEY) emailEnv.brevoApiKey = E.MU_EMAIL_BREVO_API_KEY;
+	if (Object.keys(emailEnv).length > 0) {
+		merged.email = { ...((merged.email as Record<string, unknown>) ?? {}), ...emailEnv };
+	}
+
 	// Validate against the schema.
 	const parsed = configSchema.parse(merged);
 
