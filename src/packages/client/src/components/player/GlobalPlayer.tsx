@@ -158,6 +158,23 @@ export function GlobalPlayer() {
 					video.currentTime = newTime;
 					currentTime.value = newTime;
 				}
+			} else if (e.key === 'Escape' || e.key === 'Backspace') {
+				// In full mode (whether or not browser-fullscreen): exit fullscreen
+				// and drop to mini. In mini/split it's a no-op so Escape/Backspace
+				// keep their normal meaning elsewhere.
+				if (playerMode.value !== 'full') return;
+				e.preventDefault();
+				// Let an open info panel close on the first press instead of
+				// minimizing (a second press then minimizes).
+				if (showInfoPanel.value) {
+					showInfoPanel.value = false;
+					return;
+				}
+				if (document.fullscreenElement) {
+					document.exitFullscreen().catch(() => {});
+					isFullscreen.value = false;
+				}
+				minimizePlayer();
 			}
 		}
 		document.addEventListener('keydown', handleGlobalKeyDown);
