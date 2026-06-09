@@ -35,7 +35,9 @@ import {
 	toggleMute,
 	volume,
 } from '@/state/player.state';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { shareMode } from '@/state/share.state';
+import { shareLinksService } from '@/services/share-links.service';
 import { VolumeControl, VolumeIcon } from './controls/VolumeControl';
 import styles from './PlayerControls.module.scss';
 
@@ -320,6 +322,69 @@ export function PlayerControls({
 		return fraction * duration.value;
 	}, []);
 
+	// ── Seek bar: right-click → "Copy URL at Time" (public/private share) ──
+	const [shareMenu, setShareMenu] = useState<{ x: number; y: number; time: number } | null>(null);
+	const [shareBusy, setShareBusy] = useState(false);
+
+	const handleSeekContext = useCallback(
+		(e: MouseEvent) => {
+			// Public viewers (share mode) can't mint share links — skip the menu.
+			if (shareMode.value) return;
+			const time = seekFromEvent(e);
+			if (time == null) return;
+			e.preventDefault();
+			setShareMenu({ x: e.clientX, y: e.clientY, time: Math.max(0, Math.floor(time)) });
+		},
+		[seekFromEvent],
+	);
+
+	const copyShareAtTime = useCallback(
+		async (kind: 'public' | 'private') => {
+			const menu = shareMenu;
+			const movieId = globalMovieId.value;
+			if (!menu || !movieId) return;
+			setShareBusy(true);
+			try {
+				let url: string;
+				if (kind === 'public') {
+					const { token } = await shareLinksService.create(movieId);
+					url = `${shareLinksService.buildUrl(token)}?t=${menu.time}`;
+				} else {
+					url = `${window.location.origin}/movie/${movieId}?t=${menu.time}`;
+				}
+				await navigator.clipboard.writeText(url);
+				notifySuccess(
+					`${kind === 'public' ? 'Public' : 'Private'} link copied (at ${formatTime(menu.time)})`,
+				);
+			} catch (err) {
+				notifyError((err as Error)?.message || 'Could not copy the link');
+			} finally {
+				setShareBusy(false);
+				setShareMenu(null);
+			}
+		},
+		[shareMenu],
+	);
+
+	// Dismiss the share menu on outside click / Escape.
+	useEffect(() => {
+		if (!shareMenu) return;
+		const close = () => setShareMenu(null);
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') setShareMenu(null);
+		};
+		// Defer binding so the opening contextmenu doesn't immediately self-close.
+		const id = setTimeout(() => {
+			document.addEventListener('mousedown', close);
+			document.addEventListener('keydown', onKey);
+		}, 0);
+		return () => {
+			clearTimeout(id);
+			document.removeEventListener('mousedown', close);
+			document.removeEventListener('keydown', onKey);
+		};
+	}, [shareMenu]);
+
 	const handleSeekBarClick = useCallback(
 		(e: MouseEvent) => {
 			if (isDragging) return;
@@ -475,6 +540,7 @@ export function PlayerControls({
 					ref={seekBarRef}
 					class={`${styles.seekBar} ${isDragging ? styles.dragging : ''}`}
 					onClick={handleSeekBarClick}
+					onContextMenu={handleSeekContext}
 					onMouseDown={handleSeekMouseDown}
 					onMouseMove={handleSeekHover}
 					onMouseLeave={() => {
@@ -1381,6 +1447,36 @@ export function PlayerControls({
 			</div>
 		</div>
 		{spritePreview}
+		{shareMenu &&
+			createPortal(
+				<div
+					class={styles.shareMenu}
+					style={{ left: `${shareMenu.x}px`, top: `${shareMenu.y}px` }}
+					onMouseDown={(e) => e.stopPropagation()}
+					onContextMenu={(e) => e.preventDefault()}
+				>
+					<div class={styles.shareMenuLabel}>Copy URL at {formatTime(shareMenu.time)}</div>
+					<div class={styles.shareMenuActions}>
+						<button
+							type="button"
+							class={styles.shareMenuBtn}
+							disabled={shareBusy}
+							onClick={() => copyShareAtTime('public')}
+						>
+							Public
+						</button>
+						<button
+							type="button"
+							class={styles.shareMenuBtn}
+							disabled={shareBusy}
+							onClick={() => copyShareAtTime('private')}
+						>
+							Private
+						</button>
+					</div>
+				</div>,
+				document.body,
+			)}
 		</>
 	);
 }

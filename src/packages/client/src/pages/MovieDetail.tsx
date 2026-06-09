@@ -29,7 +29,7 @@ import { type MatchCandidate, moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
 import { currentUser } from '@/state/auth.state';
 import { personKeyFor } from '@/state/favorites.state';
-import { playMovie } from '@/state/globalPlayer.state';
+import { forceStartPosition, playMovie } from '@/state/globalPlayer.state';
 import { updateMovieInHistory } from '@/state/history.state';
 import { type Movie, updateMovieInList } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
@@ -244,6 +244,21 @@ export function MovieDetail({ id }: MovieDetailProps) {
 			cancelled = true;
 		};
 	}, [id, movie?.status]);
+
+	// Deep-link: /movie/:id?t=<seconds> (a "private" share link) — auto-play at
+	// that time once the movie has loaded, then strip ?t so a refresh / back-nav
+	// doesn't re-seek.
+	const sharedSeekDone = useRef(false);
+	useEffect(() => {
+		if (!movie || sharedSeekDone.current) return;
+		const t = new URLSearchParams(window.location.search).get('t');
+		if (t == null) return;
+		sharedSeekDone.current = true;
+		const seconds = Math.max(0, Number.parseFloat(t) || 0);
+		if (seconds > 0) forceStartPosition.value = seconds;
+		void playMovie(movie.id);
+		route(`/movie/${movie.id}`, true);
+	}, [movie?.id]);
 
 	const handlePlay = useCallback(() => {
 		if (movie) {

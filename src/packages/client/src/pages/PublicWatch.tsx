@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { useSeo } from '@/hooks/useSeo';
 import { shareLinksService } from '@/services/share-links.service';
-import { playerMode, playMovie } from '@/state/globalPlayer.state';
+import { forceStartPosition, playerMode, playMovie } from '@/state/globalPlayer.state';
 import { setShareToken, shareToken } from '@/state/share.state';
 
 interface PublicWatchProps {
@@ -54,6 +54,10 @@ export function PublicWatch({ token }: PublicWatchProps) {
 				}
 				// Re-store with the real movieId
 				setShareToken(token, result.movieId);
+				// `?t=<seconds>` deep-link → seek there and autoplay.
+				const t = new URLSearchParams(window.location.search).get('t');
+				const seconds = t != null ? Math.max(0, Number.parseFloat(t) || 0) : 0;
+				if (seconds > 0) forceStartPosition.value = seconds;
 				// Force full mode (share viewers cannot minimize/split)
 				playerMode.value = 'full';
 				playMovie(result.movieId).catch((err) => {
