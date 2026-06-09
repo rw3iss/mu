@@ -16,5 +16,5 @@ recommendations.html
 src/packages/client/PLAN.md
 
 # Local Playwright screenshots / artifacts
-dashboard-*.png
+dash*.png
 .playwright-mcp/
