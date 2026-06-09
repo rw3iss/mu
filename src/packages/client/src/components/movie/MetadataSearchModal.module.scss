@@ -86,6 +86,17 @@
 	font-weight: var(--font-weight-normal);
 }
 
+.source {
+	margin-left: var(--space-sm);
+	padding: 1px 6px;
+	border-radius: var(--radius-sm);
+	background: var(--surface-overlay-2);
+	color: var(--color-text-muted);
+	font-size: var(--font-size-xs);
+	font-weight: var(--font-weight-normal);
+	vertical-align: middle;
+}
+
 .overview {
 	margin: 2px 0 0;
 	font-size: var(--font-size-sm);

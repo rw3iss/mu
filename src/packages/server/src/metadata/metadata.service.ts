@@ -490,17 +490,19 @@ export class MetadataService {
 	 *   - genres, director, writer: TMDB structured > OMDB string-split
 	 */
 	/**
-	 * Free-text provider search for the "Search for Metadata" modal. TMDB-first
-	 * (richest results). TMDB caches by query in the provider, so re-searching
-	 * the same term — and the later assign by tmdbId — won't re-hit the API.
+	 * Free-text provider search for the "Search for Metadata" modal, across BOTH
+	 * sources: TMDB (richest — posters, overviews) and OMDb/IMDb (catches titles
+	 * TMDB misses). Both provider searches are cached by query, and the later
+	 * assign reuses cached details, so re-searching + selecting won't re-hit the
+	 * APIs. OMDb hits that duplicate a TMDB result (same title+year) are dropped.
 	 */
 	async searchCandidates(
 		query: string,
 		_type?: string,
 	): Promise<
 		Array<{
-			provider: 'tmdb';
-			tmdbId: number;
+			provider: 'tmdb' | 'omdb';
+			tmdbId: number | null;
 			imdbId: string | null;
 			title: string;
 			year: number | null;
@@ -510,19 +512,54 @@ export class MetadataService {
 	> {
 		const q = (query ?? '').trim();
 		if (q.length < 2) return [];
-		const results = (await this.tmdb.searchMovie(q)) ?? [];
-		return results.slice(0, 20).map((r) => {
+
+		const [tmdbRes, omdbRes] = await Promise.allSettled([
+			this.tmdb.searchMovie(q),
+			this.omdb.searchMovies(q),
+		]);
+		const tmdbHits = tmdbRes.status === 'fulfilled' ? (tmdbRes.value ?? []) : [];
+		const omdbHits = omdbRes.status === 'fulfilled' ? (omdbRes.value ?? []) : [];
+
+		const candidates: Array<{
+			provider: 'tmdb' | 'omdb';
+			tmdbId: number | null;
+			imdbId: string | null;
+			title: string;
+			year: number | null;
+			overview: string | null;
+			posterUrl: string | null;
+		}> = [];
+		const seen = new Set<string>();
+		const key = (title: string, year: number | null) => `${title.toLowerCase()}|${year ?? ''}`;
+
+		for (const r of tmdbHits.slice(0, 20)) {
 			const year = r.release_date ? Number(r.release_date.slice(0, 4)) || null : null;
-			return {
-				provider: 'tmdb' as const,
+			seen.add(key(r.title, year));
+			candidates.push({
+				provider: 'tmdb',
 				tmdbId: r.id,
 				imdbId: null,
 				title: r.title,
 				year,
 				overview: r.overview || null,
 				posterUrl: this.tmdb.getImageUrl(r.poster_path),
-			};
-		});
+			});
+		}
+		for (const h of omdbHits.slice(0, 15)) {
+			const year = h.year ?? null;
+			if (seen.has(key(h.title, year))) continue; // already shown via TMDB
+			seen.add(key(h.title, year));
+			candidates.push({
+				provider: 'omdb',
+				tmdbId: null,
+				imdbId: h.imdbId,
+				title: h.title,
+				year,
+				overview: null,
+				posterUrl: h.posterUrl ?? null,
+			});
+		}
+		return candidates;
 	}
 
 	/**

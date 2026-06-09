@@ -66,8 +66,8 @@ let newStatsCache: { value: NewTitleStats; at: number } | null = null;
 
 /** A provider search result shown in the "Search for Metadata" modal. */
 export interface MetadataSearchCandidate {
-	provider: 'tmdb';
-	tmdbId: number;
+	provider: 'tmdb' | 'omdb';
+	tmdbId: number | null;
 	imdbId: string | null;
 	title: string;
 	year: number | null;
@@ -126,7 +126,7 @@ export const moviesService = {
 		return api.post<void>(`/movies/${movieId}/clear-metadata`);
 	},
 
-	/** Free-text metadata search (TMDB) for the "Search for Metadata" modal. */
+	/** Free-text metadata search (TMDB + OMDb) for the "Search for Metadata" modal. */
 	searchMetadata(q: string, type?: string): Promise<{ candidates: MetadataSearchCandidate[] }> {
 		const params: Record<string, string> = { q };
 		if (type) params.type = type;
