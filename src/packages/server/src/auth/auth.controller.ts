@@ -21,6 +21,23 @@ export class AuthController {
 		private readonly config: ConfigService,
 	) {}
 
+	/**
+	 * Cookie options for the `mu_access_token` cookie. Its lifetime tracks the
+	 * JWT's own expiry (`auth.jwtExpiresIn`, default 7d) rather than a fixed
+	 * 15 minutes — otherwise the cookie vanishes from the browser long before
+	 * the still-valid token would, which broke cookie-authed navigations like
+	 * the offline-download endpoint (a native download can't send a Bearer
+	 * header, only cookies). Token expiry is still enforced by JWT verification.
+	 */
+	private accessCookieOptions() {
+		return {
+			httpOnly: true,
+			path: '/',
+			sameSite: 'lax' as const,
+			maxAge: parseDurationSeconds(this.config.get<string>('auth.jwtExpiresIn', '7d')),
+		};
+	}
+
 	@Post('setup')
 	@Public()
 	@UsePipes(new ZodValidationPipe(setupSchema))
@@ -28,12 +45,7 @@ export class AuthController {
 		const user = await this.authService.setup(body);
 		const { accessToken } = await this.authService.generateTokens(user as any, req.server);
 
-		reply.setCookie('mu_access_token', accessToken, {
-			httpOnly: true,
-			path: '/',
-			sameSite: 'lax',
-			maxAge: 15 * 60,
-		});
+		reply.setCookie('mu_access_token', accessToken, this.accessCookieOptions());
 
 		// Compute effective paths: prefer mediaPaths array, fall back to single mediaPath
 		const effectivePaths = (
@@ -62,12 +74,7 @@ export class AuthController {
 		const user = await this.authService.login(body.username, body.password);
 		const { accessToken } = await this.authService.generateTokens(user, req.server);
 
-		reply.setCookie('mu_access_token', accessToken, {
-			httpOnly: true,
-			path: '/',
-			sameSite: 'lax',
-			maxAge: 15 * 60,
-		});
+		reply.setCookie('mu_access_token', accessToken, this.accessCookieOptions());
 
 		return { user, accessToken };
 	}
@@ -88,7 +95,20 @@ export class AuthController {
 
 	@Get('me')
 	@RequireAction('view:library')
-	async me(@CurrentUser() user: any) {
+	async me(@CurrentUser() user: any, @Req() req: any, @Res({ passthrough: true }) reply: any) {
+		// Refresh the access-token cookie's browser lifetime on every session
+		// check (the client calls /auth/me on load). The cookie carries the
+		// same token the API client sends as a Bearer header, so re-setting it
+		// keeps the two in sync and self-heals stale/expired cookies — which is
+		// what makes cookie-authed navigations (offline download) reliable for
+		// the whole session without a token in the URL.
+		const auth = req.headers?.authorization;
+		const raw =
+			typeof auth === 'string' && auth.toLowerCase().startsWith('bearer ')
+				? auth.slice(7).trim()
+				: null;
+		if (raw) reply.setCookie('mu_access_token', raw, this.accessCookieOptions());
+
 		// JWT payload has { sub, role } — look up full user
 		const userId = user.sub ?? user.id;
 		const fullUser = await this.authService.findById(userId);
@@ -105,4 +125,20 @@ export class AuthController {
 		const localBypass = this.config.get<boolean>('auth.localBypass', true);
 		return { setupComplete, localBypass };
 	}
+}
+
+/**
+ * Parse a JWT-style duration ("7d", "24h", "15m", "60s", or a plain number of
+ * seconds) into seconds. Falls back to 7 days for anything unrecognised.
+ */
+function parseDurationSeconds(value: string | number | undefined): number {
+	const WEEK = 7 * 24 * 60 * 60;
+	if (value == null) return WEEK;
+	if (typeof value === 'number') return value > 0 ? Math.floor(value) : WEEK;
+	const m = value.trim().match(/^(\d+)\s*([smhd])?$/i);
+	if (!m) return WEEK;
+	const n = parseInt(m[1]!, 10);
+	const unit = (m[2] || 's').toLowerCase();
+	const mult = unit === 'd' ? 86400 : unit === 'h' ? 3600 : unit === 'm' ? 60 : 1;
+	return n * mult;
 }

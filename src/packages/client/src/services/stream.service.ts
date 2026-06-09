@@ -259,11 +259,16 @@ export const streamService = {
 
 	/**
 	 * Direct-download URL for a movie's source file. The browser streams it
-	 * natively (resumable), and the server sets a `Title (Year).<ext>`
-	 * filename. Auth rides on the `?token=` query credential, like the other
-	 * media URLs, since a native download can't attach an Authorization header.
+	 * natively (resumable) and the server sets a `Title (Year).<ext>` filename.
+	 *
+	 * Auth: for a logged-in user the request rides on the `mu_access_token`
+	 * cookie (sent automatically on the same-origin navigation), so no token
+	 * appears in the URL. Pass `{ withCredential: true }` to embed the
+	 * `?token=`/`?shareToken=` credential instead — only for producing a URL
+	 * meant to be shared/opened outside the authenticated session.
 	 */
-	getDownloadUrl(movieId: string): string {
-		return `/api/v1/stream/download/${encodeURIComponent(movieId)}?${buildStreamUrlCredential()}`;
+	getDownloadUrl(movieId: string, opts?: { withCredential?: boolean }): string {
+		const base = `/api/v1/stream/download/${encodeURIComponent(movieId)}`;
+		return opts?.withCredential ? `${base}?${buildStreamUrlCredential()}` : base;
 	},
 };
