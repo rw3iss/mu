@@ -219,13 +219,18 @@ export const configSchema = z.object({
 	email: z
 		.object({
 			enabled: z.boolean().default(false),
-			provider: z.enum(['brevo', 'smtp']).default('brevo'),
+			provider: z.enum(['brevo', 'resend', 'smtp']).default('brevo'),
+			/** Verified sender on your domain, e.g. `mu@ryanweiss.net`. */
 			fromAddress: z.string().default('noreply@mu.local'),
 			fromName: z.string().default('Mu'),
+			/** Where recipient replies land (e.g. ryan@ryanweiss.net). */
+			replyTo: z.string().default(''),
 			/** Where admin notifications (e.g. new feedback) are sent. */
 			adminEmail: z.string().default(''),
 			/** Brevo (https://www.brevo.com) transactional email API key. */
 			brevoApiKey: z.string().default(''),
+			/** Resend (https://resend.com) transactional email API key. */
+			resendApiKey: z.string().default(''),
 		})
 		.default(() => ({}) as any),
 

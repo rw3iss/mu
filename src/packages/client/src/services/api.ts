@@ -12,8 +12,18 @@ export class ApiError extends Error {
 		public statusText: string,
 		public body: unknown,
 	) {
-		super(`API Error ${status}: ${statusText}`);
+		// Prefer the server's own message (NestJS sends `{ message, error,
+		// statusCode }`) so callers and toasts show the real reason instead of a
+		// generic "API Error 400: Bad Request".
+		super(ApiError.deriveMessage(status, statusText, body));
 		this.name = 'ApiError';
+	}
+
+	private static deriveMessage(status: number, statusText: string, body: unknown): string {
+		const m = (body as { message?: unknown } | null | undefined)?.message;
+		if (typeof m === 'string' && m.trim()) return m;
+		if (Array.isArray(m) && m.length) return m.filter(Boolean).join(', ');
+		return `API Error ${status}: ${statusText}`;
 	}
 }
 

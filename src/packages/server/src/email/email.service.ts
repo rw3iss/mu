@@ -51,11 +51,27 @@ export class EmailService {
 
 	constructor(private readonly config: ConfigService) {}
 
+	/** Configured to send the admin NOTIFICATION (needs an admin recipient). */
 	get isConfigured(): boolean {
 		return (
 			this.config.get<boolean>('email.enabled', false) === true &&
 			!!this.config.get<string>('email.adminEmail')
 		);
+	}
+
+	private get provider(): string {
+		return this.config.get<string>('email.provider', 'brevo');
+	}
+
+	/**
+	 * Whether outbound SENDING is wired (email enabled + the selected provider's
+	 * API key). Unlike `isConfigured` this does NOT require `email.adminEmail` —
+	 * that's only the notification recipient; replies are sent to the submitter.
+	 */
+	get canSend(): boolean {
+		if (this.config.get<boolean>('email.enabled', false) !== true) return false;
+		if (this.provider === 'resend') return !!this.config.get<string>('email.resendApiKey');
+		return !!this.config.get<string>('email.brevoApiKey');
 	}
 
 	async sendFeedbackNotification(data: FeedbackNotificationData): Promise<void> {
@@ -109,12 +125,10 @@ export class EmailService {
 	 * key / provider error) so the caller can surface the failure to the admin.
 	 */
 	async sendFeedbackReply(data: FeedbackReplyData): Promise<void> {
-		if (!this.isConfigured) {
-			throw new Error('Email is disabled or no admin address is set (server email config).');
-		}
-		const provider = this.config.get<string>('email.provider', 'brevo');
-		if (provider === 'brevo' && !this.config.get<string>('email.brevoApiKey')) {
-			throw new Error('Brevo API key is not configured.');
+		if (!this.canSend) {
+			throw new Error(
+				'Emailing is disabled — could not send the reply. Configure email (provider + API key) in config.yml.',
+			);
 		}
 
 		const reportedAt = this.formatDate(data.reportedAt);
@@ -146,6 +160,8 @@ export class EmailService {
 			subject: data.resolved ? 'Your Mu feedback has been resolved' : 'Re: your Mu feedback',
 			html,
 			attachments: [],
+			// So the submitter's reply goes to a real inbox (e.g. ryan@…).
+			replyTo: this.config.get<string>('email.replyTo') || undefined,
 		});
 		this.logger.log(`Sent feedback ${data.resolved ? 'resolution' : 'reply'} to ${data.to}`);
 	}
@@ -157,30 +173,17 @@ export class EmailService {
 			: d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 	}
 
-	private async send(opts: {
-		to: string;
-		subject: string;
-		html: string;
-		attachments: EmailAttachment[];
-	}): Promise<void> {
-		const provider = this.config.get<string>('email.provider', 'brevo');
-		if (provider === 'brevo') return this.sendViaBrevo(opts);
-		// SMTP transport isn't wired (no SMTP dependency bundled). Treated as a
-		// stub: log and move on so configuration mistakes degrade gracefully.
-		this.logger.warn(
-			`Email provider '${provider}' is not implemented — notification not sent (stub)`,
-		);
+	private async send(opts: SendOpts): Promise<void> {
+		if (this.provider === 'resend') return this.sendViaResend(opts);
+		if (this.provider === 'brevo') return this.sendViaBrevo(opts);
+		// Unknown provider — log and degrade gracefully.
+		this.logger.warn(`Email provider '${this.provider}' is not implemented — not sent (stub)`);
 	}
 
-	private async sendViaBrevo(opts: {
-		to: string;
-		subject: string;
-		html: string;
-		attachments: EmailAttachment[];
-	}): Promise<void> {
+	private async sendViaBrevo(opts: SendOpts): Promise<void> {
 		const apiKey = this.config.get<string>('email.brevoApiKey');
 		if (!apiKey) {
-			this.logger.warn('email.brevoApiKey not set — feedback notification not sent (stub)');
+			this.logger.warn('email.brevoApiKey not set — email not sent (stub)');
 			return;
 		}
 		const payload: Record<string, unknown> = {
@@ -192,6 +195,7 @@ export class EmailService {
 			subject: opts.subject,
 			htmlContent: opts.html,
 		};
+		if (opts.replyTo) payload.replyTo = { email: opts.replyTo };
 		if (opts.attachments.length > 0) {
 			payload.attachment = opts.attachments.map((a) => ({
 				name: a.name,
@@ -212,4 +216,48 @@ export class EmailService {
 			throw new Error(`Brevo responded ${res.status}: ${text.slice(0, 200)}`);
 		}
 	}
+
+	private async sendViaResend(opts: SendOpts): Promise<void> {
+		const apiKey = this.config.get<string>('email.resendApiKey');
+		if (!apiKey) {
+			this.logger.warn('email.resendApiKey not set — email not sent (stub)');
+			return;
+		}
+		const fromName = this.config.get<string>('email.fromName', 'Mu');
+		const fromAddress = this.config.get<string>('email.fromAddress', 'noreply@mu.local');
+		const payload: Record<string, unknown> = {
+			from: `${fromName} <${fromAddress}>`,
+			to: [opts.to],
+			subject: opts.subject,
+			html: opts.html,
+		};
+		if (opts.replyTo) payload.reply_to = opts.replyTo;
+		if (opts.attachments.length > 0) {
+			payload.attachments = opts.attachments.map((a) => ({
+				filename: a.name,
+				content: a.contentBase64,
+			}));
+		}
+		const res = await fetch('https://api.resend.com/emails', {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${apiKey}`,
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify(payload),
+		});
+		if (!res.ok) {
+			const text = await res.text().catch(() => '');
+			throw new Error(`Resend responded ${res.status}: ${text.slice(0, 200)}`);
+		}
+	}
+}
+
+/** Shared options for a single outbound email. */
+interface SendOpts {
+	to: string;
+	subject: string;
+	html: string;
+	attachments: EmailAttachment[];
+	replyTo?: string;
 }
