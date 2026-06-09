@@ -75,8 +75,12 @@
   gap: var(--space-xl);
   align-items: start;
 
+  // Three columns, each capped to a single sensible card width and centered as
+  // a group — so cards stay their normal size rather than stretching to a third
+  // of the page. Shrinks to fit, then collapses to one column under 1024px.
   @media (min-width: 1024px) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 300px));
+    justify-content: center;
   }
 }
 
