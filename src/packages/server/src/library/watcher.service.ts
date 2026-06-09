@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { basename, extname } from 'node:path';
 import { SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
 import {
@@ -20,12 +20,20 @@ import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { ScannerService } from './scanner.service.js';
 
+/** How often the background health-check reconciles watchers against sources. */
+const HEALTH_CHECK_INTERVAL_MS = 2 * 60 * 1000;
+
 @Injectable()
 export class WatcherService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger('WatcherService');
 	private watchers = new Map<string, FSWatcher>();
+	/** Inode of each watched source root at watch-creation time. A change means
+	 *  the drive was unmounted/remounted under the same path — chokidar's watch
+	 *  is now pointing at a dead inode and must be re-armed. */
+	private watchedInodes = new Map<string, number>();
 	private debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+	private healthTimer: ReturnType<typeof setInterval> | null = null;
 	private readonly extSet = new Set(SUPPORTED_VIDEO_EXTENSIONS.map((e) => e.toLowerCase()));
 
 	constructor(
@@ -57,7 +65,17 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 			return;
 		}
 
-		await this.refreshWatchers();
+		await this.ensureWatchersHealthy('startup');
+
+		// Safety net: these are removable /run/media mounts; a drive unmount /
+		// remount silently kills chokidar's watch. Re-check periodically so a
+		// re-attached drive starts being watched again without a restart.
+		this.healthTimer = setInterval(() => {
+			this.ensureWatchersHealthy('periodic').catch((err) =>
+				this.logger.error(`Watcher health check failed: ${(err as Error).message}`),
+			);
+		}, HEALTH_CHECK_INTERVAL_MS);
+
 		this.logger.log('File watcher service initialized');
 	}
 
@@ -84,7 +102,7 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 		if (this.refreshTimer) clearTimeout(this.refreshTimer);
 		this.refreshTimer = setTimeout(() => {
 			this.refreshTimer = null;
-			this.refreshWatchers().catch((err) =>
+			this.ensureWatchersHealthy('source-changed').catch((err) =>
 				this.logger.error(`Failed to refresh watchers: ${(err as Error).message}`),
 			);
 		}, 1500);
@@ -106,33 +124,141 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 			clearTimeout(this.refreshTimer);
 			this.refreshTimer = null;
 		}
+
+		if (this.healthTimer) {
+			clearInterval(this.healthTimer);
+			this.healthTimer = null;
+		}
 	}
 
-	async refreshWatchers() {
-		// Close existing watchers
-		for (const watcher of this.watchers.values()) {
-			await watcher.close();
+	private async closeWatcher(sourceId: string) {
+		const watcher = this.watchers.get(sourceId);
+		if (watcher) {
+			try {
+				await watcher.close();
+			} catch {
+				/* already closing */
+			}
 		}
-		this.watchers.clear();
+		this.watchers.delete(sourceId);
+		this.watchedInodes.delete(sourceId);
+	}
+
+	/**
+	 * Reconcile the live watcher set against the enabled media sources. Creates
+	 * watchers that are missing, drops watchers for sources that are gone /
+	 * disabled / offline, and RE-ARMS a watcher whose source path was remounted
+	 * (inode changed) — chokidar keeps watching the old, now-dead inode otherwise.
+	 *
+	 * Safe to call repeatedly: it's a no-op when everything already matches. The
+	 * manual-scan endpoints and a periodic timer both call it so a watcher that
+	 * died (e.g. a removable drive remount) is revived without a server restart.
+	 * When a source is re-armed after going away, its directory is re-scanned to
+	 * pick up anything added while it was unwatched.
+	 */
+	async ensureWatchersHealthy(
+		reason: string,
+	): Promise<{ created: number; removed: number; rearmed: number; active: number }> {
+		if (!this.config.get<boolean>('library.watchEnabled', true)) {
+			return { created: 0, removed: 0, rearmed: 0, active: this.watchers.size };
+		}
 
 		const sources = this.database.db
 			.select()
 			.from(mediaSources)
 			.where(eq(mediaSources.enabled, true))
 			.all();
+		const desired = new Set(sources.map((s) => s.id));
 
-		for (const source of sources) {
-			this.createWatcher(source.id, source.path);
+		let created = 0;
+		let removed = 0;
+		let rearmed = 0;
+		const rescan: string[] = [];
+
+		// Drop watchers for sources that are no longer enabled/present.
+		for (const sourceId of [...this.watchers.keys()]) {
+			if (!desired.has(sourceId)) {
+				await this.closeWatcher(sourceId);
+				removed++;
+			}
 		}
 
-		this.logger.log(`Watching ${sources.length} media source(s)`);
+		for (const source of sources) {
+			let ino: number | null = null;
+			try {
+				ino = statSync(source.path).ino;
+			} catch {
+				ino = null; // path not present — drive offline / not mounted yet
+			}
+
+			if (ino == null) {
+				// Source path is gone (drive unmounted). Tear down its now-dead
+				// watcher; it'll be recreated by a later check once remounted.
+				if (this.watchers.has(source.id)) {
+					await this.closeWatcher(source.id);
+					removed++;
+					this.logger.warn(`Source offline, watcher dropped: ${source.path}`);
+				}
+				continue;
+			}
+
+			const hasWatcher = this.watchers.has(source.id);
+			const prevIno = this.watchedInodes.get(source.id);
+			const remounted = hasWatcher && prevIno != null && prevIno !== ino;
+
+			if (!hasWatcher || remounted) {
+				if (hasWatcher) await this.closeWatcher(source.id);
+				this.createWatcher(source.id, source.path);
+				this.watchedInodes.set(source.id, ino);
+				if (remounted) {
+					rearmed++;
+					rescan.push(source.id);
+					this.logger.warn(
+						`Re-armed watcher for ${source.path} (drive remounted: inode ${prevIno} → ${ino})`,
+					);
+				} else {
+					created++;
+					// A watcher appearing where there was none (other than first
+					// boot) means we may have missed files while it was down.
+					if (reason !== 'startup') rescan.push(source.id);
+				}
+			}
+		}
+
+		if (created || removed || rearmed) {
+			this.logger.log(
+				`Watcher health check (${reason}): ${this.watchers.size} active (+${created} created, ${rearmed} re-armed, -${removed} removed)`,
+			);
+		}
+
+		// Reconcile any source that just (re)gained a watcher — catches files
+		// added while it was unwatched. Fire-and-forget; scans are idempotent.
+		for (const sourceId of rescan) {
+			this.scanner
+				.scanSource(sourceId)
+				.catch((err) =>
+					this.logger.error(`Gap re-scan failed: ${(err as Error).message}`),
+				);
+		}
+
+		return { created, removed, rearmed, active: this.watchers.size };
 	}
 
 	private createWatcher(sourceId: string, sourcePath: string) {
+		// Polling is the reliable fallback for filesystems that don't deliver
+		// inotify events (some network shares / FUSE mounts). Off by default
+		// (native inotify is far cheaper); enable via library.watchPolling for
+		// paths where new files aren't being detected.
+		const usePolling = this.config.get<boolean>('library.watchPolling', false);
+		const pollIntervalMs = this.config.get<number>('library.watchPollIntervalMs', 4000);
+
 		const watcher = chokidar.watch(sourcePath, {
 			ignoreInitial: true,
 			awaitWriteFinish: { stabilityThreshold: 2000, pollInterval: 500 },
 			depth: 10,
+			usePolling,
+			interval: pollIntervalMs,
+			binaryInterval: pollIntervalMs,
 		});
 
 		watcher.on('add', (filePath: string) => {

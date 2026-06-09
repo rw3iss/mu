@@ -38,6 +38,8 @@
 .grid {
 	display: grid;
 	gap: var(--item-gap);
+	// Every card in a row stretches to the tallest, so heights stay uniform.
+	align-items: stretch;
 	// Explicit column counts cap the row at 4 and step down cleanly. Using
 	// auto-fill instead pads the row with empty "ghost" tracks when there
 	// are fewer members than columns fit — which is what we're avoiding.
@@ -60,6 +62,10 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-md);
+	// Fill the grid cell so every card in a row is the same height regardless
+	// of whether it has a "watching now" row or a blurb (the footer pins to the
+	// bottom via margin-top:auto below).
+	height: 100%;
 	padding: var(--space-lg);
 	background: var(--color-bg-surface);
 	border: var(--card-border);
@@ -189,7 +195,10 @@
 .cardStats {
 	display: flex;
 	flex-wrap: wrap;
+	align-items: baseline;
 	gap: var(--space-md);
+	// Pin the stats/joined row to the bottom so cards of equal height line up.
+	margin-top: auto;
 	font-size: var(--font-size-xs);
 	color: var(--color-text-secondary);
 

@@ -5,6 +5,7 @@ import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from './library.service.js';
 import { LibraryJobsService } from './library-jobs.service.js';
 import { ScannerService } from './scanner.service.js';
+import { WatcherService } from './watcher.service.js';
 
 @Controller('sources')
 export class LibraryController {
@@ -14,6 +15,7 @@ export class LibraryController {
 		private readonly libraryService: LibraryService,
 		private readonly libraryJobs: LibraryJobsService,
 		private readonly scanner: ScannerService,
+		private readonly watcher: WatcherService,
 		readonly _jobManager: JobManagerService,
 	) {}
 
@@ -96,6 +98,10 @@ export class LibraryController {
 	@Roles('admin')
 	@RequireAction('edit:app-settings')
 	async scanAll(@Body() body?: { reEncode?: boolean }) {
+		// A manual scan is also the moment to confirm watchers are alive — they
+		// can die silently if a removable drive remounted since boot.
+		await this.watcher.ensureWatchersHealthy('manual-scan-all');
+
 		const sources = this.libraryService.getSources().filter((s) => s.enabled);
 
 		let totalFilesFound = 0;
@@ -137,6 +143,9 @@ export class LibraryController {
 	@RequireAction('edit:app-settings')
 	async scan(@Param('id') id: string) {
 		const source = this.libraryService.getSource(id);
+		// Re-check watchers on a manual scan so a watcher that died (e.g. drive
+		// remount) is revived — this is the user's "make sure it's running" hook.
+		await this.watcher.ensureWatchersHealthy('manual-scan');
 		const result = await this.scanner.scanSource(id);
 
 		return {
