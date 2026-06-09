@@ -28,11 +28,15 @@
   padding: 0;
 }
 
-/* Greeting + the "new since your last session" growth line, stacked. */
+/* Greeting + the growth line, inline on one row. The stat sits after the
+   username and wraps (its own text can run to two lines) but stays beside the
+   name until the row is too narrow, then drops below it. */
 .welcomeGreeting {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  flex-flow: row wrap;
+  align-items: baseline;
+  column-gap: var(--space-sm);
+  row-gap: 1px;
   min-width: 0;
 }
 
@@ -147,12 +151,22 @@
   grid-template-columns: 1fr;
   gap: var(--space-xl);
   align-items: start;
+  // Match the Continue Watching rail's card width so Recently Added and
+  // Trending pack more cards per row (Trending → ~2-up instead of 1).
+  --mg-card-min: 180px;
 
   // Stretch columns to fill the (fixed-height) dashboard so each scrolls.
   @media (min-width: 768px) {
     height: 100%;
     align-items: stretch;
   }
+}
+
+/* Trending lives in the narrower right column, so it needs a smaller card
+   min than the 180px left-column cards to fit two per row at typical desktop
+   widths (auto-fill still drops it to one column when the column is narrow). */
+.areaTrending {
+  --mg-card-min: 150px;
 }
 
 .column {
@@ -257,7 +271,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
 
 .sectionTitle {
