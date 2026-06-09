@@ -222,7 +222,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 					onClick={onToggle}
 					aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
 				>
-					<Icon name={collapsed ? 'chevron-right' : 'chevron-left'} />
+					<Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={20} />
 				</button>
 			</div>
 

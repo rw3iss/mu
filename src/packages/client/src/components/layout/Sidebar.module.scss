@@ -82,7 +82,9 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: 0;
-	color: var(--color-text-secondary);
+	// Use the high-contrast primary text colour so the chevron is clearly
+	// visible in every theme (the secondary colour was too dim on the header).
+	color: var(--color-text-primary);
 	font-size: var(--font-size-sm);
 	transition:
 		background 150ms ease,
