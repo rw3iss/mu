@@ -6,7 +6,13 @@ import { Icon } from '@/components/common/Icon';
 import { moviesService } from '@/services/movies.service';
 import type { MoviePlaylistInfo, Playlist } from '@/services/playlists.service';
 import type { Movie } from '@/state/library.state';
-import { notifyError, notifySuccess, shouldNotifyPlaylist } from '@/state/notifications.state';
+import {
+	notifyError,
+	notifyInfo,
+	notifySuccess,
+	notifyWarning,
+	shouldNotifyPlaylist,
+} from '@/state/notifications.state';
 import {
 	addMovieToPlaylist,
 	ensurePlaylistsLoaded,
@@ -189,11 +195,21 @@ export function MovieOptionsMenu({
 			e.stopPropagation();
 			setOpen(false);
 			setRefreshState('loading');
+			notifyInfo('Refreshing metadata. This may take up to a minute…');
 			try {
-				await moviesService.refreshMetadata(movie.id);
+				const result = await moviesService.refreshMetadata(movie.id);
 				await refreshMovie();
 				setRefreshState('complete');
-				notifySuccess('Metadata refreshed');
+				const src = result?.source;
+				if (!src) {
+					notifyWarning(result?.message || 'No metadata found for this movie.');
+				} else if (src === 'omdb') {
+					notifySuccess(
+						'Metadata loaded from OMDb (TMDB unavailable). Refresh again later to try TMDB.',
+					);
+				} else {
+					notifySuccess('Metadata loaded.');
+				}
 				setTimeout(() => setRefreshState('idle'), 3000);
 			} catch {
 				setRefreshState('idle');

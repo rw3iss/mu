@@ -103,10 +103,12 @@ export const moviesService = {
 	},
 
 	/**
-	 * Trigger a metadata refresh for a movie
+	 * Trigger a metadata refresh for a movie. Returns the applied metadata row
+	 * (its `source` is "tmdb"/"omdb"/"tmdb+omdb"), or `{ message }` when nothing
+	 * matched — so the UI can report which source was used / if it fell back.
 	 */
-	refreshMetadata(movieId: string): Promise<void> {
-		return api.post<void>(`/movies/${movieId}/refresh`);
+	refreshMetadata(movieId: string): Promise<{ source?: string; message?: string }> {
+		return api.post<{ source?: string; message?: string }>(`/movies/${movieId}/refresh`);
 	},
 
 	clearMetadata(movieId: string): Promise<void> {

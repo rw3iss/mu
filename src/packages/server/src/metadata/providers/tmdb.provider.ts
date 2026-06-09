@@ -4,6 +4,16 @@ import { CacheService } from '../../cache/cache.service.js';
 import { ConfigService } from '../../config/config.service.js';
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+
+/**
+ * fetch() with a hard timeout so a slow/stalled provider request can't hang a
+ * metadata refresh for a minute (the calling methods catch the resulting
+ * AbortError and fall back / return null). A 429 leaves a clear log line below.
+ */
+const PROVIDER_FETCH_TIMEOUT_MS = 12_000;
+function fetchWithTimeout(url: string): Promise<Response> {
+	return fetch(url, { signal: AbortSignal.timeout(PROVIDER_FETCH_TIMEOUT_MS) });
+}
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
 interface TmdbSearchResult {
@@ -211,7 +221,7 @@ export class TmdbProvider {
 		if (year) params.set('year', String(year));
 
 		try {
-			const response = await fetch(`${TMDB_BASE_URL}/search/movie?${params}`);
+			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/search/movie?${params}`);
 			if (!response.ok) {
 				this.logger.warn(`TMDB search failed: ${response.status}`);
 				return null;
@@ -242,7 +252,7 @@ export class TmdbProvider {
 		});
 
 		try {
-			const response = await fetch(`${TMDB_BASE_URL}/movie/${tmdbId}?${params}`);
+			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/movie/${tmdbId}?${params}`);
 			if (!response.ok) {
 				this.logger.warn(`TMDB details failed for ${tmdbId}: ${response.status}`);
 				return null;
@@ -280,7 +290,7 @@ export class TmdbProvider {
 		if (year) params.set('first_air_date_year', String(year));
 
 		try {
-			const response = await fetch(`${TMDB_BASE_URL}/search/tv?${params}`);
+			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/search/tv?${params}`);
 			if (!response.ok) {
 				this.logger.warn(`TMDB TV search failed: ${response.status}`);
 				return null;
@@ -308,7 +318,7 @@ export class TmdbProvider {
 		});
 
 		try {
-			const response = await fetch(`${TMDB_BASE_URL}/tv/${tmdbTvId}?${params}`);
+			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/tv/${tmdbTvId}?${params}`);
 			if (!response.ok) {
 				this.logger.warn(`TMDB TV details failed for ${tmdbTvId}: ${response.status}`);
 				return null;
@@ -348,7 +358,7 @@ export class TmdbProvider {
 		});
 
 		try {
-			const response = await fetch(
+			const response = await fetchWithTimeout(
 				`${TMDB_BASE_URL}/tv/${tmdbTvId}/season/${seasonNumber}/episode/${episodeNumber}?${params}`,
 			);
 			if (!response.ok) {
@@ -382,7 +392,7 @@ export class TmdbProvider {
 		});
 
 		try {
-			const response = await fetch(`${TMDB_BASE_URL}/search/collection?${params}`);
+			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/search/collection?${params}`);
 			if (!response.ok) return null;
 			const data = (await response.json()) as { results: TmdbCollectionSearchResult[] };
 			const results = data.results ?? [];
@@ -407,7 +417,7 @@ export class TmdbProvider {
 		const params = new URLSearchParams({ api_key: this.apiKey });
 
 		try {
-			const response = await fetch(`${TMDB_BASE_URL}/collection/${collectionId}?${params}`);
+			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/collection/${collectionId}?${params}`);
 			if (!response.ok) return null;
 			const data = (await response.json()) as TmdbCollectionDetails;
 			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, data, CACHE_TTL.METADATA);
@@ -441,7 +451,7 @@ export class TmdbProvider {
 		});
 
 		try {
-			const response = await fetch(`${TMDB_BASE_URL}/find/${imdbId}?${params}`);
+			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/find/${imdbId}?${params}`);
 			if (!response.ok) return null;
 			const data = (await response.json()) as {
 				movie_results: TmdbSearchResult[];
@@ -472,7 +482,7 @@ export class TmdbProvider {
 		});
 
 		try {
-			const response = await fetch(`${TMDB_BASE_URL}/person/${personId}?${params}`);
+			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/person/${personId}?${params}`);
 			if (!response.ok) {
 				this.logger.warn(`TMDB person details failed for ${personId}: ${response.status}`);
 				return null;
@@ -498,7 +508,7 @@ export class TmdbProvider {
 
 		const params = new URLSearchParams({ api_key: this.apiKey });
 		try {
-			const response = await fetch(
+			const response = await fetchWithTimeout(
 				`${TMDB_BASE_URL}/person/${personId}/combined_credits?${params}`,
 			);
 			if (!response.ok) {
@@ -536,7 +546,7 @@ export class TmdbProvider {
 			include_adult: 'false',
 		});
 		try {
-			const response = await fetch(`${TMDB_BASE_URL}/search/person?${params}`);
+			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/search/person?${params}`);
 			if (!response.ok) return null;
 			const data = (await response.json()) as { results: any[] };
 			const results = data.results ?? [];

@@ -6,6 +6,16 @@ import { RatingsSyncService } from '../../imdb-datasets/ratings-sync.service.js'
 
 const OMDB_BASE_URL = 'https://www.omdbapi.com';
 
+/**
+ * fetch() with a hard timeout so a slow/stalled provider request can't hang a
+ * metadata refresh for a minute (the calling methods catch the resulting
+ * AbortError and fall back / return null). A 429 leaves a clear log line below.
+ */
+const PROVIDER_FETCH_TIMEOUT_MS = 12_000;
+function fetchWithTimeout(url: string): Promise<Response> {
+	return fetch(url, { signal: AbortSignal.timeout(PROVIDER_FETCH_TIMEOUT_MS) });
+}
+
 interface OmdbResult {
 	Title: string;
 	Year: string;
@@ -144,7 +154,7 @@ export class OmdbProvider {
 		});
 
 		try {
-			const response = await fetch(`${OMDB_BASE_URL}/?${params}`);
+			const response = await fetchWithTimeout(`${OMDB_BASE_URL}/?${params}`);
 			if (!response.ok) {
 				this.logger.warn(`OMDB request failed: ${response.status}`);
 				return localOnlyData();
@@ -192,7 +202,7 @@ export class OmdbProvider {
 		});
 
 		try {
-			const response = await fetch(`${OMDB_BASE_URL}/?${params}`);
+			const response = await fetchWithTimeout(`${OMDB_BASE_URL}/?${params}`);
 			if (!response.ok) {
 				this.logger.warn(`OMDB multi-search failed: ${response.status}`);
 				return [];
@@ -244,7 +254,7 @@ export class OmdbProvider {
 		if (year) params.set('y', String(year));
 
 		try {
-			const response = await fetch(`${OMDB_BASE_URL}/?${params}`);
+			const response = await fetchWithTimeout(`${OMDB_BASE_URL}/?${params}`);
 			if (!response.ok) {
 				this.logger.warn(`OMDB title search failed: ${response.status}`);
 				return null;
