@@ -16,6 +16,7 @@ import { parseJsonArray } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movies, transcodeCache, userWatchHistory } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
+import { buildPrettyTitle } from '../grouping/title-sanitiser.js';
 import type { JobHelpers, JobRecord } from '../jobs/job.interface.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { parseThumbnailSize, SpriteService } from '../media/sprite.service.js';
@@ -44,6 +45,13 @@ export const JOB_TYPE = {
 	/** Backfill ffprobe codec info for files that were never probed (null codec). */
 	PROBE_UNPROBED: 'probe-unprobed',
 } as const;
+
+/**
+ * Backoff delays for auto metadata fetches on newly-scanned movies. One retry
+ * per entry (so 4 total attempts), giving transient provider failures time to
+ * recover before giving up.
+ */
+const METADATA_RETRY_BACKOFF_MS = [5_000, 20_000, 60_000];
 
 /**
  * A pre-transcode error that will recur identically on every retry — a missing
@@ -128,19 +136,38 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			},
 		);
 
-		// Metadata handler
+		// Metadata handler. Retries with backoff when a fetch finds/applies
+		// nothing (fetchForMovie returns null) or throws — transient provider
+		// failures then self-heal instead of leaving a movie metadata-less. The
+		// retry is scheduled (setTimeout → re-enqueue) so it doesn't hold a job
+		// slot during the backoff.
 		this.jobManager.registerHandler(
 			JOB_TYPE.METADATA,
 			async (job: JobRecord, helpers: JobHelpers) => {
 				const movieId = job.payload.movieId as string;
-				const _fetchExtended = job.payload.fetchExtended as boolean | undefined;
-				helpers.log(`Fetching metadata for movie ${movieId}`);
+				const attempt = (job.payload.attempt as number) ?? 0;
+				helpers.log(`Fetching metadata for movie ${movieId} (attempt ${attempt + 1})`);
 
-				const result = await this.metadata.fetchForMovie(movieId);
+				let result: unknown = null;
+				try {
+					result = await this.metadata.fetchForMovie(movieId);
+				} catch (err) {
+					helpers.log(`Metadata fetch error: ${(err as Error).message}`);
+				}
 
-				// If the setting is enabled and TMDB found a match (imdbId), extended data
-				// is already fetched inside MetadataService.fetchForMovie (OMDB step).
-				// This flag is checked at enqueue time, not here — we always try.
+				if (!result && attempt < METADATA_RETRY_BACKOFF_MS.length) {
+					const delay = METADATA_RETRY_BACKOFF_MS[attempt]!;
+					helpers.log(`No metadata yet — retrying in ${Math.round(delay / 1000)}s`);
+					setTimeout(() => {
+						this.jobManager.enqueue({
+							type: JOB_TYPE.METADATA,
+							label: `Fetch metadata (retry ${attempt + 1}): ${movieId.slice(0, 8)}`,
+							payload: { movieId, fetchExtended: true, attempt: attempt + 1 },
+							priority: 25,
+						});
+					}, delay);
+				}
+
 				helpers.reportProgress(100);
 				return result;
 			},
@@ -684,14 +711,26 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 	private listenForNewMovies(): void {
 		this.events.on(WsEvent.LIBRARY_MOVIE_ADDED, async (data: unknown) => {
 			const { movieId, title } = data as { movieId: string; title: string };
+			let effectiveTitle = title;
 
-			// Always enqueue metadata fetch
-			this.jobManager.enqueue({
-				type: JOB_TYPE.METADATA,
-				label: `Fetch metadata: ${title}`,
-				payload: { movieId, fetchExtended: this.shouldFetchExtendedMetadata() },
-				priority: 20,
-			});
+			// 1. Sanitize the title FIRST (if enabled), so the metadata search
+			//    below queries the clean title rather than the raw filename.
+			if (this.shouldAutoSanitizeTitles()) {
+				const cleaned = this.sanitizeNewMovieTitle(movieId);
+				if (cleaned) effectiveTitle = cleaned;
+			}
+
+			// 2. Metadata fetch — only when the setting is enabled. Enqueued with
+			//    a retry+backoff attempt counter so a transient provider failure
+			//    (which a manual "Refresh metadata" would later fix) self-heals.
+			if (this.shouldFetchExtendedMetadata()) {
+				this.jobManager.enqueue({
+					type: JOB_TYPE.METADATA,
+					label: `Fetch metadata: ${effectiveTitle}`,
+					payload: { movieId, fetchExtended: true, attempt: 0 },
+					priority: 20,
+				});
+			}
 
 			// Always enqueue thumbnail generation
 			this.jobManager.enqueue({
@@ -1311,5 +1350,44 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 	private shouldFetchExtendedMetadata(): boolean {
 		const lib = this.settings.get<Record<string, unknown>>('library', {});
 		return (lib as any)?.fetchExtendedMetadata !== false; // default true
+	}
+
+	private shouldAutoSanitizeTitles(): boolean {
+		const lib = this.settings.get<Record<string, unknown>>('library', {});
+		return (lib as any)?.autoSanitizeTitles !== false; // default true
+	}
+
+	/**
+	 * Clean a freshly-scanned movie's title from its filename (the same routine
+	 * as the manual "Sanitize Title" action, force mode). Runs before the
+	 * metadata fetch so the search uses the clean title. Returns the new title,
+	 * or null if no change was made.
+	 */
+	private sanitizeNewMovieTitle(movieId: string): string | null {
+		try {
+			const row = this.database.db
+				.select({ title: movies.title, filePath: movieFiles.filePath })
+				.from(movies)
+				.leftJoin(movieFiles, eq(movieFiles.movieId, movies.id))
+				.where(eq(movies.id, movieId))
+				.get();
+			if (!row?.title) return null;
+			const fileBase = row.filePath
+				? path.basename(row.filePath, path.extname(row.filePath))
+				: null;
+			const cleaned = buildPrettyTitle(fileBase || row.title);
+			if (!cleaned || cleaned.length < 2 || cleaned === row.title) return null;
+			this.database.db
+				.update(movies)
+				.set({ title: cleaned, updatedAt: nowISO() })
+				.where(eq(movies.id, movieId))
+				.run();
+			// Bust the movies list cache so the clean title shows immediately.
+			this.events.emit('library:movie-updated', { movieId });
+			return cleaned;
+		} catch (err) {
+			this.logger.warn(`Auto-sanitize failed for ${movieId}: ${(err as Error).message}`);
+			return null;
+		}
 	}
 }

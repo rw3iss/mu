@@ -256,6 +256,7 @@ export function Settings(props: SettingsProps) {
 	const [scanInterval, setScanInterval] = useState('6');
 	const [mediaPathEntries, setMediaPathEntries] = useState<MediaPathEntryData[]>([]);
 	const [fetchExtendedMetadata, setFetchExtendedMetadata] = useState(true);
+	const [autoSanitizeTitles, setAutoSanitizeTitles] = useState(true);
 	const [persistTranscodes, setPersistTranscodes] = useState(true);
 	const [cacheDir, setCacheDir] = useState('');
 	const [dbPath, setDbPath] = useState('');
@@ -345,8 +346,7 @@ export function Settings(props: SettingsProps) {
 	useEffect(() => {
 		if (activeTab !== 'encoding') return;
 		let cancelled = false;
-		api
-			.get<typeof memCacheStatus>('/stream/memory-cache/status')
+		api.get<typeof memCacheStatus>('/stream/memory-cache/status')
 			.then((s) => {
 				if (!cancelled) setMemCacheStatus(s);
 			})
@@ -401,6 +401,8 @@ export function Settings(props: SettingsProps) {
 						setScanInterval(String(library.scanIntervalHours));
 					if (typeof library.fetchExtendedMetadata === 'boolean')
 						setFetchExtendedMetadata(library.fetchExtendedMetadata);
+					if (typeof library.autoSanitizeTitles === 'boolean')
+						setAutoSanitizeTitles(library.autoSanitizeTitles);
 					if (typeof library.persistTranscodes === 'boolean')
 						setPersistTranscodes(library.persistTranscodes);
 					if (typeof library.cacheDir === 'string') setCacheDir(library.cacheDir);
@@ -646,6 +648,7 @@ export function Settings(props: SettingsProps) {
 				value: {
 					scanIntervalHours: parseInt(scanInterval, 10),
 					fetchExtendedMetadata,
+					autoSanitizeTitles,
 					persistTranscodes,
 					cacheDir: cacheDir || undefined,
 					autoScanEnabled,
@@ -676,6 +679,7 @@ export function Settings(props: SettingsProps) {
 		scanInterval,
 		mediaPathEntries,
 		fetchExtendedMetadata,
+		autoSanitizeTitles,
 		persistTranscodes,
 		cacheDir,
 		autoScanEnabled,
@@ -2431,24 +2435,34 @@ export function Settings(props: SettingsProps) {
 							{/* In-RAM file cache (page-cache residency) */}
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Maximum Cache Memory (GB)</span>
+									<span class={styles.settingLabel}>
+										Maximum Cache Memory (GB)
+									</span>
 									<span class={styles.settingDescription}>
 										Keep recently played / processed movie files resident in RAM
 										(the OS page cache) up to this many GB, evicting the oldest
-										first — so re-watching, sprite generation, and conversions read
-										from memory instead of the disk. 0 = off (rely on the OS
-										default).
+										first — so re-watching, sprite generation, and conversions
+										read from memory instead of the disk. 0 = off (rely on the
+										OS default).
 										{memCacheStatus && (
 											<>
 												{' '}
 												System memory:{' '}
 												<strong>
-													{(memCacheStatus.systemTotalBytes / 1024 ** 3).toFixed(1)} GB
+													{(
+														memCacheStatus.systemTotalBytes /
+														1024 ** 3
+													).toFixed(1)}{' '}
+													GB
 												</strong>{' '}
-												total, {(memCacheStatus.systemFreeBytes / 1024 ** 3).toFixed(1)}{' '}
+												total,{' '}
+												{(
+													memCacheStatus.systemFreeBytes /
+													1024 ** 3
+												).toFixed(1)}{' '}
 												GB free. In cache:{' '}
-												{(memCacheStatus.usedBytes / 1024 ** 3).toFixed(2)} GB across{' '}
-												{memCacheStatus.fileCount} file(s).
+												{(memCacheStatus.usedBytes / 1024 ** 3).toFixed(2)}{' '}
+												GB across {memCacheStatus.fileCount} file(s).
 												{!memCacheStatus.vmtouch &&
 													' (vmtouch not installed — warm-only, OS handles eviction.)'}
 											</>
@@ -2461,7 +2475,9 @@ export function Settings(props: SettingsProps) {
 									min={0}
 									max={
 										memCacheStatus
-											? Math.floor(memCacheStatus.systemTotalBytes / 1024 ** 3)
+											? Math.floor(
+													memCacheStatus.systemTotalBytes / 1024 ** 3,
+												)
 											: 256
 									}
 									step={1}
@@ -2757,6 +2773,55 @@ export function Settings(props: SettingsProps) {
 
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Automatically Sanitize Titles
+									</span>
+									<span class={styles.settingDescription}>
+										Run the "Sanitize Title" routine on newly scanned movies —
+										clean the title from the filename (strip quality tags,
+										release groups, junk) before metadata is fetched.
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={autoSanitizeTitles}
+										onChange={(e) =>
+											setAutoSanitizeTitles(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Download Extended Metadata
+									</span>
+									<span class={styles.settingDescription}>
+										Fetch ratings and reviews from third-party sources (IMDB,
+										Rotten Tomatoes) when a new movie is scanned
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={fetchExtendedMetadata}
+										onChange={(e) =>
+											setFetchExtendedMetadata(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Thumbnail Size</span>
 									<span class={styles.settingDescription}>
 										Seek-bar preview thumbnails. {(() => {
@@ -2803,30 +2868,6 @@ export function Settings(props: SettingsProps) {
 									}))}
 									style={{ minWidth: 320 }}
 								/>
-							</div>
-
-							<div class={styles.settingRow}>
-								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>
-										Download Extended Metadata
-									</span>
-									<span class={styles.settingDescription}>
-										Fetch ratings and reviews from third-party sources (IMDB,
-										Rotten Tomatoes) when a new movie is scanned
-									</span>
-								</div>
-								<label class={styles.toggle}>
-									<input
-										type="checkbox"
-										checked={fetchExtendedMetadata}
-										onChange={(e) =>
-											setFetchExtendedMetadata(
-												(e.target as HTMLInputElement).checked,
-											)
-										}
-									/>
-									<span class={styles.toggleTrack} />
-								</label>
 							</div>
 
 							<div class={styles.settingRow}>
