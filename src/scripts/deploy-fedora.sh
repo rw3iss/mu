@@ -91,6 +91,11 @@ pnpm build >/tmp/mu-deploy-build.log 2>&1 || { echo "FATAL: pnpm build (see /tmp
 	|| { echo "FATAL: vite build (see /tmp/mu-deploy-build.log)"; exit 1; }
 [ -f packages/client/dist/index.html ] && [ -n "$(ls -A packages/client/dist/assets 2>/dev/null)" ] \
 	|| { echo "FATAL: client dist incomplete"; exit 1; }
+# Public assets (logo, favicon, …) must be copied from public/ into dist/. A
+# partial Turbo cache restore can leave them out even when index.html/assets are
+# present, which 404s the site logo. Guard on a known committed public file.
+[ -f packages/client/dist/mu_logo_small.png ] \
+	|| { echo "FATAL: client dist missing public assets (e.g. mu_logo_small.png)"; exit 1; }
 
 pnpm db:migrate >/tmp/mu-deploy-migrate.log 2>&1 || echo "WARN: db:migrate non-zero (continuing)"
 

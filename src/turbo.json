@@ -3,7 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "../../plugins/*/client/**"],
+      "inputs": ["src/**", "public/**", "index.html", "../../plugins/*/client/**"],
       "outputs": ["dist/**", "*.tsbuildinfo"]
     },
     "dev": {
