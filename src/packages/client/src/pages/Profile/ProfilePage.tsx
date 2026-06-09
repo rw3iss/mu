@@ -1,0 +1,262 @@
+import { PROFILE_DESCRIPTION_MAX, type ProfileView } from '@mu/shared';
+import { useEffect, useState } from 'preact/hooks';
+import { route } from 'preact-router';
+import { Avatar } from '@/components/common/Avatar';
+import { Button } from '@/components/common/Button';
+import { Panel } from '@/components/common/Panel';
+import { Spinner } from '@/components/common/Spinner';
+import { ToggleButton } from '@/components/common/ToggleButton';
+import { ProfileFavorites } from '@/components/profile/ProfileFavorites';
+import { ProfileHistoryList } from '@/components/profile/ProfileHistoryList';
+import { WatchingNow } from '@/components/profile/WatchingNow';
+import { profileService } from '@/services/profile.service';
+import { currentUser } from '@/state/auth.state';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { showUsersInfo } from '@/state/system.state';
+import { relativeTime } from '@/utils/time-format';
+import styles from './ProfilePage.module.scss';
+
+interface ProfilePageProps {
+	path?: string;
+	/** Present on /profile/:username (the read view); absent on /profile (edit). */
+	username?: string;
+}
+
+export function ProfilePage({ username }: ProfilePageProps) {
+	const editMode = !username;
+
+	const [data, setData] = useState<ProfileView | null>(null);
+	const [loading, setLoading] = useState(true);
+	const [notFound, setNotFound] = useState(false);
+
+	// Edit drafts (only used when editMode).
+	const [descDraft, setDescDraft] = useState('');
+	const [avatarDraft, setAvatarDraft] = useState('');
+	const [usernameDraft, setUsernameDraft] = useState('');
+	const [emailDraft, setEmailDraft] = useState('');
+	const [saving, setSaving] = useState(false);
+	const [togglingPublic, setTogglingPublic] = useState(false);
+
+	useEffect(() => {
+		let cancelled = false;
+		setLoading(true);
+		setNotFound(false);
+		const load = username ? profileService.getByUsername(username) : profileService.getMine();
+		load
+			.then((view: ProfileView) => {
+				if (cancelled) return;
+				setData(view);
+				setDescDraft(view.user.description ?? '');
+				setAvatarDraft(view.user.avatarUrl ?? '');
+				setUsernameDraft(view.user.username);
+				setEmailDraft(view.user.email ?? '');
+			})
+			.catch(() => {
+				if (!cancelled) setNotFound(true);
+			})
+			.finally(() => {
+				if (!cancelled) setLoading(false);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [username]);
+
+	const isSelf = !!data && currentUser.value?.id === data.user.id;
+	const dirty =
+		!!data &&
+		(descDraft !== (data.user.description ?? '') ||
+			avatarDraft !== (data.user.avatarUrl ?? '') ||
+			usernameDraft !== data.user.username ||
+			emailDraft !== (data.user.email ?? ''));
+
+	async function handleSave() {
+		if (!data) return;
+		setSaving(true);
+		try {
+			const view = await profileService.updateMine({
+				description: descDraft,
+				avatarUrl: avatarDraft.trim() || null,
+				username: usernameDraft.trim(),
+				email: emailDraft.trim() || null,
+			});
+			setData(view);
+			notifySuccess('Profile saved');
+		} catch (err) {
+			notifyError((err as Error)?.message || 'Could not save profile');
+		} finally {
+			setSaving(false);
+		}
+	}
+
+	async function handleTogglePublic() {
+		if (!data) return;
+		const next = !data.user.profilePublic;
+		setTogglingPublic(true);
+		try {
+			const view = await profileService.updateMine({ profilePublic: next });
+			setData(view);
+			notifySuccess(next ? 'Profile is now visible to others' : 'Profile is now private');
+		} catch (err) {
+			notifyError((err as Error)?.message || 'Could not update visibility');
+		} finally {
+			setTogglingPublic(false);
+		}
+	}
+
+	if (loading) {
+		return (
+			<div class={styles.page}>
+				<div class={styles.loading}>
+					<Spinner size="lg" />
+				</div>
+			</div>
+		);
+	}
+
+	if (notFound || !data) {
+		return (
+			<div class={styles.page}>
+				<Panel>
+					<div class={styles.notFound}>
+						<h1>Profile unavailable</h1>
+						<p>This profile doesn't exist or its owner has kept it private.</p>
+						<Button variant="secondary" onClick={() => route('/')}>
+							Back home
+						</Button>
+					</div>
+				</Panel>
+			</div>
+		);
+	}
+
+	const { user, stats, favorites, history, currentlyWatching } = data;
+
+	return (
+		<div class={styles.page}>
+			{/* ── Header / identity ───────────────────────────────── */}
+			<Panel
+				class={styles.headerPanel}
+				actions={
+					editMode && showUsersInfo.value ? (
+						<ToggleButton
+							pressed={!!user.profilePublic}
+							loading={togglingPublic}
+							onClick={handleTogglePublic}
+							title="Control whether other members can see your profile"
+						>
+							{user.profilePublic ? 'Profile is public' : 'Show Profile Info'}
+						</ToggleButton>
+					) : (
+						!editMode &&
+						isSelf && (
+							<Button variant="secondary" size="sm" onClick={() => route('/profile')}>
+								Edit profile
+							</Button>
+						)
+					)
+				}
+			>
+				<div class={styles.identity}>
+					<Avatar name={usernameDraft || user.username} src={editMode ? avatarDraft : user.avatarUrl} size={88} />
+					<div class={styles.identityMain}>
+						{editMode ? (
+							<input
+								class={styles.nameInput}
+								value={usernameDraft}
+								onInput={(e) => setUsernameDraft((e.target as HTMLInputElement).value)}
+								aria-label="Username"
+							/>
+						) : (
+							<h1 class={styles.name}>{user.username}</h1>
+						)}
+						<div class={styles.subline}>
+							<span class={styles.role}>{user.role}</span>
+							<span class={styles.dotSep}>·</span>
+							<span>Joined {relativeTime(stats.joinedAt)}</span>
+						</div>
+						<div class={styles.stats}>
+							<span class={styles.stat}>
+								<strong>{stats.favoritesCount}</strong> favorites
+							</span>
+							<span class={styles.stat}>
+								<strong>{stats.watchedCount}</strong> watched
+							</span>
+						</div>
+					</div>
+				</div>
+
+				{/* Editable basic info */}
+				{editMode && (
+					<div class={styles.editFields}>
+						<label class={styles.field}>
+							<span class={styles.fieldLabel}>Avatar image URL</span>
+							<input
+								class={styles.input}
+								value={avatarDraft}
+								placeholder="https://…"
+								onInput={(e) => setAvatarDraft((e.target as HTMLInputElement).value)}
+							/>
+						</label>
+						<label class={styles.field}>
+							<span class={styles.fieldLabel}>Email</span>
+							<input
+								class={styles.input}
+								type="email"
+								value={emailDraft}
+								onInput={(e) => setEmailDraft((e.target as HTMLInputElement).value)}
+							/>
+						</label>
+					</div>
+				)}
+
+				{/* Description / blurb */}
+				<div class={styles.blurb}>
+					{editMode ? (
+						<label class={styles.field}>
+							<span class={styles.fieldLabel}>
+								About you
+								<span class={styles.counter}>
+									{descDraft.length}/{PROFILE_DESCRIPTION_MAX}
+								</span>
+							</span>
+							<textarea
+								class={styles.textarea}
+								value={descDraft}
+								maxLength={PROFILE_DESCRIPTION_MAX}
+								rows={3}
+								placeholder="A short blurb about your taste in film…"
+								onInput={(e) => setDescDraft((e.target as HTMLTextAreaElement).value)}
+							/>
+						</label>
+					) : user.description ? (
+						<p class={styles.description}>{user.description}</p>
+					) : (
+						<p class={styles.descriptionMuted}>No description yet.</p>
+					)}
+				</div>
+
+				{editMode && (
+					<div class={styles.saveRow}>
+						<Button variant="primary" loading={saving} disabled={!dirty} onClick={handleSave}>
+							Save changes
+						</Button>
+					</div>
+				)}
+			</Panel>
+
+			{/* ── Watching now ────────────────────────────────────── */}
+			{currentlyWatching && <WatchingNow watching={currentlyWatching} />}
+
+			{/* ── Favorites ───────────────────────────────────────── */}
+			<Panel title="Favorites" subtitle="Movies, cast, and directors — earliest first">
+				<ProfileFavorites favorites={favorites} />
+			</Panel>
+
+			{/* ── Watch history ───────────────────────────────────── */}
+			<Panel title="Recently watched" subtitle={`${history.length} ${history.length === 1 ? 'movie' : 'movies'}`}>
+				<ProfileHistoryList history={history} />
+			</Panel>
+		</div>
+	);
+}

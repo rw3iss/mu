@@ -2,10 +2,13 @@ import type { UserRole } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Select } from '@/components/common/Select';
+import { ToggleButton } from '@/components/common/ToggleButton';
 import { useConfirm } from '@/hooks/useConfirm';
 import { api } from '@/services/api';
+import { profileService } from '@/services/profile.service';
 import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { setShowUsersInfoLocal, showUsersInfo } from '@/state/system.state';
 import styles from './Users.module.scss';
 
 interface UserRow {
@@ -34,9 +37,26 @@ export function Users() {
 	const [busy, setBusy] = useState<string | null>(null);
 	const [showAdd, setShowAdd] = useState(false);
 	const [editPassword, setEditPassword] = useState<UserRow | null>(null);
+	const [savingSystem, setSavingSystem] = useState(false);
 	const { confirm, dialog } = useConfirm();
 
 	const me = currentUser.value;
+
+	const toggleShowUsersInfo = async () => {
+		const next = !showUsersInfo.value;
+		setSavingSystem(true);
+		try {
+			await profileService.setSystemConfig(next);
+			setShowUsersInfoLocal(next);
+			notifySuccess(
+				next ? 'Members are now visible to users' : 'Member info is now hidden from users',
+			);
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed to update setting');
+		} finally {
+			setSavingSystem(false);
+		}
+	};
 
 	const refresh = async () => {
 		setLoading(true);
@@ -110,6 +130,25 @@ export function Users() {
 					edit movies; admins control everything including app settings, plugins,
 					and the user list itself.
 				</p>
+			</div>
+
+			<div class={styles.systemToggle}>
+				<div class={styles.systemToggleInfo}>
+					<span class={styles.systemToggleLabel}>Show Users Info</span>
+					<span class={styles.systemToggleDesc}>
+						When enabled, a <strong>Members</strong> item appears in the sidebar and
+						users can view each other's profiles, favorites, and watch activity — but
+						only for members who have made their profile public. Admins always see
+						everyone. When disabled, member info is hidden from non-admins.
+					</span>
+				</div>
+				<ToggleButton
+					pressed={showUsersInfo.value}
+					loading={savingSystem}
+					onClick={toggleShowUsersInfo}
+				>
+					{showUsersInfo.value ? 'Enabled' : 'Disabled'}
+				</ToggleButton>
 			</div>
 
 			<div class={styles.toolbar}>

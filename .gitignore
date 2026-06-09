@@ -13,3 +13,4 @@ _*.md
 # Local scratch outputs
 graphify-out/
 recommendations.html
+src/packages/client/PLAN.md

@@ -426,6 +426,9 @@ const alters = [
 	// overwrite. See packages/server/src/providers/merge/.
 	'ALTER TABLE movie_metadata ADD COLUMN provenance TEXT',
 	'ALTER TABLE stream_sessions ADD COLUMN ip_address TEXT',
+	// Social profile fields (Members + profile pages).
+	'ALTER TABLE users ADD COLUMN description TEXT',
+	'ALTER TABLE users ADD COLUMN profile_public INTEGER DEFAULT 0',
 	'ALTER TABLE movies ADD COLUMN thumbnail_url TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_aspect_ratio REAL',
 	'ALTER TABLE movies ADD COLUMN hidden INTEGER DEFAULT 0',

@@ -24,6 +24,50 @@
 	max-width: 60ch;
 }
 
+// System setting: "Show Users Info" master switch.
+.systemToggle {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-lg);
+	padding: var(--space-md) var(--space-lg);
+	background: var(--color-bg-surface);
+	border: var(--card-border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-card);
+
+	@include mobile {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-md);
+	}
+}
+
+.systemToggleInfo {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+	min-width: 0;
+}
+
+.systemToggleLabel {
+	font-size: var(--font-size-md);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-label);
+}
+
+.systemToggleDesc {
+	font-size: var(--font-size-sm);
+	color: var(--color-text-secondary);
+	line-height: var(--line-height-normal);
+	max-width: 64ch;
+
+	strong {
+		color: var(--color-text-primary);
+		font-weight: var(--font-weight-medium);
+	}
+}
+
 .toolbar {
 	display: flex;
 	gap: 0.5rem;

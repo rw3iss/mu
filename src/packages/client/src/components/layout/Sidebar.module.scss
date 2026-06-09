@@ -176,6 +176,25 @@
 	flex-shrink: 0;
 }
 
+// Avatar + name link to the user's own profile.
+.userLink {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	padding: var(--space-xs);
+	margin: calc(var(--space-xs) * -1);
+	border-radius: var(--item-radius);
+	color: inherit;
+	text-decoration: none;
+	transition: background-color var(--transition-fast);
+
+	:root:not([data-no-hover]) &:hover {
+		background: var(--color-bg-hover);
+	}
+}
+
 .avatar {
 	width: 36px;
 	height: 36px;

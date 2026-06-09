@@ -56,6 +56,12 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 - **Favorites page** -- search, sort (recent / name / role / year), filter by type (All / People / Movies / Actors / Directors / Writers), and toggle cards-vs-list view.
 - **Person Details** -- click any cast row or director name to open a person page with profile photo, biography, birth/place facts, and known-for credits cross-referenced against your library. Backend fetches and caches from TMDB on demand (`/people/:key` where key is `tmdb:<id>` or `name:<slug>`).
 
+### Members & Profiles
+- **Social profiles** -- every user gets a profile page at **`/profile`** (their own, editable) and **`/profile/:username`** (a public read view). It's a dashboard of panels: identity + avatar, an editable blurb (≤500 chars), favorites (with movies/cast/directors filter toggles, earliest-added first), full recently-watched history with each movie's resume position, and a prominent **"Watching Now"** tout when the user has a live playback session.
+- **Members directory** -- a **Members** sidebar item (under Favorites) and `/members` page list registered users with basic stats and links to each profile.
+- **Visibility, two levels.** An admin **"Show Users Info"** system setting (Settings → Users) is the master switch that exposes Members + cross-user profiles to non-admins. Each user then controls their own **"Show Profile Info"** toggle (atop `/profile`, shown only when the system setting is on): when off, ordinary users get a 404 for that profile and it's hidden from the directory. **Admins always see every profile regardless of either setting.**
+- **Backend** -- the `profile` module (`GET/PATCH /profile/me`, `GET /profile/:username`, `GET/PUT /profile/config`, `GET /members`) aggregates favorites, watch history, and live `stream_sessions`, and enforces the visibility rules. Two columns back it: `users.description` and `users.profile_public`.
+
 ### Administration
 - **Admin dashboard** -- server stats, user management, media sources, log viewer, cache management
 - **Bulk movie operations** -- multi-select cards (Edit toggle in Library and Search), bulk re-scan, refresh metadata, clear metadata, hide/unhide, mark watched/unwatched, remove from library, delete from disk; per-movie failures are isolated so one bad row doesn't kill the batch

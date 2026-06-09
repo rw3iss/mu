@@ -28,6 +28,7 @@ import { MetadataModule } from './metadata/metadata.module.js';
 import { MoviesModule } from './movies/movies.module.js';
 import { PeopleModule } from './people/people.module.js';
 import { PluginModule } from './plugins/plugin.module.js';
+import { ProfileModule } from './profile/profile.module.js';
 import { ProvidersModule } from './providers/providers.module.js';
 import { RecommendationsModule } from './recommendations/recommendations.module.js';
 import { RemoteModule } from './remote/remote.module.js';
@@ -75,6 +76,7 @@ import { UsersModule } from './users/users.module.js';
 		GroupingModule,
 		PeopleModule,
 		FavoritesModule,
+		ProfileModule,
 		EmailModule,
 		FeedbackModule,
 		SearchModule,

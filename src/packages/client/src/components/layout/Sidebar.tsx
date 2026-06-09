@@ -6,6 +6,7 @@ import { Link } from '@/components/common/Link';
 import { currentUser, logout } from '@/state/auth.state';
 import { openFeedbackModal } from '@/state/feedback.state';
 import { isPlayerActive, playerMode } from '@/state/globalPlayer.state';
+import { showUsersInfo } from '@/state/system.state';
 import { fetchMovies } from '@/state/library.state';
 import { RecentlyPlayed } from './RecentlyPlayed';
 import styles from './Sidebar.module.scss';
@@ -75,6 +76,8 @@ interface NavItem {
 	path: string;
 	icon: JSX.Element;
 	adminOnly?: boolean;
+	/** Only shown when the admin "Show Users Info" system setting is enabled. */
+	requiresUsersInfo?: boolean;
 	/** When set, the item runs this instead of navigating (e.g. open a modal). */
 	action?: () => void;
 }
@@ -117,6 +120,17 @@ const navItems: NavItem[] = [
 		path: '/favorites',
 		icon: (
 			<Icon d="M12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z" />
+		),
+	},
+	{
+		label: 'Members',
+		path: '/members',
+		requiresUsersInfo: true,
+		icon: (
+			<Icon2
+				d1="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"
+				d2="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"
+			/>
 		),
 	},
 	{
@@ -188,7 +202,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 		route(path);
 	}, []);
 
-	const filteredItems = navItems.filter((item) => !item.adminOnly || user?.role === 'admin');
+	const filteredItems = navItems.filter(
+		(item) =>
+			(!item.adminOnly || user?.role === 'admin') &&
+			(!item.requiresUsersInfo || showUsersInfo.value),
+	);
 
 	return (
 		<nav
@@ -245,11 +263,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
 			{user && !collapsed && (
 				<div class={styles.userInfo}>
-					<div class={styles.avatar}>{user.username.charAt(0).toUpperCase()}</div>
-					<div class={styles.userDetails}>
-						<span class={styles.userName}>{user.username}</span>
-						<span class={styles.userRole}>{user.role}</span>
-					</div>
+					<Link
+						href="/profile"
+						onNavigate={() => handleNav('/profile')}
+						class={styles.userLink}
+						title="Your profile"
+					>
+						<div class={styles.avatar}>{user.username.charAt(0).toUpperCase()}</div>
+						<div class={styles.userDetails}>
+							<span class={styles.userName}>{user.username}</span>
+							<span class={styles.userRole}>{user.role}</span>
+						</div>
+					</Link>
 					<button
 						class={styles.logoutButton}
 						onClick={logout}

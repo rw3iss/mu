@@ -1,0 +1,44 @@
+import type {
+	MemberSummary,
+	ProfileSystemConfig,
+	ProfileView,
+	UpdateProfileInput,
+} from '@mu/shared';
+import { api } from './api';
+
+/**
+ * Profile + Members API. Backs the /profile (edit + public view) and /members
+ * pages and the admin "Show Users Info" system toggle. All access goes through
+ * here — components never call `api` directly (see BUILD.md → Data & API).
+ */
+export const profileService = {
+	/** The current user's own editable profile. */
+	getMine(): Promise<ProfileView> {
+		return api.get<ProfileView>('/profile/me');
+	},
+
+	/** A public read view of another user (404 if not visible to the requester). */
+	getByUsername(username: string): Promise<ProfileView> {
+		return api.get<ProfileView>(`/profile/${encodeURIComponent(username)}`);
+	},
+
+	/** Update the current user's editable profile fields. */
+	updateMine(patch: UpdateProfileInput): Promise<ProfileView> {
+		return api.patch<ProfileView>('/profile/me', patch);
+	},
+
+	/** Read the admin master switch (any authed user). */
+	getSystemConfig(): Promise<ProfileSystemConfig> {
+		return api.get<ProfileSystemConfig>('/profile/config');
+	},
+
+	/** Admin: toggle the master switch. */
+	setSystemConfig(showUsersInfo: boolean): Promise<ProfileSystemConfig> {
+		return api.put<ProfileSystemConfig>('/profile/config', { showUsersInfo });
+	},
+
+	/** The Members directory (gated for non-admins by the master switch). */
+	listMembers(): Promise<{ members: MemberSummary[] }> {
+		return api.get<{ members: MemberSummary[] }>('/members');
+	},
+};

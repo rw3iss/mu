@@ -1,6 +1,7 @@
 export * from './api.js';
 export * from './movie.js';
 export * from './plugin.js';
+export * from './profile.js';
 export * from './search.js';
 export * from './seo.js';
 export * from './subtitle.js';

@@ -13,9 +13,11 @@ import { History } from '@/pages/History';
 import { JobDetails } from '@/pages/JobDetails';
 import { Library } from '@/pages/Library';
 import { Login } from '@/pages/Login';
+import { MembersPage } from '@/pages/Members/MembersPage';
 import { MovieDetail } from '@/pages/MovieDetail';
 import { NotFound } from '@/pages/NotFound';
 import { PersonDetail } from '@/pages/PersonDetail';
+import { ProfilePage } from '@/pages/Profile/ProfilePage';
 // Player is now handled entirely by GlobalPlayer (no dedicated route)
 import { PlaylistDetail } from '@/pages/PlaylistDetail';
 import { Playlists } from '@/pages/Playlists';
@@ -42,6 +44,7 @@ import { ensureFavoritesLoaded } from '@/state/favorites.state';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
 import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
 import { initProcessingState } from '@/state/processing.state';
+import { loadSystemConfig } from '@/state/system.state';
 import { fetchThemes } from '@/state/themes.state';
 import { installUserGestureListener } from '@/state/user-gesture.state';
 import { fetchWatchPositions } from '@/state/watchPositions.state';
@@ -161,6 +164,7 @@ export function App() {
 			void ensureFavoritesLoaded();
 			void fetchWatchPositions();
 			void fetchPlaybackSettings();
+			void loadSystemConfig();
 		}
 	}, [isLoading.value, isAuthenticated.value]);
 
@@ -215,6 +219,9 @@ export function App() {
 						<Watchlist path="/watchlist" />
 						<Favorites path="/favorites" />
 						<History path="/history" />
+						<MembersPage path="/members" />
+						<ProfilePage path="/profile" />
+						<ProfilePage path="/profile/:username" />
 						<Discover path="/discover" />
 						<Redirect path="/search" to="/library" preserveQuery />
 						<Settings path="/settings/:tab?" />
