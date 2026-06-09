@@ -291,6 +291,10 @@ export function sanitiseRawTitle(input: string): string {
 	// First pass — bracketed sections + year.
 	s = s.replace(BRACKET_CONTENT, ' ');
 	s = s.replace(YEAR_REGEX, ' ');
+	// BRACKET_CONTENT only catches matched pairs; remove any leftover stray /
+	// unpaired bracket characters (e.g. a dangling "(" left after the year was
+	// stripped from "Title (2016)") so they don't end up in the pretty title.
+	s = s.replace(/[[\](){}]/g, ' ');
 
 	// Replace common separators with spaces BEFORE running token regexes
 	// so tokens delimited by '.' or '_' get caught.

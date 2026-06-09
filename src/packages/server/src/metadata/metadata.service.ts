@@ -657,9 +657,17 @@ export class MetadataService {
 		setIf('trailerUrl', m.trailerUrl);
 		setIf('contentRating', m.contentRating);
 		// Title is normally left alone so refreshes don't clobber manual edits;
-		// a user-triggered "Refresh Metadata" opts in to pulling the real title
-		// back (the merge engine still respects a `user`-provenance title).
-		if (opts.overwriteTitle) setIf('title', m.title);
+		// a user-triggered "Refresh Metadata" (or new-scan auto-fetch) opts in to
+		// pulling the real title back. Use the PROVIDER title directly rather
+		// than the merged value — the merge engine keeps the existing title by
+		// provenance, which would re-apply the same dirty title we're fixing.
+		if (opts.overwriteTitle) {
+			const providerTitle =
+				(tmdbDetails as { title?: string } | null)?.title ||
+				(omdbData as { Title?: string } | null)?.Title ||
+				(m.title as string | null);
+			setIf('title', providerTitle);
+		}
 
 		this.database.db.update(movies).set(movieUpdate).where(eq(movies.id, movieId)).run();
 

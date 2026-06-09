@@ -150,7 +150,9 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 
 				let result: unknown = null;
 				try {
-					result = await this.metadata.fetchForMovie(movieId);
+					// overwriteTitle: replace the scanned/sanitized filename title
+					// with the official metadata title when a match is found.
+					result = await this.metadata.fetchForMovie(movieId, { overwriteTitle: true });
 				} catch (err) {
 					helpers.log(`Metadata fetch error: ${(err as Error).message}`);
 				}
