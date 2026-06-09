@@ -253,6 +253,50 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		};
 	}
 
+	/**
+	 * Resolve the canonical download target for a movie: the best available
+	 * source file on disk, its real (on-disk) size, and a friendly download
+	 * filename of the form `Title (Year).<ext>`. Returns null when the movie
+	 * has no available file or the file is missing from disk.
+	 */
+	async getDownloadTarget(
+		movieId: string,
+	): Promise<{ filePath: string; fileSize: number; downloadName: string } | null> {
+		const fileList = await this.database.db
+			.select()
+			.from(movieFiles)
+			.where(and(eq(movieFiles.movieId, movieId), eq(movieFiles.available, true)));
+
+		if (fileList.length === 0) return null;
+
+		const file = this.selectBestFile(fileList);
+		if (!existsSync(file.filePath)) return null;
+		// Trust the disk for the size shown to the user (matches File Info,
+		// and is authoritative even if the DB row is stale post-conversion).
+		const fileSize = statSync(file.filePath).size;
+
+		const movieRow = this.database.db
+			.select({ title: movies.title, year: movies.year })
+			.from(movies)
+			.where(eq(movies.id, movieId))
+			.get();
+
+		const ext = path.extname(file.filePath) || '.mp4';
+		const rawBase = movieRow?.title
+			? `${movieRow.title}${movieRow.year ? ` (${movieRow.year})` : ''}`
+			: path.basename(
+					file.fileName ?? file.filePath,
+					path.extname(file.fileName ?? file.filePath),
+				);
+		// Strip only filesystem-illegal characters (keep spaces, parens, hyphens
+		// so the name stays readable: "The Matrix (1999).mkv").
+		// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control chars from a download filename
+		const safeBase = rawBase.replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim() || 'movie';
+		const downloadName = `${safeBase}${ext}`;
+
+		return { filePath: file.filePath, fileSize, downloadName };
+	}
+
 	async startStream(movieId: string, userId: string, options: StartStreamOptions = {}) {
 		const movieFileList = await this.database.db
 			.select()

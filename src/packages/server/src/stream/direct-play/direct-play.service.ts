@@ -4,6 +4,16 @@ import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { FastifyReply, FastifyRequest } from 'fastify';
 
+/**
+ * Build an RFC 6266 Content-Disposition value with an ASCII fallback plus a
+ * UTF-8 `filename*` so accented / non-Latin movie titles download intact.
+ */
+function contentDisposition(name: string): string {
+	const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+	const encoded = encodeURIComponent(name);
+	return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
 const MIME_TYPES: Record<string, string> = {
 	'.mp4': 'video/mp4',
 	'.mkv': 'video/x-matroska',
@@ -26,11 +36,19 @@ export class DirectPlayService {
 		filePath: string,
 		request: FastifyRequest,
 		reply: FastifyReply,
+		opts?: { downloadName?: string },
 	): Promise<FastifyReply> {
 		const fileStat = await stat(filePath);
 		const fileSize = fileStat.size;
 		const ext = path.extname(filePath).toLowerCase();
-		const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+		// Force a download dialog (attachment) with a friendly filename when a
+		// downloadName is given; otherwise stream inline for in-browser playback.
+		const contentType = opts?.downloadName
+			? 'application/octet-stream'
+			: MIME_TYPES[ext] || 'application/octet-stream';
+		if (opts?.downloadName) {
+			reply.header('Content-Disposition', contentDisposition(opts.downloadName));
+		}
 
 		const rangeHeader = request.headers.range;
 

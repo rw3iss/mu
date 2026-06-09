@@ -348,6 +348,29 @@ export class StreamController {
 	}
 
 	/**
+	 * Download a movie's source file to the user's device. Streams the file
+	 * straight off disk with HTTP range support (so browsers can resume a
+	 * dropped download) and a friendly `Title (Year).<ext>` filename. Uses
+	 * Node streams — never buffers the whole 1-10GB file into the heap — so it
+	 * doesn't block the event loop or other disk readers.
+	 */
+	@RequireAction('view:library')
+	@Get('download/:movieId')
+	async download(
+		@Param('movieId') movieId: string,
+		@Req() request: FastifyRequest,
+		@Res() reply: FastifyReply,
+	) {
+		const target = await this.streamService.getDownloadTarget(movieId);
+		if (!target) {
+			throw new NotFoundException(`No downloadable file for movie ${movieId}`);
+		}
+		return this.directPlayService.serveFile(target.filePath, request, reply, {
+			downloadName: target.downloadName,
+		});
+	}
+
+	/**
 	 * Heartbeat endpoint — keeps session alive during pause.
 	 */
 	@RequireAction('view:library')

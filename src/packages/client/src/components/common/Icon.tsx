@@ -45,6 +45,7 @@ export type IconName =
 	| 'search'
 	| 'settings'
 	| 'share'
+	| 'download'
 	| 'play'
 	| 'pause'
 	| 'layers'
@@ -230,6 +231,13 @@ const PATHS: Record<IconName, JSX.Element> = {
 			<circle cx="18" cy="19" r="3" />
 			<line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
 			<line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+		</>
+	),
+	download: (
+		<>
+			<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+			<polyline points="7 10 12 15 17 10" />
+			<line x1="12" y1="15" x2="12" y2="3" />
 		</>
 	),
 	play: <polygon points="6 4 20 12 6 20 6 4" />,

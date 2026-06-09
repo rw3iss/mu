@@ -256,4 +256,14 @@ export const streamService = {
 	getSubtitleUrl(sessionId: string, trackId: string): string {
 		return `/api/v1/stream/${sessionId}/subtitles/${trackId}?${buildStreamUrlCredential()}`;
 	},
+
+	/**
+	 * Direct-download URL for a movie's source file. The browser streams it
+	 * natively (resumable), and the server sets a `Title (Year).<ext>`
+	 * filename. Auth rides on the `?token=` query credential, like the other
+	 * media URLs, since a native download can't attach an Authorization header.
+	 */
+	getDownloadUrl(movieId: string): string {
+		return `/api/v1/stream/download/${encodeURIComponent(movieId)}?${buildStreamUrlCredential()}`;
+	},
 };
