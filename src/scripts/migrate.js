@@ -438,6 +438,7 @@ const alters = [
 	'ALTER TABLE feedback ADD COLUMN attachment_url TEXT',
 	'ALTER TABLE feedback ADD COLUMN attachment_type TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_url TEXT',
+	'ALTER TABLE movies ADD COLUMN uploaded_by TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_aspect_ratio REAL',
 	'ALTER TABLE movies ADD COLUMN hidden INTEGER DEFAULT 0',
 	'ALTER TABLE movies ADD COLUMN play_settings TEXT',

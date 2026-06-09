@@ -19,7 +19,14 @@ interface PanelProps {
  * label color. Used to section the profile (info, favorites, history, …) and
  * reusable anywhere a page needs a grouped surface.
  */
-export function Panel({ title, subtitle, actions, children, class: cls = '', bodyClass = '' }: PanelProps) {
+export function Panel({
+	title,
+	subtitle,
+	actions,
+	children,
+	class: cls = '',
+	bodyClass = '',
+}: PanelProps) {
 	const hasHeader = title != null || subtitle != null || actions != null;
 	return (
 		<section class={`${styles.panel} ${cls}`}>
@@ -32,7 +39,9 @@ export function Panel({ title, subtitle, actions, children, class: cls = '', bod
 					{actions != null && <div class={styles.actions}>{actions}</div>}
 				</header>
 			)}
-			<div class={`${styles.body} ${bodyClass}`}>{children}</div>
+			<div class={`${styles.body} ${hasHeader ? '' : styles.bodyFlush} ${bodyClass}`}>
+				{children}
+			</div>
 		</section>
 	);
 }

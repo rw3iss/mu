@@ -409,3 +409,59 @@
     border-color: var(--color-accent);
   }
 }
+
+/* Direct-upload button — accent-tinted so it reads as a primary action,
+   sitting at the left of the right-aligned toolbar cluster. */
+.uploadBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+  white-space: nowrap;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    background: var(--color-accent);
+    color: #fff;
+  }
+}
+
+/* Numeric filter rows in the expanded Filters panel (year/runtime min–max). */
+.filterNumRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.filterDash {
+  color: var(--color-text-muted);
+}
+
+.numInput {
+  width: 110px;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+}

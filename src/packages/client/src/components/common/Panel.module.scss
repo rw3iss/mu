@@ -41,3 +41,9 @@
 .body {
 	padding: 0 var(--space-lg) var(--space-lg);
 }
+
+// When the panel has no header, the body provides its own top padding (the
+// header normally supplies that top spacing) so content doesn't hug the edge.
+.bodyFlush {
+	padding-top: var(--space-lg);
+}

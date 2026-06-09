@@ -95,7 +95,7 @@ NestJS modules in `packages/server/src/`:
 | `auth` | JWT authentication, user sessions. localBypass works only during initial setup; once a user exists, every request needs a JWT cookie. |
 | `users` | User management. Admin-only CRUD with last-admin protection (cannot demote/delete the only admin). |
 | `common/permissions` | Three-role model (`admin`/`contributor`/`viewer`) + `PermissionsService` + `@RequireAction(action)` decorator + global `RequireActionGuard`. See `docs/users-and-permissions.md`. |
-| `library` | Media source scanning, file discovery |
+| `library` | Media source scanning, file discovery. **Direct uploads** (`library-upload.{service,controller}.ts`, `edit:movie` = contributor/admin): `POST /library/upload` streams one file per request (multipart, fields before file) to `<sourcePath>/<relativePath>` — folders rebuilt verbatim; never buffered (50GB cap, `MAX_UPLOAD_BYTES`); path-traversal guarded; `preflight` rejects existing names; `finalize` enqueues a scan + emits `WsEvent.UPLOAD_COMPLETED`. Movies get `movies.uploaded_by` (uploader id) via a `LIBRARY_MOVIE_ADDED` listener matching the written path. **nginx must allow it**: `client_max_body_size 0` + `proxy_request_buffering off` (set by `nginx-setup.sh`). |
 | `movies` | Movie CRUD, detail endpoints |
 | `metadata` | TMDB/OMDB metadata fetching |
 | `stream` | HLS transcoding, direct play, subtitle management |

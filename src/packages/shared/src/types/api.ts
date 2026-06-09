@@ -57,6 +57,13 @@ export interface MovieListQuery extends PaginationQuery {
 	yearTo?: number;
 	ratingFrom?: number;
 	ratingTo?: number;
+	/** Minimum external (IMDb) rating, 0–10. */
+	minRating?: number;
+	/** Minimum external (IMDb) vote count. */
+	minVotes?: number;
+	/** Runtime bounds in minutes. */
+	minRuntime?: number;
+	maxRuntime?: number;
 	resolution?: string;
 	watched?: boolean;
 	hideWatched?: boolean;

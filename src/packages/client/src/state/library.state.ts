@@ -110,8 +110,15 @@ export interface Movie {
 
 export interface LibraryFilters {
 	genres: string[];
-	yearRange: [number, number] | null;
-	ratingRange: [number, number] | null;
+	/** Year bounds (inclusive). null = unbounded. */
+	yearMin: number | null;
+	yearMax: number | null;
+	/** Minimum external (IMDb) rating 0–10, and minimum vote count. */
+	minRating: number | null;
+	minVotes: number | null;
+	/** Runtime bounds in minutes. */
+	runtimeMin: number | null;
+	runtimeMax: number | null;
 	sortBy: 'title' | 'year' | 'rating' | 'addedAt' | 'runtime' | 'fileSize';
 	sortOrder: 'asc' | 'desc';
 }
@@ -202,8 +209,12 @@ export function setSelectedTypes(types: LibraryContentType[]): void {
 
 export const filters = signal<LibraryFilters>({
 	genres: [],
-	yearRange: null,
-	ratingRange: null,
+	yearMin: null,
+	yearMax: null,
+	minRating: null,
+	minVotes: null,
+	runtimeMin: null,
+	runtimeMax: null,
 	sortBy: (localStorage.getItem('mu_sort_by') as LibraryFilters['sortBy']) || 'addedAt',
 	sortOrder: (localStorage.getItem('mu_sort_order') as LibraryFilters['sortOrder']) || 'desc',
 });
@@ -245,19 +256,16 @@ export async function fetchMovies(page = 1): Promise<void> {
 			params.genre = filters.value.genres.join(',');
 		}
 
-		if (filters.value.yearRange) {
-			params.yearFrom = String(filters.value.yearRange[0]);
-			params.yearTo = String(filters.value.yearRange[1]);
-		}
+		if (filters.value.yearMin != null) params.yearFrom = String(filters.value.yearMin);
+		if (filters.value.yearMax != null) params.yearTo = String(filters.value.yearMax);
+		if (filters.value.minRating != null) params.minRating = String(filters.value.minRating);
+		if (filters.value.minVotes != null) params.minVotes = String(filters.value.minVotes);
+		if (filters.value.runtimeMin != null) params.minRuntime = String(filters.value.runtimeMin);
+		if (filters.value.runtimeMax != null) params.maxRuntime = String(filters.value.runtimeMax);
 
-		if (filters.value.ratingRange) {
-			params.ratingFrom = String(filters.value.ratingRange[0]);
-			params.ratingTo = String(filters.value.ratingRange[1]);
-		}
-
-		if (showHidden.value) {
-			params.showHidden = 'true';
-		}
+		// The Library shows ALL movies, including ones marked hidden (the Hidden
+		// toggle was removed) — always request them.
+		params.showHidden = 'true';
 
 		if (hideWatched.value) {
 			params.hideWatched = 'true';

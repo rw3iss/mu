@@ -54,20 +54,20 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 
-  // Dot separator between the welcome message and the stat, 10px on each side.
+  // Dot separator between the welcome message and the stat, 20px on each side.
   &::before {
     content: "\00b7";
-    margin: 0 10px;
+    margin: 0 20px;
     color: var(--color-text-muted);
   }
 }
 
-// Emphasised counts inside the growth stat: header colour, sized to match the
-// "Welcome back" / username text (larger than the surrounding stat copy).
+// Emphasised counts inside the growth stat: accent colour, a touch larger than
+// the surrounding stat copy but smaller than the greeting.
 .statNum {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-medium);
+  color: var(--color-accent);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
 }
 
 .welcomeUser {

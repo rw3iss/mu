@@ -140,6 +140,41 @@ export class MoviesService implements OnModuleInit {
 			conditions.push(sql`${movies.year} <= ${query.yearTo}`);
 		}
 
+		// Rating / votes / runtime filters. Rating + votes reference external
+		// (IMDb) data via correlated subqueries rather than the joined tables, so
+		// the same `where` works in both the data query and the (less-joined)
+		// count query. Rating prefers fetched metadata, falls back to the IMDb
+		// dataset.
+		if (query.minRating != null && Number(query.minRating) > 0) {
+			const r = Number(query.minRating);
+			conditions.push(sql`COALESCE(
+				(SELECT ${movieMetadata.imdbRating} FROM ${movieMetadata} WHERE ${movieMetadata.movieId} = ${movies.id}),
+				(SELECT ${imdbRatings.averageRating} FROM ${imdbRatings} WHERE ${imdbRatings.tconst} = ${movies.imdbId}),
+				0
+			) >= ${r}`);
+		}
+
+		if (query.minVotes != null && Number(query.minVotes) > 0) {
+			const v = Math.floor(Number(query.minVotes));
+			conditions.push(sql`COALESCE(
+				(SELECT ${movieMetadata.imdbVotes} FROM ${movieMetadata} WHERE ${movieMetadata.movieId} = ${movies.id}),
+				(SELECT ${imdbRatings.numVotes} FROM ${imdbRatings} WHERE ${imdbRatings.tconst} = ${movies.imdbId}),
+				0
+			) >= ${v}`);
+		}
+
+		if (query.minRuntime != null && Number(query.minRuntime) > 0) {
+			conditions.push(
+				sql`${movies.runtimeMinutes} >= ${Math.floor(Number(query.minRuntime))}`,
+			);
+		}
+
+		if (query.maxRuntime != null && Number(query.maxRuntime) > 0) {
+			conditions.push(
+				sql`${movies.runtimeMinutes} <= ${Math.floor(Number(query.maxRuntime))}`,
+			);
+		}
+
 		// "Grouped only" filter — restrict to movies that belong to a
 		// subgroup (i.e. members of a series / collection / etc).
 		if (String((query as { groupedOnly?: string }).groupedOnly) === 'true') {

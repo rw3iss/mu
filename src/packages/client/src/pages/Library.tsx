@@ -5,6 +5,8 @@ import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { MultiSelect, type MultiSelectOption } from '@/components/common/MultiSelect';
 import { Select } from '@/components/common/Select';
+import { Tooltip } from '@/components/common/Tooltip';
+import { UploadMovieModal } from '@/components/library/UploadMovieModal';
 import type { BulkAction } from '@/components/movie/BulkActionsBar';
 import { BulkActionsBar } from '@/components/movie/BulkActionsBar';
 import { MovieGrid } from '@/components/movie/MovieGrid';
@@ -14,6 +16,7 @@ import { UI } from '@/plugins/ui-slots';
 import { libraryEvents } from '@/services/library-events.service';
 import { moviesService } from '@/services/movies.service';
 import { sourcesService } from '@/services/sources.service';
+import { currentUser } from '@/state/auth.state';
 import { pageGroups } from '@/state/groups.state';
 import type { LibraryFilters } from '@/state/library.state';
 import {
@@ -22,7 +25,6 @@ import {
 	fetchMovies,
 	filters,
 	hasRemoteServers,
-	hiddenCount,
 	hideWatched,
 	initRemoteServers,
 	initSortPrefs,
@@ -44,9 +46,7 @@ import {
 	setSelectedTypes,
 	setServerFilter,
 	setViewMode,
-	showHidden,
 	toggleHideWatched,
-	toggleShowHidden,
 	totalMovies,
 	totalPages,
 	viewMode,
@@ -144,8 +144,12 @@ export function Library(_props: LibraryProps) {
 	const [localSearch, setLocalSearch] = useState(initialQ || searchQuery.value);
 	const [genres, setGenres] = useState<string[]>([]);
 	const [showFilters, setShowFilters] = useState(false);
+	const [showUpload, setShowUpload] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
 	const [editMode, setEditMode] = useState(false);
+	// Direct library upload is contributor/admin only.
+	const canUpload =
+		currentUser.value?.role === 'admin' || currentUser.value?.role === 'contributor';
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 	const [bulkLoading, setBulkLoading] = useState(false);
 	const [bulkStatus, setBulkStatus] = useState<{
@@ -274,6 +278,21 @@ export function Library(_props: LibraryProps) {
 		setFilters({ genres: newGenres });
 	}, []);
 
+	// Numeric filter inputs (year/rating/votes/runtime). Fires on `change`
+	// (blur/Enter in Preact), so it doesn't refetch on every keystroke. Empty
+	// clears the bound to null.
+	const handleNumFilter = useCallback(
+		(
+			key: 'yearMin' | 'yearMax' | 'minRating' | 'minVotes' | 'runtimeMin' | 'runtimeMax',
+			raw: string,
+		) => {
+			const trimmed = raw.trim();
+			const num = trimmed === '' ? null : Number(trimmed);
+			setFilters({ [key]: num != null && Number.isFinite(num) ? num : null });
+		},
+		[],
+	);
+
 	const handleSortChange = useCallback((value: LibraryFilters['sortBy']) => {
 		setFilters({ sortBy: value });
 	}, []);
@@ -361,9 +380,6 @@ export function Library(_props: LibraryProps) {
 					<h1 class={styles.title}>Library</h1>
 					<span class={styles.count}>
 						{totalMovies.value} movies
-						{hiddenCount.value > 0 && !showHidden.value && (
-							<span class={styles.hiddenCount}> ({hiddenCount.value} hidden)</span>
-						)}
 						{watchedCount.value > 0 && !hideWatched.value && (
 							<span class={styles.hiddenCount}> ({watchedCount.value} watched)</span>
 						)}
@@ -371,6 +387,19 @@ export function Library(_props: LibraryProps) {
 				</div>
 
 				<div class={styles.headerActions}>
+					{canUpload && (
+						<Tooltip label="Upload a movie file or folder directly to the server's library">
+							<button
+								class={styles.uploadBtn}
+								onClick={() => setShowUpload(true)}
+								aria-label="Upload to library"
+							>
+								<Icon name="upload" />
+								<span>Upload</span>
+							</button>
+						</Tooltip>
+					)}
+
 					<MultiSelect<LibraryContentType>
 						options={TYPE_OPTIONS}
 						selected={selectedTypes.value}
@@ -408,15 +437,6 @@ export function Library(_props: LibraryProps) {
 							]}
 						/>
 					)}
-
-					<button
-						class={`${styles.showHiddenBtn} ${showHidden.value ? styles.active : ''}`}
-						onClick={toggleShowHidden}
-						title={showHidden.value ? 'Showing all movies' : 'Show hidden movies'}
-					>
-						<Icon name={showHidden.value ? 'eye' : 'eye-off'} />
-						<span>Hidden</span>
-					</button>
 
 					<button
 						class={`${styles.showHiddenBtn} ${hideWatched.value ? styles.active : ''}`}
@@ -530,8 +550,89 @@ export function Library(_props: LibraryProps) {
 							))}
 						</div>
 					</div>
+
+					<div class={styles.filterGroup}>
+						<h3 class={styles.filterLabel}>Year</h3>
+						<div class={styles.filterNumRow}>
+							<input
+								type="number"
+								class={styles.numInput}
+								placeholder="From"
+								value={filters.value.yearMin ?? ''}
+								onChange={(e) => handleNumFilter('yearMin', e.currentTarget.value)}
+							/>
+							<span class={styles.filterDash}>–</span>
+							<input
+								type="number"
+								class={styles.numInput}
+								placeholder="To"
+								value={filters.value.yearMax ?? ''}
+								onChange={(e) => handleNumFilter('yearMax', e.currentTarget.value)}
+							/>
+						</div>
+					</div>
+
+					<div class={styles.filterGroup}>
+						<h3 class={styles.filterLabel}>Min rating</h3>
+						<input
+							type="number"
+							min="0"
+							max="10"
+							step="0.1"
+							class={styles.numInput}
+							placeholder="0–10"
+							value={filters.value.minRating ?? ''}
+							onChange={(e) => handleNumFilter('minRating', e.currentTarget.value)}
+						/>
+					</div>
+
+					<div class={styles.filterGroup}>
+						<h3 class={styles.filterLabel}>Min votes</h3>
+						<input
+							type="number"
+							min="0"
+							step="100"
+							class={styles.numInput}
+							placeholder="e.g. 1000"
+							value={filters.value.minVotes ?? ''}
+							onChange={(e) => handleNumFilter('minVotes', e.currentTarget.value)}
+						/>
+					</div>
+
+					<div class={styles.filterGroup}>
+						<h3 class={styles.filterLabel}>Runtime (min)</h3>
+						<div class={styles.filterNumRow}>
+							<input
+								type="number"
+								min="0"
+								class={styles.numInput}
+								placeholder="Min"
+								value={filters.value.runtimeMin ?? ''}
+								onChange={(e) =>
+									handleNumFilter('runtimeMin', e.currentTarget.value)
+								}
+							/>
+							<span class={styles.filterDash}>–</span>
+							<input
+								type="number"
+								min="0"
+								class={styles.numInput}
+								placeholder="Max"
+								value={filters.value.runtimeMax ?? ''}
+								onChange={(e) =>
+									handleNumFilter('runtimeMax', e.currentTarget.value)
+								}
+							/>
+						</div>
+					</div>
 				</div>
 			)}
+
+			<UploadMovieModal
+				isOpen={showUpload}
+				onClose={() => setShowUpload(false)}
+				onUploaded={() => fetchMovies(1)}
+			/>
 
 			<PluginSlot name={UI.LIBRARY_TOOLBAR} context={{}} />
 

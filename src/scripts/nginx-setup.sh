@@ -163,6 +163,9 @@ emit_proxy() {
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection \$connection_upgrade;
         proxy_buffering off;
+        # Stream large uploads (direct movie uploads) straight to the app
+        # instead of buffering the whole body to disk first.
+        proxy_request_buffering off;
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
 PROXY
@@ -182,7 +185,7 @@ server {
     listen 80;
     server_name $DOMAIN;
 
-    client_max_body_size 4g;   # large uploads (feedback screenshots, etc.)
+    client_max_body_size 0;    # unlimited — direct movie uploads (app caps at 50GB)
 
     # ACME (Let's Encrypt) HTTP-01 challenge — served from disk so it is NOT
     # proxied to the app. Kept permanently so 'certbot renew' keeps working.

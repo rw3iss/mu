@@ -52,4 +52,10 @@ export enum WsEvent {
 	JOB_FAILED = 'job:failed',
 	SERVER_STATUS = 'server:status',
 	NOTIFICATION = 'notification',
+	/**
+	 * A direct library upload finished (all files written) or failed. Lets other
+	 * sessions/devices toast the result. Payload: { uploadId, sourceId, rootName,
+	 * ok, error? }. Channel: `upload`.
+	 */
+	UPLOAD_COMPLETED = 'upload:completed',
 }

@@ -38,6 +38,12 @@ export const movies = sqliteTable(
 		 * work the same) but are filtered out of normal library queries.
 		 */
 		source: text('source').notNull().default('library'),
+		/**
+		 * User id of the member who uploaded this movie via the direct
+		 * library-upload feature. Null for auto-scanned files (no uploader).
+		 * Auxiliary attribution only — not enforced or surfaced widely yet.
+		 */
+		uploadedBy: text('uploaded_by'),
 		addedAt: text('added_at').notNull(),
 		updatedAt: text('updated_at').notNull(),
 	},
