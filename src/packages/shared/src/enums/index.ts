@@ -53,6 +53,13 @@ export enum WsEvent {
 	SERVER_STATUS = 'server:status',
 	NOTIFICATION = 'notification',
 	/**
+	 * Progress of a direct library upload, emitted from the server as bytes are
+	 * streamed to disk (ground-truth progress, independent of the browser's XHR
+	 * upload events). Payload: { uploadId, relativePath, bytesWritten, fileTotal }.
+	 * Channel: `upload`.
+	 */
+	UPLOAD_PROGRESS = 'upload:progress',
+	/**
 	 * A direct library upload finished (all files written) or failed. Lets other
 	 * sessions/devices toast the result. Payload: { uploadId, sourceId, rootName,
 	 * ok, error? }. Channel: `upload`.

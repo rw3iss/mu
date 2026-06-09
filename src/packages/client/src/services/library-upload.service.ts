@@ -19,6 +19,8 @@ export interface UploadFileOptions {
 	sourceId: string;
 	relativePath: string;
 	file: File;
+	/** Correlates server-side WS progress events to this upload batch. */
+	uploadId?: string;
 	onProgress?: (loaded: number, total: number) => void;
 	signal?: AbortSignal;
 }
@@ -54,6 +56,8 @@ export const libraryUploadService = {
 			const form = new FormData();
 			form.append('sourceId', opts.sourceId);
 			form.append('relativePath', opts.relativePath);
+			if (opts.uploadId) form.append('uploadId', opts.uploadId);
+			form.append('fileTotal', String(opts.file.size));
 			form.append('file', opts.file, opts.file.name);
 
 			xhr.open('POST', `${apiBase()}/library/upload`);

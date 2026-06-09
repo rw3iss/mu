@@ -1,6 +1,7 @@
 import { createWriteStream, existsSync } from 'node:fs';
 import { mkdir, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
+import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { WsEvent } from '@mu/shared';
 import {
@@ -151,6 +152,9 @@ export class LibraryUploadService {
 		relativePath: string;
 		userId: string;
 		stream: NodeJS.ReadableStream & { truncated?: boolean };
+		/** For server-driven progress (WS). */
+		uploadId?: string;
+		fileTotal?: number;
 	}): Promise<{ bytes: number; target: string }> {
 		const source = this.resolveSource(opts.sourceId);
 		const segs = this.segments(opts.relativePath);
@@ -175,8 +179,35 @@ export class LibraryUploadService {
 
 		await mkdir(path.dirname(target), { recursive: true });
 		const tmp = `${target}.uploading`;
+
+		// Count bytes as they stream to disk and emit throttled WS progress —
+		// this is ground-truth progress (what's actually been written), robust
+		// to proxy/XHR quirks that can stall the browser's own upload events.
+		const uploadId = opts.uploadId;
+		const fileTotal = opts.fileTotal ?? 0;
+		let written = 0;
+		let lastEmit = 0;
+		const events = this.events;
+		const relativePath = opts.relativePath;
+		const emit = () => {
+			if (!uploadId) return;
+			events.emit(WsEvent.UPLOAD_PROGRESS, { uploadId, relativePath, bytesWritten: written, fileTotal });
+		};
+		const counter = new Transform({
+			transform(chunk: Buffer, _enc, cb) {
+				written += chunk.length;
+				const now = Date.now();
+				if (now - lastEmit >= 400) {
+					lastEmit = now;
+					emit();
+				}
+				cb(null, chunk);
+			},
+		});
+
 		try {
-			await pipeline(opts.stream, createWriteStream(tmp));
+			await pipeline(opts.stream, counter, createWriteStream(tmp));
+			emit(); // final 100% tick
 		} catch (err) {
 			await unlink(tmp).catch(() => {});
 			throw err;

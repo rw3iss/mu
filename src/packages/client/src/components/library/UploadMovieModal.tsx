@@ -4,6 +4,7 @@ import { Icon } from '@/components/common/Icon';
 import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
 import { libraryUploadService, type UploadTarget } from '@/services/library-upload.service';
+import { wsService } from '@/services/websocket.service';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { formatBytes } from '@/utils/format-bytes';
 import styles from './UploadMovieModal.module.scss';
@@ -67,8 +68,28 @@ export function UploadMovieModal({ isOpen, onClose, onUploaded }: UploadMovieMod
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const folderInputRef = useRef<HTMLInputElement>(null);
 	const abortRef = useRef<AbortController | null>(null);
+	// Bytes of fully-uploaded files (aggregate base), and the active batch id —
+	// refs so the WS progress handler (stable) can read the latest values.
+	const baseRef = useRef(0);
+	const uploadIdRef = useRef('');
 
 	const totalBytes = entries.reduce((sum, e) => sum + e.file.size, 0);
+
+	// Server-driven progress: the server emits upload:progress as it writes each
+	// file to disk. Drive the bar from that (monotonic, so it never goes
+	// backwards if the browser's own XHR estimate disagrees).
+	useEffect(() => {
+		if (!isOpen) return;
+		wsService.subscribe('upload');
+		const onProgress = (data: unknown) => {
+			const p = data as { uploadId?: string; bytesWritten?: number };
+			if (!p || p.uploadId !== uploadIdRef.current) return;
+			const written = p.bytesWritten ?? 0;
+			setSent((prev) => Math.max(prev, baseRef.current + written));
+		};
+		wsService.on('upload:progress', onProgress);
+		return () => wsService.off('upload:progress', onProgress);
+	}, [isOpen]);
 
 	// Load destinations whenever the modal opens; reset transient state.
 	useEffect(() => {
@@ -137,6 +158,8 @@ export function UploadMovieModal({ isOpen, onClose, onUploaded }: UploadMovieMod
 		setPhase('uploading');
 		setSent(0);
 		const uploadId = `up_${Date.now()}_${Math.round(Math.random() * 1e6)}`;
+		uploadIdRef.current = uploadId;
+		baseRef.current = 0;
 		const controller = new AbortController();
 		abortRef.current = controller;
 
@@ -147,17 +170,20 @@ export function UploadMovieModal({ isOpen, onClose, onUploaded }: UploadMovieMod
 				throw new Error(`Already exists in the library: ${conflicts.join(', ')}`);
 			}
 
-			let base = 0;
 			for (const entry of entries) {
 				await libraryUploadService.uploadFile({
 					sourceId,
 					relativePath: entry.relativePath,
 					file: entry.file,
+					uploadId,
 					signal: controller.signal,
-					onProgress: (loaded) => setSent(base + loaded),
+					// Browser-side estimate as a fallback; monotonic so it never
+					// fights the server's WS progress.
+					onProgress: (loaded) =>
+						setSent((prev) => Math.max(prev, baseRef.current + loaded)),
 				});
-				base += entry.file.size;
-				setSent(base);
+				baseRef.current += entry.file.size;
+				setSent(baseRef.current);
 			}
 
 			await libraryUploadService.finalize(sourceId, uploadId, rootName);

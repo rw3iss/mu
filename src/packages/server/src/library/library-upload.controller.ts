@@ -54,6 +54,8 @@ export class LibraryUploadController {
 				relativePath: fields.relativePath,
 				userId,
 				stream: part.file,
+				uploadId: fields.uploadId,
+				fileTotal: fields.fileTotal ? Number(fields.fileTotal) : undefined,
 			});
 		}
 
