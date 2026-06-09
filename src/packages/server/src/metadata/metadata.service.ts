@@ -1,6 +1,6 @@
 import { existsSync, statSync } from 'node:fs';
 import { CACHE_NAMESPACES, nowISO, WsEvent } from '@mu/shared';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
@@ -489,6 +489,70 @@ export class MetadataService {
 	 *     else file probe
 	 *   - genres, director, writer: TMDB structured > OMDB string-split
 	 */
+	/**
+	 * Free-text provider search for the "Search for Metadata" modal. TMDB-first
+	 * (richest results). TMDB caches by query in the provider, so re-searching
+	 * the same term — and the later assign by tmdbId — won't re-hit the API.
+	 */
+	async searchCandidates(
+		query: string,
+		_type?: string,
+	): Promise<
+		Array<{
+			provider: 'tmdb';
+			tmdbId: number;
+			imdbId: string | null;
+			title: string;
+			year: number | null;
+			overview: string | null;
+			posterUrl: string | null;
+		}>
+	> {
+		const q = (query ?? '').trim();
+		if (q.length < 2) return [];
+		const results = (await this.tmdb.searchMovie(q)) ?? [];
+		return results.slice(0, 20).map((r) => {
+			const year = r.release_date ? Number(r.release_date.slice(0, 4)) || null : null;
+			return {
+				provider: 'tmdb' as const,
+				tmdbId: r.id,
+				imdbId: null,
+				title: r.title,
+				year,
+				overview: r.overview || null,
+				posterUrl: this.tmdb.getImageUrl(r.poster_path),
+			};
+		});
+	}
+
+	/**
+	 * Assign a user-chosen search result as a movie's metadata — same merge path
+	 * as auto-match, with the official title written back. The chosen tmdbId is
+	 * applied directly (no re-search); fetchAndMerge pulls cached provider
+	 * details. Emits LIBRARY_MOVIE_UPDATED so the UI refreshes.
+	 */
+	async assignMetadata(
+		movieId: string,
+		opts: { tmdbId?: number | null; imdbId?: string | null },
+	): Promise<any> {
+		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
+		if (!movie) throw new NotFoundException(`Movie ${movieId} not found`);
+		if (!opts.tmdbId && !opts.imdbId) {
+			throw new BadRequestException('tmdbId or imdbId required');
+		}
+		const result = await this.fetchAndMerge({
+			movieId,
+			tmdbId: opts.tmdbId ?? null,
+			imdbId: opts.imdbId ?? null,
+			priorYear: movie.year ?? null,
+			overwriteTitle: true,
+		});
+		if (result) {
+			this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'metadata-assign' });
+		}
+		return result;
+	}
+
 	private async fetchAndMerge(opts: {
 		movieId: string;
 		tmdbId: number | null;

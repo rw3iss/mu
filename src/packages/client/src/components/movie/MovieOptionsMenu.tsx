@@ -30,6 +30,7 @@ import {
 } from '@/state/watchlist.state';
 import { DeleteMovieModal } from './DeleteMovieModal';
 import { DownloadOfflineModal } from './DownloadOfflineModal';
+import { MetadataSearchModal } from './MetadataSearchModal';
 import styles from './MovieOptionsMenu.module.scss';
 import { useMenuOpen } from './useMenuOpen';
 
@@ -63,7 +64,9 @@ export function MovieOptionsMenu({
 	const [showClearMetaConfirm, setShowClearMetaConfirm] = useState(false);
 	const [showDeleteModal, setShowDeleteModal] = useState(false);
 	const [showDownloadModal, setShowDownloadModal] = useState(false);
+	const [showMetadataSearch, setShowMetadataSearch] = useState(false);
 	const [playlistFlyoutOpen, setPlaylistFlyoutOpen] = useState(false);
+	const [opsOpen, setOpsOpen] = useState(false);
 	const [playlistsListing, setPlaylistsListing] = useState<Playlist[]>([]);
 	const [playlistsMembership, setPlaylistsMembership] = useState<MoviePlaylistInfo[]>(
 		() => getCachedMembership(movie.id) ?? [],
@@ -230,21 +233,6 @@ export function MovieOptionsMenu({
 		}
 	}, [movie.id, refreshMovie]);
 
-	const handleSanitizeTitle = useCallback(async () => {
-		setOpen(false);
-		try {
-			const result = await moviesService.sanitizeTitle(movie.id);
-			await refreshMovie();
-			if (result.changed) {
-				notifySuccess(`Renamed: "${result.from}" → "${result.to}"`);
-			} else {
-				notifySuccess('Title already clean — no change');
-			}
-		} catch {
-			notifyError('Failed to sanitize title');
-		}
-	}, [movie.id, refreshMovie, setOpen]);
-
 	const handleRemove = useCallback(async () => {
 		setShowRemoveConfirm(false);
 		try {
@@ -291,12 +279,21 @@ export function MovieOptionsMenu({
 		cancelFlyoutClose();
 		flyoutCloseTimerRef.current = window.setTimeout(() => {
 			setPlaylistFlyoutOpen(false);
+			setOpsOpen(false);
 			flyoutCloseTimerRef.current = null;
 		}, 140);
 	}, [cancelFlyoutClose]);
 
+	// "Operations" submenu — hover/click open, mutually exclusive with playlists.
+	const openOps = useCallback(() => {
+		cancelFlyoutClose();
+		setPlaylistFlyoutOpen(false);
+		setOpsOpen(true);
+	}, [cancelFlyoutClose]);
+
 	const openPlaylistFlyout = useCallback(async () => {
 		cancelFlyoutClose();
+		setOpsOpen(false);
 		setPlaylistFlyoutOpen(true);
 
 		// First-open lazy fetch (no-op if already cached)
@@ -416,54 +413,37 @@ export function MovieOptionsMenu({
 						style={pos ? { top: `${pos.top}px`, right: `${pos.right}px` } : undefined}
 						onClick={(e: Event) => e.stopPropagation()}
 					>
-						<button
-							class={styles.menuItem}
-							onClick={handleRescan}
-							disabled={rescanState !== 'idle'}
-						>
+						<button class={styles.menuItem} onClick={handleWatchedToggle}>
 							<span class={styles.menuIcon}>
-								<Icon name={rescanState === 'complete' ? 'check' : 'search'} />
+								<Icon name={movie.watched ? 'refresh' : 'check'} />
 							</span>
-							{asyncLabel(rescanState, {
-								idle: 'Re-scan File',
-								loading: 'Scanning...',
-								complete: 'Scanned',
-							})}
+							{movie.watched ? 'Mark as Unwatched' : 'Mark as Watched'}
 						</button>
 						<button
 							class={styles.menuItem}
-							onClick={handleRefreshMetadata}
-							disabled={refreshState !== 'idle'}
+							onClick={handleWatchlistToggle}
+							disabled={watchlistPending}
 						>
 							<span class={styles.menuIcon}>
-								<Icon name={refreshState === 'complete' ? 'check' : 'refresh'} />
+								<Icon name={inWatchlist ? 'star-filled' : 'star'} />
 							</span>
-							{asyncLabel(refreshState, {
-								idle: 'Refresh Metadata',
-								loading: 'Refreshing...',
-								complete: 'Complete',
-							})}
+							{inWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}
 						</button>
-						<button
-							class={styles.menuItem}
-							onClick={(e: Event) => {
-								e.stopPropagation();
-								setOpen(false);
-								setShowClearMetaConfirm(true);
-							}}
-						>
-							<span class={styles.menuIcon}>
-								<Icon name="x" />
-							</span>
-							Clear Metadata
-						</button>
-						<button class={styles.menuItem} onClick={handleSanitizeTitle}>
-							<span class={styles.menuIcon}>
-								<Icon name="edit" />
-							</span>
-							Sanitize Title Name
-						</button>
-						<div class={styles.menuDivider} />
+						{canDownload && (
+							<button
+								class={styles.menuItem}
+								onClick={(e: Event) => {
+									e.stopPropagation();
+									setOpen(false);
+									setShowDownloadModal(true);
+								}}
+							>
+								<span class={styles.menuIcon}>
+									<Icon name="download" />
+								</span>
+								Download for Offline
+							</button>
+						)}
 						<div
 							class={styles.flyoutAnchor}
 							onMouseEnter={openPlaylistFlyout}
@@ -536,69 +516,140 @@ export function MovieOptionsMenu({
 								</div>
 							)}
 						</div>
-						<button
-							class={styles.menuItem}
-							onClick={handleWatchlistToggle}
-							disabled={watchlistPending}
+						<div
+							class={styles.flyoutAnchor}
+							onMouseEnter={openOps}
+							onMouseLeave={scheduleFlyoutClose}
 						>
-							<span class={styles.menuIcon}>
-								<Icon name={inWatchlist ? 'star-filled' : 'star'} />
-							</span>
-							{inWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}
-						</button>
-						{canDownload && (
 							<button
-								class={styles.menuItem}
-								onClick={(e: Event) => {
-									e.stopPropagation();
-									setOpen(false);
-									setShowDownloadModal(true);
-								}}
+								class={`${styles.menuItem} ${styles.submenuTrigger}`}
+								onClick={openOps}
+								aria-haspopup="menu"
+								aria-expanded={opsOpen}
 							>
 								<span class={styles.menuIcon}>
-									<Icon name="download" />
+									<Icon name="settings" />
 								</span>
-								Download for Offline
+								<span class={styles.submenuLabel}>Operations</span>
+								<span class={styles.submenuChevron} aria-hidden="true">
+									<Icon name="chevron-right" />
+								</span>
 							</button>
-						)}
-						<div class={styles.menuDivider} />
-						<button class={styles.menuItem} onClick={handleHideToggle}>
-							<span class={styles.menuIcon}>
-								<Icon name={movie.hidden ? 'eye' : 'eye-off'} />
-							</span>
-							{movie.hidden ? 'Unhide from Library' : 'Hide from Library'}
-						</button>
-						<button class={styles.menuItem} onClick={handleWatchedToggle}>
-							<span class={styles.menuIcon}>
-								<Icon name={movie.watched ? 'refresh' : 'check'} />
-							</span>
-							{movie.watched ? 'Mark as Unwatched' : 'Mark as Watched'}
-						</button>
-						<button
-							class={`${styles.menuItem} ${styles.danger}`}
-							onClick={(e: Event) => {
-								e.stopPropagation();
-								setOpen(false);
-								setShowRemoveConfirm(true);
-							}}
-						>
-							<span class={styles.menuIcon}>
-								<Icon name="x-circle" />
-							</span>
-							Remove from Library
-						</button>
-						<button
-							class={`${styles.menuItem} ${styles.danger}`}
-							onClick={(e: Event) => {
-								e.stopPropagation();
-								setShowDeleteModal(true);
-							}}
-						>
-							<span class={styles.menuIcon}>
-								<Icon name="trash" />
-							</span>
-							Delete from Disk
-						</button>
+							{opsOpen && (
+								<div
+									class={styles.flyoutWrapper}
+									role="menu"
+									onMouseEnter={cancelFlyoutClose}
+									onMouseLeave={scheduleFlyoutClose}
+									onClick={(e: Event) => e.stopPropagation()}
+								>
+									<div class={styles.flyoutInner}>
+										<button
+											class={`${styles.menuItem} ${styles.flyoutItem}`}
+											onClick={handleRescan}
+											disabled={rescanState !== 'idle'}
+										>
+											<span class={styles.menuIcon}>
+												<Icon
+													name={
+														rescanState === 'complete'
+															? 'check'
+															: 'search'
+													}
+												/>
+											</span>
+											{asyncLabel(rescanState, {
+												idle: 'Rescan File',
+												loading: 'Scanning...',
+												complete: 'Scanned',
+											})}
+										</button>
+										<button
+											class={`${styles.menuItem} ${styles.flyoutItem}`}
+											onClick={handleRefreshMetadata}
+											disabled={refreshState !== 'idle'}
+										>
+											<span class={styles.menuIcon}>
+												<Icon
+													name={
+														refreshState === 'complete'
+															? 'check'
+															: 'refresh'
+													}
+												/>
+											</span>
+											{asyncLabel(refreshState, {
+												idle: 'Refresh Metadata',
+												loading: 'Refreshing...',
+												complete: 'Complete',
+											})}
+										</button>
+										<button
+											class={`${styles.menuItem} ${styles.flyoutItem}`}
+											onClick={(e: Event) => {
+												e.stopPropagation();
+												setOpen(false);
+												setShowMetadataSearch(true);
+											}}
+										>
+											<span class={styles.menuIcon}>
+												<Icon name="search" />
+											</span>
+											Search for Metadata
+										</button>
+										<button
+											class={`${styles.menuItem} ${styles.flyoutItem}`}
+											onClick={(e: Event) => {
+												e.stopPropagation();
+												setOpen(false);
+												setShowClearMetaConfirm(true);
+											}}
+										>
+											<span class={styles.menuIcon}>
+												<Icon name="x" />
+											</span>
+											Clear Metadata
+										</button>
+										<button
+											class={`${styles.menuItem} ${styles.flyoutItem}`}
+											onClick={handleHideToggle}
+										>
+											<span class={styles.menuIcon}>
+												<Icon name={movie.hidden ? 'eye' : 'eye-off'} />
+											</span>
+											{movie.hidden
+												? 'Unhide from Library'
+												: 'Hide from Library'}
+										</button>
+										<button
+											class={`${styles.menuItem} ${styles.flyoutItem} ${styles.danger}`}
+											onClick={(e: Event) => {
+												e.stopPropagation();
+												setOpen(false);
+												setShowRemoveConfirm(true);
+											}}
+										>
+											<span class={styles.menuIcon}>
+												<Icon name="x-circle" />
+											</span>
+											Remove from Library
+										</button>
+										<button
+											class={`${styles.menuItem} ${styles.flyoutItem} ${styles.danger}`}
+											onClick={(e: Event) => {
+												e.stopPropagation();
+												setShowDeleteModal(true);
+											}}
+										>
+											<span class={styles.menuIcon}>
+												<Icon name="trash" />
+											</span>
+											Delete from Disk
+										</button>
+									</div>
+								</div>
+							)}
+						</div>
 					</div>,
 					document.body,
 				)}
@@ -636,6 +687,14 @@ export function MovieOptionsMenu({
 				isOpen={showDownloadModal}
 				movie={movie}
 				onClose={() => setShowDownloadModal(false)}
+			/>
+
+			<MetadataSearchModal
+				isOpen={showMetadataSearch}
+				movieId={movie.id}
+				initialQuery={movie.title}
+				onClose={() => setShowMetadataSearch(false)}
+				onAssigned={refreshMovie}
 			/>
 		</div>
 	);

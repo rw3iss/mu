@@ -64,6 +64,17 @@ export interface NewTitleStats {
 const NEW_STATS_TTL_MS = 60_000;
 let newStatsCache: { value: NewTitleStats; at: number } | null = null;
 
+/** A provider search result shown in the "Search for Metadata" modal. */
+export interface MetadataSearchCandidate {
+	provider: 'tmdb';
+	tmdbId: number;
+	imdbId: string | null;
+	title: string;
+	year: number | null;
+	overview: string | null;
+	posterUrl: string | null;
+}
+
 export const moviesService = {
 	/**
 	 * List movies with pagination and filtering
@@ -113,6 +124,24 @@ export const moviesService = {
 
 	clearMetadata(movieId: string): Promise<void> {
 		return api.post<void>(`/movies/${movieId}/clear-metadata`);
+	},
+
+	/** Free-text metadata search (TMDB) for the "Search for Metadata" modal. */
+	searchMetadata(q: string, type?: string): Promise<{ candidates: MetadataSearchCandidate[] }> {
+		const params: Record<string, string> = { q };
+		if (type) params.type = type;
+		return api.get<{ candidates: MetadataSearchCandidate[] }>('/metadata/search', params);
+	},
+
+	/** Assign a chosen search result as this movie's metadata. */
+	assignMetadata(
+		movieId: string,
+		candidate: { tmdbId?: number; imdbId?: string },
+	): Promise<{ source?: string; message?: string }> {
+		return api.post<{ source?: string; message?: string }>(
+			`/movies/${movieId}/assign-metadata`,
+			candidate,
+		);
 	},
 
 	/**

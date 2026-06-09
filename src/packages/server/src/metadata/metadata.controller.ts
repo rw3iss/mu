@@ -9,6 +9,7 @@ import {
 	Logger,
 	Param,
 	Post,
+	Query,
 } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
@@ -47,6 +48,28 @@ export class MetadataController {
 	@Get('movies/:id/match-candidates')
 	listCandidates(@Param('id') movieId: string) {
 		return { candidates: this.matchCandidates.list('movie', movieId) };
+	}
+
+	/** Free-text metadata search for the "Search for Metadata" modal. */
+	@RequireAction('view:library')
+	@Get('metadata/search')
+	async searchMetadata(@Query('q') q: string, @Query('type') type?: string) {
+		const candidates = await this.metadataService.searchCandidates(q ?? '', type);
+		return { candidates };
+	}
+
+	/** Assign a chosen search result as this movie's metadata. */
+	@Post('movies/:id/assign-metadata')
+	@RequireAction('edit:movie')
+	async assignMetadata(
+		@Param('id') movieId: string,
+		@Body() body: { tmdbId?: number; imdbId?: string },
+	) {
+		const result = await this.metadataService.assignMetadata(movieId, {
+			tmdbId: body?.tmdbId ?? null,
+			imdbId: body?.imdbId ?? null,
+		});
+		return result ?? { message: 'No metadata applied' };
 	}
 
 	@Post('movies/:id/match-candidates/apply')
