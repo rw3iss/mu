@@ -6,6 +6,7 @@ import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { type Feedback, feedback, users } from '../database/schema/index.js';
 import { EmailService } from '../email/email.service.js';
+import { UploadsService } from '../uploads/uploads.service.js';
 
 /** Result of an admin respond action (resolve and/or reply). */
 export interface RespondResult {
@@ -52,6 +53,7 @@ export class FeedbackService {
 		private readonly database: DatabaseService,
 		private readonly email: EmailService,
 		private readonly config: ConfigService,
+		private readonly uploads: UploadsService,
 	) {}
 
 	create(input: CreateFeedbackInput): Feedback {
@@ -184,12 +186,22 @@ export class FeedbackService {
 	}
 
 	remove(id: string): boolean {
+		const row = this.get(id);
 		const res = this.database.db.delete(feedback).where(eq(feedback.id, id)).run();
+		// Best-effort cleanup of the on-disk attachment so files don't orphan.
+		if (res.changes > 0) void this.uploads.deleteByUrl(row?.attachmentUrl);
 		return res.changes > 0;
 	}
 
 	clear(): number {
+		const urls = this.database.db
+			.select({ url: feedback.attachmentUrl })
+			.from(feedback)
+			.all()
+			.map((r) => r.url)
+			.filter((u): u is string => !!u);
 		const res = this.database.db.delete(feedback).run();
+		for (const url of urls) void this.uploads.deleteByUrl(url);
 		return res.changes ?? 0;
 	}
 
