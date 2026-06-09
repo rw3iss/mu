@@ -27,17 +27,21 @@ export function DownloadOfflineModal({ isOpen, movie, onClose }: DownloadOffline
 	const startDownload = useCallback(() => {
 		setDownloading(true);
 		try {
-			// Trigger a native download via a transient anchor. The server's
-			// Content-Disposition sets the "Title (Year).<ext>" filename; the
-			// download attribute is just a same-origin hint.
+			// Trigger the download in a hidden iframe rather than an <a> click.
+			// preact-router installs a global click interceptor that swallows
+			// same-origin anchor navigations and routes them client-side — which
+			// would land on /api/v1/stream/download/... (no SPA route → the app's
+			// 404 page) instead of letting the browser fetch the file. An iframe
+			// navigation isn't intercepted; the server's Content-Disposition:
+			// attachment makes the browser download it (page unaffected).
 			const url = streamService.getDownloadUrl(movie.id);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = '';
-			a.rel = 'noopener';
-			document.body.appendChild(a);
-			a.click();
-			a.remove();
+			const iframe = document.createElement('iframe');
+			iframe.style.display = 'none';
+			iframe.src = url;
+			document.body.appendChild(iframe);
+			// Headers arrive quickly; the browser's download manager takes over,
+			// so the iframe can be torn down well before the transfer finishes.
+			window.setTimeout(() => iframe.remove(), 60_000);
 		} catch {
 			notifyError('Could not start the download.');
 			setDownloading(false);
