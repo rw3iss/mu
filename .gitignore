@@ -14,3 +14,7 @@ _*.md
 graphify-out/
 recommendations.html
 src/packages/client/PLAN.md
+
+# Local Playwright screenshots / artifacts
+dashboard-*.png
+.playwright-mcp/
