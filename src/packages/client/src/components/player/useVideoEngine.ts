@@ -420,12 +420,26 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				suppressPauseRef.current = false;
 			});
 
+			// Attempt autoplay; if the browser blocks unmuted autoplay (no user
+			// gesture — e.g. a shared `/watch?t=` deep-link opened in a fresh
+			// tab), fall back to MUTED autoplay, which is always permitted, so
+			// the movie still starts at the shared time. We reflect the forced
+			// mute in `isMuted` so the controls show an unmute affordance.
+			const attemptAutoplay = (v: HTMLVideoElement) => {
+				v.play().catch(() => {
+					if (v.muted) return; // already muted and still blocked — give up
+					v.muted = true;
+					isMuted.value = true;
+					v.play().catch(() => {});
+				});
+			};
+
 			// Robust autoplay: listen for canplay to guarantee playback starts
 			// once the browser has enough data, regardless of timing.
 			if (autoplay) {
 				const onCanPlay = () => {
 					if (intendedPlayingRef.current && video.paused) {
-						video.play().catch(() => {});
+						attemptAutoplay(video);
 					}
 					video.removeEventListener('canplay', onCanPlay);
 				};
@@ -460,7 +474,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 					deferredSrcRef.current = null;
 					video.src = directUrl;
 					if (startPosition > 0) video.currentTime = startPosition;
-					video.play().catch(() => {});
+					attemptAutoplay(video);
 				} else {
 					// Load the source muted to show a frame, but don't play.
 					// Muting prevents the Web Audio API ghost audio issue.
@@ -524,7 +538,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 					// Don't disrupt if user already started playing manually
 					if (!video.paused) return;
 					if (startPosition > 0) video.currentTime = startPosition;
-					if (autoplay) video.play().catch(() => {});
+					if (autoplay) attemptAutoplay(video);
 				});
 
 				let networkRecoveries = 0;

@@ -46,6 +46,8 @@ export type IconName =
 	| 'settings'
 	| 'share'
 	| 'download'
+	| 'globe'
+	| 'lock'
 	| 'play'
 	| 'pause'
 	| 'layers'
@@ -238,6 +240,19 @@ const PATHS: Record<IconName, JSX.Element> = {
 			<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
 			<polyline points="7 10 12 15 17 10" />
 			<line x1="12" y1="15" x2="12" y2="3" />
+		</>
+	),
+	globe: (
+		<>
+			<circle cx="12" cy="12" r="10" />
+			<line x1="2" y1="12" x2="22" y2="12" />
+			<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+		</>
+	),
+	lock: (
+		<>
+			<rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+			<path d="M7 11V7a5 5 0 0 1 10 0v4" />
 		</>
 	),
 	play: <polygon points="6 4 20 12 6 20 6 4" />,

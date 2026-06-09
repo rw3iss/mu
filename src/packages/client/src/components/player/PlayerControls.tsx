@@ -3,11 +3,13 @@ import { createPortal } from 'preact/compat';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Icon } from '@/components/common/Icon';
+import { Tooltip } from '@/components/common/Tooltip';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
+import { shareLinksService } from '@/services/share-links.service';
 import { subtitlesService } from '@/services/subtitles.service';
 import {
 	compressorEnabled,
@@ -17,6 +19,7 @@ import {
 	videoEnabled,
 } from '@/state/audio-effects.state';
 import { globalMovie, globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
+import { notifyError, notifySuccess } from '@/state/notifications.state';
 import type { StreamSession } from '@/state/player.state';
 import {
 	audioTrack,
@@ -30,14 +33,13 @@ import {
 	saveAudioTrackChoice,
 	saveSubtitleChoice,
 	setVolume,
+	showControls,
 	spriteMeta,
 	subtitleTrack,
 	toggleMute,
 	volume,
 } from '@/state/player.state';
-import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { shareMode } from '@/state/share.state';
-import { shareLinksService } from '@/services/share-links.service';
 import { VolumeControl, VolumeIcon } from './controls/VolumeControl';
 import styles from './PlayerControls.module.scss';
 
@@ -113,10 +115,7 @@ function renderSpritePortal(args: {
 	const cursorX = seekBarRect.left + seekHoverX;
 
 	// Sprite math
-	const frameIndex = Math.min(
-		Math.floor(seekHover / meta.interval),
-		meta.totalFrames - 1,
-	);
+	const frameIndex = Math.min(Math.floor(seekHover / meta.interval), meta.totalFrames - 1);
 	const framesPerSheet = meta.columns * meta.rows;
 	const sheetIndex = Math.floor(frameIndex / framesPerSheet);
 	const frameInSheet = frameIndex % framesPerSheet;
@@ -325,6 +324,9 @@ export function PlayerControls({
 	// ── Seek bar: right-click → "Copy URL at Time" (public/private share) ──
 	const [shareMenu, setShareMenu] = useState<{ x: number; y: number; time: number } | null>(null);
 	const [shareBusy, setShareBusy] = useState(false);
+	// Tracks whether the cursor is over the share menu, so auto-hiding the
+	// player controls doesn't yank the menu out from under the user.
+	const shareMenuHover = useRef(false);
 
 	const handleSeekContext = useCallback(
 		(e: MouseEvent) => {
@@ -385,6 +387,15 @@ export function PlayerControls({
 		};
 	}, [shareMenu]);
 
+	// Auto-close the share menu when the player controls auto-hide — unless the
+	// cursor is currently over the menu (then keep it until they leave/dismiss).
+	useEffect(() => {
+		if (!shareMenu) return;
+		return showControls.subscribe((v) => {
+			if (!v && !shareMenuHover.current) setShareMenu(null);
+		});
+	}, [shareMenu]);
+
 	const handleSeekBarClick = useCallback(
 		(e: MouseEvent) => {
 			if (isDragging) return;
@@ -421,6 +432,9 @@ export function PlayerControls({
 	// ── Seek bar: drag ──
 	const handleSeekMouseDown = useCallback(
 		(e: MouseEvent) => {
+			// Only the primary (left) button drags/seeks. Right-click is reserved
+			// for the "Copy URL at Time" menu and must not move the playhead.
+			if (e.button !== 0) return;
 			e.preventDefault();
 			setIsDragging(true);
 			dragLastSeek.current = 0;
@@ -530,111 +544,111 @@ export function PlayerControls({
 
 	return (
 		<>
-		<div
-			data-player-panel
-			class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''} ${isSplit ? styles.splitControls : ''}`}
-		>
-			{/* ── Row 1: Seek bar — flush to top, full width ── */}
-			<div class={styles.seekRow}>
-				<div
-					ref={seekBarRef}
-					class={`${styles.seekBar} ${isDragging ? styles.dragging : ''}`}
-					onClick={handleSeekBarClick}
-					onContextMenu={handleSeekContext}
-					onMouseDown={handleSeekMouseDown}
-					onMouseMove={handleSeekHover}
-					onMouseLeave={() => {
-						setSeekHover(null);
-						setSeekBarRect(null);
-					}}
-					role="slider"
-					aria-label="Seek"
-					aria-valuemin={0}
-					aria-valuemax={duration.value}
-					aria-valuenow={currentTime.value}
-				>
-					<div class={styles.seekTrack}>
-						<div class={styles.seekProgress} style={{ width: `${progress}%` }} />
-						<div class={styles.seekThumb} style={{ left: `${progress}%` }} />
+			<div
+				data-player-panel
+				class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''} ${isSplit ? styles.splitControls : ''}`}
+			>
+				{/* ── Row 1: Seek bar — flush to top, full width ── */}
+				<div class={styles.seekRow}>
+					<div
+						ref={seekBarRef}
+						class={`${styles.seekBar} ${isDragging ? styles.dragging : ''}`}
+						onClick={handleSeekBarClick}
+						onContextMenu={handleSeekContext}
+						onMouseDown={handleSeekMouseDown}
+						onMouseMove={handleSeekHover}
+						onMouseLeave={() => {
+							setSeekHover(null);
+							setSeekBarRect(null);
+						}}
+						role="slider"
+						aria-label="Seek"
+						aria-valuemin={0}
+						aria-valuemax={duration.value}
+						aria-valuenow={currentTime.value}
+					>
+						<div class={styles.seekTrack}>
+							<div class={styles.seekProgress} style={{ width: `${progress}%` }} />
+							<div class={styles.seekThumb} style={{ left: `${progress}%` }} />
+						</div>
+						{seekHover !== null &&
+							(() => {
+								const meta = spriteMeta.value;
+								// Fallback text-only tooltip when sprite meta
+								// isn't loaded yet (or this movie has no sprite
+								// sheet generated). Stays inside .seekBar
+								// because the text is small + we don't need
+								// the portal escape for it.
+								if (!meta) {
+									return (
+										<div
+											class={styles.seekTooltip}
+											style={{
+												left: `${(seekHover / (duration.value || 1)) * 100}%`,
+											}}
+										>
+											{formatTime(seekHover)}
+										</div>
+									);
+								}
+								// Sprite preview: rendered into a portal below
+								// (see {seekHover !== null && seekBarRect && …}
+								// at the bottom of the .controls return JSX).
+								// Inside the seekBar we render nothing here so
+								// the original layout stays clean.
+								return null;
+							})()}
 					</div>
-					{seekHover !== null &&
-						(() => {
-							const meta = spriteMeta.value;
-							// Fallback text-only tooltip when sprite meta
-							// isn't loaded yet (or this movie has no sprite
-							// sheet generated). Stays inside .seekBar
-							// because the text is small + we don't need
-							// the portal escape for it.
-							if (!meta) {
-								return (
-									<div
-										class={styles.seekTooltip}
-										style={{
-											left: `${(seekHover / (duration.value || 1)) * 100}%`,
+				</div>
+
+				{/* ── Row 2: Content row — optional left slot + controls ── */}
+				<div class={styles.contentRow}>
+					{leftSlot}
+					<div class={styles.mainRow}>
+						{/* Left: title + timing (hidden in split mode — shown above) */}
+						{!isSplit && (
+							<div class={styles.leftSection}>
+								{title && globalMovieId.value && (
+									<a
+										// In share-watch mode the recipient can't reach
+										// /movie/:id, so the title acts as an "open info"
+										// affordance instead — same behaviour as the info
+										// button in the player toolbar.
+										href={
+											shareMode.value
+												? undefined
+												: `/movie/${globalMovieId.value}`
+										}
+										class={styles.titleText}
+										onClick={(e) => {
+											e.preventDefault();
+											if (shareMode.value) {
+												onToggleInfo();
+												return;
+											}
+											if (playerMode.value !== 'mini') {
+												minimizePlayer();
+											}
+											route(`/movie/${globalMovieId.value}`);
 										}}
 									>
-										{formatTime(seekHover)}
-									</div>
-								);
-							}
-							// Sprite preview: rendered into a portal below
-							// (see {seekHover !== null && seekBarRect && …}
-							// at the bottom of the .controls return JSX).
-							// Inside the seekBar we render nothing here so
-							// the original layout stays clean.
-							return null;
-						})()}
-				</div>
-			</div>
+										{title}
+									</a>
+								)}
+								<span class={styles.timingLabel}>
+									{formatTime(currentTime.value)} / {formatTime(duration.value)}
+								</span>
+							</div>
+						)}
 
-			{/* ── Row 2: Content row — optional left slot + controls ── */}
-			<div class={styles.contentRow}>
-				{leftSlot}
-				<div class={styles.mainRow}>
-					{/* Left: title + timing (hidden in split mode — shown above) */}
-					{!isSplit && (
-						<div class={styles.leftSection}>
-							{title && globalMovieId.value && (
-								<a
-									// In share-watch mode the recipient can't reach
-									// /movie/:id, so the title acts as an "open info"
-									// affordance instead — same behaviour as the info
-									// button in the player toolbar.
-									href={
-										shareMode.value
-											? undefined
-											: `/movie/${globalMovieId.value}`
-									}
-									class={styles.titleText}
-									onClick={(e) => {
-										e.preventDefault();
-										if (shareMode.value) {
-											onToggleInfo();
-											return;
-										}
-										if (playerMode.value !== 'mini') {
-											minimizePlayer();
-										}
-										route(`/movie/${globalMovieId.value}`);
-									}}
-								>
-									{title}
-								</a>
-							)}
-							<span class={styles.timingLabel}>
+						{/* Time display — left side in split mode */}
+						{isSplit && (
+							<div class={styles.splitTimeLeft}>
 								{formatTime(currentTime.value)} / {formatTime(duration.value)}
-							</span>
-						</div>
-					)}
+							</div>
+						)}
 
-					{/* Time display — left side in split mode */}
-					{isSplit && (
-						<div class={styles.splitTimeLeft}>
-							{formatTime(currentTime.value)} / {formatTime(duration.value)}
-						</div>
-					)}
-
-					{/*
+						{/*
 					    Center (transport) + Right (secondary) wrapped in a
 					    single .controlsBottomRow. Default `display: contents`
 					    keeps this transparent on desktop / portrait; on mobile
@@ -642,841 +656,902 @@ export function PlayerControls({
 					    transport buttons and secondary buttons together as one
 					    spread-out row beneath the title row.
 					*/}
-					<div class={styles.controlsBottomRow}>
-						{/* Center: skip-back, play, skip-forward */}
-						{(() => {
-							const st = getUiSetting<number[]>('skip_times', [5, 10, 20]);
-							const t = [st[0] ?? 5, st[1] ?? 10, st[2] ?? 20];
-							return (
-								<div
-									class={`${styles.centerControls} ${isSplit ? styles.centerControlsSplit : ''}`}
-								>
-									{/* Skip Back — rollover reveals extended options */}
+						<div class={styles.controlsBottomRow}>
+							{/* Center: skip-back, play, skip-forward */}
+							{(() => {
+								const st = getUiSetting<number[]>('skip_times', [5, 10, 20]);
+								const t = [st[0] ?? 5, st[1] ?? 10, st[2] ?? 20];
+								return (
 									<div
-										class={styles.skipWrap}
-										onMouseEnter={() => !isMobile && setSkipBackOpen(true)}
-										onMouseLeave={() => !isMobile && setSkipBackOpen(false)}
+										class={`${styles.centerControls} ${isSplit ? styles.centerControlsSplit : ''}`}
 									>
-										<button
-											class={`${styles.controlBtn} ${styles.skipBtn} ${skipBackOpen ? styles.skipBtnHidden : ''}`}
-											onClick={() => {
-												if (isMobile) {
-													// Touch: tap toggles the expanded
-													// time options outward. Auto-hide
-													// after a few seconds; each option
-													// tap resets the timer.
-													const next = !skipBackOpen;
-													setSkipBackOpen(next);
-													if (next) armSkipBackAutoHide();
-												} else {
-													skipBack(t[0]);
-												}
-											}}
-											aria-label="Skip back"
+										{/* Skip Back — rollover reveals extended options */}
+										<div
+											class={styles.skipWrap}
+											onMouseEnter={() => !isMobile && setSkipBackOpen(true)}
+											onMouseLeave={() => !isMobile && setSkipBackOpen(false)}
 										>
-											<svg
-												width="20"
-												height="20"
-												viewBox="0 0 24 24"
-												fill="none"
-												stroke="white"
-												stroke-width="2.5"
-												stroke-linecap="round"
-												stroke-linejoin="round"
-											>
-												<polyline points="11 17 6 12 11 7" />
-												<polyline points="18 17 13 12 18 7" />
-											</svg>
-										</button>
-										{skipBackOpen && (
-											<div
-												class={`${styles.skipExtended} ${styles.skipExtendedLeft}`}
-											>
-												<button
-													class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-													onClick={() => {
-														skipBack(t[2]);
-														armSkipBackAutoHide();
-													}}
-													aria-label={`Skip back ${t[2]}s`}
-												>
-													<span class={styles.skipExtText}>{t[2]}s</span>
-												</button>
-												<button
-													class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-													onClick={() => {
-														skipBack(t[1]);
-														armSkipBackAutoHide();
-													}}
-													aria-label={`Skip back ${t[1]}s`}
-												>
-													<span class={styles.skipExtText}>{t[1]}s</span>
-												</button>
-												<button
-													class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-													onClick={() => {
+											<button
+												class={`${styles.controlBtn} ${styles.skipBtn} ${skipBackOpen ? styles.skipBtnHidden : ''}`}
+												onClick={() => {
+													if (isMobile) {
+														// Touch: tap toggles the expanded
+														// time options outward. Auto-hide
+														// after a few seconds; each option
+														// tap resets the timer.
+														const next = !skipBackOpen;
+														setSkipBackOpen(next);
+														if (next) armSkipBackAutoHide();
+													} else {
 														skipBack(t[0]);
-														armSkipBackAutoHide();
-													}}
-													aria-label={`Skip back ${t[0]}s`}
-												>
-													<span class={styles.skipExtText}>{t[0]}s</span>
-												</button>
-											</div>
-										)}
-									</div>
-
-									<button
-										class={`${styles.controlBtn} ${styles.playBtn}`}
-										onClick={onTogglePlay}
-										aria-label={isPlaying.value ? 'Pause' : 'Play'}
-									>
-										{isPlaying.value ? (
-											<svg
-												width="22"
-												height="22"
-												viewBox="0 0 24 24"
-												fill="white"
-											>
-												<rect x="6" y="4" width="4" height="16" rx="1" />
-												<rect x="14" y="4" width="4" height="16" rx="1" />
-											</svg>
-										) : (
-											<svg
-												width="22"
-												height="22"
-												viewBox="0 0 24 24"
-												fill="white"
-											>
-												<path d="M8 5v14l11-7z" />
-											</svg>
-										)}
-									</button>
-
-									{/* Skip Forward — rollover reveals extended options */}
-									<div
-										class={styles.skipWrap}
-										onMouseEnter={() => !isMobile && setSkipFwdOpen(true)}
-										onMouseLeave={() => !isMobile && setSkipFwdOpen(false)}
-									>
-										<button
-											class={`${styles.controlBtn} ${styles.skipBtn} ${skipFwdOpen ? styles.skipBtnHidden : ''}`}
-											onClick={() => {
-												if (isMobile) {
-													const next = !skipFwdOpen;
-													setSkipFwdOpen(next);
-													if (next) armSkipFwdAutoHide();
-												} else {
-													skipForward(t[0]);
-												}
-											}}
-											aria-label="Skip forward"
-										>
-											<svg
-												width="20"
-												height="20"
-												viewBox="0 0 24 24"
-												fill="none"
-												stroke="white"
-												stroke-width="2.5"
-												stroke-linecap="round"
-												stroke-linejoin="round"
-											>
-												<polyline points="13 17 18 12 13 7" />
-												<polyline points="6 17 11 12 6 7" />
-											</svg>
-										</button>
-										{skipFwdOpen && (
-											<div
-												class={`${styles.skipExtended} ${styles.skipExtendedRight}`}
-											>
-												<button
-													class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-													onClick={() => {
-														skipForward(t[0]);
-														armSkipFwdAutoHide();
-													}}
-													aria-label={`Skip forward ${t[0]}s`}
-												>
-													<span class={styles.skipExtText}>{t[0]}s</span>
-												</button>
-												<button
-													class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-													onClick={() => {
-														skipForward(t[1]);
-														armSkipFwdAutoHide();
-													}}
-													aria-label={`Skip forward ${t[1]}s`}
-												>
-													<span class={styles.skipExtText}>{t[1]}s</span>
-												</button>
-												<button
-													class={`${styles.controlBtn} ${styles.skipExtBtn}`}
-													onClick={() => {
-														skipForward(t[2]);
-														armSkipFwdAutoHide();
-													}}
-													aria-label={`Skip forward ${t[2]}s`}
-												>
-													<span class={styles.skipExtText}>{t[2]}s</span>
-												</button>
-											</div>
-										)}
-									</div>
-								</div>
-							);
-						})()}
-
-						{/* Right: plugin buttons, info, volume, settings, fullscreen */}
-						<div class={styles.rightControls}>
-							{/* Plugin buttons — rendered before system buttons */}
-							<PluginSlot name={UI.PLAYER_BUTTON} context={{}} />
-
-							{/* Info — hidden in split mode (info shown inline) */}
-							{!isSplit && (
-								<button
-									class={styles.controlBtn}
-									onClick={onToggleInfo}
-									aria-label="Movie info"
-									title="Info"
-								>
-									<svg
-										width="20"
-										height="20"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="white"
-										stroke-width="2"
-									>
-										<circle cx="12" cy="12" r="10" />
-										<line x1="12" y1="16" x2="12" y2="12" />
-										<line x1="12" y1="8" x2="12.01" y2="8" />
-									</svg>
-								</button>
-							)}
-
-							{/* Effects */}
-							<div class={styles.effectsBtnWrap}>
-								<div class={styles.effectsDots}>
-									<span
-										class={`${styles.effectsDot} ${eqEnabled.value ? styles.effectsDotActive : ''}`}
-									/>
-									<span
-										class={`${styles.effectsDot} ${compressorEnabled.value ? styles.effectsDotActive : ''}`}
-									/>
-								</div>
-								<div class={styles.effectsDotsBottom}>
-									<span
-										class={`${styles.effectsDot} ${videoEnabled.value ? styles.effectsDotActive : ''}`}
-									/>
-								</div>
-								<button
-									class={`${styles.controlBtn} ${showEffectsPanel.value ? styles.active : ''}`}
-									onClick={toggleEffectsPanel}
-									aria-label="Audio effects"
-									title="Effects"
-								>
-									<svg
-										width="20"
-										height="20"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="white"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<line x1="4" y1="21" x2="4" y2="14" />
-										<line x1="4" y1="10" x2="4" y2="3" />
-										<line x1="12" y1="21" x2="12" y2="12" />
-										<line x1="12" y1="8" x2="12" y2="3" />
-										<line x1="20" y1="21" x2="20" y2="16" />
-										<line x1="20" y1="12" x2="20" y2="3" />
-										<line x1="1" y1="14" x2="7" y2="14" />
-										<line x1="9" y1="8" x2="15" y2="8" />
-										<line x1="17" y1="16" x2="23" y2="16" />
-									</svg>
-								</button>
-							</div>
-
-							{/* Volume */}
-							<VolumeControl />
-
-							{/* Settings */}
-							<div class={styles.menuContainer} ref={settingsRef}>
-								<button
-									class={`${styles.controlBtn} ${showSettingsMenu ? styles.active : ''}`}
-									onClick={toggleSettings}
-									aria-label="Settings"
-									title="Settings"
-								>
-									<svg
-										width="20"
-										height="20"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="white"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<circle cx="12" cy="12" r="3" />
-										<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-									</svg>
-								</button>
-
-								{showSettingsMenu && (
-									<div class={styles.menu}>
-										{settingsPanel === 'main' && (
-											<>
-												<button
-													class={styles.menuRow}
-													onClick={() => setSettingsPanel('quality')}
-												>
-													<span class={styles.menuRowLabel}>Quality</span>
-													<span class={styles.menuRowValue}>
-														{quality.value === 'auto'
-															? 'Auto'
-															: quality.value}
-													</span>
-													<span class={styles.menuRowChevron}>
-														<Icon name="chevron-right" size={14} />
-													</span>
-												</button>
-
-												<button
-													class={styles.menuRow}
-													onClick={() => setSettingsPanel('subtitles')}
-												>
-													<span class={styles.menuRowLabel}>
-														Subtitles
-													</span>
-													<span class={styles.menuRowValue}>
-														{subtitleTrack.value
-															? (session?.subtitles?.find(
-																	(t) =>
-																		t.id ===
-																		subtitleTrack.value,
-																)?.label ?? 'On')
-															: 'Off'}
-													</span>
-													<span class={styles.menuRowChevron}>
-														<Icon name="chevron-right" size={14} />
-													</span>
-												</button>
-
-												{(session?.audioTracks?.length ?? 0) > 1 && (
-													<button
-														class={styles.menuRow}
-														onClick={() => setSettingsPanel('audio')}
-													>
-														<span class={styles.menuRowLabel}>
-															Audio Track
-														</span>
-														<span class={styles.menuRowValue}>
-															{audioTrack.value
-																? (session?.audioTracks?.find(
-																		(t) =>
-																			String(t.id) ===
-																			audioTrack.value,
-																	)?.label ??
-																	session?.audioTracks
-																		?.find(
-																			(t) =>
-																				String(t.id) ===
-																				audioTrack.value,
-																		)
-																		?.language?.toUpperCase() ??
-																	`Track ${audioTrack.value}`)
-																: (session?.audioTracks?.[0]
-																		?.label ??
-																	session?.audioTracks?.[0]?.language?.toUpperCase() ??
-																	'Default')}
-														</span>
-														<span class={styles.menuRowChevron}>
-															<Icon name="chevron-right" size={14} />
-														</span>
-													</button>
-												)}
-											</>
-										)}
-
-										{settingsPanel === 'quality' && (
-											<>
-												<button
-													class={styles.menuBack}
-													onClick={() => setSettingsPanel('main')}
-												>
-													<Icon name="chevron-left" size={14} /> Quality
-												</button>
-												<button
-													class={`${styles.menuItem} ${quality.value === 'auto' ? styles.selected : ''}`}
-													onClick={() => handleQualitySelect('auto')}
-												>
-													Auto
-												</button>
-												{(session?.qualities ?? []).map((q) => (
-													<button
-														key={q.label}
-														class={`${styles.menuItem} ${
-															quality.value === q.label
-																? styles.selected
-																: ''
-														}`}
-														onClick={() => handleQualitySelect(q.label)}
-													>
-														{q.label} ({q.height}p)
-													</button>
-												))}
-											</>
-										)}
-
-										{settingsPanel === 'subtitles' && (
-											<>
-												<button
-													class={styles.menuBack}
-													onClick={() => setSettingsPanel('main')}
-												>
-													<Icon name="chevron-left" size={14} /> Subtitles
-												</button>
-												<button
-													class={`${styles.menuItem} ${subtitleTrack.value === null ? styles.selected : ''}`}
-													onClick={() => handleSubtitleSelect(null)}
-												>
-													Off
-												</button>
-												{(session?.subtitles ?? []).map((track) => (
-													<button
-														key={track.id}
-														class={`${styles.menuItem} ${
-															subtitleTrack.value === track.id
-																? styles.selected
-																: ''
-														}`}
-														onClick={() =>
-															handleSubtitleSelect(track.id)
-														}
-													>
-														{track.label}
-													</button>
-												))}
-												<div class={styles.menuDivider} />
-												<button
-													class={styles.menuItem}
-													onClick={() =>
-														setSettingsPanel('subtitle-manage')
 													}
+												}}
+												aria-label="Skip back"
+											>
+												<svg
+													width="20"
+													height="20"
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="white"
+													stroke-width="2.5"
+													stroke-linecap="round"
+													stroke-linejoin="round"
 												>
-													Manage Subtitles{' '}
-													<Icon name="chevron-right" size={14} />
-												</button>
-											</>
-										)}
-
-										{settingsPanel === 'subtitle-manage' && (
-											<>
-												<button
-													class={styles.menuBack}
-													onClick={() => setSettingsPanel('subtitles')}
+													<polyline points="11 17 6 12 11 7" />
+													<polyline points="18 17 13 12 18 7" />
+												</svg>
+											</button>
+											{skipBackOpen && (
+												<div
+													class={`${styles.skipExtended} ${styles.skipExtendedLeft}`}
 												>
-													<Icon name="chevron-left" size={14} /> Manage
-													Subtitles
-												</button>
-												<div class={styles.menuPanelContent}>
-													<SubtitleSettingsCollapsible />
-													<div class={styles.menuDivider} />
-													{globalMovieId.value && (
-														<SubtitlePanel
-															movieId={globalMovieId.value}
-															fileName={
-																globalMovie.value?.fileInfo
-																	?.fileName ||
-																globalMovie.value?.fileInfo?.filePath
-																	?.split(/[/\\]/)
-																	.pop() ||
-																undefined
-															}
-															existingTracks={(
-																session?.subtitles ?? []
-															).map((t, i) => ({
-																index: i,
-																language: t.language,
-																label: t.label,
-															}))}
-															onTrackDeleted={(track) => {
-																const s = currentSession.value;
-																if (!s) return;
-																const activeId =
-																	subtitleTrack.value;
-																if (activeId) {
-																	const activeSub =
-																		s.subtitles.find(
-																			(st) =>
-																				st.id === activeId,
-																		);
-																	if (
-																		activeSub &&
-																		activeSub.label ===
-																			track.label &&
-																		activeSub.language ===
-																			track.language
-																	) {
-																		subtitleTrack.value = null;
-																		const mid =
-																			globalMovieId.value;
-																		if (mid)
-																			saveSubtitleChoice(
-																				mid,
-																				null,
-																			);
-																	}
-																}
-															}}
-															onSubtitlesChanged={async () => {
-																const mid = globalMovieId.value;
-																if (!mid) return;
-																try {
-																	const { subtitles: subs } =
-																		await subtitlesService.list(
-																			mid,
-																		);
-																	const s = currentSession.value;
-																	if (!s) return;
-																	currentSession.value = {
-																		...s,
-																		subtitles: subs.map(
-																			(t, i) => ({
-																				id: `sub-${i}`,
-																				label: t.label,
-																				language:
-																					t.language,
-																				url: `/api/v1/stream/${s.sessionId}/subtitles/${i}.vtt`,
-																			}),
-																		),
-																	};
-																} catch {}
-															}}
-															onSelect={(track) => {
-																// Select this subtitle track for playback
-																const s = currentSession.value;
-																if (!s) return;
-																const sub =
-																	s.subtitles.find(
-																		(st) =>
-																			st.label ===
-																				track.label &&
-																			st.language ===
-																				track.language,
-																	) ?? s.subtitles[track.index];
-																if (sub) {
-																	const movieId =
-																		globalMovieId.value;
-																	if (movieId) {
-																		saveSubtitleChoice(
-																			movieId,
-																			sub.id,
-																		);
-																	} else {
-																		subtitleTrack.value =
-																			sub.id;
-																	}
-																}
-															}}
-															onTrackAdded={(track) => {
-																const s = currentSession.value;
-																if (!s) return;
-																const trackId = `sub-${track.index}`;
-																const newTrack = {
-																	id: trackId,
-																	label: track.label,
-																	language: track.language,
-																	url: `/api/v1/stream/${s.sessionId}/subtitles/${track.index}.vtt`,
-																};
-																currentSession.value = {
-																	...s,
-																	subtitles: [
-																		...s.subtitles,
-																		newTrack,
-																	],
-																};
-																const movieId = globalMovieId.value;
-																if (movieId) {
-																	saveSubtitleChoice(
-																		movieId,
-																		trackId,
-																	);
-																} else {
-																	subtitleTrack.value = trackId;
-																}
-															}}
-														/>
-													)}
+													<button
+														class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+														onClick={() => {
+															skipBack(t[2]);
+															armSkipBackAutoHide();
+														}}
+														aria-label={`Skip back ${t[2]}s`}
+													>
+														<span class={styles.skipExtText}>
+															{t[2]}s
+														</span>
+													</button>
+													<button
+														class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+														onClick={() => {
+															skipBack(t[1]);
+															armSkipBackAutoHide();
+														}}
+														aria-label={`Skip back ${t[1]}s`}
+													>
+														<span class={styles.skipExtText}>
+															{t[1]}s
+														</span>
+													</button>
+													<button
+														class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+														onClick={() => {
+															skipBack(t[0]);
+															armSkipBackAutoHide();
+														}}
+														aria-label={`Skip back ${t[0]}s`}
+													>
+														<span class={styles.skipExtText}>
+															{t[0]}s
+														</span>
+													</button>
 												</div>
-											</>
-										)}
+											)}
+										</div>
 
-										{settingsPanel === 'audio' && (
-											<>
-												<button
-													class={styles.menuBack}
-													onClick={() => setSettingsPanel('main')}
+										<button
+											class={`${styles.controlBtn} ${styles.playBtn}`}
+											onClick={onTogglePlay}
+											aria-label={isPlaying.value ? 'Pause' : 'Play'}
+										>
+											{isPlaying.value ? (
+												<svg
+													width="22"
+													height="22"
+													viewBox="0 0 24 24"
+													fill="white"
 												>
-													<Icon name="chevron-left" size={14} /> Audio
-													Track
-												</button>
-												{(session?.audioTracks ?? []).map((track) => {
-													const trackId = String(track.id);
-													const isSelected = audioTrack.value
-														? audioTrack.value === trackId
-														: trackId ===
-															String(session?.audioTracks?.[0]?.id);
-													const lang = (
-														track.language || 'und'
-													).toUpperCase();
-													const label =
-														track.label &&
-														track.label !== track.language
-															? `${lang} — ${track.label}`
-															: lang;
-													const channels = track.channels
-														? ` (${track.channels === 6 ? '5.1' : track.channels === 8 ? '7.1' : `${track.channels}ch`})`
-														: '';
-													return (
-														<button
-															key={trackId}
-															class={`${styles.menuItem} ${isSelected ? styles.selected : ''}`}
-															onClick={() =>
-																handleAudioTrackSelect(trackId)
-															}
-														>
-															{label}
-															{channels}
-														</button>
-													);
-												})}
-											</>
-										)}
-									</div>
-								)}
-							</div>
+													<rect
+														x="6"
+														y="4"
+														width="4"
+														height="16"
+														rx="1"
+													/>
+													<rect
+														x="14"
+														y="4"
+														width="4"
+														height="16"
+														rx="1"
+													/>
+												</svg>
+											) : (
+												<svg
+													width="22"
+													height="22"
+													viewBox="0 0 24 24"
+													fill="white"
+												>
+													<path d="M8 5v14l11-7z" />
+												</svg>
+											)}
+										</button>
 
-							{/* Mobile overflow — only visible on mobile-mini (CSS-gated).
-						    Surfaces the controls hidden by the mobile-mini @media
-						    rule (info / effects / mute) so touch users can still
-						    reach them without maximizing the player. */}
-							{hasMiniThumbnail && (
-								<div class={styles.mobileOverflow} ref={mobileOverflowRef}>
+										{/* Skip Forward — rollover reveals extended options */}
+										<div
+											class={styles.skipWrap}
+											onMouseEnter={() => !isMobile && setSkipFwdOpen(true)}
+											onMouseLeave={() => !isMobile && setSkipFwdOpen(false)}
+										>
+											<button
+												class={`${styles.controlBtn} ${styles.skipBtn} ${skipFwdOpen ? styles.skipBtnHidden : ''}`}
+												onClick={() => {
+													if (isMobile) {
+														const next = !skipFwdOpen;
+														setSkipFwdOpen(next);
+														if (next) armSkipFwdAutoHide();
+													} else {
+														skipForward(t[0]);
+													}
+												}}
+												aria-label="Skip forward"
+											>
+												<svg
+													width="20"
+													height="20"
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="white"
+													stroke-width="2.5"
+													stroke-linecap="round"
+													stroke-linejoin="round"
+												>
+													<polyline points="13 17 18 12 13 7" />
+													<polyline points="6 17 11 12 6 7" />
+												</svg>
+											</button>
+											{skipFwdOpen && (
+												<div
+													class={`${styles.skipExtended} ${styles.skipExtendedRight}`}
+												>
+													<button
+														class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+														onClick={() => {
+															skipForward(t[0]);
+															armSkipFwdAutoHide();
+														}}
+														aria-label={`Skip forward ${t[0]}s`}
+													>
+														<span class={styles.skipExtText}>
+															{t[0]}s
+														</span>
+													</button>
+													<button
+														class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+														onClick={() => {
+															skipForward(t[1]);
+															armSkipFwdAutoHide();
+														}}
+														aria-label={`Skip forward ${t[1]}s`}
+													>
+														<span class={styles.skipExtText}>
+															{t[1]}s
+														</span>
+													</button>
+													<button
+														class={`${styles.controlBtn} ${styles.skipExtBtn}`}
+														onClick={() => {
+															skipForward(t[2]);
+															armSkipFwdAutoHide();
+														}}
+														aria-label={`Skip forward ${t[2]}s`}
+													>
+														<span class={styles.skipExtText}>
+															{t[2]}s
+														</span>
+													</button>
+												</div>
+											)}
+										</div>
+									</div>
+								);
+							})()}
+
+							{/* Right: plugin buttons, info, volume, settings, fullscreen */}
+							<div class={styles.rightControls}>
+								{/* Plugin buttons — rendered before system buttons */}
+								<PluginSlot name={UI.PLAYER_BUTTON} context={{}} />
+
+								{/* Info — hidden in split mode (info shown inline) */}
+								{!isSplit && (
 									<button
-										class={`${styles.controlBtn} ${showMobileOverflow ? styles.active : ''}`}
-										onClick={() => setShowMobileOverflow((v) => !v)}
-										aria-label="More controls"
-										aria-expanded={showMobileOverflow}
-										title="More"
+										class={styles.controlBtn}
+										onClick={onToggleInfo}
+										aria-label="Movie info"
+										title="Info"
 									>
 										<svg
 											width="20"
 											height="20"
 											viewBox="0 0 24 24"
-											fill="white"
-											aria-hidden="true"
+											fill="none"
+											stroke="white"
+											stroke-width="2"
 										>
-											<circle cx="5" cy="12" r="2" />
-											<circle cx="12" cy="12" r="2" />
-											<circle cx="19" cy="12" r="2" />
+											<circle cx="12" cy="12" r="10" />
+											<line x1="12" y1="16" x2="12" y2="12" />
+											<line x1="12" y1="8" x2="12.01" y2="8" />
+										</svg>
+									</button>
+								)}
+
+								{/* Effects */}
+								<div class={styles.effectsBtnWrap}>
+									<div class={styles.effectsDots}>
+										<span
+											class={`${styles.effectsDot} ${eqEnabled.value ? styles.effectsDotActive : ''}`}
+										/>
+										<span
+											class={`${styles.effectsDot} ${compressorEnabled.value ? styles.effectsDotActive : ''}`}
+										/>
+									</div>
+									<div class={styles.effectsDotsBottom}>
+										<span
+											class={`${styles.effectsDot} ${videoEnabled.value ? styles.effectsDotActive : ''}`}
+										/>
+									</div>
+									<button
+										class={`${styles.controlBtn} ${showEffectsPanel.value ? styles.active : ''}`}
+										onClick={toggleEffectsPanel}
+										aria-label="Audio effects"
+										title="Effects"
+									>
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="white"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<line x1="4" y1="21" x2="4" y2="14" />
+											<line x1="4" y1="10" x2="4" y2="3" />
+											<line x1="12" y1="21" x2="12" y2="12" />
+											<line x1="12" y1="8" x2="12" y2="3" />
+											<line x1="20" y1="21" x2="20" y2="16" />
+											<line x1="20" y1="12" x2="20" y2="3" />
+											<line x1="1" y1="14" x2="7" y2="14" />
+											<line x1="9" y1="8" x2="15" y2="8" />
+											<line x1="17" y1="16" x2="23" y2="16" />
+										</svg>
+									</button>
+								</div>
+
+								{/* Volume */}
+								<VolumeControl />
+
+								{/* Settings */}
+								<div class={styles.menuContainer} ref={settingsRef}>
+									<button
+										class={`${styles.controlBtn} ${showSettingsMenu ? styles.active : ''}`}
+										onClick={toggleSettings}
+										aria-label="Settings"
+										title="Settings"
+									>
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="white"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<circle cx="12" cy="12" r="3" />
+											<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
 										</svg>
 									</button>
 
-									{showMobileOverflow && (
-										<div class={styles.mobileOverflowMenu} role="menu">
-											<button
-												type="button"
-												class={styles.mobileOverflowItem}
-												onClick={() => {
-													setShowMobileOverflow(false);
-													onToggleInfo();
-												}}
-											>
-												<svg
-													width="18"
-													height="18"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													stroke-width="2"
-													aria-hidden="true"
-												>
-													<circle cx="12" cy="12" r="10" />
-													<line x1="12" y1="16" x2="12" y2="12" />
-													<line x1="12" y1="8" x2="12.01" y2="8" />
-												</svg>
-												<span>Info</span>
-											</button>
-											<button
-												type="button"
-												class={`${styles.mobileOverflowItem} ${showEffectsPanel.value ? styles.mobileOverflowItemActive : ''}`}
-												onClick={() => {
-													setShowMobileOverflow(false);
-													toggleEffectsPanel();
-												}}
-											>
-												<svg
-													width="18"
-													height="18"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													stroke-width="2"
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													aria-hidden="true"
-												>
-													<line x1="4" y1="21" x2="4" y2="14" />
-													<line x1="4" y1="10" x2="4" y2="3" />
-													<line x1="12" y1="21" x2="12" y2="12" />
-													<line x1="12" y1="8" x2="12" y2="3" />
-													<line x1="20" y1="21" x2="20" y2="16" />
-													<line x1="20" y1="12" x2="20" y2="3" />
-													<line x1="1" y1="14" x2="7" y2="14" />
-													<line x1="9" y1="8" x2="15" y2="8" />
-													<line x1="17" y1="16" x2="23" y2="16" />
-												</svg>
-												<span>Effects</span>
-											</button>
-											<button
-												type="button"
-												class={styles.mobileOverflowItem}
-												onClick={() => {
-													toggleMute();
-												}}
-											>
-												<VolumeIcon />
-												<span>{isMuted.value ? 'Unmute' : 'Mute'}</span>
-											</button>
-											<button
-												type="button"
-												class={styles.mobileOverflowItem}
-												onClick={() => {
-													setShowMobileOverflow(false);
-													onToggleFullscreen();
-												}}
-												aria-label="Maximize player"
-											>
-												<svg
-													width="18"
-													height="18"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													stroke-width="2"
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													aria-hidden="true"
-												>
-													<polyline points="18 15 12 9 6 15" />
-												</svg>
-												<span>Maximize</span>
-											</button>
+									{showSettingsMenu && (
+										<div class={styles.menu}>
+											{settingsPanel === 'main' && (
+												<>
+													<button
+														class={styles.menuRow}
+														onClick={() => setSettingsPanel('quality')}
+													>
+														<span class={styles.menuRowLabel}>
+															Quality
+														</span>
+														<span class={styles.menuRowValue}>
+															{quality.value === 'auto'
+																? 'Auto'
+																: quality.value}
+														</span>
+														<span class={styles.menuRowChevron}>
+															<Icon name="chevron-right" size={14} />
+														</span>
+													</button>
+
+													<button
+														class={styles.menuRow}
+														onClick={() =>
+															setSettingsPanel('subtitles')
+														}
+													>
+														<span class={styles.menuRowLabel}>
+															Subtitles
+														</span>
+														<span class={styles.menuRowValue}>
+															{subtitleTrack.value
+																? (session?.subtitles?.find(
+																		(t) =>
+																			t.id ===
+																			subtitleTrack.value,
+																	)?.label ?? 'On')
+																: 'Off'}
+														</span>
+														<span class={styles.menuRowChevron}>
+															<Icon name="chevron-right" size={14} />
+														</span>
+													</button>
+
+													{(session?.audioTracks?.length ?? 0) > 1 && (
+														<button
+															class={styles.menuRow}
+															onClick={() =>
+																setSettingsPanel('audio')
+															}
+														>
+															<span class={styles.menuRowLabel}>
+																Audio Track
+															</span>
+															<span class={styles.menuRowValue}>
+																{audioTrack.value
+																	? (session?.audioTracks?.find(
+																			(t) =>
+																				String(t.id) ===
+																				audioTrack.value,
+																		)?.label ??
+																		session?.audioTracks
+																			?.find(
+																				(t) =>
+																					String(t.id) ===
+																					audioTrack.value,
+																			)
+																			?.language?.toUpperCase() ??
+																		`Track ${audioTrack.value}`)
+																	: (session?.audioTracks?.[0]
+																			?.label ??
+																		session?.audioTracks?.[0]?.language?.toUpperCase() ??
+																		'Default')}
+															</span>
+															<span class={styles.menuRowChevron}>
+																<Icon
+																	name="chevron-right"
+																	size={14}
+																/>
+															</span>
+														</button>
+													)}
+												</>
+											)}
+
+											{settingsPanel === 'quality' && (
+												<>
+													<button
+														class={styles.menuBack}
+														onClick={() => setSettingsPanel('main')}
+													>
+														<Icon name="chevron-left" size={14} />{' '}
+														Quality
+													</button>
+													<button
+														class={`${styles.menuItem} ${quality.value === 'auto' ? styles.selected : ''}`}
+														onClick={() => handleQualitySelect('auto')}
+													>
+														Auto
+													</button>
+													{(session?.qualities ?? []).map((q) => (
+														<button
+															key={q.label}
+															class={`${styles.menuItem} ${
+																quality.value === q.label
+																	? styles.selected
+																	: ''
+															}`}
+															onClick={() =>
+																handleQualitySelect(q.label)
+															}
+														>
+															{q.label} ({q.height}p)
+														</button>
+													))}
+												</>
+											)}
+
+											{settingsPanel === 'subtitles' && (
+												<>
+													<button
+														class={styles.menuBack}
+														onClick={() => setSettingsPanel('main')}
+													>
+														<Icon name="chevron-left" size={14} />{' '}
+														Subtitles
+													</button>
+													<button
+														class={`${styles.menuItem} ${subtitleTrack.value === null ? styles.selected : ''}`}
+														onClick={() => handleSubtitleSelect(null)}
+													>
+														Off
+													</button>
+													{(session?.subtitles ?? []).map((track) => (
+														<button
+															key={track.id}
+															class={`${styles.menuItem} ${
+																subtitleTrack.value === track.id
+																	? styles.selected
+																	: ''
+															}`}
+															onClick={() =>
+																handleSubtitleSelect(track.id)
+															}
+														>
+															{track.label}
+														</button>
+													))}
+													<div class={styles.menuDivider} />
+													<button
+														class={styles.menuItem}
+														onClick={() =>
+															setSettingsPanel('subtitle-manage')
+														}
+													>
+														Manage Subtitles{' '}
+														<Icon name="chevron-right" size={14} />
+													</button>
+												</>
+											)}
+
+											{settingsPanel === 'subtitle-manage' && (
+												<>
+													<button
+														class={styles.menuBack}
+														onClick={() =>
+															setSettingsPanel('subtitles')
+														}
+													>
+														<Icon name="chevron-left" size={14} />{' '}
+														Manage Subtitles
+													</button>
+													<div class={styles.menuPanelContent}>
+														<SubtitleSettingsCollapsible />
+														<div class={styles.menuDivider} />
+														{globalMovieId.value && (
+															<SubtitlePanel
+																movieId={globalMovieId.value}
+																fileName={
+																	globalMovie.value?.fileInfo
+																		?.fileName ||
+																	globalMovie.value?.fileInfo?.filePath
+																		?.split(/[/\\]/)
+																		.pop() ||
+																	undefined
+																}
+																existingTracks={(
+																	session?.subtitles ?? []
+																).map((t, i) => ({
+																	index: i,
+																	language: t.language,
+																	label: t.label,
+																}))}
+																onTrackDeleted={(track) => {
+																	const s = currentSession.value;
+																	if (!s) return;
+																	const activeId =
+																		subtitleTrack.value;
+																	if (activeId) {
+																		const activeSub =
+																			s.subtitles.find(
+																				(st) =>
+																					st.id ===
+																					activeId,
+																			);
+																		if (
+																			activeSub &&
+																			activeSub.label ===
+																				track.label &&
+																			activeSub.language ===
+																				track.language
+																		) {
+																			subtitleTrack.value =
+																				null;
+																			const mid =
+																				globalMovieId.value;
+																			if (mid)
+																				saveSubtitleChoice(
+																					mid,
+																					null,
+																				);
+																		}
+																	}
+																}}
+																onSubtitlesChanged={async () => {
+																	const mid = globalMovieId.value;
+																	if (!mid) return;
+																	try {
+																		const { subtitles: subs } =
+																			await subtitlesService.list(
+																				mid,
+																			);
+																		const s =
+																			currentSession.value;
+																		if (!s) return;
+																		currentSession.value = {
+																			...s,
+																			subtitles: subs.map(
+																				(t, i) => ({
+																					id: `sub-${i}`,
+																					label: t.label,
+																					language:
+																						t.language,
+																					url: `/api/v1/stream/${s.sessionId}/subtitles/${i}.vtt`,
+																				}),
+																			),
+																		};
+																	} catch {}
+																}}
+																onSelect={(track) => {
+																	// Select this subtitle track for playback
+																	const s = currentSession.value;
+																	if (!s) return;
+																	const sub =
+																		s.subtitles.find(
+																			(st) =>
+																				st.label ===
+																					track.label &&
+																				st.language ===
+																					track.language,
+																		) ??
+																		s.subtitles[track.index];
+																	if (sub) {
+																		const movieId =
+																			globalMovieId.value;
+																		if (movieId) {
+																			saveSubtitleChoice(
+																				movieId,
+																				sub.id,
+																			);
+																		} else {
+																			subtitleTrack.value =
+																				sub.id;
+																		}
+																	}
+																}}
+																onTrackAdded={(track) => {
+																	const s = currentSession.value;
+																	if (!s) return;
+																	const trackId = `sub-${track.index}`;
+																	const newTrack = {
+																		id: trackId,
+																		label: track.label,
+																		language: track.language,
+																		url: `/api/v1/stream/${s.sessionId}/subtitles/${track.index}.vtt`,
+																	};
+																	currentSession.value = {
+																		...s,
+																		subtitles: [
+																			...s.subtitles,
+																			newTrack,
+																		],
+																	};
+																	const movieId =
+																		globalMovieId.value;
+																	if (movieId) {
+																		saveSubtitleChoice(
+																			movieId,
+																			trackId,
+																		);
+																	} else {
+																		subtitleTrack.value =
+																			trackId;
+																	}
+																}}
+															/>
+														)}
+													</div>
+												</>
+											)}
+
+											{settingsPanel === 'audio' && (
+												<>
+													<button
+														class={styles.menuBack}
+														onClick={() => setSettingsPanel('main')}
+													>
+														<Icon name="chevron-left" size={14} /> Audio
+														Track
+													</button>
+													{(session?.audioTracks ?? []).map((track) => {
+														const trackId = String(track.id);
+														const isSelected = audioTrack.value
+															? audioTrack.value === trackId
+															: trackId ===
+																String(
+																	session?.audioTracks?.[0]?.id,
+																);
+														const lang = (
+															track.language || 'und'
+														).toUpperCase();
+														const label =
+															track.label &&
+															track.label !== track.language
+																? `${lang} — ${track.label}`
+																: lang;
+														const channels = track.channels
+															? ` (${track.channels === 6 ? '5.1' : track.channels === 8 ? '7.1' : `${track.channels}ch`})`
+															: '';
+														return (
+															<button
+																key={trackId}
+																class={`${styles.menuItem} ${isSelected ? styles.selected : ''}`}
+																onClick={() =>
+																	handleAudioTrackSelect(trackId)
+																}
+															>
+																{label}
+																{channels}
+															</button>
+														);
+													})}
+												</>
+											)}
 										</div>
 									)}
 								</div>
-							)}
 
-							{/* Fullscreen */}
-							<button
-								class={styles.controlBtn}
-								onClick={onToggleFullscreen}
-								aria-label={
-									hasMiniThumbnail
-										? 'Maximize player'
-										: isFullscreen.value
-											? 'Exit fullscreen'
-											: 'Enter fullscreen'
-								}
-								title={
-									hasMiniThumbnail
-										? 'Maximize'
-										: isFullscreen.value
-											? 'Exit fullscreen'
-											: 'Fullscreen'
-								}
-							>
-								{hasMiniThumbnail ? (
-									<svg
-										width="20"
-										height="20"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="white"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<polyline points="18 15 12 9 6 15" />
-									</svg>
-								) : isFullscreen.value ? (
-									<svg
-										width="20"
-										height="20"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="white"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
-									</svg>
-								) : (
-									<svg
-										width="20"
-										height="20"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="white"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-									</svg>
+								{/* Mobile overflow — only visible on mobile-mini (CSS-gated).
+						    Surfaces the controls hidden by the mobile-mini @media
+						    rule (info / effects / mute) so touch users can still
+						    reach them without maximizing the player. */}
+								{hasMiniThumbnail && (
+									<div class={styles.mobileOverflow} ref={mobileOverflowRef}>
+										<button
+											class={`${styles.controlBtn} ${showMobileOverflow ? styles.active : ''}`}
+											onClick={() => setShowMobileOverflow((v) => !v)}
+											aria-label="More controls"
+											aria-expanded={showMobileOverflow}
+											title="More"
+										>
+											<svg
+												width="20"
+												height="20"
+												viewBox="0 0 24 24"
+												fill="white"
+												aria-hidden="true"
+											>
+												<circle cx="5" cy="12" r="2" />
+												<circle cx="12" cy="12" r="2" />
+												<circle cx="19" cy="12" r="2" />
+											</svg>
+										</button>
+
+										{showMobileOverflow && (
+											<div class={styles.mobileOverflowMenu} role="menu">
+												<button
+													type="button"
+													class={styles.mobileOverflowItem}
+													onClick={() => {
+														setShowMobileOverflow(false);
+														onToggleInfo();
+													}}
+												>
+													<svg
+														width="18"
+														height="18"
+														viewBox="0 0 24 24"
+														fill="none"
+														stroke="currentColor"
+														stroke-width="2"
+														aria-hidden="true"
+													>
+														<circle cx="12" cy="12" r="10" />
+														<line x1="12" y1="16" x2="12" y2="12" />
+														<line x1="12" y1="8" x2="12.01" y2="8" />
+													</svg>
+													<span>Info</span>
+												</button>
+												<button
+													type="button"
+													class={`${styles.mobileOverflowItem} ${showEffectsPanel.value ? styles.mobileOverflowItemActive : ''}`}
+													onClick={() => {
+														setShowMobileOverflow(false);
+														toggleEffectsPanel();
+													}}
+												>
+													<svg
+														width="18"
+														height="18"
+														viewBox="0 0 24 24"
+														fill="none"
+														stroke="currentColor"
+														stroke-width="2"
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														aria-hidden="true"
+													>
+														<line x1="4" y1="21" x2="4" y2="14" />
+														<line x1="4" y1="10" x2="4" y2="3" />
+														<line x1="12" y1="21" x2="12" y2="12" />
+														<line x1="12" y1="8" x2="12" y2="3" />
+														<line x1="20" y1="21" x2="20" y2="16" />
+														<line x1="20" y1="12" x2="20" y2="3" />
+														<line x1="1" y1="14" x2="7" y2="14" />
+														<line x1="9" y1="8" x2="15" y2="8" />
+														<line x1="17" y1="16" x2="23" y2="16" />
+													</svg>
+													<span>Effects</span>
+												</button>
+												<button
+													type="button"
+													class={styles.mobileOverflowItem}
+													onClick={() => {
+														toggleMute();
+													}}
+												>
+													<VolumeIcon />
+													<span>{isMuted.value ? 'Unmute' : 'Mute'}</span>
+												</button>
+												<button
+													type="button"
+													class={styles.mobileOverflowItem}
+													onClick={() => {
+														setShowMobileOverflow(false);
+														onToggleFullscreen();
+													}}
+													aria-label="Maximize player"
+												>
+													<svg
+														width="18"
+														height="18"
+														viewBox="0 0 24 24"
+														fill="none"
+														stroke="currentColor"
+														stroke-width="2"
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														aria-hidden="true"
+													>
+														<polyline points="18 15 12 9 6 15" />
+													</svg>
+													<span>Maximize</span>
+												</button>
+											</div>
+										)}
+									</div>
 								)}
-							</button>
+
+								{/* Fullscreen */}
+								<button
+									class={styles.controlBtn}
+									onClick={onToggleFullscreen}
+									aria-label={
+										hasMiniThumbnail
+											? 'Maximize player'
+											: isFullscreen.value
+												? 'Exit fullscreen'
+												: 'Enter fullscreen'
+									}
+									title={
+										hasMiniThumbnail
+											? 'Maximize'
+											: isFullscreen.value
+												? 'Exit fullscreen'
+												: 'Fullscreen'
+									}
+								>
+									{hasMiniThumbnail ? (
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="white"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="18 15 12 9 6 15" />
+										</svg>
+									) : isFullscreen.value ? (
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="white"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+										</svg>
+									) : (
+										<svg
+											width="20"
+											height="20"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="white"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+										</svg>
+									)}
+								</button>
+							</div>
 						</div>
 					</div>
 				</div>
 			</div>
-		</div>
-		{spritePreview}
-		{shareMenu &&
-			createPortal(
-				<div
-					class={styles.shareMenu}
-					style={{ left: `${shareMenu.x}px`, top: `${shareMenu.y}px` }}
-					onMouseDown={(e) => e.stopPropagation()}
-					onContextMenu={(e) => e.preventDefault()}
-				>
-					<div class={styles.shareMenuLabel}>Copy URL at {formatTime(shareMenu.time)}</div>
-					<div class={styles.shareMenuActions}>
-						<button
-							type="button"
-							class={styles.shareMenuBtn}
-							disabled={shareBusy}
-							onClick={() => copyShareAtTime('public')}
-						>
-							Public
-						</button>
-						<button
-							type="button"
-							class={styles.shareMenuBtn}
-							disabled={shareBusy}
-							onClick={() => copyShareAtTime('private')}
-						>
-							Private
-						</button>
-					</div>
-				</div>,
-				document.body,
-			)}
+			{spritePreview}
+			{shareMenu &&
+				createPortal(
+					<div
+						class={styles.shareMenu}
+						style={{ left: `${shareMenu.x}px`, top: `${shareMenu.y}px` }}
+						onMouseDown={(e) => e.stopPropagation()}
+						onContextMenu={(e) => e.preventDefault()}
+						onMouseEnter={() => {
+							shareMenuHover.current = true;
+						}}
+						onMouseLeave={() => {
+							shareMenuHover.current = false;
+						}}
+					>
+						<div class={styles.shareMenuLabel}>
+							Copy URL at {formatTime(shareMenu.time)}
+						</div>
+						<div class={styles.shareMenuActions}>
+							<Tooltip label="Copies a public link anyone can watch" delay={1000}>
+								<button
+									type="button"
+									class={styles.shareMenuBtn}
+									disabled={shareBusy}
+									onClick={() => copyShareAtTime('public')}
+								>
+									<Icon name="globe" size={14} />
+									Public
+								</button>
+							</Tooltip>
+							<Tooltip label="Copies a link for logged-in users" delay={1000}>
+								<button
+									type="button"
+									class={styles.shareMenuBtn}
+									disabled={shareBusy}
+									onClick={() => copyShareAtTime('private')}
+								>
+									<Icon name="lock" size={14} />
+									Private
+								</button>
+							</Tooltip>
+						</div>
+					</div>,
+					document.body,
+				)}
 		</>
 	);
 }
