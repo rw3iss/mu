@@ -23,7 +23,7 @@ export const FEEDBACK_REPLY_TEMPLATE = `<!doctype html>
         {{{closing}}}
       </div>
       <div style="padding:14px 24px;background:#1b2030;border-top:1px solid #232838;font-size:12px;color:#6b7488;">
-        This message was sent from your Mu server.
+        {{{footer}}}
       </div>
     </div>
   </body>

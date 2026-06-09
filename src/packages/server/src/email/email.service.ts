@@ -32,6 +32,8 @@ export interface FeedbackReplyData {
 	resolved: boolean;
 	/** Display name of the admin responding (used in the reply intro). */
 	adminName: string;
+	/** Public web URL of the server (footer link); empty → no link. */
+	siteUrl?: string;
 }
 
 interface EmailAttachment {
@@ -148,6 +150,11 @@ export class EmailService {
 			? '<p style="margin:20px 0 0;line-height:1.6;color:#e7e9ee;">Thanks a lot for helping to make Mu better! — Mu</p>'
 			: '';
 
+		const siteUrl = (data.siteUrl ?? '').trim();
+		const footer = siteUrl
+			? `&copy; Mu — <a href="${escapeHtml(siteUrl)}" style="color:#8ab4ff;text-decoration:none;">${escapeHtml(siteUrl)}</a>`
+			: '&copy; Mu';
+
 		const html = renderTemplate(FEEDBACK_REPLY_TEMPLATE, {
 			heading,
 			intro,
@@ -156,6 +163,7 @@ export class EmailService {
 			originalBody: escapeMultiline(data.originalBody),
 			replyBlock,
 			closing,
+			footer,
 		});
 
 		await this.send({

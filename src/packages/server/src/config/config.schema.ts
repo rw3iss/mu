@@ -231,6 +231,9 @@ export const configSchema = z.object({
 			brevoApiKey: z.string().default(''),
 			/** Resend (https://resend.com) transactional email API key. */
 			resendApiKey: z.string().default(''),
+			/** Public web URL for email footer links. Empty → derived from the
+			 *  page the feedback was sent from, else https://<tls.hostname>. */
+			siteUrl: z.string().default(''),
 		})
 		.default(() => ({}) as any),
 

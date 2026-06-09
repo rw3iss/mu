@@ -164,6 +164,7 @@ export class FeedbackService {
 				replyMessage: message || null,
 				resolved: opts.resolve,
 				adminName,
+				siteUrl: this.siteUrl(row.pageUrl),
 			});
 			return { status, emailed: true };
 		} catch (err) {
@@ -174,6 +175,25 @@ export class FeedbackService {
 			if (!opts.resolve) throw new BadRequestException(emailError);
 			return { status, emailed: false, emailError };
 		}
+	}
+
+	/**
+	 * The server's public web URL for the email footer link. Prefers an explicit
+	 * `email.siteUrl` override, else the origin of the page the feedback was
+	 * submitted from (i.e. where it was sent from), else https://<tls.hostname>.
+	 */
+	private siteUrl(pageUrl?: string | null): string {
+		const configured = this.config.get<string>('email.siteUrl', '')?.trim();
+		if (configured) return configured.replace(/\/+$/, '');
+		if (pageUrl) {
+			try {
+				return new URL(pageUrl).origin;
+			} catch {
+				/* fall through */
+			}
+		}
+		const hostname = this.config.get<string>('tls.hostname');
+		return hostname ? `https://${hostname}` : '';
 	}
 
 	private adminDisplayName(userId: string): string {

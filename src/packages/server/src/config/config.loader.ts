@@ -207,6 +207,7 @@ export function loadConfig(): MuConfig {
 	if (E.MU_EMAIL_ADMIN_EMAIL) emailEnv.adminEmail = E.MU_EMAIL_ADMIN_EMAIL;
 	if (E.MU_EMAIL_RESEND_API_KEY) emailEnv.resendApiKey = E.MU_EMAIL_RESEND_API_KEY;
 	if (E.MU_EMAIL_BREVO_API_KEY) emailEnv.brevoApiKey = E.MU_EMAIL_BREVO_API_KEY;
+	if (E.MU_EMAIL_SITE_URL) emailEnv.siteUrl = E.MU_EMAIL_SITE_URL;
 	if (Object.keys(emailEnv).length > 0) {
 		merged.email = { ...((merged.email as Record<string, unknown>) ?? {}), ...emailEnv };
 	}
