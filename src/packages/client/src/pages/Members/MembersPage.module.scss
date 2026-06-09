@@ -1,7 +1,7 @@
 .page {
 	padding: var(--space-lg);
 	padding-bottom: calc(var(--space-2xl) + var(--mobile-nav-height));
-	max-width: 1100px;
+	max-width: 1500px;
 	margin: 0 auto;
 }
 
@@ -37,8 +37,23 @@
 
 .grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 	gap: var(--item-gap);
+	// Explicit column counts cap the row at 4 and step down cleanly. Using
+	// auto-fill instead pads the row with empty "ghost" tracks when there
+	// are fewer members than columns fit — which is what we're avoiding.
+	grid-template-columns: 1fr;
+
+	@media (min-width: 768px) {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	@media (min-width: 1100px) {
+		grid-template-columns: repeat(3, 1fr);
+	}
+
+	@media (min-width: 1500px) {
+		grid-template-columns: repeat(4, 1fr);
+	}
 }
 
 .card {
