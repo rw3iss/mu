@@ -203,3 +203,57 @@
 	color: var(--color-text-muted);
 	font-size: var(--font-size-sm);
 }
+
+/* ── Respond / reply form ─────────────────────────────────────────── */
+.respondBar {
+	margin-top: var(--space-md);
+	padding-top: var(--space-md);
+	border-top: 1px solid var(--color-border);
+}
+
+.respondForm {
+	margin-top: var(--space-md);
+	padding-top: var(--space-md);
+	border-top: 1px solid var(--color-border);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-sm);
+}
+
+.replyInput {
+	width: 100%;
+	box-sizing: border-box;
+	resize: vertical;
+	min-height: 88px;
+	padding: var(--space-sm) var(--space-md);
+	background: var(--color-bg-input, rgba(255, 255, 255, 0.04));
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	color: var(--color-text-primary);
+	font-family: inherit;
+	font-size: var(--font-size-sm);
+	line-height: 1.5;
+
+	&:focus {
+		outline: none;
+		border-color: var(--color-accent);
+	}
+}
+
+.respondActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-sm);
+}
+
+.formError {
+	margin: 0;
+	color: var(--color-error);
+	font-size: var(--font-size-sm);
+}
+
+.formHint {
+	margin: 0;
+	color: var(--color-text-muted);
+	font-size: var(--font-size-xs);
+}

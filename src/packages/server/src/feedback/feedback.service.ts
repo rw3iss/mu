@@ -1,11 +1,19 @@
 import crypto from 'node:crypto';
-import { nowISO } from '@mu/shared';
-import { Injectable } from '@nestjs/common';
+import { nowISO, resolveDisplayName } from '@mu/shared';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { type Feedback, feedback } from '../database/schema/index.js';
+import { type Feedback, feedback, users } from '../database/schema/index.js';
 import { EmailService } from '../email/email.service.js';
+
+/** Result of an admin respond action (resolve and/or reply). */
+export interface RespondResult {
+	status: string;
+	emailed: boolean;
+	/** Set when the email couldn't be sent on a resolve-and-reply (soft warning). */
+	emailError?: string;
+}
 
 export interface CreateFeedbackInput {
 	name?: string | null;
@@ -100,6 +108,67 @@ export class FeedbackService {
 			.where(eq(feedback.id, id))
 			.run();
 		return res.changes > 0;
+	}
+
+	/**
+	 * Admin action: optionally resolve the ticket and email the submitter a
+	 * reply/resolution. A plain reply (resolve=false) REQUIRES a message and a
+	 * deliverable email — it hard-fails otherwise. A resolve-and-reply always
+	 * resolves first; if the email can't be sent (no address / not configured)
+	 * it returns a soft `emailError` rather than undoing the resolve.
+	 */
+	async respond(
+		id: string,
+		opts: { resolve: boolean; message?: string | null; adminUserId: string },
+	): Promise<RespondResult> {
+		const row = this.get(id);
+		if (!row) throw new NotFoundException('Feedback not found');
+
+		const message = (opts.message ?? '').trim();
+		if (!opts.resolve && !message) {
+			throw new BadRequestException('Enter a reply message.');
+		}
+
+		let status = row.status;
+		if (opts.resolve) {
+			this.setStatus(id, 'resolved');
+			status = 'resolved';
+		}
+
+		const to = (row.email ?? '').trim();
+		const adminName = this.adminDisplayName(opts.adminUserId);
+
+		try {
+			if (!to) {
+				throw new Error('This submitter didn’t provide an email address.');
+			}
+			await this.email.sendFeedbackReply({
+				to,
+				feedbackId: row.id,
+				reportedAt: row.createdAt,
+				originalBody: row.description,
+				replyMessage: message || null,
+				resolved: opts.resolve,
+				adminName,
+			});
+			return { status, emailed: true };
+		} catch (err) {
+			const emailError = (err as Error).message;
+			// A plain reply that can't be delivered is a hard failure (nothing
+			// else changed). A resolve-and-reply keeps the resolve, warns about
+			// the email.
+			if (!opts.resolve) throw new BadRequestException(emailError);
+			return { status, emailed: false, emailError };
+		}
+	}
+
+	private adminDisplayName(userId: string): string {
+		const u = this.database.db
+			.select({ username: users.username, displayName: users.displayName })
+			.from(users)
+			.where(eq(users.id, userId))
+			.get();
+		return u ? resolveDisplayName(u) : 'A Mu administrator';
 	}
 
 	remove(id: string): boolean {

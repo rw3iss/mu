@@ -103,6 +103,26 @@ export class FeedbackController {
 		return { ok: true };
 	}
 
+	/**
+	 * Resolve and/or reply to a feedback ticket, emailing the submitter.
+	 * `resolve:true` + no/empty message → resolution email. `resolve:false` →
+	 * a plain reply (message required, must be deliverable).
+	 */
+	@RequireAction('admin:server')
+	@Post(':id/respond')
+	async respond(
+		@Param('id') id: string,
+		@Body() body: { resolve?: boolean; message?: string },
+		@CurrentUser('id') adminUserId: string,
+	) {
+		const result = await this.feedback.respond(id, {
+			resolve: !!body?.resolve,
+			message: body?.message ?? null,
+			adminUserId,
+		});
+		return { ok: true, ...result };
+	}
+
 	@RequireAction('admin:server')
 	@Delete(':id')
 	remove(@Param('id') id: string) {

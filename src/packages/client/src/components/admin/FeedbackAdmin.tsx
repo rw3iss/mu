@@ -18,7 +18,72 @@ export function FeedbackAdmin() {
 	const [expandedId, setExpandedId] = useState<string | null>(null);
 	const [details, setDetails] = useState<Record<string, FeedbackDetail>>({});
 	const [busy, setBusy] = useState(false);
+	// Respond form (one open at a time, keyed to the expanded item).
+	const [respondingId, setRespondingId] = useState<string | null>(null);
+	const [replyText, setReplyText] = useState('');
+	const [formError, setFormError] = useState<string | null>(null);
+	const [acting, setActing] = useState(false);
 	const { confirm, dialog } = useConfirm();
+
+	const openRespond = (id: string) => {
+		setRespondingId(id);
+		setReplyText('');
+		setFormError(null);
+	};
+	const closeRespond = () => {
+		setRespondingId(null);
+		setReplyText('');
+		setFormError(null);
+	};
+
+	const setStatusLocal = (id: string, status: string) =>
+		setItems((list) => list.map((f) => (f.id === id ? { ...f, status } : f)));
+
+	const markResolved = async (id: string) => {
+		setActing(true);
+		setFormError(null);
+		try {
+			await feedbackService.setStatus(id, 'resolved');
+			setStatusLocal(id, 'resolved');
+			notifySuccess('Marked resolved');
+			closeRespond();
+		} catch {
+			setFormError('Failed to mark resolved.');
+		} finally {
+			setActing(false);
+		}
+	};
+
+	const respond = async (id: string, resolve: boolean) => {
+		if (!resolve && !replyText.trim()) {
+			setFormError('Enter a reply message.');
+			return;
+		}
+		setActing(true);
+		setFormError(null);
+		try {
+			const res = await feedbackService.respond(id, {
+				resolve,
+				message: replyText.trim() || undefined,
+			});
+			if (resolve) setStatusLocal(id, res.status);
+			if (res.emailed) {
+				notifySuccess(resolve ? 'Resolved & reply sent' : 'Reply sent');
+				closeRespond();
+			} else {
+				// Only a resolve-and-reply reaches here (a plain reply throws when
+				// it can't send). The resolve stuck; warn about the email.
+				notifySuccess('Marked resolved');
+				setFormError(
+					`Resolved, but the reply email wasn't sent: ${res.emailError ?? 'unknown reason'}`,
+				);
+			}
+		} catch (err) {
+			setFormError((err as Error)?.message || 'Something went wrong.');
+		} finally {
+			setActing(false);
+		}
+	};
 
 	const load = async () => {
 		setLoading(true);
@@ -210,6 +275,71 @@ export function FeedbackAdmin() {
 													<Spinner size="sm" /> Loading screenshot…
 												</div>
 											))}
+
+										{respondingId === f.id ? (
+											<div class={styles.respondForm}>
+												<textarea
+													class={styles.replyInput}
+													value={replyText}
+													onInput={(e) =>
+														setReplyText((e.target as HTMLTextAreaElement).value)
+													}
+													placeholder="Write a reply to the user (optional when resolving)…"
+													rows={4}
+												/>
+												{!f.email && (
+													<p class={styles.formHint}>
+														This submitter didn't provide an email — a reply can't be
+														delivered, but you can still mark it resolved.
+													</p>
+												)}
+												{formError && <p class={styles.formError}>{formError}</p>}
+												<div class={styles.respondActions}>
+													<Button
+														variant="secondary"
+														size="sm"
+														loading={acting}
+														onClick={() => markResolved(f.id)}
+													>
+														Mark Resolved
+													</Button>
+													<Button
+														variant="primary"
+														size="sm"
+														loading={acting}
+														onClick={() => respond(f.id, true)}
+													>
+														Resolve and Reply
+													</Button>
+													<Button
+														variant="primary"
+														size="sm"
+														loading={acting}
+														onClick={() => respond(f.id, false)}
+													>
+														Reply
+													</Button>
+													<Button
+														variant="ghost"
+														size="sm"
+														disabled={acting}
+														onClick={closeRespond}
+													>
+														Cancel
+													</Button>
+												</div>
+											</div>
+										) : (
+											<div class={styles.respondBar}>
+												<Button
+													variant="secondary"
+													size="sm"
+													onClick={() => openRespond(f.id)}
+												>
+													Respond
+												</Button>
+											</div>
+										)}
 									</div>
 								)}
 							</div>

@@ -65,6 +65,18 @@ export const feedbackService = {
 		return api.patch(`/feedback/${id}`, { status });
 	},
 
+	/**
+	 * Admin: resolve and/or reply to a ticket, emailing the submitter.
+	 * `resolve` toggles closing the ticket; `message` is the reply body
+	 * (required when not resolving).
+	 */
+	respond(
+		id: string,
+		body: { resolve: boolean; message?: string },
+	): Promise<{ ok: boolean; status: string; emailed: boolean; emailError?: string }> {
+		return api.post(`/feedback/${id}/respond`, body);
+	},
+
 	/** Admin: delete one entry. */
 	remove(id: string): Promise<{ ok: boolean }> {
 		return api.delete(`/feedback/${id}`);

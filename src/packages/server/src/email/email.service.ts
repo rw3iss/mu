@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '../config/config.service.js';
-import { escapeMultiline, renderTemplate } from './template-renderer.js';
+import { escapeHtml, escapeMultiline, renderTemplate } from './template-renderer.js';
 import { FEEDBACK_NOTIFICATION_TEMPLATE } from './templates/feedback-notification.template.js';
+import { FEEDBACK_REPLY_TEMPLATE } from './templates/feedback-reply.template.js';
 
 /** Strict input for the feedback-notification template. */
 export interface FeedbackNotificationData {
@@ -14,6 +15,23 @@ export interface FeedbackNotificationData {
 	screenshot?: { dataUrl: string; name: string } | null;
 	/** Absolute URL to the admin feedback manager. */
 	adminUrl: string;
+}
+
+/** Input for the resolution/reply email sent to a feedback submitter. */
+export interface FeedbackReplyData {
+	/** Submitter's email address. */
+	to: string;
+	feedbackId: string;
+	/** When the feedback was originally reported (ISO). */
+	reportedAt: string;
+	/** The original feedback text, quoted back to the submitter. */
+	originalBody: string;
+	/** The admin's optional written message. */
+	replyMessage?: string | null;
+	/** True when this also resolves the ticket (vs. a plain reply). */
+	resolved: boolean;
+	/** Display name of the admin responding (used in the reply intro). */
+	adminName: string;
 }
 
 interface EmailAttachment {
@@ -83,6 +101,60 @@ export class EmailService {
 			// Never let an email failure break feedback submission.
 			this.logger.warn(`Feedback notification email failed: ${err?.message ?? err}`);
 		}
+	}
+
+	/**
+	 * Email a feedback submitter a resolution and/or reply. Unlike the admin
+	 * notification this DOES throw when it can't send (no email config / no API
+	 * key / provider error) so the caller can surface the failure to the admin.
+	 */
+	async sendFeedbackReply(data: FeedbackReplyData): Promise<void> {
+		if (!this.isConfigured) {
+			throw new Error('Email is disabled or no admin address is set (server email config).');
+		}
+		const provider = this.config.get<string>('email.provider', 'brevo');
+		if (provider === 'brevo' && !this.config.get<string>('email.brevoApiKey')) {
+			throw new Error('Brevo API key is not configured.');
+		}
+
+		const reportedAt = this.formatDate(data.reportedAt);
+		const heading = data.resolved ? 'Your feedback has been resolved' : 'Response to your feedback';
+		const intro = data.resolved
+			? 'A note from the Mu administrator — your feedback ticket has been resolved.'
+			: `${escapeHtml(data.adminName || 'A Mu administrator')} has responded to your feedback submission:`;
+
+		const msg = (data.replyMessage ?? '').trim();
+		const replyBlock = msg
+			? `<div style="margin-top:16px;"><div style="margin:0 0 4px;font-size:12px;color:#9aa3b5;">Message</div><div style="padding:14px 16px;background:#11233a;border:1px solid #233a57;border-radius:6px;line-height:1.6;color:#e7e9ee;">${escapeMultiline(msg)}</div></div>`
+			: '';
+		const closing = data.resolved
+			? '<p style="margin:20px 0 0;line-height:1.6;color:#e7e9ee;">Thanks a lot for helping to make Mu better! — Mu</p>'
+			: '';
+
+		const html = renderTemplate(FEEDBACK_REPLY_TEMPLATE, {
+			heading,
+			intro,
+			ticketId: data.feedbackId.slice(0, 8),
+			reportedAt,
+			originalBody: escapeMultiline(data.originalBody),
+			replyBlock,
+			closing,
+		});
+
+		await this.send({
+			to: data.to,
+			subject: data.resolved ? 'Your Mu feedback has been resolved' : 'Re: your Mu feedback',
+			html,
+			attachments: [],
+		});
+		this.logger.log(`Sent feedback ${data.resolved ? 'resolution' : 'reply'} to ${data.to}`);
+	}
+
+	private formatDate(iso: string): string {
+		const d = new Date(iso);
+		return Number.isNaN(d.getTime())
+			? iso
+			: d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 	}
 
 	private async send(opts: {
