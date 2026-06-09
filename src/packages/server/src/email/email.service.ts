@@ -185,10 +185,26 @@ export class EmailService {
 	}
 
 	private async send(opts: SendOpts): Promise<void> {
-		if (this.provider === 'resend') return this.sendViaResend(opts);
-		if (this.provider === 'brevo') return this.sendViaBrevo(opts);
-		// Unknown provider — log and degrade gracefully.
-		this.logger.warn(`Email provider '${this.provider}' is not implemented — not sent (stub)`);
+		const dispatch = (): Promise<void> => {
+			if (this.provider === 'resend') return this.sendViaResend(opts);
+			if (this.provider === 'brevo') return this.sendViaBrevo(opts);
+			this.logger.warn(`Email provider '${this.provider}' is not implemented — not sent (stub)`);
+			return Promise.resolve();
+		};
+		// Retry transient failures (the host's outbound network can blip — a
+		// `fetch failed` to the provider shouldn't drop the message).
+		let lastErr: unknown;
+		for (let attempt = 1; attempt <= 3; attempt++) {
+			try {
+				await dispatch();
+				return;
+			} catch (err) {
+				lastErr = err;
+				this.logger.warn(`Email send attempt ${attempt}/3 failed: ${(err as Error).message}`);
+				if (attempt < 3) await new Promise((r) => setTimeout(r, 600 * attempt));
+			}
+		}
+		throw lastErr;
 	}
 
 	private async sendViaBrevo(opts: SendOpts): Promise<void> {
