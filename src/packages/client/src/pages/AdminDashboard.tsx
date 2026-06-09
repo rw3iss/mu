@@ -1,3 +1,4 @@
+import { resolveDisplayName } from '@mu/shared';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { jobAction, jobListAction } from '@/components/admin/JobBadge';
@@ -727,7 +728,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 							<div key={session.sessionId} class={styles.sessionItem}>
 								<div class={styles.sessionInfo}>
 									<span class={styles.sessionUser}>
-										{session.username || 'Unknown'}
+										{resolveDisplayName(session) || 'Unknown'}
 									</span>
 									<span class={styles.sessionMovie}>
 										{session.movieTitle || 'Unknown'}
@@ -787,7 +788,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 							>
 								<div class={styles.sessionInfo}>
 									<span class={styles.sessionUser}>
-										{entry.username || 'Unknown user'}
+										{resolveDisplayName(entry) || 'Unknown user'}
 									</span>
 									<span class={styles.sessionMovie}>
 										{entry.movieTitle || 'Unknown movie'}

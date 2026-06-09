@@ -1,4 +1,4 @@
-import type { UserRole } from '@mu/shared';
+import { type UserRole, resolveDisplayName } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Select } from '@/components/common/Select';
@@ -14,6 +14,7 @@ import styles from './Users.module.scss';
 interface UserRow {
 	id: string;
 	username: string;
+	displayName?: string | null;
 	email: string | null;
 	role: UserRole;
 	createdAt: string;
@@ -170,7 +171,10 @@ export function Users() {
 					{users.map((u) => (
 						<tr key={u.id}>
 							<td>
-								{u.username}
+								{resolveDisplayName(u)}
+								{u.displayName?.trim() && u.displayName.trim() !== u.username ? (
+									<span class={styles.subtle}> @{u.username}</span>
+								) : null}
 								{u.id === me?.id ? <span class={styles.selfBadge}>you</span> : null}
 							</td>
 							<td>{u.email ?? '—'}</td>

@@ -430,6 +430,7 @@ const alters = [
 	'ALTER TABLE users ADD COLUMN description TEXT',
 	'ALTER TABLE users ADD COLUMN profile_public INTEGER DEFAULT 0',
 	'ALTER TABLE users ADD COLUMN last_login_at TEXT',
+	'ALTER TABLE users ADD COLUMN display_name TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_url TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_aspect_ratio REAL',
 	'ALTER TABLE movies ADD COLUMN hidden INTEGER DEFAULT 0',
@@ -473,6 +474,24 @@ try {
 	}
 } catch (e) {
 	console.warn(`Role migration skipped: ${e.message}`);
+}
+
+// One-time: make all existing profiles public (the new default). Guarded by a
+// settings marker so a user who later chooses "private" isn't forced back to
+// public on every subsequent migrate run.
+try {
+	const marker = db
+		.prepare(`SELECT value FROM settings WHERE key = 'migration_profiles_public_v1'`)
+		.get();
+	if (!marker) {
+		const res = db.prepare(`UPDATE users SET profile_public = 1`).run();
+		db.prepare(
+			`INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('migration_profiles_public_v1', 'done', ?)`,
+		).run(new Date().toISOString());
+		console.log(`Made ${res.changes} existing profile(s) public (one-time)`);
+	}
+} catch (e) {
+	console.warn(`Profile-public migration skipped: ${e.message}`);
 }
 
 // Seed built-in curated themes from the canonical catalogue.

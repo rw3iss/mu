@@ -32,6 +32,7 @@ export class AuthService {
 				email: data.email ?? null,
 				passwordHash,
 				role: 'admin',
+				profilePublic: true,
 				createdAt: now,
 				updatedAt: now,
 			})
@@ -83,6 +84,7 @@ export class AuthService {
 			.select({
 				id: users.id,
 				username: users.username,
+				displayName: users.displayName,
 				email: users.email,
 				role: users.role,
 				avatarUrl: users.avatarUrl,

@@ -15,6 +15,7 @@ export interface StreamSession {
 	sessionId: string;
 	userId: string;
 	username: string;
+	displayName?: string | null;
 	movieId: string;
 	movieTitle: string;
 	position: number;

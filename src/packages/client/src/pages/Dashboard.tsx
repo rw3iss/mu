@@ -1,3 +1,4 @@
+import { resolveDisplayName } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
@@ -72,7 +73,7 @@ export function Dashboard(_props: DashboardProps) {
 					Welcome back
 					{user && (
 						<>
-							, <span class={styles.welcomeUser}>{user.username}</span>
+							, <span class={styles.welcomeUser}>{resolveDisplayName(user)}</span>
 						</>
 					)}
 				</p>

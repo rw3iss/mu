@@ -29,6 +29,7 @@ export interface ActiveSession {
 	sessionId: string;
 	userId: string;
 	username: string;
+	displayName?: string | null;
 	movieId: string;
 	movieTitle: string;
 	position: number;
@@ -44,6 +45,7 @@ export interface SessionHistoryEntry {
 	id: string;
 	userId: string;
 	username: string | null;
+	displayName?: string | null;
 	movieId: string;
 	movieTitle: string | null;
 	movieYear: number | null;

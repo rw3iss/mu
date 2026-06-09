@@ -15,6 +15,8 @@ export interface ProfileSystemConfig {
 export interface ProfileUser {
 	id: string;
 	username: string;
+	/** Friendly name shown in place of the username when set. */
+	displayName: string | null;
 	role: string;
 	avatarUrl: string | null;
 	description: string | null;
@@ -89,6 +91,8 @@ export interface ProfileView {
 export interface MemberSummary {
 	id: string;
 	username: string;
+	/** Friendly name shown in place of the username when set. */
+	displayName: string | null;
 	role: string;
 	avatarUrl: string | null;
 	description: string | null;
@@ -108,9 +112,20 @@ export interface UpdateProfileInput {
 	description?: string;
 	profilePublic?: boolean;
 	avatarUrl?: string | null;
+	displayName?: string | null;
 	username?: string;
 	email?: string | null;
 }
 
 /** Max length of the profile description blurb. */
 export const PROFILE_DESCRIPTION_MAX = 500;
+
+/** Max length of the display name. */
+export const DISPLAY_NAME_MAX = 60;
+
+/** The name to show for a user: their display name when set, else username. */
+export function resolveDisplayName(
+	user: { displayName?: string | null; username?: string | null } | null | undefined,
+): string {
+	return (user?.displayName?.trim() || user?.username || '').trim();
+}

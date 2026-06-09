@@ -1,4 +1,4 @@
-import type { CurrentlyWatching, MemberSummary } from '@mu/shared';
+import { type CurrentlyWatching, type MemberSummary, resolveDisplayName } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Avatar } from '@/components/common/Avatar';
@@ -66,9 +66,9 @@ export function MembersPage(_props: MembersPageProps) {
 							}}
 						>
 							<div class={styles.cardHead}>
-								<Avatar name={m.username} src={m.avatarUrl} size={48} />
+								<Avatar name={resolveDisplayName(m)} src={m.avatarUrl} size={48} />
 								<div class={styles.cardId}>
-									<span class={styles.cardName}>{m.username}</span>
+									<span class={styles.cardName}>{resolveDisplayName(m)}</span>
 									<span class={styles.cardRole}>
 										<span class={styles.roleText}>
 											{m.role}

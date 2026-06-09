@@ -27,6 +27,24 @@ export const profileService = {
 		return api.patch<ProfileView>('/profile/me', patch);
 	},
 
+	/** Upload a new avatar image (multipart). Returns the refreshed profile. */
+	async uploadAvatar(file: File): Promise<ProfileView> {
+		const form = new FormData();
+		form.append('avatar', file);
+		const token = localStorage.getItem('mu_token');
+		const res = await fetch('/api/v1/profile/me/avatar', {
+			method: 'POST',
+			headers: token ? { Authorization: `Bearer ${token}` } : {},
+			body: form,
+			credentials: 'include',
+		});
+		if (!res.ok) {
+			const body = await res.json().catch(() => ({}) as Record<string, unknown>);
+			throw new Error((body as { message?: string }).message || `Upload failed: ${res.status}`);
+		}
+		return res.json();
+	},
+
 	/** Read the admin master switch (any authed user). */
 	getSystemConfig(): Promise<ProfileSystemConfig> {
 		return api.get<ProfileSystemConfig>('/profile/config');

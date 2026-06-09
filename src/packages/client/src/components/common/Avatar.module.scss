@@ -27,3 +27,36 @@
 .initial {
 	line-height: 1;
 }
+
+// Editable variant — clickable circle that opens a file picker.
+.editable {
+	position: relative;
+	cursor: pointer;
+}
+
+.fileInput {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	width: 100%;
+	height: 100%;
+	cursor: pointer;
+}
+
+.editOverlay {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.45);
+	opacity: 0;
+	transition: opacity var(--transition-fast);
+	pointer-events: none;
+}
+
+.editable:hover .editOverlay,
+.editable:focus-within .editOverlay {
+	opacity: 1;
+}

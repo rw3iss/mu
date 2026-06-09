@@ -271,6 +271,17 @@ async function bootstrap() {
 		limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max subtitle file
 	});
 
+	// Serve user uploads (avatars now; chat/comment media later) verbatim at
+	// /uploads/*. Files are written by UploadsService under <dataDir>/uploads.
+	const uploadsDir = config.get<string>('uploads.dir');
+	if (uploadsDir && existsSync(uploadsDir)) {
+		await register(fastifyStatic, {
+			root: uploadsDir,
+			prefix: '/uploads/',
+			decorateReply: false,
+		});
+	}
+
 	// Rate limiting disabled for now
 	// await register(fastifyRateLimit, {
 	//   max: 100,
@@ -300,7 +311,11 @@ async function bootstrap() {
 		// the response Content-Type — any text/html response on a non-API
 		// GET path runs through the injector.
 		fastify.addHook('onSend', async (request, reply, payload) => {
-			if (request.method !== 'GET' || request.url.startsWith('/api/')) {
+			if (
+				request.method !== 'GET' ||
+				request.url.startsWith('/api/') ||
+				request.url.startsWith('/uploads/')
+			) {
 				return payload;
 			}
 			const url = request.url.split('?')[0] ?? '/';

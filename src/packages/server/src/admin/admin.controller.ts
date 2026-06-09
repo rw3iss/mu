@@ -202,6 +202,7 @@ export class AdminController {
 				id: userWatchHistory.id,
 				userId: userWatchHistory.userId,
 				username: users.username,
+				displayName: users.displayName,
 				movieId: userWatchHistory.movieId,
 				movieTitle: movies.title,
 				movieYear: movies.year,

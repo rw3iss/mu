@@ -1,4 +1,9 @@
-import { PROFILE_DESCRIPTION_MAX, type ProfileView } from '@mu/shared';
+import {
+	DISPLAY_NAME_MAX,
+	PROFILE_DESCRIPTION_MAX,
+	type ProfileView,
+	resolveDisplayName,
+} from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Avatar } from '@/components/common/Avatar';
@@ -31,10 +36,11 @@ export function ProfilePage({ username }: ProfilePageProps) {
 
 	// Edit drafts (only used when editMode).
 	const [descDraft, setDescDraft] = useState('');
-	const [avatarDraft, setAvatarDraft] = useState('');
+	const [displayNameDraft, setDisplayNameDraft] = useState('');
 	const [usernameDraft, setUsernameDraft] = useState('');
 	const [emailDraft, setEmailDraft] = useState('');
 	const [saving, setSaving] = useState(false);
+	const [uploadingAvatar, setUploadingAvatar] = useState(false);
 	const [togglingPublic, setTogglingPublic] = useState(false);
 
 	useEffect(() => {
@@ -47,7 +53,7 @@ export function ProfilePage({ username }: ProfilePageProps) {
 				if (cancelled) return;
 				setData(view);
 				setDescDraft(view.user.description ?? '');
-				setAvatarDraft(view.user.avatarUrl ?? '');
+				setDisplayNameDraft(view.user.displayName ?? '');
 				setUsernameDraft(view.user.username);
 				setEmailDraft(view.user.email ?? '');
 			})
@@ -66,7 +72,7 @@ export function ProfilePage({ username }: ProfilePageProps) {
 	const dirty =
 		!!data &&
 		(descDraft !== (data.user.description ?? '') ||
-			avatarDraft !== (data.user.avatarUrl ?? '') ||
+			displayNameDraft !== (data.user.displayName ?? '') ||
 			usernameDraft !== data.user.username ||
 			emailDraft !== (data.user.email ?? ''));
 
@@ -76,7 +82,7 @@ export function ProfilePage({ username }: ProfilePageProps) {
 		try {
 			const view = await profileService.updateMine({
 				description: descDraft,
-				avatarUrl: avatarDraft.trim() || null,
+				displayName: displayNameDraft.trim() || null,
 				username: usernameDraft.trim(),
 				email: emailDraft.trim() || null,
 			});
@@ -86,6 +92,19 @@ export function ProfilePage({ username }: ProfilePageProps) {
 			notifyError((err as Error)?.message || 'Could not save profile');
 		} finally {
 			setSaving(false);
+		}
+	}
+
+	async function handleAvatarSelect(file: File) {
+		setUploadingAvatar(true);
+		try {
+			const view = await profileService.uploadAvatar(file);
+			setData(view);
+			notifySuccess('Avatar updated');
+		} catch (err) {
+			notifyError((err as Error)?.message || 'Could not upload avatar');
+		} finally {
+			setUploadingAvatar(false);
 		}
 	}
 
@@ -173,7 +192,18 @@ export function ProfilePage({ username }: ProfilePageProps) {
 				}
 			>
 				<div class={styles.identity}>
-					<Avatar name={usernameDraft || user.username} src={editMode ? avatarDraft : user.avatarUrl} size={88} />
+					<Avatar
+						name={
+							editMode
+								? resolveDisplayName({ displayName: displayNameDraft, username: usernameDraft })
+								: resolveDisplayName(user)
+						}
+						src={user.avatarUrl}
+						size={88}
+						editable={editMode}
+						uploading={uploadingAvatar}
+						onSelectFile={handleAvatarSelect}
+					/>
 					<div class={styles.identityMain}>
 						{editMode ? (
 							<input
@@ -183,7 +213,7 @@ export function ProfilePage({ username }: ProfilePageProps) {
 								aria-label="Username"
 							/>
 						) : (
-							<h1 class={styles.name}>{user.username}</h1>
+							<h1 class={styles.name}>{resolveDisplayName(user)}</h1>
 						)}
 						<div class={styles.subline}>
 							<span class={styles.role}>{user.role}</span>
@@ -211,12 +241,13 @@ export function ProfilePage({ username }: ProfilePageProps) {
 				{editMode && (
 					<div class={styles.editFields}>
 						<label class={styles.field}>
-							<span class={styles.fieldLabel}>Avatar image URL</span>
+							<span class={styles.fieldLabel}>Display name</span>
 							<input
 								class={styles.input}
-								value={avatarDraft}
-								placeholder="https://…"
-								onInput={(e) => setAvatarDraft((e.target as HTMLInputElement).value)}
+								value={displayNameDraft}
+								maxLength={DISPLAY_NAME_MAX}
+								placeholder="Shown across the site (defaults to your username)"
+								onInput={(e) => setDisplayNameDraft((e.target as HTMLInputElement).value)}
 							/>
 						</label>
 						<label class={styles.field}>

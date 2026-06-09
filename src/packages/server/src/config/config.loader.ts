@@ -231,12 +231,21 @@ export function loadConfig(): MuConfig {
 		parsed.cache.hot.dir = join(cacheRoot, 'hot');
 	}
 
+	// Public uploads root (avatars, future chat/comment media). Empty →
+	// `<dataDir>/uploads`. Served verbatim at `/uploads/*`.
+	const uploadsRoot = parsed.uploads.dir
+		? resolve(parsed.uploads.dir)
+		: join(resolvedDataDir, 'uploads');
+	parsed.uploads.dir = uploadsRoot;
+
 	// Ensure all required data directories exist.
 	const dirs = [
 		resolvedDataDir,
 		resolve(resolvedDataDir, 'db'),
 		resolve(resolvedDataDir, 'config'),
 		resolve(resolvedDataDir, 'thumbnails'),
+		uploadsRoot,
+		resolve(uploadsRoot, 'avatars'),
 		cacheRoot,
 		parsed.cache.streamDir,
 		parsed.cache.imageDir,

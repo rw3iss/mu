@@ -1,3 +1,4 @@
+import { resolveDisplayName } from '@mu/shared';
 import { JSX } from 'preact';
 import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
@@ -269,9 +270,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 						class={styles.userLink}
 						title="Your profile"
 					>
-						<div class={styles.avatar}>{user.username.charAt(0).toUpperCase()}</div>
+						<div class={styles.avatar}>
+							{resolveDisplayName(user).charAt(0).toUpperCase()}
+						</div>
 						<div class={styles.userDetails}>
-							<span class={styles.userName}>{user.username}</span>
+							<span class={styles.userName}>{resolveDisplayName(user)}</span>
 							<span class={styles.userRole}>{user.role}</span>
 						</div>
 					</Link>

@@ -87,6 +87,18 @@ export const configSchema = z.object({
 		})
 		.default(() => ({}) as any),
 
+	uploads: z
+		.object({
+			/**
+			 * Public uploads root — user-provided files served verbatim at
+			 * `/uploads/*` (avatars now; chat/comment media later). Empty →
+			 * `<dataDir>/uploads`. Each kind lives in its own subdir
+			 * (`avatars/`, …). Keep this OFF a slow media HDD if possible.
+			 */
+			dir: z.string().default(''),
+		})
+		.default(() => ({}) as any),
+
 	auth: z.object({
 		jwtSecret: z.string().min(32),
 		jwtExpiresIn: z.string().default('7d'),

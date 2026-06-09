@@ -1,4 +1,4 @@
-import { PROFILE_DESCRIPTION_MAX } from '@mu/shared';
+import { DISPLAY_NAME_MAX, PROFILE_DESCRIPTION_MAX } from '@mu/shared';
 import type {
 	CurrentlyWatching,
 	MemberSummary,
@@ -23,6 +23,7 @@ import { favorites as favoritesTable, movies, streamSessions, users } from '../d
 import { FavoritesService } from '../favorites/favorites.service.js';
 import { HistoryService } from '../movies/history.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { UploadsService } from '../uploads/uploads.service.js';
 
 /** A "watching now" session counts only if it was active within this window. */
 const ACTIVE_SESSION_WINDOW_MS = 3 * 60 * 1000;
@@ -42,6 +43,7 @@ export class ProfileService {
 		private readonly history: HistoryService,
 		private readonly settings: SettingsService,
 		private readonly authCache: AuthCacheService,
+		private readonly uploads: UploadsService,
 	) {}
 
 	// ── System setting ────────────────────────────────────────────────────
@@ -96,6 +98,7 @@ export class ProfileService {
 			const summary: MemberSummary = {
 				id: u.id,
 				username: u.username,
+				displayName: u.displayName ?? null,
 				role: u.role,
 				avatarUrl: u.avatarUrl ?? null,
 				description: u.description ?? null,
@@ -127,6 +130,13 @@ export class ProfileService {
 		}
 		if (patch.profilePublic !== undefined) update.profilePublic = !!patch.profilePublic;
 		if (patch.avatarUrl !== undefined) update.avatarUrl = patch.avatarUrl?.toString().trim() || null;
+		if (patch.displayName !== undefined) {
+			const name = (patch.displayName ?? '').toString().trim();
+			if (name.length > DISPLAY_NAME_MAX) {
+				throw new BadRequestException(`Display name must be ${DISPLAY_NAME_MAX} characters or fewer`);
+			}
+			update.displayName = name || null;
+		}
 		if (patch.username !== undefined) {
 			const username = patch.username.toString().trim();
 			if (!username) throw new BadRequestException('Username cannot be empty');
@@ -149,6 +159,31 @@ export class ProfileService {
 		return this.getOwnProfile(userId);
 	}
 
+	/**
+	 * Store an uploaded avatar image and point the user's row at it, removing
+	 * the previous uploaded avatar (if any) so old files don't accumulate.
+	 */
+	async setUploadedAvatar(userId: string, buffer: Buffer, mimetype: string): Promise<ProfileView> {
+		const user = this.findUserById(userId);
+		if (!user) throw new NotFoundException('User not found');
+		if (!this.uploads.isSupportedImage(mimetype)) {
+			throw new BadRequestException('Avatar must be an image (jpg, png, webp, gif, or avif)');
+		}
+
+		const url = await this.uploads.saveImage(buffer, mimetype, 'avatars');
+		this.database.db
+			.update(users)
+			.set({ avatarUrl: url, updatedAt: new Date().toISOString() })
+			.where(eq(users.id, userId))
+			.run();
+
+		// Clean up the prior avatar if it was one we hosted.
+		await this.uploads.deleteByUrl(user.avatarUrl);
+		this.authCache.invalidateUser(userId);
+
+		return this.getOwnProfile(userId);
+	}
+
 	// ── Aggregation ───────────────────────────────────────────────────────
 
 	private async buildProfile(
@@ -158,6 +193,7 @@ export class ProfileService {
 		const profileUser: ProfileUser = {
 			id: user.id,
 			username: user.username,
+			displayName: user.displayName ?? null,
 			role: user.role,
 			avatarUrl: user.avatarUrl ?? null,
 			description: user.description ?? null,

@@ -15,6 +15,7 @@ export type UserRole = 'admin' | 'contributor' | 'viewer';
 export interface User {
 	id: string;
 	username: string;
+	displayName?: string | null;
 	email: string;
 	role: UserRole;
 	avatarUrl?: string;

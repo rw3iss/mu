@@ -107,6 +107,7 @@ NestJS modules in `packages/server/src/`:
 | `remote` | Remote server federation |
 | `settings` | App-wide settings |
 | `media` | Poster/backdrop image proxying |
+| `uploads` | Public user-file store. `UploadsService.saveImage(buffer, mime, subdir)` writes under `<dataDir>/uploads/<subdir>/` and returns a `/uploads/...` URL served verbatim by Fastify static (`main.ts`). Avatars use `avatars/`; reuse the pattern for future chat/comment media. `@Global`. |
 | `people` | Canonical person rows (TMDB-backed, cached). Powers `/person/:key` detail page; key format: `tmdb:<id>` or `name:<slug>`. |
 | `favorites` | Polymorphic favorites (person/movie). Per-user in-memory key cache busted on mutation; `GET /favorites/keys` for client hydration. |
 | `search` | Federated search (movies + people) over local DB + TMDB + OMDB + Trakt. SSE-streaming via `@Sse('/search/{movies\|people}/stream?q=')` with JSON fallback. Persistent 7d `search_cache` table keyed by (type, normalized_query, source). |

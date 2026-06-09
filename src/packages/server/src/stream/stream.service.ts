@@ -1012,6 +1012,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				sessionId: streamSessions.id,
 				userId: streamSessions.userId,
 				username: users.username,
+				displayName: users.displayName,
 				movieId: streamSessions.movieId,
 				movieTitle: movies.title,
 				position: streamSessions.positionSeconds,

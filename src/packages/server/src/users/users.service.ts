@@ -16,6 +16,7 @@ export class UsersService {
 	private readonly publicColumns = {
 		id: users.id,
 		username: users.username,
+		displayName: users.displayName,
 		email: users.email,
 		role: users.role,
 		avatarUrl: users.avatarUrl,
@@ -50,6 +51,7 @@ export class UsersService {
 				email: data.email ?? null,
 				passwordHash,
 				role: data.role ?? 'viewer',
+				profilePublic: true,
 				createdAt: now,
 				updatedAt: now,
 			})

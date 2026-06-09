@@ -1,3 +1,4 @@
+import { resolveDisplayName } from '@mu/shared';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
@@ -32,7 +33,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 	// Reset to a clean form (prefilled from the account) each time it opens.
 	useEffect(() => {
 		if (!isOpen) return;
-		setName(user?.username ?? '');
+		setName(user ? resolveDisplayName(user) : '');
 		setEmail(user?.email ?? '');
 		setDescription('');
 		setScreenshot(null);

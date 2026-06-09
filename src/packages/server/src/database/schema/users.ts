@@ -8,10 +8,13 @@ export const users = sqliteTable('users', {
 	role: text('role').notNull().default('viewer'),
 	avatarUrl: text('avatar_url'),
 	preferences: text('preferences'),
+	// Optional friendly name shown across the UI in place of the login username.
+	displayName: text('display_name'),
 	// Social profile: a short blurb (<=500 chars) and whether non-admins may
 	// view this user's profile/info (the per-user "show profile info" flag).
+	// Profiles are public by default.
 	description: text('description'),
-	profilePublic: integer('profile_public', { mode: 'boolean' }).default(false),
+	profilePublic: integer('profile_public', { mode: 'boolean' }).default(true),
 	/** Updated on each successful login; feeds the profile "Active …" label. */
 	lastLoginAt: text('last_login_at'),
 	createdAt: text('created_at').notNull(),
