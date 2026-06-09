@@ -268,7 +268,10 @@ async function bootstrap() {
 	});
 
 	await register(fastifyMultipart, {
-		limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max subtitle file
+		// Hard ceiling across all multipart endpoints. 64MB lets feedback carry
+		// short screen-capture clips / videos; per-route caps are stricter
+		// (subtitles small, avatars 5MB, feedback 50MB).
+		limits: { fileSize: 64 * 1024 * 1024 },
 	});
 
 	// Serve user uploads (avatars now; chat/comment media later) verbatim at

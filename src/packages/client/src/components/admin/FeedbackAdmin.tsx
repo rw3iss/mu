@@ -257,8 +257,21 @@ export function FeedbackAdmin() {
 											)}
 										</div>
 										<p class={styles.body}>{f.description}</p>
-										{f.hasScreenshot &&
-											(detail?.screenshotData ? (
+										{f.attachmentUrl ? (
+											f.attachmentType?.startsWith('video/') ? (
+												// biome-ignore lint/a11y/useMediaCaption: user-supplied clip
+												<video src={f.attachmentUrl} class={styles.shot} controls />
+											) : (
+												<a href={f.attachmentUrl} target="_blank" rel="noreferrer">
+													<img
+														src={f.attachmentUrl}
+														alt={f.screenshotName ?? 'attachment'}
+														class={styles.shot}
+													/>
+												</a>
+											)
+										) : f.hasScreenshot ? (
+											detail?.screenshotData ? (
 												<a
 													href={detail.screenshotData}
 													target="_blank"
@@ -274,7 +287,8 @@ export function FeedbackAdmin() {
 												<div class={styles.shotLoading}>
 													<Spinner size="sm" /> Loading screenshot…
 												</div>
-											))}
+											)
+										) : null}
 
 										{respondingId === f.id ? (
 											<div class={styles.respondForm}>

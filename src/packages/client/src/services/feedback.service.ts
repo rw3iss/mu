@@ -9,13 +9,17 @@ export interface FeedbackSummary {
 	status: string;
 	hasScreenshot: boolean;
 	screenshotName: string | null;
+	/** On-disk attachment URL (`/uploads/feedback/…`) for new rows. */
+	attachmentUrl: string | null;
+	/** Attachment MIME type (e.g. `image/gif`, `video/mp4`). */
+	attachmentType: string | null;
 	createdAt: string;
 }
 
 export interface FeedbackDetail extends FeedbackSummary {
 	userId: string | null;
 	userAgent: string | null;
-	/** `data:<mime>;base64,...` screenshot, when present. */
+	/** Legacy `data:<mime>;base64,...` screenshot, when present (old rows). */
 	screenshotData: string | null;
 }
 

@@ -19,15 +19,19 @@ export interface CreateFeedbackInput {
 	name?: string | null;
 	email?: string | null;
 	description: string;
-	/** Screenshot as a `data:<mime>;base64,...` URL, when supplied. */
+	/** Legacy: screenshot as a `data:<mime>;base64,...` URL (old code paths). */
 	screenshotData?: string | null;
 	screenshotName?: string | null;
+	/** New: on-disk attachment served at `/uploads/feedback/…`. */
+	attachmentUrl?: string | null;
+	attachmentType?: string | null;
 	pageUrl?: string | null;
 	userAgent?: string | null;
 	userId?: string | null;
 }
 
-/** List row — omits the (potentially large) screenshot payload. */
+/** List row — omits any (potentially large) inline base64 payload, but carries
+ *  the on-disk attachment URL so the admin UI can render it directly. */
 export interface FeedbackSummary {
 	id: string;
 	name: string | null;
@@ -37,6 +41,8 @@ export interface FeedbackSummary {
 	status: string;
 	hasScreenshot: boolean;
 	screenshotName: string | null;
+	attachmentUrl: string | null;
+	attachmentType: string | null;
 	createdAt: string;
 }
 
@@ -57,6 +63,8 @@ export class FeedbackService {
 			description: input.description.trim(),
 			screenshotData: input.screenshotData ?? null,
 			screenshotName: input.screenshotName ?? null,
+			attachmentUrl: input.attachmentUrl ?? null,
+			attachmentType: input.attachmentType ?? null,
 			pageUrl: input.pageUrl ?? null,
 			userAgent: input.userAgent ?? null,
 			status: 'new',
@@ -79,6 +87,8 @@ export class FeedbackService {
 				status: feedback.status,
 				screenshotName: feedback.screenshotName,
 				screenshotData: feedback.screenshotData,
+				attachmentUrl: feedback.attachmentUrl,
+				attachmentType: feedback.attachmentType,
 				createdAt: feedback.createdAt,
 			})
 			.from(feedback)
@@ -91,8 +101,10 @@ export class FeedbackService {
 			description: r.description,
 			pageUrl: r.pageUrl,
 			status: r.status,
-			hasScreenshot: !!r.screenshotData,
+			hasScreenshot: !!r.screenshotData || !!r.attachmentUrl,
 			screenshotName: r.screenshotName,
+			attachmentUrl: r.attachmentUrl,
+			attachmentType: r.attachmentType,
 			createdAt: r.createdAt,
 		}));
 	}

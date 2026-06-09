@@ -63,8 +63,8 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 			setPreview(null);
 			return;
 		}
-		if (!file.type.startsWith('image/')) {
-			notifyError('Please choose an image file');
+		if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+			notifyError('Please choose an image or video file');
 			return;
 		}
 		setScreenshot(file);
@@ -158,19 +158,20 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 					</div>
 
 					<div class={styles.field}>
-						<span class={styles.label}>Screenshot (optional)</span>
+						<span class={styles.label}>Attachment (optional)</span>
 						{preview ? (
 							<div class={styles.previewWrap}>
-								<img
-									src={preview}
-									alt="Screenshot preview"
-									class={styles.preview}
-								/>
+								{screenshot?.type.startsWith('video/') ? (
+									// biome-ignore lint/a11y/useMediaCaption: user-supplied clip, no captions
+									<video src={preview} class={styles.preview} controls muted />
+								) : (
+									<img src={preview} alt="Attachment preview" class={styles.preview} />
+								)}
 								<button
 									type="button"
 									class={styles.removeShot}
 									onClick={() => pickFile(null)}
-									aria-label="Remove screenshot"
+									aria-label="Remove attachment"
 								>
 									<Icon name="x" size={14} />
 								</button>
@@ -178,10 +179,10 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 						) : (
 							<label class={styles.dropzone}>
 								<Icon name="image" size={18} />
-								<span>Click to attach, or paste an image</span>
+								<span>Click to attach an image or video, or paste an image</span>
 								<input
 									type="file"
-									accept="image/*"
+									accept="image/*,video/*"
 									class={styles.fileInput}
 									onChange={(e) =>
 										pickFile((e.target as HTMLInputElement).files?.[0] ?? null)

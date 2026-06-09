@@ -18,10 +18,15 @@ export const feedback = sqliteTable(
 		email: text('email'),
 		/** The feedback body. */
 		description: text('description').notNull(),
-		/** Optional screenshot as a `data:<mime>;base64,...` URL. */
+		/** Legacy: optional screenshot as a `data:<mime>;base64,...` URL (old rows). */
 		screenshotData: text('screenshot_data'),
-		/** Original screenshot filename. */
+		/** Original attachment filename. */
 		screenshotName: text('screenshot_name'),
+		/** Public URL of the attachment on disk (`/uploads/feedback/…`). New rows
+		 * store image/video attachments here instead of inline base64. */
+		attachmentUrl: text('attachment_url'),
+		/** Attachment MIME type (e.g. `image/gif`, `video/mp4`). */
+		attachmentType: text('attachment_type'),
 		/** URL the feedback was submitted from. */
 		pageUrl: text('page_url'),
 		/** Submitter user-agent string. */

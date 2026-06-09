@@ -13,14 +13,19 @@ import {
 import type { FastifyRequest } from 'fastify';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
+import { UploadsService } from '../uploads/uploads.service.js';
 import { FeedbackService } from './feedback.service.js';
 
-/** Cap an inbound screenshot (well under the 10MB multipart limit). */
-const MAX_SCREENSHOT_BYTES = 8 * 1024 * 1024;
+/** Cap an inbound attachment (kept under the global multipart limit). Larger
+ *  than before so short screen-capture clips / animated gifs go through. */
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 
 @Controller('feedback')
 export class FeedbackController {
-	constructor(private readonly feedback: FeedbackService) {}
+	constructor(
+		private readonly feedback: FeedbackService,
+		private readonly uploads: UploadsService,
+	) {}
 
 	/**
 	 * Submit feedback. Open to any authenticated user. Multipart form: `name`,
@@ -30,44 +35,72 @@ export class FeedbackController {
 	@Post()
 	async submit(@CurrentUser('id') userId: string, @Req() req: FastifyRequest) {
 		const fields: Record<string, string> = {};
-		let screenshot: { dataUrl: string; name: string } | null = null;
+		let pending: { buffer: Buffer; mimetype: string; name: string } | null = null;
 		let tooLarge = false;
+		let unsupported = false;
 
 		const parts = (req as any).parts();
 		for await (const part of parts) {
-			if (part.type === 'file') {
-				const isImage = String(part.mimetype || '').startsWith('image/');
-				if (part.fieldname === 'screenshot' && isImage && !screenshot && !tooLarge) {
-					const chunks: Buffer[] = [];
-					let size = 0;
-					for await (const chunk of part.file as AsyncIterable<Buffer>) {
-						size += chunk.length;
-						if (size > MAX_SCREENSHOT_BYTES) {
-							tooLarge = true;
-							break;
-						}
-						chunks.push(chunk);
-					}
-					if (part.file.truncated) tooLarge = true;
-					if (!tooLarge) {
-						const buf = Buffer.concat(chunks);
-						screenshot = {
-							dataUrl: `data:${part.mimetype};base64,${buf.toString('base64')}`,
-							name: String(part.filename || 'screenshot'),
-						};
-					}
-				} else {
-					// Drain any unexpected / oversized file part so the iterator advances.
-					part.file.resume();
-				}
-			} else {
+			if (part.type !== 'file') {
 				fields[part.fieldname] = part.value;
+				continue;
+			}
+
+			const isMedia = this.uploads.isSupportedMedia(part.mimetype);
+			const wanted = part.fieldname === 'screenshot' && isMedia && !pending && !tooLarge;
+
+			if (!wanted) {
+				if (part.fieldname === 'screenshot' && !isMedia) unsupported = true;
+				// Always fully drain a part we're not keeping so the parts iterator
+				// can advance — failing to drain is what hung large/gif uploads.
+				part.file.resume();
+				continue;
+			}
+
+			const chunks: Buffer[] = [];
+			let size = 0;
+			for await (const chunk of part.file as AsyncIterable<Buffer>) {
+				size += chunk.length;
+				if (size > MAX_ATTACHMENT_BYTES) {
+					tooLarge = true;
+					break;
+				}
+				chunks.push(chunk);
+			}
+			// Drain whatever's left (no-op if already fully consumed) — this is the
+			// fix for the hang on oversized / partially-read parts.
+			part.file.resume();
+			if (tooLarge || part.file.truncated) {
+				tooLarge = true;
+			} else {
+				pending = {
+					buffer: Buffer.concat(chunks),
+					mimetype: String(part.mimetype || 'application/octet-stream'),
+					name: String(part.filename || 'attachment'),
+				};
 			}
 		}
 
 		const description = (fields.description ?? '').trim();
 		if (!description) throw new BadRequestException('A description is required');
-		if (tooLarge) throw new BadRequestException('Screenshot too large (max 8MB)');
+		if (tooLarge) throw new BadRequestException('Attachment too large (max 50MB)');
+		if (unsupported) {
+			throw new BadRequestException('Unsupported attachment type — use an image or video.');
+		}
+
+		let attachmentUrl: string | null = null;
+		let attachmentType: string | null = null;
+		let attachmentName: string | null = null;
+		if (pending) {
+			attachmentUrl = await this.uploads.saveFile(
+				pending.buffer,
+				pending.mimetype,
+				'feedback',
+				pending.name,
+			);
+			attachmentType = pending.mimetype;
+			attachmentName = pending.name;
+		}
 
 		const created = this.feedback.create({
 			userId: userId ?? null,
@@ -76,8 +109,9 @@ export class FeedbackController {
 			description,
 			pageUrl: fields.pageUrl ?? null,
 			userAgent: (req.headers['user-agent'] as string) ?? null,
-			screenshotData: screenshot?.dataUrl ?? null,
-			screenshotName: screenshot?.name ?? null,
+			attachmentUrl,
+			attachmentType,
+			screenshotName: attachmentName,
 		});
 		return { ok: true, id: created.id };
 	}
