@@ -840,7 +840,8 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// Lifecycle:
 		//   < threshold       → ignore (no history row)
 		//   ≥ threshold, mid  → upsert position
-		//   near end          → DELETE the row (clean slate next time)
+		//   near end          → mark completed, reset resume to 0 (keep the
+		//                       row so it stays in the user's watch history)
 		const existing = await this.database.db
 			.select()
 			.from(userWatchHistory)
@@ -855,10 +856,30 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			// Tell the hot cache this file was watched to the end so it can be
 			// evicted sooner (watchedTtl vs the longer unwatched window).
 			this.mediaCache.markWatchedFully(session.movieFileId);
+			// Keep a permanent "watched" record rather than deleting it — the
+			// profile / history lists show fully-watched movies too. Resume
+			// position is reset to 0 so "Play" restarts from the beginning.
 			if (existing.length > 0) {
+				const entry = existing[0]!;
 				await this.database.db
-					.delete(userWatchHistory)
-					.where(eq(userWatchHistory.id, existing[0]!.id));
+					.update(userWatchHistory)
+					.set({
+						positionSeconds: 0,
+						durationWatchedSeconds: (entry.durationWatchedSeconds ?? 0) + increment,
+						completed: true,
+						watchedAt: nowISO(),
+					})
+					.where(eq(userWatchHistory.id, entry.id));
+			} else {
+				await this.database.db.insert(userWatchHistory).values({
+					id: crypto.randomUUID(),
+					userId: session.userId,
+					movieId: session.movieId,
+					positionSeconds: 0,
+					durationWatchedSeconds: increment,
+					completed: true,
+					watchedAt: nowISO(),
+				});
 			}
 			return;
 		}
@@ -926,8 +947,23 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// Mark session as ended by clearing lastActiveAt
 		await this.database.db.delete(streamSessions).where(eq(streamSessions.id, sessionId));
 
-		// Update watch history with final position
+		// Update watch history with final position. If the user stopped within
+		// the "completed" tail of the runtime, record it as fully watched
+		// (position 0) so it joins the permanent history instead of leaving a
+		// near-end resume point.
 		const finalPosition = session.positionSeconds ?? 0;
+		const durationRow = await this.database.db
+			.select({ d: movieFiles.durationSeconds })
+			.from(movieFiles)
+			.where(eq(movieFiles.movieId, session.movieId))
+			.limit(1);
+		const movieDurationSeconds = durationRow[0]?.d ?? null;
+		const completedTailSeconds = this.settings.get<number>('completedTailSeconds', 300);
+		const endedCompleted =
+			movieDurationSeconds != null && movieDurationSeconds > 0
+				? finalPosition >= movieDurationSeconds - completedTailSeconds
+				: false;
+
 		const existing = await this.database.db
 			.select()
 			.from(userWatchHistory)
@@ -939,20 +975,23 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			);
 
 		if (existing.length > 0) {
+			const wasCompleted = !!existing[0]!.completed || endedCompleted;
 			await this.database.db
 				.update(userWatchHistory)
 				.set({
-					positionSeconds: finalPosition,
+					positionSeconds: wasCompleted ? 0 : finalPosition,
+					completed: wasCompleted,
 					watchedAt: nowISO(),
 				})
 				.where(eq(userWatchHistory.id, existing[0]!.id));
-		} else {
+		} else if (endedCompleted || finalPosition > 0) {
 			await this.database.db.insert(userWatchHistory).values({
 				id: crypto.randomUUID(),
 				userId: session.userId,
 				movieId: session.movieId,
-				positionSeconds: finalPosition,
+				positionSeconds: endedCompleted ? 0 : finalPosition,
 				durationWatchedSeconds: 0,
+				completed: endedCompleted,
 				watchedAt: nowISO(),
 			});
 		}

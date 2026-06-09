@@ -21,6 +21,36 @@
   animation: scaleIn 200ms ease;
 }
 
+// Exit animations — applied while the modal is closing, before unmount.
+// Reduce-motion zeroes the duration globally, so the modal just disappears.
+.overlayClosing {
+  animation: modalFadeOut 180ms ease forwards;
+}
+
+.modalClosing {
+  animation: modalScaleOut 180ms ease forwards;
+}
+
+@keyframes modalFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modalScaleOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
 .sm {
   max-width: 400px;
 }

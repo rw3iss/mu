@@ -1120,26 +1120,25 @@ export class MoviesService implements OnModuleInit {
 			.where(eq(movieFiles.movieId, id))
 			.all();
 
-		// Safety: prevent deleting a library source root
-		if (deleteEnclosingFolder) {
-			const sources = this.libraryService.getSources();
-			const sourcePaths = sources.map((s) => path.resolve(s.path));
-
-			for (const file of files) {
-				const dir = path.resolve(path.dirname(file.filePath));
-				if (sourcePaths.includes(dir)) {
-					throw new BadRequestException(
-						`Cannot delete enclosing folder "${dir}" because it is a library source path`,
-					);
-				}
-			}
-		}
+		// Safety: never delete a folder that IS a configured library root.
+		// We don't hard-fail — we just downgrade that file to file-only so
+		// the movie still gets removed while the source root is preserved.
+		const sourcePaths = deleteEnclosingFolder
+			? this.libraryService.getSources().map((s) => path.resolve(s.path))
+			: [];
 
 		// Delete files and caches
 		for (const file of files) {
 			await rm(file.filePath, { force: true });
 			if (deleteEnclosingFolder) {
-				await rm(path.dirname(file.filePath), { recursive: true, force: true });
+				const dir = path.resolve(path.dirname(file.filePath));
+				if (sourcePaths.includes(dir)) {
+					this.logger.warn(
+						`Skipping enclosing-folder delete for "${dir}" — it is a library source root`,
+					);
+				} else {
+					await rm(dir, { recursive: true, force: true });
+				}
 			}
 			await this.transcoderService.clearCache(file.id);
 			await this.subtitleService.clearCache(file.id);

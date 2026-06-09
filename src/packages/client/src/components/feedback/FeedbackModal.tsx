@@ -119,6 +119,10 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 			) : (
 				// biome-ignore lint/a11y/noStaticElementInteractions: paste-to-attach convenience
 				<div class={styles.form} onPaste={onPaste}>
+					<p class={styles.blurb}>
+						Use this for anything — a bug, a rough edge, or an idea for something you'd
+						like to see. All feedback is welcome and genuinely appreciated.
+					</p>
 					<div class={styles.field}>
 						<span class={styles.label}>Name</span>
 						<input

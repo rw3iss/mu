@@ -13,6 +13,28 @@
 	min-height: 40vh;
 }
 
+.backLink {
+	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-xs);
+	margin-bottom: calc(var(--space-sm) * -1);
+	padding: var(--space-xs) var(--space-sm);
+	border-radius: var(--radius-md);
+	color: var(--color-text-secondary);
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-medium);
+	text-decoration: none;
+	transition:
+		color var(--transition-fast),
+		background-color var(--transition-fast);
+
+	&:hover {
+		color: var(--color-text-primary);
+		background: var(--color-bg-elevated, rgba(255, 255, 255, 0.04));
+	}
+}
+
 .notFound {
 	display: flex;
 	flex-direction: column;

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { moviesService } from '@/services/movies.service';
+import { sourcesService } from '@/services/sources.service';
 import { closePlayer, globalMovieId } from '@/state/globalPlayer.state';
 import { notifyError } from '@/state/notifications.state';
+import { isLibraryRoot, parentDir } from '@/utils/path';
 import styles from './MovieOptionsMenu.module.scss';
 
 interface DeleteMovieModalProps {
@@ -44,6 +46,7 @@ export function DeleteMovieModal({
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [deleteSuccess, setDeleteSuccess] = useState(false);
 	const [resolvedPath, setResolvedPath] = useState<string | null>(filePath);
+	const [libraryRoots, setLibraryRoots] = useState<string[]>([]);
 
 	// Reset transient state each time the modal opens so a previous
 	// success/loading state doesn't leak into the next open.
@@ -53,6 +56,17 @@ export function DeleteMovieModal({
 			setDeleteSuccess(false);
 			setIsDeleting(false);
 		}
+	}, [isOpen]);
+
+	// Load the configured library root paths so we can hide the
+	// "delete enclosing folder" option when this movie sits directly
+	// in a root (deleting that folder would wipe the library source).
+	useEffect(() => {
+		if (!isOpen) return;
+		sourcesService
+			.getAll()
+			.then((sources) => setLibraryRoots(sources.map((s) => s.path)))
+			.catch(() => {});
 	}, [isOpen]);
 
 	// Fetch the file path lazily if the parent didn't have it (e.g.
@@ -94,6 +108,13 @@ export function DeleteMovieModal({
 		? resolvedPath.replace(/\\/g, '/').split('/').slice(-2, -1)[0]
 		: null;
 
+	// The enclosing folder is protected when it IS a library root — never
+	// offer to delete it. Until the path resolves we keep the option hidden
+	// to stay on the safe side.
+	const folderIsLibraryRoot =
+		!resolvedPath || isLibraryRoot(parentDir(resolvedPath), libraryRoots);
+	const canDeleteFolder = !folderIsLibraryRoot;
+
 	return (
 		<Modal
 			isOpen={isOpen}
@@ -117,38 +138,42 @@ export function DeleteMovieModal({
 							This will permanently delete the movie file(s) from disk and remove all
 							cached data. This action cannot be undone.
 						</p>
-						<label class={styles.deleteOption}>
-							<input
-								type="radio"
-								name="deleteMode"
-								checked={!deleteFolder}
-								onChange={() => setDeleteFolder(false)}
-							/>
-							Delete movie file only
-						</label>
-						<label class={styles.deleteOption}>
-							<input
-								type="radio"
-								name="deleteMode"
-								checked={deleteFolder}
-								onChange={() => setDeleteFolder(true)}
-							/>
-							Delete file and enclosing folder
-							{folderName && (
-								<span
-									style={{
-										display: 'block',
-										fontSize: '0.8em',
-										opacity: 0.6,
-										marginTop: '0.2rem',
-										marginLeft: '1.5rem',
-										wordBreak: 'break-all',
-									}}
-								>
-									({folderName})
-								</span>
-							)}
-						</label>
+						{canDeleteFolder && (
+							<label class={styles.deleteOption}>
+								<input
+									type="radio"
+									name="deleteMode"
+									checked={!deleteFolder}
+									onChange={() => setDeleteFolder(false)}
+								/>
+								Delete movie file only
+							</label>
+						)}
+						{canDeleteFolder && (
+							<label class={styles.deleteOption}>
+								<input
+									type="radio"
+									name="deleteMode"
+									checked={deleteFolder}
+									onChange={() => setDeleteFolder(true)}
+								/>
+								Delete file and enclosing folder
+								{folderName && (
+									<span
+										style={{
+											display: 'block',
+											fontSize: '0.8em',
+											opacity: 0.6,
+											marginTop: '0.2rem',
+											marginLeft: '1.5rem',
+											wordBreak: 'break-all',
+										}}
+									>
+										({folderName})
+									</span>
+								)}
+							</label>
+						)}
 						<div class={styles.deleteActions}>
 							<Button variant="secondary" onClick={onClose} disabled={isDeleting}>
 								Cancel

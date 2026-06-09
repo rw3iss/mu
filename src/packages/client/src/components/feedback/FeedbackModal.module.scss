@@ -4,6 +4,13 @@
 	gap: var(--space-md);
 }
 
+.blurb {
+	margin: 0;
+	font-size: var(--font-size-sm);
+	line-height: var(--line-height-normal);
+	color: var(--color-text-secondary);
+}
+
 .field {
 	display: flex;
 	flex-direction: column;

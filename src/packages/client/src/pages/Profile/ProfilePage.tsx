@@ -134,6 +134,21 @@ export function ProfilePage({ username }: ProfilePageProps) {
 
 	return (
 		<div class={styles.page}>
+			{/* Back to the member directory (read view only). */}
+			{!editMode && (
+				<a
+					class={styles.backLink}
+					href="/members"
+					onClick={(e: MouseEvent) => {
+						if (e.metaKey || e.ctrlKey || e.button === 1) return;
+						e.preventDefault();
+						route('/members');
+					}}
+				>
+					← Members
+				</a>
+			)}
+
 			{/* ── Header / identity ───────────────────────────────── */}
 			<Panel
 				class={styles.headerPanel}

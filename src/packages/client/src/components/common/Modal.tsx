@@ -1,7 +1,11 @@
 import { ComponentChildren, createPortal } from 'preact/compat';
-import { useCallback, useEffect, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { reduceMotion } from '@/state/appearance.state';
 import { Icon } from './Icon';
 import styles from './Modal.module.scss';
+
+/** Exit-animation duration — kept in sync with the `.closing` CSS below. */
+const EXIT_MS = 180;
 
 interface ModalProps {
 	isOpen: boolean;
@@ -23,6 +27,38 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 	const modalRef = useRef<HTMLDivElement>(null);
 	// Element that had focus *before* the modal opened — restored on close.
 	const openerRef = useRef<HTMLElement | null>(null);
+	// Keep the modal mounted through its exit animation. `rendered` controls
+	// presence in the DOM; `closing` swaps in the exit keyframes.
+	const [rendered, setRendered] = useState(isOpen);
+	const [closing, setClosing] = useState(false);
+	const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(() => {
+		if (isOpen) {
+			if (exitTimer.current) {
+				clearTimeout(exitTimer.current);
+				exitTimer.current = null;
+			}
+			setClosing(false);
+			setRendered(true);
+			return;
+		}
+		// Closing: play the exit animation, then unmount. Reduce-motion skips
+		// the wait so the modal disappears immediately.
+		setClosing(true);
+		const delay = reduceMotion.value ? 0 : EXIT_MS;
+		exitTimer.current = setTimeout(() => {
+			exitTimer.current = null;
+			setRendered(false);
+			setClosing(false);
+		}, delay);
+		return () => {
+			if (exitTimer.current) {
+				clearTimeout(exitTimer.current);
+				exitTimer.current = null;
+			}
+		};
+	}, [isOpen]);
 
 	const handleBackdropClick = useCallback(
 		(e: MouseEvent) => {
@@ -95,18 +131,22 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 		};
 	}, [isOpen, onClose]);
 
-	if (!isOpen) return null;
+	if (!rendered) return null;
 
 	return createPortal(
 		<div
 			ref={overlayRef}
-			class={styles.overlay}
+			class={`${styles.overlay} ${closing ? styles.overlayClosing : ''}`}
 			onClick={handleBackdropClick}
 			role="dialog"
 			aria-modal="true"
 			aria-label={title}
 		>
-			<div ref={modalRef} class={`${styles.modal} ${styles[size]}`} tabIndex={-1}>
+			<div
+				ref={modalRef}
+				class={`${styles.modal} ${styles[size]} ${closing ? styles.modalClosing : ''}`}
+				tabIndex={-1}
+			>
 				{title && (
 					<div class={styles.header}>
 						<h2 class={styles.title}>{title}</h2>

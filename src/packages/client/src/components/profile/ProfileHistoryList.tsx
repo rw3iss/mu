@@ -57,7 +57,8 @@ export function ProfileHistoryList({ history }: ProfileHistoryListProps) {
 									<span class={styles.when}>{relativeTime(item.watchedAt)}</span>
 									{item.durationSeconds ? (
 										<span class={styles.position}>
-											{clockFromSeconds(item.positionSeconds)} / {clockFromSeconds(item.durationSeconds)}
+											{clockFromSeconds(item.completed ? item.durationSeconds : item.positionSeconds)} /{' '}
+											{clockFromSeconds(item.durationSeconds)}
 										</span>
 									) : item.positionSeconds > 0 ? (
 										<span class={styles.position}>{clockFromSeconds(item.positionSeconds)}</span>
