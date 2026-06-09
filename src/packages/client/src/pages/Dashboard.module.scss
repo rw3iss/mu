@@ -35,7 +35,9 @@
   display: flex;
   flex-flow: row wrap;
   align-items: baseline;
-  column-gap: var(--space-sm);
+  // Spacing between greeting and stat is supplied by the .welcomeStat dot
+  // separator (10px each side), so no inline column-gap here.
+  column-gap: 0;
   row-gap: 1px;
   min-width: 0;
 }
@@ -51,6 +53,21 @@
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+
+  // Dot separator between the welcome message and the stat, 10px on each side.
+  &::before {
+    content: "\00b7";
+    margin: 0 10px;
+    color: var(--color-text-muted);
+  }
+}
+
+// Emphasised counts inside the growth stat: header colour, sized to match the
+// "Welcome back" / username text (larger than the surrounding stat copy).
+.statNum {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
 }
 
 .welcomeUser {

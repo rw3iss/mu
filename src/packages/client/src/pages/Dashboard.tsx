@@ -24,17 +24,29 @@ interface DashboardProps {
 /**
  * Build the dashboard header growth line. Prefers "since your last session"
  * (gated on > 0) with the rolling 24h count in parentheses; falls back to a
- * 24h-only line. Returns null when there's nothing new to report.
+ * 24h-only line. The counts are emphasised (larger, header colour) via
+ * `.statNum`. Returns null when there's nothing new to report.
  */
-function formatNewTitles(stats: NewTitleStats | null): string | null {
+function renderNewTitles(stats: NewTitleStats | null) {
 	if (!stats) return null;
 	const { sinceSession, last24h } = stats;
-	const titles = (n: number) => `${n} new ${n === 1 ? 'title' : 'titles'}`;
+	const num = (n: number) => <span class={styles.statNum}>{n}</span>;
+	const titles = (n: number) => (n === 1 ? 'new title' : 'new titles');
 	if (sinceSession > 0) {
-		const tail = last24h > 0 ? ` (${last24h} in the last 24 hours)` : '';
-		return `${titles(sinceSession)} added since your last session${tail}.`;
+		return (
+			<>
+				{num(sinceSession)} {titles(sinceSession)} added since your last session
+				{last24h > 0 ? <> ({num(last24h)} in the last 24 hours)</> : null}.
+			</>
+		);
 	}
-	if (last24h > 0) return `${titles(last24h)} added in the last 24 hours.`;
+	if (last24h > 0) {
+		return (
+			<>
+				{num(last24h)} {titles(last24h)} added in the last 24 hours.
+			</>
+		);
+	}
 	return null;
 }
 
@@ -154,7 +166,7 @@ export function Dashboard(_props: DashboardProps) {
 		},
 	];
 
-	const newTitlesMessage = formatNewTitles(newStats);
+	const newTitlesMessage = renderNewTitles(newStats);
 
 	return (
 		<div class={`${styles.dashboard} stagger-rise`}>
