@@ -512,6 +512,32 @@
 	}
 }
 
+// ── Split mode: open the bar's popups DOWNWARD ──
+// In split mode the control bar sits directly below the video, which is a
+// fixed sibling painted ABOVE the opaque split panel (the panel must be
+// opaque so it backs the video). Any popup that opens upward is therefore
+// hidden behind the video. Opening them downward keeps them in the info
+// area below the bar — same stacking context, not covered by the video.
+.splitControls {
+	.menu {
+		bottom: auto;
+		top: calc(100% + 6px);
+		box-shadow: var(--shadow-overlay-down, 0 12px 32px rgba(0, 0, 0, 0.55));
+	}
+
+	.volumePopup {
+		bottom: auto;
+		top: calc(100% + 8px);
+		box-shadow: var(--shadow-overlay-down, 0 12px 32px rgba(0, 0, 0, 0.55));
+
+		// Move the invisible hover bridge to the top edge (button is now above).
+		&::after {
+			bottom: auto;
+			top: -10px;
+		}
+	}
+}
+
 @keyframes volumeFadeIn {
 	from {
 		opacity: 0;
