@@ -2,23 +2,30 @@
 // (applied alongside this class in Dashboard.tsx): the welcome row and each
 // section cascade in rather than the whole page fading as one block.
 .dashboard {
-  // Anchor `nth-child` stagger to real content even if a plugin slot
-  // renders an empty wrapper at the top.
-  display: block;
+  display: flex;
+  flex-direction: column;
+
+  // Fit the viewport so the columns (not the page) scroll. Desktop only —
+  // mobile keeps its natural body scroll.
+  @media (min-width: 768px) {
+    height: calc(100dvh - var(--topbar-height) - 2 * var(--space-lg));
+    overflow: hidden;
+  }
 }
 
-/* Compact welcome row — single-line: text + inline link buttons. */
+/* Compact welcome row — single-line: text + inline link buttons. Kept tight
+   to the top of the page. */
 .welcomeRow {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-sm) var(--space-md);
-  margin-bottom: var(--space-xl);
-  padding: var(--space-sm) 0;
+  margin-bottom: var(--space-md);
+  padding: 0;
 }
 
 .welcomeText {
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-lg);
   color: var(--color-text-secondary);
   font-weight: var(--font-weight-normal);
   margin: 0;
@@ -74,6 +81,12 @@
 .columnsWrap {
   container-type: inline-size;
   container-name: dash;
+
+  // Fill the remaining dashboard height so the columns can scroll internally.
+  @media (min-width: 768px) {
+    flex: 1;
+    min-height: 0;
+  }
 }
 
 /* Section selector — only shown in single-column mode (see @container below). */
@@ -116,10 +129,54 @@
   grid-template-columns: 1fr;
   gap: var(--space-xl);
   align-items: start;
+
+  // Stretch columns to fill the (fixed-height) dashboard so each scrolls.
+  @media (min-width: 768px) {
+    height: 100%;
+    grid-auto-rows: 1fr;
+    align-items: stretch;
+  }
 }
 
 .column {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+
+  @media (min-width: 768px) {
+    min-height: 0;
+    height: 100%;
+  }
+}
+
+/* The section header stays put; only .columnBody scrolls. */
+.columnBody {
+  position: relative;
+
+  @media (min-width: 768px) {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    @include scrollbar;
+  }
+}
+
+/* Soft fade over the top of each scrolling list — bg fading to translucent,
+   pinned to the top of the column body so items slip under it as you scroll
+   (the column header stays fixed above it). */
+.fade {
+  display: none;
+
+  @media (min-width: 768px) {
+    display: block;
+    position: sticky;
+    top: 0;
+    height: var(--space-lg);
+    margin-bottom: calc(-1 * var(--space-lg));
+    background: linear-gradient(to bottom, var(--color-bg-primary) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 2;
+  }
 }
 
 /* Default = single-column mode: show only the active section, keep tabs. */
@@ -138,7 +195,7 @@
   }
 
   .column:not(.activeColumn) {
-    display: block;
+    display: flex;
   }
 }
 

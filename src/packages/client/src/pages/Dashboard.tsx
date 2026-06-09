@@ -177,12 +177,15 @@ export function Dashboard(_props: DashboardProps) {
 									See All
 								</Button>
 							</div>
-							<MovieGrid
-								movies={s.movies}
-								isLoading={isLoading}
-								viewMode={view}
-								emptyMessage={s.empty}
-							/>
+							<div class={styles.columnBody}>
+								<div class={styles.fade} aria-hidden="true" />
+								<MovieGrid
+									movies={s.movies}
+									isLoading={isLoading}
+									viewMode={view}
+									emptyMessage={s.empty}
+								/>
+							</div>
 						</section>
 					))}
 				</div>

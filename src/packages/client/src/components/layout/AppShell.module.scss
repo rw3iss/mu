@@ -80,7 +80,17 @@
 
 .withSplitPlayer {
 	transition: none;
-	overflow-x: hidden;
+	// In split mode the shell is a fixed-height box and the LEFT content column
+	// scrolls internally, so the TopBar (a non-scrolling row above .content)
+	// stays pinned — instead of body-scrolling away as it did when the shell's
+	// overflow turned it into the sticky scroll container.
+	height: 100vh;
+	overflow: hidden;
+
+	.content {
+		overflow-y: auto;
+		min-height: 0;
+	}
 }
 
 // Light theme adjustments for the radial effect
