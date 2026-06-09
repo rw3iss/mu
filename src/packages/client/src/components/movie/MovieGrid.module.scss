@@ -3,6 +3,9 @@
   // Card min width is overridable per-context via `--mg-card-min` (e.g. the
   // dashboard sets it to match the Continue Watching rail so more cards fit).
   grid-template-columns: repeat(auto-fill, minmax(var(--mg-card-min, 180px), 1fr));
+  // Optional top padding inside a scroll container (dashboard sets this so the
+  // first row clears the sticky top fade); 0 everywhere else.
+  padding-top: var(--mg-grid-pad-top, 0);
   gap: var(--item-gap);
 
   @include mobile {

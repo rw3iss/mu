@@ -154,6 +154,9 @@
   // Match the Continue Watching rail's card width so Recently Added and
   // Trending pack more cards per row (Trending → ~2-up instead of 1).
   --mg-card-min: 180px;
+  // Nudge the grid's first row down inside the scroll container so it clears
+  // the sticky top fade (the fade itself stays pinned at the top).
+  --mg-grid-pad-top: 10px;
 
   // Stretch columns to fill the (fixed-height) dashboard so each scrolls.
   @media (min-width: 768px) {
@@ -167,6 +170,11 @@
    widths (auto-fill still drops it to one column when the column is narrow). */
 .areaTrending {
   --mg-card-min: 150px;
+
+  // Trending's header sits tighter to its grid than the other sections.
+  .sectionHeader {
+    margin-bottom: var(--space-sm);
+  }
 
   // On large monitors the right column is wide enough that 150px cards pack 4+;
   // bump the min so it caps at fewer, larger cards (≈3 not 4, ≈2 not 3). The
