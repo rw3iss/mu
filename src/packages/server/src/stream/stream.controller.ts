@@ -1,3 +1,4 @@
+import { createReadStream, statSync } from 'node:fs';
 import {
 	Body,
 	Controller,
@@ -21,6 +22,7 @@ import { DatabaseService } from '../database/database.service.js';
 import { movieFiles } from '../database/schema/index.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { MediaCacheService } from './media-cache/media-cache.service.js';
+import { MemoryCacheService } from './memory-cache/memory-cache.service.js';
 import { StreamService } from './stream.service.js';
 import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
@@ -41,7 +43,16 @@ export class StreamController {
 		private readonly transcodeDebugger: TranscodeDebuggerService,
 		private readonly guidResolver: GuidResolverService,
 		private readonly mediaCache: MediaCacheService,
+		private readonly memoryCache: MemoryCacheService,
 	) {}
+
+	/** Admin: in-RAM file cache status + system memory (for Settings → Encoding). */
+	@Roles('admin')
+	@RequireAction('edit:app-settings')
+	@Get('memory-cache/status')
+	memoryCacheStatus() {
+		return this.memoryCache.getStatus();
+	}
 
 	/**
 	 * Get stream mode info for a movie (whether it needs transcoding, has cache, etc.).
@@ -123,7 +134,7 @@ export class StreamController {
 		// Fallback: check if the manifest and first segment exist on disk
 		const dir = this.streamService.getSessionCacheDir(sessionId);
 		const manifest = await this.hlsGenerator.getManifest(sessionId, dir);
-		const firstSeg = await this.hlsGenerator.getSegment(sessionId, 0, dir);
+		const firstSeg = await this.hlsGenerator.getSegmentPath(sessionId, 0, dir);
 		const ready = manifest !== null && firstSeg !== null;
 
 		return reply.send({
@@ -199,9 +210,9 @@ export class StreamController {
 
 		const segmentNumber = parseInt(match[1]!, 10);
 		const dir = this.streamService.getSessionCacheDir(sessionId);
-		const segment = await this.hlsGenerator.getSegment(sessionId, segmentNumber, dir);
+		const segmentPath = await this.hlsGenerator.getSegmentPath(sessionId, segmentNumber, dir);
 
-		if (!segment) {
+		if (!segmentPath) {
 			const sessionInfo = this.streamService.getSessionInfo(sessionId);
 
 			// Check if this is a "complete" cache with missing segments (corruption)
@@ -247,17 +258,21 @@ export class StreamController {
 				.send({ message: 'Segment not yet available, encoding triggered' });
 		}
 
+		const size = statSync(segmentPath).size;
 		this.recordReply(sessionId, 'segment', segmentNumber, 200, requestStart);
-		this.transcodeDebugger.recordSegmentReady(sessionId, segmentNumber, segment.length);
+		this.transcodeDebugger.recordSegmentReady(sessionId, segmentNumber, size);
 		if (segmentNumber === 0) {
 			this.transcodeDebugger.recordMilestone(sessionId, 'firstSegmentServed');
 		}
 		// Update session heartbeat — keeps session alive even if progress POSTs fail
 		this.streamService.touchSession(sessionId);
+		// Stream the segment from disk (page cache) instead of buffering it into
+		// the Node heap — avoids per-request 2–5 MB allocations under concurrency.
 		return reply
 			.header('Content-Type', 'video/mp2t')
+			.header('Content-Length', String(size))
 			.header('Cache-Control', 'public, max-age=86400')
-			.send(segment);
+			.send(createReadStream(segmentPath));
 	}
 
 	/**
@@ -325,7 +340,11 @@ export class StreamController {
 		//      directly, so this only matters for cache-mode.
 		const hot = this.mediaCache.getHotPath(file.id);
 		const cached = hot ?? this.transcoderService.getCachedDirectMp4(file.id);
-		return this.directPlayService.serveFile(cached ?? file.filePath, request, reply);
+		const servePath = cached ?? file.filePath;
+		// Keep the file being played resident in RAM (no-op unless the admin set
+		// a memory-cache budget). Warms whichever copy we actually serve.
+		this.memoryCache.touch(servePath);
+		return this.directPlayService.serveFile(servePath, request, reply);
 	}
 
 	/**

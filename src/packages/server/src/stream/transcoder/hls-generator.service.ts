@@ -48,6 +48,26 @@ export class HlsGeneratorService {
 		segmentNumber: number,
 		dir?: string,
 	): Promise<Buffer | null> {
+		const segmentPath = await this.getSegmentPath(sessionId, segmentNumber, dir);
+		if (!segmentPath) return null;
+		try {
+			return await readFile(segmentPath);
+		} catch {
+			return null;
+		}
+	}
+
+	/**
+	 * Resolve a segment's path once it's fully written (size-stable), or null if
+	 * it isn't available after the retry window. Lets callers stream the file
+	 * (`createReadStream`) instead of buffering the whole 2–5 MB segment into the
+	 * Node heap on every request.
+	 */
+	async getSegmentPath(
+		sessionId: string,
+		segmentNumber: number,
+		dir?: string,
+	): Promise<string | null> {
 		const sessionDir = dir || this.transcoderService.getSessionDir(sessionId);
 		const segmentFileName = `segment_${segmentNumber.toString().padStart(4, '0')}.ts`;
 		const segmentPath = path.join(sessionDir, segmentFileName);
@@ -57,8 +77,8 @@ export class HlsGeneratorService {
 			try {
 				const fileStat = await stat(segmentPath);
 
-				// Verify segment is complete: check size stability
-				// A segment being written will have a changing size
+				// Verify segment is complete: a segment being written has size 0 or
+				// a changing size.
 				if (fileStat.size === 0) {
 					if (attempt < 4) {
 						await new Promise((r) => setTimeout(r, 1000));
@@ -67,19 +87,17 @@ export class HlsGeneratorService {
 					return null;
 				}
 
-				// Wait briefly and check size again to ensure FFmpeg finished writing
+				// Wait briefly and re-check size to ensure FFmpeg finished writing.
 				if (attempt === 0) {
 					await new Promise((r) => setTimeout(r, 100));
 					const recheck = await stat(segmentPath);
 					if (recheck.size !== fileStat.size) {
-						// Still being written — wait and retry
 						await new Promise((r) => setTimeout(r, 500));
 						continue;
 					}
 				}
 
-				const data = await readFile(segmentPath);
-				return data;
+				return segmentPath;
 			} catch (err: any) {
 				if (err.code === 'ENOENT') {
 					if (attempt < 4) {

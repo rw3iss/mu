@@ -286,6 +286,14 @@ export function Settings(props: SettingsProps) {
 	// Shrink oversized H.264 files: re-encode any whose bitrate exceeds this many
 	// Mbps. 0 = off.
 	const [reencodeAboveMbps, setReencodeAboveMbps] = useState('0');
+	const [memoryCacheMaxGb, setMemoryCacheMaxGb] = useState('0');
+	const [memCacheStatus, setMemCacheStatus] = useState<{
+		vmtouch: boolean;
+		usedBytes: number;
+		fileCount: number;
+		systemTotalBytes: number;
+		systemFreeBytes: number;
+	} | null>(null);
 	// Scheduled, time-boxed library conversion sweep (admin).
 	const [convertSweepEnabled, setConvertSweepEnabled] = useState(false);
 	const [convertSweepStartTime, setConvertSweepStartTime] = useState('02:00');
@@ -332,6 +340,21 @@ export function Settings(props: SettingsProps) {
 			setActiveTab(props.tab);
 		}
 	}, [props.tab]);
+
+	// In-RAM file-cache status + system memory (for the Encoding tab control).
+	useEffect(() => {
+		if (activeTab !== 'encoding') return;
+		let cancelled = false;
+		api
+			.get<typeof memCacheStatus>('/stream/memory-cache/status')
+			.then((s) => {
+				if (!cancelled) setMemCacheStatus(s);
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, [activeTab, memoryCacheMaxGb]);
 
 	const handleTabChange = useCallback((tab: SettingsTab) => {
 		setActiveTab(tab);
@@ -421,6 +444,8 @@ export function Settings(props: SettingsProps) {
 					if (encoding.av1Cq != null) setAv1Cq(String(encoding.av1Cq));
 					if (encoding.reencodeAboveMbps != null)
 						setReencodeAboveMbps(String(encoding.reencodeAboveMbps));
+					if (encoding.memoryCacheMaxGb != null)
+						setMemoryCacheMaxGb(String(encoding.memoryCacheMaxGb));
 					const sweep = encoding.convertSweep as Record<string, unknown> | undefined;
 					if (sweep) {
 						if (typeof sweep.enabled === 'boolean')
@@ -562,6 +587,7 @@ export function Settings(props: SettingsProps) {
 					convertHevcToAv1,
 					av1Cq: parseInt(av1Cq, 10) || 32,
 					reencodeAboveMbps: parseFloat(reencodeAboveMbps) || 0,
+					memoryCacheMaxGb: parseFloat(memoryCacheMaxGb) || 0,
 					convertSweep: {
 						enabled: convertSweepEnabled,
 						startTime: convertSweepStartTime,
@@ -594,6 +620,7 @@ export function Settings(props: SettingsProps) {
 		convertHevcToAv1,
 		av1Cq,
 		reencodeAboveMbps,
+		memoryCacheMaxGb,
 		convertSweepEnabled,
 		convertSweepStartTime,
 		convertSweepDurationHours,
@@ -2396,6 +2423,51 @@ export function Settings(props: SettingsProps) {
 									value={reencodeAboveMbps}
 									onInput={(e) =>
 										setReencodeAboveMbps((e.target as HTMLInputElement).value)
+									}
+									style={{ width: '80px' }}
+								/>
+							</div>
+
+							{/* In-RAM file cache (page-cache residency) */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Maximum Cache Memory (GB)</span>
+									<span class={styles.settingDescription}>
+										Keep recently played / processed movie files resident in RAM
+										(the OS page cache) up to this many GB, evicting the oldest
+										first — so re-watching, sprite generation, and conversions read
+										from memory instead of the disk. 0 = off (rely on the OS
+										default).
+										{memCacheStatus && (
+											<>
+												{' '}
+												System memory:{' '}
+												<strong>
+													{(memCacheStatus.systemTotalBytes / 1024 ** 3).toFixed(1)} GB
+												</strong>{' '}
+												total, {(memCacheStatus.systemFreeBytes / 1024 ** 3).toFixed(1)}{' '}
+												GB free. In cache:{' '}
+												{(memCacheStatus.usedBytes / 1024 ** 3).toFixed(2)} GB across{' '}
+												{memCacheStatus.fileCount} file(s).
+												{!memCacheStatus.vmtouch &&
+													' (vmtouch not installed — warm-only, OS handles eviction.)'}
+											</>
+										)}
+									</span>
+								</div>
+								<input
+									type="number"
+									class={styles.select}
+									min={0}
+									max={
+										memCacheStatus
+											? Math.floor(memCacheStatus.systemTotalBytes / 1024 ** 3)
+											: 256
+									}
+									step={1}
+									value={memoryCacheMaxGb}
+									onInput={(e) =>
+										setMemoryCacheMaxGb((e.target as HTMLInputElement).value)
 									}
 									style={{ width: '80px' }}
 								/>

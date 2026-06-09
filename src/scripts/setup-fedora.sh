@@ -115,7 +115,9 @@ install_system_deps() {
 	step "System packages (build tools, git, curl, openssl)"
 	# gcc-c++/make/python3 cover native rebuilds of better-sqlite3 if no prebuilt
 	# binary matches; the rest are baseline tooling.
-	local pkgs=(gcc-c++ make python3 git curl tar openssl)
+	# vmtouch lets the memory-cache module actively warm/evict files in the OS
+	# page cache (Settings → Encoding → Maximum Cache Memory).
+	local pkgs=(gcc-c++ make python3 git curl tar openssl vmtouch)
 	local missing=()
 	for p in "${pkgs[@]}"; do rpm -q "$p" &>/dev/null || missing+=("$p"); done
 	if [ ${#missing[@]} -eq 0 ]; then

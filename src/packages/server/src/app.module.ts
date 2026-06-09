@@ -35,6 +35,7 @@ import { RemoteModule } from './remote/remote.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SeoModule } from './seo/seo.module.js';
+import { MemoryCacheModule } from './stream/memory-cache/memory-cache.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { ShareLinksModule } from './share-links/share-links.module.js';
 import { UploadsModule } from './uploads/uploads.module.js';
@@ -78,6 +79,7 @@ import { UsersModule } from './users/users.module.js';
 		PeopleModule,
 		FavoritesModule,
 		UploadsModule,
+		MemoryCacheModule,
 		ProfileModule,
 		EmailModule,
 		FeedbackModule,

@@ -27,6 +27,7 @@ import { EventsService } from '../events/events.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { MediaCacheService } from './media-cache/media-cache.service.js';
+import { MemoryCacheService } from './memory-cache/memory-cache.service.js';
 import { SubtitleService } from './subtitles/subtitle.service.js';
 import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
@@ -154,6 +155,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		private readonly guidResolver: GuidResolverService,
 		private readonly sessionRegistry: SessionRegistryService,
 		private readonly mediaCache: MediaCacheService,
+		private readonly memoryCache: MemoryCacheService,
 	) {}
 
 	onModuleInit(): void {
@@ -282,6 +284,11 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 		// Pick the best available file (prefer highest resolution)
 		const file = this.selectBestFile(movieFileList);
+
+		// Keep the source resident in RAM for the duration / re-watches (no-op
+		// unless a memory-cache budget is configured). ffmpeg then reads the
+		// transcode input straight from the OS page cache.
+		this.memoryCache.touch(file.filePath);
 
 		// Warm up GUID resolver with movie and file names
 		const movieRow = this.database.db

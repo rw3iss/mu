@@ -8,6 +8,7 @@ import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, movies } from '../../database/schema/index.js';
 import { EventsService } from '../../events/events.service.js';
 import { SettingsService } from '../../settings/settings.service.js';
+import { MemoryCacheService } from '../memory-cache/memory-cache.service.js';
 import { TranscoderService } from '../transcoder/transcoder.service.js';
 
 /** What the planner decided to do with a file. */
@@ -79,6 +80,7 @@ export class ConversionService {
 		private readonly database: DatabaseService,
 		private readonly settings: SettingsService,
 		private readonly events: EventsService,
+		private readonly memoryCache: MemoryCacheService,
 	) {}
 
 	getConfig() {
@@ -353,6 +355,10 @@ export class ConversionService {
 			return { ...base, status: 'failed', reason: 'source-missing' };
 		}
 
+		// Warm the source so ffmpeg reads it from RAM (no-op unless a budget is
+		// set). The matching forget()/touch() on replacement happens below.
+		this.memoryCache.touch(srcPath);
+
 		const movieRow = this.database.db
 			.select({ title: movies.title, year: movies.year })
 			.from(movies)
@@ -447,7 +453,11 @@ export class ConversionService {
 			// New file verified & in place — now it's safe to drop the original.
 			if (path.resolve(finalPath) !== path.resolve(srcPath)) {
 				await this.safeUnlink(srcPath);
+				// Release the now-deleted original from the memory cache and warm
+				// the replacement so future reads hit the new file.
+				this.memoryCache.forget(srcPath);
 			}
+			this.memoryCache.touch(finalPath);
 			this.database.db
 				.update(movieFiles)
 				.set({

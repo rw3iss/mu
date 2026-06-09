@@ -4,6 +4,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
+import { MemoryCacheService } from '../stream/memory-cache/memory-cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles } from '../database/schema/index.js';
 
@@ -73,6 +74,7 @@ export class SpriteService {
 	constructor(
 		private readonly database: DatabaseService,
 		private readonly config: ConfigService,
+		private readonly memoryCache: MemoryCacheService,
 	) {
 		this.spriteDir = this.resolveSpriteDir();
 		if (!existsSync(this.spriteDir)) {
@@ -268,6 +270,9 @@ export class SpriteService {
 		const ffmpegPath = this.detectFfmpeg();
 		// Use the native file path — spawn passes args individually so special chars are safe
 		const filePath = file.filePath;
+		// Warm the source into RAM so the many per-frame seeks read from the page
+		// cache rather than hammering the disk (no-op unless a budget is set).
+		this.memoryCache.touch(filePath);
 		const framesDir = join(movieDir, '_frames');
 		mkdirSync(framesDir, { recursive: true });
 
