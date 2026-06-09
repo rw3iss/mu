@@ -390,7 +390,7 @@ export function Library(_props: LibraryProps) {
 					{canUpload && (
 						<Tooltip label="Upload a movie file or folder directly to the server's library">
 							<button
-								class={styles.uploadBtn}
+								class={styles.showHiddenBtn}
 								onClick={() => setShowUpload(true)}
 								aria-label="Upload to library"
 							>
