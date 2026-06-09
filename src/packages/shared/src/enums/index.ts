@@ -31,6 +31,13 @@ export enum WsEvent {
 	STREAM_STARTED = 'stream:started',
 	STREAM_ENDED = 'stream:ended',
 	/**
+	 * A user's watched/in-progress status for a movie changed (finished playing,
+	 * marked watched/unwatched). Lets the dashboard "Continue Watching" rail and
+	 * resume bars refresh live. Payload: { userId, movieId, watched }. Channel:
+	 * `watch`.
+	 */
+	WATCH_STATUS_CHANGED = 'watch:status-changed',
+	/**
 	 * A movie's stream was superseded — its source changed (e.g. a background
 	 * MP4 conversion replaced the original / produced a cached direct-play
 	 * file, and the old HLS cache was cleared). Clients currently playing that

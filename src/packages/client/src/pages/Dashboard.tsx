@@ -9,6 +9,7 @@ import { useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
+import { wsService } from '@/services/websocket.service';
 import { currentUser } from '@/state/auth.state';
 import type { Movie, ViewMode } from '@/state/library.state';
 import { notifyError } from '@/state/notifications.state';
@@ -60,6 +61,33 @@ export function Dashboard(_props: DashboardProps) {
 		}
 
 		load();
+	}, []);
+
+	// Keep "Continue Watching" live: refresh it whenever this user's watch status
+	// changes (a movie finishes playing, or is marked watched/unwatched).
+	useEffect(() => {
+		wsService.subscribe('watch');
+		wsService.subscribe('stream');
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		const refresh = (data: unknown) => {
+			const uid = (data as { userId?: string } | null)?.userId;
+			const me = currentUser.value?.id;
+			if (uid && me && uid !== me) return; // ignore other users' changes
+			if (timer) clearTimeout(timer);
+			timer = setTimeout(() => {
+				moviesService
+					.getContinueWatching()
+					.then((r) => setContinueWatching(r.movies))
+					.catch(() => {});
+			}, 250);
+		};
+		wsService.on('watch:status-changed', refresh);
+		wsService.on('stream:ended', refresh);
+		return () => {
+			if (timer) clearTimeout(timer);
+			wsService.off('watch:status-changed', refresh);
+			wsService.off('stream:ended', refresh);
+		};
 	}, []);
 
 	const user = currentUser.value;

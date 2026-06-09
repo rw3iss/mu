@@ -1,7 +1,8 @@
-import { nowISO, paginationDefaults } from '@mu/shared';
+import { nowISO, paginationDefaults, WsEvent } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
+import { EventsService } from '../events/events.service.js';
 import {
 	movieFiles,
 	movies,
@@ -16,7 +17,13 @@ export class HistoryService {
 	constructor(
 		private readonly database: DatabaseService,
 		private readonly settings: SettingsService,
+		private readonly events: EventsService,
 	) {}
+
+	/** Notify clients (dashboard rail, resume bars) that a user's watch status changed. */
+	private emitWatchChange(userId: string, movieId: string, watched: boolean): void {
+		this.events.emit(WsEvent.WATCH_STATUS_CHANGED, { userId, movieId, watched });
+	}
 
 	addToHistory(
 		userId: string,
@@ -128,11 +135,14 @@ export class HistoryService {
 			.get();
 
 		if (existing) {
+			// Marking watched clears the resume position so it leaves "Continue
+			// Watching" (which only lists in-progress titles) but stays in history.
 			this.database.db
 				.update(userWatchHistory)
-				.set({ completed: true, watchedAt: now })
+				.set({ completed: true, positionSeconds: 0, watchedAt: now })
 				.where(eq(userWatchHistory.id, existing.id))
 				.run();
+			this.emitWatchChange(userId, movieId, true);
 			return;
 		}
 
@@ -142,10 +152,12 @@ export class HistoryService {
 				id: crypto.randomUUID(),
 				userId,
 				movieId,
+				positionSeconds: 0,
 				completed: true,
 				watchedAt: now,
 			})
 			.run();
+		this.emitWatchChange(userId, movieId, true);
 	}
 
 	clearHistory(userId: string) {
@@ -157,6 +169,7 @@ export class HistoryService {
 			.delete(userWatchHistory)
 			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, movieId)))
 			.run();
+		this.emitWatchChange(userId, movieId, false);
 	}
 
 	/**
@@ -200,7 +213,8 @@ export class HistoryService {
 			})
 			.from(userWatchHistory)
 			.leftJoin(movieFiles, eq(movieFiles.movieId, userWatchHistory.movieId))
-			.where(eq(userWatchHistory.userId, userId))
+			// Only in-progress titles get a resume position — finished ones don't.
+			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, false)))
 			.orderBy(desc(userWatchHistory.watchedAt))
 			.all();
 
@@ -227,13 +241,10 @@ export class HistoryService {
 	}
 
 	getContinueWatching(userId: string) {
-		// Returns the user's most-recently-watched movies regardless of
-		// completion state. The dashboard's "Continue Watching" rail
-		// mirrors the sidebar's "Recent" list — anything you watched,
-		// fully or partially, ordered by when you last touched it.
-		// Completed movies still show with progress=1 so the card shows
-		// the full progress bar (the player decides whether "Play"
-		// resumes or restarts based on watch position).
+		// The dashboard "Continue Watching" rail lists only IN-PROGRESS titles —
+		// finished movies (completed=true) are excluded so they don't linger here
+		// after you watch them; they remain in the full watch history. Ordered by
+		// when you last touched them.
 		const rows = this.database.db
 			.select({
 				id: movies.id,
@@ -252,7 +263,7 @@ export class HistoryService {
 			})
 			.from(userWatchHistory)
 			.innerJoin(movies, eq(userWatchHistory.movieId, movies.id))
-			.where(eq(userWatchHistory.userId, userId))
+			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, false)))
 			.orderBy(desc(userWatchHistory.watchedAt))
 			.limit(20)
 			.all();

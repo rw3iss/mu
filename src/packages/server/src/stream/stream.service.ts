@@ -888,6 +888,12 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 					watchedAt: nowISO(),
 				});
 			}
+			// Tell clients so the dashboard rail / resume bars drop this title live.
+			this.events.emit(WsEvent.WATCH_STATUS_CHANGED, {
+				userId: session.userId,
+				movieId: session.movieId,
+				watched: true,
+			});
 			return;
 		}
 
