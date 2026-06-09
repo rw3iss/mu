@@ -1039,3 +1039,26 @@
   gap: var(--space-sm);
   margin-top: var(--space-sm);
 }
+
+/* Share — a simple larger icon button beside the favorite star, after the title. */
+.shareIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+
+  &:hover {
+    color: var(--color-accent);
+    background: var(--surface-overlay-1);
+  }
+}

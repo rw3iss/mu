@@ -563,6 +563,17 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									size="large"
 									stopPropagation
 								/>
+								{!isPreview && (
+									<button
+										type="button"
+										class={styles.shareIconBtn}
+										onClick={() => setShowShareModal(true)}
+										title="Share this movie"
+										aria-label="Share this movie"
+									>
+										<Icon name="share" size={20} />
+									</button>
+								)}
 							</div>
 						)}
 
@@ -771,16 +782,6 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											<Icon name="star" size={14} /> Watchlist
 										</>
 									)}
-								</Button>
-							)}
-							{!isRemote && !isPreview && (
-								<Button
-									variant="ghost"
-									size="lg"
-									onClick={() => setShowShareModal(true)}
-									title="Share this movie"
-								>
-									<Icon name="share" size={14} /> Share
 								</Button>
 							)}
 							<Button

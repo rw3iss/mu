@@ -384,11 +384,11 @@ export function MovieOptionsMenu({
 		movie.status === 'processing' ||
 		movie.status === 'processing_playable' ||
 		processingMovieIds.value.has(movie.id);
+	// Any played-from-disk library movie can be downloaded (by movieId) — works
+	// from card menus too, where fileInfo isn't loaded. Bookmarks/externals have
+	// no file; processing ones aren't ready yet.
 	const canDownload =
-		movie.source !== 'bookmark' &&
-		movie.source !== 'external' &&
-		!!movie.fileInfo?.filePath &&
-		!isProcessing;
+		movie.source !== 'bookmark' && movie.source !== 'external' && !isProcessing;
 
 	return (
 		<div class={`${styles.container} ${compact ? styles.compact : ''}`} ref={containerRef}>
@@ -429,21 +429,6 @@ export function MovieOptionsMenu({
 							</span>
 							{inWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}
 						</button>
-						{canDownload && (
-							<button
-								class={styles.menuItem}
-								onClick={(e: Event) => {
-									e.stopPropagation();
-									setOpen(false);
-									setShowDownloadModal(true);
-								}}
-							>
-								<span class={styles.menuIcon}>
-									<Icon name="download" />
-								</span>
-								Download for Offline
-							</button>
-						)}
 						<div
 							class={styles.flyoutAnchor}
 							onMouseEnter={openPlaylistFlyout}
@@ -516,6 +501,21 @@ export function MovieOptionsMenu({
 								</div>
 							)}
 						</div>
+						{canDownload && (
+							<button
+								class={styles.menuItem}
+								onClick={(e: Event) => {
+									e.stopPropagation();
+									setOpen(false);
+									setShowDownloadModal(true);
+								}}
+							>
+								<span class={styles.menuIcon}>
+									<Icon name="download" />
+								</span>
+								Download for Offline
+							</button>
+						)}
 						<div
 							class={styles.flyoutAnchor}
 							onMouseEnter={openOps}
