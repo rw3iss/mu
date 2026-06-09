@@ -1,0 +1,76 @@
+.pager {
+	position: relative;
+}
+
+.track {
+	display: flex;
+	gap: var(--space-md);
+	overflow-x: auto;
+	overflow-y: hidden;
+	scroll-snap-type: x proximity;
+	// Room for card hover lift + the watch-progress bar at the bottom.
+	padding: 4px 2px var(--space-md);
+	@include scrollbar;
+}
+
+.item {
+	flex: 0 0 auto;
+	width: 180px;
+	scroll-snap-align: start;
+
+	@include mobile {
+		width: 150px;
+	}
+}
+
+.arrow {
+	position: absolute;
+	top: calc(50% - var(--space-md) / 2);
+	transform: translateY(-50%);
+	z-index: 3;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--radius-full);
+	background: var(--color-bg-elevated, rgba(20, 24, 34, 0.85));
+	border: var(--card-border);
+	color: var(--color-text-primary);
+	cursor: pointer;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+	opacity: 0.92;
+	transition:
+		opacity var(--transition-fast),
+		background var(--transition-fast),
+		color var(--transition-fast);
+
+	&:hover {
+		background: var(--color-accent);
+		color: #fff;
+		opacity: 1;
+	}
+
+	// Fade out (and ignore clicks) when there's nothing more to scroll to.
+	&:disabled {
+		opacity: 0;
+		pointer-events: none;
+	}
+}
+
+.arrowLeft {
+	left: 2px;
+}
+
+.arrowRight {
+	right: 2px;
+}
+
+.state {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	padding: var(--space-lg) var(--space-sm);
+	color: var(--color-text-secondary);
+	font-size: var(--font-size-sm);
+}

@@ -150,6 +150,17 @@ export class MoviesController {
 		return this.moviesService.getGenres();
 	}
 
+	/**
+	 * Library-growth stats for the dashboard header: titles added since the
+	 * user's last session + a rolling 24h count. Cheap COUNT queries; the
+	 * shared rolling window is cached ~1 min server-side.
+	 */
+	@RequireAction('view:own-data')
+	@Get('stats/new')
+	getNewStats(@CurrentUser('id') userId: string) {
+		return this.moviesService.getLibraryGrowthStats(userId);
+	}
+
 	@RequireAction('view:own-data')
 	@Get('continue-watching')
 	getContinueWatching(@CurrentUser('id') userId: string) {

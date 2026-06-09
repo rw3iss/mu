@@ -23,6 +23,7 @@ import {
 	playlistMovies,
 	transcodeCache,
 	userRatings,
+	users,
 	userWatchHistory,
 	userWatchlist,
 } from '../database/schema/index.js';
@@ -902,6 +903,67 @@ export class MoviesService implements OnModuleInit {
 			.map(this.applyPosterFallback);
 	}
 
+	/** Short-TTL cache for shared rolling-window growth counts. */
+	private growthCountCache = new Map<string, { value: number; at: number }>();
+
+	/** Count visible library movies added strictly after an ISO timestamp. */
+	private countAddedSince(sinceIso: string): number {
+		const r = this.database.db
+			.select({ count: count() })
+			.from(movies)
+			.where(
+				and(
+					sql`(${movies.source} IS NULL OR ${movies.source} = 'library')`,
+					sql`(${movies.hidden} IS NULL OR ${movies.hidden} = 0)`,
+					sql`${movies.addedAt} > ${sinceIso}`,
+				),
+			)
+			.get();
+		return r?.count ?? 0;
+	}
+
+	/** Cached count for shared windows — reused within `ttlMs` across users. */
+	private cachedCountSince(key: string, sinceIso: string, ttlMs: number): number {
+		const now = Date.now();
+		const hit = this.growthCountCache.get(key);
+		if (hit && now - hit.at < ttlMs) return hit.value;
+		const value = this.countAddedSince(sinceIso);
+		this.growthCountCache.set(key, { value, at: now });
+		return value;
+	}
+
+	/**
+	 * Library-growth stats for the dashboard header. `sinceSession` counts
+	 * titles added since the user's PREVIOUS login ("new since your last
+	 * session"); `last24h` is a rolling 24-hour count, cached ~1 min and shared
+	 * across users. Built to extend later with more windows (week/month/year)
+	 * by adding more `cachedCountSince` calls.
+	 */
+	getLibraryGrowthStats(userId: string): {
+		sinceSession: number;
+		sinceDate: string | null;
+		last24h: number;
+	} {
+		const u = userId
+			? this.database.db
+					.select({ prev: users.previousLoginAt, last: users.lastLoginAt })
+					.from(users)
+					.where(eq(users.id, userId))
+					.get()
+			: null;
+		// Reference = the prior session's login. Fall back to the current login
+		// (counts ~0 until they next log in) rather than account creation, which
+		// would massively over-report on the first run after this ships.
+		const sinceDate = u?.prev ?? u?.last ?? null;
+		const sinceSession = sinceDate ? this.countAddedSince(sinceDate) : 0;
+		const last24h = this.cachedCountSince(
+			'window:24h',
+			new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+			60_000,
+		);
+		return { sinceSession, sinceDate, last24h };
+	}
+
 	/**
 	 * Trending = what people are actually watching lately, across ALL users.
 	 * Takes each user's most-recent `PER_USER_LIMIT` watches, aggregates by
@@ -956,7 +1018,8 @@ export class MoviesService implements OnModuleInit {
 		const orderedIds = [...agg.entries()]
 			.sort(
 				(a, b) =>
-					b[1].instances - a[1].instances || b[1].lastWatched.localeCompare(a[1].lastWatched),
+					b[1].instances - a[1].instances ||
+					b[1].lastWatched.localeCompare(a[1].lastWatched),
 			)
 			.slice(0, limit)
 			.map(([movieId]) => movieId);

@@ -71,12 +71,19 @@ export class AuthService {
 			throw new UnauthorizedException('Invalid credentials');
 		}
 
-		// Record the login so profiles can show an "Active …" timestamp.
+		// Record the login so profiles can show an "Active …" timestamp. Capture
+		// the PRIOR login into previousLoginAt first, so the dashboard can count
+		// "new since your last session" against the previous visit, not this one.
+		const previousLoginAt = user.lastLoginAt ?? null;
 		const lastLoginAt = nowISO();
-		this.database.db.update(users).set({ lastLoginAt }).where(eq(users.id, user.id)).run();
+		this.database.db
+			.update(users)
+			.set({ lastLoginAt, previousLoginAt })
+			.where(eq(users.id, user.id))
+			.run();
 
 		const { passwordHash: _, ...userWithoutPassword } = user;
-		return { ...userWithoutPassword, lastLoginAt };
+		return { ...userWithoutPassword, lastLoginAt, previousLoginAt };
 	}
 
 	/** Record an explicit logout so profiles can show a "Logged out" status. */

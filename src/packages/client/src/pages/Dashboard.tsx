@@ -4,11 +4,12 @@ import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { Tooltip } from '@/components/common/Tooltip';
+import { HorizontalMoviePager } from '@/components/movie/HorizontalMoviePager';
 import { MovieGrid } from '@/components/movie/MovieGrid';
 import { useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
-import { moviesService } from '@/services/movies.service';
+import { moviesService, type NewTitleStats } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
 import { currentUser } from '@/state/auth.state';
 import type { Movie, ViewMode } from '@/state/library.state';
@@ -20,10 +21,28 @@ interface DashboardProps {
 	path?: string;
 }
 
+/**
+ * Build the dashboard header growth line. Prefers "since your last session"
+ * (gated on > 0) with the rolling 24h count in parentheses; falls back to a
+ * 24h-only line. Returns null when there's nothing new to report.
+ */
+function formatNewTitles(stats: NewTitleStats | null): string | null {
+	if (!stats) return null;
+	const { sinceSession, last24h } = stats;
+	const titles = (n: number) => `${n} new ${n === 1 ? 'title' : 'titles'}`;
+	if (sinceSession > 0) {
+		const tail = last24h > 0 ? ` (${last24h} in the last 24 hours)` : '';
+		return `${titles(sinceSession)} added since your last session${tail}.`;
+	}
+	if (last24h > 0) return `${titles(last24h)} added in the last 24 hours.`;
+	return null;
+}
+
 export function Dashboard(_props: DashboardProps) {
 	const [continueWatching, setContinueWatching] = useState<Movie[]>([]);
 	const [recentlyAdded, setRecentlyAdded] = useState<Movie[]>([]);
 	const [trending, setTrending] = useState<Movie[]>([]);
+	const [newStats, setNewStats] = useState<NewTitleStats | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	// One shared view mode for all three columns (was per-section).
 	const [view, setView] = useUiSetting<ViewMode>('dashboard_view', 'grid');
@@ -63,6 +82,15 @@ export function Dashboard(_props: DashboardProps) {
 		load();
 	}, []);
 
+	// Library-growth stat for the header ("new since your last session"). Loaded
+	// independently (lightly cached in the service) so it never blocks the feeds.
+	useEffect(() => {
+		moviesService
+			.getNewStats()
+			.then(setNewStats)
+			.catch(() => {});
+	}, []);
+
 	// Keep "Continue Watching" live: refresh it whenever this user's watch status
 	// changes (a movie finishes playing, or is marked watched/unwatched).
 	useEffect(() => {
@@ -100,6 +128,9 @@ export function Dashboard(_props: DashboardProps) {
 			seeAll: '/history',
 			movies: continueWatching,
 			empty: 'Nothing in progress yet',
+			area: styles.areaCw,
+			// Renders as a horizontal scrolling rail rather than a vertical grid.
+			horizontal: true,
 		},
 		{
 			key: 'ra',
@@ -108,6 +139,8 @@ export function Dashboard(_props: DashboardProps) {
 			seeAll: '/library',
 			movies: recentlyAdded,
 			empty: 'No movies in your library yet',
+			area: styles.areaRa,
+			horizontal: false,
 		},
 		{
 			key: 'tr',
@@ -116,8 +149,12 @@ export function Dashboard(_props: DashboardProps) {
 			seeAll: '/discover',
 			movies: trending,
 			empty: 'Nothing trending yet',
+			area: styles.areaTrending,
+			horizontal: false,
 		},
 	];
+
+	const newTitlesMessage = formatNewTitles(newStats);
 
 	return (
 		<div class={`${styles.dashboard} stagger-rise`}>
@@ -125,14 +162,17 @@ export function Dashboard(_props: DashboardProps) {
 
 			{/* Welcome row: greeting on the left, view toggle + nav on the right. */}
 			<div class={styles.welcomeRow}>
-				<p class={styles.welcomeText}>
-					Welcome back
-					{user && (
-						<>
-							, <span class={styles.welcomeUser}>{resolveDisplayName(user)}</span>
-						</>
-					)}
-				</p>
+				<div class={styles.welcomeGreeting}>
+					<p class={styles.welcomeText}>
+						Welcome back
+						{user && (
+							<>
+								, <span class={styles.welcomeUser}>{resolveDisplayName(user)}</span>
+							</>
+						)}
+					</p>
+					{newTitlesMessage && <p class={styles.welcomeStat}>{newTitlesMessage}</p>}
+				</div>
 				<div class={styles.welcomeActions}>
 					<div class={styles.viewToggle} role="group" aria-label="Dashboard view">
 						<Tooltip label="Cards">
@@ -197,7 +237,7 @@ export function Dashboard(_props: DashboardProps) {
 					{sections.map((s, i) => (
 						<section
 							key={s.key}
-							class={`${styles.column} ${activeTab === i ? styles.activeColumn : ''}`}
+							class={`${styles.column} ${s.area} ${activeTab === i ? styles.activeColumn : ''}`}
 						>
 							<div class={styles.sectionHeader}>
 								<h2 class={styles.sectionTitle}>{s.title}</h2>
@@ -205,14 +245,24 @@ export function Dashboard(_props: DashboardProps) {
 									See All
 								</Button>
 							</div>
-							<div class={styles.columnBody}>
-								<div class={styles.fade} aria-hidden="true" />
-								<MovieGrid
-									movies={s.movies}
-									isLoading={isLoading}
-									viewMode={view}
-									emptyMessage={s.empty}
-								/>
+							<div
+								class={`${styles.columnBody} ${s.horizontal ? styles.columnBodyHorizontal : ''}`}
+							>
+								{!s.horizontal && <div class={styles.fade} aria-hidden="true" />}
+								{s.horizontal ? (
+									<HorizontalMoviePager
+										movies={s.movies}
+										isLoading={isLoading}
+										emptyMessage={s.empty}
+									/>
+								) : (
+									<MovieGrid
+										movies={s.movies}
+										isLoading={isLoading}
+										viewMode={view}
+										emptyMessage={s.empty}
+									/>
+								)}
 							</div>
 						</section>
 					))}

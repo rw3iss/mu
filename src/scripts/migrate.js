@@ -431,6 +431,7 @@ const alters = [
 	'ALTER TABLE users ADD COLUMN profile_public INTEGER DEFAULT 0',
 	'ALTER TABLE users ADD COLUMN last_login_at TEXT',
 	'ALTER TABLE users ADD COLUMN last_logout_at TEXT',
+	'ALTER TABLE users ADD COLUMN previous_login_at TEXT',
 	'ALTER TABLE users ADD COLUMN display_name TEXT',
 	'ALTER TABLE feedback ADD COLUMN attachment_url TEXT',
 	'ALTER TABLE feedback ADD COLUMN attachment_type TEXT',

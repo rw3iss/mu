@@ -17,6 +17,10 @@ export const users = sqliteTable('users', {
 	profilePublic: integer('profile_public', { mode: 'boolean' }).default(true),
 	/** Updated on each successful login; feeds the profile "Active …" label. */
 	lastLoginAt: text('last_login_at'),
+	/** The login time BEFORE the current one — captured at login by copying the
+	 *  prior `lastLoginAt`. Lets the dashboard count "new since your last
+	 *  session" against the previous visit rather than the current one. */
+	previousLoginAt: text('previous_login_at'),
 	/** Updated on explicit logout; when newer than last activity, the profile
 	 *  shows "Logged out" instead of "Active …". */
 	lastLogoutAt: text('last_logout_at'),

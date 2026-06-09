@@ -51,6 +51,19 @@ export interface MovieFile {
 // Movies Service
 // ============================================
 
+/** Library-growth stats shown in the dashboard header. */
+export interface NewTitleStats {
+	/** Titles added since the user's previous session/login. */
+	sinceSession: number;
+	/** The reference timestamp used (ISO), or null if unknown. */
+	sinceDate: string | null;
+	/** Rolling count of titles added in the last 24 hours. */
+	last24h: number;
+}
+
+const NEW_STATS_TTL_MS = 60_000;
+let newStatsCache: { value: NewTitleStats; at: number } | null = null;
+
 export const moviesService = {
 	/**
 	 * List movies with pagination and filtering
@@ -154,6 +167,23 @@ export const moviesService = {
 	 */
 	getContinueWatching(): Promise<MovieListResponse> {
 		return api.get<MovieListResponse>('/movies/continue-watching');
+	},
+
+	/**
+	 * Library-growth stats for the dashboard header (new since last session +
+	 * rolling 24h count). Lightly cached client-side so revisiting the
+	 * dashboard within ~60s doesn't refetch; the server also caches the
+	 * shared rolling window.
+	 */
+	getNewStats(): Promise<NewTitleStats> {
+		const now = Date.now();
+		if (newStatsCache && now - newStatsCache.at < NEW_STATS_TTL_MS) {
+			return Promise.resolve(newStatsCache.value);
+		}
+		return api.get<NewTitleStats>('/movies/stats/new').then((value) => {
+			newStatsCache = { value, at: Date.now() };
+			return value;
+		});
 	},
 
 	/**

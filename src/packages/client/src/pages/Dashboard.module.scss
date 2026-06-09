@@ -28,11 +28,25 @@
   padding: 0;
 }
 
+/* Greeting + the "new since your last session" growth line, stacked. */
+.welcomeGreeting {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
 .welcomeText {
   font-size: var(--font-size-lg);
   color: var(--color-text-secondary);
   font-weight: var(--font-weight-normal);
   margin: 0;
+}
+
+.welcomeStat {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 .welcomeUser {
@@ -137,7 +151,6 @@
   // Stretch columns to fill the (fixed-height) dashboard so each scrolls.
   @media (min-width: 768px) {
     height: 100%;
-    grid-auto-rows: 1fr;
     align-items: stretch;
   }
 }
@@ -165,6 +178,16 @@
   }
 }
 
+/* Continue-Watching rail: a horizontal pager, so the body must NOT become a
+   vertical scroller (that's the default .columnBody desktop behaviour). */
+.columnBodyHorizontal {
+  @media (min-width: 768px) {
+    flex: none;
+    min-height: 0;
+    overflow: visible;
+  }
+}
+
 /* Soft fade over the top of each scrolling list — bg fading to translucent,
    pinned to the top of the column body so items slip under it as you scroll
    (the column header stays fixed above it). */
@@ -189,17 +212,43 @@
 }
 
 /* Enough room for three columns of cards → show all three, hide the tabs. */
+/* Medium+ : merge the left two columns into one stacked area (Continue
+   Watching above Recently Added) with Trending spanning the full height on
+   the right. Left and right are 50/50 here — the left has already "shrunk
+   first" from its wider tier below. */
 @container dash (min-width: 720px) {
   .tabs {
     display: none;
   }
 
   .columns {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "cw trending"
+      "ra trending";
+  }
+
+  .areaCw {
+    grid-area: cw;
+  }
+  .areaRa {
+    grid-area: ra;
+  }
+  .areaTrending {
+    grid-area: trending;
   }
 
   .column:not(.activeColumn) {
     display: flex;
+  }
+}
+
+/* Wide : give the merged left area extra width (2:1). As the window narrows
+   the left shrinks first back toward 50% (the 720px tier above). */
+@container dash (min-width: 1040px) {
+  .columns {
+    grid-template-columns: 2fr 1fr;
   }
 }
 
