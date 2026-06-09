@@ -152,7 +152,7 @@ function renderSpritePortal(args: {
 				display: 'flex',
 				flexDirection: 'column',
 				alignItems: 'center',
-				zIndex: 2147483647,
+				zIndex: 'var(--z-portal-overlay)',
 			}}
 		>
 			<div

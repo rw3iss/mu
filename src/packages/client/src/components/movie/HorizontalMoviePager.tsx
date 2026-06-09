@@ -10,6 +10,8 @@ interface HorizontalMoviePagerProps {
 	isLoading?: boolean;
 	emptyMessage?: string;
 	onMovieRemoved?: (movieId: string) => void;
+	/** Extra class appended to the root, so callers can tweak layout/spacing. */
+	class?: string;
 }
 
 /**
@@ -23,6 +25,7 @@ export function HorizontalMoviePager({
 	isLoading,
 	emptyMessage,
 	onMovieRemoved,
+	class: className = '',
 }: HorizontalMoviePagerProps) {
 	const trackRef = useRef<HTMLDivElement>(null);
 	const [canLeft, setCanLeft] = useState(false);
@@ -57,18 +60,20 @@ export function HorizontalMoviePager({
 
 	if (isLoading) {
 		return (
-			<div class={styles.state}>
+			<div class={`${styles.state} ${className}`}>
 				<Spinner size="md" />
 			</div>
 		);
 	}
 
 	if (!movies.length) {
-		return <div class={styles.state}>{emptyMessage ?? 'Nothing here yet'}</div>;
+		return (
+			<div class={`${styles.state} ${className}`}>{emptyMessage ?? 'Nothing here yet'}</div>
+		);
 	}
 
 	return (
-		<div class={styles.pager}>
+		<div class={`${styles.pager} ${className}`}>
 			<button
 				class={`${styles.arrow} ${styles.arrowLeft}`}
 				onClick={() => page(-1)}

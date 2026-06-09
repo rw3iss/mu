@@ -494,7 +494,7 @@
 	// narrow even though the hit area is wide.
 	padding: 14px 0;
 	min-width: 72px;
-	background: rgba(18, 18, 18, 0.97);
+	background: var(--player-menu-bg);
 	border: 1px solid var(--on-dark-overlay-1);
 	border-radius: 6px;
 	box-shadow: var(--shadow-overlay-up);
@@ -635,7 +635,7 @@
 	max-width: 320px;
 	max-height: 80vh;
 	overflow-y: auto;
-	background: rgba(18, 18, 18, 0.97);
+	background: var(--player-menu-bg);
 	border: 1px solid var(--surface-overlay-2);
 	border-radius: 6px;
 	padding: 4px 0;
@@ -1365,24 +1365,27 @@
 	position: fixed;
 	// Anchored at the cursor; render centered just above it.
 	transform: translate(-50%, calc(-100% - 10px));
-	z-index: 2147483000;
+	z-index: var(--z-portal-overlay);
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
 	padding: 10px 12px;
 	min-width: 180px;
-	background: var(--color-bg-elevated, #1b2030);
-	border: 1px solid var(--color-border, rgba(255, 255, 255, 0.14));
-	border-radius: 10px;
-	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
-	color: #fff;
+	// Match the sibling player popups (.menu / .volumePopup): always-dark
+	// surface, overlay border, glass blur, and the standard overlay shadow.
+	background: var(--player-menu-bg);
+	border: 1px solid var(--surface-overlay-2);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-overlay-strong);
+	backdrop-filter: blur(var(--surface-glass-blur));
+	color: var(--on-dark-text-primary);
 	font-family: inherit;
 }
 
 .shareMenuLabel {
 	font-size: 12px;
 	font-weight: 600;
-	color: rgba(255, 255, 255, 0.85);
+	color: var(--on-dark-text-secondary);
 	white-space: nowrap;
 }
 
@@ -1398,20 +1401,20 @@
 	justify-content: center;
 	gap: 6px;
 	padding: 6px 10px;
-	border: 1px solid rgba(255, 255, 255, 0.18);
-	border-radius: 6px;
-	background: rgba(255, 255, 255, 0.06);
-	color: #fff;
+	border: 1px solid var(--on-dark-overlay-3);
+	border-radius: var(--radius-sm);
+	background: var(--on-dark-overlay-1);
+	color: var(--on-dark-text-primary);
 	font-size: 12px;
 	font-weight: 600;
 	cursor: pointer;
 	transition:
-		background 120ms ease,
-		border-color 120ms ease;
+		background var(--transition-fast),
+		border-color var(--transition-fast);
 
 	&:hover {
-		background: var(--color-accent, #2563eb);
-		border-color: var(--color-accent, #2563eb);
+		background: var(--color-accent);
+		border-color: var(--color-accent);
 	}
 
 	&:disabled {

@@ -38,7 +38,7 @@
 	border: var(--card-border);
 	color: var(--color-text-primary);
 	cursor: pointer;
-	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+	box-shadow: var(--shadow-lg);
 	opacity: 0.92;
 	transition:
 		opacity var(--transition-fast),

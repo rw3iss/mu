@@ -179,6 +179,11 @@
   --z-modal: 400;
   --z-toast: 500;
   --z-player-controls: 600;
+  // Overlays portaled to <body> that must paint above the fixed video element
+  // (which can outrank the player chrome in split mode): seek-bar sprite
+  // preview, the "Copy URL at Time" share menu. One shared max value so the
+  // portaled layers don't fight each other with ad-hoc numbers.
+  --z-portal-overlay: 2147483000;
 
   // Appearance overrides (set at runtime by appearance.state.ts)
   --item-gap: var(--space-lg);
@@ -209,6 +214,12 @@
   --surface-glass-bg: var(--color-bg-elevated);
   --surface-glass-blur: 16px;
   --surface-glass-border: 1px solid var(--color-border);
+
+  // Always-dark popup surface for player chrome (settings/quality/volume/share
+  // menus). The player overlay is dark in every theme, so this is intentionally
+  // not theme-flipped — it just deduplicates the literal that was repeated
+  // across the player's popups.
+  --player-menu-bg: rgba(18, 18, 18, 0.97);
 
   // Hover lift — translateY + shadow combo for cards and clickable
   // surfaces. Use via `@mixin hover-lift` or the `.lift` utility class.
