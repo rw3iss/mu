@@ -92,7 +92,7 @@ export class ProfileService {
 			.all();
 
 		return rows.map((u) => {
-			const stats = this.computeStats(u.id, u.createdAt);
+			const stats = this.computeStats(u.id, u.createdAt, u.lastLoginAt ?? null);
 			const summary: MemberSummary = {
 				id: u.id,
 				username: u.username,
@@ -102,6 +102,8 @@ export class ProfileService {
 				createdAt: u.createdAt,
 				favoritesCount: stats.favoritesCount,
 				watchedCount: stats.watchedCount,
+				lastActiveAt: stats.lastActiveAt,
+				currentlyWatching: this.getCurrentlyWatching(u.id),
 			};
 			if (isAdmin) summary.profilePublic = !!u.profilePublic;
 			return summary;
@@ -174,8 +176,9 @@ export class ProfileService {
 
 		const stats: ProfileStats = {
 			favoritesCount: favorites.length,
-			watchedCount: this.history.getWatchedCount(user.id),
+			watchedCount: this.history.getHistoryCount(user.id),
 			joinedAt: user.createdAt,
+			lastActiveAt: this.getLastActiveAt(user.id, user.lastLoginAt ?? null),
 		};
 
 		return { user: profileUser, stats, favorites, history, currentlyWatching, editable: opts.editable };
@@ -265,7 +268,7 @@ export class ProfileService {
 		};
 	}
 
-	private computeStats(userId: string, createdAt: string): ProfileStats {
+	private computeStats(userId: string, createdAt: string, lastLoginAt: string | null): ProfileStats {
 		const fav = this.database.db
 			.select({ c: sql<number>`COUNT(*)` })
 			.from(favoritesTable)
@@ -273,9 +276,26 @@ export class ProfileService {
 			.get();
 		return {
 			favoritesCount: fav?.c ?? 0,
-			watchedCount: this.history.getWatchedCount(userId),
+			watchedCount: this.history.getHistoryCount(userId),
 			joinedAt: createdAt,
+			lastActiveAt: this.getLastActiveAt(userId, lastLoginAt),
 		};
+	}
+
+	/** Latest of: last login, most-recent watch, most-recent stream session. */
+	private getLastActiveAt(userId: string, lastLoginAt: string | null): string | null {
+		const session = this.database.db
+			.select({ at: streamSessions.lastActiveAt })
+			.from(streamSessions)
+			.where(eq(streamSessions.userId, userId))
+			.orderBy(desc(streamSessions.lastActiveAt))
+			.limit(1)
+			.get();
+		const candidates = [lastLoginAt, this.history.getLastWatchedAt(userId), session?.at ?? null];
+		return candidates.reduce<string | null>(
+			(best, cur) => (cur && (!best || cur > best) ? cur : best),
+			null,
+		);
 	}
 
 	// ── Lookups ───────────────────────────────────────────────────────────

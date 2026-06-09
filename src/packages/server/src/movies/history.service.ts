@@ -284,6 +284,28 @@ export class HistoryService {
 		});
 	}
 
+	/** Total movies in the user's history (started or completed) — the "watched" tally. */
+	getHistoryCount(userId: string): number {
+		const result = this.database.db
+			.select({ count: count() })
+			.from(userWatchHistory)
+			.where(eq(userWatchHistory.userId, userId))
+			.get();
+		return result?.count ?? 0;
+	}
+
+	/** Most recent watch timestamp for the user, or null. */
+	getLastWatchedAt(userId: string): string | null {
+		const result = this.database.db
+			.select({ watchedAt: userWatchHistory.watchedAt })
+			.from(userWatchHistory)
+			.where(eq(userWatchHistory.userId, userId))
+			.orderBy(desc(userWatchHistory.watchedAt))
+			.limit(1)
+			.get();
+		return result?.watchedAt ?? null;
+	}
+
 	getWatchedCount(userId: string): number {
 		const result = this.database.db
 			.select({ count: count() })

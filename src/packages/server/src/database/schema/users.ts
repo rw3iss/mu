@@ -12,6 +12,8 @@ export const users = sqliteTable('users', {
 	// view this user's profile/info (the per-user "show profile info" flag).
 	description: text('description'),
 	profilePublic: integer('profile_public', { mode: 'boolean' }).default(false),
+	/** Updated on each successful login; feeds the profile "Active …" label. */
+	lastLoginAt: text('last_login_at'),
 	createdAt: text('created_at').notNull(),
 	updatedAt: text('updated_at').notNull(),
 });

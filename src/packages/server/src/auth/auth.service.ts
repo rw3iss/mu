@@ -70,8 +70,12 @@ export class AuthService {
 			throw new UnauthorizedException('Invalid credentials');
 		}
 
+		// Record the login so profiles can show an "Active …" timestamp.
+		const lastLoginAt = nowISO();
+		this.database.db.update(users).set({ lastLoginAt }).where(eq(users.id, user.id)).run();
+
 		const { passwordHash: _, ...userWithoutPassword } = user;
-		return userWithoutPassword;
+		return { ...userWithoutPassword, lastLoginAt };
 	}
 
 	async findById(id: string) {

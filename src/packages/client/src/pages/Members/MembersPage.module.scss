@@ -85,9 +85,23 @@
 }
 
 .cardRole {
-	text-transform: capitalize;
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-sm);
 	font-size: var(--font-size-xs);
+}
+
+.roleText {
+	text-transform: capitalize;
 	color: var(--color-accent);
+}
+
+.active {
+	flex-shrink: 0;
+	text-transform: none;
+	color: var(--color-text-muted);
+	font-variant-numeric: tabular-nums;
 }
 
 .privateTag {
@@ -101,13 +115,60 @@
 	color: var(--color-text-secondary);
 	font-size: var(--font-size-sm);
 	line-height: var(--line-height-normal);
-	min-height: calc(var(--font-size-sm) * var(--line-height-normal) * 2);
 }
 
-.blurbMuted {
-	@extend .blurb;
+// Compact "watching now" row.
+.watching {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	padding: var(--space-xs) var(--space-sm);
+	background: var(--color-bg-elevated, rgba(255, 255, 255, 0.03));
+	border: var(--card-border);
+	border-radius: var(--radius-md);
+}
+
+.watchPoster {
+	flex-shrink: 0;
+	width: 28px;
+	height: 42px;
+	border-radius: var(--radius-sm);
+	overflow: hidden;
+	object-fit: cover;
+}
+
+.watchBody {
+	min-width: 0;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.watchTitle {
+	@include truncate(1);
+	font-size: var(--font-size-xs);
+	color: var(--color-text-primary);
+}
+
+.watchYear {
 	color: var(--color-text-muted);
-	font-style: italic;
+}
+
+.watchSeek {
+	position: relative;
+	height: 3px;
+	border-radius: 999px;
+	background: var(--color-border, rgba(255, 255, 255, 0.12));
+	overflow: hidden;
+}
+
+.watchSeekFill {
+	position: absolute;
+	inset: 0 auto 0 0;
+	height: 100%;
+	border-radius: inherit;
+	background: var(--color-accent);
 }
 
 .cardStats {

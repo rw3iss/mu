@@ -30,6 +30,8 @@ export interface ProfileStats {
 	favoritesCount: number;
 	watchedCount: number;
 	joinedAt: string;
+	/** Most recent activity (login / watch / session); null if never active. */
+	lastActiveAt: string | null;
 }
 
 /** One favorite entry on a profile, flattened for display + filtering. */
@@ -93,6 +95,10 @@ export interface MemberSummary {
 	createdAt: string;
 	favoritesCount: number;
 	watchedCount: number;
+	/** Most recent activity (login / watch / session); null if never active. */
+	lastActiveAt: string | null;
+	/** The user's live session, if any — shown as a compact row on the card. */
+	currentlyWatching: CurrentlyWatching | null;
 	/** Present for admins (so they can see who has opted in). */
 	profilePublic?: boolean;
 }

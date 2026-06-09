@@ -429,6 +429,7 @@ const alters = [
 	// Social profile fields (Members + profile pages).
 	'ALTER TABLE users ADD COLUMN description TEXT',
 	'ALTER TABLE users ADD COLUMN profile_public INTEGER DEFAULT 0',
+	'ALTER TABLE users ADD COLUMN last_login_at TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_url TEXT',
 	'ALTER TABLE movies ADD COLUMN thumbnail_aspect_ratio REAL',
 	'ALTER TABLE movies ADD COLUMN hidden INTEGER DEFAULT 0',

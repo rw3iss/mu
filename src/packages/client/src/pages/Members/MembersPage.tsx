@@ -1,7 +1,8 @@
-import type { MemberSummary } from '@mu/shared';
+import type { CurrentlyWatching, MemberSummary } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Avatar } from '@/components/common/Avatar';
+import { SmartImage } from '@/components/common/SmartImage';
 import { Spinner } from '@/components/common/Spinner';
 import { profileService } from '@/services/profile.service';
 import { relativeTime } from '@/utils/time-format';
@@ -69,16 +70,20 @@ export function MembersPage(_props: MembersPageProps) {
 								<div class={styles.cardId}>
 									<span class={styles.cardName}>{m.username}</span>
 									<span class={styles.cardRole}>
-										{m.role}
-										{m.profilePublic === false && <span class={styles.privateTag}> · private</span>}
+										<span class={styles.roleText}>
+											{m.role}
+											{m.profilePublic === false && (
+												<span class={styles.privateTag}> · private</span>
+											)}
+										</span>
+										{m.lastActiveAt && (
+											<span class={styles.active}>Active {relativeTime(m.lastActiveAt)}</span>
+										)}
 									</span>
 								</div>
 							</div>
-							{m.description ? (
-								<p class={styles.blurb}>{m.description}</p>
-							) : (
-								<p class={styles.blurbMuted}>No description.</p>
-							)}
+							{m.description && <p class={styles.blurb}>{m.description}</p>}
+							{m.currentlyWatching && <WatchingRow watching={m.currentlyWatching} />}
 							<div class={styles.cardStats}>
 								<span>
 									<strong>{m.favoritesCount}</strong> favorites
@@ -92,6 +97,34 @@ export function MembersPage(_props: MembersPageProps) {
 					))}
 				</div>
 			)}
+		</div>
+	);
+}
+
+/** Compact "watching now" row for a member card: tiny poster, title/year, seek bar. */
+function WatchingRow({ watching }: { watching: CurrentlyWatching }) {
+	const pct =
+		watching.durationSeconds && watching.durationSeconds > 0
+			? Math.min(100, Math.max(0, (watching.positionSeconds / watching.durationSeconds) * 100))
+			: 0;
+	return (
+		<div class={styles.watching} title={`Watching ${watching.title}`}>
+			<SmartImage
+				src={watching.posterUrl}
+				alt={watching.title}
+				class={styles.watchPoster}
+				fallbackLabel={watching.title}
+				iconOnly
+			/>
+			<div class={styles.watchBody}>
+				<span class={styles.watchTitle}>
+					{watching.title}
+					{watching.year ? <span class={styles.watchYear}> ({watching.year})</span> : null}
+				</span>
+				<span class={styles.watchSeek}>
+					<span class={styles.watchSeekFill} style={{ width: `${pct}%` }} />
+				</span>
+			</div>
 		</div>
 	);
 }
