@@ -149,7 +149,7 @@
 .columns {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-xl);
+  gap: var(--space-lg);
   align-items: start;
   // Match the Continue Watching rail's card width so Recently Added and
   // Trending pack more cards per row (Trending → ~2-up instead of 1).
@@ -167,6 +167,17 @@
    widths (auto-fill still drops it to one column when the column is narrow). */
 .areaTrending {
   --mg-card-min: 150px;
+
+  // On large monitors the right column is wide enough that 150px cards pack 4+;
+  // bump the min so it caps at fewer, larger cards (≈3 not 4, ≈2 not 3). The
+  // laptop sizes below this keep the smaller card so they still fit two.
+  @media (min-width: 1700px) {
+    --mg-card-min: 185px;
+  }
+
+  @media (min-width: 2300px) {
+    --mg-card-min: 215px;
+  }
 }
 
 .column {
