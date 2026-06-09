@@ -1,5 +1,4 @@
 import type { ProfileHistoryItem } from '@mu/shared';
-import { route } from 'preact-router';
 import { SmartImage } from '@/components/common/SmartImage';
 import { clockFromSeconds, relativeTime } from '@/utils/time-format';
 import styles from './ProfileHistoryList.module.scss';
@@ -31,15 +30,7 @@ export function ProfileHistoryList({ history }: ProfileHistoryListProps) {
 				const pct = progressPercent(item);
 				return (
 					<li key={`${item.movieId}-${item.watchedAt}`}>
-						<a
-							class={styles.row}
-							href={`/movie/${item.movieId}`}
-							onClick={(e: MouseEvent) => {
-								if (e.metaKey || e.ctrlKey || e.button === 1) return;
-								e.preventDefault();
-								route(`/movie/${item.movieId}`);
-							}}
-						>
+						<a class={styles.row} href={`/movie/${item.movieId}`}>
 							<SmartImage
 								src={item.posterUrl}
 								alt={item.title}

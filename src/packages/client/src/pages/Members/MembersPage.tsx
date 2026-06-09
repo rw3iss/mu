@@ -1,6 +1,5 @@
 import { type CurrentlyWatching, type MemberSummary, resolveDisplayName } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
-import { route } from 'preact-router';
 import { Avatar } from '@/components/common/Avatar';
 import { SmartImage } from '@/components/common/SmartImage';
 import { Spinner } from '@/components/common/Spinner';
@@ -35,8 +34,6 @@ export function MembersPage(_props: MembersPageProps) {
 		};
 	}, []);
 
-	const open = (username: string) => route(`/profile/${encodeURIComponent(username)}`);
-
 	return (
 		<div class={styles.page}>
 			<header class={styles.header}>
@@ -59,11 +56,6 @@ export function MembersPage(_props: MembersPageProps) {
 							key={m.id}
 							class={styles.card}
 							href={`/profile/${encodeURIComponent(m.username)}`}
-							onClick={(e: MouseEvent) => {
-								if (e.metaKey || e.ctrlKey || e.button === 1) return;
-								e.preventDefault();
-								open(m.username);
-							}}
 						>
 							<div class={styles.cardHead}>
 								<Avatar name={resolveDisplayName(m)} src={m.avatarUrl} size={48} />

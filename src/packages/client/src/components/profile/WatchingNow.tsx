@@ -1,5 +1,4 @@
 import type { CurrentlyWatching } from '@mu/shared';
-import { route } from 'preact-router';
 import { SmartImage } from '@/components/common/SmartImage';
 import { clockFromSeconds } from '@/utils/time-format';
 import styles from './WatchingNow.module.scss';
@@ -21,15 +20,7 @@ export function WatchingNow({ watching }: WatchingNowProps) {
 	const href = `/movie/${watching.movieId}`;
 
 	return (
-		<a
-			class={styles.tout}
-			href={href}
-			onClick={(e: MouseEvent) => {
-				if (e.metaKey || e.ctrlKey || e.button === 1) return;
-				e.preventDefault();
-				route(href);
-			}}
-		>
+		<a class={styles.tout} href={href}>
 			<SmartImage
 				src={watching.backdropUrl || watching.posterUrl}
 				alt={watching.title}
