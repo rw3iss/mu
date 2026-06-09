@@ -23,9 +23,12 @@ export function AppShell({ children }: AppShellProps) {
 	return (
 		<div
 			class={`${styles.shell} ${collapsed ? styles.collapsed : ''} ${showMiniPlayer ? styles.withMiniPlayer : ''} ${showSplitPlayer ? styles.withSplitPlayer : ''}`}
-			style={
-				showSplitPlayer ? { maxWidth: `calc(100vw - ${splitWidth.value}vw)` } : undefined
-			}
+			style={{
+				// Exposed so the fit-height dashboard can reserve space for the
+				// docked mini-player bar (the class itself is CSS-module-hashed).
+				'--mu-docked-player': showMiniPlayer ? 'var(--player-bar-height)' : '0px',
+				...(showSplitPlayer ? { maxWidth: `calc(100vw - ${splitWidth.value}vw)` } : {}),
+			}}
 		>
 			<Sidebar collapsed={collapsed} onToggle={() => (sidebarCollapsed.value = !collapsed)} />
 			<div class={styles.main}>

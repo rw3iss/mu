@@ -8,16 +8,12 @@
   // Fit the viewport so the columns (not the page) scroll. Desktop only —
   // mobile keeps its natural body scroll.
   @media (min-width: 768px) {
-    height: calc(100dvh - var(--topbar-height) - 2 * var(--space-lg));
+    // `--mu-docked-player` (set on the shell) is the mini-player bar height when
+    // docked, else 0 — so the page fits and the body doesn't scroll either way.
+    height: calc(
+      100dvh - var(--topbar-height) - 2 * var(--space-lg) - var(--mu-docked-player, 0px)
+    );
     overflow: hidden;
-
-    // When the mini-player is docked the content reserves space for its bar —
-    // subtract it too so the page still fits and the body doesn't scroll.
-    :global(.withMiniPlayer) & {
-      height: calc(
-        100dvh - var(--topbar-height) - 2 * var(--space-lg) - var(--player-bar-height)
-      );
-    }
   }
 }
 
