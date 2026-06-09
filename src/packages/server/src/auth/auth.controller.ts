@@ -74,7 +74,10 @@ export class AuthController {
 
 	@Post('logout')
 	@RequireAction('view:library')
-	async logout(@Res({ passthrough: true }) reply: any) {
+	async logout(@CurrentUser('id') userId: string, @Res({ passthrough: true }) reply: any) {
+		// Stamp the logout so Members/profile show "Logged out" (a later login
+		// flips it back to "Active").
+		this.authService.recordLogout(userId);
 		reply.clearCookie('mu_access_token', {
 			httpOnly: true,
 			path: '/',

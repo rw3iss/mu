@@ -211,12 +211,17 @@ export function ProfilePage({ username }: ProfilePageProps) {
 							<span class={styles.role}>{user.role}</span>
 							<span class={styles.dotSep}>·</span>
 							<span>Joined {relativeTime(stats.joinedAt)}</span>
-							{stats.lastActiveAt && (
+							{stats.loggedOutAt ? (
+								<>
+									<span class={styles.dotSep}>·</span>
+									<span>Logged out {relativeTime(stats.loggedOutAt)}</span>
+								</>
+							) : stats.lastActiveAt ? (
 								<>
 									<span class={styles.dotSep}>·</span>
 									<span>Active {relativeTime(stats.lastActiveAt)}</span>
 								</>
-							)}
+							) : null}
 						</div>
 						<div class={styles.stats}>
 							<span class={styles.stat}>

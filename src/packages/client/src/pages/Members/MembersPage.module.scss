@@ -125,6 +125,11 @@
 	font-variant-numeric: tabular-nums;
 }
 
+.loggedOut {
+	font-style: italic;
+	opacity: 0.8;
+}
+
 .privateTag {
 	color: var(--color-text-muted);
 	text-transform: none;

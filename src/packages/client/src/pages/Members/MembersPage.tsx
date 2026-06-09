@@ -68,9 +68,13 @@ export function MembersPage(_props: MembersPageProps) {
 												<span class={styles.privateTag}> · private</span>
 											)}
 										</span>
-										{m.lastActiveAt && (
+										{m.loggedOutAt ? (
+											<span class={`${styles.active} ${styles.loggedOut}`}>
+												Logged out {relativeTime(m.loggedOutAt)}
+											</span>
+										) : m.lastActiveAt ? (
 											<span class={styles.active}>Active {relativeTime(m.lastActiveAt)}</span>
-										)}
+										) : null}
 									</span>
 								</div>
 							</div>

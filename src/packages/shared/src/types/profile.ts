@@ -34,6 +34,9 @@ export interface ProfileStats {
 	joinedAt: string;
 	/** Most recent activity (login / watch / session); null if never active. */
 	lastActiveAt: string | null;
+	/** When the user last logged out, IF that's newer than their last activity
+	 *  (i.e. they're currently signed out). Null when they're active. */
+	loggedOutAt: string | null;
 }
 
 /** One favorite entry on a profile, flattened for display + filtering. */
@@ -105,6 +108,9 @@ export interface MemberSummary {
 	watchedCount: number;
 	/** Most recent activity (login / watch / session); null if never active. */
 	lastActiveAt: string | null;
+	/** When the user last logged out, if newer than their last activity (i.e.
+	 *  currently signed out); null when active. */
+	loggedOutAt: string | null;
 	/** The user's live session, if any — shown as a compact row on the card. */
 	currentlyWatching: CurrentlyWatching | null;
 	/** Present for admins (so they can see who has opted in). */

@@ -79,6 +79,16 @@ export class AuthService {
 		return { ...userWithoutPassword, lastLoginAt };
 	}
 
+	/** Record an explicit logout so profiles can show a "Logged out" status. */
+	recordLogout(userId: string): void {
+		if (!userId) return;
+		this.database.db
+			.update(users)
+			.set({ lastLogoutAt: nowISO() })
+			.where(eq(users.id, userId))
+			.run();
+	}
+
 	async findById(id: string) {
 		const user = this.database.db
 			.select({

@@ -100,7 +100,7 @@ export class ProfileService {
 			.all();
 
 		return rows.map((u) => {
-			const stats = this.computeStats(u.id, u.createdAt, u.lastLoginAt ?? null);
+			const stats = this.computeStats(u.id, u.createdAt, u.lastLoginAt ?? null, u.lastLogoutAt ?? null);
 			const summary: MemberSummary = {
 				id: u.id,
 				username: u.username,
@@ -112,6 +112,7 @@ export class ProfileService {
 				favoritesCount: stats.favoritesCount,
 				watchedCount: stats.watchedCount,
 				lastActiveAt: stats.lastActiveAt,
+				loggedOutAt: stats.loggedOutAt,
 				currentlyWatching: this.getCurrentlyWatching(u.id),
 			};
 			if (isAdmin) summary.profilePublic = !!u.profilePublic;
@@ -216,11 +217,13 @@ export class ProfileService {
 		]);
 		const currentlyWatching = this.getCurrentlyWatching(user.id);
 
+		const presence = this.getPresence(user.id, user.lastLoginAt ?? null, user.lastLogoutAt ?? null);
 		const stats: ProfileStats = {
 			favoritesCount: favorites.length,
 			watchedCount: this.history.getHistoryCount(user.id),
 			joinedAt: user.createdAt,
-			lastActiveAt: this.getLastActiveAt(user.id, user.lastLoginAt ?? null),
+			lastActiveAt: presence.lastActiveAt,
+			loggedOutAt: presence.loggedOutAt,
 		};
 
 		return { user: profileUser, stats, favorites, history, currentlyWatching, editable: opts.editable };
@@ -329,18 +332,40 @@ export class ProfileService {
 		};
 	}
 
-	private computeStats(userId: string, createdAt: string, lastLoginAt: string | null): ProfileStats {
+	private computeStats(
+		userId: string,
+		createdAt: string,
+		lastLoginAt: string | null,
+		lastLogoutAt: string | null,
+	): ProfileStats {
 		const fav = this.database.db
 			.select({ c: sql<number>`COUNT(*)` })
 			.from(favoritesTable)
 			.where(eq(favoritesTable.userId, userId))
 			.get();
+		const presence = this.getPresence(userId, lastLoginAt, lastLogoutAt);
 		return {
 			favoritesCount: fav?.c ?? 0,
 			watchedCount: this.history.getHistoryCount(userId),
 			joinedAt: createdAt,
-			lastActiveAt: this.getLastActiveAt(userId, lastLoginAt),
+			lastActiveAt: presence.lastActiveAt,
+			loggedOutAt: presence.loggedOutAt,
 		};
+	}
+
+	/**
+	 * Presence: `lastActiveAt` = latest of last login / watch / stream session;
+	 * `loggedOutAt` = the logout time IF it's newer than the last activity (so a
+	 * later login naturally clears it back to "active").
+	 */
+	private getPresence(
+		userId: string,
+		lastLoginAt: string | null,
+		lastLogoutAt: string | null,
+	): { lastActiveAt: string | null; loggedOutAt: string | null } {
+		const lastActiveAt = this.getLastActiveAt(userId, lastLoginAt);
+		const loggedOut = !!lastLogoutAt && (!lastActiveAt || lastLogoutAt > lastActiveAt);
+		return { lastActiveAt, loggedOutAt: loggedOut ? lastLogoutAt : null };
 	}
 
 	/** Latest of: last login, most-recent watch, most-recent stream session. */

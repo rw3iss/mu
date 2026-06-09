@@ -17,6 +17,9 @@ export const users = sqliteTable('users', {
 	profilePublic: integer('profile_public', { mode: 'boolean' }).default(true),
 	/** Updated on each successful login; feeds the profile "Active …" label. */
 	lastLoginAt: text('last_login_at'),
+	/** Updated on explicit logout; when newer than last activity, the profile
+	 *  shows "Logged out" instead of "Active …". */
+	lastLogoutAt: text('last_logout_at'),
 	createdAt: text('created_at').notNull(),
 	updatedAt: text('updated_at').notNull(),
 });
