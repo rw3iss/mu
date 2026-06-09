@@ -29,6 +29,14 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* Right-hand cluster: shared view toggle + nav links. */
+.welcomeActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-left: auto;
+}
+
 .welcomeLinks {
   display: inline-flex;
   align-items: center;
@@ -57,6 +65,23 @@
 
 .section {
   margin-bottom: var(--space-2xl);
+}
+
+/* Three side-by-side feeds (Continue Watching · Recently Added · Trending).
+   Collapses to a single column on narrower viewports. */
+.columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+  align-items: start;
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.column {
+  min-width: 0;
 }
 
 .sectionHeader {

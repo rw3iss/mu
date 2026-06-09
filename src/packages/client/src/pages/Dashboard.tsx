@@ -1,4 +1,5 @@
 import { resolveDisplayName } from '@mu/shared';
+import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
@@ -24,7 +25,8 @@ export function Dashboard(_props: DashboardProps) {
 	const [recentlyAdded, setRecentlyAdded] = useState<Movie[]>([]);
 	const [trending, setTrending] = useState<Movie[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
-	const [cwView, setCwView] = useUiSetting<ViewMode>('dashboard_cw_view', 'grid');
+	// One shared view mode for all three columns (was per-section).
+	const [view, setView] = useUiSetting<ViewMode>('dashboard_view', 'grid');
 
 	useEffect(() => {
 		async function load() {
@@ -60,14 +62,14 @@ export function Dashboard(_props: DashboardProps) {
 	}, []);
 
 	const user = currentUser.value;
+	// One card per column in grid view; list view renders short rows.
+	const gridColumns = view === 'grid' ? 1 : undefined;
 
 	return (
 		<div class={`${styles.dashboard} stagger-rise`}>
 			<PluginSlot name={UI.DASHBOARD_TOP} context={{}} />
 
-			{/* Compact welcome row: single-line text + inline link buttons.
-			    Mobile hides the inline buttons (the bottom nav already has
-			    Library + Discover tabs). */}
+			{/* Welcome row: greeting on the left, view toggle + nav on the right. */}
 			<div class={styles.welcomeRow}>
 				<p class={styles.welcomeText}>
 					Welcome back
@@ -77,92 +79,103 @@ export function Dashboard(_props: DashboardProps) {
 						</>
 					)}
 				</p>
-				<span class={styles.welcomeLinks}>
-					<button
-						class={styles.welcomeLink}
-						{...newTabNav('/library', () => route('/library'))}
-					>
-						Browse Library
-					</button>
-					<button
-						class={styles.welcomeLink}
-						{...newTabNav('/discover', () => route('/discover'))}
-					>
-						Discover
-					</button>
-				</span>
+				<div class={styles.welcomeActions}>
+					<div class={styles.viewToggle} role="group" aria-label="Dashboard view">
+						<Tooltip label="Cards">
+							<button
+								class={`${styles.viewBtn} ${view === 'grid' ? styles.active : ''}`}
+								onClick={() => setView('grid')}
+								aria-label="Card view"
+								aria-pressed={view === 'grid'}
+							>
+								<Icon name="view-grid" size={14} />
+							</button>
+						</Tooltip>
+						<Tooltip label="Rows">
+							<button
+								class={`${styles.viewBtn} ${view === 'list' ? styles.active : ''}`}
+								onClick={() => setView('list')}
+								aria-label="Row view"
+								aria-pressed={view === 'list'}
+							>
+								<Icon name="view-list" size={14} />
+							</button>
+						</Tooltip>
+					</div>
+					<span class={styles.welcomeLinks}>
+						<button
+							class={styles.welcomeLink}
+							{...newTabNav('/library', () => route('/library'))}
+						>
+							Browse Library
+						</button>
+						<button
+							class={styles.welcomeLink}
+							{...newTabNav('/discover', () => route('/discover'))}
+						>
+							Discover
+						</button>
+					</span>
+				</div>
 			</div>
 
-			{/* Continue Watching */}
-			{continueWatching.length > 0 && (
-				<section class={styles.section}>
-					<div class={styles.sectionHeader}>
-						<h2 class={styles.sectionTitle}>Continue Watching</h2>
-						<div class={styles.sectionActions}>
-							<div
-								class={styles.viewToggle}
-								role="group"
-								aria-label="Continue watching view"
-							>
-								<Tooltip label="Grid">
-									<button
-										class={`${styles.viewBtn} ${cwView === 'grid' ? styles.active : ''}`}
-										onClick={() => setCwView('grid')}
-										aria-label="Grid view"
-										aria-pressed={cwView === 'grid'}
-									>
-										<Icon name="view-grid" size={14} />
-									</button>
-								</Tooltip>
-								<Tooltip label="List">
-									<button
-										class={`${styles.viewBtn} ${cwView === 'list' ? styles.active : ''}`}
-										onClick={() => setCwView('list')}
-										aria-label="List view"
-										aria-pressed={cwView === 'list'}
-									>
-										<Icon name="view-list" size={14} />
-									</button>
-								</Tooltip>
-							</div>
-							<Button variant="ghost" size="sm" onClick={() => route('/history')}>
-								See All
-							</Button>
-						</div>
-					</div>
-					<MovieGrid movies={continueWatching} isLoading={isLoading} viewMode={cwView} />
-				</section>
-			)}
+			{/* Three columns: Continue Watching · Recently Added · Trending. */}
+			<div class={styles.columns}>
+				<DashColumn title="Continue Watching" onSeeAll={() => route('/history')}>
+					<MovieGrid
+						movies={continueWatching}
+						isLoading={isLoading}
+						viewMode={view}
+						gridColumns={gridColumns}
+						emptyMessage="Nothing in progress yet"
+					/>
+				</DashColumn>
 
-			{/* Recently Added */}
-			<section class={styles.section}>
-				<div class={styles.sectionHeader}>
-					<h2 class={styles.sectionTitle}>Recently Added</h2>
-					<Button variant="ghost" size="sm" onClick={() => route('/library')}>
-						See All
-					</Button>
-				</div>
-				<MovieGrid
-					movies={recentlyAdded}
-					isLoading={isLoading}
-					emptyMessage="No movies in your library yet"
-				/>
-			</section>
+				<DashColumn title="Recently Added" onSeeAll={() => route('/library')}>
+					<MovieGrid
+						movies={recentlyAdded}
+						isLoading={isLoading}
+						viewMode={view}
+						gridColumns={gridColumns}
+						emptyMessage="No movies in your library yet"
+					/>
+				</DashColumn>
 
-			{/* Trending */}
-			{trending.length > 0 && (
-				<section class={styles.section}>
-					<div class={styles.sectionHeader}>
-						<h2 class={styles.sectionTitle}>Trending</h2>
-						<Button variant="ghost" size="sm" onClick={() => route('/discover')}>
-							See All
-						</Button>
-					</div>
-					<MovieGrid movies={trending} isLoading={isLoading} />
-				</section>
-			)}
+				<DashColumn title="Trending" onSeeAll={() => route('/discover')}>
+					<MovieGrid
+						movies={trending}
+						isLoading={isLoading}
+						viewMode={view}
+						gridColumns={gridColumns}
+						emptyMessage="Nothing trending yet"
+					/>
+				</DashColumn>
+			</div>
 
 			<PluginSlot name={UI.DASHBOARD_BOTTOM} context={{}} />
 		</div>
+	);
+}
+
+/** One dashboard column: a titled section with a "See All" link and its body. */
+function DashColumn({
+	title,
+	onSeeAll,
+	children,
+}: {
+	title: string;
+	onSeeAll: () => void;
+	children: ComponentChildren;
+}) {
+	return (
+		<section class={styles.column}>
+			<div class={styles.sectionHeader}>
+				<h2 class={styles.sectionTitle}>{title}</h2>
+				<Button variant="ghost" size="sm" onClick={onSeeAll}>
+					See All
+				</Button>
+			</div>
+			{children}
+		</section>
 	);
 }

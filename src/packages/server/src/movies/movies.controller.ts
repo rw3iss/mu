@@ -159,8 +159,8 @@ export class MoviesController {
 
 	@RequireAction('view:library')
 	@Get('trending')
-	getTrending(@Query('limit') limit?: string) {
-		const movies = this.moviesService.findRecent(limit ? parseInt(limit, 10) : 20);
+	getTrending(@Query('limit') limit?: string, @CurrentUser('id') userId?: string) {
+		const movies = this.moviesService.getTrending(limit ? parseInt(limit, 10) : 20, userId);
 		return { movies, total: movies.length, page: 1, pageSize: movies.length };
 	}
 

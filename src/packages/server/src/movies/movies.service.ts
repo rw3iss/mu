@@ -902,6 +902,70 @@ export class MoviesService implements OnModuleInit {
 			.map(this.applyPosterFallback);
 	}
 
+	/**
+	 * Trending = what people are actually watching lately, across ALL users.
+	 * Takes each user's most-recent `PER_USER_LIMIT` watches, aggregates by
+	 * movie, and ranks by how many users watched it (instances) then by most-
+	 * recent play. So a movie several people watched recently bubbles to the
+	 * front; ties break toward the more recently played. Deleted movies drop
+	 * out (getMoviesByIds only returns existing rows).
+	 */
+	getTrending(limit: number = 20, userId?: string) {
+		const PER_USER_LIMIT = 20;
+
+		// Globally newest-first; per-user slices below stay in recency order.
+		const rows = this.database.db
+			.select({
+				userId: userWatchHistory.userId,
+				movieId: userWatchHistory.movieId,
+				watchedAt: userWatchHistory.watchedAt,
+			})
+			.from(userWatchHistory)
+			.orderBy(desc(userWatchHistory.watchedAt))
+			.all();
+
+		// Each user's most-recent PER_USER_LIMIT watches.
+		const byUser = new Map<string, { movieId: string; watchedAt: string }[]>();
+		for (const r of rows) {
+			const list = byUser.get(r.userId);
+			if (!list) {
+				byUser.set(r.userId, [{ movieId: r.movieId, watchedAt: r.watchedAt }]);
+			} else if (list.length < PER_USER_LIMIT) {
+				list.push({ movieId: r.movieId, watchedAt: r.watchedAt });
+			}
+		}
+
+		// Aggregate across users: instances = how many users have it in their
+		// recent list; lastWatched = the most recent play of it by anyone.
+		const agg = new Map<string, { instances: number; lastWatched: string }>();
+		for (const list of byUser.values()) {
+			const seen = new Set<string>();
+			for (const e of list) {
+				if (seen.has(e.movieId)) continue;
+				seen.add(e.movieId);
+				const cur = agg.get(e.movieId);
+				if (cur) {
+					cur.instances += 1;
+					if (e.watchedAt > cur.lastWatched) cur.lastWatched = e.watchedAt;
+				} else {
+					agg.set(e.movieId, { instances: 1, lastWatched: e.watchedAt });
+				}
+			}
+		}
+
+		const orderedIds = [...agg.entries()]
+			.sort(
+				(a, b) =>
+					b[1].instances - a[1].instances || b[1].lastWatched.localeCompare(a[1].lastWatched),
+			)
+			.slice(0, limit)
+			.map(([movieId]) => movieId);
+
+		// Fetch + restore the trending order (inArray doesn't preserve it).
+		const byId = new Map(this.getMoviesByIds(orderedIds, userId).map((m) => [m.id, m]));
+		return orderedIds.map((id) => byId.get(id)).filter((m): m is NonNullable<typeof m> => !!m);
+	}
+
 	search(q: string, userId?: string) {
 		const ratingJoinCond = userId
 			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
