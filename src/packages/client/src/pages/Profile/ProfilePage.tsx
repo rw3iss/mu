@@ -48,15 +48,14 @@ export function ProfilePage({ username }: ProfilePageProps) {
 		setLoading(true);
 		setNotFound(false);
 		const load = username ? profileService.getByUsername(username) : profileService.getMine();
-		load
-			.then((view: ProfileView) => {
-				if (cancelled) return;
-				setData(view);
-				setDescDraft(view.user.description ?? '');
-				setDisplayNameDraft(view.user.displayName ?? '');
-				setUsernameDraft(view.user.username);
-				setEmailDraft(view.user.email ?? '');
-			})
+		load.then((view: ProfileView) => {
+			if (cancelled) return;
+			setData(view);
+			setDescDraft(view.user.description ?? '');
+			setDisplayNameDraft(view.user.displayName ?? '');
+			setUsernameDraft(view.user.username);
+			setEmailDraft(view.user.email ?? '');
+		})
 			.catch(() => {
 				if (!cancelled) setNotFound(true);
 			})
@@ -161,37 +160,19 @@ export function ProfilePage({ username }: ProfilePageProps) {
 			)}
 
 			{/* ── Header / identity ───────────────────────────────── */}
-			<Panel
-				class={styles.headerPanel}
-				actions={
-					editMode && showUsersInfo.value ? (
-						<ToggleButton
-							pressed={!!user.profilePublic}
-							loading={togglingPublic}
-							onClick={handleTogglePublic}
-							title="Control whether other members can see your profile"
-						>
-							{user.profilePublic ? 'Profile is public' : 'Show Profile Info'}
-						</ToggleButton>
-					) : (
-						!editMode &&
-						isSelf && (
-							<Button variant="secondary" size="sm" onClick={() => route('/profile')}>
-								Edit profile
-							</Button>
-						)
-					)
-				}
-			>
+			<Panel class={styles.headerPanel}>
 				<div class={styles.identity}>
 					<Avatar
 						name={
 							editMode
-								? resolveDisplayName({ displayName: displayNameDraft, username: usernameDraft })
+								? resolveDisplayName({
+										displayName: displayNameDraft,
+										username: usernameDraft,
+									})
 								: resolveDisplayName(user)
 						}
 						src={user.avatarUrl}
-						size={88}
+						size={132}
 						editable={editMode}
 						uploading={uploadingAvatar}
 						onSelectFile={handleAvatarSelect}
@@ -201,7 +182,9 @@ export function ProfilePage({ username }: ProfilePageProps) {
 							<input
 								class={styles.nameInput}
 								value={usernameDraft}
-								onInput={(e) => setUsernameDraft((e.target as HTMLInputElement).value)}
+								onInput={(e) =>
+									setUsernameDraft((e.target as HTMLInputElement).value)
+								}
 								aria-label="Username"
 							/>
 						) : (
@@ -232,6 +215,31 @@ export function ProfilePage({ username }: ProfilePageProps) {
 							</span>
 						</div>
 					</div>
+					{/* Action column — Edit / visibility lives in the header row itself
+					    (across from the name) instead of a separate panel header,
+					    which removes the gap above the identity block. */}
+					{(editMode && showUsersInfo.value) || (!editMode && isSelf) ? (
+						<div class={styles.identityActions}>
+							{editMode && showUsersInfo.value ? (
+								<ToggleButton
+									pressed={!!user.profilePublic}
+									loading={togglingPublic}
+									onClick={handleTogglePublic}
+									title="Control whether other members can see your profile"
+								>
+									{user.profilePublic ? 'Profile is public' : 'Show Profile Info'}
+								</ToggleButton>
+							) : (
+								<Button
+									variant="secondary"
+									size="sm"
+									onClick={() => route('/profile')}
+								>
+									Edit profile
+								</Button>
+							)}
+						</div>
+					) : null}
 				</div>
 
 				{/* Editable basic info */}
@@ -244,7 +252,9 @@ export function ProfilePage({ username }: ProfilePageProps) {
 								value={displayNameDraft}
 								maxLength={DISPLAY_NAME_MAX}
 								placeholder="Shown across the site (defaults to your username)"
-								onInput={(e) => setDisplayNameDraft((e.target as HTMLInputElement).value)}
+								onInput={(e) =>
+									setDisplayNameDraft((e.target as HTMLInputElement).value)
+								}
 							/>
 						</label>
 						<label class={styles.field}>
@@ -275,7 +285,9 @@ export function ProfilePage({ username }: ProfilePageProps) {
 								maxLength={PROFILE_DESCRIPTION_MAX}
 								rows={3}
 								placeholder="A short blurb about your taste in film…"
-								onInput={(e) => setDescDraft((e.target as HTMLTextAreaElement).value)}
+								onInput={(e) =>
+									setDescDraft((e.target as HTMLTextAreaElement).value)
+								}
 							/>
 						</label>
 					) : user.description ? (
@@ -287,7 +299,12 @@ export function ProfilePage({ username }: ProfilePageProps) {
 
 				{editMode && (
 					<div class={styles.saveRow}>
-						<Button variant="primary" loading={saving} disabled={!dirty} onClick={handleSave}>
+						<Button
+							variant="primary"
+							loading={saving}
+							disabled={!dirty}
+							onClick={handleSave}
+						>
 							Save changes
 						</Button>
 					</div>
@@ -303,7 +320,10 @@ export function ProfilePage({ username }: ProfilePageProps) {
 			</Panel>
 
 			{/* ── Watch history ───────────────────────────────────── */}
-			<Panel title="Recently watched" subtitle={`${history.length} ${history.length === 1 ? 'movie' : 'movies'}`}>
+			<Panel
+				title="Recently watched"
+				subtitle={`${history.length} ${history.length === 1 ? 'movie' : 'movies'}`}
+			>
 				<ProfileHistoryList history={history} />
 			</Panel>
 		</div>

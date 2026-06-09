@@ -3,12 +3,13 @@ import { JSX } from 'preact';
 import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import { currentPath } from '@/app';
+import { Avatar } from '@/components/common/Avatar';
 import { Link } from '@/components/common/Link';
 import { currentUser, logout } from '@/state/auth.state';
 import { openFeedbackModal } from '@/state/feedback.state';
 import { isPlayerActive, playerMode } from '@/state/globalPlayer.state';
-import { showUsersInfo } from '@/state/system.state';
 import { fetchMovies } from '@/state/library.state';
+import { showUsersInfo } from '@/state/system.state';
 import { RecentlyPlayed } from './RecentlyPlayed';
 import styles from './Sidebar.module.scss';
 
@@ -270,9 +271,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 						class={styles.userLink}
 						title="Your profile"
 					>
-						<div class={styles.avatar}>
-							{resolveDisplayName(user).charAt(0).toUpperCase()}
-						</div>
+						<Avatar
+							name={resolveDisplayName(user)}
+							src={user.avatarUrl}
+							size={36}
+							class={styles.avatar}
+						/>
 						<div class={styles.userDetails}>
 							<span class={styles.userName}>{resolveDisplayName(user)}</span>
 							<span class={styles.userRole}>{user.role}</span>

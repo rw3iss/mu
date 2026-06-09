@@ -68,9 +68,21 @@
 
 .identityMain {
 	min-width: 0;
+	flex: 1;
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
+}
+
+// Edit / visibility action, top-right of the identity row, across from the name.
+.identityActions {
+	flex: none;
+	align-self: flex-start;
+
+	@include mobile {
+		align-self: stretch;
+		width: 100%;
+	}
 }
 
 .name {
