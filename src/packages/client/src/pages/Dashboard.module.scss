@@ -10,6 +10,14 @@
   @media (min-width: 768px) {
     height: calc(100dvh - var(--topbar-height) - 2 * var(--space-lg));
     overflow: hidden;
+
+    // When the mini-player is docked the content reserves space for its bar —
+    // subtract it too so the page still fits and the body doesn't scroll.
+    :global(.withMiniPlayer) & {
+      height: calc(
+        100dvh - var(--topbar-height) - 2 * var(--space-lg) - var(--player-bar-height)
+      );
+    }
   }
 }
 
