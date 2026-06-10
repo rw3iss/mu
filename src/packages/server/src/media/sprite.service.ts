@@ -356,7 +356,26 @@ export class SpriteService {
 		// Clean up individual frames
 		rmSync(framesDir, { recursive: true, force: true });
 
-		const frameHeight = Math.round((frameWidth / 16) * 9);
+		// Frames are scaled `frameWidth:-2`, preserving the SOURCE aspect ratio —
+		// so derive the real frame height from the generated sheet (sheet height /
+		// rows) instead of assuming 16:9 (which skewed previews for 2.35:1 etc).
+		let frameHeight = Math.round((frameWidth / 16) * 9);
+		try {
+			const probe = execSync(
+				`"${ffmpegPath.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1')}" -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "${join(movieDir, '0.jpg')}"`,
+				{ encoding: 'utf8' },
+			).trim();
+			const sheetHeight = Number(probe);
+			// Sheet 0's actual row count (short videos may not fill all ROWS).
+			const sheet0Rows = Math.ceil(
+				Math.min(actualTotalFrames, FRAMES_PER_SHEET) / COLUMNS,
+			);
+			if (Number.isFinite(sheetHeight) && sheetHeight > 0 && sheet0Rows > 0) {
+				frameHeight = Math.round(sheetHeight / sheet0Rows);
+			}
+		} catch {
+			// keep the 16:9 fallback
+		}
 
 		const meta: SpriteMeta = {
 			interval,
