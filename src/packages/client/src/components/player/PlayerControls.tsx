@@ -1,8 +1,9 @@
-import type { VNode } from 'preact';
 import { signal } from '@preact/signals';
+import type { VNode } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { CommentTooltip } from '@/components/comments/CommentTooltip';
 import { Icon } from '@/components/common/Icon';
 import { Tooltip } from '@/components/common/Tooltip';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
@@ -19,6 +20,8 @@ import {
 	toggleEffectsPanel,
 	videoEnabled,
 } from '@/state/audio-effects.state';
+import { currentUser } from '@/state/auth.state';
+import { getTimedComments, loadComments, movieComments } from '@/state/comments.state';
 import { globalMovie, globalMovieId, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import type { StreamSession } from '@/state/player.state';
@@ -379,6 +382,47 @@ export function PlayerControls({
 	// player controls doesn't yank the menu out from under the user.
 	const shareMenuHover = useRef(false);
 
+	// ── Comments: draft entry (right-click → Add Comment) + bubble hover ──
+	const [commentDraft, setCommentDraft] = useState<{ x: number; time: number } | null>(null);
+	const [hoverComment, setHoverComment] = useState<{
+		comment: import('@/services/comments.service').MovieComment;
+		x: number;
+	} | null>(null);
+	const hoverCommentTimer = useRef<number | null>(null);
+	const [showCommentBubbles, setShowCommentBubbles] = useUiSetting(
+		'player_show_comment_bubbles',
+		false,
+	);
+	// Load comments for the playing movie (cheap — shared client cache).
+	useEffect(() => {
+		const mid = globalMovieId.value;
+		if (mid) loadComments(mid).catch(() => {});
+	}, [globalMovieId.value]);
+	// Subscribe so bubbles re-render when the movie's comments change.
+	void movieComments.value;
+
+	const isSplitMode = playerMode.value === 'split';
+	/** Anchor Y for comment tooltips: above the bar in mini/full, below in split. */
+	const commentTooltipY = useCallback(
+		(rect: { top: number } | null) => {
+			const barTop = rect?.top ?? seekBarRef.current?.getBoundingClientRect().top ?? 0;
+			const barBottom = seekBarRef.current?.getBoundingClientRect().bottom ?? barTop + 8;
+			return isSplitMode ? barBottom + 10 : barTop - 10;
+		},
+		[isSplitMode],
+	);
+
+	const cancelHoverCommentClose = useCallback(() => {
+		if (hoverCommentTimer.current !== null) {
+			clearTimeout(hoverCommentTimer.current);
+			hoverCommentTimer.current = null;
+		}
+	}, []);
+	const scheduleHoverCommentClose = useCallback(() => {
+		cancelHoverCommentClose();
+		hoverCommentTimer.current = window.setTimeout(() => setHoverComment(null), 200);
+	}, [cancelHoverCommentClose]);
+
 	const handleSeekContext = useCallback(
 		(e: MouseEvent) => {
 			// Public viewers (share mode) can't mint share links — skip the menu.
@@ -585,6 +629,34 @@ export function PlayerControls({
 	// Sprite preview tooltip rendered via portal so it escapes the
 	// player bar's backdrop-filter stacking context — see the
 	// commentary on `seekBarRect` for why.
+	const commentEntryPortal =
+		commentDraft && globalMovieId.value ? (
+			<CommentTooltip
+				movieId={globalMovieId.value}
+				x={commentDraft.x}
+				y={commentTooltipY(null)}
+				placement={isSplitMode ? 'below' : 'above'}
+				timeSeconds={commentDraft.time}
+				currentUserId={currentUser.value?.id ?? null}
+				onClose={() => setCommentDraft(null)}
+			/>
+		) : null;
+
+	const commentHoverPortal =
+		hoverComment && globalMovieId.value ? (
+			<CommentTooltip
+				movieId={globalMovieId.value}
+				x={hoverComment.x}
+				y={commentTooltipY(null)}
+				placement={isSplitMode ? 'below' : 'above'}
+				comment={hoverComment.comment}
+				currentUserId={currentUser.value?.id ?? null}
+				onClose={() => setHoverComment(null)}
+				onMouseEnter={cancelHoverCommentClose}
+				onMouseLeave={scheduleHoverCommentClose}
+			/>
+		) : null;
+
 	const spritePreview = renderSpritePortal({
 		seekHover,
 		seekBarRect,
@@ -622,6 +694,41 @@ export function PlayerControls({
 							<div class={styles.seekProgress} style={{ width: `${progress}%` }} />
 							<div class={styles.seekThumb} style={{ left: `${progress}%` }} />
 						</div>
+						{showCommentBubbles &&
+							duration.value > 0 &&
+							globalMovieId.value &&
+							getTimedComments(globalMovieId.value).map((c) => {
+								const initials = (c.authorName || '?')
+									.split(/\s+/)
+									.map((w) => w[0])
+									.join('')
+									.slice(0, 2)
+									.toUpperCase();
+								return (
+									<button
+										key={c.id}
+										class={styles.commentBubble}
+										style={{
+											left: `${Math.min(100, ((c.timeSeconds ?? 0) / duration.value) * 100)}%`,
+										}}
+										onClick={(e: Event) => e.stopPropagation()}
+										onMouseDown={(e: Event) => e.stopPropagation()}
+										onMouseEnter={(e: MouseEvent) => {
+											cancelHoverCommentClose();
+											const r = (
+												e.currentTarget as HTMLElement
+											).getBoundingClientRect();
+											setHoverComment({
+												comment: c,
+												x: r.left + r.width / 2,
+											});
+										}}
+										onMouseLeave={scheduleHoverCommentClose}
+									>
+										{initials}
+									</button>
+								);
+							})}
 						{seekHover !== null &&
 							(() => {
 								const meta = spriteMeta.value;
@@ -1055,6 +1162,24 @@ export function PlayerControls({
 														</span>
 														<span class={styles.menuRowChevron}>
 															<Icon name="chevron-right" size={14} />
+														</span>
+													</button>
+
+													<button
+														class={styles.menuRow}
+														onClick={() =>
+															setShowCommentBubbles(
+																!showCommentBubbles,
+															)
+														}
+													>
+														<span class={styles.menuRowLabel}>
+															{showCommentBubbles
+																? 'Hide Comments'
+																: 'Show Comments'}
+														</span>
+														<span class={styles.menuRowValue}>
+															{showCommentBubbles ? 'On' : 'Off'}
 														</span>
 													</button>
 
@@ -1559,6 +1684,8 @@ export function PlayerControls({
 				</div>
 			</div>
 			{spritePreview}
+			{commentEntryPortal}
+			{commentHoverPortal}
 			{shareMenu &&
 				createPortal(
 					<div
@@ -1576,6 +1703,17 @@ export function PlayerControls({
 						<div class={styles.shareMenuLabel}>
 							Copy URL at {formatTime(shareMenu.time)}
 						</div>
+						<button
+							type="button"
+							class={styles.shareMenuAddComment}
+							onClick={() => {
+								setCommentDraft({ x: shareMenu.x, time: shareMenu.time });
+								setShareMenu(null);
+							}}
+						>
+							<Icon name="edit" size={14} />
+							Add Comment at {formatTime(shareMenu.time)}
+						</button>
 						<div class={styles.shareMenuActions}>
 							<Tooltip label="Copies a public link anyone can watch" delay={1000}>
 								<button

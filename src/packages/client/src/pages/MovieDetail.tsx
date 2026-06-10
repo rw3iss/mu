@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { CommentsPanel } from '@/components/comments/CommentsPanel';
 import { Button } from '@/components/common/Button';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
@@ -28,6 +29,7 @@ import { jobsService } from '@/services/jobs.service';
 import { type MatchCandidate, moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
 import { currentUser } from '@/state/auth.state';
+import { countComments, loadComments } from '@/state/comments.state';
 import { personKeyFor } from '@/state/favorites.state';
 import { forceStartPosition, playMovie } from '@/state/globalPlayer.state';
 import { updateMovieInHistory } from '@/state/history.state';
@@ -314,6 +316,11 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	const [showPlaySettings, setShowPlaySettings] = useState(false);
 	const [showSubtitles, setShowSubtitles] = useState(false);
 	const [showPlaylists, setShowPlaylists] = useState(false);
+	const [showComments, setShowComments] = useState(false);
+	// Comment count for the section header (panel itself loads on expand too).
+	useEffect(() => {
+		if (id) loadComments(id).catch(() => {});
+	}, [id]);
 	// Cast is expanded on desktop, collapsed on mobile. Track explicit
 	// state so the user toggle works on both; the initial value flips
 	// based on viewport width at mount.
@@ -1001,6 +1008,32 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								</div>
 							</div>
 						)}
+
+						{/* Comments */}
+						<div class={styles.fileInfoSection}>
+							<button
+								class={styles.fileInfoToggle}
+								onClick={() => setShowComments(!showComments)}
+							>
+								<h2 class={styles.sectionTitle}>
+									Comments
+									{countComments(movie.id) > 0
+										? ` (${countComments(movie.id)})`
+										: ''}
+								</h2>
+								<span class={styles.fileInfoArrow}>
+									<Icon
+										name={showComments ? 'chevron-up' : 'chevron-down'}
+										size={14}
+									/>
+								</span>
+							</button>
+							{showComments && (
+								<div class={styles.fileInfoContent}>
+									<CommentsPanel movieId={movie.id} />
+								</div>
+							)}
+						</div>
 
 						{/* Playlists */}
 						<div class={styles.fileInfoSection}>

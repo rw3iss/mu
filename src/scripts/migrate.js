@@ -441,6 +441,28 @@ const alters = [
 	'ALTER TABLE playlists ADD COLUMN is_public INTEGER DEFAULT 0',
 	'ALTER TABLE playlists ADD COLUMN public_edit INTEGER DEFAULT 0',
 	'ALTER TABLE playlist_movies ADD COLUMN added_by TEXT',
+	`CREATE TABLE IF NOT EXISTS movie_comments (
+		id TEXT PRIMARY KEY,
+		movie_id TEXT NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		parent_id TEXT,
+		time_seconds REAL,
+		text TEXT NOT NULL,
+		edited INTEGER DEFAULT 0,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS movie_comments_movie_idx ON movie_comments(movie_id)`,
+	`CREATE INDEX IF NOT EXISTS movie_comments_parent_idx ON movie_comments(parent_id)`,
+	`CREATE TABLE IF NOT EXISTS comment_reactions (
+		id TEXT PRIMARY KEY,
+		comment_id TEXT NOT NULL REFERENCES movie_comments(id) ON DELETE CASCADE,
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		emoji TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	)`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS comment_reactions_uniq ON comment_reactions(comment_id, user_id, emoji)`,
+	`CREATE INDEX IF NOT EXISTS comment_reactions_comment_idx ON comment_reactions(comment_id)`,
 	'ALTER TABLE stream_sessions ADD COLUMN ip_address TEXT',
 	// Social profile fields (Members + profile pages).
 	'ALTER TABLE users ADD COLUMN description TEXT',

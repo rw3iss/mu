@@ -1422,3 +1422,46 @@
 		cursor: default;
 	}
 }
+
+// ── Seek-bar comment bubbles ─────────────────────────────────────
+// Attached inside the seek bar so they show/hide with the controls.
+.commentBubble {
+	position: absolute;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: var(--color-accent);
+	color: var(--color-accent-text, #111);
+	font-size: 8px;
+	font-weight: 700;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid rgba(0, 0, 0, 0.4);
+	z-index: 2;
+	cursor: pointer;
+
+	&:hover {
+		transform: translate(-50%, -50%) scale(1.2);
+	}
+}
+
+// "Add Comment" row in the seek-bar context menu.
+.shareMenuAddComment {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 6px 10px;
+	font-size: var(--font-size-xs);
+	color: var(--color-text-secondary);
+	border-radius: var(--radius-sm);
+
+	&:hover {
+		background: var(--color-bg-hover);
+		color: var(--color-text-primary);
+	}
+}

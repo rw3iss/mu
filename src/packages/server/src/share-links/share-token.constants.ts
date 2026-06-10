@@ -14,6 +14,8 @@ export const ALLOWED_SHARE_ROUTE_PREFIXES = [
 	'/api/v1/stream',
 	'/api/v1/movies',
 	'/api/v1/share-links/verify',
+	// Read-only comments for the public watch page (GET guarded by view:library).
+	'/api/v1/comments',
 ];
 
 export interface ShareTokenPayload {

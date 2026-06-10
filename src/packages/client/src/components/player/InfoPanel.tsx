@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { CommentsPanel } from '@/components/comments/CommentsPanel';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
@@ -283,6 +284,11 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								</div>
 							)}
 
+							<div class={styles.section}>
+								<h3 class={styles.sectionTitle}>Comments</h3>
+								<CommentsPanel movieId={movie.id} />
+							</div>
+
 							{movie.fileInfo && (
 								<div class={styles.section}>
 									<button
@@ -509,6 +515,11 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								</div>
 							</div>
 						)}
+
+						<div class={styles.section}>
+							<h3 class={styles.sectionTitle}>Comments</h3>
+							<CommentsPanel movieId={movie.id} />
+						</div>
 
 						{movie.fileInfo && (
 							<div class={styles.section}>
