@@ -49,6 +49,11 @@
 	padding: var(--space-sm) 0;
 }
 
+.list {
+	// Keep comment rows readable on wide pages (entry form above is 600px).
+	max-width: 800px;
+}
+
 .list,
 .replies {
 	list-style: none;
