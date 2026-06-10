@@ -194,3 +194,7 @@
 .copied {
 	color: var(--color-success, #4caf50) !important;
 }
+
+.groupsSingle {
+	grid-template-columns: 1fr;
+}

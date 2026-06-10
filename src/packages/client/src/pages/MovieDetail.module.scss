@@ -1073,3 +1073,25 @@
 .sectionNarrow {
 	max-width: 400px;
 }
+
+/* Bottom two-column layout (Playlists/PlaySettings/FileInfo left, Comments
+ * right). Stacks to one column on mobile, left first. */
+.bottomColumns {
+	display: flex;
+	gap: var(--space-xl);
+	align-items: flex-start;
+
+	@include mobile {
+		flex-direction: column;
+	}
+}
+
+.bottomCol {
+	flex: 1 1 50%;
+	min-width: 0;
+
+	@include mobile {
+		width: 100%;
+		flex: none;
+	}
+}

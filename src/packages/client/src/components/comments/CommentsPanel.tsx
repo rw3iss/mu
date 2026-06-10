@@ -76,9 +76,7 @@ export function CommentsPanel({ movieId, onSeek }: CommentsPanelProps) {
 
 			{comments === null ? (
 				<div class={styles.empty}>Loading…</div>
-			) : comments.length === 0 ? (
-				<div class={styles.empty}>No comments yet — be the first.</div>
-			) : (
+			) : comments.length === 0 ? null : (
 				<ul class={styles.list}>
 					{comments.map((c) => (
 						<CommentItem key={c.id} movieId={movieId} comment={c} onSeek={onSeek} />

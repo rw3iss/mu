@@ -316,7 +316,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	const [showPlaySettings, setShowPlaySettings] = useState(false);
 	const [showSubtitles, setShowSubtitles] = useState(false);
 	const [showPlaylists, setShowPlaylists] = useState(false);
-	const [showComments, setShowComments] = useState(false);
+	const [showComments, setShowComments] = useState(true);
 	// Comment count for the section header (panel itself loads on expand too).
 	useEffect(() => {
 		if (id) loadComments(id).catch(() => {});
@@ -1029,254 +1029,288 @@ export function MovieDetail({ id }: MovieDetailProps) {
 							</div>
 						)}
 
-						{/* Comments */}
-						<div class={styles.fileInfoSection}>
-							<button
-								class={styles.fileInfoToggle}
-								onClick={() => setShowComments(!showComments)}
-							>
-								<h2 class={styles.sectionTitle}>
-									Comments
-									{countComments(movie.id) > 0
-										? ` (${countComments(movie.id)})`
-										: ''}
-								</h2>
-								<span class={styles.fileInfoArrow}>
-									<Icon
-										name={showComments ? 'chevron-up' : 'chevron-down'}
-										size={14}
-									/>
-								</span>
-							</button>
-							{showComments && (
-								<div class={styles.fileInfoContent}>
-									<CommentsPanel movieId={movie.id} />
-								</div>
-							)}
-						</div>
-
-						{/* Playlists */}
-						<div class={styles.fileInfoSection}>
-							<button
-								class={styles.fileInfoToggle}
-								onClick={() => setShowPlaylists(!showPlaylists)}
-							>
-								<h2 class={styles.sectionTitle}>
-									Playlists{playlistCount > 0 ? ` (${playlistCount})` : ''}
-								</h2>
-								<span class={styles.fileInfoArrow}>
-									<Icon
-										name={showPlaylists ? 'chevron-up' : 'chevron-down'}
-										size={14}
-									/>
-								</span>
-							</button>
-							{showPlaylists && (
-								<div class={styles.sectionNarrow}>
-									<MoviePlaylists
-										movieId={movie.id}
-										hideTitle
-										onCountChange={setPlaylistCount}
-										remoteInfo={
-											isRemote && movie.remoteOrigin
-												? {
-														title: movie.title,
-														posterUrl: movie.posterUrl,
-														serverId: movie.remoteOrigin.serverId,
-													}
-												: undefined
-										}
-									/>
-								</div>
-							)}
-						</div>
-
-						{/* Play Settings (local only) */}
-						{!isRemote && (
-							<div class={styles.fileInfoSection}>
-								<button
-									class={styles.fileInfoToggle}
-									onClick={() => setShowPlaySettings(!showPlaySettings)}
-								>
-									<h2 class={styles.sectionTitle}>Play Settings</h2>
-									<span class={styles.fileInfoArrow}>
-										<Icon
-											name={showPlaySettings ? 'chevron-up' : 'chevron-down'}
-											size={14}
-										/>
-									</span>
-								</button>
-
-								{showPlaySettings && (
-									<div
-										class={`${styles.fileInfoContent} ${styles.sectionNarrow}`}
+						{/* ── Bottom sections: two 50% columns (stack on mobile) ── */}
+						<div class={styles.bottomColumns}>
+							<div class={styles.bottomCol}>
+								{/* Playlists */}
+								<div class={styles.fileInfoSection}>
+									<button
+										class={styles.fileInfoToggle}
+										onClick={() => setShowPlaylists(!showPlaylists)}
 									>
-										<p class={styles.playSettingsDescription}>
-											Override default audio settings when playing this movie.
-										</p>
-										<div class={styles.playSettingsGrid}>
-											<label class={styles.playSettingsLabel}>
-												EQ Profile
-											</label>
-											<Select
-												value={selectedEqProfile}
-												onChange={(val) => {
-													setSelectedEqProfile(val);
-													updatePlaySetting('eqProfileId', val || null);
-												}}
-												options={[
-													{ value: '', label: 'None (use default)' },
-													...audioProfiles
-														.filter(
-															(p) =>
-																p.type === 'eq' ||
-																p.type === 'full',
-														)
-														.map((p) => ({
-															value: p.id,
-															label: p.name,
-														})),
-												]}
+										<h2 class={styles.sectionTitle}>
+											Playlists
+											{playlistCount > 0 ? ` (${playlistCount})` : ''}
+										</h2>
+										<span class={styles.fileInfoArrow}>
+											<Icon
+												name={showPlaylists ? 'chevron-up' : 'chevron-down'}
+												size={14}
 											/>
-
-											<label class={styles.playSettingsLabel}>
-												Compressor Profile
-											</label>
-											<Select
-												value={selectedCompProfile}
-												onChange={(val) => {
-													setSelectedCompProfile(val);
-													updatePlaySetting(
-														'compressorProfileId',
-														val || null,
-													);
-												}}
-												options={[
-													{ value: '', label: 'None (use default)' },
-													...audioProfiles
-														.filter(
-															(p) =>
-																p.type === 'compressor' ||
-																p.type === 'full',
-														)
-														.map((p) => ({
-															value: p.id,
-															label: p.name,
-														})),
-												]}
-											/>
-
-											<label class={styles.playSettingsLabel}>
-												Video Profile
-											</label>
-											<Select
-												value={selectedVideoProfile}
-												onChange={(val) => {
-													setSelectedVideoProfile(val);
-													updatePlaySetting(
-														'videoProfileId',
-														val || null,
-													);
-												}}
-												options={[
-													{ value: '', label: 'None (use default)' },
-													...audioProfiles
-														.filter((p) => p.type === 'video')
-														.map((p) => ({
-															value: p.id,
-															label: p.name,
-														})),
-												]}
+										</span>
+									</button>
+									{showPlaylists && (
+										<div class={styles.sectionNarrow}>
+											<MoviePlaylists
+												movieId={movie.id}
+												hideTitle
+												onCountChange={setPlaylistCount}
+												remoteInfo={
+													isRemote && movie.remoteOrigin
+														? {
+																title: movie.title,
+																posterUrl: movie.posterUrl,
+																serverId:
+																	movie.remoteOrigin.serverId,
+															}
+														: undefined
+												}
 											/>
 										</div>
-									</div>
-								)}
-							</div>
-						)}
+									)}
+								</div>
 
-						{/* File Info (local only) */}
-						{!isRemote && movie.fileInfo && (
-							<div class={styles.fileInfoSection}>
-								<button
-									class={styles.fileInfoToggle}
-									onClick={() => setShowFileInfo(!showFileInfo)}
-								>
-									<h2 class={styles.sectionTitle}>File Info</h2>
-									<PlaybackBadge movie={movie} />
-									<span class={styles.fileInfoArrow}>
-										<Icon
-											name={showFileInfo ? 'chevron-up' : 'chevron-down'}
-											size={14}
-										/>
-									</span>
-								</button>
+								{/* Play Settings (local only) */}
+								{!isRemote && (
+									<div class={styles.fileInfoSection}>
+										<button
+											class={styles.fileInfoToggle}
+											onClick={() => setShowPlaySettings(!showPlaySettings)}
+										>
+											<h2 class={styles.sectionTitle}>Play Settings</h2>
+											<span class={styles.fileInfoArrow}>
+												<Icon
+													name={
+														showPlaySettings
+															? 'chevron-up'
+															: 'chevron-down'
+													}
+													size={14}
+												/>
+											</span>
+										</button>
 
-								{showFileInfo && (
-									<div class={styles.fileInfoContent}>
-										<FileInfoGrid
-											movie={movie}
-											onCacheDeleted={() => {
-												moviesService
-													.get(id!)
-													.then(setMovie)
-													.catch(() => {});
-											}}
-										/>
-
-										{/* Subtitles */}
-										<div class={styles.trackSection}>
-											<button
-												class={styles.subtitleToggle}
-												onClick={() => setShowSubtitles(!showSubtitles)}
+										{showPlaySettings && (
+											<div
+												class={`${styles.fileInfoContent} ${styles.sectionNarrow}`}
 											>
-												{movie.fileInfo.subtitleTracks.length > 0
-													? `${movie.fileInfo.subtitleTracks.length} subtitle${movie.fileInfo.subtitleTracks.length === 1 ? '' : 's'} found`
-													: 'No subtitles found'}
-												<span class={styles.fileInfoArrow}>
-													<Icon
-														name={
-															showSubtitles
-																? 'chevron-up'
-																: 'chevron-down'
-														}
-														size={14}
-													/>
-												</span>
-											</button>
-											{showSubtitles && (
-												<div class={styles.subtitlePanelWrap}>
-													<SubtitlePanel
-														movieId={movie.id}
-														fileName={
-															movie.fileInfo?.fileName ?? undefined
-														}
-														existingTracks={(
-															movie.fileInfo?.subtitleTracks ?? []
-														).map((t) => ({
-															index: t.index,
-															language: t.language || 'und',
-															label:
-																t.title ||
-																t.language ||
-																`Track ${t.index}`,
-															codec: t.codec,
-															forced: t.forced,
-															external: t.external,
-														}))}
-														onSubtitlesChanged={async () => {
-															const data = await moviesService.get(
-																movie.id,
+												<p class={styles.playSettingsDescription}>
+													Override default audio settings when playing
+													this movie.
+												</p>
+												<div class={styles.playSettingsGrid}>
+													<label class={styles.playSettingsLabel}>
+														EQ Profile
+													</label>
+													<Select
+														value={selectedEqProfile}
+														onChange={(val) => {
+															setSelectedEqProfile(val);
+															updatePlaySetting(
+																'eqProfileId',
+																val || null,
 															);
-															setMovie(data);
 														}}
+														options={[
+															{
+																value: '',
+																label: 'None (use default)',
+															},
+															...audioProfiles
+																.filter(
+																	(p) =>
+																		p.type === 'eq' ||
+																		p.type === 'full',
+																)
+																.map((p) => ({
+																	value: p.id,
+																	label: p.name,
+																})),
+														]}
+													/>
+
+													<label class={styles.playSettingsLabel}>
+														Compressor Profile
+													</label>
+													<Select
+														value={selectedCompProfile}
+														onChange={(val) => {
+															setSelectedCompProfile(val);
+															updatePlaySetting(
+																'compressorProfileId',
+																val || null,
+															);
+														}}
+														options={[
+															{
+																value: '',
+																label: 'None (use default)',
+															},
+															...audioProfiles
+																.filter(
+																	(p) =>
+																		p.type === 'compressor' ||
+																		p.type === 'full',
+																)
+																.map((p) => ({
+																	value: p.id,
+																	label: p.name,
+																})),
+														]}
+													/>
+
+													<label class={styles.playSettingsLabel}>
+														Video Profile
+													</label>
+													<Select
+														value={selectedVideoProfile}
+														onChange={(val) => {
+															setSelectedVideoProfile(val);
+															updatePlaySetting(
+																'videoProfileId',
+																val || null,
+															);
+														}}
+														options={[
+															{
+																value: '',
+																label: 'None (use default)',
+															},
+															...audioProfiles
+																.filter((p) => p.type === 'video')
+																.map((p) => ({
+																	value: p.id,
+																	label: p.name,
+																})),
+														]}
 													/>
 												</div>
-											)}
-										</div>
+											</div>
+										)}
+									</div>
+								)}
+
+								{/* File Info (local only) */}
+								{!isRemote && movie.fileInfo && (
+									<div class={styles.fileInfoSection}>
+										<button
+											class={styles.fileInfoToggle}
+											onClick={() => setShowFileInfo(!showFileInfo)}
+										>
+											<h2 class={styles.sectionTitle}>File Info</h2>
+											<PlaybackBadge movie={movie} />
+											<span class={styles.fileInfoArrow}>
+												<Icon
+													name={
+														showFileInfo ? 'chevron-up' : 'chevron-down'
+													}
+													size={14}
+												/>
+											</span>
+										</button>
+
+										{showFileInfo && (
+											<div class={styles.fileInfoContent}>
+												<FileInfoGrid
+													movie={movie}
+													singleColumn
+													onCacheDeleted={() => {
+														moviesService
+															.get(id!)
+															.then(setMovie)
+															.catch(() => {});
+													}}
+												/>
+
+												{/* Subtitles */}
+												<div class={styles.trackSection}>
+													<button
+														class={styles.subtitleToggle}
+														onClick={() =>
+															setShowSubtitles(!showSubtitles)
+														}
+													>
+														{movie.fileInfo.subtitleTracks.length > 0
+															? `${movie.fileInfo.subtitleTracks.length} subtitle${movie.fileInfo.subtitleTracks.length === 1 ? '' : 's'} found`
+															: 'No subtitles found'}
+														<span class={styles.fileInfoArrow}>
+															<Icon
+																name={
+																	showSubtitles
+																		? 'chevron-up'
+																		: 'chevron-down'
+																}
+																size={14}
+															/>
+														</span>
+													</button>
+													{showSubtitles && (
+														<div class={styles.subtitlePanelWrap}>
+															<SubtitlePanel
+																movieId={movie.id}
+																fileName={
+																	movie.fileInfo?.fileName ??
+																	undefined
+																}
+																existingTracks={(
+																	movie.fileInfo
+																		?.subtitleTracks ?? []
+																).map((t) => ({
+																	index: t.index,
+																	language: t.language || 'und',
+																	label:
+																		t.title ||
+																		t.language ||
+																		`Track ${t.index}`,
+																	codec: t.codec,
+																	forced: t.forced,
+																	external: t.external,
+																}))}
+																onSubtitlesChanged={async () => {
+																	const data =
+																		await moviesService.get(
+																			movie.id,
+																		);
+																	setMovie(data);
+																}}
+															/>
+														</div>
+													)}
+												</div>
+											</div>
+										)}
 									</div>
 								)}
 							</div>
-						)}
+
+							<div class={styles.bottomCol}>
+								{/* Comments */}
+								<div class={styles.fileInfoSection}>
+									<button
+										class={styles.fileInfoToggle}
+										onClick={() => setShowComments(!showComments)}
+									>
+										<h2 class={styles.sectionTitle}>
+											Comments
+											{countComments(movie.id) > 0
+												? ` (${countComments(movie.id)})`
+												: ''}
+										</h2>
+										<span class={styles.fileInfoArrow}>
+											<Icon
+												name={showComments ? 'chevron-up' : 'chevron-down'}
+												size={14}
+											/>
+										</span>
+									</button>
+									{showComments && (
+										<div class={styles.fileInfoContent}>
+											<CommentsPanel movieId={movie.id} />
+										</div>
+									)}
+								</div>
+							</div>
+						</div>
 
 						<PluginSlot name={UI.MOVIE_PAGE_CONTENT} context={{ movie }} />
 					</div>

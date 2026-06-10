@@ -14,6 +14,8 @@ interface FileInfoGridProps {
 	onCacheDeleted?: () => void;
 	/** Use dark-on-dark palette for player flyout panels */
 	dark?: boolean;
+	/** Force a single group column (narrow page columns). */
+	singleColumn?: boolean;
 }
 
 /** Tiny copy-to-clipboard button: copy icon → green check for 2s. */
@@ -41,7 +43,7 @@ function CopyBtn({ text, label }: { text: string; label: string }) {
 	);
 }
 
-export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps) {
+export function FileInfoGrid({ movie, onCacheDeleted, dark, singleColumn }: FileInfoGridProps) {
 	const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState(false);
 	const isAdmin = currentUser.value?.role === 'admin';
@@ -66,7 +68,7 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 
 	return (
 		<div class={wrapClass}>
-			<div class={styles.groups}>
+			<div class={`${styles.groups} ${singleColumn ? styles.groupsSingle : ''}`}>
 				{/* ── General ── */}
 				<div class={styles.group}>
 					<h4 class={styles.groupTitle}>General</h4>
@@ -103,13 +105,20 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 								<span class={styles.label}>Location</span>
 								<span class={styles.value}>
 									{fi.filePath.replace(/[\\/][^\\/]*$/, '')}
+									<CopyBtn
+										text={fi.filePath.replace(/[\\/][^\\/]*$/, '')}
+										label="Copy folder path"
+									/>
 								</span>
 							</>
 						)}
 						{fi.fileName && (
 							<>
 								<span class={styles.label}>File</span>
-								<span class={styles.value}>{fi.fileName}</span>
+								<span class={styles.value}>
+									{fi.fileName}
+									<CopyBtn text={fi.fileName} label="Copy file name" />
+								</span>
 							</>
 						)}
 						{fi.containerFormat && (
