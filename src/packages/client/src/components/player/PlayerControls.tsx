@@ -1701,28 +1701,6 @@ export function PlayerControls({
 						}}
 					>
 						<div class={styles.shareMenuLabel}>{formatTime(shareMenu.time)}</div>
-						<Tooltip label="Copies a link for logged-in users" delay={1000}>
-							<button
-								type="button"
-								class={styles.shareMenuBtn}
-								disabled={shareBusy}
-								onClick={() => copyShareAtTime('private')}
-							>
-								<Icon name="lock" size={13} />
-								Copy Private URL
-							</button>
-						</Tooltip>
-						<Tooltip label="Copies a public link anyone can watch" delay={1000}>
-							<button
-								type="button"
-								class={styles.shareMenuBtn}
-								disabled={shareBusy}
-								onClick={() => copyShareAtTime('public')}
-							>
-								<Icon name="globe" size={13} />
-								Copy Public URL
-							</button>
-						</Tooltip>
 						<button
 							type="button"
 							class={styles.shareMenuBtn}
@@ -1734,6 +1712,28 @@ export function PlayerControls({
 							<Icon name="edit" size={13} />
 							Add Comment
 						</button>
+						<Tooltip label="Copies a public link anyone can watch" delay={1000}>
+							<button
+								type="button"
+								class={styles.shareMenuBtn}
+								disabled={shareBusy}
+								onClick={() => copyShareAtTime('public')}
+							>
+								<Icon name="globe" size={13} />
+								Copy Public URL
+							</button>
+						</Tooltip>
+						<Tooltip label="Copies a link for logged-in users" delay={1000}>
+							<button
+								type="button"
+								class={styles.shareMenuBtn}
+								disabled={shareBusy}
+								onClick={() => copyShareAtTime('private')}
+							>
+								<Icon name="lock" size={13} />
+								Copy Private URL
+							</button>
+						</Tooltip>
 					</div>,
 					document.body,
 				)}
