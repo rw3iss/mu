@@ -9,6 +9,7 @@ import {
 	movieComments,
 	reactToComment,
 } from '@/state/comments.state';
+import { jumpToCommentTime } from '@/state/globalPlayer.state';
 import { notifyError } from '@/state/notifications.state';
 import { relativeTime } from '@/utils/time-format';
 import styles from './CommentsPanel.module.scss';
@@ -145,7 +146,11 @@ function CommentItem({
 				{comment.timeSeconds != null && (
 					<button
 						class={styles.timeChip}
-						onClick={() => onSeek?.(comment.timeSeconds!)}
+						onClick={() =>
+							onSeek
+								? onSeek(comment.timeSeconds!)
+								: jumpToCommentTime(movieId, comment.timeSeconds!)
+						}
 						title="Jump to this time"
 					>
 						{fmtTime(comment.timeSeconds)}

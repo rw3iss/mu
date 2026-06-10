@@ -153,6 +153,26 @@ function setupPersistenceEffects(): void {
  * If already playing this movie, just switches to full mode.
  * If playing a different movie, stops old stream first.
  */
+/** Live seek fn registered by the active video engine (GlobalPlayer). */
+export const playerSeek: { current: ((t: number) => void) | null } = { current: null };
+
+/**
+ * Timestamp-chip behavior for comments, site-wide:
+ *  - same movie loaded (playing or paused) → seek to the time
+ *  - nothing loaded → load that movie, start at the time, play
+ *  - a DIFFERENT movie loaded → do nothing
+ */
+export async function jumpToCommentTime(movieId: string, timeSeconds: number): Promise<void> {
+	const current = globalMovieId.value;
+	if (current === movieId) {
+		playerSeek.current?.(Math.max(0, timeSeconds));
+		return;
+	}
+	if (current) return;
+	forceStartPosition.value = Math.max(0, timeSeconds);
+	await playMovie(movieId);
+}
+
 export async function playMovie(
 	movieId: string,
 	opts?: { fromBeginning?: boolean },

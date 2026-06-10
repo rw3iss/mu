@@ -20,6 +20,7 @@ import {
 	minimizePlayer,
 	type PlayerMode,
 	playerMode,
+	playerSeek,
 	restoredAutoplay,
 	splitExclusive,
 	splitPlayer,
@@ -73,6 +74,14 @@ function setSplitWidth(w: number) {
 
 export function GlobalPlayer() {
 	const engine = useVideoEngine();
+
+	// Expose the live seek to comment timestamp chips anywhere in the app.
+	useEffect(() => {
+		playerSeek.current = engine.seek;
+		return () => {
+			if (playerSeek.current === engine.seek) playerSeek.current = null;
+		};
+	}, [engine.seek]);
 	const [_isInitializing, setIsInitializing] = useState(false);
 	const [preparingMessage, setPreparingMessage] = useState<string | null>(null);
 	const playbackInitRef = useRef(false);

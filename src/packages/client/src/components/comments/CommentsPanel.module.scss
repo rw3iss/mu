@@ -9,6 +9,8 @@
 	flex-direction: column;
 	gap: 6px;
 	align-items: flex-end;
+	// Wide layouts (movie detail page) — keep the entry form a sane width.
+	max-width: 600px;
 }
 
 .textarea {
