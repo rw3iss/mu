@@ -248,9 +248,6 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark, singleColumn }: File
 														? t.language?.toUpperCase()
 														: ''}
 												</span>
-												{t.title && t.title !== `Track ${t.index + 1}` && (
-													<span class={styles.trackExtra}>{t.title}</span>
-												)}
 											</div>
 										))}
 									</div>

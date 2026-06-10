@@ -598,19 +598,9 @@
   padding-right: var(--space-md);
 }
 
-/* The Cast toggle is a fully-styled button on mobile but should
-   render as a plain h2 on desktop — strip the affordances. */
+/* Cast toggle behaves like the other collapsible sections on all sizes. */
 .castToggle {
-  @include tablet-up {
-    cursor: default;
-    pointer-events: none;
-  }
-}
-
-.castArrow {
-  @include tablet-up {
-    display: none;
-  }
+  cursor: pointer;
 }
 
 .castGrid {
@@ -622,12 +612,8 @@
   margin-top: var(--space-md);
 }
 
-/* Only honour the collapsed state on mobile — desktop ignores it so
-   the cast grid is always visible regardless of toggle state. */
 .castGridCollapsed {
-  @include mobile {
-    display: none;
-  }
+  display: none;
 }
 
 .castMember {

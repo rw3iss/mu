@@ -344,10 +344,8 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	// Cast is expanded on desktop, collapsed on mobile. Track explicit
 	// state so the user toggle works on both; the initial value flips
 	// based on viewport width at mount.
-	const [showCast, setShowCast] = useState(() => {
-		if (typeof window === 'undefined') return true;
-		return window.matchMedia('(min-width: 768px)').matches;
-	});
+	const [showCast, setShowCast] = useState(true);
+	const [showOverview, setShowOverview] = useState(true);
 	const [playlistCount, setPlaylistCount] = useState(0);
 	const [audioProfiles, setAudioProfiles] = useState<AudioProfile[]>([]);
 	const [selectedEqProfile, setSelectedEqProfile] = useState<string>('');
@@ -842,19 +840,43 @@ export function MovieDetail({ id }: MovieDetailProps) {
 							)}
 						</div>
 
-						{/* Overview */}
-						{movie.overview && (
-							<div class={styles.overviewSection}>
+						{/* Overview (collapsible: description + trailer + keywords) */}
+						<div class={styles.overviewSection}>
+							<button
+								class={styles.fileInfoToggle}
+								onClick={() => setShowOverview(!showOverview)}
+							>
 								<h2 class={styles.sectionTitle}>Overview</h2>
-								<p class={styles.overview}>{movie.overview}</p>
-							</div>
-						)}
-
-						{/* Trailer (collapsible, lazy-loaded iframe) */}
-						<TrailerSection
-							trailerUrl={movie.trailerUrl}
-							posterUrl={movie.backdropUrl || movie.posterUrl}
-						/>
+								<span class={styles.fileInfoArrow}>
+									<Icon
+										name={showOverview ? 'chevron-up' : 'chevron-down'}
+										size={14}
+									/>
+								</span>
+							</button>
+							{showOverview && (
+								<>
+									{movie.overview && (
+										<p class={styles.overview}>{movie.overview}</p>
+									)}
+									<TrailerSection
+										trailerUrl={movie.trailerUrl}
+										posterUrl={movie.backdropUrl || movie.posterUrl}
+									/>
+									{movie.keywords && movie.keywords.length > 0 && (
+										<div class={styles.keywordsSection}>
+											<div class={styles.genres}>
+												{movie.keywords.map((kw) => (
+													<span key={kw} class={styles.keywordTag}>
+														{kw}
+													</span>
+												))}
+											</div>
+										</div>
+									)}
+								</>
+							)}
+						</div>
 
 						{/* Details */}
 						{(movie.writers?.length ||
@@ -932,19 +954,6 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									{/* Trailer moved out to a dedicated collapsible
 										section above. Detail grid keeps its other
 										rows. */}
-								</div>
-							</div>
-						)}
-
-						{/* Keywords */}
-						{movie.keywords && movie.keywords.length > 0 && (
-							<div class={styles.keywordsSection}>
-								<div class={styles.genres}>
-									{movie.keywords.map((kw) => (
-										<span key={kw} class={styles.keywordTag}>
-											{kw}
-										</span>
-									))}
 								</div>
 							</div>
 						)}

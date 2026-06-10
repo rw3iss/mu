@@ -109,11 +109,16 @@
   background: var(--color-bg-elevated);
   padding: 1px 5px;
   border-radius: var(--radius-sm);
+  white-space: nowrap;
+  min-width: 36px;
+  text-align: center;
 }
 
 .trackMeta {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
+  white-space: nowrap;
+  min-width: 40px;
 }
 
 .trackDeleteBtn {
@@ -135,6 +140,8 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  min-width: 28px;
 }
 
 .trackExtra {
