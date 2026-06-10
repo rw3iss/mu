@@ -269,17 +269,14 @@
   // Above page content, below the player bar
   z-index: var(--z-player-controls);
 
-  // `cover` so the video fills the wrapper edge-to-edge in both browser
-  // fullscreen and windowed-full mode. With `contain`, windowed mode
-  // (viewport often wider than 16:9 because of browser chrome) leaves
-  // pillarbars while browser fullscreen (viewport ≈ 16:9) does not —
-  // the two modes look different. cover trades a few pixels of vertical
-  // crop in windowed for visual consistency. Source video with built-in
-  // black bars (anamorphic 2.39:1 in 16:9 frame) shows the same content
-  // either way; only the wrapper bars differ. The Crop and Vertical
-  // Scale transforms still compose on top of object-fit.
+  // `contain` so the video is always fully visible, constrained by whichever
+  // dimension hits the window edge first (portrait → height-limited with
+  // pillarbars; ultrawide → width-limited with letterbars). `cover` was tried
+  // for windowed/fullscreen visual consistency on 16:9 content, but it badly
+  // crops portrait/non-16:9 sources (top+bottom cut off). The Crop and
+  // Vertical Scale transforms still compose on top of object-fit.
   video {
-    object-fit: cover;
+    object-fit: contain;
   }
 }
 
