@@ -35,6 +35,11 @@ export interface DiskInfo {
 	isAppDrive: boolean;
 	/** Bytes used by the app data dir — only populated for the app drive. */
 	appUsedBytes: number | null;
+	/** True if the cache root (`cache.dir`) lives on this drive. */
+	isCacheDrive: boolean;
+	/** Bytes used by the cache root — only populated for the cache drive
+	 *  (and only when it isn't inside the data dir, which would double-count). */
+	cacheUsedBytes: number | null;
 	/** Sum of media_sources.total_size_bytes for sources on this drive.
 	 *  Free signal — scanner tracks it per source at scan time. */
 	mediaUsedBytes: number;
@@ -85,6 +90,8 @@ export class HealthController implements OnModuleInit {
 	/** Per-drive disk cache keyed by canonical root (e.g. `C:\` / `D:\` / `/`). */
 	private diskCache = new Map<string, { data: DiskStats; expiresAt: number }>();
 	private dataDirCache: { size: number; expiresAt: number } | null = null;
+	private cacheDirCache: { size: number; expiresAt: number } | null = null;
+	private cacheDirRefreshInFlight = false;
 	/** In-flight guard per drive root so we don't queue duplicate refreshes. */
 	private diskRefreshInFlight = new Set<string>();
 	private dataDirRefreshInFlight = false;
@@ -105,6 +112,7 @@ export class HealthController implements OnModuleInit {
 	 */
 	onModuleInit(): void {
 		void this.refreshDataDirSize();
+		void this.refreshCacheDirSize();
 		// Pre-warm disk stats for every drive we expect to surface
 		// (app drive + each media source drive). Fires async — each
 		// drive gets its own statfs in parallel.
@@ -196,11 +204,19 @@ export class HealthController implements OnModuleInit {
 		}
 		// Always include the app drive even if no media sources live on it.
 		if (!byRoot.has(appRoot)) byRoot.set(appRoot, { paths: [], mediaUsed: 0 });
+		// And the cache drive (e.g. an NVMe cache.dir on its own disk).
+		const cacheDir = this.getCacheDir();
+		const cacheRoot = cacheDir ? getDriveRoot(cacheDir) : null;
+		if (cacheRoot && !byRoot.has(cacheRoot)) {
+			byRoot.set(cacheRoot, { paths: [], mediaUsed: 0 });
+		}
+		const cacheUsed = this.cacheInsideDataDir() ? null : this.getCacheDirSizeCached();
 
 		const disks: DiskInfo[] = [];
 		for (const [root, bucket] of byRoot.entries()) {
 			const cached = this.getDiskStatsForRoot(root);
 			const isAppDrive = root === appRoot;
+			const isCacheDrive = root === cacheRoot;
 			disks.push({
 				root,
 				label: driveLabel(root),
@@ -208,6 +224,8 @@ export class HealthController implements OnModuleInit {
 				free: cached?.diskFree ?? null,
 				isAppDrive,
 				appUsedBytes: isAppDrive ? dataDirSize : null,
+				isCacheDrive,
+				cacheUsedBytes: isCacheDrive ? cacheUsed : null,
 				mediaUsedBytes: bucket.mediaUsed,
 				mediaSourcePaths: bucket.paths,
 			});
@@ -254,14 +272,54 @@ export class HealthController implements OnModuleInit {
 		}
 	}
 
-	/** Enumerate the drive roots /health/stats should surface. */
+	/** Enumerate the drive roots /health/stats should surface:
+	 *  app data dir + cache root + every configured media source. */
 	private getRelevantDriveRoots(): Array<{ root: string }> {
 		const dataDir = this.config.get<string>('dataDir', './data');
 		const roots = new Set<string>([getDriveRoot(dataDir)]);
+		const cacheDir = this.getCacheDir();
+		if (cacheDir) roots.add(getDriveRoot(cacheDir));
 		for (const s of this.safelyGetSources()) {
 			if (s.path) roots.add(getDriveRoot(s.path));
 		}
 		return [...roots].map((root) => ({ root }));
+	}
+
+	private getCacheDir(): string | null {
+		return this.config.get<string>('cache.dir', '') || null;
+	}
+
+	/** True when the cache root lives inside the data dir (default layout) —
+	 *  its bytes are already counted by the data-dir scan. */
+	private cacheInsideDataDir(): boolean {
+		const cacheDir = this.getCacheDir();
+		if (!cacheDir) return true;
+		const dataDir = this.config.get<string>('dataDir', './data');
+		return cacheDir.startsWith(dataDir);
+	}
+
+	private getCacheDirSizeCached(): number | null {
+		const now = Date.now();
+		const cached = this.cacheDirCache;
+		if (!cached || now >= cached.expiresAt) {
+			void this.refreshCacheDirSize();
+		}
+		return cached?.size ?? null;
+	}
+
+	private async refreshCacheDirSize(): Promise<void> {
+		if (this.cacheDirRefreshInFlight) return;
+		const cacheDir = this.getCacheDir();
+		if (!cacheDir || this.cacheInsideDataDir()) return;
+		this.cacheDirRefreshInFlight = true;
+		try {
+			const size = await this.dirSize(cacheDir);
+			this.cacheDirCache = { size, expiresAt: Date.now() + DATA_DIR_CACHE_TTL_MS };
+		} catch (err) {
+			this.logger.warn(`cache-dir scan failed: ${(err as Error).message}`);
+		} finally {
+			this.cacheDirRefreshInFlight = false;
+		}
 	}
 
 	private async queryDiskForRoot(root: string): Promise<DiskStats> {

@@ -226,6 +226,10 @@
   background: rgba(244, 67, 54, 0.6);
 }
 
+.diskRowCache {
+  background: rgba(66, 165, 245, 0.55);
+}
+
 // ── Disk hover tooltip ──
 // Pure CSS — opens on hover/focus of the bar. Uses a small delay so it
 // doesn't flicker when the cursor passes over multiple rows.

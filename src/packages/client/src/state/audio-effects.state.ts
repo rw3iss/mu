@@ -105,9 +105,9 @@ export const spectrumEnabled = signal(false);
 export const autoEqOpen = signal(false);
 export const autoEqSampleSeconds = signal(2);
 // Factor multiplier applied to each band's correction. 0.8 = strong
-// flatten, 0.25 = mild correction (default — high strength tends to
+// flatten, 0.2 = mild correction (default — high strength tends to
 // over-correct on dense source material), 0.05 = barely audible nudge.
-export const autoEqFactor = signal(0.25);
+export const autoEqFactor = signal(0.2);
 export const autoEqRunning = signal(false);
 
 // ============================================

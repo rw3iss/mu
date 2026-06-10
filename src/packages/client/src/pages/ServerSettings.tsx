@@ -277,6 +277,8 @@ interface DiskRowData {
 	free: number | null;
 	isAppDrive: boolean;
 	appUsedBytes: number | null;
+	isCacheDrive?: boolean;
+	cacheUsedBytes?: number | null;
 	mediaUsedBytes: number;
 	mediaSourcePaths: string[];
 }
@@ -299,6 +301,8 @@ function DiskRow({ disk }: { disk: DiskRowData }) {
 	const mediaRatio = known ? Math.min(disk.mediaUsedBytes / total, 1) : 0;
 	const appRatio =
 		known && disk.appUsedBytes != null ? Math.min(disk.appUsedBytes / total, 1) : 0;
+	const cacheRatio =
+		known && disk.cacheUsedBytes != null ? Math.min(disk.cacheUsedBytes / total, 1) : 0;
 	const measuring = disk.isAppDrive && disk.appUsedBytes == null;
 
 	return (
@@ -336,6 +340,12 @@ function DiskRow({ disk }: { disk: DiskRowData }) {
 						style={{ width: `${Math.max(appRatio * 100, 0.5)}%` }}
 					/>
 				)}
+				{cacheRatio > 0 && (
+					<div
+						class={`${styles.diskRowOverlay} ${styles.diskRowCache}`}
+						style={{ width: `${Math.max(cacheRatio * 100, 0.5)}%` }}
+					/>
+				)}
 				{/* Hover tooltip — pure CSS, only opens on bar hover */}
 				<div class={styles.diskTooltip} role="tooltip">
 					<div class={styles.diskTooltipRoot}>{disk.root}</div>
@@ -350,10 +360,14 @@ function DiskRow({ disk }: { disk: DiskRowData }) {
 							<>
 								<dt>App data</dt>
 								<dd>
-									{measuring
-										? 'measuring…'
-										: formatBytes(disk.appUsedBytes ?? 0)}
+									{measuring ? 'measuring…' : formatBytes(disk.appUsedBytes ?? 0)}
 								</dd>
+							</>
+						)}
+						{disk.isCacheDrive && disk.cacheUsedBytes != null && (
+							<>
+								<dt>Cache</dt>
+								<dd>{formatBytes(disk.cacheUsedBytes)}</dd>
 							</>
 						)}
 						{disk.mediaUsedBytes > 0 && (
@@ -472,9 +486,7 @@ function StatsSection() {
 		<>
 			<div class={styles.statsMeta}>
 				<span class={styles.statsMetaTime}>
-					{updatedAt
-						? `Updated ${formatRelativeTime(updatedAt)}`
-						: 'Loading…'}
+					{updatedAt ? `Updated ${formatRelativeTime(updatedAt)}` : 'Loading…'}
 				</span>
 				{updating && (
 					<span class={styles.statsMetaUpdating}>
@@ -484,99 +496,107 @@ function StatsSection() {
 			</div>
 			<div class={styles.statsGrid}>
 				{/* CPU */}
-			<div class={styles.statCard}>
-				<div class={styles.statCardHeader}>
-					<span class={styles.statLabel}>CPU Load</span>
-					<span class={styles.statValue}>
-						{sys.loadAvg[0].toFixed(2)} / {sys.cpuCount}
-					</span>
+				<div class={styles.statCard}>
+					<div class={styles.statCardHeader}>
+						<span class={styles.statLabel}>CPU Load</span>
+						<span class={styles.statValue}>
+							{sys.loadAvg[0].toFixed(2)} / {sys.cpuCount}
+						</span>
+					</div>
+					<div class={styles.statBar}>
+						<div
+							class={styles.statBarFill}
+							style={{
+								width: `${cpuRatio * 100}%`,
+								background: meterColor(cpuRatio),
+							}}
+						/>
+					</div>
 				</div>
-				<div class={styles.statBar}>
-					<div
-						class={styles.statBarFill}
-						style={{ width: `${cpuRatio * 100}%`, background: meterColor(cpuRatio) }}
-					/>
-				</div>
-			</div>
 
-			{/* Memory */}
-			<div class={styles.statCard}>
-				<div class={styles.statCardHeader}>
-					<span class={styles.statLabel}>Memory</span>
+				{/* Memory */}
+				<div class={styles.statCard}>
+					<div class={styles.statCardHeader}>
+						<span class={styles.statLabel}>Memory</span>
+					</div>
+					<div class={styles.statSegments}>
+						<span class={styles.statSegment}>App: {formatBytes(appMem)}</span>
+						<span class={styles.statSegment}>System: {formatBytes(memUsed)}</span>
+						<span class={styles.statSegment}>Total: {formatBytes(memTotal)}</span>
+					</div>
+					<div class={styles.statBar}>
+						<div
+							class={styles.statBarFill}
+							style={{
+								width: `${memRatio * 100}%`,
+								background: meterColor(memRatio),
+							}}
+						/>
+						<div
+							class={`${styles.statBarFill} ${styles.statBarOverlay}`}
+							style={{ width: `${Math.max(appMemRatio * 100, 0.5)}%` }}
+						/>
+					</div>
 				</div>
-				<div class={styles.statSegments}>
-					<span class={styles.statSegment}>App: {formatBytes(appMem)}</span>
-					<span class={styles.statSegment}>System: {formatBytes(memUsed)}</span>
-					<span class={styles.statSegment}>Total: {formatBytes(memTotal)}</span>
-				</div>
-				<div class={styles.statBar}>
-					<div
-						class={styles.statBarFill}
-						style={{ width: `${memRatio * 100}%`, background: meterColor(memRatio) }}
-					/>
-					<div
-						class={`${styles.statBarFill} ${styles.statBarOverlay}`}
-						style={{ width: `${Math.max(appMemRatio * 100, 0.5)}%` }}
-					/>
-				</div>
-			</div>
 
-			{/* Disks — one bar per distinct physical drive across app data
+				{/* Disks — one bar per distinct physical drive across app data
 			    dir + media source paths. Falls back to the legacy single
 			    pair (diskTotal/diskFree) for an old server that hasn't
 			    been upgraded yet. */}
-			{(() => {
-				const disks: any[] = Array.isArray(sys.disks) ? sys.disks : [];
-				const fallback =
-					disks.length === 0 && (sys.diskTotal ?? 0) > 0
-						? [
-								{
-									root: '/',
-									label: 'Disk',
-									total: sys.diskTotal,
-									free: sys.diskFree,
-									isAppDrive: true,
-									appUsedBytes: sys.dataDirSize ?? null,
-									mediaUsedBytes: 0,
-									mediaSourcePaths: [],
-								},
-						  ]
-						: disks;
-				if (fallback.length === 0) return null;
-				return (
-					<div class={`${styles.statCard} ${styles.diskCard}`}>
-						<div class={styles.statCardHeader}>
-							<span class={styles.statLabel}>
-								Disks{fallback.length > 1 ? ` (${fallback.length})` : ''}
-							</span>
+				{(() => {
+					const disks: any[] = Array.isArray(sys.disks) ? sys.disks : [];
+					const fallback =
+						disks.length === 0 && (sys.diskTotal ?? 0) > 0
+							? [
+									{
+										root: '/',
+										label: 'Disk',
+										total: sys.diskTotal,
+										free: sys.diskFree,
+										isAppDrive: true,
+										appUsedBytes: sys.dataDirSize ?? null,
+										mediaUsedBytes: 0,
+										mediaSourcePaths: [],
+									},
+								]
+							: disks;
+					if (fallback.length === 0) return null;
+					return (
+						<div class={`${styles.statCard} ${styles.diskCard}`}>
+							<div class={styles.statCardHeader}>
+								<span class={styles.statLabel}>
+									Disks{fallback.length > 1 ? ` (${fallback.length})` : ''}
+								</span>
+							</div>
+							<div class={styles.diskList}>
+								{fallback.map((d) => (
+									<DiskRow key={d.root} disk={d} />
+								))}
+							</div>
 						</div>
-						<div class={styles.diskList}>
-							{fallback.map((d) => (
-								<DiskRow key={d.root} disk={d} />
-							))}
-						</div>
-					</div>
-				);
-			})()}
+					);
+				})()}
 
-			{/* Library */}
-			<div class={styles.statCard}>
-				<div class={styles.statLabel}>Library</div>
-				<div class={styles.statValue}>
-					{stats.library?.movieCount ?? 0} movies, {stats.library?.fileCount ?? 0} files
-				</div>
-			</div>
-
-			{/* Services */}
-			{svc && (
+				{/* Library */}
 				<div class={styles.statCard}>
-					<div class={styles.statLabel}>Activity</div>
+					<div class={styles.statLabel}>Library</div>
 					<div class={styles.statValue}>
-						{svc.activeStreams ?? 0} streams, {svc.activeTranscodes ?? 0} transcodes,{' '}
-						{svc.runningJobs ?? 0} running / {svc.pendingJobs ?? 0} pending jobs
+						{stats.library?.movieCount ?? 0} movies, {stats.library?.fileCount ?? 0}{' '}
+						files
 					</div>
 				</div>
-			)}
+
+				{/* Services */}
+				{svc && (
+					<div class={styles.statCard}>
+						<div class={styles.statLabel}>Activity</div>
+						<div class={styles.statValue}>
+							{svc.activeStreams ?? 0} streams, {svc.activeTranscodes ?? 0}{' '}
+							transcodes, {svc.runningJobs ?? 0} running / {svc.pendingJobs ?? 0}{' '}
+							pending jobs
+						</div>
+					</div>
+				)}
 			</div>
 		</>
 	);
