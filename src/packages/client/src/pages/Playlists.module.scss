@@ -307,10 +307,9 @@
 }
 
 .stripEmpty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 120px;
+  // Left-aligned under the row header (was centered in a tall strip area).
+  padding: var(--space-sm) 0;
+  text-align: left;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
