@@ -70,7 +70,14 @@ export class PlaylistsController {
 	update(
 		@Param('id') id: string,
 		@CurrentUser('id') userId: string,
-		@Body() body: { name?: string; description?: string; coverUrl?: string; isPublic?: boolean },
+		@Body()
+		body: {
+			name?: string;
+			description?: string;
+			coverUrl?: string;
+			isPublic?: boolean;
+			publicEdit?: boolean;
+		},
 	) {
 		return this.playlistsService.update(id, userId, body);
 	}

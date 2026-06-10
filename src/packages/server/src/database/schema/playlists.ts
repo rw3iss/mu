@@ -12,6 +12,8 @@ export const playlists = sqliteTable('playlists', {
 	isSmart: integer('is_smart', { mode: 'boolean' }).default(false),
 	/** Public playlists are visible (read-only) to every user. */
 	isPublic: integer('is_public', { mode: 'boolean' }).default(false),
+	/** When also public, other members may ADD movies (and remove their own adds). */
+	publicEdit: integer('public_edit', { mode: 'boolean' }).default(false),
 	smartRules: text('smart_rules'),
 	createdAt: text('created_at').notNull(),
 	updatedAt: text('updated_at').notNull(),

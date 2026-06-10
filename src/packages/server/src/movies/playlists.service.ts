@@ -41,6 +41,23 @@ export class PlaylistsService {
 		this.listCache.clear();
 	}
 
+	/** Owner check OR public-edit contribution rights (add movies). */
+	private assertCanContribute(id: string, userId: string) {
+		const row = this.database.db
+			.select({
+				userId: playlists.userId,
+				isPublic: playlists.isPublic,
+				publicEdit: playlists.publicEdit,
+			})
+			.from(playlists)
+			.where(eq(playlists.id, id))
+			.get();
+		if (!row) throw new NotFoundException(`Playlist ${id} not found`);
+		if (row.userId === userId) return;
+		if (row.isPublic && row.publicEdit) return;
+		throw new ForbiddenException('This playlist does not accept contributions');
+	}
+
 	/** Throws unless `userId` owns the playlist. Mutations only — public
 	 *  playlists are strictly read-only for everyone but the author. */
 	private assertOwner(id: string, userId: string) {
@@ -116,6 +133,7 @@ export class PlaylistsService {
 				coverUrl: playlists.coverUrl,
 				isSmart: playlists.isSmart,
 				isPublic: playlists.isPublic,
+				publicEdit: playlists.publicEdit,
 				userId: playlists.userId,
 				createdAt: playlists.createdAt,
 				updatedAt: playlists.updatedAt,
@@ -155,6 +173,7 @@ export class PlaylistsService {
 				coverUrl: playlists.coverUrl,
 				isSmart: playlists.isSmart,
 				isPublic: playlists.isPublic,
+				publicEdit: playlists.publicEdit,
 				userId: playlists.userId,
 				ownerName: sql<string>`COALESCE(${users.displayName}, ${users.username})`,
 				createdAt: playlists.createdAt,
@@ -337,7 +356,13 @@ export class PlaylistsService {
 	update(
 		id: string,
 		userId: string,
-		data: Partial<{ name: string; description: string; coverUrl: string; isPublic: boolean }>,
+		data: Partial<{
+			name: string;
+			description: string;
+			coverUrl: string;
+			isPublic: boolean;
+			publicEdit: boolean;
+		}>,
 	) {
 		this.assertOwner(id, userId);
 
@@ -363,7 +388,7 @@ export class PlaylistsService {
 		remoteInfo?: { title: string; posterUrl?: string; serverId: string },
 		userId?: string,
 	) {
-		if (userId) this.assertOwner(playlistId, userId);
+		if (userId) this.assertCanContribute(playlistId, userId);
 		this.bustCache();
 		const existing = this.database.db
 			.select()
@@ -394,6 +419,7 @@ export class PlaylistsService {
 				movieId,
 				position,
 				addedAt: nowISO(),
+				addedBy: userId ?? null,
 				remoteTitle: remoteInfo?.title ?? null,
 				remotePosterUrl: remoteInfo?.posterUrl ?? null,
 				remoteServerId: remoteInfo?.serverId ?? null,
@@ -409,7 +435,30 @@ export class PlaylistsService {
 	}
 
 	removeMovie(playlistId: string, movieId: string, userId?: string) {
-		if (userId) this.assertOwner(playlistId, userId);
+		if (userId) {
+			const pl = this.database.db
+				.select({ userId: playlists.userId })
+				.from(playlists)
+				.where(eq(playlists.id, playlistId))
+				.get();
+			if (!pl) throw new NotFoundException(`Playlist ${playlistId} not found`);
+			if (pl.userId !== userId) {
+				// Public-edit contributors may only remove rows they added.
+				const row = this.database.db
+					.select({ addedBy: playlistMovies.addedBy })
+					.from(playlistMovies)
+					.where(
+						and(
+							eq(playlistMovies.playlistId, playlistId),
+							eq(playlistMovies.movieId, movieId),
+						),
+					)
+					.get();
+				if (!row || row.addedBy !== userId) {
+					throw new ForbiddenException('You can only remove movies you added');
+				}
+			}
+		}
 		this.bustCache();
 		this.database.db
 			.delete(playlistMovies)

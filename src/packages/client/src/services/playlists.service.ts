@@ -23,6 +23,8 @@ export interface Playlist {
 	movies?: PlaylistMovieSummary[];
 	/** Visible (read-only) to all users when true. */
 	isPublic?: boolean;
+	/** With isPublic: other members may add movies (and remove their own adds). */
+	publicEdit?: boolean;
 	/** Owner's user id (lists + detail) — gates edit controls. */
 	userId?: string;
 	/** Owner display name (public list + detail). */
@@ -91,7 +93,7 @@ export const playlistsService = {
 	 */
 	update(
 		id: string,
-		data: { name?: string; description?: string; isPublic?: boolean },
+		data: { name?: string; description?: string; isPublic?: boolean; publicEdit?: boolean },
 	): Promise<PlaylistDetail> {
 		return api.patch<PlaylistDetail>(`/playlists/${id}`, data);
 	},

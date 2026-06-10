@@ -4,7 +4,12 @@ import { route } from 'preact-router';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Icon } from '@/components/common/Icon';
 import { moviesService } from '@/services/movies.service';
-import type { MoviePlaylistInfo, Playlist } from '@/services/playlists.service';
+import {
+	type MoviePlaylistInfo,
+	type Playlist,
+	playlistsService,
+} from '@/services/playlists.service';
+import { currentUser } from '@/state/auth.state';
 import type { Movie } from '@/state/library.state';
 import {
 	notifyError,
@@ -68,6 +73,7 @@ export function MovieOptionsMenu({
 	const [playlistFlyoutOpen, setPlaylistFlyoutOpen] = useState(false);
 	const [opsOpen, setOpsOpen] = useState(false);
 	const [playlistsListing, setPlaylistsListing] = useState<Playlist[]>([]);
+	const [publicListing, setPublicListing] = useState<Playlist[]>([]);
 	const [playlistsMembership, setPlaylistsMembership] = useState<MoviePlaylistInfo[]>(
 		() => getCachedMembership(movie.id) ?? [],
 	);
@@ -305,12 +311,16 @@ export function MovieOptionsMenu({
 		// First-open lazy fetch (no-op if already cached)
 		setPlaylistsLoading(true);
 		try {
-			const [list, member] = await Promise.all([
+			const me = currentUser.value?.id;
+			const [list, member, pub] = await Promise.all([
 				ensurePlaylistsLoaded(),
 				getMembership(movie.id),
+				playlistsService.listPublic().catch(() => [] as Playlist[]),
 			]);
 			setPlaylistsListing(list);
 			setPlaylistsMembership(member);
+			// Other members' public playlists that accept contributions.
+			setPublicListing(pub.filter((p) => p.publicEdit && p.userId !== me));
 		} catch {
 			notifyError('Failed to load playlists');
 		} finally {
@@ -393,8 +403,7 @@ export function MovieOptionsMenu({
 	// Any played-from-disk library movie can be downloaded (by movieId) — works
 	// from card menus too, where fileInfo isn't loaded. Bookmarks/externals have
 	// no file; processing ones aren't ready yet.
-	const canDownload =
-		movie.source !== 'bookmark' && movie.source !== 'external' && !isProcessing;
+	const canDownload = movie.source !== 'bookmark' && movie.source !== 'external' && !isProcessing;
 
 	return (
 		<div class={`${styles.container} ${compact ? styles.compact : ''}`} ref={containerRef}>
@@ -463,12 +472,8 @@ export function MovieOptionsMenu({
 									onClick={(e: Event) => e.stopPropagation()}
 								>
 									<div class={styles.flyoutInner}>
-										{playlistsLoading && playlistsListing.length === 0 ? (
-											<div class={styles.submenuEmpty}>Loading…</div>
-										) : playlistsListing.length === 0 ? (
-											<div class={styles.submenuEmpty}>No playlists yet</div>
-										) : (
-											playlistsListing.map((p) => {
+										{(() => {
+											const renderRow = (p: Playlist) => {
 												const isMember = playlistsMembership.some(
 													(m) => m.id === p.id,
 												);
@@ -501,8 +506,32 @@ export function MovieOptionsMenu({
 														</span>
 													</button>
 												);
-											})
-										)}
+											};
+											if (playlistsLoading && playlistsListing.length === 0) {
+												return (
+													<div class={styles.submenuEmpty}>Loading…</div>
+												);
+											}
+											return (
+												<>
+													{playlistsListing.length === 0 ? (
+														<div class={styles.submenuEmpty}>
+															No playlists yet
+														</div>
+													) : (
+														playlistsListing.map(renderRow)
+													)}
+													{publicListing.length > 0 && (
+														<>
+															<div class={styles.flyoutSectionLabel}>
+																Public playlists
+															</div>
+															{publicListing.map(renderRow)}
+														</>
+													)}
+												</>
+											);
+										})()}
 									</div>
 								</div>
 							)}

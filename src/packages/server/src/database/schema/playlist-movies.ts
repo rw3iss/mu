@@ -11,6 +11,8 @@ export const playlistMovies = sqliteTable(
 		movieId: text('movie_id').notNull(),
 		position: integer('position').notNull(),
 		addedAt: text('added_at').notNull(),
+		/** User who added the row — lets public-edit contributors remove their own adds. */
+		addedBy: text('added_by'),
 		remoteTitle: text('remote_title'),
 		remotePosterUrl: text('remote_poster_url'),
 		remoteServerId: text('remote_server_id'),

@@ -33,6 +33,7 @@ interface Playlist {
 	description: string;
 	userId: string;
 	isPublic?: boolean;
+	publicEdit?: boolean;
 	ownerName?: string | null;
 	movies: PlaylistMovie[];
 }
@@ -54,6 +55,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 	const [editName, setEditName] = useState('');
 	const [editDescription, setEditDescription] = useState('');
 	const [editPublic, setEditPublic] = useState(false);
+	const [editPublicEdit, setEditPublicEdit] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [removingMovieId, setRemovingMovieId] = useState<string | null>(null);
 
@@ -80,6 +82,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 		setEditName(playlist.name);
 		setEditDescription(playlist.description);
 		setEditPublic(!!playlist.isPublic);
+		setEditPublicEdit(!!playlist.publicEdit);
 		setShowEdit(true);
 	}, [playlist]);
 
@@ -94,12 +97,14 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 					name: editName.trim(),
 					description: editDescription.trim(),
 					isPublic: editPublic,
+					publicEdit: editPublicEdit,
 				});
 				setPlaylist({
 					...playlist,
 					name: editName.trim(),
 					description: editDescription.trim(),
 					isPublic: editPublic,
+					publicEdit: editPublicEdit,
 				});
 				invalidatePlaylists();
 				setShowEdit(false);
@@ -110,7 +115,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 				setIsSaving(false);
 			}
 		},
-		[playlist, editName, editDescription, editPublic],
+		[playlist, editName, editDescription, editPublic, editPublicEdit],
 	);
 
 	const handleDelete = useCallback(async () => {
@@ -315,7 +320,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 					</div>
 					<div class={styles.publicRow}>
 						<div class={styles.publicInfo}>
-							<span class={styles.formLabel}>Public</span>
+							<span class={styles.formLabel}>Public View</span>
 							<span class={styles.publicHint}>Allow other members to view it.</span>
 						</div>
 						<label class={styles.toggle}>
@@ -324,6 +329,26 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 								checked={editPublic}
 								onChange={(e) =>
 									setEditPublic((e.target as HTMLInputElement).checked)
+								}
+							/>
+							<span class={styles.toggleTrack} />
+						</label>
+					</div>
+					<div class={styles.publicRow}>
+						<div class={styles.publicInfo}>
+							<span class={styles.formLabel}>Public Edit</span>
+							<span class={styles.publicHint}>
+								Allow other members to add movies (they can remove their own
+								additions).
+							</span>
+						</div>
+						<label class={styles.toggle}>
+							<input
+								type="checkbox"
+								checked={editPublicEdit}
+								disabled={!editPublic}
+								onChange={(e) =>
+									setEditPublicEdit((e.target as HTMLInputElement).checked)
 								}
 							/>
 							<span class={styles.toggleTrack} />
