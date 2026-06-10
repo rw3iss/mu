@@ -19,11 +19,11 @@
 	margin-left: var(--space-xs);
 	padding: 0 5px;
 	border-radius: 9px;
-	// Panel-background pill + inherited button text color (bold) so the
-	// number contrasts on every theme, including the accent-filled active
-	// state where plain secondary text used to vanish.
-	background: var(--color-bg-surface);
-	color: inherit;
+	// Theme button-hover background + label color for the digits — both
+	// track the active theme so the count stays readable on the accent-
+	// filled active state in every theme.
+	background: var(--color-bg-hover);
+	color: var(--color-label);
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-bold);
 	font-variant-numeric: tabular-nums;
