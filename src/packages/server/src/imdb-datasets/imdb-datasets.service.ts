@@ -1,6 +1,7 @@
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { BasicsSyncService } from './basics-sync.service.js';
 import type { DatasetSync } from './dataset-sync.interface.js';
 import { RatingsSyncService } from './ratings-sync.service.js';
 
@@ -54,8 +55,9 @@ export class ImdbDatasetsService implements OnModuleInit {
 		private readonly settings: SettingsService,
 		private readonly jobs: JobManagerService,
 		private readonly ratings: RatingsSyncService,
+		private readonly basics: BasicsSyncService,
 	) {
-		this.registry = [this.ratings];
+		this.registry = [this.ratings, this.basics];
 	}
 
 	onModuleInit(): void {
@@ -76,6 +78,7 @@ export class ImdbDatasetsService implements OnModuleInit {
 			label: 'IMDB datasets — manual sync',
 			payload: { source: 'manual' },
 			priority: 100,
+			idleOnly: true,
 		});
 	}
 
@@ -85,7 +88,7 @@ export class ImdbDatasetsService implements OnModuleInit {
 	 * after a settings change.
 	 */
 	reconcileSchedule(): void {
-		const enabled = this.settings.get<boolean>('imdb.datasets.enabled', false);
+		const enabled = this.isEnabled();
 		if (this.firstRunTimer) {
 			clearTimeout(this.firstRunTimer);
 			this.firstRunTimer = null;
@@ -98,10 +101,7 @@ export class ImdbDatasetsService implements OnModuleInit {
 		// don't see WAL contention during normal browsing. Once the
 		// first run fires, the 24h SimpleIntervalJob keeps it daily at
 		// the same wall-clock time without further babysitting.
-		const targetHour = this.settings.get<number>(
-			'imdb.datasets.syncHour',
-			DEFAULT_SYNC_HOUR,
-		);
+		const targetHour = this.settings.get<number>('imdb.datasets.syncHour', DEFAULT_SYNC_HOUR);
 		const delay = this.msUntilHour(targetHour);
 		this.jobs.unschedule(JOB_NAME); // clear any previous schedule
 		this.firstRunTimer = setTimeout(() => {
@@ -115,6 +115,9 @@ export class ImdbDatasetsService implements OnModuleInit {
 					label: 'IMDB datasets — daily sync',
 					payload: {},
 					priority: 90,
+					// Defers start until NO other job is running, so the nightly
+					// refresh never competes with encodes/scans for the disk.
+					idleOnly: true,
 				},
 			});
 			this.logger.log('Daily IMDB datasets sync now active');
@@ -196,6 +199,11 @@ export class ImdbDatasetsService implements OnModuleInit {
 	}
 
 	isEnabled(): boolean {
+		// MU_IMDB_DATASETS=1 in the environment force-enables the whole
+		// module (aux opt-in without touching settings); else the setting.
+		if (process.env.MU_IMDB_DATASETS === '1' || process.env.MU_IMDB_DATASETS === 'true') {
+			return true;
+		}
 		return this.settings.get<boolean>('imdb.datasets.enabled', false);
 	}
 

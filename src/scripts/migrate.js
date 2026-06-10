@@ -399,6 +399,18 @@ const tables = [
 		updated_at TEXT NOT NULL
 	)`,
 	`CREATE INDEX IF NOT EXISTS imdb_ratings_rating_idx ON imdb_ratings(average_rating, num_votes)`,
+	`CREATE TABLE IF NOT EXISTS imdb_titles (
+		tconst TEXT PRIMARY KEY,
+		title_type TEXT NOT NULL,
+		primary_title TEXT NOT NULL,
+		original_title TEXT,
+		year INTEGER,
+		runtime_minutes INTEGER,
+		genres TEXT,
+		updated_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS imdb_titles_title_idx ON imdb_titles(primary_title COLLATE NOCASE)`,
+	`CREATE INDEX IF NOT EXISTS imdb_titles_year_idx ON imdb_titles(year)`,
 	// Per-user setting overrides. (user_id, key) -> JSON value.
 	// Cascade-deleted with the user. Reads fall back to app-wide
 	// `settings` table. Allowlist of keys enforced in code; admins

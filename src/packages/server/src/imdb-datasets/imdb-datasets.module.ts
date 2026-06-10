@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module.js';
 import { JobModule } from '../jobs/job.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
+import { BasicsSyncService } from './basics-sync.service.js';
 import { ImdbDatasetsController } from './imdb-datasets.controller.js';
 import { ImdbDatasetsService } from './imdb-datasets.service.js';
+import { LocalImdbSearchService } from './local-imdb-search.service.js';
 import { RatingsSyncService } from './ratings-sync.service.js';
 
 /**
@@ -16,8 +18,8 @@ import { RatingsSyncService } from './ratings-sync.service.js';
  */
 @Module({
 	imports: [DatabaseModule, SettingsModule, JobModule],
-	providers: [RatingsSyncService, ImdbDatasetsService],
+	providers: [RatingsSyncService, BasicsSyncService, LocalImdbSearchService, ImdbDatasetsService],
 	controllers: [ImdbDatasetsController],
-	exports: [RatingsSyncService, ImdbDatasetsService],
+	exports: [RatingsSyncService, BasicsSyncService, LocalImdbSearchService, ImdbDatasetsService],
 })
 export class ImdbDatasetsModule {}

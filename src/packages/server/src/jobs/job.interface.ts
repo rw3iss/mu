@@ -15,6 +15,13 @@ export interface JobDescriptor {
 	 * and refined at runtime via `helpers.setDetails()`.
 	 */
 	details?: string;
+	/**
+	 * Defer starting until NO other job is running. For low-priority
+	 * background maintenance (e.g. nightly dataset refresh) that should
+	 * never compete with encodes/scans. The job stays queued until the
+	 * system is idle; other queued jobs freely run past it.
+	 */
+	idleOnly?: boolean;
 }
 
 export interface JobRecord {
@@ -28,6 +35,7 @@ export interface JobRecord {
 	result?: unknown;
 	error?: string;
 	details?: string;
+	idleOnly?: boolean;
 	createdAt: string;
 	startedAt?: string;
 	completedAt?: string;

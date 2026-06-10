@@ -7,6 +7,7 @@ import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
+import { LocalImdbSearchService } from '../imdb-datasets/local-imdb-search.service.js';
 import { MovieIdentityService } from '../providers/identity/movie-identity.service.js';
 import { MovieSourcePayloadsService } from '../providers/identity/movie-source-payloads.service.js';
 import { MergeEngine } from '../providers/merge/merge-engine.js';
@@ -47,6 +48,7 @@ export class MetadataService {
 		private readonly mergeEngine: MergeEngine,
 		private readonly identityService: MovieIdentityService,
 		private readonly payloadsService: MovieSourcePayloadsService,
+		private readonly localImdb: LocalImdbSearchService,
 	) {}
 
 	/**
@@ -501,7 +503,7 @@ export class MetadataService {
 		_type?: string,
 	): Promise<
 		Array<{
-			provider: 'tmdb' | 'omdb';
+			provider: 'tmdb' | 'omdb' | 'imdb';
 			tmdbId: number | null;
 			imdbId: string | null;
 			title: string;
@@ -513,6 +515,10 @@ export class MetadataService {
 		const q = (query ?? '').trim();
 		if (q.length < 2) return [];
 
+		// Local IMDB catalog (if synced) — instant, offline, no quota. Runs
+		// alongside the remote sources; its hits carry rating/genres inline.
+		const localHits = this.localImdb.search(q, 15);
+
 		const [tmdbRes, omdbRes] = await Promise.allSettled([
 			this.tmdb.searchMovie(q),
 			this.omdb.searchMovies(q),
@@ -521,7 +527,7 @@ export class MetadataService {
 		const omdbHits = omdbRes.status === 'fulfilled' ? (omdbRes.value ?? []) : [];
 
 		const candidates: Array<{
-			provider: 'tmdb' | 'omdb';
+			provider: 'tmdb' | 'omdb' | 'imdb';
 			tmdbId: number | null;
 			imdbId: string | null;
 			title: string;
@@ -557,6 +563,28 @@ export class MetadataService {
 				year,
 				overview: null,
 				posterUrl: h.posterUrl ?? null,
+			});
+		}
+		for (const h of localHits) {
+			if (seen.has(key(h.title, h.year))) continue; // already shown
+			seen.add(key(h.title, h.year));
+			// No poster/plot in the bulk dataset — surface rating + genres in
+			// the description line instead.
+			const bits: string[] = [];
+			if (h.rating != null)
+				bits.push(
+					`IMDb ${h.rating}${h.votes ? ` (${h.votes.toLocaleString()} votes)` : ''}`,
+				);
+			if (h.genres) bits.push(h.genres.replace(/,/g, ', '));
+			if (h.runtimeMinutes) bits.push(`${h.runtimeMinutes} min`);
+			candidates.push({
+				provider: 'imdb',
+				tmdbId: null,
+				imdbId: h.imdbId,
+				title: h.title,
+				year: h.year,
+				overview: bits.length ? bits.join(' · ') : null,
+				posterUrl: null,
 			});
 		}
 		return candidates;

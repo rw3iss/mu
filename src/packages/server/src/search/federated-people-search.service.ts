@@ -51,7 +51,10 @@ export class FederatedPeopleSearchService {
 					p,
 					new Promise<T>((_, reject) =>
 						setTimeout(
-							() => reject(new Error(`${source} timed out after ${SOURCE_TIMEOUT_MS}ms`)),
+							() =>
+								reject(
+									new Error(`${source} timed out after ${SOURCE_TIMEOUT_MS}ms`),
+								),
 							SOURCE_TIMEOUT_MS,
 						),
 					),
@@ -64,7 +67,10 @@ export class FederatedPeopleSearchService {
 				try {
 					const local = await this.people.searchPeopleForFederation(query);
 					if (local.length) {
-						const scored = local.map((h) => ({ ...h, matchScore: scorePerson(query, h) }));
+						const scored = local.map((h) => ({
+							...h,
+							matchScore: scorePerson(query, h),
+						}));
 						emit('local', scored);
 					}
 				} catch (e: any) {
@@ -112,7 +118,9 @@ export class FederatedPeopleSearchService {
 				knownFor: Array.isArray(r.known_for)
 					? r.known_for
 							.map((k: any) => k.title || k.name)
-							.filter((x: unknown): x is string => typeof x === 'string' && x.length > 0)
+							.filter(
+								(x: unknown): x is string => typeof x === 'string' && x.length > 0,
+							)
 					: undefined,
 				sources: ['tmdb'],
 				isOwned: false,

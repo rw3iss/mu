@@ -1,4 +1,4 @@
-export type SearchSource = 'local' | 'cache' | 'tmdb' | 'omdb' | 'trakt';
+export type SearchSource = 'local' | 'cache' | 'tmdb' | 'omdb' | 'trakt' | 'imdb';
 
 export interface MovieSearchHit {
 	movieId?: string;

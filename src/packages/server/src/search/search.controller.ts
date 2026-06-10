@@ -1,13 +1,5 @@
-import {
-	BadRequestException,
-	Controller,
-	Get,
-	Logger,
-	Query,
-	Req,
-	Sse,
-} from '@nestjs/common';
-import { lastValueFrom, map, toArray, type Observable } from 'rxjs';
+import { BadRequestException, Controller, Get, Logger, Query, Req, Sse } from '@nestjs/common';
+import { lastValueFrom, map, type Observable, toArray } from 'rxjs';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { FederatedMovieSearchService } from './federated-movie-search.service.js';
 import { FederatedPeopleSearchService } from './federated-people-search.service.js';
@@ -36,7 +28,7 @@ export class SearchController {
 		const userId = req.user?.sub ?? req.user?.id ?? 'anonymous';
 		return this.movies
 			.search$(query, userId)
-			.pipe(map((ev) => ({ data: ev } as unknown as MessageEvent)));
+			.pipe(map((ev) => ({ data: ev }) as unknown as MessageEvent));
 	}
 
 	@RequireAction('view:library')
@@ -45,7 +37,7 @@ export class SearchController {
 		const query = this.requireQuery(q);
 		return this.people
 			.search$(query)
-			.pipe(map((ev) => ({ data: ev } as unknown as MessageEvent)));
+			.pipe(map((ev) => ({ data: ev }) as unknown as MessageEvent));
 	}
 
 	@RequireAction('view:library')

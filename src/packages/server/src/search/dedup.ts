@@ -1,8 +1,4 @@
-import type {
-	MovieSearchHit,
-	PersonSearchHit,
-	SearchSource,
-} from './search-types.js';
+import type { MovieSearchHit, PersonSearchHit, SearchSource } from './search-types.js';
 
 export function normalizeQuery(q: string): string {
 	return q.toLowerCase().trim().replace(/\s+/g, ' ');

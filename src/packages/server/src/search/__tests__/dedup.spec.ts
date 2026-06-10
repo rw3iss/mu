@@ -31,7 +31,13 @@ describe('movieDedupKey', () => {
 	});
 	it('falls back to tmdbId', () => {
 		expect(
-			movieDedupKey({ title: 'X', tmdbId: 42, sources: ['tmdb'], isOwned: false, matchScore: 0.5 }),
+			movieDedupKey({
+				title: 'X',
+				tmdbId: 42,
+				sources: ['tmdb'],
+				isOwned: false,
+				matchScore: 0.5,
+			}),
 		).toBe('tmdb:42');
 	});
 	it('falls back to title+year slug', () => {

@@ -1,16 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
+import { LocalImdbSearchService } from '../imdb-datasets/local-imdb-search.service.js';
 import { OmdbProvider } from '../metadata/providers/omdb.provider.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { MoviesService } from '../movies/movies.service.js';
 import { TraktSearchProvider } from '../providers/sources/trakt/trakt-search.provider.js';
 import { mergeMovieHit, movieDedupKey, scoreMovie } from './dedup.js';
 import { SearchCacheService } from './search-cache.service.js';
-import type {
-	MovieSearchHit,
-	SearchEvent,
-	SearchSource,
-} from './search-types.js';
+import type { MovieSearchHit, SearchEvent, SearchSource } from './search-types.js';
 
 const SOURCE_TIMEOUT_MS = 5000;
 
@@ -28,6 +25,7 @@ export class FederatedMovieSearchService {
 		private readonly cache: SearchCacheService,
 		private readonly omdb: OmdbProvider,
 		private readonly trakt: TraktSearchProvider,
+		private readonly localImdb: LocalImdbSearchService,
 	) {}
 
 	search$(query: string, userId: string): Observable<SearchEvent<MovieSearchHit>> {
@@ -61,7 +59,10 @@ export class FederatedMovieSearchService {
 					p,
 					new Promise<T>((_, reject) =>
 						setTimeout(
-							() => reject(new Error(`${source} timed out after ${SOURCE_TIMEOUT_MS}ms`)),
+							() =>
+								reject(
+									new Error(`${source} timed out after ${SOURCE_TIMEOUT_MS}ms`),
+								),
 							SOURCE_TIMEOUT_MS,
 						),
 					),
@@ -75,11 +76,40 @@ export class FederatedMovieSearchService {
 				try {
 					const local = await this.movies.searchForFederation(query, userId);
 					if (local.length) {
-						const scored = local.map((h) => ({ ...h, matchScore: scoreMovie(query, h) }));
+						const scored = local.map((h) => ({
+							...h,
+							matchScore: scoreMovie(query, h),
+						}));
 						emitResults('local', scored);
 					}
 				} catch (e: any) {
 					emitError('local', e?.message ?? String(e));
+				}
+
+				// 1.5) Local IMDB catalog — instant offline source (if synced).
+				try {
+					const imdbHits = this.localImdb.search(query, 15);
+					if (imdbHits.length) {
+						emitResults(
+							'imdb',
+							imdbHits.map((h): MovieSearchHit => {
+								const hit: MovieSearchHit = {
+									imdbId: h.imdbId,
+									title: h.title,
+									year: h.year ?? undefined,
+									imdbRating: h.rating ?? undefined,
+									imdbVotes: h.votes ?? undefined,
+									sources: ['imdb'],
+									isOwned: false,
+									matchScore: 0,
+								};
+								hit.matchScore = scoreMovie(query, hit);
+								return hit;
+							}),
+						);
+					}
+				} catch (e: any) {
+					emitError('imdb', e?.message ?? String(e));
 				}
 
 				// 2) External sources in parallel

@@ -133,6 +133,7 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 			status: 'pending',
 			payload: descriptor.payload ?? {},
 			priority: descriptor.priority ?? 10,
+			idleOnly: descriptor.idleOnly,
 			details: descriptor.details,
 			createdAt: now,
 		};
@@ -493,6 +494,12 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 			// Drop stale/cancelled entries in place.
 			if (!job || job.status !== 'pending') {
 				this.queue.splice(idx, 1);
+				continue;
+			}
+
+			// Idle-only jobs wait for a completely quiet system.
+			if (job.idleOnly && this.running.size > 0) {
+				idx++;
 				continue;
 			}
 

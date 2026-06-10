@@ -72,7 +72,7 @@ let newStatsCache: { value: NewTitleStats; at: number } | null = null;
 
 /** A provider search result shown in the "Search for Metadata" modal. */
 export interface MetadataSearchCandidate {
-	provider: 'tmdb' | 'omdb';
+	provider: 'tmdb' | 'omdb' | 'imdb';
 	tmdbId: number | null;
 	imdbId: string | null;
 	title: string;

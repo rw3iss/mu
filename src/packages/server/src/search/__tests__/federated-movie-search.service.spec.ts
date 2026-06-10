@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { lastValueFrom, toArray } from 'rxjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FederatedMovieSearchService } from '../federated-movie-search.service.js';
 import type { MovieSearchHit, SearchEvent } from '../search-types.js';
 
@@ -17,7 +17,9 @@ async function collect(
 	svc: FederatedMovieSearchService,
 	q: string,
 ): Promise<SearchEvent<MovieSearchHit>[]> {
-	return (await lastValueFrom(svc.search$(q, 'user-1').pipe(toArray()))) as SearchEvent<MovieSearchHit>[];
+	return (await lastValueFrom(
+		svc.search$(q, 'user-1').pipe(toArray()),
+	)) as SearchEvent<MovieSearchHit>[];
 }
 
 describe('FederatedMovieSearchService', () => {
@@ -35,7 +37,8 @@ describe('FederatedMovieSearchService', () => {
 		cache = mkCache();
 		omdb = { searchMovies: vi.fn().mockResolvedValue([]) };
 		trakt = { searchMovies: vi.fn().mockResolvedValue([]) };
-		svc = new FederatedMovieSearchService(local, tmdb, cache, omdb, trakt);
+		const localImdb = { search: vi.fn().mockReturnValue([]) };
+		svc = new FederatedMovieSearchService(local, tmdb, cache, omdb, trakt, localImdb as any);
 	});
 
 	it('emits local results first then tmdb then done', async () => {
@@ -70,9 +73,7 @@ describe('FederatedMovieSearchService', () => {
 		]);
 		const events = await collect(svc, 'matrix');
 		expect(tmdb.searchMovie).not.toHaveBeenCalled();
-		const resultSources = events
-			.filter((e) => e.kind === 'results')
-			.map((e: any) => e.source);
+		const resultSources = events.filter((e) => e.kind === 'results').map((e: any) => e.source);
 		expect(resultSources).toContain('cache');
 	});
 
@@ -94,13 +95,9 @@ describe('FederatedMovieSearchService', () => {
 	});
 
 	it('emits omdb results when omdb.searchMovies returns hits', async () => {
-		omdb.searchMovies.mockResolvedValue([
-			{ imdbId: 'tt1', title: 'OMDB Hit', year: 1999 },
-		]);
+		omdb.searchMovies.mockResolvedValue([{ imdbId: 'tt1', title: 'OMDB Hit', year: 1999 }]);
 		const events = await collect(svc, 'matrix');
-		const sources = events
-			.filter((e) => e.kind === 'results')
-			.map((e: any) => e.source);
+		const sources = events.filter((e) => e.kind === 'results').map((e: any) => e.source);
 		expect(sources).toContain('omdb');
 	});
 
@@ -109,9 +106,7 @@ describe('FederatedMovieSearchService', () => {
 			{ traktId: 1, tmdbId: 2, imdbId: 'tt2', title: 'Trakt Hit', year: 2001 },
 		]);
 		const events = await collect(svc, 'matrix');
-		const sources = events
-			.filter((e) => e.kind === 'results')
-			.map((e: any) => e.source);
+		const sources = events.filter((e) => e.kind === 'results').map((e: any) => e.source);
 		expect(sources).toContain('trakt');
 	});
 

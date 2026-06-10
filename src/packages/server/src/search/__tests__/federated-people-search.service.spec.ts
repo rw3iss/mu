@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { lastValueFrom, toArray } from 'rxjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FederatedPeopleSearchService } from '../federated-people-search.service.js';
 import type { PersonSearchHit, SearchEvent } from '../search-types.js';
 
@@ -73,20 +73,21 @@ describe('FederatedPeopleSearchService', () => {
 	it('emits trakt results when trakt.searchPeople returns hits', async () => {
 		trakt.searchPeople.mockResolvedValue([{ traktId: 99, tmdbId: 5, name: 'Trakt Person' }]);
 		const evs = await collect(svc, 'someone');
-		const sources = evs
-			.filter((e) => e.kind === 'results')
-			.map((e: any) => e.source);
+		const sources = evs.filter((e) => e.kind === 'results').map((e: any) => e.source);
 		expect(sources).toContain('trakt');
 	});
 
 	it('normalizes tmdb person results with profile URL', async () => {
 		tmdb.searchPerson.mockResolvedValue([
-			{ id: 5, name: 'John Cleese', profile_path: '/john.jpg', known_for_department: 'Acting' },
+			{
+				id: 5,
+				name: 'John Cleese',
+				profile_path: '/john.jpg',
+				known_for_department: 'Acting',
+			},
 		]);
 		const evs = await collect(svc, 'cleese');
-		const tmdbEvent = evs.find(
-			(e) => e.kind === 'results' && e.source === 'tmdb',
-		) as any;
+		const tmdbEvent = evs.find((e) => e.kind === 'results' && e.source === 'tmdb') as any;
 		expect(tmdbEvent.items[0]).toMatchObject({
 			personKey: 'tmdb:5',
 			tmdbId: 5,

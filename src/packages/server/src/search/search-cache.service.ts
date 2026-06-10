@@ -15,18 +15,10 @@ export class SearchCacheService {
 		return createHash('sha1').update(`${type}|${q}|${source}`).digest('hex');
 	}
 
-	get<T>(
-		type: 'movie' | 'person',
-		query: string,
-		source: 'tmdb' | 'omdb' | 'trakt',
-	): T[] | null {
+	get<T>(type: 'movie' | 'person', query: string, source: 'tmdb' | 'omdb' | 'trakt'): T[] | null {
 		const q = normalizeQuery(query);
 		const id = this.hash(type, q, source);
-		const row = this.database.db
-			.select()
-			.from(searchCache)
-			.where(eq(searchCache.id, id))
-			.get();
+		const row = this.database.db.select().from(searchCache).where(eq(searchCache.id, id)).get();
 		if (!row) return null;
 		const age = Date.now() - new Date(row.fetchedAt).getTime();
 		if (age > TTL_MS) return null;
