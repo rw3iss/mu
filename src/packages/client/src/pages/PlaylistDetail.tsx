@@ -53,6 +53,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 	const [editName, setEditName] = useState('');
 	const [editDescription, setEditDescription] = useState('');
+	const [editPublic, setEditPublic] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [removingMovieId, setRemovingMovieId] = useState<string | null>(null);
 
@@ -78,6 +79,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 		if (!playlist) return;
 		setEditName(playlist.name);
 		setEditDescription(playlist.description);
+		setEditPublic(!!playlist.isPublic);
 		setShowEdit(true);
 	}, [playlist]);
 
@@ -88,14 +90,16 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 
 			setIsSaving(true);
 			try {
-				await api.put(`/playlists/${playlist.id}`, {
+				await api.patch(`/playlists/${playlist.id}`, {
 					name: editName.trim(),
 					description: editDescription.trim(),
+					isPublic: editPublic,
 				});
 				setPlaylist({
 					...playlist,
 					name: editName.trim(),
 					description: editDescription.trim(),
+					isPublic: editPublic,
 				});
 				invalidatePlaylists();
 				setShowEdit(false);
@@ -106,21 +110,8 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 				setIsSaving(false);
 			}
 		},
-		[playlist, editName, editDescription],
+		[playlist, editName, editDescription, editPublic],
 	);
-
-	const handleTogglePublic = useCallback(async () => {
-		if (!playlist) return;
-		const next = !playlist.isPublic;
-		try {
-			await api.patch(`/playlists/${playlist.id}`, { isPublic: next });
-			setPlaylist({ ...playlist, isPublic: next });
-			invalidatePlaylists();
-			notifySuccess(next ? 'Playlist is now public' : 'Playlist is now private');
-		} catch {
-			notifyError('Failed to update visibility');
-		}
-	}, [playlist]);
 
 	const handleDelete = useCallback(async () => {
 		if (!playlist) return;
@@ -207,17 +198,6 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 				</div>
 				{isOwner && (
 					<div class={styles.headerActions}>
-						<label
-							class={styles.publicToggle}
-							title="Public playlists are visible (read-only) to all users"
-						>
-							<input
-								type="checkbox"
-								checked={!!playlist.isPublic}
-								onChange={handleTogglePublic}
-							/>
-							Public
-						</label>
 						<Button variant="secondary" size="sm" onClick={handleOpenEdit}>
 							Edit
 						</Button>
@@ -332,6 +312,22 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 							rows={3}
 							class={styles.formTextarea}
 						/>
+					</div>
+					<div class={styles.publicRow}>
+						<div class={styles.publicInfo}>
+							<span class={styles.formLabel}>Public</span>
+							<span class={styles.publicHint}>Allow other members to view it.</span>
+						</div>
+						<label class={styles.toggle}>
+							<input
+								type="checkbox"
+								checked={editPublic}
+								onChange={(e) =>
+									setEditPublic((e.target as HTMLInputElement).checked)
+								}
+							/>
+							<span class={styles.toggleTrack} />
+						</label>
 					</div>
 					<div class={styles.formActions}>
 						<Button variant="ghost" onClick={() => setShowEdit(false)}>
