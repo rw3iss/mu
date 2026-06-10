@@ -11,9 +11,21 @@
 }
 
 .count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
 	margin-left: var(--space-xs);
+	padding: 0 5px;
+	border-radius: 9px;
+	// Panel-background pill + inherited button text color (bold) so the
+	// number contrasts on every theme, including the accent-filled active
+	// state where plain secondary text used to vanish.
+	background: var(--color-bg-surface);
+	color: inherit;
 	font-size: var(--font-size-xs);
-	color: var(--color-text-secondary);
+	font-weight: var(--font-weight-bold);
 	font-variant-numeric: tabular-nums;
 }
 
