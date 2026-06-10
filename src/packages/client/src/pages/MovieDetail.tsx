@@ -1072,20 +1072,22 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								</span>
 							</button>
 							{showPlaylists && (
-								<MoviePlaylists
-									movieId={movie.id}
-									hideTitle
-									onCountChange={setPlaylistCount}
-									remoteInfo={
-										isRemote && movie.remoteOrigin
-											? {
-													title: movie.title,
-													posterUrl: movie.posterUrl,
-													serverId: movie.remoteOrigin.serverId,
-												}
-											: undefined
-									}
-								/>
+								<div class={styles.sectionNarrow}>
+									<MoviePlaylists
+										movieId={movie.id}
+										hideTitle
+										onCountChange={setPlaylistCount}
+										remoteInfo={
+											isRemote && movie.remoteOrigin
+												? {
+														title: movie.title,
+														posterUrl: movie.posterUrl,
+														serverId: movie.remoteOrigin.serverId,
+													}
+												: undefined
+										}
+									/>
+								</div>
 							)}
 						</div>
 
@@ -1106,7 +1108,9 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								</button>
 
 								{showPlaySettings && (
-									<div class={styles.fileInfoContent}>
+									<div
+										class={`${styles.fileInfoContent} ${styles.sectionNarrow}`}
+									>
 										<p class={styles.playSettingsDescription}>
 											Override default audio settings when playing this movie.
 										</p>

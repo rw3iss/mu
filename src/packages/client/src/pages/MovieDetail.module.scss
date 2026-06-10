@@ -1068,3 +1068,8 @@
 	color: var(--color-text-muted);
 	white-space: nowrap;
 }
+
+// Narrow section content (Playlists, Play Settings) — don't fill wide pages.
+.sectionNarrow {
+	max-width: 400px;
+}
