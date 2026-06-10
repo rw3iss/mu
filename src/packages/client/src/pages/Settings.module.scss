@@ -4,18 +4,17 @@
   animation: fadeIn 300ms ease;
 }
 
-/* "Settings" heading sticks just below the global TopBar so it
- * stays visible while a long panel scrolls. A matching background
- * hides the panel content sliding underneath. */
+/* "Settings" heading sticks to the top of the scroll container (works in
+ * both normal and split mode — no static topbar offset). A matching
+ * background hides the panel content sliding underneath. */
 .title {
   position: sticky;
-  top: var(--topbar-height);
+  top: 0;
   z-index: 3;
   background: var(--color-bg);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  margin-bottom: var(--space-xl);
   padding: var(--space-md) 0;
 
   @include mobile {
@@ -38,7 +37,8 @@
 }
 
 /* Tab rail sticks alongside the active panel as the user scrolls.
- * Sits just under the sticky title (topbar + title row). */
+ * Sits just under the sticky title row (no static topbar offset, so it
+ * lands identically in normal and split mode on every page). */
 .tabs {
   flex-shrink: 0;
   width: 180px;
@@ -46,8 +46,8 @@
   flex-direction: column;
   gap: var(--space-xs);
   position: sticky;
-  top: calc(var(--topbar-height) + 4.5rem);
-  max-height: calc(100vh - var(--topbar-height) - 5rem);
+  top: 4.5rem;
+  max-height: calc(100vh - 5.5rem);
   overflow-y: auto;
 
   @include mobile {
@@ -58,6 +58,21 @@
     flex-direction: row;
     overflow-x: auto;
     padding-bottom: var(--space-sm);
+  }
+}
+
+/* One section of the tab rail; groups are separated by a 10px gap. */
+.tabGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+
+  & + & {
+    margin-top: 10px;
+  }
+
+  @include mobile {
+    flex-direction: row;
   }
 }
 

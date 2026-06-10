@@ -752,26 +752,37 @@ export function Settings(props: SettingsProps) {
 	const user = currentUser.value;
 	const isAdmin = user?.role === 'admin';
 
-	const tabs: { id: SettingsTab; label: string }[] = [
-		{ id: 'general', label: 'General' },
-		{ id: 'playback', label: 'Playback' },
-		{ id: 'appearance', label: 'Appearance' },
-		{ id: 'notifications', label: 'Notifications' },
+	// Tabs in sectioned groups (gap rendered between groups). The first
+	// group is for every user; the middle groups are admin-only; About is
+	// for everyone.
+	const tabGroups: { id: SettingsTab; label: string }[][] = [
+		[
+			{ id: 'general', label: 'General' },
+			{ id: 'playback', label: 'Playback' },
+			{ id: 'appearance', label: 'Appearance' },
+			{ id: 'notifications', label: 'Notifications' },
+		],
 		...(isAdmin
 			? [
-					{ id: 'library' as SettingsTab, label: 'Library' },
-					{ id: 'users' as SettingsTab, label: 'Users' },
-					{ id: 'plugins' as SettingsTab, label: 'Plugins' },
-					{ id: 'admin' as SettingsTab, label: 'Admin' },
-					{ id: 'connections' as SettingsTab, label: 'Sources' },
-					{ id: 'matching' as SettingsTab, label: 'Matching' },
-					{ id: 'jobs' as SettingsTab, label: 'Jobs' },
-					{ id: 'server' as SettingsTab, label: 'Server' },
-					{ id: 'encoding' as SettingsTab, label: 'Encoding' },
-					{ id: 'feedback' as SettingsTab, label: 'Feedback' },
+					[
+						{ id: 'library' as SettingsTab, label: 'Library' },
+						{ id: 'encoding' as SettingsTab, label: 'Encoding' },
+						{ id: 'connections' as SettingsTab, label: 'Sources' },
+						{ id: 'matching' as SettingsTab, label: 'Matching' },
+						{ id: 'plugins' as SettingsTab, label: 'Plugins' },
+					],
+					[
+						{ id: 'server' as SettingsTab, label: 'Server' },
+						{ id: 'jobs' as SettingsTab, label: 'Jobs' },
+						{ id: 'admin' as SettingsTab, label: 'Admin' },
+					],
+					[
+						{ id: 'users' as SettingsTab, label: 'Users' },
+						{ id: 'feedback' as SettingsTab, label: 'Feedback' },
+					],
 				]
 			: []),
-		{ id: 'about', label: 'About' },
+		[{ id: 'about', label: 'About' }],
 	];
 
 	return (
@@ -781,14 +792,18 @@ export function Settings(props: SettingsProps) {
 			<div class={styles.layout}>
 				{/* Tabs */}
 				<nav class={styles.tabs}>
-					{tabs.map((tab) => (
-						<button
-							key={tab.id}
-							class={`${styles.tab} ${activeTab === tab.id ? styles.active : ''}`}
-							onClick={() => handleTabChange(tab.id)}
-						>
-							{tab.label}
-						</button>
+					{tabGroups.map((group, gi) => (
+						<div class={styles.tabGroup} key={gi}>
+							{group.map((tab) => (
+								<button
+									key={tab.id}
+									class={`${styles.tab} ${activeTab === tab.id ? styles.active : ''}`}
+									onClick={() => handleTabChange(tab.id)}
+								>
+									{tab.label}
+								</button>
+							))}
+						</div>
 					))}
 				</nav>
 
