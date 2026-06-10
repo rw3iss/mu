@@ -90,6 +90,9 @@
 	.content {
 		overflow-y: auto;
 		min-height: 0;
+		// Reserve scrollbar space so pages that scroll and pages that don't
+		// keep identical content width (no left "pop" when a bar appears).
+		scrollbar-gutter: stable;
 	}
 }
 

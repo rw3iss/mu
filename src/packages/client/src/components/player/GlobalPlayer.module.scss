@@ -415,6 +415,7 @@
 	position: relative;
 	flex: 1;
 	overflow-y: auto;
+	scrollbar-gutter: stable;
 	padding: 0.75rem;
 	border-top: 1px solid var(--on-dark-overlay-1);
 }
