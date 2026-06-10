@@ -70,6 +70,18 @@
   font-weight: var(--font-weight-semibold);
 }
 
+// Window names (session/day/week/month/year) — theme label styling.
+.statLabel {
+  color: var(--color-label);
+  font-weight: var(--font-weight-medium);
+}
+
+// Dot separator between windows.
+.statSep {
+  margin: 0 10px;
+  color: var(--color-text-muted);
+}
+
 .welcomeUser {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-medium);

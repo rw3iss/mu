@@ -59,6 +59,12 @@ export interface NewTitleStats {
 	sinceDate: string | null;
 	/** Rolling count of titles added in the last 24 hours. */
 	last24h: number;
+	/** Rolling 7-day count. */
+	lastWeek?: number;
+	/** Rolling 30-day count. */
+	lastMonth?: number;
+	/** Rolling 365-day count. */
+	lastYear?: number;
 }
 
 const NEW_STATS_TTL_MS = 60_000;

@@ -22,32 +22,37 @@ interface DashboardProps {
 }
 
 /**
- * Build the dashboard header growth line. Prefers "since your last session"
- * (gated on > 0) with the rolling 24h count in parentheses; falls back to a
- * 24h-only line. The counts are emphasised (larger, header colour) via
- * `.statNum`. Returns null when there's nothing new to report.
+ * Build the dashboard header growth line:
+ *   "New titles since last: session <a> · day <b> · week <c> · month <d> · year <e>"
+ * Only windows with a non-zero count are shown; when every window is zero a
+ * quiet fallback line renders instead. Counts use `.statNum` (accent, larger),
+ * window names use `.statLabel`.
  */
 function renderNewTitles(stats: NewTitleStats | null) {
 	if (!stats) return null;
-	const { sinceSession, last24h } = stats;
-	const num = (n: number) => <span class={styles.statNum}>{n}</span>;
-	const titles = (n: number) => (n === 1 ? 'new title' : 'new titles');
-	if (sinceSession > 0) {
-		return (
-			<>
-				{num(sinceSession)} {titles(sinceSession)} added since your last session
-				{last24h > 0 ? <> ({num(last24h)} in the last 24 hours)</> : null}.
-			</>
-		);
+	const windows: Array<[string, number]> = [
+		['session', stats.sinceSession],
+		['day', stats.last24h],
+		['week', stats.lastWeek ?? 0],
+		['month', stats.lastMonth ?? 0],
+		['year', stats.lastYear ?? 0],
+	];
+	const active = windows.filter(([, n]) => n > 0);
+	if (active.length === 0) {
+		return <>No new titles added recently.</>;
 	}
-	if (last24h > 0) {
-		return (
-			<>
-				{num(last24h)} {titles(last24h)} added in the last 24 hours.
-			</>
-		);
-	}
-	return null;
+	return (
+		<>
+			New titles since last:{' '}
+			{active.map(([label, n], i) => (
+				<span key={label}>
+					{i > 0 && <span class={styles.statSep}>·</span>}
+					<span class={styles.statLabel}>{label}</span>{' '}
+					<span class={styles.statNum}>{n}</span>
+				</span>
+			))}
+		</>
+	);
 }
 
 export function Dashboard(_props: DashboardProps) {

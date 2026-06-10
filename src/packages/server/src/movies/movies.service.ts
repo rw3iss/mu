@@ -1001,6 +1001,9 @@ export class MoviesService implements OnModuleInit {
 		sinceSession: number;
 		sinceDate: string | null;
 		last24h: number;
+		lastWeek: number;
+		lastMonth: number;
+		lastYear: number;
 	} {
 		const u = userId
 			? this.database.db
@@ -1014,12 +1017,29 @@ export class MoviesService implements OnModuleInit {
 		// would massively over-report on the first run after this ships.
 		const sinceDate = u?.prev ?? u?.last ?? null;
 		const sinceSession = sinceDate ? this.countAddedSince(sinceDate) : 0;
+		const DAY = 24 * 60 * 60 * 1000;
 		const last24h = this.cachedCountSince(
 			'window:24h',
-			new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+			new Date(Date.now() - DAY).toISOString(),
 			60_000,
 		);
-		return { sinceSession, sinceDate, last24h };
+		// Wider windows change slowly — cache longer (shared across users).
+		const lastWeek = this.cachedCountSince(
+			'window:7d',
+			new Date(Date.now() - 7 * DAY).toISOString(),
+			5 * 60_000,
+		);
+		const lastMonth = this.cachedCountSince(
+			'window:30d',
+			new Date(Date.now() - 30 * DAY).toISOString(),
+			15 * 60_000,
+		);
+		const lastYear = this.cachedCountSince(
+			'window:365d',
+			new Date(Date.now() - 365 * DAY).toISOString(),
+			60 * 60_000,
+		);
+		return { sinceSession, sinceDate, last24h, lastWeek, lastMonth, lastYear };
 	}
 
 	/**
