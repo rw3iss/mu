@@ -47,3 +47,19 @@
 .bodyFlush {
 	padding-top: var(--space-lg);
 }
+
+// Collapsible header affordance.
+.headerToggle {
+	cursor: pointer;
+	user-select: none;
+
+	&:hover .title {
+		color: var(--color-text-primary);
+	}
+}
+
+.chevron {
+	display: inline-flex;
+	color: var(--color-text-muted);
+	padding-top: 3px;
+}

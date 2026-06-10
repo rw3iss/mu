@@ -2,7 +2,7 @@ import { nowISO } from '@mu/shared';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { asc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { commentReactions, movieComments, users } from '../database/schema/index.js';
+import { commentReactions, movieComments, movies, users } from '../database/schema/index.js';
 
 export interface CommentReactionSummary {
 	emoji: string;
@@ -130,6 +130,38 @@ export class CommentsService {
 		}));
 		this.cache.set(movieId, { data, expires: Date.now() + CommentsService.TTL_MS });
 		return data;
+	}
+
+	/**
+	 * A user's comments across all movies, newest first, pageable. Joined with
+	 * movie title/poster for profile rendering. Light query — no cache needed.
+	 */
+	listByUser(userId: string, page = 1, pageSize = 20) {
+		const limit = Math.min(50, Math.max(1, pageSize));
+		const offset = (Math.max(1, page) - 1) * limit;
+		const rows = this.database.db
+			.select({
+				id: movieComments.id,
+				movieId: movieComments.movieId,
+				parentId: movieComments.parentId,
+				timeSeconds: movieComments.timeSeconds,
+				text: movieComments.text,
+				edited: movieComments.edited,
+				createdAt: movieComments.createdAt,
+				movieTitle: movies.title,
+				movieYear: movies.year,
+				moviePosterUrl: movies.posterUrl,
+				movieThumbnailUrl: movies.thumbnailUrl,
+			})
+			.from(movieComments)
+			.leftJoin(movies, eq(movieComments.movieId, movies.id))
+			.where(eq(movieComments.userId, userId))
+			.orderBy(sql`${movieComments.createdAt} DESC`)
+			.limit(limit + 1)
+			.offset(offset)
+			.all();
+		const hasMore = rows.length > limit;
+		return { comments: rows.slice(0, limit), page: Math.max(1, page), hasMore };
 	}
 
 	create(

@@ -26,7 +26,33 @@ export interface CommentsResponse {
 	count?: number;
 }
 
+export interface UserCommentRow {
+	id: string;
+	movieId: string;
+	parentId: string | null;
+	timeSeconds: number | null;
+	text: string;
+	edited: boolean;
+	createdAt: string;
+	movieTitle: string | null;
+	movieYear: number | null;
+	moviePosterUrl: string | null;
+	movieThumbnailUrl: string | null;
+}
+
 export const commentsService = {
+	/** A user's comments across all movies, newest first, pageable. */
+	listByUser(
+		userId: string,
+		page = 1,
+		pageSize = 20,
+	): Promise<{ comments: UserCommentRow[]; page: number; hasMore: boolean }> {
+		return api.get(`/comments/user/${userId}`, {
+			page: String(page),
+			pageSize: String(pageSize),
+		});
+	},
+
 	/** Comment tree for a movie (server-cached). Works with share tokens too. */
 	list(movieId: string): Promise<CommentsResponse> {
 		return api.get<CommentsResponse>(`/comments/movie/${movieId}`);

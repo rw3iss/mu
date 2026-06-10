@@ -223,3 +223,38 @@
 	justify-content: flex-end;
 	margin-top: var(--space-lg);
 }
+
+/* Sections layout: main column (Favorites, Recently watched) + a narrow
+ * Comments sidebar (~1/4 width). Stacks on mobile. */
+.sectionsColumns {
+	display: flex;
+	gap: var(--space-lg);
+	align-items: flex-start;
+}
+
+.sectionsMain {
+	flex: 3;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-lg);
+}
+
+.sectionsSide {
+	flex: 1;
+	min-width: 240px;
+
+	@include mobile {
+		min-width: 0;
+	}
+}
+
+@include mobile {
+	.sectionsColumns {
+		flex-direction: column;
+	}
+
+	.sectionsSide {
+		width: 100%;
+	}
+}

@@ -321,6 +321,26 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	useEffect(() => {
 		if (id) loadComments(id).catch(() => {});
 	}, [id]);
+
+	// Deep link from profile pages: /movie/:id?comment=<commentId> expands the
+	// Comments section and scrolls the target comment into view once rendered.
+	useEffect(() => {
+		const target = new URLSearchParams(window.location.search).get('comment');
+		if (!target || !id) return;
+		setShowComments(true);
+		let tries = 0;
+		const tick = () => {
+			const el = document.getElementById(`comment-${target}`);
+			if (el) {
+				el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				el.classList.add('comment-highlight');
+				setTimeout(() => el.classList.remove('comment-highlight'), 2500);
+				return;
+			}
+			if (tries++ < 20) setTimeout(tick, 250);
+		};
+		setTimeout(tick, 300);
+	}, [id]);
 	// Cast is expanded on desktop, collapsed on mobile. Track explicit
 	// state so the user toggle works on both; the initial value flips
 	// based on viewport width at mount.

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { CommentsService } from './comments.service.js';
@@ -20,6 +20,21 @@ export class CommentsController {
 			comments: this.comments.getForMovie(movieId, userId),
 			count: this.comments.count(movieId),
 		};
+	}
+
+	/** A user's comments across movies (profile pages). */
+	@RequireAction('view:library')
+	@Get('user/:userId')
+	listByUser(
+		@Param('userId') userId: string,
+		@Query('page') page?: string,
+		@Query('pageSize') pageSize?: string,
+	) {
+		return this.comments.listByUser(
+			userId,
+			parseInt(page ?? '1', 10) || 1,
+			parseInt(pageSize ?? '20', 10) || 20,
+		);
 	}
 
 	@RequireAction('view:own-data')

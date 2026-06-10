@@ -312,3 +312,10 @@ html[data-reduce-motion='true'] *::after {
     background-position: -200% 0;
   }
 }
+
+// Briefly highlights a comment navigated to via /movie/:id?comment=<id>.
+.comment-highlight {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}

@@ -11,6 +11,7 @@ import { Button } from '@/components/common/Button';
 import { Panel } from '@/components/common/Panel';
 import { Spinner } from '@/components/common/Spinner';
 import { ToggleButton } from '@/components/common/ToggleButton';
+import { ProfileComments } from '@/components/profile/ProfileComments';
 import { ProfileFavorites } from '@/components/profile/ProfileFavorites';
 import { ProfileHistoryList } from '@/components/profile/ProfileHistoryList';
 import { WatchingNow } from '@/components/profile/WatchingNow';
@@ -314,18 +315,33 @@ export function ProfilePage({ username }: ProfilePageProps) {
 			{/* ── Watching now ────────────────────────────────────── */}
 			{currentlyWatching && <WatchingNow watching={currentlyWatching} />}
 
-			{/* ── Favorites ───────────────────────────────────────── */}
-			<Panel title="Favorites" subtitle="Movies, cast, and directors — earliest first">
-				<ProfileFavorites favorites={favorites} />
-			</Panel>
+			{/* ── Two columns: main (Favorites + Recently watched) and a
+			      narrow Comments sidebar. All sections are collapsible. ── */}
+			<div class={styles.sectionsColumns}>
+				<div class={styles.sectionsMain}>
+					<Panel
+						collapsible
+						title="Favorites"
+						subtitle="Movies, cast, and directors — earliest first"
+					>
+						<ProfileFavorites favorites={favorites} />
+					</Panel>
 
-			{/* ── Watch history ───────────────────────────────────── */}
-			<Panel
-				title="Recently watched"
-				subtitle={`${history.length} ${history.length === 1 ? 'movie' : 'movies'}`}
-			>
-				<ProfileHistoryList history={history} />
-			</Panel>
+					<Panel
+						collapsible
+						title="Recently watched"
+						subtitle={`${history.length} ${history.length === 1 ? 'movie' : 'movies'}`}
+					>
+						<ProfileHistoryList history={history} />
+					</Panel>
+				</div>
+
+				<div class={styles.sectionsSide}>
+					<Panel collapsible title="Comments">
+						<ProfileComments userId={user.id} />
+					</Panel>
+				</div>
+			</div>
 		</div>
 	);
 }

@@ -139,7 +139,7 @@ function CommentItem({
 	);
 
 	return (
-		<li class={`${styles.item} ${isReply ? styles.reply : ''}`}>
+		<li id={`comment-${comment.id}`} class={`${styles.item} ${isReply ? styles.reply : ''}`}>
 			<div class={styles.itemHead}>
 				<span class={styles.author}>{comment.authorName}</span>
 				{comment.timeSeconds != null && (
