@@ -1,9 +1,10 @@
-import { signal } from '@preact/signals';
+import { effect, signal } from '@preact/signals';
 import {
 	type MoviePlaylistInfo,
 	type Playlist,
 	playlistsService,
 } from '@/services/playlists.service';
+import { currentUser } from './auth.state';
 
 // ============================================
 // Signals
@@ -61,6 +62,22 @@ export async function ensurePlaylistsLoaded(): Promise<Playlist[]> {
 		});
 	return listInflight;
 }
+
+// The caches are per-user data held in module scope, so they MUST be dropped
+// when the logged-in user changes (logout/login without a reload) — otherwise
+// the previous user's playlists leak into the next session's menus.
+let cachedForUserId: string | null | undefined;
+effect(() => {
+	const uid = currentUser.value?.id ?? null;
+	if (cachedForUserId === undefined) {
+		cachedForUserId = uid; // initial run — nothing cached yet
+		return;
+	}
+	if (uid !== cachedForUserId) {
+		cachedForUserId = uid;
+		invalidatePlaylists();
+	}
+});
 
 /** Drop all cached playlists + memberships. Used after CRUD on management pages. */
 export function invalidatePlaylists(): void {
