@@ -30,6 +30,7 @@ interface InfoPanelProps {
 
 export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 	const [showFileInfo, setShowFileInfo] = useState(false);
+	const [showComments, setShowComments] = useState(false);
 
 	// Refresh movie data when panel opens or when movie is updated via WebSocket
 	useEffect(() => {
@@ -285,8 +286,19 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							)}
 
 							<div class={styles.section}>
-								<h3 class={styles.sectionTitle}>Comments</h3>
-								<CommentsPanel movieId={movie.id} />
+								<button
+									class={styles.fileInfoToggle}
+									onClick={() => setShowComments(!showComments)}
+								>
+									<h3 class={styles.sectionTitle}>Comments</h3>
+									<span class={styles.fileInfoArrow}>
+										<Icon
+											name={showComments ? 'chevron-up' : 'chevron-down'}
+											size={14}
+										/>
+									</span>
+								</button>
+								{showComments && <CommentsPanel movieId={movie.id} />}
 							</div>
 
 							{movie.fileInfo && (
@@ -517,8 +529,19 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 						)}
 
 						<div class={styles.section}>
-							<h3 class={styles.sectionTitle}>Comments</h3>
-							<CommentsPanel movieId={movie.id} />
+							<button
+								class={styles.fileInfoToggle}
+								onClick={() => setShowComments(!showComments)}
+							>
+								<h3 class={styles.sectionTitle}>Comments</h3>
+								<span class={styles.fileInfoArrow}>
+									<Icon
+										name={showComments ? 'chevron-up' : 'chevron-down'}
+										size={14}
+									/>
+								</span>
+							</button>
+							{showComments && <CommentsPanel movieId={movie.id} />}
 						</div>
 
 						{movie.fileInfo && (
