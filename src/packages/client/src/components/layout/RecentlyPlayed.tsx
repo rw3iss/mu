@@ -1,5 +1,6 @@
 import { useEffect } from 'preact/hooks';
 import { route } from 'preact-router';
+import { Tooltip } from '@/components/common/Tooltip';
 import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
 import { currentUser } from '@/state/auth.state';
 import { playMovie } from '@/state/globalPlayer.state';
@@ -54,63 +55,60 @@ export function RecentlyPlayed() {
 			{!collapsed && (
 				<div class={styles.list}>
 					{items.map((movie) => (
-						<button
+						<Tooltip
 							key={movie.id}
-							class={styles.item}
-							{...newTabNav(`/movie/${movie.id}`, () => route(`/movie/${movie.id}`))}
+							label={movie.title}
+							placement="top"
+							delay={500}
+							class={styles.tipWrap}
 						>
-							<div class={styles.poster}>
-								{movie.posterUrl ? (
-									<img src={movie.posterUrl} alt={movie.title} loading="lazy" />
-								) : (
-									<div class={styles.posterPlaceholder} />
-								)}
-							</div>
-							<div class={styles.info}>
-								<span class={styles.title}>{movie.title}</span>
-								{movie.year > 0 && <span class={styles.year}>{movie.year}</span>}
-							</div>
-							{/* Watch-position bar along the bottom of the row */}
-							{(movie.watchPosition ?? 0) > 0 && (movie.durationSeconds ?? 0) > 0 && (
-								<div class={styles.progressTrack}>
-									<div
-										class={styles.progressFill}
-										style={{
-											width: `${Math.min(100, ((movie.watchPosition ?? 0) / (movie.durationSeconds || 1)) * 100)}%`,
-										}}
-									/>
-								</div>
-							)}
-							{/* Hover tooltip with larger poster */}
-							<div class={styles.tooltip}>
-								{movie.posterUrl && (
-									<img
-										src={movie.posterUrl}
-										alt=""
-										class={styles.tooltipPoster}
-									/>
-								)}
-								<span class={styles.tooltipTitle}>{movie.title}</span>
-							</div>
 							<button
-								class={styles.playBtn}
-								onClick={(e) => {
-									e.stopPropagation();
-									playMovie(movie.id);
-								}}
-								title="Play"
+								class={styles.item}
+								{...newTabNav(`/movie/${movie.id}`, () => route(`/movie/${movie.id}`))}
 							>
-								<svg
-									width="14"
-									height="14"
-									viewBox="0 0 24 24"
-									fill="currentColor"
-									stroke="none"
+								<div class={styles.poster}>
+									{movie.posterUrl ? (
+										<img src={movie.posterUrl} alt={movie.title} loading="lazy" />
+									) : (
+										<div class={styles.posterPlaceholder} />
+									)}
+								</div>
+								<div class={styles.info}>
+									<span class={styles.title}>{movie.title}</span>
+									{movie.year > 0 && <span class={styles.year}>{movie.year}</span>}
+								</div>
+								{/* Watch-position bar along the bottom of the row */}
+								{(movie.watchPosition ?? 0) > 0 &&
+									(movie.durationSeconds ?? 0) > 0 && (
+										<div class={styles.progressTrack}>
+											<div
+												class={styles.progressFill}
+												style={{
+													width: `${Math.min(100, ((movie.watchPosition ?? 0) / (movie.durationSeconds || 1)) * 100)}%`,
+												}}
+											/>
+										</div>
+									)}
+								<button
+									class={styles.playBtn}
+									onClick={(e) => {
+										e.stopPropagation();
+										playMovie(movie.id);
+									}}
+									title="Play"
 								>
-									<polygon points="5 3 19 12 5 21 5 3" />
-								</svg>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="currentColor"
+										stroke="none"
+									>
+										<polygon points="5 3 19 12 5 21 5 3" />
+									</svg>
+								</button>
 							</button>
-						</button>
+						</Tooltip>
 					))}
 				</div>
 			)}

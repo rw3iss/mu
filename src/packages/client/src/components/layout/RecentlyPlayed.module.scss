@@ -58,6 +58,12 @@
   padding: 0;
 }
 
+// Wrapper span the shared Tooltip puts around each row — behave like the row.
+.tipWrap {
+  display: block;
+  width: 100%;
+}
+
 .item {
   position: relative;
   display: flex;
@@ -78,55 +84,11 @@
     .playBtn {
       opacity: 1;
     }
-
-    .tooltip {
-      opacity: 1;
-      pointer-events: auto;
-      transform: translateX(0);
-      // 500ms hover-intent delay before the tooltip appears; hides instantly
-      // (the base state has no delay).
-      transition-delay: 0.5s;
-    }
   }
 }
 
-.tooltip {
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateX(-4px) translateY(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(15, 15, 15, 0.95);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-md);
-  padding: 6px 12px 6px 6px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s, transform 0.15s;
-  z-index: var(--z-overlay);
-  white-space: nowrap;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-}
 
-.tooltipPoster {
-  width: 48px;
-  height: 72px;
-  object-fit: cover;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
 
-.tooltipTitle {
-  font-size: 13px;
-  font-weight: 500;
-  color: #fff;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 .poster {
   width: 28px;
@@ -167,23 +129,25 @@
 }
 
 .year {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 
 .playBtn {
   position: absolute;
   right: 0;
-  top: 0;
-  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 42px;
   border-radius: 0;
+  // Inset by the watch-bar height so the seek bar stays visible beneath it.
+  top: 2px;
+  bottom: 2px;
   color: var(--color-text-secondary);
-  // Opaque themed backing so the icon reads over long, ellipsized titles.
-  background: var(--color-bg-elevated);
+  // Same backing as the hovered row itself (tracks the theme variable) so the
+  // icon reads over long, ellipsized titles.
+  background: var(--color-bg-hover);
   opacity: 0;
   transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 
