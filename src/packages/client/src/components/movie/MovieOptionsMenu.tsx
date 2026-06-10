@@ -157,15 +157,21 @@ export function MovieOptionsMenu({
 					notifySuccess('Marked as unwatched');
 				} else {
 					await moviesService.markWatched(movie.id);
-					onMovieUpdate?.({ ...movie, watched: true });
+					// Optimistic: watched also clears the resume position server-side,
+					// so drop it locally too (hides Resume + the position bar at once).
+					onMovieUpdate?.({ ...movie, watched: true, watchPosition: 0 });
 					notifySuccess('Marked as watched');
 				}
 				setOpen(false);
+				// Re-fetch so every server-derived field (position, progress,
+				// history) is authoritative — the optimistic patch only covers
+				// the obvious ones.
+				await refreshMovie();
 			} catch {
 				notifyError('Failed to update watched status');
 			}
 		},
-		[movie, onMovieUpdate, setOpen],
+		[movie, onMovieUpdate, setOpen, refreshMovie],
 	);
 
 	const handleRescan = useCallback(
