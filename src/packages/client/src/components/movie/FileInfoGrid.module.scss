@@ -4,6 +4,8 @@
 // not just narrow viewports.
 .wrap {
 	container-type: inline-size;
+	// Breathing room under the "File Info" section header when expanded.
+	padding-top: var(--space-md);
 }
 
 .groups {
@@ -25,11 +27,14 @@
 
 .groupTitle {
 	margin: 0 0 var(--space-sm);
-	font-size: var(--font-size-xs);
-	font-weight: var(--font-weight-semibold);
-	letter-spacing: 0.06em;
+	// Visibly subordinate to the "File Info" section header: smaller,
+	// lighter weight, label color, softer tracking.
+	font-size: 11px;
+	font-weight: var(--font-weight-medium);
+	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	color: var(--color-label);
+	opacity: 0.85;
 }
 
 .wrap {
