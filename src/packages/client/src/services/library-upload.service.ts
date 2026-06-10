@@ -1,6 +1,8 @@
 import { api } from './api';
 
 export interface UploadTarget {
+	/** Marked default in Settings → Library (preselected in the upload modal). */
+	isDefault?: boolean;
 	id: string;
 	path: string;
 	label: string | null;

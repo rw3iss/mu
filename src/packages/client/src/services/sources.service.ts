@@ -6,6 +6,8 @@ export interface MediaSourceDto {
 	label: string | null;
 	scanIntervalHours: number;
 	enabled: boolean;
+	/** At most one source is the default (upload target preselection). */
+	isDefault?: boolean;
 	lastScannedAt: string | null;
 	fileCount: number;
 	totalSizeBytes: number;
@@ -53,6 +55,19 @@ export const sourcesService = {
 
 	create(path: string, label?: string) {
 		return api.post<MediaSourceDto>('/sources', { path, label });
+	},
+
+	update(id: string, data: Partial<{ label: string; enabled: boolean; isDefault: boolean }>) {
+		return api.patch<MediaSourceDto>(`/sources/${id}`, data);
+	},
+
+	/**
+	 * The default media source: explicit default flag → the single source →
+	 * the first source. Null when there are no sources.
+	 */
+	resolveDefault(sources: MediaSourceDto[]): MediaSourceDto | null {
+		if (sources.length === 0) return null;
+		return sources.find((s) => s.isDefault) ?? sources[0]!;
 	},
 
 	remove(id: string) {

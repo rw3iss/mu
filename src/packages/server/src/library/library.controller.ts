@@ -38,7 +38,7 @@ export class LibraryController {
 	@RequireAction('edit:app-settings')
 	update(
 		@Param('id') id: string,
-		@Body() body: { label?: string; enabled?: boolean; scanIntervalHours?: number },
+		@Body() body: { label?: string; enabled?: boolean; scanIntervalHours?: number; isDefault?: boolean },
 	) {
 		return this.libraryService.updateSource(id, body);
 	}

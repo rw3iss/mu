@@ -59,6 +59,17 @@ export class LibraryService {
 		this.events.emit('library:source-removed', { id, path: source.path });
 	}
 
+	/**
+	 * The default media source for new uploads etc. Resolution order:
+	 * the explicitly flagged default → the single source when only one
+	 * exists → the first source found. Null when no sources exist.
+	 */
+	getDefaultSource() {
+		const sources = this.getSources();
+		if (sources.length === 0) return null;
+		return sources.find((s) => s.isDefault) ?? sources[0]!;
+	}
+
 	findByPath(path: string) {
 		return this.database.db
 			.select()
@@ -99,11 +110,24 @@ export class LibraryService {
 
 	updateSource(
 		id: string,
-		data: Partial<{ label: string; enabled: boolean; scanIntervalHours: number }>,
+		data: Partial<{
+			label: string;
+			enabled: boolean;
+			scanIntervalHours: number;
+			isDefault: boolean;
+		}>,
 	) {
 		const existing = this.getSource(id);
 		if (!existing) {
 			throw new NotFoundException(`Source ${id} not found`);
+		}
+
+		// Only one source may be the default — clear the flag everywhere else.
+		if (data.isDefault === true) {
+			this.database.db
+				.update(mediaSources)
+				.set({ isDefault: false, updatedAt: nowISO() })
+				.run();
 		}
 
 		this.database.db

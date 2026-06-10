@@ -59,3 +59,22 @@
   color: var(--color-accent);
   padding-left: var(--space-md);
 }
+
+// "Default" radio column (shown only with multiple saved sources).
+.defaultRadio {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	flex-shrink: 0;
+	cursor: pointer;
+
+	input {
+		accent-color: var(--color-accent);
+		cursor: pointer;
+	}
+}
+
+.defaultLabel {
+	font-size: 11px;
+	color: var(--color-text-muted);
+}

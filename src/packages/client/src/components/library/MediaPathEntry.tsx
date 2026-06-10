@@ -13,6 +13,9 @@ interface MediaPathEntryProps {
 	onRemove: () => void;
 	showBrowse?: boolean;
 	placeholder?: string;
+	/** Render the "Default" radio column (only when multiple saved sources). */
+	showDefault?: boolean;
+	onSetDefault?: () => void;
 }
 
 function formatDate(iso: string | null): string {
@@ -33,6 +36,8 @@ export function MediaPathEntry({
 	onRemove,
 	showBrowse = false,
 	placeholder = '/path/to/movies',
+	showDefault = false,
+	onSetDefault,
 }: MediaPathEntryProps) {
 	const [isBrowseOpen, setIsBrowseOpen] = useState(false);
 	const [isScanning, setIsScanning] = useState(false);
@@ -55,6 +60,21 @@ export function MediaPathEntry({
 	return (
 		<div class={styles.entry}>
 			<div class={styles.row}>
+				{showDefault && (
+					<label
+						class={styles.defaultRadio}
+						title="Use as the default media path (preselected for uploads)"
+					>
+						<input
+							type="radio"
+							name="default-media-path"
+							checked={!!source?.isDefault}
+							disabled={!source}
+							onChange={() => onSetDefault?.()}
+						/>
+						<span class={styles.defaultLabel}>Default</span>
+					</label>
+				)}
 				<input
 					type="text"
 					class={styles.input}

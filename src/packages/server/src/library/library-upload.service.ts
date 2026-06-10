@@ -62,6 +62,8 @@ export interface UploadTarget {
 	id: string;
 	path: string;
 	label: string | null;
+	/** Marked default in Settings → Library. */
+	isDefault: boolean;
 }
 
 /**
@@ -95,7 +97,12 @@ export class LibraryUploadService {
 		return this.library
 			.getSources()
 			.filter((s) => s.enabled)
-			.map((s) => ({ id: s.id, path: s.path, label: s.label ?? null }));
+			.map((s) => ({
+				id: s.id,
+				path: s.path,
+				label: s.label ?? null,
+				isDefault: !!s.isDefault,
+			}));
 	}
 
 	private resolveSource(sourceId: string) {

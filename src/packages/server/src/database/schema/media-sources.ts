@@ -6,6 +6,8 @@ export const mediaSources = sqliteTable('media_sources', {
 	label: text('label'),
 	scanIntervalHours: integer('scan_interval_hours').default(6),
 	enabled: integer('enabled', { mode: 'boolean' }).default(true),
+	/** At most one source is flagged default (upload target preselection etc). */
+	isDefault: integer('is_default', { mode: 'boolean' }).default(false),
 	lastScannedAt: text('last_scanned_at'),
 	fileCount: integer('file_count').default(0),
 	totalSizeBytes: integer('total_size_bytes').default(0),

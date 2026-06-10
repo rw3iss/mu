@@ -103,7 +103,9 @@ export function UploadMovieModal({ isOpen, onClose, onUploaded }: UploadMovieMod
 			.getTargets()
 			.then((r) => {
 				setTargets(r.targets);
-				setSourceId((prev) => prev || r.targets[0]?.id || '');
+				// Preselect the default media path (flagged default → first).
+				const def = r.targets.find((t) => t.isDefault) ?? r.targets[0];
+				setSourceId((prev) => prev || def?.id || '');
 			})
 			.catch(() => setError('Could not load library destinations.'));
 	}, [isOpen]);
