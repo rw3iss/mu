@@ -981,11 +981,16 @@ export class MoviesService implements OnModuleInit {
 					AND added_at > ${sinceIso}
 			) + (
 				SELECT COUNT(*) FROM (
-					SELECT group_id, MIN(added_at) AS first_added FROM movies
-					WHERE group_id IS NOT NULL
-						AND (source IS NULL OR source = 'library')
-						AND (hidden IS NULL OR hidden = 0)
-					GROUP BY group_id
+					-- Collapse child groups (e.g. seasons) into their TOP-LEVEL
+					-- parent, exactly like the library's interleaved stacks.
+					SELECT COALESCE(g.parent_group_id, g.id) AS top_group,
+					       MIN(m.added_at) AS first_added
+					FROM movies m
+					JOIN movie_groups g ON g.id = m.group_id
+					WHERE m.group_id IS NOT NULL
+						AND (m.source IS NULL OR m.source = 'library')
+						AND (m.hidden IS NULL OR m.hidden = 0)
+					GROUP BY top_group
 					HAVING first_added > ${sinceIso}
 				)
 			) AS n
