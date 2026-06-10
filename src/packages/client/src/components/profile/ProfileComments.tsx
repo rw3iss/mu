@@ -16,7 +16,14 @@ function fmtTime(t: number): string {
  * date, and the comment text. Clicking a row jumps to that comment in the
  * movie's Comments section. Paged 20 at a time via "Load more".
  */
-export function ProfileComments({ userId }: { userId: string }) {
+export function ProfileComments({
+	userId,
+	onCount,
+}: {
+	userId: string;
+	/** Reports how many rows are loaded (page-level layout gates on > 0). */
+	onCount?: (n: number) => void;
+}) {
 	const [rows, setRows] = useState<UserCommentRow[]>([]);
 	const [page, setPage] = useState(1);
 	const [hasMore, setHasMore] = useState(false);
@@ -27,7 +34,11 @@ export function ProfileComments({ userId }: { userId: string }) {
 			setLoading(true);
 			try {
 				const r = await commentsService.listByUser(userId, p, 20);
-				setRows((prev) => (p === 1 ? r.comments : [...prev, ...r.comments]));
+				setRows((prev) => {
+					const next = p === 1 ? r.comments : [...prev, ...r.comments];
+					onCount?.(next.length);
+					return next;
+				});
 				setHasMore(r.hasMore);
 				setPage(p);
 			} catch {

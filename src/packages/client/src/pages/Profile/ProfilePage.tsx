@@ -41,6 +41,7 @@ export function ProfilePage({ username }: ProfilePageProps) {
 	const [usernameDraft, setUsernameDraft] = useState('');
 	const [emailDraft, setEmailDraft] = useState('');
 	const [saving, setSaving] = useState(false);
+	const [commentCount, setCommentCount] = useState<number | null>(null);
 	const [uploadingAvatar, setUploadingAvatar] = useState(false);
 	const [togglingPublic, setTogglingPublic] = useState(false);
 
@@ -312,17 +313,17 @@ export function ProfilePage({ username }: ProfilePageProps) {
 				)}
 			</Panel>
 
-			{/* ── Watching now ────────────────────────────────────── */}
-			{currentlyWatching && <WatchingNow watching={currentlyWatching} />}
-
-			{/* ── Two columns: main (Favorites + Recently watched) and a
-			      narrow Comments sidebar. All sections are collapsible. ── */}
+			{/* ── Two columns: main (Watching now, Favorites, Recently watched)
+			      and a Comments sidebar (hidden when the user has none). ── */}
 			<div class={styles.sectionsColumns}>
 				<div class={styles.sectionsMain}>
+					{currentlyWatching && <WatchingNow watching={currentlyWatching} />}
+
 					<Panel
 						collapsible
 						title="Favorites"
 						subtitle="Movies, cast, and directors — earliest first"
+						bodyClass={styles.scrollBody}
 					>
 						<ProfileFavorites favorites={favorites} />
 					</Panel>
@@ -331,14 +332,19 @@ export function ProfilePage({ username }: ProfilePageProps) {
 						collapsible
 						title="Recently watched"
 						subtitle={`${history.length} ${history.length === 1 ? 'movie' : 'movies'}`}
+						bodyClass={styles.scrollBody}
 					>
 						<ProfileHistoryList history={history} />
 					</Panel>
 				</div>
 
-				<div class={styles.sectionsSide}>
+				{/* Mounted even before the count is known so the fetch runs;
+				    shown only when the user actually has comments. */}
+				<div
+					class={`${styles.sectionsSide} ${commentCount === 0 || commentCount === null ? styles.sectionsSideHidden : ''}`}
+				>
 					<Panel collapsible title="Comments">
-						<ProfileComments userId={user.id} />
+						<ProfileComments userId={user.id} onCount={setCommentCount} />
 					</Panel>
 				</div>
 			</div>

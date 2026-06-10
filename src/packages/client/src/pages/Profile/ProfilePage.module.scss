@@ -2,7 +2,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-lg);
-	max-width: 920px;
+	max-width: 1200px;
 	margin: 0 auto;
 	padding: var(--space-lg);
 	padding-bottom: calc(var(--space-2xl) + var(--mobile-nav-height));
@@ -233,7 +233,7 @@
 }
 
 .sectionsMain {
-	flex: 3;
+	flex: 2;
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
@@ -257,4 +257,16 @@
 	.sectionsSide {
 		width: 100%;
 	}
+}
+
+
+/* Comments sidebar hidden until the user is known to have comments. */
+.sectionsSideHidden {
+	display: none;
+}
+
+/* Scrollable section bodies (Favorites / Recently watched). */
+.scrollBody {
+	max-height: 800px;
+	overflow-y: auto;
 }
