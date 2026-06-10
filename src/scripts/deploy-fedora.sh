@@ -77,7 +77,13 @@ fi
 restore_watcher() { [ "$WATCHER_WAS_ACTIVE" = true ] && systemctl --user start mu-autodeploy 2>/dev/null || true; }
 trap restore_watcher EXIT
 
-git fetch origin "$BR" --quiet || { echo "FATAL: git fetch"; exit 1; }
+# Retry fetch a few times — the VPN exit occasionally drops a single attempt.
+fetch_ok=""
+for _try in 1 2 3 4; do
+	if git fetch origin "$BR" --quiet; then fetch_ok=1; break; fi
+	echo ">> git fetch failed (try $_try), retrying in 5s…"; sleep 5
+done
+[ -n "$fetch_ok" ] || { echo "FATAL: git fetch"; exit 1; }
 git reset --hard "origin/$BR" --quiet || { echo "FATAL: git reset"; exit 1; }
 SHA="$(git rev-parse --short HEAD)"
 echo ">> building $SHA (old server still serving)…"
