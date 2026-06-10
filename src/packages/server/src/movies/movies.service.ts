@@ -532,6 +532,24 @@ export class MoviesService implements OnModuleInit {
 		if (query.maxRuntime != null && Number(query.maxRuntime) > 0) {
 			conds.push(sql`${movies.runtimeMinutes} <= ${Math.floor(Number(query.maxRuntime))}`);
 		}
+		// Watched filters — self-contained EXISTS so they work in this
+		// interleaved path (no watch-history join here).
+		if (String(query.hideWatched) === 'true' && userId) {
+			conds.push(sql`NOT EXISTS (
+				SELECT 1 FROM ${userWatchHistory}
+				WHERE ${userWatchHistory.movieId} = ${movies.id}
+					AND ${userWatchHistory.userId} = ${userId}
+					AND ${userWatchHistory.completed} = 1
+			)`);
+		}
+		if (String(query.watchedOnly) === 'true' && userId) {
+			conds.push(sql`EXISTS (
+				SELECT 1 FROM ${userWatchHistory}
+				WHERE ${userWatchHistory.movieId} = ${movies.id}
+					AND ${userWatchHistory.userId} = ${userId}
+					AND ${userWatchHistory.completed} = 1
+			)`);
+		}
 
 		const ratingJoinCond = userId
 			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))

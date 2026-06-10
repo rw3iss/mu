@@ -247,6 +247,9 @@ export class MoviesController {
 	@Post(':id/watched')
 	markWatched(@Param('id') movieId: string, @CurrentUser('id') userId: string) {
 		this.historyService.markWatched(userId, movieId);
+		// Watched state feeds the Unwatched/Watched library filters — bust the
+		// cached lists so the toggle reflects the change immediately.
+		this.moviesService.invalidateListCache();
 		this.moviesService.invalidateListCache();
 		return { success: true };
 	}
@@ -255,6 +258,7 @@ export class MoviesController {
 	@Delete(':id/watched')
 	markUnwatched(@Param('id') movieId: string, @CurrentUser('id') userId: string) {
 		this.historyService.markUnwatched(userId, movieId);
+		this.moviesService.invalidateListCache();
 		this.moviesService.invalidateListCache();
 		return { success: true };
 	}
