@@ -201,24 +201,38 @@
 }
 
 /* Trending lives in the narrower right column, so it needs a smaller card
-   min than the 180px left-column cards to fit two per row at typical desktop
-   widths (auto-fill still drops it to one column when the column is narrow). */
+   min than the 180px left-column cards. The column is its own size container:
+   card size steps with the COLUMN's width (not the viewport), so split mode —
+   where the viewport stays wide but the column is squeezed — sizes correctly.
+   auto-fill still drops to one column when even two small cards can't fit. */
 .areaTrending {
   --mg-card-min: 150px;
+  container-type: inline-size;
+  container-name: trending;
 
   // Trending's header sits tighter to its grid than the other sections.
   .sectionHeader {
     margin-bottom: var(--space-sm);
   }
+}
 
-  // On large monitors the right column is wide enough that 150px cards pack 4+;
-  // bump the min so it caps at fewer, larger cards (≈3 not 4, ≈2 not 3). The
-  // laptop sizes below this keep the smaller card so they still fit two.
-  @media (min-width: 1700px) {
+/* Narrow column (split mode): shrink cards so two fit whenever the column
+   can hold ~2×135px; below that auto-fill falls back to one column. */
+@container trending (max-width: 459px) {
+  .areaTrending > * {
+    --mg-card-min: 135px;
+  }
+}
+
+/* Wide right column (large monitors): fewer, larger cards. */
+@container trending (min-width: 560px) {
+  .areaTrending > * {
     --mg-card-min: 185px;
   }
+}
 
-  @media (min-width: 2300px) {
+@container trending (min-width: 760px) {
+  .areaTrending > * {
     --mg-card-min: 215px;
   }
 }
