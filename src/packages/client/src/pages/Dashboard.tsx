@@ -43,12 +43,12 @@ function renderNewTitles(stats: NewTitleStats | null) {
 	}
 	return (
 		<>
-			New titles since last:{' '}
+			<span class={styles.statIntro}>New titles since last:</span>
 			{active.map(([label, n], i) => (
 				<span key={label}>
 					{i > 0 && <span class={styles.statSep}>·</span>}
-					<span class={styles.statLabel}>{label}</span>{' '}
 					<span class={styles.statNum}>{n}</span>
+					<span class={styles.statLabel}>{label}</span>
 				</span>
 			))}
 		</>

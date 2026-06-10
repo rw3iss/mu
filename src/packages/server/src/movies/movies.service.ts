@@ -965,19 +965,32 @@ export class MoviesService implements OnModuleInit {
 	private growthCountCache = new Map<string, { value: number; at: number }>();
 
 	/** Count visible library movies added strictly after an ISO timestamp. */
+	/**
+	 * Counts library "cards" added since a date, matching the /library page's
+	 * counting: grouped titles (collections/series stacks) count once. A card =
+	 * an ungrouped movie added in the window, or a group whose FIRST title
+	 * arrived in the window (an old group gaining a sequel isn't a new card).
+	 */
 	private countAddedSince(sinceIso: string): number {
-		const r = this.database.db
-			.select({ count: count() })
-			.from(movies)
-			.where(
-				and(
-					sql`(${movies.source} IS NULL OR ${movies.source} = 'library')`,
-					sql`(${movies.hidden} IS NULL OR ${movies.hidden} = 0)`,
-					sql`${movies.addedAt} > ${sinceIso}`,
-				),
-			)
-			.get();
-		return r?.count ?? 0;
+		const r = this.database.db.get<{ n: number }>(sql`
+			SELECT (
+				SELECT COUNT(*) FROM movies
+				WHERE group_id IS NULL
+					AND (source IS NULL OR source = 'library')
+					AND (hidden IS NULL OR hidden = 0)
+					AND added_at > ${sinceIso}
+			) + (
+				SELECT COUNT(*) FROM (
+					SELECT group_id, MIN(added_at) AS first_added FROM movies
+					WHERE group_id IS NOT NULL
+						AND (source IS NULL OR source = 'library')
+						AND (hidden IS NULL OR hidden = 0)
+					GROUP BY group_id
+					HAVING first_added > ${sinceIso}
+				)
+			) AS n
+		`);
+		return r?.n ?? 0;
 	}
 
 	/** Cached count for shared windows — reused within `ttlMs` across users. */

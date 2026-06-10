@@ -66,12 +66,18 @@
 // the surrounding stat copy but smaller than the greeting.
 .statNum {
   color: var(--color-accent);
-  font-size: var(--font-size-md);
+  font-size: 16px;
   font-weight: var(--font-weight-semibold);
+}
+
+// Lead-in text before the window counts.
+.statIntro {
+  margin-right: 10px;
 }
 
 // Window names (session/day/week/month/year) — theme label styling.
 .statLabel {
+  margin-left: 5px;
   color: var(--color-label);
   font-weight: var(--font-weight-medium);
 }
