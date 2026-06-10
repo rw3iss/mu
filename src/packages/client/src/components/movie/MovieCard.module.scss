@@ -2,6 +2,10 @@
   position: relative;
   cursor: pointer;
   border-radius: var(--item-radius);
+  // Clip children (poster) to the card's own radius — the poster carries no
+  // radius of its own so its corners follow the card exactly. Menus/overlays
+  // that must escape (options menu) are body-portalled, so clipping is safe.
+  overflow: hidden;
   background: var(--color-bg-surface);
   border: var(--card-border);
   transition: transform var(--transition-normal), box-shadow var(--transition-normal), opacity var(--transition-normal);
@@ -153,7 +157,6 @@
   aspect-ratio: 2 / 3;
   overflow: hidden;
   background: var(--color-bg-elevated);
-  border-radius: var(--item-radius) var(--item-radius) 0 0;
 }
 
 .posterImage {

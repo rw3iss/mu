@@ -15,10 +15,16 @@
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  padding: var(--space-md) 0;
+  // Fixed rem height matching the tab rail's sticky offset below, so the
+  // rail can never scroll up underneath the header (both scale with zoom).
+  height: 4.5rem;
+  display: flex;
+  align-items: center;
+  margin: 0;
 
   @include mobile {
     position: static;
+    height: auto;
     padding: 0;
   }
 }
