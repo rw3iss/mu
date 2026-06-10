@@ -39,8 +39,8 @@ export interface ConversionResult {
 }
 
 /** Audio codecs browsers can play natively (no re-encode needed). */
-/** A shrink re-encode must predict ≤ this fraction of the original size to
- *  be worthwhile; marginal savings aren't worth the time + quality cost. */
+/** Default for `encoding.shrinkWorthRatio` — a shrink re-encode must predict
+ *  ≤ this fraction of the original size to be worthwhile. */
 const SHRINK_WORTH_RATIO = 0.8;
 
 const BROWSER_AUDIO = ['aac', 'mp3', 'opus', 'flac', 'vorbis', 'mp4a', 'pcm_s16le'];
@@ -104,6 +104,12 @@ export class ConversionService {
 			reencodeAboveMbps: (() => {
 				const v = Number(enc?.reencodeAboveMbps);
 				return Number.isFinite(v) && v > 0 ? v : 0;
+			})(),
+			// A shrink must predict ≤ this fraction of the original size to be
+			// worthwhile (read on demand; Settings → Encoding).
+			shrinkWorthRatio: (() => {
+				const v = Number(enc?.shrinkWorthRatio);
+				return Number.isFinite(v) && v >= 0.1 && v <= 1 ? v : SHRINK_WORTH_RATIO;
 			})(),
 		};
 	}
@@ -187,8 +193,8 @@ export class ConversionService {
 				const refVideo = this.h264RefBitrate(this.parseHeight(file));
 				const predictedBytes = Math.round(((refVideo + 256_000) / 8) * duration);
 				// Only worth the re-encode (and quality cost) when the result is
-				// meaningfully smaller — at most SHRINK_WORTH_RATIO of the original.
-				if (predictedBytes <= originalBytes * SHRINK_WORTH_RATIO) {
+				// meaningfully smaller — at most shrinkWorthRatio of the original.
+				if (predictedBytes <= originalBytes * this.getConfig().shrinkWorthRatio) {
 					return { action: 'shrink', reason: 'oversized', predictedBytes };
 				}
 			}

@@ -288,6 +288,7 @@ export function Settings(props: SettingsProps) {
 	const [av1Cq, setAv1Cq] = useState('32');
 	// Shrink oversized H.264 files: re-encode any whose bitrate exceeds this many
 	// Mbps. 0 = off.
+	const [shrinkWorthRatio, setShrinkWorthRatio] = useState('0.8');
 	const [reencodeAboveMbps, setReencodeAboveMbps] = useState('0');
 	const [memoryCacheMaxGb, setMemoryCacheMaxGb] = useState('0');
 	const [memCacheStatus, setMemCacheStatus] = useState<{
@@ -452,6 +453,8 @@ export function Settings(props: SettingsProps) {
 					if (encoding.av1Cq != null) setAv1Cq(String(encoding.av1Cq));
 					if (encoding.reencodeAboveMbps != null)
 						setReencodeAboveMbps(String(encoding.reencodeAboveMbps));
+					if (encoding.shrinkWorthRatio != null)
+						setShrinkWorthRatio(String(encoding.shrinkWorthRatio));
 					if (encoding.memoryCacheMaxGb != null)
 						setMemoryCacheMaxGb(String(encoding.memoryCacheMaxGb));
 					const sweep = encoding.convertSweep as Record<string, unknown> | undefined;
@@ -597,6 +600,7 @@ export function Settings(props: SettingsProps) {
 					convertHevcToAv1,
 					av1Cq: parseInt(av1Cq, 10) || 32,
 					reencodeAboveMbps: parseFloat(reencodeAboveMbps) || 0,
+					shrinkWorthRatio: parseFloat(shrinkWorthRatio) || 0.8,
 					memoryCacheMaxGb: parseFloat(memoryCacheMaxGb) || 0,
 					convertSweep: {
 						enabled: convertSweepEnabled,
@@ -632,6 +636,7 @@ export function Settings(props: SettingsProps) {
 		convertHevcToAv1,
 		av1Cq,
 		reencodeAboveMbps,
+		shrinkWorthRatio,
 		memoryCacheMaxGb,
 		convertSweepEnabled,
 		convertSweepStartTime,
@@ -2505,6 +2510,32 @@ export function Settings(props: SettingsProps) {
 									value={reencodeAboveMbps}
 									onInput={(e) =>
 										setReencodeAboveMbps((e.target as HTMLInputElement).value)
+									}
+									style={{ width: '80px' }}
+								/>
+							</div>
+
+							{/* Shrink worthwhile ratio */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Shrink Worth Ratio</span>
+									<span class={styles.settingDescription}>
+										Only shrink a file when the predicted output is at most
+										this fraction of the original size (0.8 = must save ≥20%).
+										Skips re-encodes whose marginal savings aren't worth the
+										time and quality cost. Applies to the "Shrink Files Above"
+										trigger; checked fresh for every conversion job.
+									</span>
+								</div>
+								<input
+									type="number"
+									class={styles.select}
+									min={0.1}
+									max={1}
+									step={0.05}
+									value={shrinkWorthRatio}
+									onInput={(e) =>
+										setShrinkWorthRatio((e.target as HTMLInputElement).value)
 									}
 									style={{ width: '80px' }}
 								/>
