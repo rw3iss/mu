@@ -429,6 +429,7 @@ export function Playlists(_props: PlaylistsProps) {
 				<section
 					class={`${styles.column} ${activeList !== 'mine' ? styles.columnInactive : ''}`}
 				>
+					<h2 class={styles.columnTitle}>My Playlists</h2>
 					{playlists.length === 0 ? (
 						<div class={styles.empty}>
 							<p>No playlists yet</p>
