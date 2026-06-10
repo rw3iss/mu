@@ -269,7 +269,9 @@ export class ConversionService {
 			case 'reencode-av1':
 				return `${from} → AV1/MP4 (GPU re-encode, CQ ${this.transcoder.getAv1Cq()})`;
 			case 'shrink': {
-				const target = this.nvencActive() ? `AV1/MP4 (GPU, CQ ${this.transcoder.getAv1Cq()})` : 'H.264/MP4 (CRF)';
+				const target = this.nvencActive()
+					? `AV1/MP4 (GPU, CQ ${this.transcoder.getAv1Cq()})`
+					: 'H.264/MP4 (CRF)';
 				const mbps = this.bitrateMbps(file);
 				return `${from} ${mbps ? `~${mbps.toFixed(0)} Mbps ` : ''}→ ${target} (shrink oversized)`;
 			}
@@ -334,10 +336,13 @@ export class ConversionService {
 	 */
 	async convertFile(
 		file: any,
-		opts: { inPlace?: boolean } = {},
+		opts: { inPlace?: boolean; forceCpu?: boolean } = {},
 		onProgress?: (pct: number) => void,
 	): Promise<ConversionResult> {
 		const inPlace = opts.inPlace ?? this.getConfig().convertOriginalFile;
+		// CPU+GPU parallel mode: this job encodes on the CPU — AV1 (NVENC-only)
+		// plans fall back to H.264 CRF on the CPU.
+		const cpu = !!opts.forceCpu;
 		const plan = this.planConversion(file);
 		const base: ConversionResult = {
 			status: 'skipped',
@@ -404,7 +409,9 @@ export class ConversionService {
 				await this.transcoder.transcodeToMp4(
 					srcPath,
 					tempPath,
-					{ preserveResolution: true, targetCodec: 'av1' },
+					cpu
+						? { preserveResolution: true, targetCodec: 'h264', forceCpu: true }
+						: { preserveResolution: true, targetCodec: 'av1' },
 					onProgress,
 				);
 			} else if (plan.action === 'shrink') {
@@ -415,16 +422,16 @@ export class ConversionService {
 				await this.transcoder.transcodeToMp4(
 					srcPath,
 					tempPath,
-					this.nvencActive()
+					this.nvencActive() && !cpu
 						? { preserveResolution: true, targetCodec: 'av1' }
-						: { preserveResolution: true, targetCodec: 'h264' },
+						: { preserveResolution: true, targetCodec: 'h264', forceCpu: cpu },
 					onProgress,
 				);
 			} else {
 				await this.transcoder.transcodeToMp4(
 					srcPath,
 					tempPath,
-					{ preserveResolution: true, nearLossless: true },
+					{ preserveResolution: true, nearLossless: true, forceCpu: cpu },
 					onProgress,
 				);
 			}
@@ -466,8 +473,9 @@ export class ConversionService {
 					fileSize: probe.sizeBytes,
 					codecVideo:
 						probe.codecVideo ??
+						(!cpu &&
 						(plan.action === 'reencode-av1' ||
-						(plan.action === 'shrink' && this.nvencActive())
+							(plan.action === 'shrink' && this.nvencActive()))
 							? 'av1'
 							: 'h264'),
 					codecAudio: probe.codecAudio ?? 'aac',

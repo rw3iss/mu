@@ -84,6 +84,12 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	private static readonly STDERR_BUFFER_LINES = 50;
 	/** If true, hardware encoding has failed and all encodes should use software */
 	private hwAccelBroken = false;
+	/**
+	 * CPU+GPU parallel transcoding: per-job encoder leases. At most one job
+	 * holds the 'gpu' lease; further concurrent encode jobs get 'cpu'. Only
+	 * consulted when `encoding.cpuParallelTranscode` is enabled.
+	 */
+	private readonly encoderLeases = new Map<string, 'gpu' | 'cpu'>();
 	/** If true, FFmpeg itself cannot spawn (Windows DLL init failure) — skip background encodes */
 	private ffmpegSpawnBroken = false;
 	private ffmpegSpawnBrokenUntil = 0;
@@ -524,6 +530,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			targetCodec?: 'h264' | 'av1';
 			/** AV1 NVENC constant-quality value; overrides the encoding setting. */
 			av1Cq?: number;
+			/** Encode on the CPU (libx264) even when a GPU is configured. */
+			forceCpu?: boolean;
 		} = {},
 		onProgress?: (pct: number) => void,
 	): Promise<void> {
@@ -540,6 +548,12 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			throw new Error(`No transcoding profile found for quality "${quality}"`);
 		}
 		const enc = this.getEncodingSettings();
+		if (opts.forceCpu) {
+			// CPU+GPU parallel mode: this job encodes on the CPU. Drop to
+			// software and swap any NVENC preset for a libx264 one.
+			enc.hwAccel = 'none';
+			if (/^p[1-7]$/.test(enc.preset)) enc.preset = 'veryfast';
+		}
 		if (opts.nearLossless) {
 			// Replacing the master — bias toward quality. CRF with a high-quality
 			// value; cap at the user's configured CRF so they can go higher still.
@@ -1053,6 +1067,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		mode: string,
 		quality: string = '1080p',
 		onProgress?: (percent: number) => void,
+		opts?: { forceCpu?: boolean },
 	): Promise<void> {
 		const persistDir = this.getPersistentDir(movieFileId, quality);
 
@@ -1082,6 +1097,18 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		}
 
 		await mkdir(persistDir, { recursive: true });
+
+		// CPU+GPU parallel mode: this job was assigned the CPU — use the
+		// existing software pipeline directly (it shadows hwAccel='none').
+		if (opts?.forceCpu && mode === 'transcode') {
+			return this.preTranscodeWithSoftware(
+				movieFileId,
+				filePath,
+				quality,
+				persistDir,
+				onProgress,
+			);
+		}
 
 		const outputPath = path.join(persistDir, 'stream.m3u8');
 		const segmentPattern = path.join(persistDir, 'segment_%04d.ts');
@@ -2316,6 +2343,26 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	 */
 	getEffectiveHwAccel(): string {
 		return this.getEncodingSettings().hwAccel;
+	}
+
+	/**
+	 * Acquire an encoder for a background encode job (CPU+GPU parallel mode).
+	 * First concurrent job gets the GPU; the rest get the CPU. When no usable
+	 * GPU is configured everything is 'cpu'. Pair with releaseEncoderLease().
+	 */
+	acquireEncoderLease(holder: string): 'gpu' | 'cpu' {
+		if (this.getEffectiveHwAccel() === 'none') {
+			this.encoderLeases.set(holder, 'cpu');
+			return 'cpu';
+		}
+		const gpuTaken = [...this.encoderLeases.values()].includes('gpu');
+		const kind: 'gpu' | 'cpu' = gpuTaken ? 'cpu' : 'gpu';
+		this.encoderLeases.set(holder, kind);
+		return kind;
+	}
+
+	releaseEncoderLease(holder: string): void {
+		this.encoderLeases.delete(holder);
 	}
 
 	/** Configured AV1 NVENC quality (CQ). Public accessor for UI/job summaries. */

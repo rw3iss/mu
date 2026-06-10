@@ -275,6 +275,8 @@ export function Settings(props: SettingsProps) {
 	const [crfValue, setCrfValue] = useState('23');
 	const [maxConcurrentJobs, setMaxConcurrentJobs] = useState('2');
 	const [maxConcurrentIoJobs, setMaxConcurrentIoJobs] = useState('1');
+	const [cpuParallelTranscode, setCpuParallelTranscode] = useState(false);
+	const [maxCpuTranscodeJobs, setMaxCpuTranscodeJobs] = useState('1');
 	const [segmentDuration, setSegmentDuration] = useState('4');
 	const [useChunkedTranscoding, setUseChunkedTranscoding] = useState(false);
 	const [debugTranscoding, setDebugTranscoding] = useState(false);
@@ -428,6 +430,10 @@ export function Settings(props: SettingsProps) {
 						setMaxConcurrentJobs(String(encoding.maxConcurrentJobs));
 					if (encoding.maxConcurrentIoJobs != null)
 						setMaxConcurrentIoJobs(String(encoding.maxConcurrentIoJobs));
+					if (encoding.cpuParallelTranscode != null)
+						setCpuParallelTranscode(!!encoding.cpuParallelTranscode);
+					if (encoding.maxCpuTranscodeJobs != null)
+						setMaxCpuTranscodeJobs(String(encoding.maxCpuTranscodeJobs));
 					if (encoding.segmentDuration != null)
 						setSegmentDuration(String(encoding.segmentDuration));
 					if (encoding.useChunkedTranscoding != null)
@@ -580,6 +586,8 @@ export function Settings(props: SettingsProps) {
 					crf: parseInt(crfValue, 10),
 					maxConcurrentJobs: parseInt(maxConcurrentJobs, 10),
 					maxConcurrentIoJobs: parseInt(maxConcurrentIoJobs, 10),
+					cpuParallelTranscode,
+					maxCpuTranscodeJobs: parseInt(maxCpuTranscodeJobs, 10) || 1,
 					segmentDuration: parseInt(segmentDuration, 10),
 					useChunkedTranscoding,
 					debugTranscoding,
@@ -613,6 +621,8 @@ export function Settings(props: SettingsProps) {
 		crfValue,
 		maxConcurrentJobs,
 		maxConcurrentIoJobs,
+		cpuParallelTranscode,
+		maxCpuTranscodeJobs,
 		segmentDuration,
 		useChunkedTranscoding,
 		debugTranscoding,
@@ -2251,6 +2261,57 @@ export function Settings(props: SettingsProps) {
 									]}
 								/>
 							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Transcode with both CPU and GPU
+									</span>
+									<span class={styles.settingDescription}>
+										Transcode/convert jobs use the GPU (if configured) by
+										default. With this on, extra queued jobs run on the CPU in
+										parallel while the GPU is busy, finishing the backlog
+										faster. GPU encodes are much faster with slightly larger
+										files; CPU encodes are slower but typically a touch
+										smaller/higher quality at the same setting. Sources are
+										pre-warmed into RAM, so parallel jobs don't thrash the disk.
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={cpuParallelTranscode}
+										onChange={(e) =>
+											setCpuParallelTranscode(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							{cpuParallelTranscode && (
+								<div class={styles.settingRow}>
+									<div class={styles.settingInfo}>
+										<span class={styles.settingLabel}>Maximum CPU Jobs</span>
+										<span class={styles.settingDescription}>
+											How many extra encode jobs may run on the CPU while the
+											GPU is busy. Each CPU encode uses most of the machine's
+											cores — keep low on a shared box.
+										</span>
+									</div>
+									<Select
+										value={maxCpuTranscodeJobs}
+										onChange={setMaxCpuTranscodeJobs}
+										options={[
+											{ value: '1', label: '1 (recommended)' },
+											{ value: '2', label: '2' },
+											{ value: '3', label: '3' },
+										]}
+									/>
+								</div>
+							)}
 
 							<div class={styles.settingRow}>
 								<div class={styles.settingInfo}>

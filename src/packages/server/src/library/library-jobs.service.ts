@@ -399,6 +399,12 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					await this.transcoderService.clearCache(movieFileId);
 				}
 
+				// CPU+GPU parallel mode: claim an encoder — first concurrent encode
+				// job gets the GPU, the rest run on the CPU.
+				const encoderLease = this.cpuParallelEnabled()
+					? this.transcoderService.acquireEncoderLease(job.id)
+					: null;
+				if (encoderLease === 'cpu') helpers.setDetails('Encoding on CPU (parallel)');
 				try {
 					await this.transcoderService.preTranscode(
 						movieFileId,
@@ -406,6 +412,7 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 						mode,
 						quality,
 						(percent) => helpers.reportProgress(percent),
+						{ forceCpu: encoderLease === 'cpu' },
 					);
 				} catch (err: any) {
 					const msg = err?.message ?? String(err);
@@ -429,6 +436,8 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 						}
 					}
 					throw err;
+				} finally {
+					if (encoderLease) this.transcoderService.releaseEncoderLease(job.id);
 				}
 				this.recordTranscodeCache(movieFileId, quality);
 
@@ -494,11 +503,25 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 					this.conversionService.cancel(movieFileId);
 				});
 
-				const result = await this.conversionService.convertFile(
-					resolved,
-					{ inPlace: inPlace ?? this.conversionService.getConfig().convertOriginalFile },
-					(percent) => helpers.reportProgress(percent),
-				);
+				// CPU+GPU parallel mode: claim an encoder for this job.
+				const encoderLease = this.cpuParallelEnabled()
+					? this.transcoderService.acquireEncoderLease(job.id)
+					: null;
+				if (encoderLease === 'cpu') helpers.setDetails('Converting on CPU (parallel)');
+				let result: Awaited<ReturnType<typeof this.conversionService.convertFile>>;
+				try {
+					result = await this.conversionService.convertFile(
+						resolved,
+						{
+							inPlace:
+								inPlace ?? this.conversionService.getConfig().convertOriginalFile,
+							forceCpu: encoderLease === 'cpu',
+						},
+						(percent) => helpers.reportProgress(percent),
+					);
+				} finally {
+					if (encoderLease) this.transcoderService.releaseEncoderLease(job.id);
+				}
 				helpers.reportProgress(100);
 				helpers.log(
 					`convert ${result.status}: ${result.action}${result.reason ? ` (${result.reason})` : ''}`,
@@ -1284,6 +1307,12 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 	// ===========================================================
 
 	/** Record a completed transcode in the cache table. */
+	/** Whether CPU+GPU parallel transcoding is enabled in encoding settings. */
+	private cpuParallelEnabled(): boolean {
+		const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+		return !!enc?.cpuParallelTranscode;
+	}
+
 	private recordTranscodeCache(movieFileId: string, quality: string): void {
 		const settingsJson = this.buildEncodingSettingsJson();
 

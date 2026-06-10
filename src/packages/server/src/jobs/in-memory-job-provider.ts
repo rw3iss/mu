@@ -62,6 +62,9 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 		'convert-mp4',
 	]);
 
+	/** Encode job types eligible for CPU+GPU parallel scheduling. */
+	private static readonly ENCODE_TYPES = new Set(['pre-transcode', 'convert-mp4']);
+
 	/** Default heavy-I/O concurrency when the setting is unset — serialize. */
 	private maxIoConcurrency = 1;
 
@@ -458,7 +461,25 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 		// Heavy-I/O cap is meaningless above the global cap; never exceed it.
 		const ioCap = Math.max(1, Math.min(maxIoConcurrency, maxConcurrency));
 
+		// CPU+GPU parallel transcoding: encode jobs (pre-transcode / convert-mp4)
+		// get their own cap of 1 GPU + N CPU slots; sprite/other heavy I/O jobs
+		// stay under the normal io cap. Everything is still bounded by the
+		// global cap. (The transcoder assigns the actual encoder per job via
+		// encoder leases — first running encode gets the GPU, the rest the CPU.)
+		let cpuParallel = false;
+		let maxCpuJobs = 1;
+		try {
+			const enc = this.settings.get<Record<string, unknown>>('encoding', {}) as any;
+			cpuParallel = !!enc?.cpuParallelTranscode;
+			const n = Number(enc?.maxCpuTranscodeJobs);
+			maxCpuJobs = Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+		} catch {
+			/* settings read failed above too — stay conservative */
+		}
+		const encodeCap = cpuParallel ? Math.min(1 + maxCpuJobs, maxConcurrency) : ioCap;
+
 		let heavyRunning = this.countRunningHeavy();
+		let encodeRunning = this.countRunningEncode();
 
 		// Scan the priority-ordered queue rather than always shifting the head: a
 		// heavy job that's blocked by the I/O cap is LEFT in place while we look
@@ -475,8 +496,15 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 				continue;
 			}
 
+			const isEncode = InMemoryJobProvider.ENCODE_TYPES.has(job.type);
 			const isHeavy = InMemoryJobProvider.IO_HEAVY_TYPES.has(job.type);
-			if (isHeavy && heavyRunning >= ioCap) {
+			if (cpuParallel && isEncode) {
+				// Encode jobs ride their own GPU+CPU slot cap in parallel mode.
+				if (encodeRunning >= encodeCap) {
+					idx++;
+					continue;
+				}
+			} else if (isHeavy && heavyRunning >= ioCap) {
 				// Can't start another heavy job yet — skip past it (stays queued).
 				idx++;
 				continue;
@@ -496,11 +524,21 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 			}
 
 			if (isHeavy) heavyRunning++;
+			if (isEncode) encodeRunning++;
 			this.runJob(job, handler);
 		}
 	}
 
 	/** Count currently-running jobs that are heavy disk-I/O (see IO_HEAVY_TYPES). */
+	private countRunningEncode(): number {
+		let n = 0;
+		for (const id of this.running) {
+			const j = this.jobs.get(id);
+			if (j && InMemoryJobProvider.ENCODE_TYPES.has(j.type)) n++;
+		}
+		return n;
+	}
+
 	private countRunningHeavy(): number {
 		let n = 0;
 		for (const id of this.running) {
