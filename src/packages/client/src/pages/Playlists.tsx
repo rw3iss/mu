@@ -214,6 +214,8 @@ export function Playlists(_props: PlaylistsProps) {
 	const [showCreate, setShowCreate] = useState(false);
 	const [newName, setNewName] = useState('');
 	const [newDescription, setNewDescription] = useState('');
+	const [newPublic, setNewPublic] = useState(false);
+	const [newPublicEdit, setNewPublicEdit] = useState(false);
 	const [sortBy, setSortBy] = useUiSetting<PlaylistSortBy>('playlists_sort', 'updated');
 	const [sortOrder, setSortOrder] = useUiSetting<PlaylistSortOrder>(
 		'playlists_sort_order',
@@ -266,18 +268,22 @@ export function Playlists(_props: PlaylistsProps) {
 				await api.post('/playlists', {
 					name: newName.trim(),
 					description: newDescription.trim(),
+					isPublic: newPublic || newPublicEdit,
+					publicEdit: newPublicEdit,
 				});
 				invalidatePlaylists();
 				notifySuccess('Playlist created');
 				setShowCreate(false);
 				setNewName('');
 				setNewDescription('');
+				setNewPublic(false);
+				setNewPublicEdit(false);
 				loadPlaylists(sortBy);
 			} catch {
 				notifyError('Failed to create playlist');
 			}
 		},
-		[newName, newDescription],
+		[newName, newDescription, newPublic, newPublicEdit],
 	);
 
 	const renderCard = (playlist: Playlist, showOwner = false) => {
@@ -584,6 +590,46 @@ export function Playlists(_props: PlaylistsProps) {
 								resize: 'vertical',
 							}}
 						/>
+					</div>
+					<div class={styles.publicRow}>
+						<div class={styles.publicInfo}>
+							<span class={styles.publicLabel}>Public View</span>
+							<span class={styles.publicHint}>Members can view it.</span>
+						</div>
+						<label
+							class={`${styles.toggle} ${newPublicEdit ? styles.toggleLocked : ''}`}
+							title={newPublicEdit ? 'Public Edit implies Public View' : undefined}
+						>
+							<input
+								type="checkbox"
+								checked={newPublic || newPublicEdit}
+								disabled={newPublicEdit}
+								onChange={(e) =>
+									setNewPublic((e.target as HTMLInputElement).checked)
+								}
+							/>
+							<span class={styles.toggleTrack} />
+						</label>
+					</div>
+					<div class={styles.publicRow}>
+						<div class={styles.publicInfo}>
+							<span class={styles.publicLabel}>Public Edit</span>
+							<span class={styles.publicHint}>
+								Members can add and remove their own movies.
+							</span>
+						</div>
+						<label class={styles.toggle}>
+							<input
+								type="checkbox"
+								checked={newPublicEdit}
+								onChange={(e) => {
+									const on = (e.target as HTMLInputElement).checked;
+									setNewPublicEdit(on);
+									if (on) setNewPublic(true);
+								}}
+							/>
+							<span class={styles.toggleTrack} />
+						</label>
 					</div>
 					<Button type="submit" variant="primary" fullWidth>
 						Create

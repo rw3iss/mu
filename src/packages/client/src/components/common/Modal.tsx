@@ -69,6 +69,12 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 		[onClose],
 	);
 
+	// Keep the latest onClose in a ref so the focus-trap effect doesn't
+	// re-run (and re-steal focus) when callers pass a new inline closure on
+	// every render — typing in a modal field was refocusing the X button.
+	const onCloseRef = useRef(onClose);
+	onCloseRef.current = onClose;
+
 	useEffect(() => {
 		if (!isOpen) return;
 
@@ -77,7 +83,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
 		function handleKey(e: KeyboardEvent) {
 			if (e.key === 'Escape') {
-				onClose();
+				onCloseRef.current();
 				return;
 			}
 			if (e.key !== 'Tab') return;
@@ -129,7 +135,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 				} catch {}
 			}
 		};
-	}, [isOpen, onClose]);
+	}, [isOpen]);
 
 	if (!rendered) return null;
 

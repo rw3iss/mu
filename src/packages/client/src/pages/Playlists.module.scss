@@ -543,3 +543,78 @@
 		display: none;
 	}
 }
+
+// "Public View" / "Public Edit" rows in the Create Playlist modal.
+.publicRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-md);
+}
+
+.publicInfo {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.publicLabel {
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-medium);
+	color: var(--color-text-primary);
+}
+
+.publicHint {
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+}
+
+.toggle {
+	position: relative;
+	display: inline-block;
+	width: 44px;
+	height: 24px;
+	cursor: pointer;
+	flex-shrink: 0;
+
+	input {
+		opacity: 0;
+		width: 0;
+		height: 0;
+		position: absolute;
+
+		&:checked + .toggleTrack {
+			background: var(--color-accent);
+
+			&::after {
+				transform: translateX(20px);
+			}
+		}
+	}
+}
+
+.toggleTrack {
+	position: absolute;
+	inset: 0;
+	background: var(--color-bg-elevated);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-full);
+	transition: background var(--transition-fast);
+
+	&::after {
+		content: '';
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		width: 18px;
+		height: 18px;
+		background: #ffffff;
+		border-radius: 50%;
+		transition: transform var(--transition-fast);
+	}
+}
+
+.toggleLocked {
+	opacity: 0.55;
+	cursor: not-allowed;
+}

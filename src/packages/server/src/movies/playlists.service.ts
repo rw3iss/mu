@@ -72,9 +72,17 @@ export class PlaylistsService {
 		}
 	}
 
-	create(userId: string, name: string, description?: string) {
+	create(
+		userId: string,
+		name: string,
+		description?: string,
+		opts?: { isPublic?: boolean; publicEdit?: boolean },
+	) {
 		const id = crypto.randomUUID();
 		const now = nowISO();
+		// Public Edit implies Public View.
+		const publicEdit = !!opts?.publicEdit;
+		const isPublic = publicEdit || !!opts?.isPublic;
 
 		this.database.db
 			.insert(playlists)
@@ -83,6 +91,8 @@ export class PlaylistsService {
 				userId,
 				name,
 				description: description ?? null,
+				isPublic,
+				publicEdit,
 				createdAt: now,
 				updatedAt: now,
 			})

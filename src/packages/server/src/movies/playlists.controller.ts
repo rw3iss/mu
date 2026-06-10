@@ -36,10 +36,14 @@ export class PlaylistsController {
 	@RequireAction('view:own-data')
 	@Post()
 	create(
-		@Body() body: { name: string; description?: string },
+		@Body()
+		body: { name: string; description?: string; isPublic?: boolean; publicEdit?: boolean },
 		@CurrentUser('id') userId: string,
 	) {
-		return this.playlistsService.create(userId, body.name, body.description);
+		return this.playlistsService.create(userId, body.name, body.description, {
+			isPublic: body.isPublic,
+			publicEdit: body.publicEdit,
+		});
 	}
 
 	@RequireAction('view:own-data')
