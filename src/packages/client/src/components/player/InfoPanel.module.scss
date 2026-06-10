@@ -5,8 +5,18 @@
   z-index: calc(var(--z-player-controls) + 4);
 }
 
-// Inline mode — no positioning, no animation, just content
+// Inline mode — no positioning, no animation, just content.
+// Unlike the full-mode flyout (dark glass over the video), this sits on the
+// page background, so remap the on-dark tokens to the current theme's text /
+// overlay colors — light themes get dark body text + label color.
 .inlinePanel {
+  --on-dark-text-primary: var(--color-text-primary);
+  --on-dark-text-secondary: var(--color-text-secondary);
+  --on-dark-text-muted: var(--color-text-muted);
+  --on-dark-overlay-1: var(--color-bg-hover);
+  --on-dark-overlay-2: var(--color-bg-hover);
+  --on-dark-overlay-3: var(--color-border);
+  --ip-section-label: var(--color-label);
   padding: var(--space-md);
   color: var(--on-dark-text-primary);
 
@@ -102,7 +112,7 @@
 
   &:hover {
     background: var(--on-dark-overlay-2);
-    color: #ffffff;
+    color: var(--on-dark-text-primary);
   }
 }
 
@@ -132,7 +142,7 @@
 .title {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
-  color: #ffffff;
+  color: var(--on-dark-text-primary);
   line-height: 1.3;
   margin: 0;
 }
@@ -150,7 +160,7 @@
   text-decoration: none;
 
   &:hover {
-    color: #ffffff;
+    color: var(--on-dark-text-primary);
     text-decoration: underline;
   }
 }
@@ -227,7 +237,7 @@
 .ratingValue {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  color: #ffffff;
+  color: var(--on-dark-text-primary);
 }
 
 .votesLabel {
@@ -245,7 +255,9 @@
 .sectionTitle {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--on-dark-text-muted);
+  // Full-mode flyout keeps muted-on-dark; falls back to the theme's
+  // "Section Label" color when remapped by .inlinePanel below.
+  color: var(--ip-section-label, var(--on-dark-text-muted));
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: var(--space-sm);
