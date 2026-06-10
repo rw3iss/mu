@@ -1,12 +1,20 @@
 // 2x2 open layout: General / Video / Audio / Cached groups — no surfaces,
-// just titles + gapped label/value grids.
+// just titles + gapped label/value grids. The wrap is a size container so
+// narrow CONTAINERS (player flyout, split panel) collapse to one column —
+// not just narrow viewports.
+.wrap {
+	container-type: inline-size;
+}
+
 .groups {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: var(--space-lg) var(--space-xl);
 	align-items: start;
+}
 
-	@include mobile {
+@container (max-width: 540px) {
+	.groups {
 		grid-template-columns: 1fr;
 	}
 }
@@ -160,4 +168,24 @@
   .trackExtra {
     color: rgba(255, 255, 255, 0.35);
   }
+}
+
+// Inline copy-to-clipboard button after Location / File values.
+.copyBtn {
+	display: inline-flex;
+	align-items: center;
+	vertical-align: middle;
+	margin-left: 6px;
+	padding: 2px;
+	border-radius: var(--radius-sm);
+	color: var(--color-text-muted);
+
+	&:hover {
+		color: var(--color-text-primary);
+		background: var(--color-bg-hover);
+	}
+}
+
+.copied {
+	color: var(--color-success, #4caf50) !important;
 }
