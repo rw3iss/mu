@@ -4,6 +4,7 @@ import { currentUser } from '@/state/auth.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { formatBytes } from '@/utils/format-bytes';
+import { clockFromSeconds, relativeTime } from '@/utils/time-format';
 import styles from './FileInfoGrid.module.scss';
 import { PlaybackBadge } from './PlaybackBadge';
 
@@ -114,6 +115,12 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 						</span>
 					</>
 				)}
+				{fi.codecAudio && (
+					<>
+						<span class={styles.label}>Audio Codec</span>
+						<span class={styles.value}>{fi.codecAudio.toUpperCase()}</span>
+					</>
+				)}
 				{fi.videoBitDepth && (
 					<>
 						<span class={styles.label}>Bit Depth</span>
@@ -144,6 +151,21 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark }: FileInfoGridProps)
 					<>
 						<span class={styles.label}>File Size</span>
 						<span class={styles.value}>{formatBytes(fi.fileSize, 2)}</span>
+					</>
+				)}
+				{movie.durationSeconds != null && movie.durationSeconds > 0 && (
+					<>
+						<span class={styles.label}>Duration</span>
+						<span class={styles.value}>{clockFromSeconds(movie.durationSeconds)}</span>
+					</>
+				)}
+				{movie.addedAt && (
+					<>
+						<span class={styles.label}>Added</span>
+						<span class={styles.value} title={new Date(movie.addedAt).toLocaleString()}>
+							{new Date(movie.addedAt).toLocaleDateString()} (
+							{relativeTime(movie.addedAt)})
+						</span>
 					</>
 				)}
 				{fi.videoColorSpace && (

@@ -39,6 +39,10 @@ export interface ConversionResult {
 }
 
 /** Audio codecs browsers can play natively (no re-encode needed). */
+/** A shrink re-encode must predict ≤ this fraction of the original size to
+ *  be worthwhile; marginal savings aren't worth the time + quality cost. */
+const SHRINK_WORTH_RATIO = 0.8;
+
 const BROWSER_AUDIO = ['aac', 'mp3', 'opus', 'flac', 'vorbis', 'mp4a', 'pcm_s16le'];
 
 /**
@@ -182,7 +186,9 @@ export class ConversionService {
 				// Conservative predicted size (H.264 reference; AV1 lands lower).
 				const refVideo = this.h264RefBitrate(this.parseHeight(file));
 				const predictedBytes = Math.round(((refVideo + 256_000) / 8) * duration);
-				if (predictedBytes < originalBytes) {
+				// Only worth the re-encode (and quality cost) when the result is
+				// meaningfully smaller — at most SHRINK_WORTH_RATIO of the original.
+				if (predictedBytes <= originalBytes * SHRINK_WORTH_RATIO) {
 					return { action: 'shrink', reason: 'oversized', predictedBytes };
 				}
 			}
