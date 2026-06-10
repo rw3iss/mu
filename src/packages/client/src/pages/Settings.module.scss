@@ -183,6 +183,13 @@
   min-width: 80px;
 }
 
+/* Both concurrency dropdowns share one fixed width (matches the
+ * narrower "Max Concurrent Jobs" control). */
+.jobsSelect {
+  width: 76px;
+  min-width: 0;
+}
+
 .settingGroup {
   display: flex;
   flex-direction: column;

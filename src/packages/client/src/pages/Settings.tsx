@@ -2243,6 +2243,7 @@ export function Settings(props: SettingsProps) {
 								<Select
 									value={maxConcurrentJobs}
 									onChange={setMaxConcurrentJobs}
+									class={styles.jobsSelect}
 									options={[
 										{ value: '1', label: '1' },
 										{ value: '2', label: '2' },
@@ -2268,7 +2269,7 @@ export function Settings(props: SettingsProps) {
 								<Select
 									value={maxConcurrentIoJobs}
 									onChange={setMaxConcurrentIoJobs}
-									class={styles.crfSelect}
+									class={styles.jobsSelect}
 									options={[
 										{ value: '1', label: '1 (Serialize — recommended)' },
 										{ value: '2', label: '2' },
