@@ -1,3 +1,29 @@
+// 2x2 open layout: General / Video / Audio / Cached groups — no surfaces,
+// just titles + gapped label/value grids.
+.groups {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--space-lg) var(--space-xl);
+	align-items: start;
+
+	@include mobile {
+		grid-template-columns: 1fr;
+	}
+}
+
+.group {
+	min-width: 0;
+}
+
+.groupTitle {
+	margin: 0 0 var(--space-sm);
+	font-size: var(--font-size-xs);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-label);
+}
+
 .wrap {
   // Default theme inherits page variables
 }
