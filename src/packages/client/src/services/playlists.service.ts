@@ -21,6 +21,12 @@ export interface Playlist {
 	description: string;
 	movieCount: number;
 	movies?: PlaylistMovieSummary[];
+	/** Visible (read-only) to all users when true. */
+	isPublic?: boolean;
+	/** Owner's user id (lists + detail) — gates edit controls. */
+	userId?: string;
+	/** Owner display name (public list + detail). */
+	ownerName?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -56,6 +62,12 @@ export const playlistsService = {
 		return api.get<Playlist[]>(`/playlists${params}`);
 	},
 
+	/** Public playlists from every user (read-only). */
+	listPublic(options?: { includeMovies?: boolean }): Promise<Playlist[]> {
+		const params = options?.includeMovies ? '?includeMovies=true' : '';
+		return api.get<Playlist[]>(`/playlists/public${params}`);
+	},
+
 	/**
 	 * Get a single playlist by ID, including its movies.
 	 */
@@ -77,7 +89,10 @@ export const playlistsService = {
 	 * @param id - The playlist ID.
 	 * @param data - Fields to update.
 	 */
-	update(id: string, data: { name?: string; description?: string }): Promise<PlaylistDetail> {
+	update(
+		id: string,
+		data: { name?: string; description?: string; isPublic?: boolean },
+	): Promise<PlaylistDetail> {
 		return api.patch<PlaylistDetail>(`/playlists/${id}`, data);
 	},
 

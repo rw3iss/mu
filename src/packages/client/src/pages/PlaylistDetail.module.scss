@@ -245,3 +245,18 @@
   color: var(--color-text-secondary);
   line-height: var(--line-height-relaxed);
 }
+
+// "Public" visibility toggle in the header actions (owner only).
+.publicToggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--font-size-sm);
+	color: var(--color-text-secondary);
+	cursor: pointer;
+
+	input {
+		accent-color: var(--color-accent);
+		cursor: pointer;
+	}
+}

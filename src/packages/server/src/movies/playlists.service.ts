@@ -1,8 +1,8 @@
 import { nowISO } from '@mu/shared';
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movies, playlistMovies, playlists } from '../database/schema/index.js';
+import { movies, playlistMovies, playlists, users } from '../database/schema/index.js';
 
 interface PlaylistMovieSummary {
 	movieId: string;
@@ -20,6 +20,41 @@ interface PlaylistMovieSummary {
 export class PlaylistsService {
 	constructor(private readonly database: DatabaseService) {}
 
+	/**
+	 * Short-lived list cache (per-user lists + the shared public list).
+	 * Busted on ANY playlist mutation by any user — playlists are small,
+	 * so a full clear is simpler and always correct.
+	 */
+	private readonly listCache = new Map<string, { data: any; expires: number }>();
+	private static readonly CACHE_TTL_MS = 60_000;
+
+	private cacheGet(key: string) {
+		const hit = this.listCache.get(key);
+		return hit && hit.expires > Date.now() ? hit.data : null;
+	}
+
+	private cacheSet(key: string, data: any) {
+		this.listCache.set(key, { data, expires: Date.now() + PlaylistsService.CACHE_TTL_MS });
+	}
+
+	bustCache(): void {
+		this.listCache.clear();
+	}
+
+	/** Throws unless `userId` owns the playlist. Mutations only — public
+	 *  playlists are strictly read-only for everyone but the author. */
+	private assertOwner(id: string, userId: string) {
+		const row = this.database.db
+			.select({ userId: playlists.userId })
+			.from(playlists)
+			.where(eq(playlists.id, id))
+			.get();
+		if (!row) throw new NotFoundException(`Playlist ${id} not found`);
+		if (row.userId !== userId) {
+			throw new ForbiddenException('Only the playlist owner can modify it');
+		}
+	}
+
 	create(userId: string, name: string, description?: string) {
 		const id = crypto.randomUUID();
 		const now = nowISO();
@@ -36,6 +71,7 @@ export class PlaylistsService {
 			})
 			.run();
 
+		this.bustCache();
 		return this.findById(id);
 	}
 
@@ -49,6 +85,9 @@ export class PlaylistsService {
 	) {
 		const sortBy = options?.sortBy ?? 'updated';
 		const order = options?.sortOrder ?? 'desc';
+		const cacheKey = `own:${userId}:${sortBy}:${order}:${!!options?.includeMovies}`;
+		const cached = this.cacheGet(cacheKey);
+		if (cached) return cached;
 		const dirFn = order === 'asc' ? asc : desc;
 
 		// For "lastPlayed" sorting we need a subquery-based approach
@@ -76,6 +115,8 @@ export class PlaylistsService {
 				description: playlists.description,
 				coverUrl: playlists.coverUrl,
 				isSmart: playlists.isSmart,
+				isPublic: playlists.isPublic,
+				userId: playlists.userId,
 				createdAt: playlists.createdAt,
 				updatedAt: playlists.updatedAt,
 				movieCount: count(playlistMovies.id),
@@ -88,10 +129,49 @@ export class PlaylistsService {
 			.all();
 
 		if (!options?.includeMovies) {
+			this.cacheSet(cacheKey, result);
 			return result;
 		}
 
-		return this.attachMovieSummaries(result);
+		const withMovies = this.attachMovieSummaries(result);
+		this.cacheSet(cacheKey, withMovies);
+		return withMovies;
+	}
+
+	/**
+	 * Public playlists from every user, owner username attached. Read-only
+	 * surface — viewable by anyone, editable by nobody but the author.
+	 */
+	findPublic(options?: { includeMovies?: boolean }) {
+		const cacheKey = `public:${!!options?.includeMovies}`;
+		const cached = this.cacheGet(cacheKey);
+		if (cached) return cached;
+
+		const result = this.database.db
+			.select({
+				id: playlists.id,
+				name: playlists.name,
+				description: playlists.description,
+				coverUrl: playlists.coverUrl,
+				isSmart: playlists.isSmart,
+				isPublic: playlists.isPublic,
+				userId: playlists.userId,
+				ownerName: sql<string>`COALESCE(${users.displayName}, ${users.username})`,
+				createdAt: playlists.createdAt,
+				updatedAt: playlists.updatedAt,
+				movieCount: count(playlistMovies.id),
+			})
+			.from(playlists)
+			.leftJoin(playlistMovies, eq(playlists.id, playlistMovies.playlistId))
+			.leftJoin(users, eq(playlists.userId, users.id))
+			.where(eq(playlists.isPublic, true))
+			.groupBy(playlists.id)
+			.orderBy(desc(playlists.updatedAt))
+			.all();
+
+		const final = options?.includeMovies ? this.attachMovieSummaries(result) : result;
+		this.cacheSet(cacheKey, final);
+		return final;
 	}
 
 	/**
@@ -217,6 +297,12 @@ export class PlaylistsService {
 			throw new NotFoundException(`Playlist ${id} not found`);
 		}
 
+		const owner = this.database.db
+			.select({ name: sql<string>`COALESCE(${users.displayName}, ${users.username})` })
+			.from(users)
+			.where(eq(users.id, playlist.userId))
+			.get();
+
 		const rows = this.database.db
 			.select({
 				id: playlistMovies.id,
@@ -245,19 +331,15 @@ export class PlaylistsService {
 			isRemote: !!r.remoteServerId,
 		}));
 
-		return { ...playlist, movies: items };
+		return { ...playlist, ownerName: owner?.name ?? null, movies: items };
 	}
 
-	update(id: string, data: Partial<{ name: string; description: string; coverUrl: string }>) {
-		const existing = this.database.db
-			.select()
-			.from(playlists)
-			.where(eq(playlists.id, id))
-			.get();
-
-		if (!existing) {
-			throw new NotFoundException(`Playlist ${id} not found`);
-		}
+	update(
+		id: string,
+		userId: string,
+		data: Partial<{ name: string; description: string; coverUrl: string; isPublic: boolean }>,
+	) {
+		this.assertOwner(id, userId);
 
 		this.database.db
 			.update(playlists)
@@ -265,28 +347,24 @@ export class PlaylistsService {
 			.where(eq(playlists.id, id))
 			.run();
 
+		this.bustCache();
 		return this.findById(id);
 	}
 
-	remove(id: string) {
-		const existing = this.database.db
-			.select()
-			.from(playlists)
-			.where(eq(playlists.id, id))
-			.get();
-
-		if (!existing) {
-			throw new NotFoundException(`Playlist ${id} not found`);
-		}
-
+	remove(id: string, userId: string) {
+		this.assertOwner(id, userId);
 		this.database.db.delete(playlists).where(eq(playlists.id, id)).run();
+		this.bustCache();
 	}
 
 	addMovie(
 		playlistId: string,
 		movieId: string,
 		remoteInfo?: { title: string; posterUrl?: string; serverId: string },
+		userId?: string,
 	) {
+		if (userId) this.assertOwner(playlistId, userId);
+		this.bustCache();
 		const existing = this.database.db
 			.select()
 			.from(playlistMovies)
@@ -330,7 +408,9 @@ export class PlaylistsService {
 			.run();
 	}
 
-	removeMovie(playlistId: string, movieId: string) {
+	removeMovie(playlistId: string, movieId: string, userId?: string) {
+		if (userId) this.assertOwner(playlistId, userId);
+		this.bustCache();
 		this.database.db
 			.delete(playlistMovies)
 			.where(
@@ -357,7 +437,9 @@ export class PlaylistsService {
 			.all();
 	}
 
-	reorder(playlistId: string, movieIds: string[]) {
+	reorder(playlistId: string, movieIds: string[], userId?: string) {
+		if (userId) this.assertOwner(playlistId, userId);
+		this.bustCache();
 		for (let i = 0; i < movieIds.length; i++) {
 			const movieId = movieIds[i]!;
 			this.database.db

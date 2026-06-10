@@ -7,6 +7,7 @@ import { Spinner } from '@/components/common/Spinner';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
+import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { invalidatePlaylists } from '@/state/playlists.state';
 import { newTabNav } from '@/utils/navigation';
@@ -31,6 +32,8 @@ interface Playlist {
 	name: string;
 	description: string;
 	userId: string;
+	isPublic?: boolean;
+	ownerName?: string | null;
 	movies: PlaylistMovie[];
 }
 
@@ -106,6 +109,19 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 		[playlist, editName, editDescription],
 	);
 
+	const handleTogglePublic = useCallback(async () => {
+		if (!playlist) return;
+		const next = !playlist.isPublic;
+		try {
+			await api.patch(`/playlists/${playlist.id}`, { isPublic: next });
+			setPlaylist({ ...playlist, isPublic: next });
+			invalidatePlaylists();
+			notifySuccess(next ? 'Playlist is now public' : 'Playlist is now private');
+		} catch {
+			notifyError('Failed to update visibility');
+		}
+	}, [playlist]);
+
 	const handleDelete = useCallback(async () => {
 		if (!playlist) return;
 
@@ -169,6 +185,8 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 		);
 	}
 
+	const isOwner = currentUser.value?.id === playlist.userId;
+
 	return (
 		<div class={styles.playlistDetail}>
 			{/* Header */}
@@ -183,16 +201,35 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 					)}
 					<span class={styles.movieCount}>
 						{playlist.movies.length} {playlist.movies.length === 1 ? 'movie' : 'movies'}
+						{!isOwner && playlist.ownerName ? ` · by ${playlist.ownerName}` : ''}
+						{playlist.isPublic ? ' · Public' : ''}
 					</span>
 				</div>
-				<div class={styles.headerActions}>
-					<Button variant="secondary" size="sm" onClick={handleOpenEdit}>
-						Edit
-					</Button>
-					<Button variant="danger" size="sm" onClick={() => setShowDeleteConfirm(true)}>
-						Delete
-					</Button>
-				</div>
+				{isOwner && (
+					<div class={styles.headerActions}>
+						<label
+							class={styles.publicToggle}
+							title="Public playlists are visible (read-only) to all users"
+						>
+							<input
+								type="checkbox"
+								checked={!!playlist.isPublic}
+								onChange={handleTogglePublic}
+							/>
+							Public
+						</label>
+						<Button variant="secondary" size="sm" onClick={handleOpenEdit}>
+							Edit
+						</Button>
+						<Button
+							variant="danger"
+							size="sm"
+							onClick={() => setShowDeleteConfirm(true)}
+						>
+							Delete
+						</Button>
+					</div>
+				)}
 			</div>
 
 			{/* Movie List */}
@@ -246,15 +283,17 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 								</div>
 							</div>
 
-							<Button
-								variant="ghost"
-								size="sm"
-								loading={removingMovieId === movie.movieId}
-								onClick={() => handleRemoveMovie(movie.movieId)}
-								aria-label={`Remove ${movie.movieTitle}`}
-							>
-								<Icon name="x" size={12} />
-							</Button>
+							{isOwner && (
+								<Button
+									variant="ghost"
+									size="sm"
+									loading={removingMovieId === movie.movieId}
+									onClick={() => handleRemoveMovie(movie.movieId)}
+									aria-label={`Remove ${movie.movieTitle}`}
+								>
+									<Icon name="x" size={12} />
+								</Button>
+							)}
 						</div>
 					))}
 				</div>

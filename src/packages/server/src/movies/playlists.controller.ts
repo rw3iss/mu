@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+	Body,
+	Controller,
+	Delete,
+	ForbiddenException,
+	Get,
+	Param,
+	Patch,
+	Post,
+	Query,
+} from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { PlaylistsService } from './playlists.service.js';
@@ -37,25 +47,38 @@ export class PlaylistsController {
 		return this.playlistsService.findByMovie(userId, movieId);
 	}
 
+	/** Public playlists across all users (read-only). */
+	@RequireAction('view:own-data')
+	@Get('public')
+	findPublic(@Query('includeMovies') includeMovies?: string) {
+		return this.playlistsService.findPublic({ includeMovies: includeMovies === 'true' });
+	}
+
 	@RequireAction('view:own-data')
 	@Get(':id')
-	findById(@Param('id') id: string) {
-		return this.playlistsService.findById(id);
+	findById(@Param('id') id: string, @CurrentUser('id') userId: string) {
+		const playlist = this.playlistsService.findById(id) as any;
+		// Private playlists are only visible to their owner.
+		if (!playlist.isPublic && playlist.userId !== userId) {
+			throw new ForbiddenException('This playlist is private');
+		}
+		return playlist;
 	}
 
 	@RequireAction('view:own-data')
 	@Patch(':id')
 	update(
 		@Param('id') id: string,
-		@Body() body: { name?: string; description?: string; coverUrl?: string },
+		@CurrentUser('id') userId: string,
+		@Body() body: { name?: string; description?: string; coverUrl?: string; isPublic?: boolean },
 	) {
-		return this.playlistsService.update(id, body);
+		return this.playlistsService.update(id, userId, body);
 	}
 
 	@RequireAction('view:own-data')
 	@Delete(':id')
-	remove(@Param('id') id: string) {
-		this.playlistsService.remove(id);
+	remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
+		this.playlistsService.remove(id, userId);
 		return { success: true };
 	}
 
@@ -63,6 +86,7 @@ export class PlaylistsController {
 	@Post(':id/movies')
 	addMovie(
 		@Param('id') playlistId: string,
+		@CurrentUser('id') userId: string,
 		@Body()
 		body: {
 			movieId: string;
@@ -78,14 +102,18 @@ export class PlaylistsController {
 					serverId: body.remoteServerId,
 				}
 			: undefined;
-		this.playlistsService.addMovie(playlistId, body.movieId, remoteInfo);
+		this.playlistsService.addMovie(playlistId, body.movieId, remoteInfo, userId);
 		return { success: true };
 	}
 
 	@RequireAction('view:own-data')
 	@Delete(':id/movies/:movieId')
-	removeMovie(@Param('id') playlistId: string, @Param('movieId') movieId: string) {
-		this.playlistsService.removeMovie(playlistId, movieId);
+	removeMovie(
+		@Param('id') playlistId: string,
+		@Param('movieId') movieId: string,
+		@CurrentUser('id') userId: string,
+	) {
+		this.playlistsService.removeMovie(playlistId, movieId, userId);
 		return { success: true };
 	}
 }

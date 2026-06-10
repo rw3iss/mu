@@ -477,3 +477,69 @@
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
+
+/* Two-column layout: private playlists left, public right (50/50).
+ * Collapses to a single tabbed column on mobile. */
+.columns {
+	display: flex;
+	gap: var(--space-xl);
+	align-items: flex-start;
+
+	@include mobile {
+		flex-direction: column;
+		gap: var(--space-md);
+	}
+}
+
+.column {
+	flex: 1 1 50%;
+	min-width: 0;
+
+	@include mobile {
+		width: 100%;
+		flex: none;
+	}
+}
+
+.columnTitle {
+	margin: 0 0 var(--space-md);
+	font-size: var(--font-size-lg);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-text-primary);
+}
+
+/* Mobile-only icon+text tabs that switch the visible column. */
+.mobileTabs {
+	display: none;
+
+	@include mobile {
+		display: flex;
+		gap: var(--space-sm);
+		margin-bottom: var(--space-md);
+	}
+}
+
+.mobileTab {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: var(--space-sm) var(--space-md);
+	border-radius: var(--radius-md);
+	font-size: var(--font-size-sm);
+	color: var(--color-text-secondary);
+	background: var(--color-bg-surface);
+	border: 1px solid var(--color-border);
+}
+
+.mobileTabActive {
+	color: var(--color-text-primary);
+	background: var(--color-bg-hover);
+	border-color: var(--color-accent);
+}
+
+/* On mobile only the active column shows; desktop shows both. */
+.columnInactive {
+	@include mobile {
+		display: none;
+	}
+}

@@ -10,6 +10,8 @@ export const playlists = sqliteTable('playlists', {
 	description: text('description'),
 	coverUrl: text('cover_url'),
 	isSmart: integer('is_smart', { mode: 'boolean' }).default(false),
+	/** Public playlists are visible (read-only) to every user. */
+	isPublic: integer('is_public', { mode: 'boolean' }).default(false),
 	smartRules: text('smart_rules'),
 	createdAt: text('created_at').notNull(),
 	updatedAt: text('updated_at').notNull(),
