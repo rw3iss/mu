@@ -2,6 +2,7 @@ import { useCallback, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { FolderBrowser } from '@/components/common/FolderBrowser';
 import { Icon } from '@/components/common/Icon';
+import { Radio } from '@/components/common/Radio';
 import type { MediaSourceDto, ScanResult } from '@/services/sources.service';
 import { sourcesService } from '@/services/sources.service';
 import styles from './MediaPathEntry.module.scss';
@@ -40,8 +41,21 @@ export function MediaPathEntry({
 	onSetDefault,
 }: MediaPathEntryProps) {
 	const [isBrowseOpen, setIsBrowseOpen] = useState(false);
+	const [label, setLabel] = useState(source?.label ?? '');
 	const [isScanning, setIsScanning] = useState(false);
 	const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+
+	// Persist the label on blur (saved sources only — new rows get one after Save).
+	const handleLabelBlur = useCallback(async () => {
+		if (!source) return;
+		const next = label.trim();
+		if (next === (source.label ?? '')) return;
+		try {
+			await sourcesService.update(source.id, { label: next });
+		} catch {
+			// non-critical; next Save will retry
+		}
+	}, [source, label]);
 
 	const handleScan = useCallback(async () => {
 		if (!source) return;
@@ -61,19 +75,24 @@ export function MediaPathEntry({
 		<div class={styles.entry}>
 			<div class={styles.row}>
 				{showDefault && (
-					<label
-						class={styles.defaultRadio}
+					<Radio
+						name="default-media-path"
+						checked={!!source?.isDefault}
+						disabled={!source}
+						onChange={() => onSetDefault?.()}
 						title="Use as the default media path (preselected for uploads)"
-					>
-						<input
-							type="radio"
-							name="default-media-path"
-							checked={!!source?.isDefault}
-							disabled={!source}
-							onChange={() => onSetDefault?.()}
-						/>
-						<span class={styles.defaultLabel}>Default</span>
-					</label>
+					/>
+				)}
+				{source && (
+					<input
+						type="text"
+						class={styles.labelInput}
+						value={label}
+						onInput={(e) => setLabel((e.target as HTMLInputElement).value)}
+						onBlur={handleLabelBlur}
+						placeholder="Label"
+						title="Short display name for this media path"
+					/>
 				)}
 				<input
 					type="text"

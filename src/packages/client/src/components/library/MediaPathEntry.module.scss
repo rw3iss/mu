@@ -78,3 +78,21 @@
 	font-size: 11px;
 	color: var(--color-text-muted);
 }
+
+
+// Short label field, inline before the path input.
+.labelInput {
+	width: 110px;
+	flex-shrink: 0;
+	padding: var(--space-sm);
+	background: var(--color-input-bg, var(--color-bg-elevated));
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	color: var(--color-text-primary);
+	font-size: var(--font-size-sm);
+
+	&:focus {
+		outline: none;
+		border-color: var(--color-accent);
+	}
+}

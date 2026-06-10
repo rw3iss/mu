@@ -259,8 +259,9 @@ export function UploadMovieModal({ isOpen, onClose, onUploaded }: UploadMovieMod
 								>
 									{targets.map((t) => (
 										<option key={t.id} value={t.id}>
+											{t.label ? `${t.label} — ` : ''}
 											{t.path}
-											{t.label ? ` (${t.label})` : ''}
+											{t.isDefault ? ' (default)' : ''}
 										</option>
 									))}
 								</select>
