@@ -10,7 +10,6 @@ import { groupsService } from '@/services/groups.service';
 import type { ActiveSession, SessionHistoryEntry } from '@/services/stream.service';
 import { streamService } from '@/services/stream.service';
 import { subtitlesService } from '@/services/subtitles.service';
-import { formatBytes } from '@/utils/format-bytes';
 import { wsService } from '@/services/websocket.service';
 import { fetchMovies } from '@/state/library.state';
 import {
@@ -19,6 +18,7 @@ import {
 	notifySuccess,
 	removeNotification,
 } from '@/state/notifications.state';
+import { formatBytes } from '@/utils/format-bytes';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -109,6 +109,19 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 		} catch {
 			removeNotification(startedId);
 			notifyError('Failed to scan library');
+		}
+	}, []);
+
+	const handleImdbSync = useCallback(async () => {
+		try {
+			const r = await api.post<{ jobId: string }>('/imdb-datasets/sync');
+			notifyInfo(
+				'IMDB dataset sync queued — it starts when no other jobs are running (5\u201310 min).',
+				6000,
+			);
+			if (r.jobId) route(`/admin/jobs/${r.jobId}`);
+		} catch {
+			notifyError('Failed to queue the IMDB dataset sync.');
 		}
 	}, []);
 
@@ -314,9 +327,11 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 				}
 				const ok = done - failed;
 				if (failed > 0) {
-					notifyError(`Converted ${ok}/${total}; ${failed} failed. See the job queue.`, undefined, [
-						jobListAction('convert-mp4'),
-					]);
+					notifyError(
+						`Converted ${ok}/${total}; ${failed} failed. See the job queue.`,
+						undefined,
+						[jobListAction('convert-mp4')],
+					);
 				} else {
 					notifySuccess(
 						`Converted ${ok} movie${ok === 1 ? '' : 's'} to direct-play MP4 and cleared old caches.`,
@@ -584,6 +599,11 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						label="Refresh All Metadata"
 						description="Re-fetch TMDB / OMDB metadata for every library movie."
 						onClick={handleRefreshMetadata}
+					/>
+					<ActionRow
+						label="Sync IMDB Datasets"
+						description="Download the latest IMDB ratings + movie catalog (title.basics) for instant offline search. Runs as an idle-gated background job (~5–10 min)."
+						onClick={handleImdbSync}
 					/>
 					<ActionRow
 						label="Fetch Missing Thumbnails"
