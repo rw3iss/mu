@@ -41,22 +41,12 @@
 	gap: var(--item-gap);
 	// Every card in a row stretches to the tallest, so heights stay uniform.
 	align-items: stretch;
-	// Explicit column counts cap the row at 4 and step down cleanly. Using
-	// auto-fill instead pads the row with empty "ghost" tracks when there
-	// are fewer members than columns fit — which is what we're avoiding.
-	grid-template-columns: 1fr;
-
-	@media (min-width: 768px) {
-		grid-template-columns: repeat(2, 1fr);
-	}
-
-	@media (min-width: 1100px) {
-		grid-template-columns: repeat(3, 1fr);
-	}
-
-	@media (min-width: 1500px) {
-		grid-template-columns: repeat(4, 1fr);
-	}
+	// auto-fit sizes columns by the CONTAINER's width (not the viewport),
+	// so the grid also wraps correctly when the content column is squeezed
+	// (split mode). Each card needs ~270px; rows step 4 → 3 → 2 → 1 as the
+	// available width shrinks (~1200px → 3, ~900px → 2, mobile → 1). Unlike
+	// auto-fill, auto-fit collapses empty tracks so a short row stretches.
+	grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
 }
 
 .card {
