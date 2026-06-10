@@ -96,14 +96,14 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 				await api.patch(`/playlists/${playlist.id}`, {
 					name: editName.trim(),
 					description: editDescription.trim(),
-					isPublic: editPublic,
+					isPublic: editPublic || editPublicEdit,
 					publicEdit: editPublicEdit,
 				});
 				setPlaylist({
 					...playlist,
 					name: editName.trim(),
 					description: editDescription.trim(),
-					isPublic: editPublic,
+					isPublic: editPublic || editPublicEdit,
 					publicEdit: editPublicEdit,
 				});
 				invalidatePlaylists();
@@ -293,7 +293,11 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 				title="Edit Playlist"
 				size="sm"
 			>
-				<form onSubmit={handleSaveEdit} class={styles.editForm}>
+				<form
+					onSubmit={handleSaveEdit}
+					class={styles.editForm}
+					style={{ minWidth: '372px' }}
+				>
 					<div class={styles.formField}>
 						<label class={styles.formLabel}>Name</label>
 						<input
@@ -321,12 +325,16 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 					<div class={styles.publicRow}>
 						<div class={styles.publicInfo}>
 							<span class={styles.formLabel}>Public View</span>
-							<span class={styles.publicHint}>Allow other members to view it.</span>
+							<span class={styles.publicHint}>Members can view it.</span>
 						</div>
-						<label class={styles.toggle}>
+						<label
+							class={`${styles.toggle} ${editPublicEdit ? styles.toggleLocked : ''}`}
+							title={editPublicEdit ? 'Public Edit implies Public View' : undefined}
+						>
 							<input
 								type="checkbox"
-								checked={editPublic}
+								checked={editPublic || editPublicEdit}
+								disabled={editPublicEdit}
 								onChange={(e) =>
 									setEditPublic((e.target as HTMLInputElement).checked)
 								}
@@ -338,18 +346,19 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 						<div class={styles.publicInfo}>
 							<span class={styles.formLabel}>Public Edit</span>
 							<span class={styles.publicHint}>
-								Allow other members to add movies (they can remove their own
-								additions).
+								Members can add and remove their own movies.
 							</span>
 						</div>
 						<label class={styles.toggle}>
 							<input
 								type="checkbox"
 								checked={editPublicEdit}
-								disabled={!editPublic}
-								onChange={(e) =>
-									setEditPublicEdit((e.target as HTMLInputElement).checked)
-								}
+								onChange={(e) => {
+									const on = (e.target as HTMLInputElement).checked;
+									setEditPublicEdit(on);
+									// Public Edit implies Public View.
+									if (on) setEditPublic(true);
+								}}
 							/>
 							<span class={styles.toggleTrack} />
 						</label>
