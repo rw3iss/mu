@@ -1368,7 +1368,8 @@
 	z-index: var(--z-portal-overlay);
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 6px;
+	min-width: 180px;
 	padding: 10px 12px;
 	min-width: 180px;
 	// Match the sibling player popups (.menu / .volumePopup): always-dark
@@ -1380,6 +1381,11 @@
 	backdrop-filter: blur(var(--surface-glass-blur));
 	color: var(--on-dark-text-primary);
 	font-family: inherit;
+}
+
+.shareMenu :global(span) {
+	display: block;
+	width: 100%;
 }
 
 .shareMenuLabel {
@@ -1395,12 +1401,12 @@
 }
 
 .shareMenuBtn {
-	flex: 1;
-	display: inline-flex;
+	width: 100%;
+	display: flex;
 	align-items: center;
 	justify-content: center;
 	gap: 6px;
-	padding: 6px 10px;
+	padding: 5px 12px;
 	border: 1px solid var(--on-dark-overlay-3);
 	border-radius: var(--radius-sm);
 	background: var(--on-dark-overlay-1);

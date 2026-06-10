@@ -1700,44 +1700,40 @@ export function PlayerControls({
 							shareMenuHover.current = false;
 						}}
 					>
-						<div class={styles.shareMenuLabel}>
-							Copy URL at {formatTime(shareMenu.time)}
-						</div>
+						<div class={styles.shareMenuLabel}>{formatTime(shareMenu.time)}</div>
+						<Tooltip label="Copies a link for logged-in users" delay={1000}>
+							<button
+								type="button"
+								class={styles.shareMenuBtn}
+								disabled={shareBusy}
+								onClick={() => copyShareAtTime('private')}
+							>
+								<Icon name="lock" size={13} />
+								Copy Private URL
+							</button>
+						</Tooltip>
+						<Tooltip label="Copies a public link anyone can watch" delay={1000}>
+							<button
+								type="button"
+								class={styles.shareMenuBtn}
+								disabled={shareBusy}
+								onClick={() => copyShareAtTime('public')}
+							>
+								<Icon name="globe" size={13} />
+								Copy Public URL
+							</button>
+						</Tooltip>
 						<button
 							type="button"
-							class={styles.shareMenuAddComment}
+							class={styles.shareMenuBtn}
 							onClick={() => {
 								setCommentDraft({ x: shareMenu.x, time: shareMenu.time });
 								setShareMenu(null);
 							}}
 						>
-							<Icon name="edit" size={14} />
-							Add Comment at {formatTime(shareMenu.time)}
+							<Icon name="edit" size={13} />
+							Add Comment
 						</button>
-						<div class={styles.shareMenuActions}>
-							<Tooltip label="Copies a public link anyone can watch" delay={1000}>
-								<button
-									type="button"
-									class={styles.shareMenuBtn}
-									disabled={shareBusy}
-									onClick={() => copyShareAtTime('public')}
-								>
-									<Icon name="globe" size={14} />
-									Public
-								</button>
-							</Tooltip>
-							<Tooltip label="Copies a link for logged-in users" delay={1000}>
-								<button
-									type="button"
-									class={styles.shareMenuBtn}
-									disabled={shareBusy}
-									onClick={() => copyShareAtTime('private')}
-								>
-									<Icon name="lock" size={14} />
-									Private
-								</button>
-							</Tooltip>
-						</div>
 					</div>,
 					document.body,
 				)}
