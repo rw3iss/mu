@@ -221,7 +221,7 @@ export function Playlists(_props: PlaylistsProps) {
 		'playlists_sort_order',
 		'desc',
 	);
-	const [viewMode, setViewMode] = useUiSetting<PlaylistViewMode>('playlists_view', 'grid');
+	const [viewMode, setViewMode] = useUiSetting<PlaylistViewMode>('playlists_view', 'list');
 
 	const [publicPlaylists, setPublicPlaylists] = useState<Playlist[]>([]);
 	// Mobile: which column is shown (columns collapse to tabs).
@@ -284,6 +284,28 @@ export function Playlists(_props: PlaylistsProps) {
 			}
 		},
 		[newName, newDescription, newPublic, newPublicEdit],
+	);
+
+	const renderRow = (playlist: Playlist, showOwner = false) => (
+		<div key={playlist.id} class={styles.listItem}>
+			<div class={styles.listItemHeader}>
+				<h3
+					class={styles.listItemName}
+					{...newTabNav(`/playlists/${playlist.id}`, () =>
+						route(`/playlists/${playlist.id}`),
+					)}
+					role="link"
+					tabIndex={0}
+				>
+					{playlist.name}
+				</h3>
+				<span class={styles.listItemCount}>
+					{playlist.movieCount} {playlist.movieCount === 1 ? 'movie' : 'movies'}
+					{showOwner && playlist.ownerName ? ` · by ${playlist.ownerName}` : ''}
+				</span>
+			</div>
+			<MovieStrip movies={playlist.movies ?? []} />
+		</div>
 	);
 
 	const renderCard = (playlist: Playlist, showOwner = false) => {
@@ -478,29 +500,7 @@ export function Playlists(_props: PlaylistsProps) {
 							})}
 						</div>
 					) : (
-						<div class={styles.list}>
-							{playlists.map((playlist) => (
-								<div key={playlist.id} class={styles.listItem}>
-									<div class={styles.listItemHeader}>
-										<h3
-											class={styles.listItemName}
-											{...newTabNav(`/playlists/${playlist.id}`, () =>
-												route(`/playlists/${playlist.id}`),
-											)}
-											role="link"
-											tabIndex={0}
-										>
-											{playlist.name}
-										</h3>
-										<span class={styles.listItemCount}>
-											{playlist.movieCount}{' '}
-											{playlist.movieCount === 1 ? 'movie' : 'movies'}
-										</span>
-									</div>
-									<MovieStrip movies={playlist.movies ?? []} />
-								</div>
-							))}
-						</div>
+						<div class={styles.list}>{playlists.map((p) => renderRow(p))}</div>
 					)}
 				</section>
 
@@ -512,9 +512,13 @@ export function Playlists(_props: PlaylistsProps) {
 						<div class={styles.empty}>
 							<p>No public playlists yet</p>
 						</div>
-					) : (
+					) : viewMode === 'grid' ? (
 						<div class={styles.grid}>
 							{publicPlaylists.map((pl) => renderCard(pl, true))}
+						</div>
+					) : (
+						<div class={styles.list}>
+							{publicPlaylists.map((pl) => renderRow(pl, true))}
 						</div>
 					)}
 				</section>
