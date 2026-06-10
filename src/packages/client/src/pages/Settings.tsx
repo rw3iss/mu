@@ -2268,6 +2268,7 @@ export function Settings(props: SettingsProps) {
 								<Select
 									value={maxConcurrentIoJobs}
 									onChange={setMaxConcurrentIoJobs}
+									class={styles.crfSelect}
 									options={[
 										{ value: '1', label: '1 (Serialize — recommended)' },
 										{ value: '2', label: '2' },
@@ -2663,7 +2664,7 @@ export function Settings(props: SettingsProps) {
 													(e.target as HTMLInputElement).value,
 												)
 											}
-											style={{ width: '120px' }}
+											style={{ width: '140px' }}
 										/>
 									</div>
 
