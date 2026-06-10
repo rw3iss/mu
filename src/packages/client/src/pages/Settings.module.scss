@@ -61,7 +61,10 @@
   }
 }
 
-/* One section of the tab rail; groups are separated by a 10px gap. */
+/* One section of the tab rail. Sections after the first carry a themed
+ * divider (top border) with 10px of breathing room above and below it.
+ * Border-top on the group itself means it only renders when that group
+ * is visible (admin groups are simply not mounted for normal users). */
 .tabGroup {
   display: flex;
   flex-direction: column;
@@ -69,10 +72,18 @@
 
   & + & {
     margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--color-border);
   }
 
   @include mobile {
     flex-direction: row;
+
+    & + & {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
   }
 }
 
