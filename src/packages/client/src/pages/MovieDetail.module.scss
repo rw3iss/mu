@@ -1062,3 +1062,9 @@
     background: var(--surface-overlay-1);
   }
 }
+
+// "Added 3d ago" — sits to the right of the director in the meta row.
+.addedAt {
+	color: var(--color-text-muted);
+	white-space: nowrap;
+}

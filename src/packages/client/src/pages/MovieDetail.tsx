@@ -621,6 +621,14 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									/>
 								</span>
 							)}
+							{movie.addedAt && (
+								<span
+									class={styles.addedAt}
+									title={new Date(movie.addedAt).toLocaleString()}
+								>
+									Added {relativeTime(movie.addedAt)}
+								</span>
+							)}
 							{movie.groupId && <MovieBreadcrumbs movie={movie} />}
 						</div>
 

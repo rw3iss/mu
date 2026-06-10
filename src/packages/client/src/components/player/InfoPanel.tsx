@@ -135,6 +135,14 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										/>
 									</span>
 								)}
+								{movie.addedAt && (
+									<span
+										class={styles.addedAt}
+										title={new Date(movie.addedAt).toLocaleString()}
+									>
+										Added {relativeTime(movie.addedAt)}
+									</span>
+								)}
 								{movie.groupId && <MovieBreadcrumbs movie={movie} />}
 							</div>
 
@@ -355,6 +363,14 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										stopPropagation
 										revealOnHover
 									/>
+								</span>
+							)}
+							{movie.addedAt && (
+								<span
+									class={styles.addedAt}
+									title={new Date(movie.addedAt).toLocaleString()}
+								>
+									Added {relativeTime(movie.addedAt)}
 								</span>
 							)}
 						</div>

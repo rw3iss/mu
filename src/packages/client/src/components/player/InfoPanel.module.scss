@@ -375,3 +375,9 @@
   font-size: var(--font-size-xs);
   color: var(--on-dark-text-muted);
 }
+
+// "Added 3d ago" — sits to the right of the director in the meta row.
+.addedAt {
+  color: var(--on-dark-text-muted);
+  white-space: nowrap;
+}
