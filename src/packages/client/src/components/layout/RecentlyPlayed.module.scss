@@ -83,6 +83,9 @@
       opacity: 1;
       pointer-events: auto;
       transform: translateX(0);
+      // 500ms hover-intent delay before the tooltip appears; hides instantly
+      // (the base state has no delay).
+      transition-delay: 0.5s;
     }
   }
 }
@@ -178,12 +181,31 @@
   justify-content: center;
   width: 42px;
   border-radius: 0;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
+  // Opaque themed backing so the icon reads over long, ellipsized titles.
+  background: var(--color-bg-elevated);
   opacity: 0;
   transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 
   &:hover {
     color: var(--color-accent);
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--color-bg-hover);
   }
+}
+
+// Thin watch-position bar pinned to the bottom of a row (only rendered when
+// the entry has an in-progress watch position).
+.progressTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-accent);
 }

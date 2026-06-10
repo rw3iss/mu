@@ -139,49 +139,10 @@
   }
 }
 
-// Right-side stack: minimize is always visible; close slides out to the
-// left on hover. Anchored at right:0 so the hit-area expansion grows
-// leftward without disturbing the topHeader's gradient height.
-.topRightGroup {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: var(--topbar-height);
-  height: var(--topbar-height);
-  z-index: 1;
-  // When hovered, extend the hit area leftward to cover the revealed
-  // close button so the cursor stays inside the wrapper while
-  // transitioning minimize → close (otherwise :hover would drop).
-  &:hover {
-    width: calc(var(--topbar-height) * 2);
-  }
-}
-
-// Pin the minimize button (non-revealed sibling) to the wrapper's right
-// edge so it stays put as the wrapper grows leftward on hover.
-.topRightGroup > .topBtn:not(.topCloseRevealed) {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-.topCloseRevealed {
-  position: absolute;
-  top: 0;
-  right: var(--topbar-height);
-  background: rgba(0, 0, 0, 0.55);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(8px);
-  transition: opacity 180ms ease, transform 180ms ease, background 120ms ease;
-}
-
-.topRightGroup:hover .topCloseRevealed,
-.topCloseRevealed:hover,
-.topCloseRevealed:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateX(0);
+// Upper-left cluster: minimize then split view.
+.topLeftGroup {
+  display: flex;
+  align-items: flex-start;
 }
 
 // ============================================
@@ -312,7 +273,7 @@
   z-index: calc(var(--z-player-controls) + 1);
 
   video {
-    object-fit: cover;
+    object-fit: contain;
   }
 
   &:hover .miniVideoOverlay {

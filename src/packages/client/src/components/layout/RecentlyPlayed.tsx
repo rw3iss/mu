@@ -70,6 +70,17 @@ export function RecentlyPlayed() {
 								<span class={styles.title}>{movie.title}</span>
 								{movie.year > 0 && <span class={styles.year}>{movie.year}</span>}
 							</div>
+							{/* Watch-position bar along the bottom of the row */}
+							{(movie.watchPosition ?? 0) > 0 && (movie.durationSeconds ?? 0) > 0 && (
+								<div class={styles.progressTrack}>
+									<div
+										class={styles.progressFill}
+										style={{
+											width: `${Math.min(100, ((movie.watchPosition ?? 0) / (movie.durationSeconds || 1)) * 100)}%`,
+										}}
+									/>
+								</div>
+							)}
 							{/* Hover tooltip with larger poster */}
 							<div class={styles.tooltip}>
 								{movie.posterUrl && (

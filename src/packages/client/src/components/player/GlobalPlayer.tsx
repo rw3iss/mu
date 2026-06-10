@@ -1120,37 +1120,7 @@ export function GlobalPlayer() {
 					}}
 				>
 					{!shareMode.value && (
-						<button
-							class={styles.topBtn}
-							onClick={splitPlayer}
-							aria-label="Split view"
-							title="Split view"
-						>
-							<svg
-								width="20"
-								height="20"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="white"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-							>
-								<rect x="3" y="3" width="18" height="18" rx="2" />
-								<line x1="12" y1="3" x2="12" y2="21" />
-							</svg>
-						</button>
-					)}
-					{!shareMode.value && (
-						<div
-							class={styles.topRightGroup}
-							onMouseEnter={() => {
-								isHoveringControls.value = true;
-							}}
-							onMouseLeave={() => {
-								isHoveringControls.value = false;
-							}}
-						>
+						<div class={styles.topLeftGroup}>
 							<button
 								class={styles.topBtn}
 								onClick={minimizePlayer}
@@ -1171,10 +1141,10 @@ export function GlobalPlayer() {
 								</svg>
 							</button>
 							<button
-								class={`${styles.topBtn} ${styles.topCloseRevealed}`}
-								onClick={closePlayer}
-								aria-label="Close player"
-								title="Close"
+								class={styles.topBtn}
+								onClick={splitPlayer}
+								aria-label="Split view"
+								title="Split view"
 							>
 								<svg
 									width="20"
@@ -1186,11 +1156,33 @@ export function GlobalPlayer() {
 									stroke-linecap="round"
 									stroke-linejoin="round"
 								>
-									<line x1="18" y1="6" x2="6" y2="18" />
-									<line x1="6" y1="6" x2="18" y2="18" />
+									<rect x="3" y="3" width="18" height="18" rx="2" />
+									<line x1="12" y1="3" x2="12" y2="21" />
 								</svg>
 							</button>
 						</div>
+					)}
+					{!shareMode.value && (
+						<button
+							class={styles.topBtn}
+							onClick={closePlayer}
+							aria-label="Close player"
+							title="Close"
+						>
+							<svg
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="white"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<line x1="18" y1="6" x2="6" y2="18" />
+								<line x1="6" y1="6" x2="18" y2="18" />
+							</svg>
+						</button>
 					)}
 				</div>
 			)}
