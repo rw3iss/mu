@@ -817,10 +817,11 @@ export class MoviesService implements OnModuleInit {
 				}
 			: null;
 
-		const activeJobs = this.jobManager.findJobsByPayload('movieId', id, 'pre-transcode', [
-			'pending',
-			'running',
-		]);
+		// Transcode + MP4-conversion jobs (pending or running) both surface as
+		// "processing" on the detail page and cards.
+		const activeJobs = this.jobManager
+			.findJobsByPayload('movieId', id, undefined, ['pending', 'running'])
+			.filter((j) => j.type === 'pre-transcode' || j.type === 'convert-mp4');
 		let status: 'idle' | 'processing' | 'processing_playable' = 'idle';
 		if (activeJobs.length > 0) {
 			// Check if partial cache is available for playback while still transcoding

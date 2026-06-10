@@ -34,22 +34,22 @@ export class JobController {
 	}
 
 	/**
-	 * Get movie IDs that are currently processing or need transcoding.
-	 * Includes active jobs AND movies that haven't finished transcoding.
+	 * Get movie IDs that are currently processing or scheduled for processing.
+	 * Covers transcode (pre-transcode) AND MP4 conversion (convert-mp4) jobs,
+	 * both pending (queued) and running — so cards/detail show "Processing…"
+	 * for the whole lifecycle of a new movie's media work.
 	 */
 	@RequireAction('view:library')
 	@Get('processing-movies')
 	getProcessingMovies() {
-		// Only return movies with ACTIVELY RUNNING transcode jobs
-		// (not pending/queued — those shouldn't show as "processing" in the UI)
-		const runningJobs = this.jobManager.listJobs({
-			type: 'pre-transcode',
-			status: 'running',
-		});
 		const movieIds = new Set<string>();
-		for (const job of runningJobs) {
-			const mid = job.payload?.movieId as string | undefined;
-			if (mid) movieIds.add(mid);
+		for (const type of ['pre-transcode', 'convert-mp4']) {
+			for (const status of ['pending', 'running']) {
+				for (const job of this.jobManager.listJobs({ type, status })) {
+					const mid = job.payload?.movieId as string | undefined;
+					if (mid) movieIds.add(mid);
+				}
+			}
 		}
 		return { movieIds: [...movieIds] };
 	}
@@ -66,12 +66,10 @@ export class JobController {
 	@RequireAction('view:library')
 	@Get('movies/:movieId/transcode-status')
 	getTranscodeStatus(@Param('movieId') movieId: string) {
-		const jobs = this.jobManager.findJobsByPayload(
-			'movieId',
-			movieId,
-			'pre-transcode',
-			['pending', 'running'],
-		);
+		// Transcode + MP4-conversion jobs both count as "processing" media work.
+		const jobs = this.jobManager
+			.findJobsByPayload('movieId', movieId, undefined, ['pending', 'running'])
+			.filter((j) => j.type === 'pre-transcode' || j.type === 'convert-mp4');
 		const running = jobs.filter((j) => j.status === 'running');
 		const isRunning = running.length > 0;
 		const progress = isRunning

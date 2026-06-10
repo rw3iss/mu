@@ -2,7 +2,9 @@ import { signal } from '@preact/signals';
 import { api } from '@/services/api';
 import { wsService } from '@/services/websocket.service';
 
-/** Set of movie IDs currently being processed (pre-transcode) */
+const PROCESSING_JOB_TYPES = new Set(['pre-transcode', 'convert-mp4']);
+
+/** Set of movie IDs currently being processed (transcode or MP4 conversion) */
 export const processingMovieIds = signal<Set<string>>(new Set());
 
 /** Per-movie transcode progress (0-100). Only set for actively running jobs. */
@@ -38,7 +40,7 @@ export function initProcessingState(): void {
 	// When a pre-transcode job starts, add the movieId
 	wsService.on('job:started', (data: unknown) => {
 		const ev = data as { type?: string; payload?: { movieId?: string } };
-		if (ev.type === 'pre-transcode' && ev.payload?.movieId) {
+		if (ev.type && PROCESSING_JOB_TYPES.has(ev.type) && ev.payload?.movieId) {
 			const next = new Set(processingMovieIds.value);
 			next.add(ev.payload.movieId);
 			processingMovieIds.value = next;
@@ -52,7 +54,12 @@ export function initProcessingState(): void {
 			payload?: { movieId?: string };
 			progress?: number;
 		};
-		if (ev.type === 'pre-transcode' && ev.payload?.movieId && ev.progress != null) {
+		if (
+			ev.type &&
+			PROCESSING_JOB_TYPES.has(ev.type) &&
+			ev.payload?.movieId &&
+			ev.progress != null
+		) {
 			const next = new Map(processingProgress.value);
 			next.set(ev.payload.movieId, Math.round(ev.progress));
 			processingProgress.value = next;
@@ -62,7 +69,7 @@ export function initProcessingState(): void {
 	// When a pre-transcode job completes or fails, remove the movieId and progress
 	const handleDone = (data: unknown) => {
 		const ev = data as { type?: string; payload?: { movieId?: string } };
-		if (ev.type === 'pre-transcode' && ev.payload?.movieId) {
+		if (ev.type && PROCESSING_JOB_TYPES.has(ev.type) && ev.payload?.movieId) {
 			const nextProgress = new Map(processingProgress.value);
 			nextProgress.delete(ev.payload.movieId);
 			processingProgress.value = nextProgress;

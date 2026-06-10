@@ -50,18 +50,25 @@ export function useTranscodeStatus(movieId: string | null | undefined): Transcod
 
 		const pull = async () => {
 			try {
-				const data = await api.get<{ progress?: number; running?: boolean }>(
-					`/jobs/movies/${encodeURIComponent(movieId)}/transcode-status`,
-				);
+				const data = await api.get<{
+					progress?: number;
+					running?: boolean;
+					pending?: boolean;
+				}>(`/jobs/movies/${encodeURIComponent(movieId)}/transcode-status`);
 				if (cancelled) return;
 				if (typeof data.progress === 'number') {
 					const next = new Map(processingProgress.value);
 					next.set(movieId, Math.round(data.progress));
 					processingProgress.value = next;
 				}
-				// Server says no longer running — sync the set so the UI
+				// Server says no longer running NOR queued — sync the set so the UI
 				// drops the processing badge even if the WS event was lost.
-				if (data.running === false && processingMovieIds.value.has(movieId)) {
+				// (A pending/scheduled job still counts as processing.)
+				if (
+					data.running === false &&
+					!data.pending &&
+					processingMovieIds.value.has(movieId)
+				) {
 					const ids = new Set(processingMovieIds.value);
 					ids.delete(movieId);
 					processingMovieIds.value = ids;
