@@ -2,9 +2,17 @@ import { createPortal } from 'preact/compat';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Icon } from '@/components/common/Icon';
 import type { MovieComment } from '@/services/comments.service';
-import { addComment, deleteComment, editComment } from '@/state/comments.state';
+import {
+	addComment,
+	deleteComment,
+	editComment,
+	movieComments,
+	reactToComment,
+} from '@/state/comments.state';
 import { notifyError } from '@/state/notifications.state';
+import { showInfoPanel } from '@/state/player.state';
 import styles from './CommentTooltip.module.scss';
+import { openEmojiPicker } from './EmojiPicker';
 
 export interface CommentTooltipProps {
 	movieId: string;
@@ -51,7 +59,21 @@ export function CommentTooltip({
 	onMouseEnter,
 	onMouseLeave,
 }: CommentTooltipProps) {
+	// Re-resolve the comment from shared state so reactions/edits made from
+	// this tooltip render immediately (the prop is a snapshot).
+	const liveComment = (() => {
+		if (!comment) return null;
+		const list = movieComments.value[movieId] ?? [];
+		for (const c of list) {
+			if (c.id === comment.id) return c;
+			const r = c.replies?.find((x) => x.id === comment.id);
+			if (r) return r;
+		}
+		return comment;
+	})();
 	const isReadOnly = !!comment && comment.userId !== currentUserId;
+	const [replying, setReplying] = useState(false);
+	const [replyText, setReplyText] = useState('');
 	const [mode, setMode] = useState<'entry' | 'read'>(comment ? 'read' : 'entry');
 	const [text, setText] = useState(comment?.text ?? '');
 	const [time, setTime] = useState<number | null>(
@@ -133,6 +155,54 @@ export function CommentTooltip({
 		}
 	}, [comment, busy, movieId, onClose]);
 
+	const openReactions = useCallback(
+		(e: Event) => {
+			if (!comment) return;
+			e.stopPropagation();
+			openEmojiPicker({
+				anchor: e.currentTarget as HTMLElement,
+				onPick: (emoji) => {
+					reactToComment(movieId, comment.id, emoji).catch(() =>
+						notifyError('Failed to react'),
+					);
+				},
+			});
+		},
+		[comment, movieId],
+	);
+
+	const submitReply = useCallback(async () => {
+		const t = replyText.trim();
+		if (!t || busy || !comment) return;
+		setBusy(true);
+		try {
+			await addComment(movieId, { text: t, parentId: comment.id });
+			finishWithSuccess();
+		} catch (err) {
+			notifyError((err as Error)?.message || 'Failed to reply');
+			setBusy(false);
+		}
+	}, [replyText, busy, comment, movieId, finishWithSuccess]);
+
+	/** Open the info panel's Comments section and select this comment. */
+	const jumpToComment = useCallback(() => {
+		if (!comment) return;
+		showInfoPanel.value = true;
+		let tries = 0;
+		const tick = () => {
+			const el = document.getElementById(`comment-${comment.id}`);
+			if (el) {
+				el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				el.classList.add('comment-highlight');
+				setTimeout(() => el.classList.remove('comment-highlight'), 2500);
+				return;
+			}
+			if (tries++ < 12) setTimeout(tick, 200);
+		};
+		setTimeout(tick, 150);
+		onClose();
+	}, [comment, onClose]);
+
 	const style = {
 		left: `${Math.max(150, Math.min(x, window.innerWidth - 150))}px`,
 		top: `${y}px`,
@@ -197,20 +267,92 @@ export function CommentTooltip({
 
 					{mode === 'read' ? (
 						<>
-							<p class={styles.blurb}>{comment!.text}</p>
-							{!isReadOnly && (
-								<div class={styles.actions}>
-									<button class={styles.linkBtn} onClick={() => setMode('entry')}>
-										Edit
-									</button>
+							<p
+								class={`${styles.blurb} ${styles.blurbClickable}`}
+								title="Open in the comments panel"
+								onClick={jumpToComment}
+							>
+								{(liveComment ?? comment)!.text}
+							</p>
+							<div class={styles.actions}>
+								<span class={styles.reactions}>
+									{(liveComment?.reactions ?? []).map((r) => (
+										<button
+											key={r.emoji}
+											class={`${styles.reactionPill} ${r.mine ? styles.reactionMine : ''}`}
+											onClick={() =>
+												reactToComment(movieId, comment!.id, r.emoji).catch(
+													() => {},
+												)
+											}
+										>
+											{r.emoji} {r.count}
+										</button>
+									))}
 									<button
-										class={`${styles.linkBtn} ${styles.danger}`}
-										disabled={busy}
-										onClick={handleDelete}
+										class={styles.linkBtn}
+										onClick={openReactions}
+										title="React"
 									>
-										Delete
+										🙂+
 									</button>
-								</div>
+								</span>
+								<button
+									class={styles.linkBtn}
+									onClick={() => setReplying(!replying)}
+								>
+									Reply
+								</button>
+								{!isReadOnly && (
+									<>
+										<button
+											class={styles.linkBtn}
+											onClick={() => setMode('entry')}
+										>
+											Edit
+										</button>
+										<button
+											class={`${styles.linkBtn} ${styles.danger}`}
+											disabled={busy}
+											onClick={handleDelete}
+										>
+											Delete
+										</button>
+									</>
+								)}
+							</div>
+							{replying && (
+								<>
+									<textarea
+										class={styles.textarea}
+										rows={2}
+										maxLength={2000}
+										placeholder={`Reply to ${comment!.authorName}…`}
+										value={replyText}
+										onInput={(e) =>
+											setReplyText((e.target as HTMLTextAreaElement).value)
+										}
+										onKeyDown={(e: KeyboardEvent) => {
+											if (e.key === 'Enter' && (e.metaKey || e.ctrlKey))
+												submitReply();
+										}}
+									/>
+									<div class={styles.actions}>
+										<button
+											class={styles.linkBtn}
+											onClick={() => setReplying(false)}
+										>
+											Cancel
+										</button>
+										<button
+											class={styles.commentBtn}
+											disabled={busy || !replyText.trim()}
+											onClick={submitReply}
+										>
+											Reply
+										</button>
+									</div>
+								</>
 							)}
 						</>
 					) : (

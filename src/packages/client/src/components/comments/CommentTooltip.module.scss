@@ -167,3 +167,33 @@
 	font-size: var(--font-size-sm);
 	color: var(--color-accent);
 }
+
+.blurbClickable {
+	cursor: pointer;
+
+	&:hover {
+		color: var(--color-text-primary);
+	}
+}
+
+.reactions {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-right: auto;
+	flex-wrap: wrap;
+}
+
+.reactionPill {
+	font-size: var(--font-size-xs);
+	padding: 0 7px;
+	border-radius: 999px;
+	background: var(--color-bg-hover);
+	border: 1px solid var(--color-border);
+	color: var(--color-text-secondary);
+}
+
+.reactionMine {
+	border-color: var(--color-accent);
+	color: var(--color-text-primary);
+}

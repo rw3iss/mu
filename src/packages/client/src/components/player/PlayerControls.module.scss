@@ -1425,13 +1425,15 @@
 
 // ── Seek-bar comment bubbles ─────────────────────────────────────
 // Attached inside the seek bar so they show/hide with the controls.
+// Styled as little speech bubbles: rounded square with a pointed tail,
+// floated just above the bar.
 .commentBubble {
 	position: absolute;
-	top: 50%;
-	transform: translate(-50%, -50%);
-	width: 16px;
+	bottom: calc(100% - 2px);
+	transform: translateX(-50%);
+	width: 18px;
 	height: 16px;
-	border-radius: 50%;
+	border-radius: 5px 5px 5px 2px;
 	background: var(--color-accent);
 	color: var(--color-accent-text, #111);
 	font-size: 8px;
@@ -1440,12 +1442,24 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	border: 1px solid rgba(0, 0, 0, 0.4);
+	border: 1px solid rgba(0, 0, 0, 0.35);
 	z-index: 2;
 	cursor: pointer;
+	transition: transform 100ms ease;
+
+	// Speech-bubble tail pointing down at the seek position.
+	&::after {
+		content: '';
+		position: absolute;
+		top: 100%;
+		left: 4px;
+		border-left: 4px solid transparent;
+		border-right: 4px solid transparent;
+		border-top: 5px solid var(--color-accent);
+	}
 
 	&:hover {
-		transform: translate(-50%, -50%) scale(1.2);
+		transform: translateX(-50%) scale(1.2);
 	}
 }
 
