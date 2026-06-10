@@ -1,5 +1,7 @@
 .playlists {
   animation: fadeIn 300ms ease;
+  container-type: inline-size;
+  container-name: playlists;
 }
 
 .loading {
@@ -351,15 +353,21 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  // One playlist per row by default; steps up with the COLUMN's width
+  // (container query) so 50% columns, zoom, and split mode all behave.
+  grid-template-columns: 1fr;
   gap: var(--item-gap);
+}
 
-  @include tablet {
+@container plcol (min-width: 560px) {
+  .grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
 
-  @include mobile {
-    grid-template-columns: 1fr;
+@container plcol (min-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -479,21 +487,35 @@
 }
 
 /* Two-column layout: private playlists left, public right (50/50).
- * Collapses to a single tabbed column on mobile. */
+ * Container-query driven: when the page area can't fit two columns it
+ * stacks to one (private first) — works for narrow windows, zoom, AND
+ * split mode, not just mobile viewports. */
 .columns {
 	display: flex;
 	gap: var(--space-xl);
 	align-items: flex-start;
+}
 
-	@include mobile {
+/* Page too narrow for two columns → stack, private first. */
+@container playlists (max-width: 760px) {
+	.columns {
 		flex-direction: column;
 		gap: var(--space-md);
+	}
+
+	.column {
+		width: 100%;
+		flex: none;
 	}
 }
 
 .column {
 	flex: 1 1 50%;
 	min-width: 0;
+	// Each column is its own size container so its card grid steps by the
+	// COLUMN's width.
+	container-type: inline-size;
+	container-name: plcol;
 
 	@include mobile {
 		width: 100%;
