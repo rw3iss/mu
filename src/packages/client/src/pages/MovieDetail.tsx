@@ -34,6 +34,7 @@ import { updateMovieInHistory } from '@/state/history.state';
 import { type Movie, updateMovieInList } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { fetchProcessingMovies, processingMovieIds } from '@/state/processing.state';
+import { relativeTime } from '@/utils/time-format';
 import { getWatchPercent, hasWatchProgress } from '@/utils/watch-progress';
 import styles from './MovieDetail.module.scss';
 

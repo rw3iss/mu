@@ -16,6 +16,7 @@ import { globalMovie, minimizePlayer, playerMode } from '@/state/globalPlayer.st
 import type { Movie } from '@/state/library.state';
 import { showInfoPanel } from '@/state/player.state';
 import { shareMode } from '@/state/share.state';
+import { relativeTime } from '@/utils/time-format';
 import styles from './InfoPanel.module.scss';
 
 interface InfoPanelProps {
