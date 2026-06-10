@@ -4,6 +4,7 @@ import {
 	Delete,
 	ForbiddenException,
 	Get,
+	NotFoundException,
 	Param,
 	Patch,
 	Post,
@@ -56,11 +57,16 @@ export class PlaylistsController {
 
 	@RequireAction('view:own-data')
 	@Get(':id')
-	findById(@Param('id') id: string, @CurrentUser('id') userId: string) {
+	findById(
+		@Param('id') id: string,
+		@CurrentUser('id') userId: string,
+		@CurrentUser('role') role: string,
+	) {
 		const playlist = this.playlistsService.findById(id) as any;
-		// Private playlists are only visible to their owner.
-		if (!playlist.isPublic && playlist.userId !== userId) {
-			throw new ForbiddenException('This playlist is private');
+		// Private playlists are only visible to their owner (and admins).
+		// 404 rather than 403 so non-owners can't probe which ids exist.
+		if (!playlist.isPublic && playlist.userId !== userId && role !== 'admin') {
+			throw new NotFoundException(`Playlist ${id} not found`);
 		}
 		return playlist;
 	}

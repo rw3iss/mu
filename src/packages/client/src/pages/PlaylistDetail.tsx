@@ -66,8 +66,8 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 			const data = await api.get<Playlist>(`/playlists/${id}`);
 			setPlaylist(data);
 		} catch (error) {
+			// Private/unknown playlists 404 — the not-found state below covers it.
 			console.error('Failed to load playlist:', error);
-			notifyError('Failed to load playlist');
 		} finally {
 			setIsLoading(false);
 		}
@@ -198,7 +198,11 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 					<span class={styles.movieCount}>
 						{playlist.movies.length} {playlist.movies.length === 1 ? 'movie' : 'movies'}
 						{!isOwner && playlist.ownerName ? ` · by ${playlist.ownerName}` : ''}
-						{playlist.isPublic ? ' · Public' : ''}
+						{playlist.isPublic
+							? playlist.publicEdit
+								? ' · Public · Members can add'
+								: ' · Public'
+							: ''}
 					</span>
 				</div>
 				{isOwner && (
@@ -291,7 +295,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 				isOpen={showEdit}
 				onClose={() => setShowEdit(false)}
 				title="Edit Playlist"
-				size="sm"
+				size="md"
 			>
 				<form
 					onSubmit={handleSaveEdit}
