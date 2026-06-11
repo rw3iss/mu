@@ -1,3 +1,4 @@
+import { APP_VERSION } from '@mu/shared';
 /**
  * Client-side console debug utility.
  * Exposes `window.mu` for live app control from the browser console.
@@ -138,7 +139,7 @@ const mu = {
 		return '';
 	},
 
-	version: '0.1.0',
+	version: APP_VERSION,
 
 	config: Object.assign(
 		(key?: string) => {

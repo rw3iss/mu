@@ -1,11 +1,11 @@
 import { execFile } from 'node:child_process';
-import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { nowISO } from '@mu/shared';
-import { Controller, Get, type OnModuleInit, Logger } from '@nestjs/common';
+import { APP_VERSION, nowISO } from '@mu/shared';
+import { Controller, Get, Logger, type OnModuleInit } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
@@ -163,7 +163,7 @@ export class HealthController implements OnModuleInit {
 		return {
 			status: 'ok',
 			uptime: process.uptime(),
-			version: '0.1.0',
+			version: APP_VERSION,
 			timestamp: nowISO(),
 		};
 	}

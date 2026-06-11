@@ -1,3 +1,4 @@
+import { APP_VERSION } from '@mu/shared';
 import 'reflect-metadata';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -412,7 +413,7 @@ async function bootstrap() {
 
 	await listenWithReclaim(app, port, host, logger);
 	const proto = tls ? 'https' : 'http';
-	logger.log(`Mu server v0.1.0 running at ${proto}://${host}:${port}`);
+	logger.log(`Mu server v${APP_VERSION} running at ${proto}://${host}:${port}`);
 
 	// When TLS is active, start a tiny HTTP server that redirects to HTTPS.
 	if (tls) {

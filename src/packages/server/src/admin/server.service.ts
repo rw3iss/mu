@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { closeSync, existsSync, openSync, readSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { APP_VERSION } from '@mu/shared';
 import { Injectable } from '@nestjs/common';
 import { count, sql } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
@@ -53,7 +54,7 @@ export class ServerService {
 			freeMemory: os.freemem(),
 			processMemory: process.memoryUsage(),
 			pid: process.pid,
-			serverVersion: '0.1.0',
+			serverVersion: APP_VERSION,
 			dbPath: this.database.getDbPath(),
 			hwAccel: enc?.hwAccel || 'none',
 			hwAccelBroken,
