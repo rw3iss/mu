@@ -127,14 +127,44 @@
 
 .titleRow {
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
 }
 
 .title {
   display: block;
-  font-size: var(--font-size-xl);
+  min-width: 0;
+  // Match the card view's title size.
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   @include truncate(1);
+}
+
+// Row 2: meta column on the left (fills), play/resume on the right.
+.secondRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.metaCol {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metaLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  flex-wrap: wrap;
 }
 
 // Year sits under the title at the top of the row (matching the cards).

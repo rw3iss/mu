@@ -71,41 +71,49 @@ export function MovieListItem({
 			</div>
 
 			<div class={styles.info}>
+				{/* Row 1: title alone, options pinned far right */}
 				<div class={styles.titleRow}>
 					<span class={styles.title}>
 						{movie.title}
 						{movie.hidden && <span class={styles.hiddenTag}>Hidden</span>}
 					</span>
-					{movie.year && <span class={styles.year}>{movie.year}</span>}
-				</div>
-				<div class={styles.meta}>
-					<RatingBadge value={rating} class={styles.ratingChip} />
-					<MovieScoreChips movie={movie} />
-					{runtimeStr && <span>{runtimeStr}</span>}
-					{formattedDate && <span>{formattedDate}</span>}
-				</div>
-			</div>
-
-			<div class={styles.actions}>
-				<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
-				{!selectionMode && (
-					<>
-						<PlayResumeButton
+					{!selectionMode && !movie.remoteOrigin && (
+						<MovieOptionsMenu
 							movie={movie}
-							size="md"
-							onPlay={handlePlay}
-							onResume={handleResume}
+							onMovieUpdate={onMovieUpdate}
+							onMovieRemoved={onMovieRemoved}
+							compact
 						/>
-						{!movie.remoteOrigin && (
-							<MovieOptionsMenu
+					)}
+				</div>
+
+				{/* Row 2: meta column (fills) + play/resume on the right */}
+				<div class={styles.secondRow}>
+					<div class={styles.metaCol}>
+						<div class={styles.metaLine}>
+							{movie.year && <span class={styles.year}>{movie.year}</span>}
+							<RatingBadge value={rating} class={styles.ratingChip} />
+							<MovieScoreChips movie={movie} />
+							{runtimeStr && <span>{runtimeStr}</span>}
+						</div>
+						{formattedDate && (
+							<div class={styles.metaLine}>
+								<span>Added {formattedDate}</span>
+							</div>
+						)}
+					</div>
+					<div class={styles.actions}>
+						<PluginSlot name={UI.MOVIE_ITEM_RATING} context={{ movie }} />
+						{!selectionMode && (
+							<PlayResumeButton
 								movie={movie}
-								onMovieUpdate={onMovieUpdate}
-								onMovieRemoved={onMovieRemoved}
-								compact
+								size="sm"
+								onPlay={handlePlay}
+								onResume={handleResume}
 							/>
 						)}
-					</>
-				)}
+					</div>
+				</div>
 			</div>
 		</div>
 	);

@@ -125,6 +125,8 @@
 	position: absolute;
 	inset: 0;
 	display: flex;
+	// Stack Play above Resume (column list, not a row).
+	flex-direction: column;
 	align-items: center;
 	justify-content: center;
 	gap: 8px;
