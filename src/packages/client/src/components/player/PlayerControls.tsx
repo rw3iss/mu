@@ -44,6 +44,7 @@ import {
 	volume,
 } from '@/state/player.state';
 import { shareMode } from '@/state/share.state';
+import { timeFromPointer } from '@/utils/seek-time';
 import { VolumeControl, VolumeIcon } from './controls/VolumeControl';
 import styles from './PlayerControls.module.scss';
 
@@ -367,13 +368,10 @@ export function PlayerControls({
 	}, [showMobileOverflow]);
 
 	// ── Seek bar: click ──
-	const seekFromEvent = useCallback((e: MouseEvent) => {
-		const bar = seekBarRef.current;
-		if (!bar) return;
-		const rect = bar.getBoundingClientRect();
-		const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-		return fraction * duration.value;
-	}, []);
+	const seekFromEvent = useCallback(
+		(e: MouseEvent) => timeFromPointer(seekBarRef.current, e.clientX, duration.value),
+		[],
+	);
 
 	// ── Seek bar: right-click → "Copy URL at Time" (public/private share) ──
 	const [shareMenu, setShareMenu] = useState<{ x: number; y: number; time: number } | null>(null);
@@ -483,10 +481,18 @@ export function PlayerControls({
 	}, [shareMenu]);
 
 	// Auto-close the share menu when the player controls auto-hide — unless the
-	// cursor is currently over the menu (then keep it until they leave/dismiss).
+	// cursor is currently over the menu. NOTE: signal.subscribe fires
+	// immediately with the current value; in split/mini modes showControls is
+	// false at open time, which used to kill the menu instantly — skip the
+	// initial fire and only react to actual hide TRANSITIONS.
 	useEffect(() => {
 		if (!shareMenu) return;
+		let initial = true;
 		return showControls.subscribe((v) => {
+			if (initial) {
+				initial = false;
+				return;
+			}
 			if (!v && !shareMenuHover.current) setShareMenu(null);
 		});
 	}, [shareMenu]);
@@ -518,8 +524,9 @@ export function PlayerControls({
 		const bar = seekBarRef.current;
 		if (!bar) return;
 		const rect = bar.getBoundingClientRect();
-		const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-		setSeekHover(fraction * duration.value);
+		const time = timeFromPointer(bar, e.clientX, duration.value);
+		if (time == null) return;
+		setSeekHover(time);
 		setSeekHoverX(e.clientX - rect.left);
 		setSeekBarRect({ left: rect.left, top: rect.top, width: rect.width });
 	}, []);
