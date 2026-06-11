@@ -370,6 +370,22 @@ function DiskRow({ disk }: { disk: DiskRowData }) {
 								<dd>{formatBytes(disk.cacheUsedBytes)}</dd>
 							</>
 						)}
+						{known && (
+							<>
+								<dt>Other</dt>
+								<dd>
+									{formatBytes(
+										Math.max(
+											0,
+											used -
+												disk.mediaUsedBytes -
+												(disk.appUsedBytes ?? 0) -
+												(disk.cacheUsedBytes ?? 0),
+										),
+									)}
+								</dd>
+							</>
+						)}
 						{disk.mediaUsedBytes > 0 && (
 							<>
 								<dt>Media</dt>

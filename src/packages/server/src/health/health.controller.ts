@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -74,14 +75,44 @@ function getDriveRoot(p: string): string {
 		const uncMatch = p.match(/^\\\\([^\\]+)\\([^\\]+)/);
 		if (uncMatch?.[1] && uncMatch?.[2]) return `\\\\${uncMatch[1]}\\${uncMatch[2]}\\`;
 	}
-	return '/';
+	return unixMountRoot(p);
+}
+
+/**
+ * Resolve the MOUNT POINT containing `p` on Unix by walking up until the
+ * parent directory lives on a different device (st_dev changes). This is
+ * what lets each media drive (e.g. /run/media/<user>/Media-1) surface as
+ * its own disk instead of collapsing into `/`.
+ */
+function unixMountRoot(p: string): string {
+	try {
+		let cur = path.resolve(p);
+		// If the path itself is missing (unmounted drive), walk up to the
+		// nearest existing ancestor first.
+		while (!fsSync.existsSync(cur)) {
+			const up = path.dirname(cur);
+			if (up === cur) return '/';
+			cur = up;
+		}
+		const dev = fsSync.statSync(cur).dev;
+		for (;;) {
+			const parent = path.dirname(cur);
+			if (parent === cur) return cur; // reached '/'
+			if (fsSync.statSync(parent).dev !== dev) return cur;
+			cur = parent;
+		}
+	} catch {
+		return '/';
+	}
 }
 
 /** Short user-facing label for a drive root. "C:\" → "C:" / "/" → "/". */
 function driveLabel(root: string): string {
 	const winLetter = root.match(/^([a-zA-Z]):/)?.[1];
 	if (winLetter) return `${winLetter.toUpperCase()}:`;
-	return root;
+	if (root === '/') return '/';
+	// Mount points read best as their leaf name ("Media-1").
+	return path.basename(root) || root;
 }
 
 @Controller('health')
