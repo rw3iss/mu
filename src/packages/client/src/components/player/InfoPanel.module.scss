@@ -382,8 +382,18 @@
   white-space: nowrap;
 }
 
-// "Added Xd ago" on its own row beneath the year/runtime/director meta.
+// "Added Xd ago" on its own row beneath the year/runtime/director meta —
+// tucked tight under that line, smaller label-style text, with breathing
+// room before the genre chips.
 .addedRow {
-  margin-top: 2px;
-  font-size: var(--font-size-sm);
+  margin-top: -6px;
+  margin-bottom: var(--space-sm);
+  font-size: var(--font-size-xs);
+
+  .addedAt {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: var(--font-weight-medium);
+    opacity: 0.8;
+  }
 }
