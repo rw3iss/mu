@@ -78,6 +78,9 @@
 .identityActions {
 	flex: none;
 	align-self: flex-start;
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
 
 	@include mobile {
 		align-self: stretch;

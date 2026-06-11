@@ -223,14 +223,26 @@ export function ProfilePage({ username }: ProfilePageProps) {
 					{(editMode && showUsersInfo.value) || (!editMode && isSelf) ? (
 						<div class={styles.identityActions}>
 							{editMode && showUsersInfo.value ? (
-								<ToggleButton
-									pressed={!!user.profilePublic}
-									loading={togglingPublic}
-									onClick={handleTogglePublic}
-									title="Control whether other members can see your profile"
-								>
-									{user.profilePublic ? 'Profile is public' : 'Show Profile Info'}
-								</ToggleButton>
+								<>
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => route(`/profile/${user.username}`)}
+										title="See your profile as other members see it"
+									>
+										← View
+									</Button>
+									<ToggleButton
+										pressed={!!user.profilePublic}
+										loading={togglingPublic}
+										onClick={handleTogglePublic}
+										title="Control whether other members can see your profile"
+									>
+										{user.profilePublic
+											? 'Profile is public'
+											: 'Show Profile Info'}
+									</ToggleButton>
+								</>
 							) : (
 								<Button
 									variant="secondary"
