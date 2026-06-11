@@ -83,13 +83,13 @@ function OverlayTimeoutSetting() {
 				/>
 				<span class={styles.settingDescription}>ms</span>
 				<button
-					class={styles.resetBtn}
+					class={`${styles.resetBtn} ${styles.stepBtn}`}
 					onClick={() => setVal(Math.max(100, (val || 0) - 100))}
 				>
 					-100
 				</button>
 				<button
-					class={styles.resetBtn}
+					class={`${styles.resetBtn} ${styles.stepBtn}`}
 					onClick={() => setVal(Math.min(10000, (val || 0) + 100))}
 				>
 					+100
@@ -1952,7 +1952,19 @@ export function Settings(props: SettingsProps) {
 										aria-label="Reset skip times"
 										title="Reset to defaults"
 									>
-										Reset
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="1 4 1 10 7 10" />
+											<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+										</svg>
 									</button>
 								</div>
 							</div>
@@ -2991,7 +3003,7 @@ export function Settings(props: SettingsProps) {
 									<input
 										type="number"
 										class={styles.input}
-										style={{ width: '80px', textAlign: 'right' }}
+										style={{ width: '200px', minWidth: 0, flex: 'none', textAlign: 'right' }}
 										value={minFileSizeMB}
 										min="0"
 										max="1000"
