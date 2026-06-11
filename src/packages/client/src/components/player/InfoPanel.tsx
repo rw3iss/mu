@@ -31,6 +31,7 @@ interface InfoPanelProps {
 export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 	const [showFileInfo, setShowFileInfo] = useState(false);
 	const [showComments, setShowComments] = useState(false);
+	const [showCast, setShowCast] = useState(true);
 
 	// Refresh movie data when panel opens or when movie is updated via WebSocket
 	useEffect(() => {
@@ -227,8 +228,22 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 
 							{movie.cast && movie.cast.length > 0 && (
 								<div class={styles.section}>
-									<h3 class={styles.sectionTitle}>Cast</h3>
-									<div class={styles.castList}>
+									<button
+										class={styles.fileInfoToggle}
+										onClick={() => setShowCast(!showCast)}
+									>
+										<h3 class={styles.sectionTitle}>Cast</h3>
+										<span class={styles.fileInfoArrow}>
+											<Icon
+												name={showCast ? 'chevron-up' : 'chevron-down'}
+												size={14}
+											/>
+										</span>
+									</button>
+									<div
+										class={styles.castList}
+										style={{ display: showCast ? '' : 'none' }}
+									>
 										{movie.cast.slice(0, 8).map((member) => {
 											const key = personKeyFor({
 												tmdbId: member.tmdbId,
@@ -473,8 +488,22 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 
 						{movie.cast && movie.cast.length > 0 && (
 							<div class={styles.section}>
-								<h3 class={styles.sectionTitle}>Cast</h3>
-								<div class={styles.castList}>
+								<button
+									class={styles.fileInfoToggle}
+									onClick={() => setShowCast(!showCast)}
+								>
+									<h3 class={styles.sectionTitle}>Cast</h3>
+									<span class={styles.fileInfoArrow}>
+										<Icon
+											name={showCast ? 'chevron-up' : 'chevron-down'}
+											size={14}
+										/>
+									</span>
+								</button>
+								<div
+									class={styles.castList}
+									style={{ display: showCast ? '' : 'none' }}
+								>
 									{movie.cast.slice(0, 8).map((member) => {
 										const key = personKeyFor({
 											tmdbId: member.tmdbId,
