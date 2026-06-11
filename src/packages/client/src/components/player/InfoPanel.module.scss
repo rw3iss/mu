@@ -381,3 +381,9 @@
   color: var(--on-dark-text-muted);
   white-space: nowrap;
 }
+
+// "Added Xd ago" on its own row beneath the year/runtime/director meta.
+.addedRow {
+  margin-top: 2px;
+  font-size: var(--font-size-sm);
+}

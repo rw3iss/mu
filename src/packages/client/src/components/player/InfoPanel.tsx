@@ -384,15 +384,18 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									/>
 								</span>
 							)}
-							{movie.addedAt && (
+						</div>
+
+						{movie.addedAt && (
+							<div class={styles.addedRow}>
 								<span
 									class={styles.addedAt}
 									title={new Date(movie.addedAt).toLocaleString()}
 								>
 									Added {relativeTime(movie.addedAt)}
 								</span>
-							)}
-						</div>
+							</div>
+						)}
 
 						{movie.genres && movie.genres.length > 0 && (
 							<div class={styles.genres}>
