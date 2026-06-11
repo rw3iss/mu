@@ -121,6 +121,14 @@ Play requirements: $25 account, TV screenshots, leanback intent, content
 rating, D-pad-only functional review (they actually test this), privacy
 policy URL. Review days-to-weeks.
 
+**Devices this one build covers**: Android TV / Google TV devices including
+**Sony Bravia TVs** (all Sony smart TVs since ~2015 run Android/Google TV —
+Sony has no platform of its own), Chromecast with Google TV, NVIDIA Shield,
+TCL/Hisense Google TV models, and **Verizon Fios TV+ stream boxes** (Android
+TV-based, ships Google Play). Note: classic Fios cable boxes (VMS1100-era)
+are a closed platform with no public SDK — unreachable; those users need a
+smart TV or stick.
+
 ### 3.4 PWA (Chromebooks, tablets, desktops, some TVs)
 Nearly free: add `manifest.json` (icons, `display: standalone`), a service
 worker (offline shell only — streams stay online), and installability is
