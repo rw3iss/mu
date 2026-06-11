@@ -1,3 +1,6 @@
+/** Application version — single source of truth for all packages. */
+export const APP_VERSION = '1.1.0';
+
 export const DEFAULT_PORT = 8080;
 export const DEFAULT_HOST = '0.0.0.0';
 export const DEFAULT_PAGE_SIZE = 24;
