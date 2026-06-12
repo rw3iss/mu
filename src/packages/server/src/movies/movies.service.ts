@@ -81,6 +81,31 @@ export class MoviesService implements OnModuleInit {
 		return JSON.stringify({ ...query, userId });
 	}
 
+	/**
+	 * Genre filter conditions. `query.genre` may be a comma-separated list;
+	 * `query.genreMode` 'and' requires ALL genres, 'or' (default) any. Each
+	 * test is a self-contained EXISTS against movie_metadata so it works in
+	 * both the joined findAll path and the join-free interleaved path.
+	 */
+	private genreConditions(query: MovieListQuery) {
+		const raw = String(query.genre ?? '').trim();
+		if (!raw) return [];
+		const list = raw
+			.split(',')
+			.map((g) => g.trim())
+			.filter(Boolean);
+		if (list.length === 0) return [];
+		const tests = list.map(
+			(g) => sql`EXISTS (
+				SELECT 1 FROM ${movieMetadata}
+				WHERE ${movieMetadata.movieId} = ${movies.id}
+					AND ${movieMetadata.genres} LIKE ${`%"${g}"%`}
+			)`,
+		);
+		if (String(query.genreMode) === 'and' || tests.length === 1) return tests;
+		return [sql.join(tests, sql` OR `)] as any[];
+	}
+
 	findAll(query: MovieListQuery, userId?: string) {
 		const cacheKey = this.getCacheKey(query, userId);
 		const cached = this.listCache.get(cacheKey);
@@ -127,10 +152,7 @@ export class MoviesService implements OnModuleInit {
 			conditions.push(like(movies.title, `%${query.search}%`));
 		}
 
-		if (query.genre) {
-			// Genres stored as JSON array in movie_metadata, use LIKE for containment
-			conditions.push(like(movieMetadata.genres, `%"${query.genre}"%`));
-		}
+		for (const cond of this.genreConditions(query)) conditions.push(cond);
 
 		if (query.yearFrom) {
 			conditions.push(sql`${movies.year} >= ${query.yearFrom}`);
@@ -550,6 +572,7 @@ export class MoviesService implements OnModuleInit {
 					AND ${userWatchHistory.completed} = 1
 			)`);
 		}
+		for (const cond of this.genreConditions(query)) conds.push(cond);
 
 		const ratingJoinCond = userId
 			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))

@@ -110,6 +110,8 @@ export interface Movie {
 
 export interface LibraryFilters {
 	genres: string[];
+	/** Multi-genre combinator: 'or' (any, default) or 'and' (all). */
+	genreMode: 'and' | 'or';
 	/** Year bounds (inclusive). null = unbounded. */
 	yearMin: number | null;
 	yearMax: number | null;
@@ -209,6 +211,7 @@ export function setSelectedTypes(types: LibraryContentType[]): void {
 
 export const filters = signal<LibraryFilters>({
 	genres: [],
+	genreMode: 'or',
 	yearMin: null,
 	yearMax: null,
 	minRating: null,
@@ -254,6 +257,7 @@ export async function fetchMovies(page = 1): Promise<void> {
 
 		if (filters.value.genres.length > 0) {
 			params.genre = filters.value.genres.join(',');
+			if (filters.value.genreMode === 'and') params.genreMode = 'and';
 		}
 
 		if (filters.value.yearMin != null) params.yearFrom = String(filters.value.yearMin);

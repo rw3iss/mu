@@ -436,3 +436,42 @@
     border-color: var(--color-accent);
   }
 }
+
+/* Genres header row: label left, Or/And mode toggle beside it. */
+.filterLabelRow {
+	display: flex;
+	align-items: center;
+	gap: var(--space-md);
+}
+
+.modeToggle {
+	display: inline-flex;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-sm);
+	overflow: hidden;
+}
+
+.modeBtn {
+	padding: 1px 10px;
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+	background: transparent;
+
+	&:hover {
+		color: var(--color-text-primary);
+	}
+}
+
+.modeActive {
+	background: var(--color-accent);
+	color: var(--color-accent-text, #111);
+}
+
+/* Numeric filter sections laid out in one wrapping row under Genres —
+ * each section keeps its label on top, field underneath. */
+.filterFieldsRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-lg);
+	align-items: flex-start;
+}

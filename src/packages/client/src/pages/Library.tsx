@@ -535,7 +535,28 @@ export function Library(_props: LibraryProps) {
 			{showFilters && (
 				<div class={styles.filtersPanel}>
 					<div class={styles.filterGroup}>
-						<h3 class={styles.filterLabel}>Genres</h3>
+						<div class={styles.filterLabelRow}>
+							<h3 class={styles.filterLabel}>Genres</h3>
+							<div
+								class={styles.modeToggle}
+								role="group"
+								aria-label="Genre match mode"
+								title="Or: any selected genre · And: must include all"
+							>
+								<button
+									class={`${styles.modeBtn} ${filters.value.genreMode !== 'and' ? styles.modeActive : ''}`}
+									onClick={() => setFilters({ genreMode: 'or' })}
+								>
+									Or
+								</button>
+								<button
+									class={`${styles.modeBtn} ${filters.value.genreMode === 'and' ? styles.modeActive : ''}`}
+									onClick={() => setFilters({ genreMode: 'and' })}
+								>
+									And
+								</button>
+							</div>
+						</div>
 						<div class={styles.genreList}>
 							{genres.map((genre) => (
 								<button
@@ -551,78 +572,86 @@ export function Library(_props: LibraryProps) {
 						</div>
 					</div>
 
-					<div class={styles.filterGroup}>
-						<h3 class={styles.filterLabel}>Year</h3>
-						<div class={styles.filterNumRow}>
+					<div class={styles.filterFieldsRow}>
+						<div class={styles.filterGroup}>
+							<h3 class={styles.filterLabel}>Year</h3>
+							<div class={styles.filterNumRow}>
+								<input
+									type="number"
+									class={styles.numInput}
+									placeholder="From"
+									value={filters.value.yearMin ?? ''}
+									onChange={(e) =>
+										handleNumFilter('yearMin', e.currentTarget.value)
+									}
+								/>
+								<span class={styles.filterDash}>–</span>
+								<input
+									type="number"
+									class={styles.numInput}
+									placeholder="To"
+									value={filters.value.yearMax ?? ''}
+									onChange={(e) =>
+										handleNumFilter('yearMax', e.currentTarget.value)
+									}
+								/>
+							</div>
+						</div>
+
+						<div class={styles.filterGroup}>
+							<h3 class={styles.filterLabel}>Min rating</h3>
 							<input
 								type="number"
+								min="0"
+								max="10"
+								step="0.1"
 								class={styles.numInput}
-								placeholder="From"
-								value={filters.value.yearMin ?? ''}
-								onChange={(e) => handleNumFilter('yearMin', e.currentTarget.value)}
-							/>
-							<span class={styles.filterDash}>–</span>
-							<input
-								type="number"
-								class={styles.numInput}
-								placeholder="To"
-								value={filters.value.yearMax ?? ''}
-								onChange={(e) => handleNumFilter('yearMax', e.currentTarget.value)}
+								placeholder="0–10"
+								value={filters.value.minRating ?? ''}
+								onChange={(e) =>
+									handleNumFilter('minRating', e.currentTarget.value)
+								}
 							/>
 						</div>
-					</div>
 
-					<div class={styles.filterGroup}>
-						<h3 class={styles.filterLabel}>Min rating</h3>
-						<input
-							type="number"
-							min="0"
-							max="10"
-							step="0.1"
-							class={styles.numInput}
-							placeholder="0–10"
-							value={filters.value.minRating ?? ''}
-							onChange={(e) => handleNumFilter('minRating', e.currentTarget.value)}
-						/>
-					</div>
-
-					<div class={styles.filterGroup}>
-						<h3 class={styles.filterLabel}>Min votes</h3>
-						<input
-							type="number"
-							min="0"
-							step="100"
-							class={styles.numInput}
-							placeholder="e.g. 1000"
-							value={filters.value.minVotes ?? ''}
-							onChange={(e) => handleNumFilter('minVotes', e.currentTarget.value)}
-						/>
-					</div>
-
-					<div class={styles.filterGroup}>
-						<h3 class={styles.filterLabel}>Runtime (min)</h3>
-						<div class={styles.filterNumRow}>
+						<div class={styles.filterGroup}>
+							<h3 class={styles.filterLabel}>Min votes</h3>
 							<input
 								type="number"
 								min="0"
+								step="100"
 								class={styles.numInput}
-								placeholder="Min"
-								value={filters.value.runtimeMin ?? ''}
-								onChange={(e) =>
-									handleNumFilter('runtimeMin', e.currentTarget.value)
-								}
+								placeholder="e.g. 1000"
+								value={filters.value.minVotes ?? ''}
+								onChange={(e) => handleNumFilter('minVotes', e.currentTarget.value)}
 							/>
-							<span class={styles.filterDash}>–</span>
-							<input
-								type="number"
-								min="0"
-								class={styles.numInput}
-								placeholder="Max"
-								value={filters.value.runtimeMax ?? ''}
-								onChange={(e) =>
-									handleNumFilter('runtimeMax', e.currentTarget.value)
-								}
-							/>
+						</div>
+
+						<div class={styles.filterGroup}>
+							<h3 class={styles.filterLabel}>Runtime (min)</h3>
+							<div class={styles.filterNumRow}>
+								<input
+									type="number"
+									min="0"
+									class={styles.numInput}
+									placeholder="Min"
+									value={filters.value.runtimeMin ?? ''}
+									onChange={(e) =>
+										handleNumFilter('runtimeMin', e.currentTarget.value)
+									}
+								/>
+								<span class={styles.filterDash}>–</span>
+								<input
+									type="number"
+									min="0"
+									class={styles.numInput}
+									placeholder="Max"
+									value={filters.value.runtimeMax ?? ''}
+									onChange={(e) =>
+										handleNumFilter('runtimeMax', e.currentTarget.value)
+									}
+								/>
+							</div>
 						</div>
 					</div>
 				</div>

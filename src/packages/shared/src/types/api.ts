@@ -53,6 +53,8 @@ export function classifyGroupType(groupType: string | null | undefined): 'series
 export interface MovieListQuery extends PaginationQuery {
 	search?: string;
 	genre?: string;
+	/** 'or' (default — any selected genre) or 'and' (must include ALL). */
+	genreMode?: 'and' | 'or';
 	yearFrom?: number;
 	yearTo?: number;
 	ratingFrom?: number;
