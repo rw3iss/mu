@@ -160,6 +160,16 @@ export function ProfilePage({ username }: ProfilePageProps) {
 					← Members
 				</a>
 			)}
+			{/* Edit view: jump to your public profile (same slot/style). */}
+			{editMode && (
+				<a
+					class={styles.backLink}
+					href={`/profile/${user.username}`}
+					title="See your profile as other members see it"
+				>
+					← View
+				</a>
+			)}
 
 			{/* ── Header / identity ───────────────────────────────── */}
 			<Panel class={styles.headerPanel}>
@@ -224,14 +234,6 @@ export function ProfilePage({ username }: ProfilePageProps) {
 						<div class={styles.identityActions}>
 							{editMode && showUsersInfo.value ? (
 								<>
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => route(`/profile/${user.username}`)}
-										title="See your profile as other members see it"
-									>
-										← View
-									</Button>
 									<ToggleButton
 										pressed={!!user.profilePublic}
 										loading={togglingPublic}
