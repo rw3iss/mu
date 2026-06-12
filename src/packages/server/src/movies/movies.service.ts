@@ -103,7 +103,8 @@ export class MoviesService implements OnModuleInit {
 			)`,
 		);
 		if (String(query.genreMode) === 'and' || tests.length === 1) return tests;
-		return [sql.join(tests, sql` OR `)] as any[];
+		// Parenthesize the OR group so it can't leak past sibling AND conditions.
+		return [sql`(${sql.join(tests, sql` OR `)})`] as any[];
 	}
 
 	findAll(query: MovieListQuery, userId?: string) {
@@ -521,43 +522,37 @@ export class MoviesService implements OnModuleInit {
 		// type (series / collection) is selected.
 		const types = this.parseTypeFilter(query);
 
-		// --- ungrouped movie sort-keys ---
-		const conds = [
-			sql`(${movies.source} IS NULL OR ${movies.source} = 'library')`,
-			sql`${movies.groupId} IS NULL`,
-		];
-		if (String(query.showHidden) !== 'true') {
-			conds.push(sql`(${movies.hidden} IS NULL OR ${movies.hidden} = 0)`);
-		}
-		if (query.search) conds.push(like(movies.title, `%${query.search}%`));
-		if (query.yearFrom) conds.push(sql`${movies.year} >= ${query.yearFrom}`);
-		if (query.yearTo) conds.push(sql`${movies.year} <= ${query.yearTo}`);
-		// Rating/votes/runtime — same self-contained conditions as findAll(), so
-		// they apply to the interleaved library view (the path the client uses).
+		// --- movie-level FILTER conditions (shared by ungrouped movies AND the
+		// group-stack membership check below, so filters affect stacks too) ---
+		const filterConds: ReturnType<typeof sql>[] = [];
+		if (query.yearFrom) filterConds.push(sql`${movies.year} >= ${query.yearFrom}`);
+		if (query.yearTo) filterConds.push(sql`${movies.year} <= ${query.yearTo}`);
 		if (query.minRating != null && Number(query.minRating) > 0) {
-			conds.push(sql`COALESCE(
+			filterConds.push(sql`COALESCE(
 				(SELECT ${movieMetadata.imdbRating} FROM ${movieMetadata} WHERE ${movieMetadata.movieId} = ${movies.id}),
 				(SELECT ${imdbRatings.averageRating} FROM ${imdbRatings} WHERE ${imdbRatings.tconst} = ${movies.imdbId}),
 				0
 			) >= ${Number(query.minRating)}`);
 		}
 		if (query.minVotes != null && Number(query.minVotes) > 0) {
-			conds.push(sql`COALESCE(
+			filterConds.push(sql`COALESCE(
 				(SELECT ${movieMetadata.imdbVotes} FROM ${movieMetadata} WHERE ${movieMetadata.movieId} = ${movies.id}),
 				(SELECT ${imdbRatings.numVotes} FROM ${imdbRatings} WHERE ${imdbRatings.tconst} = ${movies.imdbId}),
 				0
 			) >= ${Math.floor(Number(query.minVotes))}`);
 		}
 		if (query.minRuntime != null && Number(query.minRuntime) > 0) {
-			conds.push(sql`${movies.runtimeMinutes} >= ${Math.floor(Number(query.minRuntime))}`);
+			filterConds.push(
+				sql`${movies.runtimeMinutes} >= ${Math.floor(Number(query.minRuntime))}`,
+			);
 		}
 		if (query.maxRuntime != null && Number(query.maxRuntime) > 0) {
-			conds.push(sql`${movies.runtimeMinutes} <= ${Math.floor(Number(query.maxRuntime))}`);
+			filterConds.push(
+				sql`${movies.runtimeMinutes} <= ${Math.floor(Number(query.maxRuntime))}`,
+			);
 		}
-		// Watched filters — self-contained EXISTS so they work in this
-		// interleaved path (no watch-history join here).
 		if (String(query.hideWatched) === 'true' && userId) {
-			conds.push(sql`NOT EXISTS (
+			filterConds.push(sql`NOT EXISTS (
 				SELECT 1 FROM ${userWatchHistory}
 				WHERE ${userWatchHistory.movieId} = ${movies.id}
 					AND ${userWatchHistory.userId} = ${userId}
@@ -565,14 +560,47 @@ export class MoviesService implements OnModuleInit {
 			)`);
 		}
 		if (String(query.watchedOnly) === 'true' && userId) {
-			conds.push(sql`EXISTS (
+			filterConds.push(sql`EXISTS (
 				SELECT 1 FROM ${userWatchHistory}
 				WHERE ${userWatchHistory.movieId} = ${movies.id}
 					AND ${userWatchHistory.userId} = ${userId}
 					AND ${userWatchHistory.completed} = 1
 			)`);
 		}
-		for (const cond of this.genreConditions(query)) conds.push(cond);
+		for (const cond of this.genreConditions(query)) filterConds.push(cond);
+
+		// --- ungrouped movie sort-keys ---
+		const conds = [
+			sql`(${movies.source} IS NULL OR ${movies.source} = 'library')`,
+			sql`${movies.groupId} IS NULL`,
+			...filterConds,
+		];
+		if (String(query.showHidden) !== 'true') {
+			conds.push(sql`(${movies.hidden} IS NULL OR ${movies.hidden} = 0)`);
+		}
+		if (query.search) conds.push(like(movies.title, `%${query.search}%`));
+
+		// When any movie-level filter is active, restrict group STACKS to
+		// top-level groups with at least one matching member — otherwise every
+		// stack rode along unfiltered and drowned out the filtered movies.
+		let allowedGroupIds: Set<string> | null = null;
+		if (filterConds.length > 0) {
+			const where = sql.join(
+				[
+					sql`${movies.groupId} IS NOT NULL`,
+					sql`(${movies.source} IS NULL OR ${movies.source} = 'library')`,
+					...filterConds,
+				],
+				sql` AND `,
+			);
+			const rows = this.database.db.all<{ gid: string | null }>(sql`
+				SELECT DISTINCT COALESCE(mg.parent_group_id, mg.id) AS gid
+				FROM ${movies}
+				JOIN ${movieGroups} mg ON mg.id = ${movies.groupId}
+				WHERE ${where}
+			`);
+			allowedGroupIds = new Set(rows.map((r) => r.gid).filter(Boolean) as string[]);
+		}
 
 		const ratingJoinCond = userId
 			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
@@ -603,6 +631,7 @@ export class MoviesService implements OnModuleInit {
 			if (g.totalMembers <= 0) continue;
 			if (search && !(g.name ?? '').toLowerCase().includes(search)) continue;
 			if (types && !types.has(classifyGroupType(g.groupType))) continue;
+			if (allowedGroupIds && !allowedGroupIds.has(g.id)) continue;
 			groupById.set(g.id, g);
 		}
 
