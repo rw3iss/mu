@@ -48,8 +48,9 @@ export function tmdbToContribution(input: TmdbAdapterInput): SourceContribution 
 			contentRating: tmdbCertification ?? null,
 			// movie_metadata
 			genres: Array.isArray(d?.genres) ? d.genres.map((g: any) => g.name) : [],
+			// Full credits — no cap; the client truncates for display.
 			cast: Array.isArray(d?.credits?.cast)
-				? d.credits.cast.slice(0, 20).map((c: any) => ({
+				? d.credits.cast.map((c: any) => ({
 						name: c.name,
 						character: c.character,
 						profileUrl: getImageUrl(c.profile_path, 'w185'),

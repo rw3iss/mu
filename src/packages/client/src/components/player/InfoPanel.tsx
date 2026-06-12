@@ -41,10 +41,16 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 
 	const handleLoadAllCast = async () => {
 		if (!movie || loadingCast) return;
+		// Show everything we already have; only hit the API to backfill rows
+		// saved under the legacy 20-cast ingest cap.
+		setFullCast(movie.cast ?? []);
+		if ((movie.cast?.length ?? 0) !== 20) return;
 		setLoadingCast(true);
 		try {
 			const r = await moviesService.loadFullCast(movie.id);
-			setFullCast(r.cast as NonNullable<Movie['cast']>);
+			if (r.cast.length > (movie.cast?.length ?? 0)) {
+				setFullCast(r.cast as NonNullable<Movie['cast']>);
+			}
 		} catch {
 			// non-critical
 		} finally {
@@ -315,7 +321,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 												</a>
 											);
 										})}
-										{!fullCast && movie.cast.length >= 8 && (
+										{!fullCast && movie.cast.length > 8 && (
 											<button
 												class={styles.loadAllCast}
 												disabled={loadingCast}
@@ -584,7 +590,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 											</a>
 										);
 									})}
-									{!fullCast && movie.cast.length >= 8 && (
+									{!fullCast && movie.cast.length > 8 && (
 										<button
 											class={styles.loadAllCast}
 											disabled={loadingCast}

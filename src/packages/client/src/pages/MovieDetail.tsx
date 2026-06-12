@@ -350,11 +350,16 @@ export function MovieDetail({ id }: MovieDetailProps) {
 
 	const handleLoadAllCast = useCallback(async () => {
 		if (!movie || loadingCast) return;
+		// Everything we have is shown immediately; the API call is only a
+		// backfill for legacy rows saved under the old 20-cast ingest cap.
+		setFullCastLoaded(true);
+		if ((movie.cast?.length ?? 0) !== 20) return;
 		setLoadingCast(true);
 		try {
 			const r = await moviesService.loadFullCast(movie.id);
-			setMovie({ ...movie, cast: r.cast as typeof movie.cast });
-			setFullCastLoaded(true);
+			if (r.cast.length > (movie.cast?.length ?? 0)) {
+				setMovie({ ...movie, cast: r.cast as typeof movie.cast });
+			}
 		} catch {
 			notifyError('Failed to load full cast');
 		} finally {
@@ -1052,7 +1057,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											);
 										},
 									)}
-									{!fullCastLoaded && movie.cast.length >= 12 && (
+									{!fullCastLoaded && movie.cast.length > 12 && (
 										<button
 											class={styles.loadAllCast}
 											disabled={loadingCast}

@@ -346,7 +346,7 @@ export class MetadataService {
 		const writers = (episode.crew ?? [])
 			.filter((c) => c.department === 'Writing')
 			.map((c) => c.name);
-		const cast = (tvDetails.credits?.cast ?? []).slice(0, 20).map((c) => ({
+		const cast = (tvDetails.credits?.cast ?? []).map((c) => ({
 			name: c.name,
 			character: c.character,
 			profileUrl: this.tmdb.getImageUrl(c.profile_path, 'w185'),
