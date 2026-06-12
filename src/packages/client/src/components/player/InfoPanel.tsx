@@ -32,6 +32,25 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 	const [showFileInfo, setShowFileInfo] = useState(false);
 	const [showComments, setShowComments] = useState(false);
 	const [showCast, setShowCast] = useState(true);
+	// "Load all" cast expansion — full list fetched (and persisted) on demand.
+	const [fullCast, setFullCast] = useState<NonNullable<Movie['cast']> | null>(null);
+	const [loadingCast, setLoadingCast] = useState(false);
+	useEffect(() => {
+		setFullCast(null);
+	}, [movie?.id]);
+
+	const handleLoadAllCast = async () => {
+		if (!movie || loadingCast) return;
+		setLoadingCast(true);
+		try {
+			const r = await moviesService.loadFullCast(movie.id);
+			setFullCast(r.cast as NonNullable<Movie['cast']>);
+		} catch {
+			// non-critical
+		} finally {
+			setLoadingCast(false);
+		}
+	};
 
 	// Refresh movie data when panel opens or when movie is updated via WebSocket
 	useEffect(() => {
@@ -244,7 +263,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										class={styles.castList}
 										style={{ display: showCast ? '' : 'none' }}
 									>
-										{movie.cast.slice(0, 8).map((member) => {
+										{(fullCast ?? movie.cast.slice(0, 8)).map((member) => {
 											const key = personKeyFor({
 												tmdbId: member.tmdbId,
 												name: member.name,
@@ -296,6 +315,15 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 												</a>
 											);
 										})}
+										{!fullCast && movie.cast.length >= 8 && (
+											<button
+												class={styles.loadAllCast}
+												disabled={loadingCast}
+												onClick={handleLoadAllCast}
+											>
+												{loadingCast ? 'Loading…' : 'Load all'}
+											</button>
+										)}
 									</div>
 								</div>
 							)}
@@ -504,7 +532,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									class={styles.castList}
 									style={{ display: showCast ? '' : 'none' }}
 								>
-									{movie.cast.slice(0, 8).map((member) => {
+									{(fullCast ?? movie.cast.slice(0, 8)).map((member) => {
 										const key = personKeyFor({
 											tmdbId: member.tmdbId,
 											name: member.name,
@@ -556,6 +584,15 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 											</a>
 										);
 									})}
+									{!fullCast && movie.cast.length >= 8 && (
+										<button
+											class={styles.loadAllCast}
+											disabled={loadingCast}
+											onClick={handleLoadAllCast}
+										>
+											{loadingCast ? 'Loading…' : 'Load all'}
+										</button>
+									)}
 								</div>
 							</div>
 						)}

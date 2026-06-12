@@ -58,6 +58,14 @@ export class MetadataController {
 		return { candidates };
 	}
 
+	/** Fetch + persist the complete TMDB cast for a movie (ingest keeps 20). */
+	@RequireAction('view:library')
+	@Post('movies/:id/full-cast')
+	async fullCast(@Param('id') movieId: string) {
+		const cast = await this.metadataService.fetchFullCast(movieId);
+		return { cast };
+	}
+
 	/** Assign a chosen search result as this movie's metadata. */
 	@Post('movies/:id/assign-metadata')
 	@RequireAction('edit:movie')

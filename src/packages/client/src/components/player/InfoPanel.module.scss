@@ -397,3 +397,15 @@
     opacity: 0.8;
   }
 }
+
+// "Load all" cast expander at the end of the cast list.
+.loadAllCast {
+  font-size: var(--font-size-xs);
+  color: var(--on-dark-text-muted);
+  padding: 6px 0;
+  text-align: left;
+
+  &:hover {
+    color: var(--on-dark-text-primary);
+  }
+}

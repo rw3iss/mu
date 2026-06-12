@@ -345,6 +345,22 @@ export function MovieDetail({ id }: MovieDetailProps) {
 	// state so the user toggle works on both; the initial value flips
 	// based on viewport width at mount.
 	const [showCast, setShowCast] = useState(true);
+	const [fullCastLoaded, setFullCastLoaded] = useState(false);
+	const [loadingCast, setLoadingCast] = useState(false);
+
+	const handleLoadAllCast = useCallback(async () => {
+		if (!movie || loadingCast) return;
+		setLoadingCast(true);
+		try {
+			const r = await moviesService.loadFullCast(movie.id);
+			setMovie({ ...movie, cast: r.cast as typeof movie.cast });
+			setFullCastLoaded(true);
+		} catch {
+			notifyError('Failed to load full cast');
+		} finally {
+			setLoadingCast(false);
+		}
+	}, [movie, loadingCast]);
 	const [showOverview, setShowOverview] = useState(true);
 	const [playlistCount, setPlaylistCount] = useState(0);
 	const [audioProfiles, setAudioProfiles] = useState<AudioProfile[]>([]);
@@ -984,56 +1000,67 @@ export function MovieDetail({ id }: MovieDetailProps) {
 										!showCast ? styles.castGridCollapsed : ''
 									}`}
 								>
-									{movie.cast.slice(0, 12).map((member) => {
-										const key = personKeyFor({
-											tmdbId: member.tmdbId,
-											name: member.name,
-										});
-										return (
-											<a
-												key={member.name}
-												class={styles.castMember}
-												href={`/person/${key}`}
-												data-reveal-host
-												onClick={(e) => {
-													e.preventDefault();
-													route(`/person/${key}`);
-												}}
-											>
-												<CastPhoto
-													name={member.name}
-													profileUrl={member.profileUrl}
-													character={member.character}
-													size={52}
-													expandedSize={220}
-													thumbClass={styles.castAvatar}
-												/>
-												<div class={styles.castInfo}>
-													<span class={styles.castName}>
-														{member.name}
-													</span>
-													<span class={styles.castCharacter}>
-														{member.character}
-													</span>
-												</div>
-												<div class={styles.castActions}>
-													<span class={styles.castArrow}>
-														<Icon name="chevron-right" size={14} />
-													</span>
-													<FavoriteButton
-														entityType="person"
-														tmdbId={member.tmdbId}
+									{(fullCastLoaded ? movie.cast : movie.cast.slice(0, 12)).map(
+										(member) => {
+											const key = personKeyFor({
+												tmdbId: member.tmdbId,
+												name: member.name,
+											});
+											return (
+												<a
+													key={member.name}
+													class={styles.castMember}
+													href={`/person/${key}`}
+													data-reveal-host
+													onClick={(e) => {
+														e.preventDefault();
+														route(`/person/${key}`);
+													}}
+												>
+													<CastPhoto
 														name={member.name}
 														profileUrl={member.profileUrl}
-														personRole="actor"
-														size="normal"
-														stopPropagation
-														revealOnHover
+														character={member.character}
+														size={52}
+														expandedSize={220}
+														thumbClass={styles.castAvatar}
 													/>
-												</div>
-											</a>
-										);
-									})}
+													<div class={styles.castInfo}>
+														<span class={styles.castName}>
+															{member.name}
+														</span>
+														<span class={styles.castCharacter}>
+															{member.character}
+														</span>
+													</div>
+													<div class={styles.castActions}>
+														<span class={styles.castArrow}>
+															<Icon name="chevron-right" size={14} />
+														</span>
+														<FavoriteButton
+															entityType="person"
+															tmdbId={member.tmdbId}
+															name={member.name}
+															profileUrl={member.profileUrl}
+															personRole="actor"
+															size="normal"
+															stopPropagation
+															revealOnHover
+														/>
+													</div>
+												</a>
+											);
+										},
+									)}
+									{!fullCastLoaded && movie.cast.length >= 12 && (
+										<button
+											class={styles.loadAllCast}
+											disabled={loadingCast}
+											onClick={handleLoadAllCast}
+										>
+											{loadingCast ? 'Loading…' : 'Load all'}
+										</button>
+									)}
 								</div>
 							</div>
 						)}

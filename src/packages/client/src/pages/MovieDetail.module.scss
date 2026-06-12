@@ -1081,3 +1081,17 @@
 		flex: none;
 	}
 }
+
+// "Load all" cast expander at the end of the cast grid.
+.loadAllCast {
+	align-self: center;
+	font-size: var(--font-size-sm);
+	color: var(--color-text-secondary);
+	padding: var(--space-sm) var(--space-md);
+	border-radius: var(--radius-md);
+
+	&:hover {
+		color: var(--color-text-primary);
+		background: var(--color-bg-hover);
+	}
+}

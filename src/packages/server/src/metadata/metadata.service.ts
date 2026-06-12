@@ -596,6 +596,47 @@ export class MetadataService {
 	 * applied directly (no re-search); fetchAndMerge pulls cached provider
 	 * details. Emits LIBRARY_MOVIE_UPDATED so the UI refreshes.
 	 */
+	/**
+	 * Fetch and persist the COMPLETE cast list for a movie from TMDB (the
+	 * normal ingest truncates to 20). Uses the cached details call, replaces
+	 * movie_metadata.cast with the full list, and returns it.
+	 */
+	async fetchFullCast(movieId: string): Promise<
+		Array<{ name: string; character: string; profileUrl: string | null; tmdbId: number }>
+	> {
+		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
+		if (!movie) throw new NotFoundException(`Movie ${movieId} not found`);
+
+		const meta = this.database.db
+			.select()
+			.from(movieMetadata)
+			.where(eq(movieMetadata.movieId, movieId))
+			.get();
+		const existing = meta?.cast ? JSON.parse(meta.cast) : [];
+
+		const tmdbId = movie.tmdbId;
+		if (!tmdbId) return existing;
+
+		const details = await this.tmdb.getMovieDetails(tmdbId);
+		const full = (details?.credits?.cast ?? []).map((c: any) => ({
+			name: c.name,
+			character: c.character,
+			profileUrl: this.tmdb.getImageUrl(c.profile_path, 'w185'),
+			tmdbId: c.id,
+		}));
+		if (full.length <= existing.length) return existing;
+
+		if (meta) {
+			this.database.db
+				.update(movieMetadata)
+				.set({ cast: JSON.stringify(full), updatedAt: nowISO() })
+				.where(eq(movieMetadata.movieId, movieId))
+				.run();
+		}
+		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'full-cast' });
+		return full;
+	}
+
 	async assignMetadata(
 		movieId: string,
 		opts: { tmdbId?: number | null; imdbId?: string | null },
