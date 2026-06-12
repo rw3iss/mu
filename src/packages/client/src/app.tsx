@@ -17,10 +17,10 @@ import { MembersPage } from '@/pages/Members/MembersPage';
 import { MovieDetail } from '@/pages/MovieDetail';
 import { NotFound } from '@/pages/NotFound';
 import { PersonDetail } from '@/pages/PersonDetail';
-import { ProfilePage } from '@/pages/Profile/ProfilePage';
 // Player is now handled entirely by GlobalPlayer (no dedicated route)
 import { PlaylistDetail } from '@/pages/PlaylistDetail';
 import { Playlists } from '@/pages/Playlists';
+import { ProfilePage } from '@/pages/Profile/ProfilePage';
 import { PublicWatch } from '@/pages/PublicWatch';
 import { Settings } from '@/pages/Settings';
 import { Setup } from '@/pages/Setup';
@@ -101,10 +101,41 @@ function enforceAuth(url: string): boolean {
 	return false;
 }
 
+/** Default tab title per route. Pages using useSeo (movie/person/discover/
+ *  watch) overwrite this right after mount with richer titles. The global
+ *  player intentionally does NOT touch the title — the tab always reflects
+ *  the page being viewed, not whatever is playing. */
+function titleForPath(path: string): string {
+	const seg = (path.split('/')[1] ?? '').toLowerCase();
+	const names: Record<string, string> = {
+		'': 'Dashboard',
+		library: 'Library',
+		discover: 'Discover',
+		playlists: 'Playlists',
+		watchlist: 'Watchlist',
+		favorites: 'Favorites',
+		history: 'History',
+		members: 'Members',
+		profile: 'Profile',
+		settings: 'Settings',
+		movie: 'Movie',
+		group: 'Group',
+		person: 'Person',
+		admin: 'Admin',
+		feedback: 'Feedback',
+		login: 'Login',
+		setup: 'Setup',
+		watch: 'Watch',
+	};
+	const name = names[seg];
+	return name ? `${name} — Mu` : 'Mu';
+}
+
 function handleRouteChange(e: { url: string }) {
 	currentUrl.value = e.url;
 	const url = e.url.split('?')[0] ?? e.url;
 	currentPath.value = url;
+	document.title = titleForPath(url);
 
 	if (enforceAuth(url)) return;
 }

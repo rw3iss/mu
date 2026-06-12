@@ -190,19 +190,6 @@ export function GlobalPlayer() {
 		return () => document.removeEventListener('keydown', handleGlobalKeyDown);
 	}, [engine]);
 
-	// Set browser tab title to movie name while playing
-	useEffect(() => {
-		const movie = globalMovie.value;
-		if (!isPlayerActive.value || !movie) {
-			document.title = 'Mu';
-			return;
-		}
-		document.title = `${movie.title} — Mu`;
-		return () => {
-			document.title = 'Mu';
-		};
-	}, [isPlayerActive.value, globalMovie.value]);
-
 	// When mode changes or a new movie starts, handle stream initialization.
 	// ALWAYS init paused, then restore play state from localStorage after.
 	useEffect(() => {
