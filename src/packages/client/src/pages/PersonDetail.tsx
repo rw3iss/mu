@@ -6,6 +6,7 @@ import { SmartImage } from '@/components/common/SmartImage';
 import { useSeo } from '@/hooks/useSeo';
 import { type PersonView, peopleService } from '@/services/people.service';
 import { ensureFavoritesLoaded, slugifyName } from '@/state/favorites.state';
+import { newTabNav } from '@/utils/navigation';
 import styles from './PersonDetail.module.scss';
 
 interface PersonDetailProps {
@@ -183,7 +184,8 @@ function CreditCard({ credit }: { credit: PersonView['knownForMovies'][number] }
 			? `/movie/tmdb:${credit.tmdbId}`
 			: null;
 	const clickable = href != null;
-	const onClick = href ? () => route(href) : undefined;
+	// newTabNav adds middle-click / ctrl+click open-in-new-tab handling.
+	const navHandlers = href ? newTabNav(href, () => route(href)) : {};
 	const onKeyDown = href
 		? (e: KeyboardEvent) => {
 				if (e.key === 'Enter' || e.key === ' ') {
@@ -197,7 +199,7 @@ function CreditCard({ credit }: { credit: PersonView['knownForMovies'][number] }
 			class={`${styles.creditCard} ${clickable ? styles.clickable : ''} ${
 				!credit.movieId ? styles.notOwned : ''
 			}`}
-			onClick={onClick}
+			{...navHandlers}
 			onKeyDown={onKeyDown as any}
 			role={clickable ? 'button' : undefined}
 			tabIndex={clickable ? 0 : undefined}
@@ -232,15 +234,11 @@ function formatVotes(n: number): string {
 }
 
 function CreditRatings({ credit }: { credit: PersonView['knownForMovies'][number] }) {
-	const imdb =
-		credit.imdbRating != null && credit.imdbRating > 0 ? credit.imdbRating : null;
-	const tmdb =
-		credit.tmdbRating != null && credit.tmdbRating > 0 ? credit.tmdbRating : null;
+	const imdb = credit.imdbRating != null && credit.imdbRating > 0 ? credit.imdbRating : null;
+	const tmdb = credit.tmdbRating != null && credit.tmdbRating > 0 ? credit.tmdbRating : null;
 	if (imdb == null && tmdb == null) return null;
 	const votes =
-		credit.tmdbVotes != null && credit.tmdbVotes > 0
-			? formatVotes(credit.tmdbVotes)
-			: null;
+		credit.tmdbVotes != null && credit.tmdbVotes > 0 ? formatVotes(credit.tmdbVotes) : null;
 	return (
 		<span
 			class={styles.creditRatings}
