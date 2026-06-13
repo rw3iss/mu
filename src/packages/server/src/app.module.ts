@@ -21,6 +21,7 @@ import { FilesystemModule } from './filesystem/filesystem.module.js';
 import { GroupingModule } from './grouping/grouping.module.js';
 import { HealthModule } from './health/health.module.js';
 import { CommentsModule } from './comments/comments.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { ImdbDatasetsModule } from './imdb-datasets/imdb-datasets.module.js';
 import { JobModule } from './jobs/job.module.js';
 import { LibraryModule } from './library/library.module.js';
@@ -89,6 +90,7 @@ import { UsersModule } from './users/users.module.js';
 		SeoModule,
 		ImdbDatasetsModule,
 		CommentsModule,
+		NotificationsModule,
 	],
 	providers: [
 		{

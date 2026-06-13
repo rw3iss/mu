@@ -42,6 +42,7 @@ import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { wsService } from '@/services/websocket.service';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
+import { initNotifications } from '@/state/notifications-feed.state';
 import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
 import { initProcessingState } from '@/state/processing.state';
 import { loadSystemConfig } from '@/state/system.state';
@@ -196,6 +197,7 @@ export function App() {
 			void fetchWatchPositions();
 			void fetchPlaybackSettings();
 			void loadSystemConfig();
+			initNotifications();
 		}
 	}, [isLoading.value, isAuthenticated.value]);
 

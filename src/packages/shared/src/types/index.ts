@@ -1,5 +1,6 @@
 export * from './api.js';
 export * from './movie.js';
+export * from './notification.js';
 export * from './plugin.js';
 export * from './profile.js';
 export * from './search.js';

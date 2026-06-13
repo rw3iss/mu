@@ -44,7 +44,6 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 			WsEvent.JOB_COMPLETED,
 			WsEvent.JOB_FAILED,
 			WsEvent.SERVER_STATUS,
-			WsEvent.NOTIFICATION,
 			WsEvent.UPLOAD_PROGRESS,
 			WsEvent.UPLOAD_COMPLETED,
 		];
@@ -53,6 +52,25 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 			this.events.on(event, (data: unknown) => {
 				this.broadcast(event, data);
 			});
+		}
+
+		// Notifications are user-targeted: deliver only to the recipient's
+		// sockets (data.userId), or to EVERY socket when userId is null
+		// (system-wide). Clients still must be subscribed to the
+		// 'notification' channel.
+		this.events.on(WsEvent.NOTIFICATION, (data: unknown) => {
+			this.deliverNotification(data);
+		});
+	}
+
+	private deliverNotification(data: unknown): void {
+		const targetUserId = (data as { userId?: string | null })?.userId ?? null;
+		const message = JSON.stringify({ event: WsEvent.NOTIFICATION, data });
+		for (const [client, meta] of this.clients) {
+			if (client.readyState !== WebSocket.OPEN) continue;
+			if (!meta.channels.has('notification')) continue;
+			if (targetUserId && meta.userId !== targetUserId) continue;
+			client.send(message);
 		}
 	}
 
@@ -86,6 +104,14 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		if (typeof channel === 'string') {
 			meta.channels.delete(channel);
 		}
+	}
+
+	@SubscribeMessage('register')
+	handleRegister(@ConnectedSocket() client: WebSocket, @MessageBody() data: unknown) {
+		const meta = this.clients.get(client);
+		if (!meta) return;
+		const userId = typeof data === 'string' ? data : (data as any)?.userId;
+		if (typeof userId === 'string') meta.userId = userId;
 	}
 
 	broadcast(eventOrChannel: string, data: unknown) {

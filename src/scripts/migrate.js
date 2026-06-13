@@ -462,6 +462,16 @@ const alters = [
 		created_at TEXT NOT NULL
 	)`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS comment_reactions_uniq ON comment_reactions(comment_id, user_id, emoji)`,
+	`CREATE TABLE IF NOT EXISTS notifications (
+		id TEXT PRIMARY KEY,
+		user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+		type TEXT NOT NULL,
+		data TEXT NOT NULL DEFAULT '{}',
+		read INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id)`,
+	`CREATE INDEX IF NOT EXISTS notifications_created_idx ON notifications(created_at)`,
 	`CREATE INDEX IF NOT EXISTS comment_reactions_comment_idx ON comment_reactions(comment_id)`,
 	'ALTER TABLE stream_sessions ADD COLUMN ip_address TEXT',
 	// Social profile fields (Members + profile pages).

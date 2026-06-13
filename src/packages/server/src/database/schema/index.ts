@@ -12,6 +12,7 @@ export type { ImdbRating, NewImdbRating } from './imdb-ratings.ts';
 export { imdbRatings } from './imdb-ratings.ts';
 export { imdbTitles } from './imdb-titles.ts';
 export { commentReactions, movieComments } from './movie-comments.ts';
+export { notifications } from './notifications.ts';
 export type { JobHistoryEntry, NewJobHistoryEntry } from './job-history.ts';
 export { jobHistory } from './job-history.ts';
 export type { MediaCacheEntry, NewMediaCacheEntry } from './media-cache.ts';

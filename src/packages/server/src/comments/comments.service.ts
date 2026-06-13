@@ -1,8 +1,9 @@
-import { nowISO } from '@mu/shared';
+import { NotificationType, nowISO } from '@mu/shared';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { asc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { commentReactions, movieComments, movies, users } from '../database/schema/index.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 export interface CommentReactionSummary {
 	emoji: string;
@@ -38,7 +39,29 @@ interface RawComment extends Omit<CommentView, 'reactions' | 'replies'> {
  */
 @Injectable()
 export class CommentsService {
-	constructor(private readonly database: DatabaseService) {}
+	constructor(
+		private readonly database: DatabaseService,
+		private readonly notifications: NotificationsService,
+	) {}
+
+	/** Display name for a user id (falls back to username / 'Someone'). */
+	private userName(userId: string): string {
+		const u = this.database.db
+			.select({ name: sql<string>`COALESCE(${users.displayName}, ${users.username}, 'Someone')` })
+			.from(users)
+			.where(eq(users.id, userId))
+			.get();
+		return u?.name ?? 'Someone';
+	}
+
+	private movieTitle(movieId: string): string | undefined {
+		const m = this.database.db
+			.select({ title: movies.title })
+			.from(movies)
+			.where(eq(movies.id, movieId))
+			.get();
+		return m?.title ?? undefined;
+	}
 
 	private readonly cache = new Map<string, { data: RawComment[]; expires: number }>();
 	private static readonly TTL_MS = 5 * 60_000;
@@ -199,6 +222,31 @@ export class CommentsService {
 				updatedAt: now,
 			})
 			.run();
+
+		// Notify the parent comment's author of a reply (not your own).
+		if (body.parentId) {
+			const parent = this.database.db
+				.select({ userId: movieComments.userId })
+				.from(movieComments)
+				.where(eq(movieComments.id, body.parentId))
+				.get();
+			if (parent && parent.userId !== userId) {
+				this.notifications.create(
+					NotificationType.CommentReply,
+					{
+						fromUserId: userId,
+						fromUserName: this.userName(userId),
+						movieId,
+						movieTitle: this.movieTitle(movieId),
+						commentId: body.parentId,
+						replyId: id,
+						snippet: text.slice(0, 140),
+					},
+					parent.userId,
+				);
+			}
+		}
+
 		this.bust(movieId);
 		return this.getForMovie(movieId, userId);
 	}
@@ -271,6 +319,27 @@ export class CommentsService {
 					createdAt: nowISO(),
 				})
 				.run();
+			// Notify the comment's author of the reaction (not your own).
+			const author = this.database.db
+				.select({ userId: movieComments.userId, text: movieComments.text })
+				.from(movieComments)
+				.where(eq(movieComments.id, commentId))
+				.get();
+			if (author && author.userId !== userId) {
+				this.notifications.create(
+					NotificationType.CommentReaction,
+					{
+						fromUserId: userId,
+						fromUserName: this.userName(userId),
+						movieId: comment.movieId,
+						movieTitle: this.movieTitle(comment.movieId),
+						commentId,
+						emoji: e,
+						snippet: (author.text ?? '').slice(0, 140),
+					},
+					author.userId,
+				);
+			}
 		}
 		this.bust(comment.movieId);
 		return this.getForMovie(comment.movieId, userId);

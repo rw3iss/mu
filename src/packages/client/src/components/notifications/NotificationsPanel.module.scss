@@ -1,0 +1,136 @@
+.panel {
+	position: absolute;
+	top: calc(100% + 10px);
+	right: 0;
+	width: 360px;
+	max-width: 92vw;
+	max-height: 70vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--color-bg-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-lg);
+	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+	z-index: var(--z-dropdown, 100);
+	overflow: hidden;
+	animation: notifIn 140ms ease-out;
+}
+
+@keyframes notifIn {
+	from {
+		opacity: 0;
+		transform: translateY(-6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--space-sm) var(--space-md);
+	border-bottom: 1px solid var(--color-border);
+}
+
+.title {
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-text-primary);
+}
+
+.markAll {
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+
+	&:hover {
+		color: var(--color-accent);
+	}
+}
+
+.list {
+	overflow-y: auto;
+	min-height: 0;
+}
+
+.empty {
+	padding: var(--space-lg);
+	text-align: center;
+	font-size: var(--font-size-sm);
+	color: var(--color-text-muted);
+}
+
+.item {
+	display: flex;
+	align-items: stretch;
+	border-bottom: 1px solid var(--color-border);
+
+	&:hover {
+		background: var(--color-bg-hover);
+	}
+}
+
+.unread {
+	background: var(--color-accent-subtle, rgba(6, 182, 212, 0.08));
+}
+
+.itemBody {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-sm);
+	padding: var(--space-sm) var(--space-md);
+	text-align: left;
+}
+
+.itemIcon {
+	flex-shrink: 0;
+	font-size: 15px;
+	line-height: 1.4;
+}
+
+.itemText {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.itemMessage {
+	font-size: var(--font-size-sm);
+	color: var(--color-text-secondary);
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+.itemTime {
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+}
+
+.dismiss {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	padding: 0 var(--space-sm);
+	color: var(--color-text-muted);
+
+	&:hover {
+		color: var(--color-text-primary);
+	}
+}
+
+.loadMore {
+	width: 100%;
+	padding: var(--space-sm);
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+
+	&:hover {
+		color: var(--color-text-primary);
+		background: var(--color-bg-hover);
+	}
+}

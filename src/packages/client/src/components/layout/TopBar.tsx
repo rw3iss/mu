@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { currentPath, currentUrl } from '@/app';
 import { Icon } from '@/components/common/Icon';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useDebounce } from '@/hooks/useDebounce';
 // The back-stack lives in library.state so the Library page's own back arrow
 // (next to its title) can consume it; the header input only maintains it.
@@ -133,6 +134,7 @@ export function TopBar() {
 			</form>
 
 			<div class={styles.actions}>
+				<NotificationBell />
 				<button
 					class={styles.themeToggle}
 					onClick={toggleTheme}
