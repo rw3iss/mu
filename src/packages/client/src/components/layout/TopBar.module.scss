@@ -29,6 +29,12 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+
+// Hide the leading magnifier while typing so it doesn't sit under the text.
+.searchForm:focus-within .searchIcon {
+  opacity: 0;
 }
 
 .searchInput {

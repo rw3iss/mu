@@ -131,6 +131,7 @@ export function TopBar() {
 					value={searchValue}
 					onInput={handleInput}
 					onKeyDown={handleKeyDown}
+					onFocus={(e) => (e.target as HTMLInputElement).select()}
 					aria-label="Search movies"
 				/>
 				{searchValue && (
