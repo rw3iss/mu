@@ -15,6 +15,9 @@ export function Notifications() {
 	const [notifyPlaylist, setNotifyPlaylist] = useState(
 		() => localStorage.getItem('mu_notify_playlist') !== 'false',
 	);
+	const [notifyComments, setNotifyComments] = useState(
+		() => localStorage.getItem('mu_notify_comments') !== 'false',
+	);
 
 	return (
 		<div class={styles.panel}>
@@ -43,10 +46,32 @@ export function Notifications() {
 
 			<div class={styles.settingRow}>
 				<div class={styles.settingInfo}>
+					<span class={styles.settingLabel}>
+						Notify for comment replies and reactions
+					</span>
+					<span class={styles.settingDescription}>
+						Show a toast when someone replies to or reacts to your comments
+					</span>
+				</div>
+				<label class={styles.toggle}>
+					<input
+						type="checkbox"
+						checked={notifyComments}
+						onChange={(e) => {
+							const checked = (e.target as HTMLInputElement).checked;
+							setNotifyComments(checked);
+							localStorage.setItem('mu_notify_comments', String(checked));
+						}}
+					/>
+					<span class={styles.toggleTrack} />
+				</label>
+			</div>
+
+			<div class={styles.settingRow}>
+				<div class={styles.settingInfo}>
 					<span class={styles.settingLabel}>Notify for playlist changes</span>
 					<span class={styles.settingDescription}>
-						Show toast notifications when movies are added to or removed from
-						playlists
+						Show toast notifications when movies are added to or removed from playlists
 					</span>
 				</div>
 				<label class={styles.toggle}>

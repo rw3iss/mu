@@ -112,6 +112,10 @@ export function notifyInfo(
 // ============================================
 
 /** Whether playlist-membership change toasts are enabled. Default on. */
+export function shouldNotifyComments(): boolean {
+	return localStorage.getItem('mu_notify_comments') !== 'false';
+}
+
 export function shouldNotifyPlaylist(): boolean {
 	return localStorage.getItem('mu_notify_playlist') !== 'false';
 }

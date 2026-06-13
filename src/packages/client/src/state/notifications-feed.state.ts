@@ -4,7 +4,7 @@ import { notificationsApi } from '@/services/notifications-api.service';
 import { socketManager } from '@/services/socket-manager';
 import { formatNotification } from '@/utils/notification-format';
 import { currentUser } from './auth.state';
-import { notifyInfo } from './notifications.state';
+import { notifyInfo, shouldNotifyComments } from './notifications.state';
 
 /** The current user's notifications (their own + system-wide), newest first. */
 export const notifications = signal<NotificationDto[]>([]);
@@ -84,6 +84,10 @@ export function initNotifications(): void {
 		if (notifications.value.some((x) => x.id === n.id)) return;
 		notifications.value = [n, ...notifications.value];
 		recountUnread();
+		// The panel always updates; the TOAST for comment reply/reaction
+		// notifications respects the user's Notifications setting.
+		const isComment = n.type === 'comment-reply' || n.type === 'comment-reaction';
+		if (isComment && !shouldNotifyComments()) return;
 		const f = formatNotification(n);
 		notifyInfo(`${f.icon ? `${f.icon} ` : ''}${f.message}`, 6000);
 	});
