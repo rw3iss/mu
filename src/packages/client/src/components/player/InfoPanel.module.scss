@@ -371,6 +371,12 @@
   }
 }
 
+// Breathing room between a collapsible header and its expanded content
+// (Cast list, Comments panel, File Info grid).
+.fileInfoToggle + * {
+  margin-top: var(--space-sm);
+}
+
 .fileInfoArrow {
   font-size: var(--font-size-xs);
   color: var(--on-dark-text-muted);

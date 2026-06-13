@@ -1120,12 +1120,12 @@ export class MoviesService implements OnModuleInit {
 		const lastMonth = this.cachedCountSince(
 			'window:30d',
 			new Date(Date.now() - 30 * DAY).toISOString(),
-			15 * 60_000,
+			5 * 60_000,
 		);
 		const lastYear = this.cachedCountSince(
 			'window:365d',
 			new Date(Date.now() - 365 * DAY).toISOString(),
-			60 * 60_000,
+			5 * 60_000,
 		);
 		return { sinceSession, sinceDate, last24h, lastWeek, lastMonth, lastYear };
 	}

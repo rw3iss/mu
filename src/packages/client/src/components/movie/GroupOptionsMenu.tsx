@@ -159,7 +159,20 @@ export function GroupOptionsMenu({
 					<div
 						ref={menuRef}
 						class={`${styles.menu} ${styles.menuPortal} ${compact ? styles.compactMenu : ''}`}
-						style={pos ? { top: `${pos.top}px`, right: `${pos.right}px` } : undefined}
+						style={
+							pos
+								? {
+										top: pos.top != null ? `${pos.top}px` : undefined,
+										bottom: pos.bottom != null ? `${pos.bottom}px` : undefined,
+										right: `${pos.right}px`,
+										maxHeight:
+											pos.maxHeight != null
+												? `${pos.maxHeight}px`
+												: undefined,
+										overflowY: pos.maxHeight != null ? 'auto' : undefined,
+									}
+								: undefined
+						}
 						onClick={(e: Event) => e.stopPropagation()}
 					>
 						{isUnsure && (
@@ -176,11 +189,7 @@ export function GroupOptionsMenu({
 								Refresh Metadata
 							</button>
 						)}
-						<button
-							class={styles.menuItem}
-							onClick={handleUngroup}
-							disabled={busy}
-						>
+						<button class={styles.menuItem} onClick={handleUngroup} disabled={busy}>
 							Ungroup
 						</button>
 						<div class={styles.menuDivider} />
