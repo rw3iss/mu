@@ -79,7 +79,13 @@ export function CommentsPanel({ movieId, onSeek }: CommentsPanelProps) {
 			) : comments.length === 0 ? null : (
 				<ul class={styles.list}>
 					{comments.map((c) => (
-						<CommentItem key={c.id} movieId={movieId} comment={c} onSeek={onSeek} />
+						<CommentItem
+							key={c.id}
+							movieId={movieId}
+							comment={c}
+							onSeek={onSeek}
+							depth={0}
+						/>
 					))}
 				</ul>
 			)}
@@ -91,16 +97,19 @@ function CommentItem({
 	movieId,
 	comment,
 	onSeek,
-	isReply = false,
+	depth,
 }: {
 	movieId: string;
 	comment: MovieComment;
 	onSeek?: (t: number) => void;
-	isReply?: boolean;
+	/** Nesting level (0 = top). Drives indent (capped) + recursion. */
+	depth: number;
 }) {
 	const me = currentUser.value?.id;
 	const mine = me === comment.userId;
+	const replyCount = comment.replies?.length ?? 0;
 	const [replying, setReplying] = useState(false);
+	const [collapsed, setCollapsed] = useState(false);
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState('');
 	const [busy, setBusy] = useState(false);
@@ -138,7 +147,7 @@ function CommentItem({
 	);
 
 	return (
-		<li id={`comment-${comment.id}`} class={`${styles.item} ${isReply ? styles.reply : ''}`}>
+		<li id={`comment-${comment.id}`} class={`${styles.item} ${depth > 0 ? styles.reply : ''}`}>
 			<div class={styles.itemHead}>
 				<span class={styles.author}>{comment.authorName}</span>
 				{comment.timeSeconds != null && (
@@ -200,17 +209,15 @@ function CommentItem({
 				<button class={styles.linkBtn} onClick={openReactions} title="React">
 					🙂+
 				</button>
-				{!isReply && (
-					<button
-						class={styles.linkBtn}
-						onClick={() => {
-							setReplying(!replying);
-							setDraft('');
-						}}
-					>
-						Reply
-					</button>
-				)}
+				<button
+					class={styles.linkBtn}
+					onClick={() => {
+						setReplying(!replying);
+						setDraft('');
+					}}
+				>
+					Reply
+				</button>
 				{mine && !editing && (
 					<button
 						class={styles.linkBtn}
@@ -264,18 +271,26 @@ function CommentItem({
 				</div>
 			)}
 
-			{(comment.replies?.length ?? 0) > 0 && (
-				<ul class={styles.replies}>
-					{comment.replies!.map((r) => (
-						<CommentItem
-							key={r.id}
-							movieId={movieId}
-							comment={r}
-							onSeek={onSeek}
-							isReply
-						/>
-					))}
-				</ul>
+			{replyCount > 0 && (
+				<>
+					<button class={styles.replyToggle} onClick={() => setCollapsed((c) => !c)}>
+						{collapsed ? '▸' : '▾'} {replyCount}{' '}
+						{replyCount === 1 ? 'reply' : 'replies'}
+					</button>
+					{!collapsed && (
+						<ul class={`${styles.replies} ${depth + 1 > 3 ? styles.repliesFlat : ''}`}>
+							{comment.replies!.map((r) => (
+								<CommentItem
+									key={r.id}
+									movieId={movieId}
+									comment={r}
+									onSeek={onSeek}
+									depth={depth + 1}
+								/>
+							))}
+						</ul>
+					)}
+				</>
 			)}
 		</li>
 	);

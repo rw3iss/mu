@@ -24,16 +24,21 @@ export function getComments(movieId: string): MovieComment[] | null {
 export function getTimedComments(movieId: string): MovieComment[] {
 	const list = movieComments.value[movieId] ?? [];
 	const out: MovieComment[] = [];
-	for (const c of list) {
-		if (c.timeSeconds != null) out.push(c);
-		for (const r of c.replies ?? []) if (r.timeSeconds != null) out.push(r);
-	}
+	const walk = (nodes: MovieComment[]) => {
+		for (const c of nodes) {
+			if (c.timeSeconds != null) out.push(c);
+			if (c.replies?.length) walk(c.replies);
+		}
+	};
+	walk(list);
 	return out;
 }
 
 export function countComments(movieId: string): number {
 	const list = movieComments.value[movieId] ?? [];
-	return list.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0);
+	const count = (nodes: MovieComment[]): number =>
+		nodes.reduce((n, c) => n + 1 + (c.replies ? count(c.replies) : 0), 0);
+	return count(list);
 }
 
 export async function loadComments(movieId: string, force = false): Promise<MovieComment[]> {

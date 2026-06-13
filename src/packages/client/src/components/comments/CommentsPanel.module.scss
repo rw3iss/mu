@@ -159,3 +159,25 @@
 	gap: 10px;
 	align-items: center;
 }
+
+
+// Beyond the indent cap (depth > 3) replies render inline — no extra
+// indent/border so deep chains don't march off the right edge.
+.repliesFlat {
+	padding-left: 0;
+	border-left: none;
+	margin-top: var(--space-sm);
+}
+
+// Collapsible toggle shown above a comment's reply group.
+.replyToggle {
+	align-self: flex-start;
+	margin-top: 4px;
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+	font-variant-numeric: tabular-nums;
+
+	&:hover {
+		color: var(--color-accent);
+	}
+}

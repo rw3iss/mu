@@ -1,6 +1,6 @@
 import { NotificationType, nowISO } from '@mu/shared';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { asc, eq, sql } from 'drizzle-orm';
+import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { commentReactions, movieComments, movies, users } from '../database/schema/index.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -65,6 +65,8 @@ export class CommentsService {
 
 	private readonly cache = new Map<string, { data: RawComment[]; expires: number }>();
 	private static readonly TTL_MS = 5 * 60_000;
+	/** Max reply nesting depth (root = 0). Replies past this reparent up. */
+	private static readonly MAX_DEPTH = 20;
 
 	bust(movieId: string): void {
 		this.cache.delete(movieId);
@@ -81,21 +83,22 @@ export class CommentsService {
 				mine: !!forUserId && r.userIds.includes(forUserId),
 			})),
 		});
-		const top: CommentView[] = [];
+		// Build the full reply tree (arbitrary depth). Each node gets a
+		// `replies[]`; children are attached to their parent, orphans (parent
+		// deleted) surface at top level. Raw rows are createdAt-ascending, so
+		// replies stay in chronological order within each parent.
 		const byId = new Map<string, CommentView>();
 		for (const c of raw) {
 			const v = shape(c);
+			v.replies = [];
 			byId.set(v.id, v);
-			if (!v.parentId) {
-				v.replies = [];
-				top.push(v);
-			}
 		}
+		const top: CommentView[] = [];
 		for (const c of raw) {
-			if (!c.parentId) continue;
-			const parent = byId.get(c.parentId);
-			if (parent) parent.replies!.push(byId.get(c.id)!);
-			else top.push(byId.get(c.id)!); // orphan (parent deleted) — show flat
+			const node = byId.get(c.id)!;
+			const parent = c.parentId ? byId.get(c.parentId) : null;
+			if (parent) parent.replies!.push(node);
+			else top.push(node);
 		}
 		return top;
 	}
@@ -195,14 +198,30 @@ export class CommentsService {
 		const text = (body.text ?? '').trim();
 		if (!text) throw new ForbiddenException('Comment text is required');
 		if (body.parentId) {
-			const parent = this.database.db
-				.select({ id: movieComments.id, parentId: movieComments.parentId })
-				.from(movieComments)
-				.where(eq(movieComments.id, body.parentId))
-				.get();
-			if (!parent) throw new NotFoundException('Parent comment not found');
-			// One level deep only — replying to a reply attaches to its parent.
-			if (parent.parentId) body.parentId = parent.parentId;
+			// Walk the ancestor chain to validate the parent exists, belongs to
+			// the same movie, and the new reply wouldn't exceed MAX_DEPTH. If the
+			// chain is already at the cap, attach to the deepest allowed ancestor.
+			let cursor: string | null = body.parentId;
+			const chain: string[] = [];
+			let guard = 0;
+			while (cursor && guard++ < CommentsService.MAX_DEPTH + 2) {
+				const row = this.database.db
+					.select({ id: movieComments.id, parentId: movieComments.parentId, movieId: movieComments.movieId })
+					.from(movieComments)
+					.where(eq(movieComments.id, cursor))
+					.get();
+				if (!row) break;
+				if (row.movieId !== movieId) throw new ForbiddenException('Parent belongs to another movie');
+				chain.unshift(row.id);
+				cursor = row.parentId;
+			}
+			if (chain.length === 0) throw new NotFoundException('Parent comment not found');
+			// chain = root..parent. The new reply sits one below parent → its
+			// depth = chain.length. Cap by reparenting to the deepest ancestor
+			// that keeps depth <= MAX_DEPTH.
+			if (chain.length >= CommentsService.MAX_DEPTH) {
+				body.parentId = chain[CommentsService.MAX_DEPTH - 1] ?? body.parentId;
+			}
 		}
 		const now = nowISO();
 		const id = crypto.randomUUID();
@@ -278,9 +297,24 @@ export class CommentsService {
 		if (existing.userId !== userId && !isAdmin) {
 			throw new ForbiddenException('Only the author can delete this comment');
 		}
-		// Replies cascade-delete via parent cleanup below (no FK on parent_id).
-		this.database.db.delete(movieComments).where(eq(movieComments.id, id)).run();
-		this.database.db.delete(movieComments).where(eq(movieComments.parentId, id)).run();
+		// Recursively delete this comment + ALL descendant replies (no FK on
+		// parent_id, so we collect the subtree by BFS then delete it).
+		const toDelete = [id];
+		const queue = [id];
+		let guard = 0;
+		while (queue.length && guard++ < 10_000) {
+			const parentId = queue.shift()!;
+			const children = this.database.db
+				.select({ id: movieComments.id })
+				.from(movieComments)
+				.where(eq(movieComments.parentId, parentId))
+				.all();
+			for (const c of children) {
+				toDelete.push(c.id);
+				queue.push(c.id);
+			}
+		}
+		this.database.db.delete(movieComments).where(inArray(movieComments.id, toDelete)).run();
 		this.bust(existing.movieId);
 		return this.getForMovie(existing.movieId, userId);
 	}
