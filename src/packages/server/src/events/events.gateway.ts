@@ -63,14 +63,24 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		});
 	}
 
+	/**
+	 * Notifications route by CHANNEL: personal → `user:<userId>`, system-wide
+	 * (userId null) → `global`. Channel subscriptions survive WS reconnects, so
+	 * delivery is robust without a separate identity handshake.
+	 */
 	private deliverNotification(data: unknown): void {
 		const targetUserId = (data as { userId?: string | null })?.userId ?? null;
-		const message = JSON.stringify({ event: WsEvent.NOTIFICATION, data });
+		const channel = targetUserId ? `user:${targetUserId}` : 'global';
+		this.broadcastToChannel(channel, WsEvent.NOTIFICATION, data);
+	}
+
+	/** Send an event to every OPEN client subscribed to `channel`. */
+	broadcastToChannel(channel: string, event: string, data: unknown): void {
+		const message = JSON.stringify({ event, data });
 		for (const [client, meta] of this.clients) {
-			if (client.readyState !== WebSocket.OPEN) continue;
-			if (!meta.channels.has('notification')) continue;
-			if (targetUserId && meta.userId !== targetUserId) continue;
-			client.send(message);
+			if (client.readyState === WebSocket.OPEN && meta.channels.has(channel)) {
+				client.send(message);
+			}
 		}
 	}
 
@@ -106,15 +116,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 		}
 	}
 
-	@SubscribeMessage('register')
-	handleRegister(@ConnectedSocket() client: WebSocket, @MessageBody() data: unknown) {
-		const meta = this.clients.get(client);
-		if (!meta) return;
-		const userId = typeof data === 'string' ? data : (data as any)?.userId;
-		if (typeof userId === 'string') meta.userId = userId;
-	}
-
-	broadcast(eventOrChannel: string, data: unknown) {
+broadcast(eventOrChannel: string, data: unknown) {
 		const message = JSON.stringify({ event: eventOrChannel, data });
 		for (const [client, meta] of this.clients) {
 			if (client.readyState === WebSocket.OPEN) {

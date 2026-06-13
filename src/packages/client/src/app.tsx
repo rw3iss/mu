@@ -39,6 +39,7 @@ import { audioEngine } from '@/audio/audio-engine';
 import { GlobalPlayer } from '@/components/player/GlobalPlayer';
 import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
+import { socketManager } from '@/services/socket-manager';
 import { wsService } from '@/services/websocket.service';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
@@ -147,6 +148,7 @@ export function App() {
 		initTheme();
 		checkAuth();
 		wsService.connect();
+		socketManager.start();
 		initGlobalPlayer();
 		initProcessingState();
 		initConsoleDebug();

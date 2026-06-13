@@ -1,7 +1,7 @@
 import type { NotificationDto } from '@mu/shared';
 import { signal } from '@preact/signals';
 import { notificationsApi } from '@/services/notifications-api.service';
-import { wsService } from '@/services/websocket.service';
+import { socketManager } from '@/services/socket-manager';
 import { formatNotification } from '@/utils/notification-format';
 import { currentUser } from './auth.state';
 import { notifyInfo } from './notifications.state';
@@ -73,26 +73,18 @@ export function initNotifications(): void {
 
 	loadNotifications();
 
-	wsService.subscribe('notification');
-	const uid = currentUser.value?.id;
-	if (uid) wsService.send('register', { userId: uid });
-
-	wsService.on('notification', (data: unknown) => {
+	// The socket manager owns the global + per-user channels; we just delegate
+	// the 'notification' event. The server routes by channel (user:<id> for
+	// personal, global for system-wide), so anything that arrives here is ours.
+	socketManager.on('notification', (data: unknown) => {
 		const n = data as NotificationDto;
 		if (!n || typeof n.id !== 'string') return;
-		// Ours or system-wide only (server already routes, but double-check).
 		const me = currentUser.value?.id;
-		if (n.userId && n.userId !== me) return;
+		if (n.userId && n.userId !== me) return; // belt-and-suspenders
 		if (notifications.value.some((x) => x.id === n.id)) return;
 		notifications.value = [n, ...notifications.value];
 		recountUnread();
 		const f = formatNotification(n);
 		notifyInfo(`${f.icon ? `${f.icon} ` : ''}${f.message}`, 6000);
 	});
-}
-
-/** Re-register our userId after a (re)connect or user change. */
-export function reregisterNotifications(): void {
-	const uid = currentUser.value?.id;
-	if (uid) wsService.send('register', { userId: uid });
 }
