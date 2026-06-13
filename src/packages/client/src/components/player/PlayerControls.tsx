@@ -1035,6 +1035,28 @@ export function PlayerControls({
 								{/* Plugin buttons — rendered before system buttons */}
 								<PluginSlot name={UI.PLAYER_BUTTON} context={{}} />
 
+								{/* Recording indicator — left of Info. Pulses red while
+								    recording; on hover becomes a Stop button. */}
+								{isRecordingSnippet.value && (
+									<button
+										class={`${styles.controlBtn} ${styles.recBtn}`}
+										onClick={() => stopSnippet()}
+										aria-label="Stop recording"
+										title={`Recording ${Math.floor(snippetElapsed.value / 60)}:${String(snippetElapsed.value % 60).padStart(2, '0')} — click to stop`}
+									>
+										<span class={styles.recDot} />
+										<svg
+											class={styles.recStop}
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="currentColor"
+										>
+											<rect x="6" y="6" width="12" height="12" rx="2" />
+										</svg>
+									</button>
+								)}
+
 								{/* Info — hidden in split mode (info shown inline) */}
 								{!isSplit && (
 									<button
@@ -1189,6 +1211,28 @@ export function PlayerControls({
 															{showCommentBubbles ? 'On' : 'Off'}
 														</span>
 													</button>
+
+													{snippetSupported() && (
+														<button
+															class={styles.menuRow}
+															disabled={isRecordingSnippet.value}
+															onClick={() => {
+																startSnippet(
+																	globalMovie.value?.title,
+																);
+																setShowSettingsMenu(false);
+															}}
+														>
+															<span class={styles.menuRowLabel}>
+																Record Snippet
+															</span>
+															<span class={styles.menuRowValue}>
+																{isRecordingSnippet.value
+																	? 'Recording…'
+																	: ''}
+															</span>
+														</button>
+													)}
 
 													{(session?.audioTracks?.length ?? 0) > 1 && (
 														<button

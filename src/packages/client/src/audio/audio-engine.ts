@@ -1,5 +1,9 @@
 import { debug } from 'dev-loggers';
-import { audioEffectsHlsBlocked, clearAudioSuspect, markAudioSuspect } from '@/state/audio-reset.state';
+import {
+	audioEffectsHlsBlocked,
+	clearAudioSuspect,
+	markAudioSuspect,
+} from '@/state/audio-reset.state';
 
 /**
  * Audio processing engine using Web Audio API.
@@ -117,6 +121,10 @@ export class AudioEngine {
 	private compMergeNode: GainNode | null = null;
 	private analyser: AnalyserNode | null = null;
 	private streamDest: MediaStreamAudioDestinationNode | null = null;
+	/** Terminal node of the live chain (set each rebuild) — recording taps here. */
+	private outputNode: AudioNode | null = null;
+	/** Active recording tap; kept connected across chain rebuilds. */
+	private recorderTap: MediaStreamAudioDestinationNode | null = null;
 	private outputAudio: HTMLAudioElement | null = null;
 	private eqEnabled = false;
 	private compressorEnabled = false;
@@ -558,6 +566,34 @@ export class AudioEngine {
 	}
 
 	/**
+	 * Tap the (effects-processed) audio for recording. Returns an audio
+	 * MediaStreamTrack carrying the live graph output, or null when no Web
+	 * Audio graph is active (e.g. HLS/blob: playback) — callers then fall back
+	 * to the <video> element's own captureStream audio.
+	 */
+	createRecordingAudioTrack(): MediaStreamTrack | null {
+		if (!this.attached || !this.ctx || !this.outputNode) return null;
+		try {
+			this.recorderTap?.disconnect();
+			this.recorderTap = this.ctx.createMediaStreamDestination();
+			this.outputNode.connect(this.recorderTap);
+			return this.recorderTap.stream.getAudioTracks()[0] ?? null;
+		} catch {
+			return null;
+		}
+	}
+
+	/** Tear down the recording tap. */
+	stopRecordingTap(): void {
+		try {
+			this.recorderTap?.disconnect();
+		} catch {
+			/* ignore */
+		}
+		this.recorderTap = null;
+	}
+
+	/**
 	 * Full diagnostic snapshot of the engine + bound element. Logged
 	 * around every toggle and chain rebuild so we can see exactly
 	 * what state the graph is in when audio dies. Unconditional —
@@ -644,9 +680,7 @@ export class AudioEngine {
 			this.ctx
 				?.resume()
 				.then(() => dlog('[audioEngine] resume after setEqEnabled → ok'))
-				.catch((err) =>
-					dwarn('[audioEngine] resume after setEqEnabled REJECTED:', err),
-				);
+				.catch((err) => dwarn('[audioEngine] resume after setEqEnabled REJECTED:', err));
 		}
 		this.rebuildChain();
 		this.dumpState(`setEqEnabled(${enabled}) AFTER`);
@@ -1385,6 +1419,10 @@ export class AudioEngine {
 		// failed for any reason.
 		const finalDest = this.streamDest ?? this.ctx.destination;
 		current.connect(finalDest);
+		// Remember the terminal node and re-attach an active recording tap so a
+		// chain rebuild (toggling EQ mid-recording) doesn't drop the captured audio.
+		this.outputNode = current;
+		if (this.recorderTap) current.connect(this.recorderTap);
 		traceConnect('lastStage', this.streamDest ? 'streamDest' : 'ctx.destination');
 		const chainInfo = {
 			event: 'rebuild-done',

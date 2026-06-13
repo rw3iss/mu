@@ -45,6 +45,11 @@ const BUFFER_CONFIGS: Record<
  */
 let sharedVideoElement: HTMLVideoElement | null = null;
 
+/** The persistent player <video> element (null before first play). */
+export function getActiveVideoElement(): HTMLVideoElement | null {
+	return sharedVideoElement;
+}
+
 function getSharedVideoElement(): HTMLVideoElement {
 	if (!sharedVideoElement) {
 		const video = document.createElement('video');

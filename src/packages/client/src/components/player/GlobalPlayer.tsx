@@ -50,6 +50,7 @@ import { EffectsPanel } from './EffectsPanel';
 import styles from './GlobalPlayer.module.scss';
 import { InfoPanel } from './InfoPanel';
 import { PlayerControls } from './PlayerControls';
+import { SnippetDialog } from './SnippetDialog';
 import { useVideoEngine } from './useVideoEngine';
 import { VideoEnhancer } from './VideoEnhancer';
 
@@ -1221,6 +1222,7 @@ export function GlobalPlayer() {
 					/>
 				</div>
 			)}
+			<SnippetDialog />
 		</>
 	);
 }
