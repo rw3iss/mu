@@ -319,3 +319,54 @@ html[data-reduce-motion='true'] *::after {
   outline-offset: 4px;
   border-radius: var(--radius-sm);
 }
+
+// ── Unified native form controls ────────────────────────────────────
+// Text/number/etc. inputs, textareas, and native selects share ONE look +
+// height that matches the custom <Select> trigger (same tokens, padding,
+// border, radius, line-height). Element-level specificity (0,0,1) so any
+// component class that needs a bespoke variant (search bars, etc.) still
+// overrides this baseline.
+input[type='text'],
+input[type='number'],
+input[type='search'],
+input[type='email'],
+input[type='password'],
+input[type='url'],
+input[type='tel'],
+input:not([type]),
+textarea,
+select {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-input-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  &:focus,
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-accent-subtle);
+  }
+}
+
+// time inputs render a clock affordance — keep them on the same chrome.
+input[type='time'] {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-input-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+}
