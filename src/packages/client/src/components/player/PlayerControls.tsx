@@ -44,6 +44,13 @@ import {
 	volume,
 } from '@/state/player.state';
 import { shareMode } from '@/state/share.state';
+import {
+	isRecordingSnippet,
+	snippetElapsed,
+	snippetSupported,
+	startSnippet,
+	stopSnippet,
+} from '@/state/snippet-recorder.state';
 import { timeFromPointer } from '@/utils/seek-time';
 import { VolumeControl, VolumeIcon } from './controls/VolumeControl';
 import styles from './PlayerControls.module.scss';
