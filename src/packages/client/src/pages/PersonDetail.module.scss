@@ -324,3 +324,37 @@
 		background-position: -200% 0;
 	}
 }
+
+/* "Known for" header row: title left, sort + min-rating controls to its right. */
+.creditsHeader {
+	display: flex;
+	align-items: center;
+	gap: var(--space-lg);
+	flex-wrap: wrap;
+	margin-bottom: var(--space-md);
+
+	.sectionTitle {
+		margin: 0;
+	}
+}
+
+.creditsControls {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-sm);
+}
+
+.minRatingInput {
+	width: 90px;
+	padding: var(--space-sm) var(--space-md);
+	background: var(--color-bg-elevated);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	color: var(--color-text-primary);
+	font-size: var(--font-size-sm);
+
+	&:focus {
+		outline: none;
+		border-color: var(--color-accent);
+	}
+}

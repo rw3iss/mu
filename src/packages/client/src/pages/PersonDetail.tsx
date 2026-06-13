@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
+import { Select } from '@/components/common/Select';
 import { SmartImage } from '@/components/common/SmartImage';
 import { useSeo } from '@/hooks/useSeo';
 import { type PersonView, peopleService } from '@/services/people.service';
@@ -41,6 +42,8 @@ function formatAge(birthday: string | null, deathday: string | null): string | n
 export function PersonDetail({ id }: PersonDetailProps) {
 	const [person, setPerson] = useState<PersonView | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	const [creditSort, setCreditSort] = useState<'year' | 'title' | 'rating' | 'votes'>('year');
+	const [creditMinRating, setCreditMinRating] = useState('');
 	const [error, setError] = useState<string | null>(null);
 	const [showFullBio, setShowFullBio] = useState(false);
 
@@ -95,6 +98,30 @@ export function PersonDetail({ id }: PersonDetailProps) {
 	const bio = person.biography ?? '';
 	const bioLong = bio.length > 480;
 	const bioShown = bioLong && !showFullBio ? `${bio.slice(0, 480).trim()}…` : bio;
+
+	// Rating used for sort + filter: prefer IMDB (owned), else TMDB.
+	const ratingOf = (c: PersonView['knownForMovies'][number]) => c.imdbRating ?? c.tmdbRating ?? 0;
+	const visibleCredits = useMemo(() => {
+		const min = parseFloat(creditMinRating);
+		let list = person.knownForMovies;
+		if (Number.isFinite(min) && min > 0) {
+			list = list.filter((c) => ratingOf(c) >= min);
+		}
+		const sorted = [...list];
+		sorted.sort((a, b) => {
+			switch (creditSort) {
+				case 'title':
+					return (a.title ?? '').localeCompare(b.title ?? '');
+				case 'rating':
+					return ratingOf(b) - ratingOf(a);
+				case 'votes':
+					return (b.tmdbVotes ?? 0) - (a.tmdbVotes ?? 0);
+				default:
+					return (b.year ?? 0) - (a.year ?? 0);
+			}
+		});
+		return sorted;
+	}, [person.knownForMovies, creditSort, creditMinRating]);
 
 	return (
 		<div class={styles.personDetail}>
@@ -158,9 +185,37 @@ export function PersonDetail({ id }: PersonDetailProps) {
 
 			{person.knownForMovies.length > 0 && (
 				<section class={styles.section}>
-					<h2 class={styles.sectionTitle}>Known for</h2>
+					<div class={styles.creditsHeader}>
+						<h2 class={styles.sectionTitle}>Known for</h2>
+						<div class={styles.creditsControls}>
+							<Select
+								value={creditSort}
+								onChange={(v) =>
+									setCreditSort(v as 'year' | 'title' | 'rating' | 'votes')
+								}
+								options={[
+									{ value: 'year', label: 'Year' },
+									{ value: 'title', label: 'Title' },
+									{ value: 'rating', label: 'Rating' },
+									{ value: 'votes', label: 'Votes' },
+								]}
+							/>
+							<input
+								type="number"
+								class={styles.minRatingInput}
+								min="0"
+								max="10"
+								step="0.1"
+								placeholder="Min ★"
+								value={creditMinRating}
+								onInput={(e) =>
+									setCreditMinRating((e.target as HTMLInputElement).value)
+								}
+							/>
+						</div>
+					</div>
 					<div class={styles.creditsGrid}>
-						{person.knownForMovies.map((credit) => (
+						{visibleCredits.map((credit) => (
 							<CreditCard
 								key={`${credit.tmdbId}-${credit.mediaType}`}
 								credit={credit}
