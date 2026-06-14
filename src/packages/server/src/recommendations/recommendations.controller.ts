@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { FavoritesService } from '../favorites/favorites.service.js';
+import { MoviesService } from '../movies/movies.service.js';
 import { PeopleService } from '../people/people.service.js';
 import { RecommendationsService } from './recommendations.service.js';
 import { TasteProfileService } from './taste-profile.service.js';
@@ -19,6 +20,7 @@ export class RecommendationsController {
 		private readonly tasteProfile: TasteProfileService,
 		private readonly people: PeopleService,
 		private readonly favorites: FavoritesService,
+		private readonly movies: MoviesService,
 	) {}
 
 	@RequireAction('view:library')
@@ -103,11 +105,24 @@ export class RecommendationsController {
 			}
 		}
 
-		const explicitIds = seedMovieIds
+		const rawExplicitIds = seedMovieIds
 			? seedMovieIds.split(',').filter(Boolean)
 			: seedMovieId
 				? [seedMovieId]
 				: [];
+
+		// Movie seeds can arrive as external keys (`tmdb:<id>`) for films
+		// not in the library — the search field emits those for not-owned
+		// hits. The recommender keys off real `movies.id` rows, so resolve
+		// each key first (creating + synchronously enriching a bookmark
+		// stub when needed). Unresolvable keys are dropped rather than
+		// triggering a spurious `seed_not_found`. Bare library ids resolve
+		// to themselves.
+		const explicitIds: string[] = [];
+		for (const key of rawExplicitIds) {
+			const resolved = await this.movies.resolveSeedMovieId(key, user.sub);
+			if (resolved) explicitIds.push(resolved);
+		}
 
 		const allSeedIds = Array.from(new Set([...explicitIds, ...personDerivedIds]));
 
@@ -200,8 +215,7 @@ export class RecommendationsController {
 		const { movieIds, personKeys: favPersonKeys } = this.favorites.listKeys(userId);
 		const seeds: string[] = [...movieIds];
 		if (favPersonKeys.length > 0 && seeds.length < 5) {
-			const { movieIds: peopleIds } =
-				await this.people.resolveOwnedMovieIds(favPersonKeys);
+			const { movieIds: peopleIds } = await this.people.resolveOwnedMovieIds(favPersonKeys);
 			for (const id of peopleIds) {
 				if (seeds.includes(id)) continue;
 				seeds.push(id);

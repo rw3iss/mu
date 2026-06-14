@@ -709,7 +709,7 @@ export class MoviesService implements OnModuleInit {
 	 * matching local row, fetches metadata from TMDB and writes a stub
 	 * `source='bookmark'` row so future visits are cached.
 	 */
-	async findOrFetchByKey(key: string, userId?: string) {
+	async findOrFetchByKey(key: string, userId?: string, opts: { awaitEnrichment?: boolean } = {}) {
 		if (!key.includes(':')) {
 			return this.findById(key, userId);
 		}
@@ -793,16 +793,56 @@ export class MoviesService implements OnModuleInit {
 			.run();
 
 		// Pull full metadata (cast, crew, OMDB ratings, keywords, …) via
-		// the existing refresh pipeline. Fire-and-forget — basic ratings
-		// above are enough for the immediate response; everything else
-		// fills in on the next visit.
-		this.metadataService.refreshMetadata(stubId).catch((err) => {
-			this.logger.warn(
-				`Background refresh for tmdb stub ${tmdbId} failed: ${(err as Error).message}`,
-			);
-		});
+		// the existing refresh pipeline. Normally fire-and-forget — basic
+		// ratings above are enough for the immediate response; everything
+		// else fills in on the next visit. Callers that need the metadata
+		// *now* (e.g. a Discover movie seed, which can't produce similars
+		// without genres/cast) pass `awaitEnrichment` to block on it.
+		if (opts.awaitEnrichment) {
+			try {
+				await this.metadataService.refreshMetadata(stubId);
+			} catch (err) {
+				this.logger.warn(
+					`Synchronous refresh for tmdb stub ${tmdbId} failed: ${(err as Error).message}`,
+				);
+			}
+		} else {
+			this.metadataService.refreshMetadata(stubId).catch((err) => {
+				this.logger.warn(
+					`Background refresh for tmdb stub ${tmdbId} failed: ${(err as Error).message}`,
+				);
+			});
+		}
 
 		return this.findById(stubId, userId);
+	}
+
+	/**
+	 * Resolve a Discover seed key to a real `movies.id`. Library ids pass
+	 * through (when they exist); external keys (`tmdb:<id>`) are resolved
+	 * to a bookmark stub via {@link findOrFetchByKey}, synchronously
+	 * enriched so the seed carries genres/cast for similarity scoring.
+	 * Returns null when the key can't be resolved (so the caller can skip
+	 * it rather than treat it as `seed_not_found`).
+	 */
+	async resolveSeedMovieId(key: string, userId?: string): Promise<string | null> {
+		if (!key.includes(':')) {
+			const row = this.database.db
+				.select({ id: movies.id })
+				.from(movies)
+				.where(eq(movies.id, key))
+				.get();
+			return row?.id ?? null;
+		}
+		try {
+			const movie = await this.findOrFetchByKey(key, userId, { awaitEnrichment: true });
+			return (movie as { id?: string })?.id ?? null;
+		} catch (err) {
+			this.logger.warn(
+				`Failed to resolve discover seed key ${key}: ${(err as Error).message}`,
+			);
+			return null;
+		}
 	}
 
 	async findById(id: string, userId?: string) {

@@ -3,9 +3,10 @@ import { CacheModule } from '../cache/cache.module.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { EmbeddingsModule } from '../embeddings/embeddings.module.js';
 import { EventsModule } from '../events/events.module.js';
+import { FavoritesModule } from '../favorites/favorites.module.js';
 import { LlmModule } from '../llm/llm.module.js';
 import { MetadataModule } from '../metadata/metadata.module.js';
-import { FavoritesModule } from '../favorites/favorites.module.js';
+import { MoviesModule } from '../movies/movies.module.js';
 import { PeopleModule } from '../people/people.module.js';
 import { TraktModule } from '../providers/sources/trakt/trakt.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
@@ -47,6 +48,7 @@ import { TasteProfileService } from './taste-profile.service.js';
 		SettingsModule,
 		PeopleModule,
 		FavoritesModule,
+		MoviesModule,
 	],
 	controllers: [RecommendationsController],
 	providers: [
