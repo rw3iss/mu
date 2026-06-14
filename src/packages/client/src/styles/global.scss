@@ -289,6 +289,23 @@ html[data-reduce-motion='true'] *::after {
   pointer-events: auto;
 }
 
+// Overlay variant — the revealed control is absolutely positioned over the
+// END of its host's text (e.g. a director name), so we animate opacity only
+// (no scale transform that would fight the absolute layout). Positioning and
+// the fade gradient live in the component module (FavoriteButton `.overlay`).
+[data-reveal-overlay='true']:not([aria-pressed='true']) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms var(--ease-out, ease-out);
+}
+
+[data-reveal-host]:hover [data-reveal-overlay='true']:not([aria-pressed='true']),
+[data-reveal-host]:focus-within [data-reveal-overlay='true']:not([aria-pressed='true']),
+[data-reveal-overlay='true']:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 // Shimmer skeleton for loading placeholders. Drop on a block-level
 // element with explicit dimensions. Respects reduce-motion via the
 // global override above (animation neutralised).

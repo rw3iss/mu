@@ -660,9 +660,12 @@
 }
 
 .directorRow {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  // The favorite star overlays the name's tail (absolute), so it reserves
+  // no inline space; the gradient fades into this section's background.
+  --reveal-overlay-bg: var(--color-bg-primary);
 }
 
 .directorLink {

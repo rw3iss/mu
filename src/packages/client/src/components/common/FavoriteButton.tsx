@@ -42,6 +42,16 @@ export type FavoriteButtonProps = (PersonProps | MovieProps) & {
 	 * `data-reveal-on-hover` on hover/focus.
 	 */
 	revealOnHover?: boolean;
+	/**
+	 * Overlay variant of {@link revealOnHover}: instead of sitting inline
+	 * after the label (reserving empty space), the star is absolutely
+	 * positioned over the END of the host text with a gradient that fades
+	 * from the section background (right, covering the text tail) to
+	 * transparent (left). The host must be `position: relative` +
+	 * `data-reveal-host`, and may set `--reveal-overlay-bg` to its own
+	 * background colour. Used on director rows.
+	 */
+	overlayReveal?: boolean;
 };
 
 const SIZE_DIMENSIONS: Record<ButtonSize, number> = {
@@ -107,13 +117,14 @@ export function FavoriteButton(props: FavoriteButtonProps) {
 	return (
 		<button
 			type="button"
-			class={`${styles.btn} ${styles[`size_${size}`]} ${isFavorited ? styles.active : ''} ${props.class ?? ''}`}
+			class={`${styles.btn} ${styles[`size_${size}`]} ${isFavorited ? styles.active : ''} ${props.overlayReveal ? styles.overlay : ''} ${props.class ?? ''}`}
 			onClick={handleClick}
 			aria-pressed={isFavorited}
 			aria-label={ariaLabel}
 			title={props.title ?? ariaLabel}
-			style={{ width: `${px}px`, height: `${px}px` }}
-			data-reveal-on-hover={props.revealOnHover ? 'true' : undefined}
+			style={props.overlayReveal ? undefined : { width: `${px}px`, height: `${px}px` }}
+			data-reveal-on-hover={props.revealOnHover && !props.overlayReveal ? 'true' : undefined}
+			data-reveal-overlay={props.overlayReveal ? 'true' : undefined}
 		>
 			<svg
 				class={styles.star}

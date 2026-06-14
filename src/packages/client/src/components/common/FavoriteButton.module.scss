@@ -98,6 +98,46 @@
 	border-width: 2px;
 }
 
+/* ── Overlay reveal (director rows) ────────────────────────────────
+ * Pin the star to the right edge of a `position: relative` host so it
+ * floats over the TAIL of the name instead of reserving inline space.
+ * A left-fading gradient (transparent → section bg) blends the covered
+ * text into the background, leaving just the star legible on top. The
+ * host supplies its own colour via `--reveal-overlay-bg`. */
+.overlay {
+	position: absolute;
+	inset: 0 0 0 auto;
+	width: auto;
+	height: 100%;
+	padding: 0 1px 0 36px;
+	justify-content: flex-end;
+	border-radius: 0;
+
+	&,
+	&:hover {
+		border-color: transparent;
+		background: linear-gradient(
+			to right,
+			transparent 0%,
+			var(--reveal-overlay-bg, var(--color-bg-primary)) 58%
+		);
+	}
+
+	&:hover {
+		color: var(--color-hover-text);
+	}
+
+	/* Favorited star stays visible; keep the gradient, tint the star. */
+	&.active {
+		color: var(--color-accent);
+		background: linear-gradient(
+			to right,
+			transparent 0%,
+			var(--reveal-overlay-bg, var(--color-bg-primary)) 58%
+		);
+	}
+}
+
 /* Reduced motion accommodation. */
 @media (prefers-reduced-motion: reduce) {
 	.btn,

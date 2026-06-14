@@ -664,7 +664,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 										personRole="director"
 										size="mini"
 										stopPropagation
-										revealOnHover
+										overlayReveal
 									/>
 								</span>
 							)}

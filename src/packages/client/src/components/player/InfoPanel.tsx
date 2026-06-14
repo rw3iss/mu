@@ -160,7 +160,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 											personRole="director"
 											size="mini"
 											stopPropagation
-											revealOnHover
+											overlayReveal
 										/>
 									</span>
 								)}
@@ -429,7 +429,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										personRole="director"
 										size="mini"
 										stopPropagation
-										revealOnHover
+										overlayReveal
 									/>
 								</span>
 							)}

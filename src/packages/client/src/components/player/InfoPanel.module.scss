@@ -17,6 +17,8 @@
   --on-dark-overlay-2: var(--color-bg-hover);
   --on-dark-overlay-3: var(--color-border);
   --ip-section-label: var(--color-label);
+  // Director-row star overlay fades into the page background here.
+  --reveal-overlay-bg: var(--color-bg-primary);
   padding: var(--space-md);
   color: var(--on-dark-text-primary);
 
@@ -70,6 +72,8 @@
   width: 380px;
   max-width: 90vw;
   background: rgba(15, 15, 15, 0.95);
+  // Director-row star overlay fades into this dark-glass panel background.
+  --reveal-overlay-bg: rgba(15, 15, 15, 0.95);
   backdrop-filter: blur(var(--surface-glass-blur));
   border-left: 1px solid var(--on-dark-overlay-1);
   z-index: calc(var(--z-player-controls) + 5);
@@ -148,11 +152,12 @@
 }
 
 .directorRow {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  /* Breathing room between the director's name and the inline
-   * favorite star — 4px was visually flush at small font sizes. */
-  gap: 8px;
+  /* The favorite star overlays the name's tail (absolute) — no inline
+   * gap reserved. The fade gradient uses --reveal-overlay-bg, set on the
+   * enclosing panel (.inlinePanel / .panel) to match its background. */
 }
 
 .directorLink {
