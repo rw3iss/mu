@@ -392,6 +392,12 @@ const tables = [
 		fetched_at TEXT NOT NULL
 	)`,
 	`CREATE INDEX IF NOT EXISTS search_cache_type_query ON search_cache(type, normalized_query)`,
+	`CREATE TABLE IF NOT EXISTS soundtrack_cache (
+		movie_id TEXT PRIMARY KEY,
+		found INTEGER NOT NULL DEFAULT 0,
+		payload TEXT NOT NULL,
+		fetched_at TEXT NOT NULL
+	)`,
 	`CREATE TABLE IF NOT EXISTS imdb_ratings (
 		tconst TEXT PRIMARY KEY,
 		average_rating REAL NOT NULL,

@@ -1,3 +1,4 @@
+import type { SoundtrackDto } from '@mu/shared';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { CommentsPanel } from '@/components/comments/CommentsPanel';
@@ -27,6 +28,7 @@ import { type AudioProfile, audioProfilesService } from '@/services/audio-profil
 import { bookmarksService } from '@/services/discover.service';
 import { jobsService } from '@/services/jobs.service';
 import { type MatchCandidate, moviesService } from '@/services/movies.service';
+import { soundtrackService } from '@/services/soundtrack.service';
 import { wsService } from '@/services/websocket.service';
 import { currentUser } from '@/state/auth.state';
 import { countComments, loadComments } from '@/state/comments.state';
@@ -366,6 +368,37 @@ export function MovieDetail({ id }: MovieDetailProps) {
 			setLoadingCast(false);
 		}
 	}, [movie, loadingCast]);
+
+	// Soundtrack (MusicBrainz album tracklist) — collapsed by default and
+	// lazy-fetched the first time it's expanded, so the movie page doesn't
+	// pay a MusicBrainz round-trip on every visit.
+	const [showSoundtrack, setShowSoundtrack] = useState(false);
+	const [soundtrack, setSoundtrack] = useState<SoundtrackDto | null>(null);
+	const [loadingSoundtrack, setLoadingSoundtrack] = useState(false);
+
+	const toggleSoundtrack = useCallback(() => {
+		setShowSoundtrack((open) => {
+			const next = !open;
+			if (next && !soundtrack && !loadingSoundtrack && movie) {
+				setLoadingSoundtrack(true);
+				soundtrackService
+					.getForMovie(movie.id)
+					.then(setSoundtrack)
+					.catch(() =>
+						setSoundtrack({
+							movieId: movie.id,
+							found: false,
+							release: null,
+							source: 'musicbrainz',
+							fetchedAt: new Date().toISOString(),
+						}),
+					)
+					.finally(() => setLoadingSoundtrack(false));
+			}
+			return next;
+		});
+	}, [soundtrack, loadingSoundtrack, movie]);
+
 	const [showOverview, setShowOverview] = useState(true);
 	const [playlistCount, setPlaylistCount] = useState(0);
 	const [audioProfiles, setAudioProfiles] = useState<AudioProfile[]>([]);
@@ -1071,6 +1104,91 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						)}
 
 						{/* ── Bottom sections: two 50% columns (stack on mobile) ── */}
+						{/* Soundtrack — collapsible, lazy-loaded album tracklist (MusicBrainz). */}
+						{!isPreview && (
+							<div class={styles.soundtrackSection}>
+								<button
+									class={styles.fileInfoToggle}
+									onClick={toggleSoundtrack}
+									type="button"
+									aria-expanded={showSoundtrack}
+								>
+									<h2 class={styles.sectionTitle}>Soundtrack</h2>
+									<span class={styles.fileInfoArrow}>
+										<Icon
+											name={showSoundtrack ? 'chevron-up' : 'chevron-down'}
+											size={14}
+										/>
+									</span>
+								</button>
+								{showSoundtrack && (
+									<div class={styles.soundtrackBody}>
+										{loadingSoundtrack ? (
+											<p class={styles.soundtrackEmpty}>
+												Searching MusicBrainz…
+											</p>
+										) : soundtrack?.found && soundtrack.release ? (
+											<>
+												<div class={styles.soundtrackHeader}>
+													<span class={styles.soundtrackAlbum}>
+														{soundtrack.release.title}
+													</span>
+													<span class={styles.soundtrackMeta}>
+														{[
+															soundtrack.release.artist,
+															soundtrack.release.date?.slice(0, 4),
+															`${soundtrack.release.trackCount} tracks`,
+														]
+															.filter(Boolean)
+															.join(' · ')}
+													</span>
+												</div>
+												<ol class={styles.trackList}>
+													{soundtrack.release.tracks.map((t, i) => (
+														<li
+															key={`${t.position ?? i}-${t.title}`}
+															class={styles.track}
+														>
+															<span class={styles.trackNum}>
+																{t.position ?? i + 1}
+															</span>
+															<span class={styles.trackTitle}>
+																{t.title}
+																{t.artist && (
+																	<span
+																		class={styles.trackArtist}
+																	>
+																		{t.artist}
+																	</span>
+																)}
+															</span>
+															{t.lengthMs != null && (
+																<span class={styles.trackTime}>
+																	{formatTrackLength(t.lengthMs)}
+																</span>
+															)}
+														</li>
+													))}
+												</ol>
+												<a
+													class={styles.soundtrackSource}
+													href={soundtrack.release.url}
+													target="_blank"
+													rel="noopener noreferrer"
+												>
+													View on MusicBrainz
+												</a>
+											</>
+										) : (
+											<p class={styles.soundtrackEmpty}>
+												No soundtrack listing found for this title.
+											</p>
+										)}
+									</div>
+								)}
+							</div>
+						)}
+
 						<div class={styles.bottomColumns}>
 							<div class={styles.bottomCol}>
 								{/* Playlists */}
@@ -1367,6 +1485,14 @@ export function MovieDetail({ id }: MovieDetailProps) {
 			)}
 		</div>
 	);
+}
+
+/** Format a track length in ms as m:ss. */
+function formatTrackLength(ms: number): string {
+	const total = Math.round(ms / 1000);
+	const m = Math.floor(total / 60);
+	const s = total % 60;
+	return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 /**

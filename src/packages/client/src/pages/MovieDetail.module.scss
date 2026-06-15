@@ -1099,3 +1099,99 @@
 		background: var(--color-bg-hover);
 	}
 }
+
+// ── Soundtrack (MusicBrainz album tracklist) ──────────────────────
+.soundtrackSection {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.soundtrackBody {
+  margin-top: var(--space-md);
+}
+
+.soundtrackHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--space-sm);
+}
+
+.soundtrackAlbum {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.soundtrackMeta {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.trackList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.track {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+
+  &:nth-child(odd) {
+    background: var(--color-bg-elevated);
+  }
+}
+
+.trackNum {
+  flex-shrink: 0;
+  width: 1.75rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.trackTitle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: var(--color-text-primary);
+}
+
+.trackArtist {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.trackTime {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.soundtrackSource {
+  display: inline-block;
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.soundtrackEmpty {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
