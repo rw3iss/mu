@@ -301,17 +301,27 @@ export class AudioEngine {
 		audioEffectsHlsBlocked.value = false;
 
 		try {
-			// Construct with explicit sampleRate. Chrome's no-arg AudioContext
-			// binds to the device's "preferred" rate at creation time, and
-			// when the device binding is half-initialized (post storage-clear,
-			// device hot-swap, focus-loss-during-sleep) it falls back to
-			// 44100 against a sink that silently drops samples. Passing an
-			// explicit rate routes through Chrome's internal resampler,
-			// which decouples ctx from the device's native clock and
-			// historically avoids that stuck-binding code path. 48000 is the
-			// industry standard for video; cost vs no-arg is one resample
-			// stage (~0.1% CPU).
-			this.ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'playback' });
+			// Sample-rate policy.
+			//
+			// Default: let the AudioContext bind to the DEVICE'S native rate
+			// (no explicit sampleRate). Forcing a rate routes the context
+			// through Chrome's internal resampler, and on some Linux
+			// (PipeWire/PulseAudio) setups the resampled output lands on a
+			// sink that renders nothing — the graph processes audio (analyser
+			// shows signal, outputLatency looks healthy) yet the speakers stay
+			// silent, while the native HTMLMediaElement path (running at the
+			// device rate) plays fine. Matching the device rate avoids that
+			// resampler sink entirely.
+			//
+			// Opt back into the old forced-48k behaviour (a workaround for a
+			// different Windows machine's half-initialized-binding stuck-sink)
+			// via `localStorage.mu_audio_force_48k = '1'`.
+			const force48k =
+				typeof localStorage !== 'undefined' &&
+				localStorage.getItem('mu_audio_force_48k') === '1';
+			this.ctx = force48k
+				? new AudioContext({ sampleRate: 48000, latencyHint: 'playback' })
+				: new AudioContext({ latencyHint: 'playback' });
 			debug('audio:attach', {
 				event: 'audio-context',
 				state: this.ctx.state,
@@ -324,15 +334,13 @@ export class AudioEngine {
 			// Heuristic stuck-sink detection. We can't directly observe
 			// whether samples reach the speakers, but two signals correlate
 			// strongly with the failure mode: outputLatency==0 (ctx never
-			// bound to a real device) and sampleRate < 48000 (Chrome's safe
-			// fallback when device negotiation didn't complete). Flag for
-			// the UI; the user gets a "Reset Audio Output" affordance.
+			// bound to a real device). We no longer treat sampleRate < 48000
+			// as suspect — now that we bind to the device's NATIVE rate, a
+			// 44100 device is expected and healthy, not a fallback.
 			const outputLatency =
 				(this.ctx as AudioContext & { outputLatency?: number }).outputLatency ?? null;
 			if (outputLatency !== null && outputLatency <= 0) {
 				markAudioSuspect(`outputLatency=${outputLatency}`);
-			} else if (this.ctx.sampleRate < 48000) {
-				markAudioSuspect(`sampleRate=${this.ctx.sampleRate} (fallback)`);
 			} else {
 				// Fresh attach with healthy-looking signals — clear any
 				// stale suspect flag from a prior session.
