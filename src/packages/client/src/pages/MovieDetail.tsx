@@ -1177,6 +1177,28 @@ export function MovieDetail({ id }: MovieDetailProps) {
 																	t.title,
 																)}
 															/>
+															<a
+																class={styles.trackOpen}
+																href={`https://www.youtube.com/results?search_query=${encodeURIComponent(
+																	trackCopyText(
+																		t.artist ??
+																			soundtrack.release
+																				.artist ??
+																			null,
+																		t.title,
+																	),
+																)}`}
+																target="_blank"
+																rel="noopener noreferrer"
+																title="Search on YouTube"
+																aria-label="Search this track on YouTube"
+																onClick={(e) => e.stopPropagation()}
+															>
+																<Icon
+																	name="arrow-up-right"
+																	size={14}
+																/>
+															</a>
 															{t.lengthMs != null && (
 																<span class={styles.trackTime}>
 																	{formatTrackLength(t.lengthMs)}
