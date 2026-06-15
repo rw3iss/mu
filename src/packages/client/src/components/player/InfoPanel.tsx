@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { CommentsPanel } from '@/components/comments/CommentsPanel';
+import { Collapse } from '@/components/common/Collapse';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
@@ -32,6 +33,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 	const [showFileInfo, setShowFileInfo] = useState(false);
 	const [showComments, setShowComments] = useState(false);
 	const [showCast, setShowCast] = useState(true);
+	const [showOverview, setShowOverview] = useState(true);
 	// "Load all" cast expansion — full list fetched (and persisted) on demand.
 	const [fullCast, setFullCast] = useState<NonNullable<Movie['cast']> | null>(null);
 	const [loadingCast, setLoadingCast] = useState(false);
@@ -246,8 +248,21 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 
 							{movie.overview && (
 								<div class={styles.section}>
-									<h3 class={styles.sectionTitle}>Overview</h3>
-									<p class={styles.overview}>{movie.overview}</p>
+									<button
+										class={styles.fileInfoToggle}
+										onClick={() => setShowOverview(!showOverview)}
+									>
+										<h3 class={styles.sectionTitle}>Overview</h3>
+										<span class={styles.fileInfoArrow}>
+											<Icon
+												name={showOverview ? 'chevron-up' : 'chevron-down'}
+												size={14}
+											/>
+										</span>
+									</button>
+									<Collapse open={showOverview}>
+										<p class={styles.overview}>{movie.overview}</p>
+									</Collapse>
 								</div>
 							)}
 
@@ -265,72 +280,74 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 											/>
 										</span>
 									</button>
-									<div
-										class={styles.castList}
-										style={{ display: showCast ? '' : 'none' }}
-									>
-										{(fullCast ?? movie.cast.slice(0, 8)).map((member) => {
-											const key = personKeyFor({
-												tmdbId: member.tmdbId,
-												name: member.name,
-											});
-											return (
-												<a
-													key={member.name}
-													class={styles.castMember}
-													href={`/person/${key}`}
-													data-reveal-host
-													onClick={(e) => {
-														e.preventDefault();
-														route(`/person/${key}`);
-													}}
-												>
-													<CastPhoto
-														name={member.name}
-														profileUrl={member.profileUrl}
-														character={member.character}
-														size={36}
-														expandedSize={180}
-														thumbClass={styles.castPhoto}
-													/>
-													<div class={styles.castInfo}>
-														<span class={styles.castName}>
-															{member.name}
-														</span>
-														{member.character && (
-															<span class={styles.castCharacter}>
-																{member.character}
-															</span>
-														)}
-													</div>
-													<div class={styles.castActions}>
-														<span class={styles.castArrow}>
-															<Icon name="chevron-right" size={12} />
-														</span>
-														<FavoriteButton
-															entityType="person"
-															tmdbId={member.tmdbId}
+									<Collapse open={showCast}>
+										<div class={styles.castList}>
+											{(fullCast ?? movie.cast.slice(0, 8)).map((member) => {
+												const key = personKeyFor({
+													tmdbId: member.tmdbId,
+													name: member.name,
+												});
+												return (
+													<a
+														key={member.name}
+														class={styles.castMember}
+														href={`/person/${key}`}
+														data-reveal-host
+														onClick={(e) => {
+															e.preventDefault();
+															route(`/person/${key}`);
+														}}
+													>
+														<CastPhoto
 															name={member.name}
 															profileUrl={member.profileUrl}
-															personRole="actor"
-															size="normal"
-															stopPropagation
-															revealOnHover
+															character={member.character}
+															size={36}
+															expandedSize={180}
+															thumbClass={styles.castPhoto}
 														/>
-													</div>
-												</a>
-											);
-										})}
-										{!fullCast && movie.cast.length > 8 && (
-											<button
-												class={styles.loadAllCast}
-												disabled={loadingCast}
-												onClick={handleLoadAllCast}
-											>
-												{loadingCast ? 'Loading…' : 'Load all'}
-											</button>
-										)}
-									</div>
+														<div class={styles.castInfo}>
+															<span class={styles.castName}>
+																{member.name}
+															</span>
+															{member.character && (
+																<span class={styles.castCharacter}>
+																	{member.character}
+																</span>
+															)}
+														</div>
+														<div class={styles.castActions}>
+															<span class={styles.castArrow}>
+																<Icon
+																	name="chevron-right"
+																	size={12}
+																/>
+															</span>
+															<FavoriteButton
+																entityType="person"
+																tmdbId={member.tmdbId}
+																name={member.name}
+																profileUrl={member.profileUrl}
+																personRole="actor"
+																size="normal"
+																stopPropagation
+																revealOnHover
+															/>
+														</div>
+													</a>
+												);
+											})}
+											{!fullCast && movie.cast.length > 8 && (
+												<button
+													class={styles.loadAllCast}
+													disabled={loadingCast}
+													onClick={handleLoadAllCast}
+												>
+													{loadingCast ? 'Loading…' : 'Load all'}
+												</button>
+											)}
+										</div>
+									</Collapse>
 								</div>
 							)}
 
@@ -347,7 +364,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										/>
 									</span>
 								</button>
-								{showComments && <CommentsPanel movieId={movie.id} />}
+								<Collapse open={showComments}>
+									<CommentsPanel movieId={movie.id} />
+								</Collapse>
 							</div>
 
 							{movie.fileInfo && (
@@ -365,7 +384,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 											/>
 										</span>
 									</button>
-									{showFileInfo && <FileInfoGrid movie={movie} dark />}
+									<Collapse open={showFileInfo}>
+										<FileInfoGrid movie={movie} dark />
+									</Collapse>
 								</div>
 							)}
 						</div>
@@ -515,8 +536,21 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 
 						{movie.overview && (
 							<div class={styles.section}>
-								<h3 class={styles.sectionTitle}>Overview</h3>
-								<p class={styles.overview}>{movie.overview}</p>
+								<button
+									class={styles.fileInfoToggle}
+									onClick={() => setShowOverview(!showOverview)}
+								>
+									<h3 class={styles.sectionTitle}>Overview</h3>
+									<span class={styles.fileInfoArrow}>
+										<Icon
+											name={showOverview ? 'chevron-up' : 'chevron-down'}
+											size={14}
+										/>
+									</span>
+								</button>
+								<Collapse open={showOverview}>
+									<p class={styles.overview}>{movie.overview}</p>
+								</Collapse>
 							</div>
 						)}
 
@@ -534,72 +568,71 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										/>
 									</span>
 								</button>
-								<div
-									class={styles.castList}
-									style={{ display: showCast ? '' : 'none' }}
-								>
-									{(fullCast ?? movie.cast.slice(0, 8)).map((member) => {
-										const key = personKeyFor({
-											tmdbId: member.tmdbId,
-											name: member.name,
-										});
-										return (
-											<a
-												key={member.name}
-												class={styles.castMember}
-												href={`/person/${key}`}
-												data-reveal-host
-												onClick={(e) => {
-													e.preventDefault();
-													route(`/person/${key}`);
-												}}
-											>
-												<CastPhoto
-													name={member.name}
-													profileUrl={member.profileUrl}
-													character={member.character}
-													size={36}
-													expandedSize={180}
-													thumbClass={styles.castPhoto}
-												/>
-												<div class={styles.castInfo}>
-													<span class={styles.castName}>
-														{member.name}
-													</span>
-													{member.character && (
-														<span class={styles.castCharacter}>
-															{member.character}
-														</span>
-													)}
-												</div>
-												<div class={styles.castActions}>
-													<span class={styles.castArrow}>
-														<Icon name="chevron-right" size={12} />
-													</span>
-													<FavoriteButton
-														entityType="person"
-														tmdbId={member.tmdbId}
+								<Collapse open={showCast}>
+									<div class={styles.castList}>
+										{(fullCast ?? movie.cast.slice(0, 8)).map((member) => {
+											const key = personKeyFor({
+												tmdbId: member.tmdbId,
+												name: member.name,
+											});
+											return (
+												<a
+													key={member.name}
+													class={styles.castMember}
+													href={`/person/${key}`}
+													data-reveal-host
+													onClick={(e) => {
+														e.preventDefault();
+														route(`/person/${key}`);
+													}}
+												>
+													<CastPhoto
 														name={member.name}
 														profileUrl={member.profileUrl}
-														personRole="actor"
-														size="normal"
-														stopPropagation
-														revealOnHover
+														character={member.character}
+														size={36}
+														expandedSize={180}
+														thumbClass={styles.castPhoto}
 													/>
-												</div>
-											</a>
-										);
-									})}
-									{!fullCast && movie.cast.length > 8 && (
-										<button
-											class={styles.loadAllCast}
-											disabled={loadingCast}
-											onClick={handleLoadAllCast}
-										>
-											{loadingCast ? 'Loading…' : 'Load all'}
-										</button>
-									)}
-								</div>
+													<div class={styles.castInfo}>
+														<span class={styles.castName}>
+															{member.name}
+														</span>
+														{member.character && (
+															<span class={styles.castCharacter}>
+																{member.character}
+															</span>
+														)}
+													</div>
+													<div class={styles.castActions}>
+														<span class={styles.castArrow}>
+															<Icon name="chevron-right" size={12} />
+														</span>
+														<FavoriteButton
+															entityType="person"
+															tmdbId={member.tmdbId}
+															name={member.name}
+															profileUrl={member.profileUrl}
+															personRole="actor"
+															size="normal"
+															stopPropagation
+															revealOnHover
+														/>
+													</div>
+												</a>
+											);
+										})}
+										{!fullCast && movie.cast.length > 8 && (
+											<button
+												class={styles.loadAllCast}
+												disabled={loadingCast}
+												onClick={handleLoadAllCast}
+											>
+												{loadingCast ? 'Loading…' : 'Load all'}
+											</button>
+										)}
+									</div>
+								</Collapse>
 							</div>
 						)}
 
@@ -616,7 +649,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									/>
 								</span>
 							</button>
-							{showComments && <CommentsPanel movieId={movie.id} />}
+							<Collapse open={showComments}>
+								<CommentsPanel movieId={movie.id} />
+							</Collapse>
 						</div>
 
 						{movie.fileInfo && (
@@ -634,7 +669,9 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 										/>
 									</span>
 								</button>
-								{showFileInfo && <FileInfoGrid movie={movie} dark />}
+								<Collapse open={showFileInfo}>
+									<FileInfoGrid movie={movie} dark />
+								</Collapse>
 							</div>
 						)}
 					</>

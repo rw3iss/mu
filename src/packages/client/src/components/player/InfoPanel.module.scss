@@ -397,9 +397,10 @@
 // tucked tight under that line, smaller label-style text, with breathing
 // room before the genre chips.
 .addedRow {
-  margin-top: -6px;
+  // Tuck tighter under the meta line above, and a touch smaller.
+  margin-top: -12px;
   margin-bottom: var(--space-sm);
-  font-size: var(--font-size-xs);
+  font-size: 10px;
 
   .addedAt {
     text-transform: uppercase;

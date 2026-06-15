@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { CommentsPanel } from '@/components/comments/CommentsPanel';
 import { Button } from '@/components/common/Button';
+import { Collapse } from '@/components/common/Collapse';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { Select } from '@/components/common/Select';
@@ -908,28 +909,24 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									/>
 								</span>
 							</button>
-							{showOverview && (
-								<>
-									{movie.overview && (
-										<p class={styles.overview}>{movie.overview}</p>
-									)}
-									<TrailerSection
-										trailerUrl={movie.trailerUrl}
-										posterUrl={movie.backdropUrl || movie.posterUrl}
-									/>
-									{movie.keywords && movie.keywords.length > 0 && (
-										<div class={styles.keywordsSection}>
-											<div class={styles.genres}>
-												{movie.keywords.map((kw) => (
-													<span key={kw} class={styles.keywordTag}>
-														{kw}
-													</span>
-												))}
-											</div>
+							<Collapse open={showOverview}>
+								{movie.overview && <p class={styles.overview}>{movie.overview}</p>}
+								<TrailerSection
+									trailerUrl={movie.trailerUrl}
+									posterUrl={movie.backdropUrl || movie.posterUrl}
+								/>
+								{movie.keywords && movie.keywords.length > 0 && (
+									<div class={styles.keywordsSection}>
+										<div class={styles.genres}>
+											{movie.keywords.map((kw) => (
+												<span key={kw} class={styles.keywordTag}>
+													{kw}
+												</span>
+											))}
 										</div>
-									)}
-								</>
-							)}
+									</div>
+								)}
+							</Collapse>
 						</div>
 
 						{/* Details */}
@@ -1026,20 +1023,19 @@ export function MovieDetail({ id }: MovieDetailProps) {
 									aria-expanded={showCast}
 								>
 									<h2 class={styles.sectionTitle}>Cast</h2>
-									<span class={`${styles.fileInfoArrow} ${styles.castArrow}`}>
+									<span class={styles.fileInfoArrow}>
 										<Icon
 											name={showCast ? 'chevron-up' : 'chevron-down'}
 											size={14}
 										/>
 									</span>
 								</button>
-								<div
-									class={`${styles.castGrid} ${
-										!showCast ? styles.castGridCollapsed : ''
-									}`}
-								>
-									{(fullCastLoaded ? movie.cast : movie.cast.slice(0, 12)).map(
-										(member) => {
+								<Collapse open={showCast}>
+									<div class={styles.castGrid}>
+										{(fullCastLoaded
+											? movie.cast
+											: movie.cast.slice(0, 12)
+										).map((member, ci) => {
 											const key = personKeyFor({
 												tmdbId: member.tmdbId,
 												name: member.name,
@@ -1047,7 +1043,18 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											return (
 												<a
 													key={member.name}
-													class={styles.castMember}
+													class={`${styles.castMember} ${
+														fullCastLoaded && ci >= 12
+															? styles.castEnter
+															: ''
+													}`}
+													style={
+														fullCastLoaded && ci >= 12
+															? {
+																	animationDelay: `${Math.min(ci - 12, 16) * 30}ms`,
+																}
+															: undefined
+													}
 													href={`/person/${key}`}
 													data-reveal-host
 													onClick={(e) => {
@@ -1088,18 +1095,18 @@ export function MovieDetail({ id }: MovieDetailProps) {
 													</div>
 												</a>
 											);
-										},
-									)}
-									{!fullCastLoaded && movie.cast.length > 12 && (
-										<button
-											class={styles.loadAllCast}
-											disabled={loadingCast}
-											onClick={handleLoadAllCast}
-										>
-											{loadingCast ? 'Loading…' : 'Load all'}
-										</button>
-									)}
-								</div>
+										})}
+										{!fullCastLoaded && movie.cast.length > 12 && (
+											<button
+												class={styles.loadAllCast}
+												disabled={loadingCast}
+												onClick={handleLoadAllCast}
+											>
+												{loadingCast ? 'Loading…' : 'Load all'}
+											</button>
+										)}
+									</div>
+								</Collapse>
 							</div>
 						)}
 
@@ -1121,7 +1128,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 										/>
 									</span>
 								</button>
-								{showSoundtrack && (
+								<Collapse open={showSoundtrack}>
 									<div class={styles.soundtrackBody}>
 										{loadingSoundtrack ? (
 											<p class={styles.soundtrackEmpty}>
@@ -1162,6 +1169,14 @@ export function MovieDetail({ id }: MovieDetailProps) {
 																	</span>
 																)}
 															</span>
+															<TrackCopyButton
+																text={trackCopyText(
+																	t.artist ??
+																		soundtrack.release.artist ??
+																		null,
+																	t.title,
+																)}
+															/>
 															{t.lengthMs != null && (
 																<span class={styles.trackTime}>
 																	{formatTrackLength(t.lengthMs)}
@@ -1185,7 +1200,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											</p>
 										)}
 									</div>
-								)}
+								</Collapse>
 							</div>
 						)}
 
@@ -1208,7 +1223,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											/>
 										</span>
 									</button>
-									{showPlaylists && (
+									<Collapse open={showPlaylists}>
 										<div class={styles.sectionNarrow}>
 											<MoviePlaylists
 												movieId={movie.id}
@@ -1226,7 +1241,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 												}
 											/>
 										</div>
-									)}
+									</Collapse>
 								</div>
 
 								{/* Play Settings (local only) */}
@@ -1249,7 +1264,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											</span>
 										</button>
 
-										{showPlaySettings && (
+										<Collapse open={showPlaySettings}>
 											<div
 												class={`${styles.fileInfoContent} ${styles.sectionNarrow}`}
 											>
@@ -1345,7 +1360,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 													/>
 												</div>
 											</div>
-										)}
+										</Collapse>
 									</div>
 								)}
 
@@ -1368,7 +1383,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											</span>
 										</button>
 
-										{showFileInfo && (
+										<Collapse open={showFileInfo}>
 											<div class={styles.fileInfoContent}>
 												<FileInfoGrid
 													movie={movie}
@@ -1403,7 +1418,7 @@ export function MovieDetail({ id }: MovieDetailProps) {
 															/>
 														</span>
 													</button>
-													{showSubtitles && (
+													<Collapse open={showSubtitles}>
 														<div class={styles.subtitlePanelWrap}>
 															<SubtitlePanel
 																movieId={movie.id}
@@ -1434,10 +1449,10 @@ export function MovieDetail({ id }: MovieDetailProps) {
 																}}
 															/>
 														</div>
-													)}
+													</Collapse>
 												</div>
 											</div>
-										)}
+										</Collapse>
 									</div>
 								)}
 							</div>
@@ -1462,11 +1477,11 @@ export function MovieDetail({ id }: MovieDetailProps) {
 											/>
 										</span>
 									</button>
-									{showComments && (
+									<Collapse open={showComments}>
 										<div class={styles.fileInfoContent}>
 											<CommentsPanel movieId={movie.id} />
 										</div>
-									)}
+									</Collapse>
 								</div>
 							</div>
 						</div>
@@ -1493,6 +1508,67 @@ function formatTrackLength(ms: number): string {
 	const m = Math.floor(total / 60);
 	const s = total % 60;
 	return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** Build the "Artist Name - Track Name" string copied from a soundtrack row. */
+function trackCopyText(artist: string | null, title: string): string {
+	return artist ? `${artist} - ${title}` : title;
+}
+
+/**
+ * Copy-to-clipboard button for a soundtrack track. The icon flips to a
+ * green check for 2s after a successful copy.
+ */
+function TrackCopyButton({ text }: { text: string }) {
+	const [copied, setCopied] = useState(false);
+	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(
+		() => () => {
+			if (timer.current) clearTimeout(timer.current);
+		},
+		[],
+	);
+
+	const handleCopy = useCallback(
+		async (e: MouseEvent) => {
+			e.preventDefault();
+			e.stopPropagation();
+			try {
+				await navigator.clipboard.writeText(text);
+			} catch {
+				// Clipboard API unavailable (insecure context) — fall back.
+				const ta = document.createElement('textarea');
+				ta.value = text;
+				ta.style.position = 'fixed';
+				ta.style.opacity = '0';
+				document.body.appendChild(ta);
+				ta.select();
+				try {
+					document.execCommand('copy');
+				} catch {
+					/* give up silently */
+				}
+				ta.remove();
+			}
+			setCopied(true);
+			if (timer.current) clearTimeout(timer.current);
+			timer.current = setTimeout(() => setCopied(false), 2000);
+		},
+		[text],
+	);
+
+	return (
+		<button
+			type="button"
+			class={`${styles.trackCopy} ${copied ? styles.trackCopied : ''}`}
+			onClick={handleCopy}
+			title={copied ? 'Copied' : 'Copy artist - track'}
+			aria-label={copied ? 'Copied' : 'Copy artist and track name'}
+		>
+			<Icon name={copied ? 'check' : 'copy'} size={14} />
+		</button>
+	);
 }
 
 /**

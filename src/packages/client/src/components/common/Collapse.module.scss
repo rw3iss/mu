@@ -1,0 +1,29 @@
+/**
+ * Animated collapse via grid-template-rows. The single child wrapper
+ * (.inner) hides overflow during the animation; once fully open it
+ * switches to visible so nested hover previews aren't clipped.
+ */
+.collapse {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: grid-template-rows 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.collapse.open {
+	grid-template-rows: 1fr;
+}
+
+.inner {
+	overflow: hidden;
+	min-height: 0;
+}
+
+.inner.settled {
+	overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.collapse {
+		transition: none;
+	}
+}
