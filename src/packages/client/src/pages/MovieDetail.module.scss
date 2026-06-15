@@ -595,7 +595,6 @@
 }
 
 .castSection {
-  margin-bottom: var(--space-2xl);
   padding-right: var(--space-md);
 }
 
@@ -1109,6 +1108,7 @@
 
 .soundtrackBody {
   margin-top: var(--space-md);
+  max-width: 600px;
 }
 
 .soundtrackHeader {
