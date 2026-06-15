@@ -4,6 +4,7 @@ import { Icon } from '@/components/common/Icon';
 import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
 import { shareLinksService } from '@/services/share-links.service';
+import { copyToClipboard } from '@/utils/clipboard';
 
 interface ShareMovieModalProps {
 	movieId: string;
@@ -43,17 +44,10 @@ export function ShareMovieModal({ movieId, movieTitle, isOpen, onClose }: ShareM
 
 	const handleCopy = () => {
 		if (!url) return;
-		try {
-			navigator.clipboard.writeText(url);
+		void copyToClipboard(url).then(() => {
 			setCopied(true);
 			setTimeout(() => setCopied(false), 2000);
-		} catch {
-			// Fallback: select the textarea
-			textareaRef.current?.select();
-			document.execCommand?.('copy');
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-		}
+		});
 	};
 
 	return (

@@ -51,6 +51,7 @@ import {
 	startSnippet,
 	stopSnippet,
 } from '@/state/snippet-recorder.state';
+import { copyToClipboard } from '@/utils/clipboard';
 import { timeFromPointer } from '@/utils/seek-time';
 import { VolumeControl, VolumeIcon } from './controls/VolumeControl';
 import styles from './PlayerControls.module.scss';
@@ -454,7 +455,8 @@ export function PlayerControls({
 				} else {
 					url = `${window.location.origin}/movie/${movieId}?t=${menu.time}`;
 				}
-				await navigator.clipboard.writeText(url);
+				const copiedOk = await copyToClipboard(url);
+				if (!copiedOk) throw new Error('Clipboard unavailable');
 				notifySuccess(
 					`${kind === 'public' ? 'Public' : 'Private'} link copied (at ${formatTime(menu.time)})`,
 				);

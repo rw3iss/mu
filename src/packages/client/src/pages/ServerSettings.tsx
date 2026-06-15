@@ -6,6 +6,7 @@ import { Select } from '@/components/common/Select';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { copyToClipboard as writeClipboard } from '@/utils/clipboard';
 import { formatBytes } from '@/utils/format-bytes';
 import styles from './ServerSettings.module.scss';
 
@@ -664,8 +665,8 @@ function LogsSection() {
 	}, [logFile, lines]);
 
 	const copyToClipboard = useCallback(() => {
-		navigator.clipboard.writeText(content).then(() => {
-			notifySuccess('Copied to clipboard');
+		void writeClipboard(content).then((ok) => {
+			if (ok) notifySuccess('Copied to clipboard');
 		});
 	}, [content]);
 

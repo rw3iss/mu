@@ -52,9 +52,12 @@
 - Problem: each re-implements `navigator.clipboard.writeText` with an ad-hoc
   `execCommand` fallback and (in several) a transient "copied" flag.
 - Fix: add `utils/clipboard.ts` (`copyToClipboard`) + a reusable `CopyButton`
-  component (icon + 2s check). **APPLIED (Phase A)**: util + component created and
-  adopted by the soundtrack rows; other call sites can migrate incrementally (kept
-  working as-is — no behavior change).
+  component (icon + 2s check). **APPLIED (Phase A + B)**: util + component created;
+  adopted by the soundtrack rows (Phase A), then all remaining sites migrated in
+  Phase B — FileInfoGrid (duplicate CopyBtn deleted → shared CopyButton),
+  ShareMovieModal, ColorPicker, SubtitlePanel, PlayerControls, Settings,
+  ServerSettings. Each preserves its existing UX; raw navigator.clipboard +
+  execCommand fallbacks removed from all of them.
 
 ### 4.2 `TrackCopyButton` was a one-off local component — Risk: low
 - Location: `pages/MovieDetail.tsx`.
@@ -68,8 +71,8 @@
   error-prone.
 - Proposed refactor: extract a shared `<MovieInfoSections movie variant="inline|flyout">`
   subcomponent so both branches render one source of truth.
-- **Deferred to Phase C** — touches a large, hot file; deserves a dedicated plan
-  (`/implement` or superpowers:writing-plans).
+- **Deferred to Phase C** — plan written at `docs/plans/infopanel-sections-refactor.md`
+  (run `/implement` against it). Touches a large, hot file.
 
 ## 5. Recommended execution plan
 - **Phase A (applied now):** shared `copyToClipboard` util + `CopyButton`

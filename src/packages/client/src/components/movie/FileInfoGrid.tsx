@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'preact/hooks';
-import { Icon } from '@/components/common/Icon';
+import { CopyButton } from '@/components/common/CopyButton';
 import { streamService } from '@/services/stream.service';
 import { currentUser } from '@/state/auth.state';
 import type { Movie } from '@/state/library.state';
@@ -16,31 +16,6 @@ interface FileInfoGridProps {
 	dark?: boolean;
 	/** Force a single group column (narrow page columns). */
 	singleColumn?: boolean;
-}
-
-/** Tiny copy-to-clipboard button: copy icon → green check for 2s. */
-function CopyBtn({ text, label }: { text: string; label: string }) {
-	const [copied, setCopied] = useState(false);
-	const copy = useCallback(async () => {
-		try {
-			await navigator.clipboard.writeText(text);
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-		} catch {
-			/* clipboard unavailable */
-		}
-	}, [text]);
-	return (
-		<button
-			type="button"
-			class={`${styles.copyBtn} ${copied ? styles.copied : ''}`}
-			onClick={copy}
-			title={copied ? 'Copied!' : label}
-			aria-label={label}
-		>
-			<Icon name={copied ? 'check' : 'copy'} size={12} />
-		</button>
-	);
 }
 
 export function FileInfoGrid({ movie, onCacheDeleted, dark, singleColumn }: FileInfoGridProps) {
@@ -105,9 +80,10 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark, singleColumn }: File
 								<span class={styles.label}>Location</span>
 								<span class={styles.value}>
 									{fi.filePath.replace(/[\\/][^\\/]*$/, '')}
-									<CopyBtn
+									<CopyButton
 										text={fi.filePath.replace(/[\\/][^\\/]*$/, '')}
-										label="Copy folder path"
+										title="Copy folder path"
+										size={12}
 									/>
 								</span>
 							</>
@@ -117,7 +93,11 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark, singleColumn }: File
 								<span class={styles.label}>File</span>
 								<span class={styles.value}>
 									{fi.fileName}
-									<CopyBtn text={fi.fileName} label="Copy file name" />
+									<CopyButton
+										text={fi.fileName}
+										title="Copy file name"
+										size={12}
+									/>
 								</span>
 							</>
 						)}

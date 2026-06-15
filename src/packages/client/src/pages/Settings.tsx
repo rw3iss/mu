@@ -48,6 +48,7 @@ import {
 	setSelectedLightId,
 	themesList,
 } from '@/state/themes.state';
+import { copyToClipboard } from '@/utils/clipboard';
 import { estimateSpriteLibrarySize } from '@/utils/sprite-size-estimate';
 import { AdminDashboard } from './AdminDashboard';
 import { Plugins } from './Plugins';
@@ -2532,11 +2533,11 @@ export function Settings(props: SettingsProps) {
 								<div class={styles.settingInfo}>
 									<span class={styles.settingLabel}>Shrink Worth Ratio</span>
 									<span class={styles.settingDescription}>
-										Only shrink a file when the predicted output is at most
-										this fraction of the original size (0.8 = must save ≥20%).
-										Skips re-encodes whose marginal savings aren't worth the
-										time and quality cost. Applies to the "Shrink Files Above"
-										trigger; checked fresh for every conversion job.
+										Only shrink a file when the predicted output is at most this
+										fraction of the original size (0.8 = must save ≥20%). Skips
+										re-encodes whose marginal savings aren't worth the time and
+										quality cost. Applies to the "Shrink Files Above" trigger;
+										checked fresh for every conversion job.
 									</span>
 								</div>
 								<input
@@ -3003,7 +3004,12 @@ export function Settings(props: SettingsProps) {
 									<input
 										type="number"
 										class={styles.input}
-										style={{ width: '200px', minWidth: 0, flex: 'none', textAlign: 'right' }}
+										style={{
+											width: '200px',
+											minWidth: 0,
+											flex: 'none',
+											textAlign: 'right',
+										}}
 										value={minFileSizeMB}
 										min="0"
 										max="1000"
@@ -3199,7 +3205,7 @@ export function Settings(props: SettingsProps) {
 													class={styles.iconBtn}
 													title="Copy to clipboard"
 													onClick={() => {
-														navigator.clipboard.writeText(sharingUrl);
+														void copyToClipboard(sharingUrl);
 														notifySuccess('URL copied to clipboard');
 													}}
 												>

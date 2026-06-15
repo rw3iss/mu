@@ -4,6 +4,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Icon } from '@/components/common/Icon';
 import { subtitlesService } from '@/services/subtitles.service';
 import { globalMovie } from '@/state/globalPlayer.state';
+import { copyToClipboard } from '@/utils/clipboard';
 import styles from './SubtitlePanel.module.scss';
 
 interface SubtitlePanelProps {
@@ -196,7 +197,7 @@ export function SubtitlePanel({
 
 	const handleCopyFileName = useCallback(() => {
 		if (!fileName) return;
-		navigator.clipboard.writeText(fileName).then(() => {
+		void copyToClipboard(fileName).then(() => {
 			setCopied(true);
 			setTimeout(() => setCopied(false), 2000);
 		});

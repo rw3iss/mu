@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { usePopover } from '@/hooks/usePopover';
+import { copyToClipboard } from '@/utils/clipboard';
 import styles from './ColorPicker.module.scss';
 
 // ── Color conversion helpers ──
@@ -264,7 +265,7 @@ export function ColorPicker({ value, onChange, size }: ColorPickerProps) {
 	}, [hexText, onChange]);
 
 	const handleCopy = useCallback(() => {
-		navigator.clipboard.writeText(value);
+		void copyToClipboard(value);
 	}, [value]);
 
 	return (
