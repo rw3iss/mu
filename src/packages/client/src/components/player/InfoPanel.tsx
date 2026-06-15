@@ -215,13 +215,10 @@ function MovieInfoContent({ movie, variant }: { movie: Movie; variant: 'inline' 
 						/>
 					</span>
 				)}
-				{/* Inline mode keeps "Added" + group breadcrumbs inline in the meta row. */}
-				{!flyout && addedNode}
+				{/* Group breadcrumbs stay inline in the meta row (inline mode only).
+				    "Added" now lives at the very bottom of the panel (see footer). */}
 				{!flyout && movie.groupId && <MovieBreadcrumbs movie={movie} />}
 			</div>
-
-			{/* Flyout mode puts "Added" on its own tight row below the meta. */}
-			{flyout && addedNode && <div class={styles.addedRow}>{addedNode}</div>}
 
 			{movie.genres && movie.genres.length > 0 && (
 				<div class={styles.genres}>
@@ -418,6 +415,9 @@ function MovieInfoContent({ movie, variant }: { movie: Movie; variant: 'inline' 
 					</Collapse>
 				</div>
 			)}
+
+			{/* "Added" — last line of the panel, below all sections. */}
+			{addedNode && <div class={styles.addedFooter}>{addedNode}</div>}
 		</>
 	);
 }

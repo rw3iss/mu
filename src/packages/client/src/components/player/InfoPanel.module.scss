@@ -387,27 +387,19 @@
   color: var(--on-dark-text-muted);
 }
 
-// "Added 3d ago" — sits to the right of the director in the meta row.
+// "Added 3d ago" text span.
 .addedAt {
   color: var(--on-dark-text-muted);
   white-space: nowrap;
 }
 
-// "Added Xd ago" on its own row beneath the year/runtime/director meta —
-// tucked tight under that line, smaller label-style text, with breathing
-// room before the genre chips.
-.addedRow {
-  // Tuck tighter under the meta line above, and a touch smaller.
-  margin-top: -12px;
-  margin-bottom: var(--space-sm);
-  font-size: 10px;
-
-  .addedAt {
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: var(--font-weight-medium);
-    opacity: 0.8;
-  }
+// "Added Xd ago" — the panel's last line, below every section. Standard body
+// text size, set off from File Info with a light top rule.
+.addedFooter {
+  margin-top: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--on-dark-overlay-1);
+  font-size: var(--font-size-sm);
 }
 
 // "Load all" cast expander at the end of the cast list.
