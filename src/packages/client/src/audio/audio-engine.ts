@@ -3,6 +3,7 @@ import {
 	audioEffectsHlsBlocked,
 	clearAudioSuspect,
 	markAudioSuspect,
+	requestAudioReset,
 } from '@/state/audio-reset.state';
 
 /**
@@ -143,6 +144,11 @@ export class AudioEngine {
 	private currentBands: EqBand[] = [...DEFAULT_EQ_BANDS];
 	private currentCompressor: CompressorSettings = { ...DEFAULT_COMPRESSOR };
 	private attached = false;
+	/** Pending post-effect silence probe (see scheduleSilenceProbe). */
+	private silenceProbeTimer: ReturnType<typeof setTimeout> | null = null;
+	/** One-shot guard so an auto-recovery reset can't loop. */
+	private autoResetCount = 0;
+	private static readonly MAX_AUTO_RESETS = 1;
 	private deviceChangeListener: (() => void) | null = null;
 	private interactionResumeListener: (() => void) | null = null;
 
@@ -1045,6 +1051,10 @@ export class AudioEngine {
 	}
 
 	destroy(): void {
+		if (this.silenceProbeTimer) {
+			clearTimeout(this.silenceProbeTimer);
+			this.silenceProbeTimer = null;
+		}
 		this.removeInteractionResumeListener();
 		if (this.deviceChangeListener && navigator.mediaDevices) {
 			navigator.mediaDevices.removeEventListener('devicechange', this.deviceChangeListener);
@@ -1496,6 +1506,73 @@ export class AudioEngine {
 		};
 		debug('audio:chain', chainInfo);
 		dlog('[audioEngine] rebuildChain done', chainInfo);
+
+		// When effects are active, verify (shortly after) that audio actually
+		// flows THROUGH the chain. Chrome's MediaElementSource can land in a
+		// state where the graph is wired + ctx is running yet the source emits
+		// silence — the symptom users hit as "no audio with EQ/Comp on".
+		if (anyEffectOn) this.scheduleSilenceProbe();
+	}
+
+	/**
+	 * Schedule a one-shot check of the analyser ~600ms after a chain rebuild:
+	 * if the element is playing unmuted but the post-effect signal is flatline
+	 * silence, the MediaElementSource/ctx is in the flaky silent state. We flag
+	 * it and auto-trigger a single audio reset (ctx + element swap) to recover,
+	 * so the user doesn't have to do it by hand.
+	 */
+	private scheduleSilenceProbe(): void {
+		if (typeof window === 'undefined' || !this.analyser) return;
+		if (this.silenceProbeTimer) clearTimeout(this.silenceProbeTimer);
+		this.silenceProbeTimer = setTimeout(() => {
+			this.silenceProbeTimer = null;
+			this.probeEffectSilence();
+		}, 600);
+	}
+
+	private probeEffectSilence(): void {
+		if (!this.attached || !this.ctx || !this.analyser) return;
+		const el = this.boundElement;
+		// Only meaningful when the element should be producing audible signal.
+		if (!el || el.paused || el.muted || el.volume === 0 || this.masterMuted) return;
+		if (this.ctx.state !== 'running') return;
+		const anyEffectOn =
+			this.eqEnabled ||
+			this.compressorEnabled ||
+			this.stereoWidthEnabled ||
+			this.bassEnhanceEnabled ||
+			this.hrtfEnabled;
+		if (!anyEffectOn) return;
+
+		const buf = new Uint8Array(this.analyser.fftSize);
+		this.analyser.getByteTimeDomainData(buf);
+		let peak = 0;
+		for (let i = 0; i < buf.length; i++) {
+			const d = Math.abs((buf[i] ?? 128) - 128);
+			if (d > peak) peak = d;
+		}
+		const info = {
+			event: 'effect-silence-probe',
+			peak,
+			ctxCurrentTime: this.ctx.currentTime,
+			elementTime: el.currentTime,
+			autoResetCount: this.autoResetCount,
+		};
+		debug('audio:silence', info);
+		dlog('[audioEngine] silence probe', info);
+
+		// peak ≈ 0 → no signal is reaching the analyser (post-EQ) even though
+		// the element is playing. (A real audio frame deviates from the 128
+		// silence midpoint; ≤1 is numerically silent.)
+		if (peak <= 1) {
+			dwarn('[audioEngine] effect chain output is silent (peak≈0)', info);
+			markAudioSuspect('effects output silent');
+			if (this.autoResetCount < AudioEngine.MAX_AUTO_RESETS) {
+				this.autoResetCount++;
+				dwarn('[audioEngine] auto-recovering via one audio reset.');
+				requestAudioReset();
+			}
+		}
 	}
 
 	private applyCompressorSettings(s: CompressorSettings): void {
