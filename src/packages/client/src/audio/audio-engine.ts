@@ -126,6 +126,17 @@ export class AudioEngine {
 	/** Active recording tap; kept connected across chain rebuilds. */
 	private recorderTap: MediaStreamAudioDestinationNode | null = null;
 	private outputAudio: HTMLAudioElement | null = null;
+	/**
+	 * Master output gain — the user's volume/mute is applied HERE, not on the
+	 * <video> element. Once an element is a MediaElementAudioSourceNode, its
+	 * own `muted`/`volume` gate the signal *entering* the graph, so muting the
+	 * element (which the player did for autoplay/preview/cleanup) feeds silence
+	 * into the chain → EQ/Comp output goes dead. Keeping the element unmuted +
+	 * full-volume and attenuating here is the only correct way to honour the
+	 * volume slider while Web Audio owns output. */
+	private masterGainNode: GainNode | null = null;
+	private masterVolume = 1;
+	private masterMuted = false;
 	private eqEnabled = false;
 	private compressorEnabled = false;
 	private inputGainDb = 0;
@@ -348,6 +359,14 @@ export class AudioEngine {
 			// download).
 			this.source = this.ctx.createMediaElementSource(target);
 			this.boundElement = target;
+			// CRITICAL: the element is now the graph's input. Its own
+			// muted/volume gate what the source node receives, so a muted
+			// element (set by the player for autoplay/preview/cleanup) would
+			// feed silence into the EQ/Comp chain. Force it unmuted + full
+			// volume; the user's volume/mute is honoured by masterGainNode
+			// instead (see setMasterOutput / rebuildChain).
+			target.muted = false;
+			target.volume = 1;
 			const boundInfo = {
 				event: 'media-element-source-bound',
 				tag: target.tagName,
@@ -448,6 +467,11 @@ export class AudioEngine {
 
 		// Recover from OS audio device changes and context state transitions.
 		this.installRecoveryHandlers();
+
+		// Master output gain — carries the user's volume/mute (the <video>
+		// element stays unmuted/full so the source node gets real signal).
+		this.masterGainNode = this.ctx.createGain();
+		this.masterGainNode.gain.value = this.masterMuted ? 0 : this.masterVolume;
 
 		// Create input gain (Amp) node
 		this.inputGainNode = this.ctx.createGain();
@@ -563,6 +587,26 @@ export class AudioEngine {
 
 	isAttached(): boolean {
 		return this.attached;
+	}
+
+	/**
+	 * Apply the player's volume slider + mute state to the graph's master
+	 * gain. Called by the video engine in place of touching the <video>
+	 * element's own volume/muted while Web Audio owns output (muting the
+	 * element would silence the source node feeding the effect chain).
+	 */
+	setMasterOutput(volume: number, muted: boolean): void {
+		this.masterVolume = Math.max(0, Math.min(1, volume));
+		this.masterMuted = muted;
+		// Keep the bound element out of the gain path — it must stay unmuted
+		// + full so the MediaElementSource receives signal.
+		if (this.boundElement) {
+			this.boundElement.muted = false;
+			this.boundElement.volume = 1;
+		}
+		if (this.masterGainNode) {
+			this.masterGainNode.gain.value = this.masterMuted ? 0 : this.masterVolume;
+		}
 	}
 
 	/**
@@ -1021,6 +1065,7 @@ export class AudioEngine {
 		}
 		this.streamDest = null;
 		this.analyser = null;
+		this.masterGainNode = null;
 		this.inputGainNode = null;
 		this.filters = [];
 		this.compressor = null;
@@ -1217,6 +1262,7 @@ export class AudioEngine {
 
 		// Disconnect everything
 		this.source.disconnect();
+		this.masterGainNode?.disconnect();
 		this.inputGainNode?.disconnect();
 		for (const f of this.filters) f.disconnect();
 		this.compressor?.disconnect();
@@ -1414,6 +1460,23 @@ export class AudioEngine {
 			current = this.hrtfMerge;
 		}
 
+		// Defensive: the element must never be muted while it's the source —
+		// the player mutes it for autoplay/preview/cleanup, and a stale mute
+		// would silence the whole chain. Volume/mute lives on masterGainNode.
+		if (this.boundElement) {
+			this.boundElement.muted = false;
+			this.boundElement.volume = 1;
+		}
+
+		// Master output gain (user volume/mute) sits last, just before the
+		// destination, so it attenuates the final mix regardless of which
+		// effects are active.
+		if (this.masterGainNode) {
+			current.connect(this.masterGainNode);
+			traceConnect('lastStage', `masterGain (val=${this.masterGainNode.gain.value})`);
+			current = this.masterGainNode;
+		}
+
 		// Route to streamDest (consumed by hidden <audio> element) when
 		// available; fall back to AudioContext.destination if creation
 		// failed for any reason.
@@ -1423,7 +1486,7 @@ export class AudioEngine {
 		// chain rebuild (toggling EQ mid-recording) doesn't drop the captured audio.
 		this.outputNode = current;
 		if (this.recorderTap) current.connect(this.recorderTap);
-		traceConnect('lastStage', this.streamDest ? 'streamDest' : 'ctx.destination');
+		traceConnect('masterGain', this.streamDest ? 'streamDest' : 'ctx.destination');
 		const chainInfo = {
 			event: 'rebuild-done',
 			anyEffectOn,

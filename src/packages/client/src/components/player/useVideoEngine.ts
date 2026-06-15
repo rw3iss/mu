@@ -4,7 +4,14 @@ import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting } from '@/hooks/useUiSetting';
 import { streamService } from '@/services/stream.service';
 import { wsService } from '@/services/websocket.service';
-import { initAudioEffects } from '@/state/audio-effects.state';
+import {
+	bassEnhanceEnabled,
+	compressorEnabled,
+	eqEnabled,
+	hrtfSurroundEnabled,
+	initAudioEffects,
+	stereoWidthEnabled,
+} from '@/state/audio-effects.state';
 import { audioResetTrigger, clearAudioSuspect } from '@/state/audio-reset.state';
 import { globalMovieId } from '@/state/globalPlayer.state';
 import { notifyInfo } from '@/state/notifications.state';
@@ -387,14 +394,40 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		};
 	}, [enabled, resetTick]);
 
-	// Sync volume/mute state
+	// Sync volume/mute state.
+	//
+	// When the Web Audio engine is attached, the <video> element is the
+	// graph's source node — its own muted/volume gate the signal ENTERING
+	// the graph, so muting it (or volume 0) silences the EQ/Comp output.
+	// In that mode we keep the element unmuted + full and route the user's
+	// volume/mute through the engine's master gain instead. Native path
+	// (no effects ever enabled) keeps applying volume/mute on the element.
+	//
+	// The effect-enabled signals are in the dep list so this re-runs the
+	// moment the engine first attaches (enabling EQ/Comp/etc.) and pushes
+	// the current volume/mute onto the freshly-built master gain.
 	useEffect(() => {
 		if (!enabled) return;
 		const video = videoRef.current;
 		if (!video) return;
-		video.volume = volume.value;
-		video.muted = isMuted.value;
-	}, [enabled, volume.value, isMuted.value]);
+		if (audioEngine.isAttached()) {
+			video.muted = false;
+			video.volume = 1;
+			audioEngine.setMasterOutput(volume.value, isMuted.value);
+		} else {
+			video.volume = volume.value;
+			video.muted = isMuted.value;
+		}
+	}, [
+		enabled,
+		volume.value,
+		isMuted.value,
+		eqEnabled.value,
+		compressorEnabled.value,
+		stereoWidthEnabled.value,
+		bassEnhanceEnabled.value,
+		hrtfSurroundEnabled.value,
+	]);
 
 	const initPlayback = useCallback(
 		(
@@ -778,8 +811,17 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		// If we deferred a direct play source (loaded muted for preview frame), unmute and play
 		if (deferredSrcRef.current) {
 			deferredSrcRef.current = null;
-			// Src is already loaded (muted for frame preview) — just unmute and play
-			video.muted = isMuted.value;
+			// Src is already loaded (muted for frame preview) — restore audio.
+			// When Web Audio is attached, keep the element unmuted and route
+			// volume/mute through the master gain (a muted source = silent
+			// effect chain); otherwise apply mute on the element directly.
+			if (audioEngine.isAttached()) {
+				video.muted = false;
+				video.volume = 1;
+				audioEngine.setMasterOutput(volume.value, isMuted.value);
+			} else {
+				video.muted = isMuted.value;
+			}
 			intendedPlayingRef.current = true;
 			audioEngine.resume();
 			video.play().catch(() => {});
@@ -897,9 +939,18 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			}
 			// Mute to kill any lingering audio from buffered data
 			video.muted = true;
-			// Restore mute state after async cleanup
+			// Restore mute state after async cleanup. If Web Audio is attached
+			// the element must go back to unmuted/full (the master gain holds
+			// the user's mute) — leaving it muted would silence the source.
 			requestAnimationFrame(() => {
-				if (video) video.muted = isMuted.value;
+				if (!video) return;
+				if (audioEngine.isAttached()) {
+					video.muted = false;
+					video.volume = 1;
+					audioEngine.setMasterOutput(volume.value, isMuted.value);
+				} else {
+					video.muted = isMuted.value;
+				}
 			});
 		}
 		requestAnimationFrame(() => {
