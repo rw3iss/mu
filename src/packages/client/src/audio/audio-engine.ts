@@ -1551,9 +1551,13 @@ export class AudioEngine {
 			const d = Math.abs((buf[i] ?? 128) - 128);
 			if (d > peak) peak = d;
 		}
+		const outputLatency =
+			(this.ctx as AudioContext & { outputLatency?: number }).outputLatency ?? null;
 		const info = {
 			event: 'effect-silence-probe',
 			peak,
+			outputLatency,
+			usingStreamDest: !!this.streamDest,
 			ctxCurrentTime: this.ctx.currentTime,
 			elementTime: el.currentTime,
 			autoResetCount: this.autoResetCount,
@@ -1561,9 +1565,10 @@ export class AudioEngine {
 		debug('audio:silence', info);
 		dlog('[audioEngine] silence probe', info);
 
-		// peak ≈ 0 → no signal is reaching the analyser (post-EQ) even though
-		// the element is playing. (A real audio frame deviates from the 128
-		// silence midpoint; ≤1 is numerically silent.)
+		// peak ≈ 0 → no signal reaches the analyser (post-EQ) even though the
+		// element is playing. The MediaElementSource latched to silence — only
+		// a ctx+element swap recovers it. (A real audio frame deviates from
+		// the 128 silence midpoint; ≤1 is numerically silent.)
 		if (peak <= 1) {
 			dwarn('[audioEngine] effect chain output is silent (peak≈0)', info);
 			markAudioSuspect('effects output silent');
@@ -1572,6 +1577,58 @@ export class AudioEngine {
 				dwarn('[audioEngine] auto-recovering via one audio reset.');
 				requestAudioReset();
 			}
+			return;
+		}
+
+		// peak > 1 → signal IS flowing through the graph, so the chain is
+		// fine. If we're still routing to AudioContext.destination and the
+		// sink looks dead (outputLatency 0), the destination is stuck: the
+		// graph renders but nothing reaches the speakers, and a fresh ctx
+		// reproduces the same dead sink. Escalate to MediaStream routing
+		// (hidden <audio> via MediaStreamAudioDestinationNode), which plays
+		// through Chrome's separate WebRTC output path and sidesteps it.
+		if (
+			!this.streamDest &&
+			outputLatency !== null &&
+			outputLatency <= 0 &&
+			this.autoResetCount < AudioEngine.MAX_AUTO_RESETS
+		) {
+			this.autoResetCount++;
+			dwarn(
+				'[audioEngine] signal present but ctx.destination sink looks dead — ' +
+					'switching to MediaStream output routing.',
+				info,
+			);
+			markAudioSuspect('output sink stuck — using alternate routing');
+			this.switchToMediaStreamOutput();
+		}
+	}
+
+	/**
+	 * Move the graph's output off the (apparently dead) AudioContext.destination
+	 * onto a MediaStreamAudioDestinationNode consumed by a hidden <audio>
+	 * element. Chrome routes MediaStream-fed <audio> through a separate output
+	 * path, which recovers audio when ctx.destination is in the stuck-sink
+	 * state. Idempotent — no-op once streamDest exists.
+	 */
+	private switchToMediaStreamOutput(): void {
+		if (!this.ctx || this.streamDest || typeof document === 'undefined') return;
+		try {
+			this.streamDest = this.ctx.createMediaStreamDestination();
+			this.outputAudio = document.createElement('audio');
+			this.outputAudio.srcObject = this.streamDest.stream;
+			this.outputAudio.autoplay = true;
+			this.outputAudio.style.display = 'none';
+			document.body.appendChild(this.outputAudio);
+			this.pinOutputAudioToDefault();
+			// Rebuild so the chain terminates at streamDest, then start the
+			// hidden element playing.
+			this.rebuildChain();
+			this.startOutputAudio();
+			dwarn('[audioEngine] switched to MediaStream output routing.');
+		} catch (err) {
+			dwarn('[audioEngine] switchToMediaStreamOutput failed:', err);
+			this.streamDest = null;
 		}
 	}
 
