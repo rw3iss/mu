@@ -1111,123 +1111,151 @@ export function MovieDetail({ id }: MovieDetailProps) {
 						)}
 
 						{/* ── Bottom sections: two 50% columns (stack on mobile) ── */}
-						{/* Soundtrack — collapsible, lazy-loaded album tracklist (MusicBrainz). */}
-						{!isPreview && (
-							<div class={styles.soundtrackSection}>
-								<button
-									class={styles.fileInfoToggle}
-									onClick={toggleSoundtrack}
-									type="button"
-									aria-expanded={showSoundtrack}
-								>
-									<h2 class={styles.sectionTitle}>Soundtrack</h2>
-									<span class={styles.fileInfoArrow}>
-										<Icon
-											name={showSoundtrack ? 'chevron-up' : 'chevron-down'}
-											size={14}
-										/>
-									</span>
-								</button>
-								<Collapse open={showSoundtrack}>
-									<div class={styles.soundtrackBody}>
-										{loadingSoundtrack ? (
-											<p class={styles.soundtrackEmpty}>
-												Searching MusicBrainz…
-											</p>
-										) : soundtrack?.found && soundtrack.release ? (
-											<>
-												<div class={styles.soundtrackHeader}>
-													<span class={styles.soundtrackAlbum}>
-														{soundtrack.release.title}
-													</span>
-													<span class={styles.soundtrackMeta}>
-														{[
-															soundtrack.release.artist,
-															soundtrack.release.date?.slice(0, 4),
-															`${soundtrack.release.trackCount} tracks`,
-														]
-															.filter(Boolean)
-															.join(' · ')}
-													</span>
-												</div>
-												<ol class={styles.trackList}>
-													{soundtrack.release.tracks.map((t, i) => (
-														<li
-															key={`${t.position ?? i}-${t.title}`}
-															class={styles.track}
-														>
-															<span class={styles.trackNum}>
-																{t.position ?? i + 1}
-															</span>
-															<span class={styles.trackTitle}>
-																{t.title}
-																{t.artist && (
-																	<span
-																		class={styles.trackArtist}
-																	>
-																		{t.artist}
-																	</span>
-																)}
-															</span>
-															<TrackCopyButton
-																text={trackCopyText(
-																	t.artist ??
-																		soundtrack.release.artist ??
-																		null,
-																	t.title,
-																)}
-															/>
-															<a
-																class={styles.trackOpen}
-																href={`https://www.youtube.com/results?search_query=${encodeURIComponent(
-																	trackCopyText(
-																		t.artist ??
-																			soundtrack.release
-																				.artist ??
-																			null,
-																		t.title,
-																	),
-																)}`}
-																target="_blank"
-																rel="noopener noreferrer"
-																title="Search on YouTube"
-																aria-label="Search this track on YouTube"
-																onClick={(e) => e.stopPropagation()}
-															>
-																<Icon
-																	name="arrow-up-right"
-																	size={14}
-																/>
-															</a>
-															{t.lengthMs != null && (
-																<span class={styles.trackTime}>
-																	{formatTrackLength(t.lengthMs)}
-																</span>
-															)}
-														</li>
-													))}
-												</ol>
-												<a
-													class={styles.soundtrackSource}
-													href={soundtrack.release.url}
-													target="_blank"
-													rel="noopener noreferrer"
-												>
-													View on MusicBrainz
-												</a>
-											</>
-										) : (
-											<p class={styles.soundtrackEmpty}>
-												No soundtrack listing found for this title.
-											</p>
-										)}
-									</div>
-								</Collapse>
-							</div>
-						)}
 
 						<div class={styles.bottomColumns}>
 							<div class={styles.bottomCol}>
+								{/* Soundtrack — collapsible, lazy-loaded album tracklist (MusicBrainz). */}
+								{!isPreview && (
+									<div class={styles.soundtrackSection}>
+										<button
+											class={styles.fileInfoToggle}
+											onClick={toggleSoundtrack}
+											type="button"
+											aria-expanded={showSoundtrack}
+										>
+											<h2 class={styles.sectionTitle}>Soundtrack</h2>
+											<span class={styles.fileInfoArrow}>
+												<Icon
+													name={
+														showSoundtrack
+															? 'chevron-up'
+															: 'chevron-down'
+													}
+													size={14}
+												/>
+											</span>
+										</button>
+										<Collapse open={showSoundtrack}>
+											<div class={styles.soundtrackBody}>
+												{loadingSoundtrack ? (
+													<p class={styles.soundtrackEmpty}>
+														Searching MusicBrainz…
+													</p>
+												) : soundtrack?.found && soundtrack.release ? (
+													<>
+														<div class={styles.soundtrackHeader}>
+															<span class={styles.soundtrackAlbum}>
+																{soundtrack.release.title}
+															</span>
+															<span class={styles.soundtrackMeta}>
+																{[
+																	soundtrack.release.artist,
+																	soundtrack.release.date?.slice(
+																		0,
+																		4,
+																	),
+																	`${soundtrack.release.trackCount} tracks`,
+																]
+																	.filter(Boolean)
+																	.join(' · ')}
+															</span>
+														</div>
+														<ol class={styles.trackList}>
+															{soundtrack.release.tracks.map(
+																(t, i) => (
+																	<li
+																		key={`${t.position ?? i}-${t.title}`}
+																		class={styles.track}
+																	>
+																		<span
+																			class={styles.trackNum}
+																		>
+																			{t.position ?? i + 1}
+																		</span>
+																		<span
+																			class={
+																				styles.trackTitle
+																			}
+																		>
+																			{t.title}
+																			{t.artist && (
+																				<span
+																					class={
+																						styles.trackArtist
+																					}
+																				>
+																					{t.artist}
+																				</span>
+																			)}
+																		</span>
+																		<TrackCopyButton
+																			text={trackCopyText(
+																				t.artist ??
+																					soundtrack
+																						.release
+																						.artist ??
+																					null,
+																				t.title,
+																			)}
+																		/>
+																		<a
+																			class={styles.trackOpen}
+																			href={`https://www.youtube.com/results?search_query=${encodeURIComponent(
+																				trackCopyText(
+																					t.artist ??
+																						soundtrack
+																							.release
+																							.artist ??
+																						null,
+																					t.title,
+																				),
+																			)}`}
+																			target="_blank"
+																			rel="noopener noreferrer"
+																			title="Search on YouTube"
+																			aria-label="Search this track on YouTube"
+																			onClick={(e) =>
+																				e.stopPropagation()
+																			}
+																		>
+																			<Icon
+																				name="arrow-up-right"
+																				size={14}
+																			/>
+																		</a>
+																		{t.lengthMs != null && (
+																			<span
+																				class={
+																					styles.trackTime
+																				}
+																			>
+																				{formatTrackLength(
+																					t.lengthMs,
+																				)}
+																			</span>
+																		)}
+																	</li>
+																),
+															)}
+														</ol>
+														<a
+															class={styles.soundtrackSource}
+															href={soundtrack.release.url}
+															target="_blank"
+															rel="noopener noreferrer"
+														>
+															View on MusicBrainz
+														</a>
+													</>
+												) : (
+													<p class={styles.soundtrackEmpty}>
+														No soundtrack listing found for this title.
+													</p>
+												)}
+											</div>
+										</Collapse>
+									</div>
+								)}
 								{/* Playlists */}
 								<div class={styles.fileInfoSection}>
 									<button
