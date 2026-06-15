@@ -63,7 +63,7 @@
 - Location: `pages/MovieDetail.tsx`.
 - Fix: replaced by the shared `CopyButton`. **APPLIED (Phase A).**
 
-### 4.3 InfoPanel inline vs flyout branches are ~95% duplicated — Risk: HIGH (Phase C)
+### 4.3 InfoPanel inline vs flyout branches are ~95% duplicated — APPLIED (Phase C)
 - Location: `components/player/InfoPanel.tsx` (two near-identical render trees for
   Overview/Cast/Comments/File Info, differing mainly by indentation + a couple of
   handlers).
@@ -71,8 +71,10 @@
   error-prone.
 - Proposed refactor: extract a shared `<MovieInfoSections movie variant="inline|flyout">`
   subcomponent so both branches render one source of truth.
-- **Deferred to Phase C** — plan written at `docs/plans/infopanel-sections-refactor.md`
-  (run `/implement` against it). Touches a large, hot file.
+- **APPLIED**: extracted a shared `MovieInfoContent` body (title→meta→genres→ratings→
+  Overview/Cast/Comments/File Info); both shells keep only poster + outer chrome.
+  710→423 lines; behavior preserved (the two render sites have fixed `inline` values).
+  Plan: `docs/plans/infopanel-sections-refactor.md`.
 
 ## 5. Recommended execution plan
 - **Phase A (applied now):** shared `copyToClipboard` util + `CopyButton`

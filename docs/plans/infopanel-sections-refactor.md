@@ -1,6 +1,6 @@
 # Plan — De-duplicate InfoPanel inline/flyout branches
 
-Status: **planned (Phase C)** — not yet implemented. Source finding:
+Status: **IMPLEMENTED 2026-06-15** — extracted MovieInfoContent (sections + header body); InfoPanel 710→423 lines. Both shells keep only their poster + outer chrome. Source finding:
 `docs/improvement-audit-2026-06-15.md` §4.3.
 
 ## Problem

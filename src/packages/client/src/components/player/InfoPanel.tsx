@@ -30,36 +30,6 @@ interface InfoPanelProps {
 }
 
 export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
-	const [showFileInfo, setShowFileInfo] = useState(false);
-	const [showComments, setShowComments] = useState(false);
-	const [showCast, setShowCast] = useState(true);
-	const [showOverview, setShowOverview] = useState(true);
-	// "Load all" cast expansion — full list fetched (and persisted) on demand.
-	const [fullCast, setFullCast] = useState<NonNullable<Movie['cast']> | null>(null);
-	const [loadingCast, setLoadingCast] = useState(false);
-	useEffect(() => {
-		setFullCast(null);
-	}, [movie?.id]);
-
-	const handleLoadAllCast = async () => {
-		if (!movie || loadingCast) return;
-		// Show everything we already have; only hit the API to backfill rows
-		// saved under the legacy 20-cast ingest cap.
-		setFullCast(movie.cast ?? []);
-		if ((movie.cast?.length ?? 0) !== 20) return;
-		setLoadingCast(true);
-		try {
-			const r = await moviesService.loadFullCast(movie.id);
-			if (r.cast.length > (movie.cast?.length ?? 0)) {
-				setFullCast(r.cast as NonNullable<Movie['cast']>);
-			}
-		} catch {
-			// non-critical
-		} finally {
-			setLoadingCast(false);
-		}
-	};
-
 	// Refresh movie data when panel opens or when movie is updated via WebSocket
 	useEffect(() => {
 		if (!visible || !movie?.id) return;
@@ -90,10 +60,6 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 
 	if (!movie) return null;
 
-	const hours = Math.floor((movie.runtime ?? 0) / 60);
-	const minutes = (movie.runtime ?? 0) % 60;
-	const runtimeText = movie.runtime ? `${hours > 0 ? `${hours}h ` : ''}${minutes}m` : '';
-
 	return (
 		<>
 			{/* Backdrop overlay — not shown in inline mode */}
@@ -121,289 +87,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 							/>
 						</div>
 						<div class={styles.inlineContent}>
-							<div class={styles.titleRow}>
-								{shareMode.value ? (
-									<h2 class={styles.title}>{movie.title}</h2>
-								) : (
-									<h2
-										class={`${styles.title} ${styles.titleLink}`}
-										onClick={() => route(`/movie/${movie.id}`)}
-									>
-										{movie.title}
-									</h2>
-								)}
-								<FavoriteButton
-									entityType="movie"
-									movieId={movie.id}
-									size="normal"
-									stopPropagation
-								/>
-							</div>
-							<div class={styles.meta}>
-								{movie.year > 0 && <span>{movie.year}</span>}
-								{runtimeText && <span>{runtimeText}</span>}
-								{movie.director && (
-									<span class={styles.directorRow} data-reveal-host>
-										<a
-											class={styles.directorLink}
-											href={`/person/${personKeyFor({ name: movie.director })}`}
-											onClick={(e) => {
-												e.preventDefault();
-												route(
-													`/person/${personKeyFor({ name: movie.director! })}`,
-												);
-											}}
-										>
-											Dir. {movie.director}
-										</a>
-										<FavoriteButton
-											entityType="person"
-											name={movie.director}
-											personRole="director"
-											size="mini"
-											stopPropagation
-											overlayReveal
-										/>
-									</span>
-								)}
-								{movie.addedAt && (
-									<span
-										class={styles.addedAt}
-										title={new Date(movie.addedAt).toLocaleString()}
-									>
-										Added {relativeTime(movie.addedAt)}
-									</span>
-								)}
-								{movie.groupId && <MovieBreadcrumbs movie={movie} />}
-							</div>
-
-							{movie.genres && movie.genres.length > 0 && (
-								<div class={styles.genres}>
-									{movie.genres.map((genre) => (
-										<span key={genre} class={styles.genreTag}>
-											{genre}
-										</span>
-									))}
-								</div>
-							)}
-
-							<div class={styles.ratings}>
-								{movie.rating != null && movie.rating > 0 && (
-									<div class={styles.ratingItem}>
-										<span class={styles.ratingSource}>You</span>
-										<span class={styles.ratingValue}>
-											{movie.rating.toFixed(1)}
-										</span>
-									</div>
-								)}
-								{movie.imdbRating != null && movie.imdbRating > 0 ? (
-									<a
-										href={
-											movie.imdbId
-												? `https://www.imdb.com/title/${movie.imdbId}/`
-												: undefined
-										}
-										target="_blank"
-										rel="noopener noreferrer"
-										class={`${styles.ratingItem} ${movie.imdbId ? styles.ratingLink : ''}`}
-									>
-										<span class={styles.ratingSource}>IMDb</span>
-										<span class={styles.ratingValue}>{movie.imdbRating}</span>
-									</a>
-								) : movie.imdbId ? (
-									<a
-										href={`https://www.imdb.com/title/${movie.imdbId}/`}
-										target="_blank"
-										rel="noopener noreferrer"
-										class={`${styles.ratingItem} ${styles.ratingLink}`}
-									>
-										<span class={styles.ratingSource}>IMDb</span>
-									</a>
-								) : null}
-								{movie.rtRating != null && movie.rtRating > 0 && (
-									<div class={styles.ratingItem}>
-										<span class={styles.ratingSource}>RT</span>
-										<span class={styles.ratingValue}>{movie.rtRating}%</span>
-									</div>
-								)}
-								{movie.metacriticRating != null && movie.metacriticRating > 0 && (
-									<div class={styles.ratingItem}>
-										<span class={styles.ratingSource}>Metacritic</span>
-										<span class={styles.ratingValue}>
-											{movie.metacriticRating}
-										</span>
-									</div>
-								)}
-								{movie.imdbVotes != null && movie.imdbVotes > 0 && (
-									<span class={styles.votesLabel} title="IMDb votes">
-										{movie.imdbVotes >= 1000000
-											? `${(movie.imdbVotes / 1000000).toFixed(1)}M`
-											: movie.imdbVotes >= 1000
-												? `${(movie.imdbVotes / 1000).toFixed(1)}K`
-												: String(movie.imdbVotes)}{' '}
-										votes
-									</span>
-								)}
-							</div>
-
-							{movie.overview && (
-								<div class={styles.section}>
-									<button
-										class={styles.fileInfoToggle}
-										onClick={() => setShowOverview(!showOverview)}
-									>
-										<h3 class={styles.sectionTitle}>Overview</h3>
-										<span class={styles.fileInfoArrow}>
-											<Icon
-												name={showOverview ? 'chevron-up' : 'chevron-down'}
-												size={14}
-											/>
-										</span>
-									</button>
-									<Collapse open={showOverview}>
-										<p class={styles.overview}>{movie.overview}</p>
-									</Collapse>
-								</div>
-							)}
-
-							{movie.cast && movie.cast.length > 0 && (
-								<div class={styles.section}>
-									<button
-										class={styles.fileInfoToggle}
-										onClick={() => setShowCast(!showCast)}
-									>
-										<h3 class={styles.sectionTitle}>Cast</h3>
-										<span class={styles.fileInfoArrow}>
-											<Icon
-												name={showCast ? 'chevron-up' : 'chevron-down'}
-												size={14}
-											/>
-										</span>
-									</button>
-									<Collapse open={showCast}>
-										<div class={styles.castList}>
-											{(fullCast ?? movie.cast.slice(0, 8)).map(
-												(member, ci) => {
-													const key = personKeyFor({
-														tmdbId: member.tmdbId,
-														name: member.name,
-													});
-													return (
-														<a
-															key={member.name}
-															class={`${styles.castMember} ${
-																fullCast && ci >= 8
-																	? styles.castEnter
-																	: ''
-															}`}
-															style={
-																fullCast && ci >= 8
-																	? {
-																			animationDelay: `${Math.min(ci - 8, 16) * 30}ms`,
-																		}
-																	: undefined
-															}
-															href={`/person/${key}`}
-															data-reveal-host
-															onClick={(e) => {
-																e.preventDefault();
-																route(`/person/${key}`);
-															}}
-														>
-															<CastPhoto
-																name={member.name}
-																profileUrl={member.profileUrl}
-																character={member.character}
-																size={36}
-																expandedSize={180}
-																thumbClass={styles.castPhoto}
-															/>
-															<div class={styles.castInfo}>
-																<span class={styles.castName}>
-																	{member.name}
-																</span>
-																{member.character && (
-																	<span
-																		class={styles.castCharacter}
-																	>
-																		{member.character}
-																	</span>
-																)}
-															</div>
-															<div class={styles.castActions}>
-																<span class={styles.castArrow}>
-																	<Icon
-																		name="chevron-right"
-																		size={12}
-																	/>
-																</span>
-																<FavoriteButton
-																	entityType="person"
-																	tmdbId={member.tmdbId}
-																	name={member.name}
-																	profileUrl={member.profileUrl}
-																	personRole="actor"
-																	size="normal"
-																	stopPropagation
-																	revealOnHover
-																/>
-															</div>
-														</a>
-													);
-												},
-											)}
-											{!fullCast && movie.cast.length > 8 && (
-												<button
-													class={styles.loadAllCast}
-													disabled={loadingCast}
-													onClick={handleLoadAllCast}
-												>
-													{loadingCast ? 'Loading…' : 'Load all'}
-												</button>
-											)}
-										</div>
-									</Collapse>
-								</div>
-							)}
-
-							<div class={styles.section}>
-								<button
-									class={styles.fileInfoToggle}
-									onClick={() => setShowComments(!showComments)}
-								>
-									<h3 class={styles.sectionTitle}>Comments</h3>
-									<span class={styles.fileInfoArrow}>
-										<Icon
-											name={showComments ? 'chevron-up' : 'chevron-down'}
-											size={14}
-										/>
-									</span>
-								</button>
-								<Collapse open={showComments}>
-									<CommentsPanel movieId={movie.id} />
-								</Collapse>
-							</div>
-
-							{movie.fileInfo && (
-								<div class={styles.section}>
-									<button
-										class={styles.fileInfoToggle}
-										onClick={() => setShowFileInfo(!showFileInfo)}
-									>
-										<h3 class={styles.sectionTitle}>File Info</h3>
-										<PlaybackBadge movie={movie} />
-										<span class={styles.fileInfoArrow}>
-											<Icon
-												name={showFileInfo ? 'chevron-up' : 'chevron-down'}
-												size={14}
-											/>
-										</span>
-									</button>
-									<Collapse open={showFileInfo}>
-										<FileInfoGrid movie={movie} dark />
-									</Collapse>
-								</div>
-							)}
+							<MovieInfoContent movie={movie} variant="inline" />
 						</div>
 					</div>
 				) : (
@@ -416,294 +100,324 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								fallbackLabel={movie.title}
 							/>
 						</div>
-
-						<div class={styles.titleRow}>
-							{shareMode.value ? (
-								<h2 class={styles.title}>{movie.title}</h2>
-							) : (
-								<h2
-									class={`${styles.title} ${styles.titleLink}`}
-									onClick={() => {
-										route(`/movie/${movie.id}`);
-										if (playerMode.value === 'full') {
-											minimizePlayer();
-										}
-										showInfoPanel.value = false;
-									}}
-								>
-									{movie.title}
-								</h2>
-							)}
-							<FavoriteButton
-								entityType="movie"
-								movieId={movie.id}
-								size="normal"
-								stopPropagation
-							/>
-						</div>
-
-						<div class={styles.meta}>
-							{movie.year > 0 && <span>{movie.year}</span>}
-							{runtimeText && <span>{runtimeText}</span>}
-							{movie.director && (
-								<span class={styles.directorRow} data-reveal-host>
-									<a
-										class={styles.directorLink}
-										href={`/person/${personKeyFor({ name: movie.director })}`}
-										onClick={(e) => {
-											e.preventDefault();
-											route(
-												`/person/${personKeyFor({ name: movie.director! })}`,
-											);
-										}}
-									>
-										Dir. {movie.director}
-									</a>
-									<FavoriteButton
-										entityType="person"
-										name={movie.director}
-										personRole="director"
-										size="mini"
-										stopPropagation
-										overlayReveal
-									/>
-								</span>
-							)}
-						</div>
-
-						{movie.addedAt && (
-							<div class={styles.addedRow}>
-								<span
-									class={styles.addedAt}
-									title={new Date(movie.addedAt).toLocaleString()}
-								>
-									Added {relativeTime(movie.addedAt)}
-								</span>
-							</div>
-						)}
-
-						{movie.genres && movie.genres.length > 0 && (
-							<div class={styles.genres}>
-								{movie.genres.map((genre) => (
-									<span key={genre} class={styles.genreTag}>
-										{genre}
-									</span>
-								))}
-							</div>
-						)}
-
-						<div class={styles.ratings}>
-							{movie.rating != null && movie.rating > 0 && (
-								<div class={styles.ratingItem}>
-									<span class={styles.ratingSource}>You</span>
-									<span class={styles.ratingValue}>
-										{movie.rating.toFixed(1)}
-									</span>
-								</div>
-							)}
-							{movie.imdbRating != null && movie.imdbRating > 0 ? (
-								<a
-									href={
-										movie.imdbId
-											? `https://www.imdb.com/title/${movie.imdbId}/`
-											: undefined
-									}
-									target="_blank"
-									rel="noopener noreferrer"
-									class={`${styles.ratingItem} ${movie.imdbId ? styles.ratingLink : ''}`}
-								>
-									<span class={styles.ratingSource}>IMDb</span>
-									<span class={styles.ratingValue}>{movie.imdbRating}</span>
-								</a>
-							) : movie.imdbId ? (
-								<a
-									href={`https://www.imdb.com/title/${movie.imdbId}/`}
-									target="_blank"
-									rel="noopener noreferrer"
-									class={`${styles.ratingItem} ${styles.ratingLink}`}
-								>
-									<span class={styles.ratingSource}>IMDb</span>
-								</a>
-							) : null}
-							{movie.rtRating != null && movie.rtRating > 0 && (
-								<div class={styles.ratingItem}>
-									<span class={styles.ratingSource}>RT</span>
-									<span class={styles.ratingValue}>{movie.rtRating}%</span>
-								</div>
-							)}
-							{movie.metacriticRating != null && movie.metacriticRating > 0 && (
-								<div class={styles.ratingItem}>
-									<span class={styles.ratingSource}>Metacritic</span>
-									<span class={styles.ratingValue}>{movie.metacriticRating}</span>
-								</div>
-							)}
-							{movie.imdbVotes != null && movie.imdbVotes > 0 && (
-								<span class={styles.votesLabel} title="IMDb votes">
-									{movie.imdbVotes >= 1000000
-										? `${(movie.imdbVotes / 1000000).toFixed(1)}M`
-										: movie.imdbVotes >= 1000
-											? `${(movie.imdbVotes / 1000).toFixed(1)}K`
-											: String(movie.imdbVotes)}{' '}
-									votes
-								</span>
-							)}
-						</div>
-
-						{movie.overview && (
-							<div class={styles.section}>
-								<button
-									class={styles.fileInfoToggle}
-									onClick={() => setShowOverview(!showOverview)}
-								>
-									<h3 class={styles.sectionTitle}>Overview</h3>
-									<span class={styles.fileInfoArrow}>
-										<Icon
-											name={showOverview ? 'chevron-up' : 'chevron-down'}
-											size={14}
-										/>
-									</span>
-								</button>
-								<Collapse open={showOverview}>
-									<p class={styles.overview}>{movie.overview}</p>
-								</Collapse>
-							</div>
-						)}
-
-						{movie.cast && movie.cast.length > 0 && (
-							<div class={styles.section}>
-								<button
-									class={styles.fileInfoToggle}
-									onClick={() => setShowCast(!showCast)}
-								>
-									<h3 class={styles.sectionTitle}>Cast</h3>
-									<span class={styles.fileInfoArrow}>
-										<Icon
-											name={showCast ? 'chevron-up' : 'chevron-down'}
-											size={14}
-										/>
-									</span>
-								</button>
-								<Collapse open={showCast}>
-									<div class={styles.castList}>
-										{(fullCast ?? movie.cast.slice(0, 8)).map((member, ci) => {
-											const key = personKeyFor({
-												tmdbId: member.tmdbId,
-												name: member.name,
-											});
-											return (
-												<a
-													key={member.name}
-													class={`${styles.castMember} ${
-														fullCast && ci >= 8 ? styles.castEnter : ''
-													}`}
-													style={
-														fullCast && ci >= 8
-															? {
-																	animationDelay: `${Math.min(ci - 8, 16) * 30}ms`,
-																}
-															: undefined
-													}
-													href={`/person/${key}`}
-													data-reveal-host
-													onClick={(e) => {
-														e.preventDefault();
-														route(`/person/${key}`);
-													}}
-												>
-													<CastPhoto
-														name={member.name}
-														profileUrl={member.profileUrl}
-														character={member.character}
-														size={36}
-														expandedSize={180}
-														thumbClass={styles.castPhoto}
-													/>
-													<div class={styles.castInfo}>
-														<span class={styles.castName}>
-															{member.name}
-														</span>
-														{member.character && (
-															<span class={styles.castCharacter}>
-																{member.character}
-															</span>
-														)}
-													</div>
-													<div class={styles.castActions}>
-														<span class={styles.castArrow}>
-															<Icon name="chevron-right" size={12} />
-														</span>
-														<FavoriteButton
-															entityType="person"
-															tmdbId={member.tmdbId}
-															name={member.name}
-															profileUrl={member.profileUrl}
-															personRole="actor"
-															size="normal"
-															stopPropagation
-															revealOnHover
-														/>
-													</div>
-												</a>
-											);
-										})}
-										{!fullCast && movie.cast.length > 8 && (
-											<button
-												class={styles.loadAllCast}
-												disabled={loadingCast}
-												onClick={handleLoadAllCast}
-											>
-												{loadingCast ? 'Loading…' : 'Load all'}
-											</button>
-										)}
-									</div>
-								</Collapse>
-							</div>
-						)}
-
-						<div class={styles.section}>
-							<button
-								class={styles.fileInfoToggle}
-								onClick={() => setShowComments(!showComments)}
-							>
-								<h3 class={styles.sectionTitle}>Comments</h3>
-								<span class={styles.fileInfoArrow}>
-									<Icon
-										name={showComments ? 'chevron-up' : 'chevron-down'}
-										size={14}
-									/>
-								</span>
-							</button>
-							<Collapse open={showComments}>
-								<CommentsPanel movieId={movie.id} />
-							</Collapse>
-						</div>
-
-						{movie.fileInfo && (
-							<div class={styles.section}>
-								<button
-									class={styles.fileInfoToggle}
-									onClick={() => setShowFileInfo(!showFileInfo)}
-								>
-									<h3 class={styles.sectionTitle}>File Info</h3>
-									<PlaybackBadge movie={movie} />
-									<span class={styles.fileInfoArrow}>
-										<Icon
-											name={showFileInfo ? 'chevron-up' : 'chevron-down'}
-											size={14}
-										/>
-									</span>
-								</button>
-								<Collapse open={showFileInfo}>
-									<FileInfoGrid movie={movie} dark />
-								</Collapse>
-							</div>
-						)}
+						<MovieInfoContent movie={movie} variant="flyout" />
 					</>
 				)}
 
 				{/* Plugin UI Slots */}
 				<PluginSlot name={UI.INFO_PANEL} context={{ movie }} />
 			</div>
+		</>
+	);
+}
+
+/**
+ * The movie info body shared by both panel variants (title → meta → genres →
+ * ratings → collapsible Overview / Cast / Comments / File Info). The only
+ * per-variant differences are:
+ *   - `flyout` title click also minimizes the player + closes the panel;
+ *   - `inline` puts the "Added" line inside the meta row and shows group
+ *     breadcrumbs; `flyout` puts "Added" on its own row below the meta.
+ * Section open/closed state + the "Load all" cast expansion live here since
+ * only one variant is mounted at a time.
+ */
+function MovieInfoContent({ movie, variant }: { movie: Movie; variant: 'inline' | 'flyout' }) {
+	const flyout = variant === 'flyout';
+	const [showFileInfo, setShowFileInfo] = useState(false);
+	const [showComments, setShowComments] = useState(false);
+	const [showCast, setShowCast] = useState(true);
+	const [showOverview, setShowOverview] = useState(true);
+	// "Load all" cast expansion — full list fetched (and persisted) on demand.
+	const [fullCast, setFullCast] = useState<NonNullable<Movie['cast']> | null>(null);
+	const [loadingCast, setLoadingCast] = useState(false);
+
+	useEffect(() => {
+		setFullCast(null);
+	}, [movie.id]);
+
+	const handleLoadAllCast = async () => {
+		if (loadingCast) return;
+		// Show everything we already have; only hit the API to backfill rows
+		// saved under the legacy 20-cast ingest cap.
+		setFullCast(movie.cast ?? []);
+		if ((movie.cast?.length ?? 0) !== 20) return;
+		setLoadingCast(true);
+		try {
+			const r = await moviesService.loadFullCast(movie.id);
+			if (r.cast.length > (movie.cast?.length ?? 0)) {
+				setFullCast(r.cast as NonNullable<Movie['cast']>);
+			}
+		} catch {
+			// non-critical
+		} finally {
+			setLoadingCast(false);
+		}
+	};
+
+	const handleTitleClick = () => {
+		route(`/movie/${movie.id}`);
+		if (flyout) {
+			if (playerMode.value === 'full') minimizePlayer();
+			showInfoPanel.value = false;
+		}
+	};
+
+	const hours = Math.floor((movie.runtime ?? 0) / 60);
+	const minutes = (movie.runtime ?? 0) % 60;
+	const runtimeText = movie.runtime ? `${hours > 0 ? `${hours}h ` : ''}${minutes}m` : '';
+
+	const addedNode = movie.addedAt ? (
+		<span class={styles.addedAt} title={new Date(movie.addedAt).toLocaleString()}>
+			Added {relativeTime(movie.addedAt)}
+		</span>
+	) : null;
+
+	return (
+		<>
+			<div class={styles.titleRow}>
+				{shareMode.value ? (
+					<h2 class={styles.title}>{movie.title}</h2>
+				) : (
+					<h2 class={`${styles.title} ${styles.titleLink}`} onClick={handleTitleClick}>
+						{movie.title}
+					</h2>
+				)}
+				<FavoriteButton
+					entityType="movie"
+					movieId={movie.id}
+					size="normal"
+					stopPropagation
+				/>
+			</div>
+
+			<div class={styles.meta}>
+				{movie.year > 0 && <span>{movie.year}</span>}
+				{runtimeText && <span>{runtimeText}</span>}
+				{movie.director && (
+					<span class={styles.directorRow} data-reveal-host>
+						<a
+							class={styles.directorLink}
+							href={`/person/${personKeyFor({ name: movie.director })}`}
+							onClick={(e) => {
+								e.preventDefault();
+								route(`/person/${personKeyFor({ name: movie.director! })}`);
+							}}
+						>
+							Dir. {movie.director}
+						</a>
+						<FavoriteButton
+							entityType="person"
+							name={movie.director}
+							personRole="director"
+							size="mini"
+							stopPropagation
+							overlayReveal
+						/>
+					</span>
+				)}
+				{/* Inline mode keeps "Added" + group breadcrumbs inline in the meta row. */}
+				{!flyout && addedNode}
+				{!flyout && movie.groupId && <MovieBreadcrumbs movie={movie} />}
+			</div>
+
+			{/* Flyout mode puts "Added" on its own tight row below the meta. */}
+			{flyout && addedNode && <div class={styles.addedRow}>{addedNode}</div>}
+
+			{movie.genres && movie.genres.length > 0 && (
+				<div class={styles.genres}>
+					{movie.genres.map((genre) => (
+						<span key={genre} class={styles.genreTag}>
+							{genre}
+						</span>
+					))}
+				</div>
+			)}
+
+			<div class={styles.ratings}>
+				{movie.rating != null && movie.rating > 0 && (
+					<div class={styles.ratingItem}>
+						<span class={styles.ratingSource}>You</span>
+						<span class={styles.ratingValue}>{movie.rating.toFixed(1)}</span>
+					</div>
+				)}
+				{movie.imdbRating != null && movie.imdbRating > 0 ? (
+					<a
+						href={
+							movie.imdbId ? `https://www.imdb.com/title/${movie.imdbId}/` : undefined
+						}
+						target="_blank"
+						rel="noopener noreferrer"
+						class={`${styles.ratingItem} ${movie.imdbId ? styles.ratingLink : ''}`}
+					>
+						<span class={styles.ratingSource}>IMDb</span>
+						<span class={styles.ratingValue}>{movie.imdbRating}</span>
+					</a>
+				) : movie.imdbId ? (
+					<a
+						href={`https://www.imdb.com/title/${movie.imdbId}/`}
+						target="_blank"
+						rel="noopener noreferrer"
+						class={`${styles.ratingItem} ${styles.ratingLink}`}
+					>
+						<span class={styles.ratingSource}>IMDb</span>
+					</a>
+				) : null}
+				{movie.rtRating != null && movie.rtRating > 0 && (
+					<div class={styles.ratingItem}>
+						<span class={styles.ratingSource}>RT</span>
+						<span class={styles.ratingValue}>{movie.rtRating}%</span>
+					</div>
+				)}
+				{movie.metacriticRating != null && movie.metacriticRating > 0 && (
+					<div class={styles.ratingItem}>
+						<span class={styles.ratingSource}>Metacritic</span>
+						<span class={styles.ratingValue}>{movie.metacriticRating}</span>
+					</div>
+				)}
+				{movie.imdbVotes != null && movie.imdbVotes > 0 && (
+					<span class={styles.votesLabel} title="IMDb votes">
+						{movie.imdbVotes >= 1000000
+							? `${(movie.imdbVotes / 1000000).toFixed(1)}M`
+							: movie.imdbVotes >= 1000
+								? `${(movie.imdbVotes / 1000).toFixed(1)}K`
+								: String(movie.imdbVotes)}{' '}
+						votes
+					</span>
+				)}
+			</div>
+
+			{movie.overview && (
+				<div class={styles.section}>
+					<button
+						class={styles.fileInfoToggle}
+						onClick={() => setShowOverview(!showOverview)}
+					>
+						<h3 class={styles.sectionTitle}>Overview</h3>
+						<span class={styles.fileInfoArrow}>
+							<Icon name={showOverview ? 'chevron-up' : 'chevron-down'} size={14} />
+						</span>
+					</button>
+					<Collapse open={showOverview}>
+						<p class={styles.overview}>{movie.overview}</p>
+					</Collapse>
+				</div>
+			)}
+
+			{movie.cast && movie.cast.length > 0 && (
+				<div class={styles.section}>
+					<button class={styles.fileInfoToggle} onClick={() => setShowCast(!showCast)}>
+						<h3 class={styles.sectionTitle}>Cast</h3>
+						<span class={styles.fileInfoArrow}>
+							<Icon name={showCast ? 'chevron-up' : 'chevron-down'} size={14} />
+						</span>
+					</button>
+					<Collapse open={showCast}>
+						<div class={styles.castList}>
+							{(fullCast ?? movie.cast.slice(0, 8)).map((member, ci) => {
+								const key = personKeyFor({
+									tmdbId: member.tmdbId,
+									name: member.name,
+								});
+								return (
+									<a
+										key={member.name}
+										class={`${styles.castMember} ${
+											fullCast && ci >= 8 ? styles.castEnter : ''
+										}`}
+										style={
+											fullCast && ci >= 8
+												? {
+														animationDelay: `${Math.min(ci - 8, 16) * 30}ms`,
+													}
+												: undefined
+										}
+										href={`/person/${key}`}
+										data-reveal-host
+										onClick={(e) => {
+											e.preventDefault();
+											route(`/person/${key}`);
+										}}
+									>
+										<CastPhoto
+											name={member.name}
+											profileUrl={member.profileUrl}
+											character={member.character}
+											size={36}
+											expandedSize={180}
+											thumbClass={styles.castPhoto}
+										/>
+										<div class={styles.castInfo}>
+											<span class={styles.castName}>{member.name}</span>
+											{member.character && (
+												<span class={styles.castCharacter}>
+													{member.character}
+												</span>
+											)}
+										</div>
+										<div class={styles.castActions}>
+											<span class={styles.castArrow}>
+												<Icon name="chevron-right" size={12} />
+											</span>
+											<FavoriteButton
+												entityType="person"
+												tmdbId={member.tmdbId}
+												name={member.name}
+												profileUrl={member.profileUrl}
+												personRole="actor"
+												size="normal"
+												stopPropagation
+												revealOnHover
+											/>
+										</div>
+									</a>
+								);
+							})}
+							{!fullCast && movie.cast.length > 8 && (
+								<button
+									class={styles.loadAllCast}
+									disabled={loadingCast}
+									onClick={handleLoadAllCast}
+								>
+									{loadingCast ? 'Loading…' : 'Load all'}
+								</button>
+							)}
+						</div>
+					</Collapse>
+				</div>
+			)}
+
+			<div class={styles.section}>
+				<button
+					class={styles.fileInfoToggle}
+					onClick={() => setShowComments(!showComments)}
+				>
+					<h3 class={styles.sectionTitle}>Comments</h3>
+					<span class={styles.fileInfoArrow}>
+						<Icon name={showComments ? 'chevron-up' : 'chevron-down'} size={14} />
+					</span>
+				</button>
+				<Collapse open={showComments}>
+					<CommentsPanel movieId={movie.id} />
+				</Collapse>
+			</div>
+
+			{movie.fileInfo && (
+				<div class={styles.section}>
+					<button
+						class={styles.fileInfoToggle}
+						onClick={() => setShowFileInfo(!showFileInfo)}
+					>
+						<h3 class={styles.sectionTitle}>File Info</h3>
+						<PlaybackBadge movie={movie} />
+						<span class={styles.fileInfoArrow}>
+							<Icon name={showFileInfo ? 'chevron-up' : 'chevron-down'} size={14} />
+						</span>
+					</button>
+					<Collapse open={showFileInfo}>
+						<FileInfoGrid movie={movie} dark />
+					</Collapse>
+				</div>
+			)}
 		</>
 	);
 }
