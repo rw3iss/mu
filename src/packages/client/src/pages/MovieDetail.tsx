@@ -4,6 +4,7 @@ import { route } from 'preact-router';
 import { CommentsPanel } from '@/components/comments/CommentsPanel';
 import { Button } from '@/components/common/Button';
 import { Collapse } from '@/components/common/Collapse';
+import { CopyButton } from '@/components/common/CopyButton';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { Select } from '@/components/common/Select';
@@ -1188,7 +1189,9 @@ export function MovieDetail({ id }: MovieDetailProps) {
 																				</span>
 																			)}
 																		</span>
-																		<TrackCopyButton
+																		<CopyButton
+																			class={styles.trackCopy}
+																			title="Copy artist - track"
 																			text={trackCopyText(
 																				t.artist ??
 																					soundtrack
@@ -1563,62 +1566,6 @@ function formatTrackLength(ms: number): string {
 /** Build the "Artist Name - Track Name" string copied from a soundtrack row. */
 function trackCopyText(artist: string | null, title: string): string {
 	return artist ? `${artist} - ${title}` : title;
-}
-
-/**
- * Copy-to-clipboard button for a soundtrack track. The icon flips to a
- * green check for 2s after a successful copy.
- */
-function TrackCopyButton({ text }: { text: string }) {
-	const [copied, setCopied] = useState(false);
-	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	useEffect(
-		() => () => {
-			if (timer.current) clearTimeout(timer.current);
-		},
-		[],
-	);
-
-	const handleCopy = useCallback(
-		async (e: MouseEvent) => {
-			e.preventDefault();
-			e.stopPropagation();
-			try {
-				await navigator.clipboard.writeText(text);
-			} catch {
-				// Clipboard API unavailable (insecure context) — fall back.
-				const ta = document.createElement('textarea');
-				ta.value = text;
-				ta.style.position = 'fixed';
-				ta.style.opacity = '0';
-				document.body.appendChild(ta);
-				ta.select();
-				try {
-					document.execCommand('copy');
-				} catch {
-					/* give up silently */
-				}
-				ta.remove();
-			}
-			setCopied(true);
-			if (timer.current) clearTimeout(timer.current);
-			timer.current = setTimeout(() => setCopied(false), 2000);
-		},
-		[text],
-	);
-
-	return (
-		<button
-			type="button"
-			class={`${styles.trackCopy} ${copied ? styles.trackCopied : ''}`}
-			onClick={handleCopy}
-			title={copied ? 'Copied' : 'Copy artist - track'}
-			aria-label={copied ? 'Copied' : 'Copy artist and track name'}
-		>
-			<Icon name={copied ? 'check' : 'copy'} size={14} />
-		</button>
-	);
 }
 
 /**

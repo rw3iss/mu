@@ -282,61 +282,76 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 									</button>
 									<Collapse open={showCast}>
 										<div class={styles.castList}>
-											{(fullCast ?? movie.cast.slice(0, 8)).map((member) => {
-												const key = personKeyFor({
-													tmdbId: member.tmdbId,
-													name: member.name,
-												});
-												return (
-													<a
-														key={member.name}
-														class={styles.castMember}
-														href={`/person/${key}`}
-														data-reveal-host
-														onClick={(e) => {
-															e.preventDefault();
-															route(`/person/${key}`);
-														}}
-													>
-														<CastPhoto
-															name={member.name}
-															profileUrl={member.profileUrl}
-															character={member.character}
-															size={36}
-															expandedSize={180}
-															thumbClass={styles.castPhoto}
-														/>
-														<div class={styles.castInfo}>
-															<span class={styles.castName}>
-																{member.name}
-															</span>
-															{member.character && (
-																<span class={styles.castCharacter}>
-																	{member.character}
-																</span>
-															)}
-														</div>
-														<div class={styles.castActions}>
-															<span class={styles.castArrow}>
-																<Icon
-																	name="chevron-right"
-																	size={12}
-																/>
-															</span>
-															<FavoriteButton
-																entityType="person"
-																tmdbId={member.tmdbId}
+											{(fullCast ?? movie.cast.slice(0, 8)).map(
+												(member, ci) => {
+													const key = personKeyFor({
+														tmdbId: member.tmdbId,
+														name: member.name,
+													});
+													return (
+														<a
+															key={member.name}
+															class={`${styles.castMember} ${
+																fullCast && ci >= 8
+																	? styles.castEnter
+																	: ''
+															}`}
+															style={
+																fullCast && ci >= 8
+																	? {
+																			animationDelay: `${Math.min(ci - 8, 16) * 30}ms`,
+																		}
+																	: undefined
+															}
+															href={`/person/${key}`}
+															data-reveal-host
+															onClick={(e) => {
+																e.preventDefault();
+																route(`/person/${key}`);
+															}}
+														>
+															<CastPhoto
 																name={member.name}
 																profileUrl={member.profileUrl}
-																personRole="actor"
-																size="normal"
-																stopPropagation
-																revealOnHover
+																character={member.character}
+																size={36}
+																expandedSize={180}
+																thumbClass={styles.castPhoto}
 															/>
-														</div>
-													</a>
-												);
-											})}
+															<div class={styles.castInfo}>
+																<span class={styles.castName}>
+																	{member.name}
+																</span>
+																{member.character && (
+																	<span
+																		class={styles.castCharacter}
+																	>
+																		{member.character}
+																	</span>
+																)}
+															</div>
+															<div class={styles.castActions}>
+																<span class={styles.castArrow}>
+																	<Icon
+																		name="chevron-right"
+																		size={12}
+																	/>
+																</span>
+																<FavoriteButton
+																	entityType="person"
+																	tmdbId={member.tmdbId}
+																	name={member.name}
+																	profileUrl={member.profileUrl}
+																	personRole="actor"
+																	size="normal"
+																	stopPropagation
+																	revealOnHover
+																/>
+															</div>
+														</a>
+													);
+												},
+											)}
 											{!fullCast && movie.cast.length > 8 && (
 												<button
 													class={styles.loadAllCast}
@@ -570,7 +585,7 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 								</button>
 								<Collapse open={showCast}>
 									<div class={styles.castList}>
-										{(fullCast ?? movie.cast.slice(0, 8)).map((member) => {
+										{(fullCast ?? movie.cast.slice(0, 8)).map((member, ci) => {
 											const key = personKeyFor({
 												tmdbId: member.tmdbId,
 												name: member.name,
@@ -578,7 +593,16 @@ export function InfoPanel({ movie, visible, onClose, inline }: InfoPanelProps) {
 											return (
 												<a
 													key={member.name}
-													class={styles.castMember}
+													class={`${styles.castMember} ${
+														fullCast && ci >= 8 ? styles.castEnter : ''
+													}`}
+													style={
+														fullCast && ci >= 8
+															? {
+																	animationDelay: `${Math.min(ci - 8, 16) * 30}ms`,
+																}
+															: undefined
+													}
 													href={`/person/${key}`}
 													data-reveal-host
 													onClick={(e) => {

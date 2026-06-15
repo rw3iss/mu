@@ -1,0 +1,39 @@
+/**
+ * Base styling for the reusable CopyButton. Context classes (passed via the
+ * `class` prop) handle positioning / reveal-on-hover. The success state uses
+ * the themed --color-success token.
+ */
+.copyBtn {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2px;
+	background: none;
+	border: none;
+	border-radius: var(--radius-sm);
+	color: var(--color-text-muted);
+	cursor: pointer;
+	transition:
+		opacity 120ms ease,
+		color 120ms ease,
+		background-color 120ms ease;
+
+	&:hover {
+		color: var(--color-text-primary);
+		background: var(--color-bg-hover);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
+	}
+}
+
+.copied {
+	color: var(--color-success);
+
+	&:hover {
+		color: var(--color-success);
+	}
+}
