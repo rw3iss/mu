@@ -1,6 +1,11 @@
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
-import { discardSnippet, downloadSnippet, recordedSnippet } from '@/state/snippet-recorder.state';
+import {
+	discardSnippet,
+	downloadSnippet,
+	recordedSnippet,
+	snippetExt,
+} from '@/state/snippet-recorder.state';
 import styles from './SnippetDialog.module.scss';
 
 function fmt(s: number): string {
@@ -19,7 +24,8 @@ export function SnippetDialog() {
 				<video class={styles.preview} src={snippet.url} controls autoPlay />
 				<div class={styles.meta}>
 					Length {fmt(snippet.durationSeconds)} ·{' '}
-					{(snippet.blob.size / (1024 * 1024)).toFixed(1)} MB · WebM
+					{(snippet.blob.size / (1024 * 1024)).toFixed(1)} MB ·{' '}
+						{snippetExt(snippet.mimeType).toUpperCase()}
 				</div>
 				<div class={styles.actions}>
 					<Button variant="ghost" onClick={discardSnippet}>

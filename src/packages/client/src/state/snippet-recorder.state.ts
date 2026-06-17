@@ -34,11 +34,28 @@ export function snippetSupported(): boolean {
 }
 
 function pickMimeType(): string {
-	const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+	const candidates = [
+		// MP4 (H.264 + AAC) first — universally playable. MediaRecorder
+		// supports it on modern Chrome/Edge/Safari; H.264 *encode* may be
+		// absent on some Linux Chromium builds, so WebM remains the fallback.
+		'video/mp4;codecs=avc1.42E01E,mp4a.40.2', // H.264 baseline + AAC-LC
+		'video/mp4;codecs=avc1.640028,mp4a.40.2', // H.264 high + AAC-LC
+		'video/mp4;codecs=h264,aac',
+		'video/mp4',
+		// WebM fallback (always available).
+		'video/webm;codecs=vp9,opus',
+		'video/webm;codecs=vp8,opus',
+		'video/webm',
+	];
 	for (const c of candidates) {
 		if (MediaRecorder.isTypeSupported(c)) return c;
 	}
 	return 'video/webm';
+}
+
+/** File extension for a recorded snippet's MIME type. */
+export function snippetExt(mimeType: string): string {
+	return mimeType.includes('mp4') ? 'mp4' : 'webm';
 }
 
 function captureVideoStream(video: HTMLVideoElement): MediaStream | null {
@@ -179,7 +196,7 @@ export function downloadSnippet(): void {
 	const a = document.createElement('a');
 	a.href = s.url;
 	const safe = (s.movieTitle ?? 'snippet').replace(/[^\w.-]+/g, '_').slice(0, 60);
-	a.download = `${safe}-snippet.webm`;
+	a.download = `${safe}-snippet.${snippetExt(s.mimeType)}`;
 	document.body.appendChild(a);
 	a.click();
 	a.remove();
