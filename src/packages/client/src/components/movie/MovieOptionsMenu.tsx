@@ -549,6 +549,20 @@ export function MovieOptionsMenu({
 								</div>
 							)}
 						</div>
+						<button
+							class={`${styles.menuItem}`}
+							onClick={handleRefreshMetadata}
+							disabled={refreshState !== 'idle'}
+						>
+							<span class={styles.menuIcon}>
+								<Icon name={refreshState === 'complete' ? 'check' : 'refresh'} />
+							</span>
+							{asyncLabel(refreshState, {
+								idle: 'Refresh Metadata',
+								loading: 'Refreshing...',
+								complete: 'Complete',
+							})}
+						</button>
 						{canDownload && (
 							<button
 								class={styles.menuItem}
@@ -578,7 +592,7 @@ export function MovieOptionsMenu({
 								<span class={styles.menuIcon}>
 									<Icon name="settings" />
 								</span>
-								<span class={styles.submenuLabel}>Operations</span>
+								<span class={styles.submenuLabel}>Other</span>
 								<span class={styles.submenuChevron} aria-hidden="true">
 									<Icon name="chevron-right" />
 								</span>
@@ -610,26 +624,6 @@ export function MovieOptionsMenu({
 												idle: 'Rescan File',
 												loading: 'Scanning...',
 												complete: 'Scanned',
-											})}
-										</button>
-										<button
-											class={`${styles.menuItem} ${styles.flyoutItem}`}
-											onClick={handleRefreshMetadata}
-											disabled={refreshState !== 'idle'}
-										>
-											<span class={styles.menuIcon}>
-												<Icon
-													name={
-														refreshState === 'complete'
-															? 'check'
-															: 'refresh'
-													}
-												/>
-											</span>
-											{asyncLabel(refreshState, {
-												idle: 'Refresh Metadata',
-												loading: 'Refreshing...',
-												complete: 'Complete',
 											})}
 										</button>
 										<button
