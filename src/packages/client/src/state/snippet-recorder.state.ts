@@ -20,6 +20,15 @@ export const recordedSnippet = signal<RecordedSnippet | null>(null);
 /** Auto-stop ceiling so an in-memory Blob can't balloon unbounded. */
 const MAX_SECONDS = 5 * 60;
 
+/**
+ * Audio encode bitrate for the snippet + the trim re-encode. The capture path
+ * (and the trim's re-encode) would otherwise default to ~128 kbps Opus, which —
+ * double-encoded by trimming and fed EQ/Comp-boosted audio — produces audible
+ * warble/"blips". 256 kbps is effectively transparent and survives the second
+ * pass cleanly.
+ */
+const RECORD_AUDIO_BPS = 256_000;
+
 let recorder: MediaRecorder | null = null;
 let chunks: Blob[] = [];
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -104,11 +113,16 @@ export function startSnippet(movieTitle?: string): void {
 
 	const mimeType = pickMimeType();
 	try {
-		recorder = new MediaRecorder(stream, { mimeType });
+		recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: RECORD_AUDIO_BPS });
 	} catch {
-		notifyError('Failed to start recording.');
-		cleanup();
-		return;
+		// Some builds reject audioBitsPerSecond — retry with just the mime.
+		try {
+			recorder = new MediaRecorder(stream, { mimeType });
+		} catch {
+			notifyError('Failed to start recording.');
+			cleanup();
+			return;
+		}
 	}
 
 	chunks = [];
@@ -312,10 +326,14 @@ export async function trimVideoBlob(
 		const at = audioTrack ?? cap?.getAudioTracks()[0] ?? null;
 		if (at) out.addTrack(at);
 
-		const recorder = new MediaRecorder(
-			out,
-			MediaRecorder.isTypeSupported(mimeType) ? { mimeType } : undefined,
-		);
+		const recOpts: MediaRecorderOptions = { audioBitsPerSecond: RECORD_AUDIO_BPS };
+		if (MediaRecorder.isTypeSupported(mimeType)) recOpts.mimeType = mimeType;
+		let recorder: MediaRecorder;
+		try {
+			recorder = new MediaRecorder(out, recOpts);
+		} catch {
+			recorder = new MediaRecorder(out, recOpts.mimeType ? { mimeType } : undefined);
+		}
 		const chunks: Blob[] = [];
 		recorder.ondataavailable = (e) => {
 			if (e.data && e.data.size > 0) chunks.push(e.data);
