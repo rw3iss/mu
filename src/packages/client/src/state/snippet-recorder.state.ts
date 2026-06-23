@@ -29,11 +29,24 @@ const MAX_SECONDS = 5 * 60;
  */
 const RECORD_AUDIO_BPS = 256_000;
 
+/**
+ * Downscale the captured video to at most this width before encoding. Live
+ * software VP8/VP9 encoding of full 1080p starves the player's decode/render,
+ * so the source stutters and captureStream records duplicate frames (judder).
+ * Encoding a smaller frame is dramatically cheaper and keeps playback smooth.
+ * Sources already ≤ this width are captured directly (no canvas).
+ */
+const MAX_CAPTURE_WIDTH = 1280;
+/** Cap the capture frame rate (also bounds encode load). */
+const CAPTURE_FPS = 30;
+
 let recorder: MediaRecorder | null = null;
 let chunks: Blob[] = [];
 let timer: ReturnType<typeof setInterval> | null = null;
 let startedAt = 0;
 let capturedStream: MediaStream | null = null;
+/** Stops the downscale draw loop (when capturing through a canvas). */
+let canvasDrawStop: (() => void) | null = null;
 
 /** Whether this browser can record the player at all. */
 export function snippetSupported(): boolean {
@@ -85,6 +98,52 @@ function captureVideoStream(video: HTMLVideoElement): MediaStream | null {
 	return null;
 }
 
+/**
+ * Capture a downscaled video track by drawing the player frames into a smaller
+ * canvas and capturing THAT. Returns null when no downscale is needed/possible
+ * (caller falls back to capturing the element directly). GPU-accelerated
+ * drawImage is cheap; the win is the much lighter encode of the smaller frame.
+ */
+function makeDownscaledTrack(
+	video: HTMLVideoElement,
+): { track: MediaStreamTrack; stop: () => void } | null {
+	const vw = video.videoWidth;
+	const vh = video.videoHeight;
+	if (!vw || !vh || vw <= MAX_CAPTURE_WIDTH) return null;
+	const scale = MAX_CAPTURE_WIDTH / vw;
+	const cw = Math.max(2, Math.round((vw * scale) / 2) * 2);
+	const ch = Math.max(2, Math.round((vh * scale) / 2) * 2);
+	const canvas = document.createElement('canvas');
+	canvas.width = cw;
+	canvas.height = ch;
+	const cctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+	if (!cctx) return null;
+	const cap = (
+		canvas as HTMLCanvasElement & { captureStream?: (fps?: number) => MediaStream }
+	).captureStream?.(CAPTURE_FPS);
+	const track = cap?.getVideoTracks()[0];
+	if (!track) return null;
+	let stopped = false;
+	let raf = 0;
+	const draw = () => {
+		if (stopped) return;
+		try {
+			cctx.drawImage(video, 0, 0, cw, ch);
+		} catch {
+			/* ignore a transient draw error */
+		}
+		raf = requestAnimationFrame(draw);
+	};
+	raf = requestAnimationFrame(draw);
+	return {
+		track,
+		stop: () => {
+			stopped = true;
+			cancelAnimationFrame(raf);
+		},
+	};
+}
+
 /** Start recording the live player output. */
 export function startSnippet(movieTitle?: string): void {
 	if (isRecordingSnippet.value) return;
@@ -99,9 +158,15 @@ export function startSnippet(movieTitle?: string): void {
 	}
 
 	const elementStream = captureVideoStream(video);
-	const videoTrack = elementStream?.getVideoTracks()[0];
+
+	// Video: downscale large sources through a canvas so the live encode is
+	// light enough to not stutter playback; otherwise capture the element track.
+	const downscaled = makeDownscaledTrack(video);
+	canvasDrawStop = downscaled?.stop ?? null;
+	const videoTrack = downscaled?.track ?? elementStream?.getVideoTracks()[0];
 	if (!videoTrack) {
 		notifyError('Could not capture the video.');
+		cleanup();
 		return;
 	}
 
@@ -180,6 +245,10 @@ function cleanup(): void {
 	if (timer) {
 		clearInterval(timer);
 		timer = null;
+	}
+	if (canvasDrawStop) {
+		canvasDrawStop();
+		canvasDrawStop = null;
 	}
 	audioEngine.stopRecordingTap();
 	// Stop only the recording tracks we created references to; the element's
