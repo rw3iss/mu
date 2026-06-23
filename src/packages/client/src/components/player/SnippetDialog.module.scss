@@ -22,3 +22,121 @@
 	justify-content: flex-end;
 	gap: var(--space-md);
 }
+
+/* ── Trim bar ───────────────────────────────────────────────── */
+.trimBar {
+	position: relative;
+	height: 34px;
+	margin-top: var(--space-xs);
+	border-radius: var(--radius-sm);
+	background: var(--color-bg-elevated);
+	border: 1px solid var(--color-border);
+	cursor: pointer;
+	touch-action: none;
+	user-select: none;
+	overflow: hidden;
+}
+
+.trimDisabled {
+	opacity: 0.6;
+	pointer-events: none;
+}
+
+/* dimmed (trimmed-away) regions */
+.trimDim {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+}
+
+/* selected (kept) region */
+.trimSel {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	background: var(--color-accent-subtle, rgba(255, 255, 255, 0.08));
+	border-top: 2px solid var(--color-accent);
+	border-bottom: 2px solid var(--color-accent);
+	pointer-events: none;
+}
+
+.trimPlayhead {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	margin-left: -1px;
+	background: #fff;
+	box-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
+	pointer-events: none;
+}
+
+.trimHandle {
+	position: absolute;
+	top: -2px;
+	bottom: -2px;
+	width: 12px;
+	margin-left: -6px;
+	border-radius: var(--radius-sm);
+	background: var(--color-accent);
+	cursor: ew-resize;
+	touch-action: none;
+
+	&::after {
+		content: '';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 2px;
+		height: 14px;
+		transform: translate(-50%, -50%);
+		background: rgba(0, 0, 0, 0.45);
+		border-radius: 1px;
+	}
+
+	&:hover,
+	&:focus-visible {
+		filter: brightness(1.12);
+		outline: none;
+	}
+}
+
+.trimRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-md);
+}
+
+.trimInfo {
+	font-size: var(--font-size-sm);
+	color: var(--color-text-secondary);
+	font-variant-numeric: tabular-nums;
+
+	strong {
+		color: var(--color-text-primary);
+	}
+}
+
+/* ── Trimming progress ──────────────────────────────────────── */
+.progress {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: var(--font-size-sm);
+	color: var(--color-text-secondary);
+}
+
+.progressTrack {
+	height: 6px;
+	border-radius: 3px;
+	background: var(--color-bg-elevated);
+	overflow: hidden;
+}
+
+.progressFill {
+	height: 100%;
+	background: var(--color-accent);
+	transition: width 120ms linear;
+}

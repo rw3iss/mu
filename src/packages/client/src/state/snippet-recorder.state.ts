@@ -189,15 +189,188 @@ export function discardSnippet(): void {
 	recordedSnippet.value = null;
 }
 
-/** Trigger a browser download of the recorded clip. */
+/** Sanitised base filename for a snippet (no extension). */
+export function snippetFilenameBase(movieTitle?: string): string {
+	const safe = (movieTitle ?? 'snippet').replace(/[^\w.-]+/g, '_').slice(0, 60);
+	return `${safe}-snippet`;
+}
+
+/** Trigger a browser download of the (full) recorded clip. */
 export function downloadSnippet(): void {
 	const s = recordedSnippet.value;
 	if (!s) return;
 	const a = document.createElement('a');
 	a.href = s.url;
-	const safe = (s.movieTitle ?? 'snippet').replace(/[^\w.-]+/g, '_').slice(0, 60);
-	a.download = `${safe}-snippet.${snippetExt(s.mimeType)}`;
+	a.download = `${snippetFilenameBase(s.movieTitle)}.${snippetExt(s.mimeType)}`;
 	document.body.appendChild(a);
 	a.click();
 	a.remove();
+}
+
+/** Trigger a download of an arbitrary blob (used for the trimmed clip). */
+export function downloadBlobAs(blob: Blob, filenameNoExt: string, mimeType: string): void {
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = `${filenameNoExt}.${snippetExt(mimeType)}`;
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+function onceEvent(el: HTMLMediaElement, ev: string): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const ok = () => {
+			cleanup();
+			resolve();
+		};
+		const no = () => {
+			cleanup();
+			reject(new Error(`${ev} failed`));
+		};
+		const cleanup = () => {
+			el.removeEventListener(ev, ok);
+			el.removeEventListener('error', no);
+		};
+		el.addEventListener(ev, ok, { once: true });
+		el.addEventListener('error', no, { once: true });
+	});
+}
+
+function seekTo(video: HTMLVideoElement, t: number): Promise<void> {
+	return new Promise((resolve) => {
+		const done = () => {
+			video.removeEventListener('seeked', done);
+			resolve();
+		};
+		video.addEventListener('seeked', done, { once: true });
+		try {
+			video.currentTime = t;
+		} catch {
+			resolve();
+		}
+	});
+}
+
+/**
+ * Re-encode the `[startSec, endSec]` region of a recorded clip into a new Blob,
+ * fully in-browser (no server). Plays a hidden element through
+ * captureStream()+MediaRecorder; audio is tapped via Web Audio so the re-encode
+ * is silent to the speakers. Runs in real time (region length) — report
+ * progress via `onProgress`. Throws on unsupported / blocked playback so the
+ * caller can fall back to the full clip.
+ */
+export async function trimVideoBlob(
+	blob: Blob,
+	mimeType: string,
+	startSec: number,
+	endSec: number,
+	onProgress?: (fraction: number) => void,
+): Promise<Blob> {
+	if (typeof MediaRecorder === 'undefined') throw new Error('MediaRecorder unsupported');
+	const url = URL.createObjectURL(blob);
+	const video = document.createElement('video');
+	video.src = url;
+	video.preload = 'auto';
+	(video as HTMLVideoElement & { playsInline?: boolean }).playsInline = true;
+	video.muted = false;
+	video.volume = 1;
+	let ctx: AudioContext | null = null;
+
+	try {
+		await onceEvent(video, 'loadedmetadata');
+
+		// Audio: route through Web Audio so capture works but nothing hits the
+		// speakers during the re-encode.
+		let audioTrack: MediaStreamTrack | null = null;
+		try {
+			const AC =
+				window.AudioContext ??
+				(window as unknown as { webkitAudioContext?: typeof AudioContext })
+					.webkitAudioContext;
+			if (AC) {
+				ctx = new AC();
+				const node = ctx.createMediaElementSource(video);
+				const dest = ctx.createMediaStreamDestination();
+				node.connect(dest);
+				audioTrack = dest.stream.getAudioTracks()[0] ?? null;
+				await ctx.resume().catch(() => {});
+			}
+		} catch {
+			ctx = null;
+		}
+
+		const cap = (
+			video as HTMLVideoElement & { captureStream?: () => MediaStream }
+		).captureStream?.();
+		const videoTrack = cap?.getVideoTracks()[0];
+		if (!videoTrack) throw new Error('captureStream unavailable');
+
+		const out = new MediaStream();
+		out.addTrack(videoTrack);
+		const at = audioTrack ?? cap?.getAudioTracks()[0] ?? null;
+		if (at) out.addTrack(at);
+
+		const recorder = new MediaRecorder(
+			out,
+			MediaRecorder.isTypeSupported(mimeType) ? { mimeType } : undefined,
+		);
+		const chunks: Blob[] = [];
+		recorder.ondataavailable = (e) => {
+			if (e.data && e.data.size > 0) chunks.push(e.data);
+		};
+		const stopped = new Promise<void>((res) => {
+			recorder.onstop = () => res();
+		});
+
+		await seekTo(video, startSec);
+		recorder.start();
+		try {
+			await video.play();
+		} catch {
+			try {
+				recorder.stop();
+			} catch {
+				/* ignore */
+			}
+			throw new Error('playback blocked');
+		}
+
+		const span = Math.max(0.1, endSec - startSec);
+		await new Promise<void>((resolve) => {
+			let raf = 0;
+			const tick = () => {
+				const t = video.currentTime;
+				onProgress?.(Math.min(1, Math.max(0, (t - startSec) / span)));
+				if (t >= endSec - 0.02 || video.ended) {
+					cancelAnimationFrame(raf);
+					resolve();
+					return;
+				}
+				raf = requestAnimationFrame(tick);
+			};
+			raf = requestAnimationFrame(tick);
+		});
+
+		try {
+			video.pause();
+		} catch {
+			/* ignore */
+		}
+		if (recorder.state !== 'inactive') recorder.stop();
+		await stopped;
+		onProgress?.(1);
+		return new Blob(chunks, { type: mimeType });
+	} finally {
+		try {
+			video.pause();
+		} catch {
+			/* ignore */
+		}
+		video.removeAttribute('src');
+		video.load();
+		ctx?.close().catch(() => {});
+		URL.revokeObjectURL(url);
+	}
 }
