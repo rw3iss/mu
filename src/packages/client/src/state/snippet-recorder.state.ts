@@ -44,16 +44,20 @@ export function snippetSupported(): boolean {
 
 function pickMimeType(): string {
 	const candidates = [
-		// MP4 (H.264 + AAC) first — universally playable. MediaRecorder
-		// supports it on modern Chrome/Edge/Safari; H.264 *encode* may be
-		// absent on some Linux Chromium builds, so WebM remains the fallback.
+		// MP4 (H.264 + AAC) first — universally playable, and H.264 encode is
+		// typically hardware-accelerated (lightest of all). Absent on some
+		// Linux Chromium builds, so WebM remains the fallback.
 		'video/mp4;codecs=avc1.42E01E,mp4a.40.2', // H.264 baseline + AAC-LC
 		'video/mp4;codecs=avc1.640028,mp4a.40.2', // H.264 high + AAC-LC
 		'video/mp4;codecs=h264,aac',
 		'video/mp4',
-		// WebM fallback (always available).
-		'video/webm;codecs=vp9,opus',
+		// WebM: prefer VP8 over VP9. VP9 *software* encoding is heavy enough to
+		// starve the player's decode/render during live capture → the source
+		// stutters and captureStream records duplicate frames (judder on fast
+		// motion). VP8 encodes far cheaper, keeping playback smooth while
+		// recording. VP9 stays as a last resort.
 		'video/webm;codecs=vp8,opus',
+		'video/webm;codecs=vp9,opus',
 		'video/webm',
 	];
 	for (const c of candidates) {
