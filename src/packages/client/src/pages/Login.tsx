@@ -39,7 +39,7 @@ export function Login(_props: LoginProps) {
 			} catch (err) {
 				const message = err instanceof Error ? err.message : 'Login failed';
 				setError(message);
-				notifyError('Login failed. Please check your credentials.');
+				notifyError(message);
 			} finally {
 				setIsLoading(false);
 			}

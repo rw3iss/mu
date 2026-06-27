@@ -72,7 +72,7 @@ export class AuthService {
 		}
 
 		if (user.disabled) {
-			throw new UnauthorizedException('This account has been disabled');
+			throw new UnauthorizedException('Your account has been disabled.');
 		}
 
 		// Record the login so profiles can show an "Active …" timestamp. Capture

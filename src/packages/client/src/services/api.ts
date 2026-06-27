@@ -76,6 +76,13 @@ function buildQueryString(params?: Record<string, string>): string {
 
 async function handleResponse<T>(response: Response): Promise<T> {
 	if (response.status === 401) {
+		// Preserve the server's message body so callers (e.g. the login form)
+		// can show a specific reason — "Your account has been disabled.",
+		// "Invalid credentials", etc. — instead of a generic "Unauthorized".
+		const contentType = response.headers.get('content-type');
+		const body = contentType?.includes('application/json')
+			? await response.json().catch(() => null)
+			: null;
 		// In share-watch mode, don't redirect to /login — the PublicWatch page
 		// will surface a "share link invalid or expired" error.
 		if (!shareToken.value) {
@@ -83,7 +90,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 			currentUser.value = null;
 			route('/login', true);
 		}
-		throw new ApiError(401, 'Unauthorized', null);
+		throw new ApiError(401, 'Unauthorized', body);
 	}
 
 	if (response.status === 204) {
