@@ -61,6 +61,19 @@ export class ProfileController {
 		return { ok: true };
 	}
 
+	/** Admin: disable / re-enable a user account (ends their active sessions). */
+	@Roles('admin')
+	@RequireAction('admin:users')
+	@Put(':username/disabled')
+	setDisabled(
+		@Param('username') username: string,
+		@Body() body: { disabled: boolean },
+		@CurrentUser('id') id: string,
+		@CurrentUser('role') role: string,
+	) {
+		return this.profile.setUserDisabled(username, !!body?.disabled, { id, role });
+	}
+
 	/** Upload a new avatar image (multipart). Stored under /uploads/avatars. */
 	@RequireAction('edit:own-settings')
 	@Post('me/avatar')

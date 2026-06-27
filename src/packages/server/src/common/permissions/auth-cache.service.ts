@@ -51,6 +51,8 @@ export interface CachedUser {
 	id: string;
 	username: string;
 	role: string;
+	/** When true the account is admin-disabled — guards reject the request. */
+	disabled: boolean;
 }
 
 /**
@@ -94,13 +96,19 @@ export class AuthCacheService {
 		const hit = this.userCache.get(userId);
 		if (hit) return hit;
 		const row = this.database.db
-			.select({ id: users.id, username: users.username, role: users.role })
+			.select({
+				id: users.id,
+				username: users.username,
+				role: users.role,
+				disabled: users.disabled,
+			})
 			.from(users)
 			.where(eq(users.id, userId))
 			.get();
 		if (!row) return undefined;
-		this.userCache.set(userId, row);
-		return row;
+		const cached: CachedUser = { ...row, disabled: !!row.disabled };
+		this.userCache.set(userId, cached);
+		return cached;
 	}
 
 	invalidateUser(userId: string): void {

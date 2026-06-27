@@ -6,10 +6,10 @@ import {
 	UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { eq } from 'drizzle-orm';
 import { ConfigService } from '../../config/config.service.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, streamSessions, users } from '../../database/schema/index.js';
-import { eq } from 'drizzle-orm';
 import {
 	ALLOWED_SHARE_ROUTE_PREFIXES,
 	extractRouteIdsFromRequest,
@@ -92,6 +92,7 @@ export class JwtAuthGuard implements CanActivate {
 			const cached = this.authCache.getToken(rawToken);
 			if (cached) {
 				request.user = cached;
+				this.assertNotDisabled(request);
 				return true;
 			}
 		}
@@ -100,8 +101,12 @@ export class JwtAuthGuard implements CanActivate {
 			if (rawToken && request.user) {
 				this.authCache.setToken(rawToken, request.user);
 			}
+			this.assertNotDisabled(request);
 			return true;
-		} catch {
+		} catch (err) {
+			// A disabled account is a hard rejection — don't fall through to the
+			// other token paths (they'd resolve the same disabled user).
+			if (err instanceof UnauthorizedException) throw err;
 			// JWT verify failed — try query token next
 		}
 
@@ -112,8 +117,10 @@ export class JwtAuthGuard implements CanActivate {
 				const decoded = request.server.jwt.verify(queryToken);
 				request.user = decoded;
 				this.authCache.setToken(queryToken, decoded);
+				this.assertNotDisabled(request);
 				return true;
-			} catch {
+			} catch (err) {
+				if (err instanceof UnauthorizedException) throw err;
 				// Fall through to setup-bypass
 			}
 		}
@@ -129,6 +136,21 @@ export class JwtAuthGuard implements CanActivate {
 		}
 
 		throw new UnauthorizedException('Invalid or expired token');
+	}
+
+	/**
+	 * Reject requests from an admin-disabled account. The user id comes from the
+	 * resolved JWT payload (`sub`); share/setup synthetic identities are exempt.
+	 * Uses the 5-min auth cache, so disabling takes effect once the token cache
+	 * is cleared (ProfileService.setUserDisabled invalidates both caches).
+	 */
+	private assertNotDisabled(request: any): void {
+		const userId: string | undefined = request.user?.sub ?? request.user?.id;
+		if (!userId || userId === SHARE_USER_SENTINEL || userId === '__setup__') return;
+		const cached = this.authCache.getUser(userId);
+		if (cached?.disabled) {
+			throw new UnauthorizedException('Account disabled');
+		}
 	}
 
 	private extractRawToken(request: any): string | null {

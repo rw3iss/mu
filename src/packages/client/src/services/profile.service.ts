@@ -52,6 +52,13 @@ export const profileService = {
 		return api.post<{ ok: boolean }>('/profile/me/password', { newPassword });
 	},
 
+	/** Admin: disable / re-enable a user account. Returns the refreshed profile. */
+	setUserDisabled(username: string, disabled: boolean): Promise<ProfileView> {
+		return api.put<ProfileView>(`/profile/${encodeURIComponent(username)}/disabled`, {
+			disabled,
+		});
+	},
+
 	/** Read the admin master switch (any authed user). */
 	getSystemConfig(): Promise<ProfileSystemConfig> {
 		return api.get<ProfileSystemConfig>('/profile/config');

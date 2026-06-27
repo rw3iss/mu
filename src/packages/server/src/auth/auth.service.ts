@@ -71,6 +71,10 @@ export class AuthService {
 			throw new UnauthorizedException('Invalid credentials');
 		}
 
+		if (user.disabled) {
+			throw new UnauthorizedException('This account has been disabled');
+		}
+
 		// Record the login so profiles can show an "Active …" timestamp. Capture
 		// the PRIOR login into previousLoginAt first, so the dashboard can count
 		// "new since your last session" against the previous visit, not this one.

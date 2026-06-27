@@ -9,6 +9,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Avatar } from '@/components/common/Avatar';
 import { Button } from '@/components/common/Button';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Panel } from '@/components/common/Panel';
 import { Spinner } from '@/components/common/Spinner';
 import { ToggleButton } from '@/components/common/ToggleButton';
@@ -17,7 +18,7 @@ import { ProfileFavorites } from '@/components/profile/ProfileFavorites';
 import { ProfileHistoryList } from '@/components/profile/ProfileHistoryList';
 import { WatchingNow } from '@/components/profile/WatchingNow';
 import { profileService } from '@/services/profile.service';
-import { currentUser } from '@/state/auth.state';
+import { currentUser, isAdmin } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { showUsersInfo } from '@/state/system.state';
 import { relativeTime } from '@/utils/time-format';
@@ -45,6 +46,10 @@ export function ProfilePage({ username }: ProfilePageProps) {
 	const [commentCount, setCommentCount] = useState<number | null>(null);
 	const [uploadingAvatar, setUploadingAvatar] = useState(false);
 	const [togglingPublic, setTogglingPublic] = useState(false);
+
+	// Admin moderation: disable / re-enable another user's account.
+	const [confirmDisableOpen, setConfirmDisableOpen] = useState(false);
+	const [moderating, setModerating] = useState(false);
 
 	// Change-password form (hidden until toggled open).
 	const [pwOpen, setPwOpen] = useState(false);
@@ -155,6 +160,22 @@ export function ProfilePage({ username }: ProfilePageProps) {
 		}
 	}
 
+	async function handleToggleDisabled() {
+		if (!data) return;
+		const next = !data.user.disabled;
+		setModerating(true);
+		try {
+			const view = await profileService.setUserDisabled(data.user.username, next);
+			setData(view);
+			notifySuccess(next ? 'Account disabled' : 'Account enabled');
+			setConfirmDisableOpen(false);
+		} catch (err) {
+			notifyError((err as Error)?.message || 'Could not update the account');
+		} finally {
+			setModerating(false);
+		}
+	}
+
 	if (loading) {
 		return (
 			<div class={styles.page}>
@@ -182,6 +203,10 @@ export function ProfilePage({ username }: ProfilePageProps) {
 	}
 
 	const { user, stats, favorites, history, currentlyWatching } = data;
+	// Admins may disable/enable any account other than their own, from the
+	// read view of that user's profile.
+	const canModerate = !editMode && isAdmin.value && !isSelf;
+	const userDisabled = !!user.disabled;
 
 	return (
 		<div class={styles.page}>
@@ -261,28 +286,43 @@ export function ProfilePage({ username }: ProfilePageProps) {
 					{/* Action column — Edit / visibility lives in the header row itself
 					    (across from the name) instead of a separate panel header,
 					    which removes the gap above the identity block. */}
-					{(editMode && showUsersInfo.value) || (!editMode && isSelf) ? (
+					{editMode && showUsersInfo.value ? (
 						<div class={styles.identityActions}>
-							{editMode && showUsersInfo.value ? (
-								<>
-									<ToggleButton
-										pressed={!!user.profilePublic}
-										loading={togglingPublic}
-										onClick={handleTogglePublic}
-										title="Control whether other members can see your profile"
+							<ToggleButton
+								pressed={!!user.profilePublic}
+								loading={togglingPublic}
+								onClick={handleTogglePublic}
+								title="Control whether other members can see your profile"
+							>
+								{user.profilePublic ? 'Profile is public' : 'Show Profile Info'}
+							</ToggleButton>
+						</div>
+					) : !editMode && isSelf ? (
+						<div class={styles.identityActions}>
+							<Button variant="secondary" size="sm" onClick={() => route('/profile')}>
+								Edit profile
+							</Button>
+						</div>
+					) : canModerate ? (
+						<div class={styles.identityActions}>
+							{userDisabled ? (
+								<div class={styles.disabledControl}>
+									<span class={styles.disabledBadge}>Account disabled</span>
+									<Button
+										variant="secondary"
+										size="sm"
+										onClick={() => setConfirmDisableOpen(true)}
 									>
-										{user.profilePublic
-											? 'Profile is public'
-											: 'Show Profile Info'}
-									</ToggleButton>
-								</>
+										Enable
+									</Button>
+								</div>
 							) : (
 								<Button
-									variant="secondary"
+									variant="danger"
 									size="sm"
-									onClick={() => route('/profile')}
+									onClick={() => setConfirmDisableOpen(true)}
 								>
-									Edit profile
+									Disable
 								</Button>
 							)}
 						</div>
@@ -456,6 +496,23 @@ export function ProfilePage({ username }: ProfilePageProps) {
 					</Panel>
 				</div>
 			</div>
+
+			{canModerate && (
+				<ConfirmDialog
+					isOpen={confirmDisableOpen}
+					onClose={() => setConfirmDisableOpen(false)}
+					onConfirm={handleToggleDisabled}
+					loading={moderating}
+					variant={userDisabled ? 'primary' : 'danger'}
+					title={userDisabled ? 'Enable account' : 'Disable account'}
+					confirmLabel={userDisabled ? 'Enable' : 'Disable'}
+					message={
+						userDisabled
+							? `Re-enable ${resolveDisplayName(user)}? They'll be able to log in again.`
+							: `Disable ${resolveDisplayName(user)}? They'll be signed out immediately and blocked from logging in until an admin re-enables the account.`
+					}
+				/>
+			)}
 		</div>
 	);
 }

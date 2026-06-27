@@ -88,6 +88,20 @@
 	}
 }
 
+/* Admin "disabled" state in the header action slot: short label + Enable. */
+.disabledControl {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+}
+
+.disabledBadge {
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-medium);
+	color: var(--color-danger, #e5484d);
+	white-space: nowrap;
+}
+
 .name {
 	margin: 0;
 	font-size: var(--font-size-3xl);

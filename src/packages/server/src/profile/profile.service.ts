@@ -30,6 +30,7 @@ import {
 import { FavoritesService } from '../favorites/favorites.service.js';
 import { HistoryService } from '../movies/history.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { StreamService } from '../stream/stream.service.js';
 import { UploadsService } from '../uploads/uploads.service.js';
 
 /** A "watching now" session counts only if it was active within this window. */
@@ -51,6 +52,7 @@ export class ProfileService {
 		private readonly settings: SettingsService,
 		private readonly authCache: AuthCacheService,
 		private readonly uploads: UploadsService,
+		private readonly stream: StreamService,
 	) {}
 
 	// ── System setting ────────────────────────────────────────────────────
@@ -83,7 +85,11 @@ export class ProfileService {
 		// Hidden profiles look like they don't exist to ordinary users.
 		if (!visible) throw new NotFoundException('User not found');
 
-		return this.buildProfile(user, { includePrivate: isAdmin || isSelf, editable: isSelf });
+		return this.buildProfile(user, {
+			includePrivate: isAdmin || isSelf,
+			editable: isSelf,
+			isAdmin,
+		});
 	}
 
 	async listMembers(requester: Requester): Promise<MemberSummary[]> {
@@ -178,6 +184,66 @@ export class ProfileService {
 		return this.getOwnProfile(userId);
 	}
 
+	/**
+	 * Admin: disable or re-enable a user account by username. Disabling marks the
+	 * row, terminates the user's active stream sessions, and clears the auth
+	 * caches so their existing JWTs stop working on the next request.
+	 * Returns the refreshed (admin) profile view so the client can update the UI.
+	 */
+	async setUserDisabled(
+		username: string,
+		disabled: boolean,
+		requester: Requester,
+	): Promise<ProfileView> {
+		const target = this.findUserByUsername(username);
+		if (!target) throw new NotFoundException('User not found');
+		// An admin cannot lock themselves out of the app.
+		if (target.id === requester.id) {
+			throw new BadRequestException('You cannot disable your own account');
+		}
+
+		this.database.db
+			.update(users)
+			.set({
+				disabled,
+				// Disabling reads as a logout; clearing it leaves prior presence intact.
+				...(disabled ? { lastLogoutAt: new Date().toISOString() } : {}),
+				updatedAt: new Date().toISOString(),
+			})
+			.where(eq(users.id, target.id))
+			.run();
+
+		if (disabled) await this.endUserSessions(target.id);
+
+		// Clear BOTH caches: the per-token cache short-circuits the guard before
+		// the user lookup, so dropping only the user row wouldn't take effect
+		// until the token TTL expired. A global clear is cheap (re-verify only).
+		this.authCache.invalidateAllUsers();
+
+		const updated = this.findUserById(target.id) ?? target;
+		return this.buildProfile(updated, {
+			includePrivate: true,
+			editable: false,
+			isAdmin: requester.role === 'admin',
+		});
+	}
+
+	/** Tear down every active stream session for a user (best-effort). */
+	private async endUserSessions(userId: string): Promise<void> {
+		const sessions = this.database.db
+			.select({ id: streamSessions.id })
+			.from(streamSessions)
+			.where(eq(streamSessions.userId, userId))
+			.all();
+		for (const s of sessions) {
+			try {
+				await this.stream.endStream(s.id);
+			} catch {
+				// Session may have already ended; ignore.
+			}
+		}
+	}
+
 	/** Set a new password for the current user (self-service). */
 	async changeOwnPassword(userId: string, newPassword: string): Promise<void> {
 		const user = this.findUserById(userId);
@@ -232,7 +298,7 @@ export class ProfileService {
 
 	private async buildProfile(
 		user: typeof users.$inferSelect,
-		opts: { includePrivate: boolean; editable: boolean },
+		opts: { includePrivate: boolean; editable: boolean; isAdmin?: boolean },
 	): Promise<ProfileView> {
 		const profileUser: ProfileUser = {
 			id: user.id,
@@ -247,6 +313,8 @@ export class ProfileService {
 			profileUser.email = user.email ?? null;
 			profileUser.profilePublic = !!user.profilePublic;
 		}
+		// Disabled state drives the admin-only Disable/Enable control.
+		if (opts.isAdmin) profileUser.disabled = !!user.disabled;
 
 		const [favorites, history] = await Promise.all([
 			this.mapFavorites(user.id),

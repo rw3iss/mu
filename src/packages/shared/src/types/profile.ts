@@ -25,6 +25,9 @@ export interface ProfileUser {
 	email?: string | null;
 	/** The per-user "show profile info" flag — present only for owner/admin. */
 	profilePublic?: boolean;
+	/** Account disabled by an admin — present only for admins (drives the
+	 *  Disable/Enable control on the profile page). */
+	disabled?: boolean;
 }
 
 /** Aggregate counts for the profile header / member rows. */

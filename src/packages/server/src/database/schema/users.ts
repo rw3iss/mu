@@ -15,6 +15,8 @@ export const users = sqliteTable('users', {
 	// Profiles are public by default.
 	description: text('description'),
 	profilePublic: integer('profile_public', { mode: 'boolean' }).default(true),
+	/** Admin-disabled accounts cannot log in and have their sessions terminated. */
+	disabled: integer('disabled', { mode: 'boolean' }).default(false),
 	/** Updated on each successful login; feeds the profile "Active …" label. */
 	lastLoginAt: text('last_login_at'),
 	/** The login time BEFORE the current one — captured at login by copying the
