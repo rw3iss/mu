@@ -1,3 +1,4 @@
+import type { UpdateProfileInput } from '@mu/shared';
 import {
 	BadRequestException,
 	Body,
@@ -9,7 +10,6 @@ import {
 	Put,
 	Req,
 } from '@nestjs/common';
-import type { UpdateProfileInput } from '@mu/shared';
 import type { FastifyRequest } from 'fastify';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
@@ -53,6 +53,14 @@ export class ProfileController {
 		return this.profile.updateOwnProfile(userId, body ?? {});
 	}
 
+	/** Change the current user's password (self-service). */
+	@RequireAction('edit:own-settings')
+	@Post('me/password')
+	async changePassword(@CurrentUser('id') userId: string, @Body() body: { newPassword: string }) {
+		await this.profile.changeOwnPassword(userId, body?.newPassword ?? '');
+		return { ok: true };
+	}
+
 	/** Upload a new avatar image (multipart). Stored under /uploads/avatars. */
 	@RequireAction('edit:own-settings')
 	@Post('me/avatar')
@@ -82,7 +90,8 @@ export class ProfileController {
 				chunks.push(chunk);
 			}
 			if (part.file.truncated) tooLarge = true;
-			if (!tooLarge) file = { buffer: Buffer.concat(chunks), mimetype: String(part.mimetype) };
+			if (!tooLarge)
+				file = { buffer: Buffer.concat(chunks), mimetype: String(part.mimetype) };
 		}
 
 		if (tooLarge) throw new BadRequestException('Avatar image is too large (max 5MB)');

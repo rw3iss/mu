@@ -133,6 +133,9 @@ export const PROFILE_DESCRIPTION_MAX = 500;
 /** Max length of the display name. */
 export const DISPLAY_NAME_MAX = 60;
 
+/** Minimum length of a user password (enforced on the self-service change form). */
+export const PASSWORD_MIN_LENGTH = 6;
+
 /** The name to show for a user: their display name when set, else username. */
 export function resolveDisplayName(
 	user: { displayName?: string | null; username?: string | null } | null | undefined,

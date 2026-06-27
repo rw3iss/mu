@@ -1,5 +1,6 @@
 import {
 	DISPLAY_NAME_MAX,
+	PASSWORD_MIN_LENGTH,
 	PROFILE_DESCRIPTION_MAX,
 	type ProfileView,
 	resolveDisplayName,
@@ -44,6 +45,12 @@ export function ProfilePage({ username }: ProfilePageProps) {
 	const [commentCount, setCommentCount] = useState<number | null>(null);
 	const [uploadingAvatar, setUploadingAvatar] = useState(false);
 	const [togglingPublic, setTogglingPublic] = useState(false);
+
+	// Change-password form (hidden until toggled open).
+	const [pwOpen, setPwOpen] = useState(false);
+	const [pwNew, setPwNew] = useState('');
+	const [pwConfirm, setPwConfirm] = useState('');
+	const [changingPw, setChangingPw] = useState(false);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -93,6 +100,30 @@ export function ProfilePage({ username }: ProfilePageProps) {
 			notifyError((err as Error)?.message || 'Could not save profile');
 		} finally {
 			setSaving(false);
+		}
+	}
+
+	const pwTooShort = pwNew.length > 0 && pwNew.length < PASSWORD_MIN_LENGTH;
+	const pwMismatch = pwConfirm.length > 0 && pwNew !== pwConfirm;
+	const pwValid = pwNew.length >= PASSWORD_MIN_LENGTH && pwNew === pwConfirm;
+
+	function resetPasswordForm() {
+		setPwOpen(false);
+		setPwNew('');
+		setPwConfirm('');
+	}
+
+	async function handleChangePassword() {
+		if (!pwValid) return;
+		setChangingPw(true);
+		try {
+			await profileService.changePassword(pwNew);
+			notifySuccess('Password changed');
+			resetPasswordForm();
+		} catch (err) {
+			notifyError((err as Error)?.message || 'Could not change password');
+		} finally {
+			setChangingPw(false);
 		}
 	}
 
@@ -314,16 +345,79 @@ export function ProfilePage({ username }: ProfilePageProps) {
 				</div>
 
 				{editMode && (
-					<div class={styles.saveRow}>
-						<Button
-							variant="primary"
-							loading={saving}
-							disabled={!dirty}
-							onClick={handleSave}
-						>
-							Save changes
-						</Button>
-					</div>
+					<>
+						<div class={styles.saveRow}>
+							<Button
+								variant="secondary"
+								onClick={() => (pwOpen ? resetPasswordForm() : setPwOpen(true))}
+							>
+								Change password
+							</Button>
+							<Button
+								variant="primary"
+								loading={saving}
+								disabled={!dirty}
+								onClick={handleSave}
+							>
+								Save changes
+							</Button>
+						</div>
+
+						{pwOpen && (
+							<div class={styles.passwordForm}>
+								<label class={styles.field}>
+									<span class={styles.fieldLabel}>New password</span>
+									<input
+										class={styles.input}
+										type="password"
+										autocomplete="new-password"
+										value={pwNew}
+										onInput={(e) =>
+											setPwNew((e.target as HTMLInputElement).value)
+										}
+									/>
+								</label>
+								<label class={styles.field}>
+									<span class={styles.fieldLabel}>Confirm password</span>
+									<input
+										class={styles.input}
+										type="password"
+										autocomplete="new-password"
+										value={pwConfirm}
+										onInput={(e) =>
+											setPwConfirm((e.target as HTMLInputElement).value)
+										}
+									/>
+								</label>
+								{(pwTooShort || pwMismatch) && (
+									<span class={styles.pwError}>
+										{pwTooShort
+											? `Password must be at least ${PASSWORD_MIN_LENGTH} characters`
+											: 'Passwords do not match'}
+									</span>
+								)}
+								<div class={styles.passwordActions}>
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={resetPasswordForm}
+										disabled={changingPw}
+									>
+										Cancel
+									</Button>
+									<Button
+										variant="primary"
+										size="sm"
+										loading={changingPw}
+										disabled={!pwValid}
+										onClick={handleChangePassword}
+									>
+										Change
+									</Button>
+								</div>
+							</div>
+						)}
+					</>
 				)}
 			</Panel>
 

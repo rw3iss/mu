@@ -9,13 +9,14 @@ import type {
 	ProfileView,
 	UpdateProfileInput,
 } from '@mu/shared';
-import { DISPLAY_NAME_MAX, PROFILE_DESCRIPTION_MAX } from '@mu/shared';
+import { DISPLAY_NAME_MAX, PASSWORD_MIN_LENGTH, PROFILE_DESCRIPTION_MAX } from '@mu/shared';
 import {
 	BadRequestException,
 	ConflictException,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
+import bcrypt from 'bcrypt';
 import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { AuthCacheService } from '../common/permissions/auth-cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -175,6 +176,27 @@ export class ProfileService {
 		this.authCache.invalidateUser(userId);
 
 		return this.getOwnProfile(userId);
+	}
+
+	/** Set a new password for the current user (self-service). */
+	async changeOwnPassword(userId: string, newPassword: string): Promise<void> {
+		const user = this.findUserById(userId);
+		if (!user) throw new NotFoundException('User not found');
+
+		const password = (newPassword ?? '').toString();
+		if (password.length < PASSWORD_MIN_LENGTH) {
+			throw new BadRequestException(
+				`Password must be at least ${PASSWORD_MIN_LENGTH} characters`,
+			);
+		}
+
+		const passwordHash = await bcrypt.hash(password, 12);
+		this.database.db
+			.update(users)
+			.set({ passwordHash, updatedAt: new Date().toISOString() })
+			.where(eq(users.id, userId))
+			.run();
+		this.authCache.invalidateUser(userId);
 	}
 
 	/**

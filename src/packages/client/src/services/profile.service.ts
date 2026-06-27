@@ -40,9 +40,16 @@ export const profileService = {
 		});
 		if (!res.ok) {
 			const body = await res.json().catch(() => ({}) as Record<string, unknown>);
-			throw new Error((body as { message?: string }).message || `Upload failed: ${res.status}`);
+			throw new Error(
+				(body as { message?: string }).message || `Upload failed: ${res.status}`,
+			);
 		}
 		return res.json();
+	},
+
+	/** Change the current user's password. */
+	changePassword(newPassword: string): Promise<{ ok: boolean }> {
+		return api.post<{ ok: boolean }>('/profile/me/password', { newPassword });
 	},
 
 	/** Read the admin master switch (any authed user). */
