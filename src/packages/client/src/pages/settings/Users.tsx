@@ -1,4 +1,4 @@
-import { type UserRole, resolveDisplayName } from '@mu/shared';
+import { resolveDisplayName, type UserRole } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Select } from '@/components/common/Select';
@@ -17,6 +17,7 @@ interface UserRow {
 	displayName?: string | null;
 	email: string | null;
 	role: UserRole;
+	disabled?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -98,6 +99,33 @@ export function Users() {
 		}
 	};
 
+	const toggleDisabled = async (u: UserRow) => {
+		if (u.id === me?.id) {
+			notifyError('You can’t disable your own account');
+			return;
+		}
+		const next = !u.disabled;
+		const ok = await confirm({
+			title: next ? 'Disable user?' : 'Enable user?',
+			message: next
+				? `Disable ${u.username}? They'll be signed out immediately and blocked from logging in until re-enabled.`
+				: `Enable ${u.username}? They'll be able to log in again.`,
+			confirmLabel: next ? 'Disable' : 'Enable',
+			variant: next ? 'danger' : 'primary',
+		});
+		if (!ok) return;
+		setBusy(u.id);
+		try {
+			await profileService.setUserDisabled(u.username, next);
+			notifySuccess(next ? `Disabled ${u.username}` : `Enabled ${u.username}`);
+			await refresh();
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed to update account');
+		} finally {
+			setBusy(null);
+		}
+	};
+
 	const remove = async (u: UserRow) => {
 		if (u.id === me?.id) {
 			notifyError('You can’t delete your own account from this page');
@@ -127,9 +155,9 @@ export function Users() {
 			<div class={styles.intro}>
 				<h2 class={styles.heading}>Users</h2>
 				<p class={styles.lede}>
-					Manage who can sign in. Viewers can search + play; contributors can also
-					edit movies; admins control everything including app settings, plugins,
-					and the user list itself.
+					Manage who can sign in. Viewers can search + play; contributors can also edit
+					movies; admins control everything including app settings, plugins, and the user
+					list itself.
 				</p>
 			</div>
 
@@ -153,7 +181,9 @@ export function Users() {
 			</div>
 
 			<div class={styles.toolbar}>
-				<span>{loading ? 'Loading…' : `${users.length} user${users.length === 1 ? '' : 's'}`}</span>
+				<span>
+					{loading ? 'Loading…' : `${users.length} user${users.length === 1 ? '' : 's'}`}
+				</span>
 				<Button onClick={() => setShowAdd(true)}>Add user</Button>
 			</div>
 
@@ -190,22 +220,34 @@ export function Users() {
 							<td>{new Date(u.createdAt).toLocaleDateString()}</td>
 							<td>
 								<div class={styles.actions}>
-									<button
-										type="button"
-										class={styles.linkButton}
-										disabled={busy === u.id}
-										onClick={() => setEditPassword(u)}
-									>
-										Reset password
-									</button>
-									<button
-										type="button"
-										class={`${styles.linkButton} ${styles.danger}`}
-										disabled={busy === u.id || u.id === me?.id}
-										onClick={() => remove(u)}
-									>
-										Delete
-									</button>
+									<div class={styles.actionRow}>
+										<button
+											type="button"
+											class={styles.linkButton}
+											disabled={busy === u.id}
+											onClick={() => setEditPassword(u)}
+										>
+											Reset password
+										</button>
+									</div>
+									<div class={styles.actionRow}>
+										<button
+											type="button"
+											class={`${styles.linkButton} ${u.disabled ? '' : styles.danger}`}
+											disabled={busy === u.id || u.id === me?.id}
+											onClick={() => toggleDisabled(u)}
+										>
+											{u.disabled ? 'Enable' : 'Disable'}
+										</button>
+										<button
+											type="button"
+											class={`${styles.linkButton} ${styles.danger}`}
+											disabled={busy === u.id || u.id === me?.id}
+											onClick={() => remove(u)}
+										>
+											Delete
+										</button>
+									</div>
 								</div>
 							</td>
 						</tr>

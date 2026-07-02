@@ -20,6 +20,7 @@ export class UsersService {
 		email: users.email,
 		role: users.role,
 		avatarUrl: users.avatarUrl,
+		disabled: users.disabled,
 		createdAt: users.createdAt,
 		updatedAt: users.updatedAt,
 	} as const;

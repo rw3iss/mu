@@ -117,6 +117,14 @@
 
 .actions {
 	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.25rem;
+}
+
+// One horizontal row of link buttons within the stacked actions cell.
+.actionRow {
+	display: flex;
 	gap: 0.4rem;
 	justify-content: flex-end;
 }
