@@ -189,10 +189,14 @@
   margin-bottom: var(--space-sm);
 }
 
-.titleInput {
+// Scoped under .titleEditRow (0,2,0) so it outranks the global
+// `input[type='text']` baseline (0,1,1) — otherwise the input renders at the
+// small global font size instead of matching the read-view <h1> title.
+.titleEditRow .titleInput {
   flex: 1;
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-bold);
+  line-height: 1.2;
   color: var(--color-text-primary);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-accent);
