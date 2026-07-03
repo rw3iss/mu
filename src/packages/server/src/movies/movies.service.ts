@@ -1460,7 +1460,9 @@ export class MoviesService implements OnModuleInit {
 			? this.libraryService.getSources().map((s) => path.resolve(s.path))
 			: [];
 
-		// Delete files and caches
+		// Delete the actual movie files / enclosing folders synchronously — this
+		// is the part the user explicitly requested + confirmed, and file/dir
+		// unlink is fast.
 		for (const file of files) {
 			await rm(file.filePath, { force: true });
 			if (deleteEnclosingFolder) {
@@ -1473,17 +1475,37 @@ export class MoviesService implements OnModuleInit {
 					await rm(dir, { recursive: true, force: true });
 				}
 			}
-			await this.transcoderService.clearCache(file.id);
-			await this.subtitleService.clearCache(file.id);
 		}
 
-		this.thumbnailService.clearForMovie(id);
-		await this.imageService.clearForMovie(id);
-
-		// Remove DB row (cascades handle FK tables)
+		// Remove the DB row (cascades handle FK tables) so the movie disappears
+		// from the app immediately and the endpoint can respond.
 		this.remove(id);
-
 		this.logger.log(`Deleted movie from disk: ${movie.title}`);
+
+		// Purge caches (HLS segments, subtitles, images, thumbnails) in the
+		// BACKGROUND. These can be slow — a persistent cache dir may hold
+		// thousands of tiny segment files — and awaiting them held the HTTP
+		// response open past the proxy timeout, so the client "hung" while the
+		// server had already finished the real deletion.
+		void this.purgeMovieCaches(id, files, movie.title);
+	}
+
+	/** Best-effort cache/image cleanup for an already-deleted movie. */
+	private async purgeMovieCaches(
+		id: string,
+		files: (typeof movieFiles.$inferSelect)[],
+		title: string,
+	): Promise<void> {
+		try {
+			for (const file of files) {
+				await this.transcoderService.clearCache(file.id);
+				await this.subtitleService.clearCache(file.id);
+			}
+			this.thumbnailService.clearForMovie(id);
+			await this.imageService.clearForMovie(id);
+		} catch (err) {
+			this.logger.warn(`Background cache purge failed for "${title}": ${err}`);
+		}
 	}
 
 	getGenres(): string[] {
