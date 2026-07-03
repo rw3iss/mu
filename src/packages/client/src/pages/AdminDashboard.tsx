@@ -149,6 +149,30 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 		}
 	}, []);
 
+	const handleFixMissingMetadata = useCallback(async () => {
+		const startedId = notifyInfo('Scanning for movies with missing metadata…', 0);
+		try {
+			const result = await api.post<{ message: string; movieCount: number }>(
+				'/movies/fix-missing-metadata',
+			);
+			removeNotification(startedId);
+			if (result.movieCount === 0) {
+				notifySuccess('No movies are missing metadata — nothing to fix.');
+				return;
+			}
+			notifySuccess(
+				`Fetching metadata for ${result.movieCount} movie${
+					result.movieCount === 1 ? '' : 's'
+				} with missing or incomplete data (queued as background jobs).`,
+				undefined,
+				[jobListAction('metadata')],
+			);
+		} catch {
+			removeNotification(startedId);
+			notifyError('Failed to start missing-metadata fetch');
+		}
+	}, []);
+
 	const handleGenerateThumbnails = useCallback(async () => {
 		setGeneratingThumbnails(true);
 		const startedId = notifyInfo('Looking for movies without thumbnails…', 0);
@@ -599,6 +623,11 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						label="Refresh All Metadata"
 						description="Re-fetch TMDB / OMDB metadata for every library movie."
 						onClick={handleRefreshMetadata}
+					/>
+					<ActionRow
+						label="Fix Missing Metadata"
+						description="Find only the movies with missing or incomplete metadata (no match, or blank overview / poster) and fetch it as rate-limited background jobs that retry on failure."
+						onClick={handleFixMissingMetadata}
 					/>
 					<ActionRow
 						label="Sync IMDB Datasets"

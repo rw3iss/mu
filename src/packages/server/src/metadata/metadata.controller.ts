@@ -11,7 +11,7 @@ import {
 	Post,
 	Query,
 } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
@@ -129,6 +129,46 @@ export class MetadataController {
 		});
 
 		return { message: 'Metadata refresh started', movieCount };
+	}
+
+	/**
+	 * Fetch metadata ONLY for movies that are missing or incomplete — i.e. no
+	 * `movie_metadata` row, no TMDB/IMDB id, or a blank overview/poster. Unlike
+	 * `refresh-all` (in-process `bulkFetch` over movies with no metadata row),
+	 * this enqueues one `metadata` JOB per movie: the job runner caps concurrency
+	 * (so we don't overrun TMDB/OMDB) and the metadata handler already retries
+	 * with backoff (5s/20s/60s) when a provider is rate-limited or slow to match.
+	 * Jobs run at a lower priority so they yield to scans / playback prep.
+	 */
+	@Post('movies/fix-missing-metadata')
+	@Roles('admin')
+	@RequireAction('edit:movie')
+	fixMissingMetadata() {
+		const rows = this.database.db
+			.select({ id: movies.id, title: movies.title })
+			.from(movies)
+			.where(
+				sql`
+					(${movies.tmdbId} IS NULL AND ${movies.imdbId} IS NULL)
+					OR ${movies.overview} IS NULL OR ${movies.overview} = ''
+					OR ${movies.posterUrl} IS NULL OR ${movies.posterUrl} = ''
+					OR NOT EXISTS (
+						SELECT 1 FROM ${movieMetadata}
+						WHERE ${movieMetadata.movieId} = ${movies.id}
+					)
+				`,
+			)
+			.all();
+
+		const movieCount = rows.length;
+		this.logger.log(`Fix missing metadata: enqueuing ${movieCount} metadata job(s)`);
+		for (const m of rows) {
+			// Priority 45 — below fresh-scan metadata (20) so a manual fix-all
+			// doesn't starve new imports or playback-critical work.
+			this.libraryJobs.enqueueMetadata(m.id, m.title ?? undefined, 45);
+		}
+
+		return { message: 'Missing-metadata fetch started', movieCount };
 	}
 
 	@Post('movies/:id/refresh')

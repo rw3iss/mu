@@ -1168,12 +1168,12 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 	/**
 	 * Enqueue a metadata job for a movie.
 	 */
-	enqueueMetadata(movieId: string, title?: string): string {
+	enqueueMetadata(movieId: string, title?: string, priority = 20): string {
 		return this.jobManager.enqueue({
 			type: JOB_TYPE.METADATA,
 			label: `Fetch metadata: ${title ?? movieId.slice(0, 8)}`,
 			payload: { movieId, fetchExtended: this.shouldFetchExtendedMetadata() },
-			priority: 20,
+			priority,
 		});
 	}
 
