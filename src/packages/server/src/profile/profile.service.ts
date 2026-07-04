@@ -493,8 +493,12 @@ export class ProfileService {
 	}
 
 	/**
-	 * Latest of: last login, last "seen" (any authed request), most-recent
-	 * watch, most-recent stream session.
+	 * Latest of: last login, last action (`lastSeenAt`, set only on real
+	 * mutating actions — see LastSeenInterceptor), most-recent watch, and the
+	 * newest ACTIVELY-PROGRESSING stream session. We use `last_progress_at`
+	 * (advances only while playback position moves) rather than `last_active_at`
+	 * (kept fresh by pause-time heartbeats), so a paused/open player does not
+	 * read as "active".
 	 */
 	private getLastActiveAt(
 		userId: string,
@@ -502,10 +506,10 @@ export class ProfileService {
 		lastSeenAt: string | null = null,
 	): string | null {
 		const session = this.database.db
-			.select({ at: streamSessions.lastActiveAt })
+			.select({ at: streamSessions.lastProgressAt })
 			.from(streamSessions)
 			.where(eq(streamSessions.userId, userId))
-			.orderBy(desc(streamSessions.lastActiveAt))
+			.orderBy(desc(streamSessions.lastProgressAt))
 			.limit(1)
 			.get();
 		const candidates = [

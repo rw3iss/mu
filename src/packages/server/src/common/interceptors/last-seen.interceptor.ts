@@ -9,11 +9,24 @@ import { users } from '../../database/schema/index.js';
 const THROTTLE_MS = 60_000;
 
 /**
- * Stamps `users.last_seen_at` on authenticated requests so member presence
- * ("Active …") reflects general app use — browsing, not just login/playback.
+ * Background/automated requests that must NOT count as "activity" — otherwise
+ * an idle-but-open browser (which keeps polling + heart-beating) would always
+ * read as "Active just now". Playback progress/heartbeat fire on a timer even
+ * while paused, so real watching is tracked separately via watch history +
+ * `stream_sessions.last_progress_at`, not here.
+ */
+const BACKGROUND_BEAT = /\/stream\/[^/]+\/(heartbeat|progress)(\?|$)/;
+
+/**
+ * Stamps `users.last_seen_at` when a member actually DOES something — i.e. a
+ * state-changing request (POST/PUT/PATCH/DELETE), excluding playback heartbeat/
+ * progress beats. Passive GET polling (notifications, jobs, library browsing)
+ * is deliberately ignored so presence reflects real activity, not just an open
+ * tab. Login sets `last_login_at` and watching updates `last_progress_at`, so
+ * this covers the remaining "performed an action" case.
+ *
  * Throttled per-user in memory and fire-and-forget, so it never blocks or
- * fails a request. Skips share-token viewers and the setup bypass (no real
- * user row to update).
+ * fails a request. Skips share-token viewers and the setup bypass.
  */
 @Injectable()
 export class LastSeenInterceptor implements NestInterceptor {
@@ -26,7 +39,20 @@ export class LastSeenInterceptor implements NestInterceptor {
 			const req = context.switchToHttp().getRequest();
 			const user = req?.user;
 			const id: string | undefined = user?.sub ?? user?.id;
-			if (id && user.role !== 'share' && id !== '__setup__' && id !== '__share__') {
+
+			const method = String(req?.method ?? 'GET').toUpperCase();
+			const isMutation =
+				method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+			const isBackgroundBeat = BACKGROUND_BEAT.test(String(req?.url ?? ''));
+			const countsAsActivity = isMutation && !isBackgroundBeat;
+
+			if (
+				countsAsActivity &&
+				id &&
+				user.role !== 'share' &&
+				id !== '__setup__' &&
+				id !== '__share__'
+			) {
 				const now = Date.now();
 				const last = this.lastWrite.get(id) ?? 0;
 				if (now - last >= THROTTLE_MS) {
