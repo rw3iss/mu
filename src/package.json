@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.1.0",
   "description": "Self-hosted movie streaming and management platform",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "dev": "turbo run dev",
     "dev:server": "turbo run dev --filter=@mu/server",

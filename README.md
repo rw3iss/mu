@@ -715,4 +715,11 @@ The bash script handles Windows (Git Bash/MSYS2/WSL), macOS, and Linux with plat
 
 ## License
 
-MIT
+**PolyForm Noncommercial License 1.0.0** — see [LICENSE.md](LICENSE.md) for the full text.
+
+In plain terms:
+
+- ✅ **You may** self-host, run, and **modify** Mu for any **noncommercial** purpose — personal use, private entertainment, hobby projects, study, and use by nonprofit / educational / government organizations.
+- ❌ **You may not** use it for any **commercial** purpose — including selling it, offering it as a paid or ad-supported service, or building a commercial product from it or its source.
+
+Copyright © 2026 Ryan Weiss. This summary is for convenience only; the [LICENSE.md](LICENSE.md) text governs.
