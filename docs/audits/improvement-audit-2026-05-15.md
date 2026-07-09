@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-- Project: Mu (CineHost) — self-hosted movie streaming + management platform
+- Project: Mu — self-hosted movie streaming + management platform
 - Working directory: `/home/rw3iss/Sites/mu/src`
 - Scope: focused pass on the *newly-landed* metadata-matcher / candidate
   feature (commit `95a3db7`) plus adjacent cross-cutting opportunities

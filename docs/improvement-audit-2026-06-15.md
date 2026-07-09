@@ -1,7 +1,7 @@
 # Improvement Audit — 2026-06-15
 
 ## 1. Summary
-- Project: CineHost (Mu) — self-hosted movie streaming platform
+- Project: Mu — self-hosted movie streaming platform
 - Working directory: `/home/rw3iss/Sites/mu`
 - Scope: features landed in the last ~2 weeks (snippet recorder, notifications,
   arbitrary-depth comments, director favorite overlay, discover seed fix, audio

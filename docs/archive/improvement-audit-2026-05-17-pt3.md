@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-- **Project:** Mu (CineHost)
+- **Project:** Mu
 - **Scope:** Close the long-deferred Phase C item — generic Card-style primitive + migrating MovieCard, DiscoverResultCard, and Favorites cards to compose it.
 - **Approach:** Composition over inheritance. New `<MediaCard>` primitive in `components/common/`; domain cards plug in their own badges / overlays via named slot props. No domain logic in the primitive; no shared inheritance hierarchy.
 

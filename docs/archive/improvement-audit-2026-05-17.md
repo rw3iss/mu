@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-- **Project:** Mu (CineHost) — self-hosted movie streaming
+- **Project:** Mu — self-hosted movie streaming
 - **Working directory:** `/home/rw3iss/Sites/mu`
 - **Scope:** UI normalization + common styling + Discover-page organization for actors/movies + mobile UX + global player mini-bar overhaul + subtle motion polish.
 - **Phases:** A (auto), B (auto with my best calls per user's instruction), C (planned for follow-up).

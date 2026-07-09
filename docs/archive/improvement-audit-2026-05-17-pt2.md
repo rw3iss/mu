@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-- **Project:** Mu (CineHost) — self-hosted movie streaming
+- **Project:** Mu — self-hosted movie streaming
 - **Working directory:** `/home/rw3iss/Sites/mu`
 - **Scope:** Close remaining Phase C items from earlier pass (backend seed-by-person + Card adoption) + add new low-risk polish (skeleton loading, EmptyState enhancement).
 - **Findings applied:** 4 of 4. No deferred Phase C this round.

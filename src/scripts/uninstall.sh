@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# CineHost - Uninstall Script
+# Mu - Uninstall Script
 # Cross-platform script to remove Mu server, services, and optionally data (Linux, macOS, Windows)
 
 BOLD='\033[1m'
@@ -114,7 +114,7 @@ stop_services_linux() {
     step "Stopping Linux services"
 
     local service_file="/etc/systemd/system/mu-server.service"
-    local legacy_service="/etc/systemd/system/cinehost.service"
+    local legacy_service="/etc/systemd/system/mu.service"
 
     for svc_file in "$service_file" "$legacy_service"; do
         if [ -f "$svc_file" ]; then
@@ -183,7 +183,7 @@ kill_ffmpeg() {
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 main() {
-    echo -e "\n${BOLD}  CineHost — Uninstall${NC}\n"
+    echo -e "\n${BOLD}  Mu — Uninstall${NC}\n"
 
     detect_platform
     detect_dirs
@@ -252,7 +252,7 @@ main() {
     echo ""
     echo -e "${BOLD}${GREEN}"
     echo "  ╔═══════════════════════════════════════════╗"
-    echo "  ║     CineHost uninstalled successfully     ║"
+    echo "  ║     Mu uninstalled successfully     ║"
     echo "  ╚═══════════════════════════════════════════╝"
     echo -e "${NC}"
 

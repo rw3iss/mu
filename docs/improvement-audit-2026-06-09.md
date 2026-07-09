@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-- **Project:** Mu (CineHost) — self-hosted movie streaming platform
+- **Project:** Mu — self-hosted movie streaming platform
 - **Working directory:** `/home/rw3iss/Sites/mu`
 - **Scope:** the features implemented over the last ~2 days — share-at-time
   (right-click "Copy URL at Time"), share-token playback fix, muted-autoplay

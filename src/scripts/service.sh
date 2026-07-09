@@ -108,7 +108,7 @@ cmd_install() {
     mkdir -p "$USER_UNIT_DIR"
     cat > "$UNIT_PATH" <<UNIT
 [Unit]
-Description=Mu Movie Server (CineHost)
+Description=Mu Movie Server
 After=network-online.target
 Wants=network-online.target
 RequiresMountsFor=$mounts

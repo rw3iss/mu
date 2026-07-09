@@ -13,7 +13,7 @@ import { Injectable, Logger } from '@nestjs/common';
  */
 
 const BASE_URL = 'https://musicbrainz.org/ws/2';
-const USER_AGENT = 'CineHost-Mu/1.0 ( https://github.com/rw3iss/cinehost )';
+const USER_AGENT = 'Mu/1.0 ( https://github.com/rw3iss/mu )';
 // 1100ms (not 1000) gives headroom against MB's rolling 1/sec window.
 const MIN_INTERVAL_MS = 1100;
 const FETCH_TIMEOUT_MS = 10_000;

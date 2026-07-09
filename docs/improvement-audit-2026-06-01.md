@@ -8,7 +8,7 @@
 
 ## 1. Summary
 
-- **Project**: Mu / CineHost — self-hosted movie streaming + management platform
+- **Project**: Mu — self-hosted movie streaming + management platform
 - **Working directory**: `/home/rw3iss/Sites/mu/src`
 - **Stack**: NestJS + Fastify + Drizzle/SQLite (server) · Preact + Signals + SCSS Modules + Vite (client)
 - **Audit scope**: client UI polish, motion design, elevation system, reusable-component gaps, feature roadmap

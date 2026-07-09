@@ -1,4 +1,4 @@
-# Fedora Linux Migration Plan — Mu / CineHost
+# Fedora Linux Migration Plan — Mu
 
 **Date:** 2026-06-04
 **Author:** migration planning pass
@@ -417,7 +417,7 @@ Create `/etc/systemd/system/mu.service`:
 
 ```ini
 [Unit]
-Description=Mu / CineHost movie streaming server
+Description=Mu movie streaming server
 After=network-online.target
 Wants=network-online.target
 
@@ -476,7 +476,7 @@ journalctl -u mu -f
 > Layout note: this plan uses `/opt/mu` for the **code** (git clone, owned by `mu`) and
 > `/var/lib/mu/data` for **runtime data** (`MU_DATA_DIR`). You can collapse both under `/var/lib/mu`
 > if you prefer — just keep `WorkingDirectory`, `ExecStart`, and `MU_DATA_DIR` consistent.
-> The existing `install.sh:802-819` generator produces a `cinehost.service` without `Group=`,
+> The existing `install.sh:802-819` generator produces a `mu.service` without `Group=`,
 > `SupplementaryGroups=`, or journald lines — the unit above supersedes it. Update `install.sh` to
 > emit this richer unit (and name it `mu.service`) as part of the rewrite.
 
@@ -589,7 +589,7 @@ runner once:
 
 ```bash
 # As the mu/deploy user, in /opt/actions-runner
-./config.sh --url https://github.com/rw3iss/cinehost --token <REG_TOKEN> --labels fedora-gpu
+./config.sh --url https://github.com/rw3iss/mu --token <REG_TOKEN> --labels fedora-gpu
 sudo ./svc.sh install mu        # installs + runs as a systemd service
 sudo ./svc.sh start
 ```
@@ -646,7 +646,7 @@ unchanged. Fall back to (a) if you don't want a runner process resident.
    "No capable devices found". This is the gate that proves the migration's whole premise.
 7. **Open firewall :4000** (§3e).
 8. **Clone repo to `/opt/mu`**, `chown -R mu:mu /opt/mu`.
-   `sudo -u mu git clone git@github.com:rw3iss/cinehost.git /opt/mu` (SSH URL still works post-rename).
+   `sudo -u mu git clone git@github.com:rw3iss/mu.git /opt/mu` (SSH URL still works post-rename).
 9. **Env / config** (§4): create `/etc/mu/mu.env`, `/var/lib/mu/data/config/config.yml`
    (set `tls.hostname`, `dataDir`, `media.libraryPaths` to Linux mounts, `transcoding.ffmpegPath`).
 10. **Copy data from old box** (§9 risks below for the gotchas):

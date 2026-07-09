@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-- **Project**: Mu / CineHost (self-hosted movie streaming)
+- **Project**: Mu (self-hosted movie streaming)
 - **Working directory**: `/home/rw3iss/Sites/mu`
 - **Pass focus**: production polish — finish the work the 2026-05-18
   audit left in Phase C, plus opportunistic consistency fixes.

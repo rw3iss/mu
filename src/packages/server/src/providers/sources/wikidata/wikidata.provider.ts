@@ -63,7 +63,7 @@ export class WikidataProvider implements Searcher, Enricher, OnModuleInit {
 			key: 'userAgent',
 			label: 'User-Agent string',
 			description:
-				'Optional. Identifies your instance to Wikidata staff. Defaults to "mu-cinehost/1.0" if blank. They appreciate self-identifying strings for any deployment running queries beyond casual use.',
+				'Optional. Identifies your instance to Wikidata staff. Defaults to "mu/1.0" if blank. They appreciate self-identifying strings for any deployment running queries beyond casual use.',
 			type: 'string' as const,
 			required: false,
 		},

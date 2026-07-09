@@ -1,4 +1,4 @@
-# CineHost (Mu)
+# Mu
 
 Self-hosted movie streaming and management platform.
 
@@ -378,5 +378,5 @@ echo 'tail -50 /c/Users/rw3is/Documents/Sites/other/mu/data/logs/server.log' | s
 ### Deploy
 - **Cadence — batch pushes/deploys.** Commit piecemeal locally as work completes, but **push/deploy infrequently**: only on major changes, after ~3-4 accumulated changes, or when a coherent unit of work is done — not after every small edit (each deploy rebuilds + restarts prod). If unsure whether to push, **ask**. **Before pushing, check for other queued user requests and finish them first**, then run a single batched deploy covering everything.
 - Canonical: `bash src/scripts/deploy-remote.sh`. Anything else (raw SSH + `bash deploy.sh`, ad-hoc `rm -rf dist && vite build && nssm restart` shortcuts) skips git-pull or external verification and has caused outages.
-- Git remote uses SSH URL: `git@github.com:rw3iss/cinehost.git` (repo was renamed to `mu` but SSH URL still works)
+- Git remote uses SSH URL: `git@github.com:rw3iss/mu.git` (repo was renamed to `mu` but SSH URL still works)
 - `pnpm logs` tails local server log; `pnpm logs:prod` tails production via SSH

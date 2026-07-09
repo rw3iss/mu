@@ -62,7 +62,7 @@ export class SubtitleRemoteProxyService {
 		fileName: string,
 	): Promise<T> {
 		const { baseUrl, headers } = this.getRemoteAuth(serverId);
-		const boundary = `----CineHostBoundary${Date.now()}`;
+		const boundary = `----MuBoundary${Date.now()}`;
 		const parts = [
 			`--${boundary}\r\n`,
 			`Content-Disposition: form-data; name="subtitle"; filename="${fileName}"\r\n`,

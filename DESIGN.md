@@ -1,4 +1,4 @@
-# DESIGN.md — Mu (CineHost)
+# DESIGN.md — Mu
 
 Design rules for this app. **Every `design-build` request reads this file first.**
 Keep it the single source of truth for how the product looks and *feels*. When a
@@ -19,7 +19,7 @@ consistent.
 
 ## Product context
 
-Mu (a.k.a. CineHost) is a **self-hosted movie streaming + library manager** — think
+Mu is a **self-hosted movie streaming + library manager** — think
 a private, beautiful Plex/Jellyfin: browse a personal film library, see rich
 metadata and artwork, and play with a persistent overlay player. Reference DNA
 (directional only): a darkened theatre lobby, the Criterion Channel's restraint,

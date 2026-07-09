@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# stop.sh — Stop the running CineHost server process.
+# stop.sh — Stop the running Mu server process.
 # Works on Linux, macOS, Windows (Git Bash / MSYS2), and WSL.
 # Can be sourced (from deploy.sh/restart.sh) or run directly.
 

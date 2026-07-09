@@ -715,7 +715,7 @@ The bash script handles Windows (Git Bash/MSYS2/WSL), macOS, and Linux with plat
 
 ## License
 
-**CineHost (Mu) Personal-Use License** — a source-available (not open-source) license. See [LICENSE.md](LICENSE.md) for the full text.
+**Mu Personal-Use License** — a source-available (not open-source) license. See [LICENSE.md](LICENSE.md) for the full text.
 
 In plain terms:
 

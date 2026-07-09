@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-- Project: Mu (CineHost) — self-hosted movie streaming + management platform
+- Project: Mu — self-hosted movie streaming + management platform
 - Working directory: `/home/rw3iss/Sites/mu/src`
 - Total findings: 11 (UI: 4, styling: 4, architecture: 3)
 - Applied this pass: 9 (4 Phase A, 2 Phase B, 3 Phase C)

@@ -1,4 +1,4 @@
-# CineHost (Mu) Personal-Use License
+# Mu Personal-Use License
 
 Version 1.0 — 2026
 
@@ -10,7 +10,7 @@ Software; by using the Software you agree to these terms.
 
 ## 1. Definitions
 
-- **"Software"** means the CineHost / Mu source code, configuration, assets, and
+- **"Software"** means the Mu source code, configuration, assets, and
   all other files in this repository provided by the Licensor, together with any
   updates the Licensor makes available under this License.
 - **"Licensor"** means the copyright holder, Ryan Weiss.

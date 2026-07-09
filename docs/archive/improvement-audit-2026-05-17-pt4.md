@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-- **Project:** Mu (CineHost)
+- **Project:** Mu
 - **Scope:** Sibling list-row primitive (`<MediaRow>`), real a11y + lint warnings, leftover unused-code cleanup.
 
 ## 2. Architecture

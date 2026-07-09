@@ -1,10 +1,10 @@
-# BUILD.md — Mu (CineHost)
+# BUILD.md — Mu
 
 Build rules for this app: structure, code quality, and tooling conventions.
 **Every `design-build` request reads this file** (alongside `DESIGN.md`) and must
 follow it. Record project-specific build decisions here so later builds comply.
 
-Mu (CineHost) is a **real, self-hosted full-stack app** — a Preact client backed by
+Mu is a **real, self-hosted full-stack app** — a Preact client backed by
 a NestJS API, in a pnpm + Turborepo monorepo. `design-build` operates on the
 **Preact client** (`src/packages/client`); it does **not** write backend code or
 tests. Client data flows through typed API services against the real backend (no

@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-- **Project**: Mu / CineHost (self-hosted streaming platform)
+- **Project**: Mu (self-hosted streaming platform)
 - **Working directory**: `/home/rw3iss/Sites/mu`
 - **Focus area** (per user `/improve` args): dynamic themes, styling, app experience
 - **Total findings**: 12 (UI: 3, styling: 7, architecture: 2)

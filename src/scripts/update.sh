@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# CineHost - Update Script
+# Mu - Update Script
 # Cross-platform script to update Mu to the latest release (Linux, macOS, Windows)
 
 BOLD='\033[1m'
@@ -13,7 +13,7 @@ CYAN='\033[0;36m'
 MAGENTA='\033[0;35m'
 NC='\033[0m'
 
-GITHUB_REPO="rw3iss/cinehost"
+GITHUB_REPO="rw3iss/mu"
 GITHUB_API="https://api.github.com/repos/${GITHUB_REPO}"
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -155,9 +155,9 @@ stop_server() {
                 return
             fi
             # Also check legacy service name
-            if command -v systemctl &>/dev/null && systemctl is-active cinehost &>/dev/null; then
-                info "Stopping systemd service (cinehost)..."
-                sudo systemctl stop cinehost 2>/dev/null || true
+            if command -v systemctl &>/dev/null && systemctl is-active mu &>/dev/null; then
+                info "Stopping systemd service (mu)..."
+                sudo systemctl stop mu 2>/dev/null || true
                 RESTART_VIA="systemd-legacy"
                 log "systemd service stopped."
                 return
@@ -206,10 +206,10 @@ restart_server() {
                 || warn "Failed to start service. Try: sudo systemctl start mu-server"
             ;;
         systemd-legacy)
-            info "Starting systemd service (cinehost)..."
-            sudo systemctl start cinehost \
+            info "Starting systemd service (mu)..."
+            sudo systemctl start mu \
                 && log "systemd service started." \
-                || warn "Failed to start service. Try: sudo systemctl start cinehost"
+                || warn "Failed to start service. Try: sudo systemctl start mu"
             ;;
         launchd)
             local plist="$HOME/Library/LaunchAgents/net.ryanweiss.mu-server.plist"
@@ -239,7 +239,7 @@ restart_server() {
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 main() {
-    echo -e "\n${BOLD}  CineHost — Update${NC}\n"
+    echo -e "\n${BOLD}  Mu — Update${NC}\n"
 
     detect_platform
     detect_dirs
@@ -413,7 +413,7 @@ main() {
     echo ""
     echo -e "${BOLD}${GREEN}"
     echo "  ╔═══════════════════════════════════════════╗"
-    echo "  ║     CineHost updated successfully!        ║"
+    echo "  ║     Mu updated successfully!        ║"
     echo "  ╚═══════════════════════════════════════════╝"
     echo -e "${NC}"
     echo -e "  ${BOLD}Previous:${NC}  ${current_version}"

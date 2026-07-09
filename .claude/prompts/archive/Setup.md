@@ -5,7 +5,7 @@ The install script can be command line, or a small GUI utility, but it needs to 
 For now let's create a command line install utility script, that users can download and run, ie. 'install.sh', or 'install.cmd', for example.
 
 The interactive terminal should first try to install all prerequisites on that platform for this app, as necessary.
-It should download the current release for the app code, at: https://github.com/rw3iss/cinehost/releases
+It should download the current release for the app code, at: https://github.com/rw3iss/mu/releases
 Can you somehow fetch the latest release automatically, or do I need to tag it as 'latest'?
 If I need to tag it as latest, let me know, otherwise you can use the 'v1.0-beta' release, configurable, or otherwise prompt the user which release they want to install by fetching the list of releases from the github repository, and displaying them in a selection list in the CLI prompt. That would be cool. Show the release date with the release names, if you can do that.
 

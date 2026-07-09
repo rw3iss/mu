@@ -3,7 +3,7 @@
 Scope: `/discover` page — movie/cast filtering, performance, depth, UI design and flow. Implementation of all phases.
 
 ## 1. Summary
-- Project: Mu / CineHost (self-hosted movie streaming)
+- Project: Mu (self-hosted movie streaming)
 - Working dir: `/home/rw3iss/Sites/mu`
 - Total findings: 27 (UI/UX: 11, performance: 6, server filtering: 5, code quality: 5)
 

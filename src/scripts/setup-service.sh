@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# CineHost - Auto-Start Service Setup
+# Mu - Auto-Start Service Setup
 # Cross-platform script to install Mu as a system service (Linux, macOS, Windows)
 
 BOLD='\033[1m'
@@ -108,7 +108,7 @@ setup_windows() {
     nssm set mu-server AppStderr "$log_file"
     nssm set mu-server AppStdoutCreationDisposition 4
     nssm set mu-server AppStderrCreationDisposition 4
-    nssm set mu-server Description "CineHost Movie Streaming Server"
+    nssm set mu-server Description "Mu Movie Streaming Server"
 
     # GPU access: offer to run service as the current user instead of SYSTEM.
     # Windows services run in Session 0 which has no GPU access by default.
@@ -171,7 +171,7 @@ setup_windows() {
             nssm install mu-nginx "$nginx_win"
             nssm set mu-nginx AppDirectory "$nginx_dir"
             nssm set mu-nginx Start SERVICE_AUTO_START
-            nssm set mu-nginx Description "Nginx (CineHost reverse proxy)"
+            nssm set mu-nginx Description "Nginx (Mu reverse proxy)"
             nssm start mu-nginx 2>/dev/null \
                 && log "nginx service installed and started." \
                 || warn "nginx service installed but failed to start."
@@ -285,7 +285,7 @@ PLIST
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 main() {
-    echo -e "\n${BOLD}  CineHost — Service Setup${NC}\n"
+    echo -e "\n${BOLD}  Mu — Service Setup${NC}\n"
 
     detect_platform
     detect_dirs

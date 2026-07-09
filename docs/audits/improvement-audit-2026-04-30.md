@@ -2,7 +2,7 @@
 
 ## 1. Summary
 
-- **Project:** CineHost (Mu) — self-hosted movie streaming and management.
+- **Project:** Mu — self-hosted movie streaming and management.
 - **Working directory:** `/home/rw3iss/Sites/mu`
 - **Scope of this audit:** focused, evidence-based pass over the client (`packages/client/src`). The server has been touched less by recent work and has its own architecture (NestJS modules) that is reasonably consistent already; backend findings are limited to a few cross-cutting items.
 - **Total findings:** 18 — UI/UX: 6, Styling: 4, Architecture: 6, Cross-cutting: 2.

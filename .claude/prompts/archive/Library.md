@@ -10,7 +10,7 @@ The user could enter strings, and if the backend sees a plain string, it knows i
 --------------------------------------------------------------------------------
 
 # Share/Add remote servers:
-I'd now like to create a feature for hosts of the application to 'share' their server with other people running CineHost servers, who can then add the other servers library to their current library for perusing, and playing.
+I'd now like to create a feature for hosts of the application to 'share' their server with other people running Mu servers, who can then add the other servers library to their current library for perusing, and playing.
 For this to happen, the server host will enable the share setting, and any credentials to access to file system (ie. a simple password they should be required to set, which can be basically encrypted, if they want the share to be secured, otherwise it would be public).
 
 Let's make the 'Share' setting a new section in the Settings > Library page. Also, in the Library settings currently, move the entire "Encoding" section, and all encoding settings, to the 'Playback' section, at the bottom. Ensure all app areas that use any of those settings are updated appropriately, if they need to be.

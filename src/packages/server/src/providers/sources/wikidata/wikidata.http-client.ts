@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 
 const SPARQL_ENDPOINT = 'https://query.wikidata.org/sparql';
-const DEFAULT_UA = 'mu-cinehost/1.0 (https://github.com/rw3iss/cinehost)';
+const DEFAULT_UA = 'mu/1.0 (https://github.com/rw3iss/mu)';
 
 /**
  * Thin HTTP client for Wikidata's SPARQL endpoint.
