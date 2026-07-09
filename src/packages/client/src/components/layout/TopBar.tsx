@@ -5,7 +5,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useDebounce } from '@/hooks/useDebounce';
 // The back-stack lives in library.state so the Library page's own back arrow
 // (next to its title) can consume it; the header input only maintains it.
-import { navToLibrary, searchBackStack } from '@/state/library.state';
+import { navToLibrary, searchBackStack, searchMovies } from '@/state/library.state';
 import { theme, toggleTheme } from '@/state/theme.state';
 import { type Throttled, throttle } from '@/utils/throttle';
 
@@ -77,14 +77,43 @@ export function TopBar() {
 		throttledNavRef.current?.(v);
 	}, []);
 
+	/**
+	 * Re-run a search for `value`. When we're already on /library showing this
+	 * exact query, `navToLibrary` would no-op (URL unchanged) and nothing would
+	 * refresh — so we re-fetch directly, which picks up movies added since the
+	 * last search. Otherwise normal URL navigation drives the fetch.
+	 */
+	const forceSearch = useCallback((value: string) => {
+		const trimmed = value.trim();
+		throttledNavRef.current?.cancel();
+		const onLibrary = currentPath.value === '/library';
+		const urlQ = (new URLSearchParams(window.location.search).get('q') || '').trim();
+		if (onLibrary && trimmed === urlQ) {
+			searchMovies(trimmed);
+		} else {
+			navToLibrary(trimmed);
+		}
+	}, []);
+
+	// Enter re-searches even when the text is unchanged.
 	const handleSubmit = useCallback(
 		(e: Event) => {
 			e.preventDefault();
-			throttledNavRef.current?.cancel();
-			navToLibrary(searchValue);
+			forceSearch(searchValue);
 			inputRef.current?.blur();
 		},
-		[searchValue],
+		[forceSearch, searchValue],
+	);
+
+	// Re-entering the input re-runs the existing search (so it catches newly
+	// added movies), and selects the text for easy replacement.
+	const handleFocus = useCallback(
+		(e: Event) => {
+			const el = e.target as HTMLInputElement;
+			el.select();
+			if (el.value.trim()) forceSearch(el.value);
+		},
+		[forceSearch],
 	);
 
 	const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -117,7 +146,7 @@ export function TopBar() {
 					value={searchValue}
 					onInput={handleInput}
 					onKeyDown={handleKeyDown}
-					onFocus={(e) => (e.target as HTMLInputElement).select()}
+					onFocus={handleFocus}
 					aria-label="Search movies"
 				/>
 				{searchValue && (
