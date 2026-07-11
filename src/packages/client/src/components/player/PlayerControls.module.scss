@@ -930,12 +930,13 @@
 		}
 
 		// .mainRow always stacks (title / transport / secondary).
+		// Tight row gap so the seek bar + title sit close to the buttons.
 		.mainRow {
 			flex-direction: column;
 			align-items: stretch;
 			min-width: 0;
 			padding: 0 8px 8px;
-			gap: 6px;
+			gap: 2px;
 		}
 		// .contentRow stacks only in non-mini (no spacer). In mini
 		// portrait the spacer sits beside mainRow.
@@ -962,20 +963,29 @@
 		.leftSection {
 			width: 100%;
 			padding: 0;
+			flex-direction: row;
 			align-items: center;
-			text-align: center;
+			justify-content: space-between;
+			gap: 10px;
+			text-align: left;
 		}
 		.titleText {
 			font-size: 14px;
-			text-align: center;
-			width: 100%;
+			text-align: left;
+			flex: 1;
+			min-width: 0;
 			margin-bottom: 0;
 			white-space: nowrap;
 			overflow: hidden;
 			text-overflow: ellipsis;
 		}
+		// Show the timing on the right of the title row (same as landscape);
+		// nudge it off the edge with a little right pad.
 		.timingLabel {
-			display: none;
+			display: inline-block;
+			font-size: 13px;
+			flex-shrink: 0;
+			padding-right: 10px;
 		}
 
 		// ── Row 2: Transport (centered, with ~10px gap between buttons) ──
@@ -989,7 +999,9 @@
 			margin: 0;
 			align-self: center;
 			justify-content: center;
-			gap: 10px;
+			// Wider gap between the transport buttons (« ▶ ») so they
+			// aren't cramped together under the thumb.
+			gap: 24px;
 			min-height: 48px;
 		}
 		.skipWrap {
@@ -1235,12 +1247,12 @@
 			align-items: center;
 			justify-content: space-between;
 			gap: 8px;
-			// Reserve ~350px of leftward expansion room for the skip-back
-			// extended cluster (3 buttons × 48px + gaps ≈ 160px, plus
-			// breathing room) so it can fully expand without being
-			// clipped. Also shifts the transport cluster well right of
-			// the title's left edge for a more balanced look.
-			padding-left: 350px;
+			// Reserve leftward room for the skip-back extended cluster
+			// (3 buttons × 48px + gaps ≈ 160px) so it can expand without
+			// being clipped. Kept as tight as the cluster needs — a larger
+			// value (was 350px) forced the row wider than a landscape phone
+			// and overflowed the whole bar (cutting off the timing label).
+			padding-left: 160px;
 		}
 		.centerControls {
 			position: static;
@@ -1332,7 +1344,7 @@
 		// already steals ~96px from the row — pre-shift means we need
 		// less padding-left than the full-landscape 350px.
 		&.miniMode .controlsBottomRow {
-			padding-left: 210px;
+			padding-left: 130px;
 		}
 		// Mini-landscape bar is only 56px tall; shrink buttons back
 		// to 44px so they fit cleanly and don't overflow the bar.

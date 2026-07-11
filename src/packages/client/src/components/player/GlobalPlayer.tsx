@@ -735,17 +735,29 @@ export function GlobalPlayer() {
 		return () => document.removeEventListener('mousedown', handleGlobalClick);
 	}, []);
 
-	// Lock body scroll when player is in full mode (prevent scrollbar over video)
+	// Lock ALL page scroll when the player is in full mode. On mobile the
+	// scroller is often <html> (or the URL-bar lets the viewport pan), so
+	// locking only <body> left a few px of vertical/horizontal scroll that
+	// dragged the fixed top/bottom bars off-screen. Lock both elements +
+	// kill overscroll so the full-screen player can never scroll.
 	useEffect(() => {
 		const isFull =
 			isPlayerActive.value && playerMode.value !== 'mini' && playerMode.value !== 'split';
+		const html = document.documentElement;
+		const body = document.body;
 		if (isFull) {
-			document.body.style.overflow = 'hidden';
+			html.style.overflow = 'hidden';
+			body.style.overflow = 'hidden';
+			body.style.overscrollBehavior = 'none';
 		} else {
-			document.body.style.overflow = '';
+			html.style.overflow = '';
+			body.style.overflow = '';
+			body.style.overscrollBehavior = '';
 		}
 		return () => {
-			document.body.style.overflow = '';
+			html.style.overflow = '';
+			body.style.overflow = '';
+			body.style.overscrollBehavior = '';
 		};
 	}, [isPlayerActive.value, playerMode.value]);
 
