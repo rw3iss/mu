@@ -188,6 +188,14 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
     box-sizing: border-box;
   }
+
+  // Short landscape viewport (single-row control layout): the default bar
+  // is far taller than the one title + one button row needs, leaving a big
+  // gap. Shrink it so the row sits near the bottom edge.
+  @media (orientation: landscape) and (max-height: 500px) {
+    height: 84px;
+    min-height: 84px;
+  }
 }
 
 // Mini mode: bar sits BELOW the video thumbnail; on mobile it must

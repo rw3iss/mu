@@ -1209,13 +1209,12 @@
 			gap: 0;
 		}
 
-		// Full-mode (non-mini) landscape: instead of pinning the title to
-		// the top and letting the button row fill (which left a big gap on
-		// short landscape screens), center title + buttons as a compact
-		// group so they sit close together.
+		// Full-mode (non-mini) landscape: pin the title + button rows to the
+		// BOTTOM of the (now-short) bar with a tight gap, so they sit close
+		// together near the bottom edge instead of spread out.
 		&:not(.miniMode) .mainRow {
-			justify-content: center;
-			gap: 2px;
+			justify-content: flex-end;
+			gap: 1px;
 			padding-bottom: 4px;
 		}
 		&:not(.miniMode) .controlsBottomRow {
