@@ -979,13 +979,14 @@
 			overflow: hidden;
 			text-overflow: ellipsis;
 		}
-		// Show the timing on the right of the title row (same as landscape);
-		// nudge it off the edge with a little right pad.
+		// Show the timing on the right of the title row (same as landscape).
+		// No extra right pad — its right gap comes from .mainRow's 8px padding,
+		// matching the title's 8px left gap exactly.
 		.timingLabel {
 			display: inline-block;
 			font-size: 13px;
 			flex-shrink: 0;
-			padding-right: 10px;
+			padding-right: 0;
 		}
 
 		// ── Row 2: Transport (centered, with ~10px gap between buttons) ──
@@ -1208,6 +1209,19 @@
 			gap: 0;
 		}
 
+		// Full-mode (non-mini) landscape: instead of pinning the title to
+		// the top and letting the button row fill (which left a big gap on
+		// short landscape screens), center title + buttons as a compact
+		// group so they sit close together.
+		&:not(.miniMode) .mainRow {
+			justify-content: center;
+			gap: 2px;
+			padding-bottom: 4px;
+		}
+		&:not(.miniMode) .controlsBottomRow {
+			flex: 0 0 auto;
+		}
+
 		// ── Row 1: Title (left) + timing (right) ──
 		// flex: 0 0 auto so title stays at its natural row-height at the
 		// top of mainRow; the controls row below expands to fill.
@@ -1343,8 +1357,12 @@
 		// In mini-landscape the bar is only 56px tall and the spacer
 		// already steals ~96px from the row — pre-shift means we need
 		// less padding-left than the full-landscape 350px.
+		// Clear the mini thumbnail on the left: the transport sits far
+		// enough right that the outward skip-time expansion (20s/10s/5s)
+		// doesn't crowd the thumbnail. (Was briefly 130px, which was too
+		// tight — the expanded cluster butted against the thumbnail.)
 		&.miniMode .controlsBottomRow {
-			padding-left: 130px;
+			padding-left: 210px;
 		}
 		// Mini-landscape bar is only 56px tall; shrink buttons back
 		// to 44px so they fit cleanly and don't overflow the bar.
