@@ -63,6 +63,7 @@ effect(() => {
 		hlsBlockedNotified = false;
 	}
 });
+
 import {
 	DEFAULT_VIDEO_EFFECTS,
 	type VideoEffectSettings,
@@ -160,6 +161,11 @@ export function initAudioEffects(): void {
 	const savedSpectrum = getUiSetting('audio_spectrum_enabled', false);
 	const savedCompVisualizer = getUiSetting('audio_compressor_visualizer', false);
 
+	// Auto-EQ / Auto-Compressor "Factor" — the last value the user set is
+	// remembered as their preferred default across reloads.
+	const savedAutoEqFactor = getUiSetting('audio_auto_eq_factor', 0.2);
+	const savedAutoCompFactor = getUiSetting('audio_auto_comp_factor', 0.8);
+
 	// Enhancements
 	const savedStereoWidthEnabled = getUiSetting('audio_stereo_width_enabled', false);
 	const savedStereoWidthAmount = getUiSetting('audio_stereo_width_amount', 1.5);
@@ -230,6 +236,8 @@ export function initAudioEffects(): void {
 		spectrumEnabled.value = savedSpectrum;
 		compressorEnabled.value = savedComp;
 		compressorVisualizerEnabled.value = savedCompVisualizer;
+		autoEqFactor.value = savedAutoEqFactor;
+		autoCompFactor.value = savedAutoCompFactor;
 		stereoWidthEnabled.value = savedStereoWidthEnabled;
 		stereoWidthAmount.value = savedStereoWidthAmount;
 		bassEnhanceEnabled.value = savedBassEnhanceEnabled;
@@ -389,6 +397,8 @@ export function setAutoEqFactor(n: number): void {
 	// Clamp to 0.05..0.8 in 0.05 increments (the slider's resolution).
 	const clamped = Math.max(0.05, Math.min(0.8, n));
 	autoEqFactor.value = Math.round(clamped * 20) / 20;
+	// Persist as the user's preferred default (restored on reload).
+	setUiSetting('audio_auto_eq_factor', autoEqFactor.value);
 }
 
 /**
@@ -742,6 +752,8 @@ export function setAutoCompFactor(n: number): void {
 	if (!Number.isFinite(n)) return;
 	const clamped = Math.max(0.1, Math.min(1, n));
 	autoCompFactor.value = Math.round(clamped * 10) / 10;
+	// Persist as the user's preferred default (restored on reload).
+	setUiSetting('audio_auto_comp_factor', autoCompFactor.value);
 }
 
 /**
