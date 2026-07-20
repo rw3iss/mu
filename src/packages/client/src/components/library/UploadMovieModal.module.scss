@@ -35,10 +35,39 @@
 	font-size: var(--font-size-sm);
 }
 
+.dropZone {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-sm);
+	padding: var(--space-lg);
+	border: 2px dashed var(--color-border);
+	border-radius: var(--radius-md);
+	color: var(--color-text-secondary);
+	text-align: center;
+	transition:
+		border-color var(--transition-fast),
+		background var(--transition-fast),
+		color var(--transition-fast);
+}
+
+// Highlighted while a file/folder is dragged over the modal.
+.dropZoneActive {
+	border-color: var(--color-accent);
+	background: var(--color-accent-subtle, rgba(255, 255, 255, 0.05));
+	color: var(--color-text-primary);
+}
+
+.dropHint {
+	margin: 0;
+	font-size: var(--font-size-sm);
+}
+
 .pickers {
 	display: flex;
 	gap: var(--space-sm);
 	flex-wrap: wrap;
+	justify-content: center;
 }
 
 .hiddenInput {

@@ -56,6 +56,47 @@ interface Entry {
 
 type Phase = 'select' | 'uploading' | 'done';
 
+// ── Drag-and-drop folder support ─────────────────────────────────────────
+// Dropping a folder only exposes its contents through the FileSystem Entry
+// API (webkitGetAsEntry) — `DataTransfer.files` gives just the folder shell.
+// We walk directory entries recursively to collect every file with its
+// folder-relative path (mirroring the pickers' webkitRelativePath).
+
+function entryToFile(entry: FileSystemFileEntry): Promise<File> {
+	return new Promise((resolve, reject) => entry.file(resolve, reject));
+}
+
+function readEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
+	return new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+}
+
+async function walkDir(dir: FileSystemDirectoryEntry, prefix: string, out: Entry[]): Promise<void> {
+	const reader = dir.createReader();
+	// readEntries returns the directory in batches — keep reading until empty.
+	let batch = await readEntries(reader);
+	while (batch.length > 0) {
+		for (const child of batch) {
+			if (child.isFile) {
+				const file = await entryToFile(child as FileSystemFileEntry);
+				out.push({ file, relativePath: `${prefix}/${file.name}` });
+			} else if (child.isDirectory) {
+				await walkDir(child as FileSystemDirectoryEntry, `${prefix}/${child.name}`, out);
+			}
+		}
+		batch = await readEntries(reader);
+	}
+}
+
+/** Collect files from one dropped top-level entry (a file or a folder). */
+async function collectEntry(entry: FileSystemEntry, out: Entry[]): Promise<void> {
+	if (entry.isFile) {
+		const file = await entryToFile(entry as FileSystemFileEntry);
+		out.push({ file, relativePath: file.name });
+	} else if (entry.isDirectory) {
+		await walkDir(entry as FileSystemDirectoryEntry, entry.name, out);
+	}
+}
+
 export function UploadMovieModal({ isOpen, onClose, onUploaded }: UploadMovieModalProps) {
 	const [targets, setTargets] = useState<UploadTarget[]>([]);
 	const [sourceId, setSourceId] = useState<string>('');
@@ -118,14 +159,18 @@ export function UploadMovieModal({ isOpen, onClose, onUploaded }: UploadMovieMod
 		}
 	}, []);
 
-	const pickFile = useCallback((files: FileList | null, folder: boolean) => {
+	const [dragging, setDragging] = useState(false);
+	const dragDepth = useRef(0);
+
+	// Stage a collected set of files as either a single movie file or a movie
+	// folder (with companions). Shared by the file/folder pickers and drop.
+	const ingest = useCallback((collected: Entry[], folder: boolean) => {
 		setError(null);
-		if (!files || files.length === 0) return;
-		const list = Array.from(files);
+		if (collected.length === 0) return;
 		if (folder) {
-			const allowed = list.filter((f) => {
-				const e = extOf(f.name);
-				return VIDEO_EXTS.has(e) || COMPANION_EXTS.has(e);
+			const allowed = collected.filter((e) => {
+				const ext = extOf(e.file.name);
+				return VIDEO_EXTS.has(ext) || COMPANION_EXTS.has(ext);
 			});
 			if (allowed.length === 0) {
 				setError(
@@ -133,24 +178,93 @@ export function UploadMovieModal({ isOpen, onClose, onUploaded }: UploadMovieMod
 				);
 				return;
 			}
-			const next = allowed.map((f) => ({
+			setEntries(allowed);
+			setRootName(allowed[0]!.relativePath.split('/')[0] || allowed[0]!.file.name);
+		} else {
+			const f = collected[0]!;
+			if (!VIDEO_EXTS.has(extOf(f.file.name))) {
+				setError('Only movie files can be uploaded individually (e.g. .mkv, .mp4).');
+				return;
+			}
+			setEntries([{ file: f.file, relativePath: f.file.name }]);
+			setRootName(f.file.name);
+		}
+	}, []);
+
+	const pickFile = useCallback(
+		(files: FileList | null, folder: boolean) => {
+			if (!files || files.length === 0) return;
+			const collected = Array.from(files).map((f) => ({
 				file: f,
 				// webkitRelativePath = "<folder>/.../file"; preserved server-side.
 				relativePath:
 					(f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name,
 			}));
-			setEntries(next);
-			setRootName(next[0]!.relativePath.split('/')[0] || next[0]!.file.name);
-		} else {
-			const f = list[0]!;
-			if (!VIDEO_EXTS.has(extOf(f.name))) {
-				setError('Only movie files can be uploaded individually (e.g. .mkv, .mp4).');
+			ingest(collected, folder);
+		},
+		[ingest],
+	);
+
+	const handleDragEnter = useCallback(
+		(e: DragEvent) => {
+			e.preventDefault();
+			if (phase !== 'select') return;
+			dragDepth.current += 1;
+			setDragging(true);
+		},
+		[phase],
+	);
+
+	const handleDragOver = useCallback((e: DragEvent) => {
+		// Required, otherwise the browser never fires `drop`.
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+	}, []);
+
+	const handleDragLeave = useCallback((e: DragEvent) => {
+		e.preventDefault();
+		dragDepth.current = Math.max(0, dragDepth.current - 1);
+		if (dragDepth.current === 0) setDragging(false);
+	}, []);
+
+	const handleDrop = useCallback(
+		async (e: DragEvent) => {
+			e.preventDefault();
+			dragDepth.current = 0;
+			setDragging(false);
+			if (phase !== 'select') return;
+			const dt = e.dataTransfer;
+			if (!dt) return;
+			// webkitGetAsEntry() must be read SYNCHRONOUSLY — the items list is
+			// only valid during the event, before any await.
+			const roots: FileSystemEntry[] = [];
+			if (dt.items?.length) {
+				for (const item of Array.from(dt.items)) {
+					const entry = item.webkitGetAsEntry?.();
+					if (entry) roots.push(entry);
+				}
+			}
+			if (roots.length > 0) {
+				const collected: Entry[] = [];
+				// Folder mode when any dropped item is a directory (companions
+				// allowed); otherwise it's plain file(s).
+				let sawDir = false;
+				for (const entry of roots) {
+					if (entry.isDirectory) sawDir = true;
+					try {
+						await collectEntry(entry, collected);
+					} catch {
+						// Skip an unreadable entry rather than failing the whole drop.
+					}
+				}
+				ingest(collected, sawDir);
 				return;
 			}
-			setEntries([{ file: f, relativePath: f.name }]);
-			setRootName(f.name);
-		}
-	}, []);
+			// Fallback: entry API unavailable — plain files only (no folders).
+			if (dt.files?.length) pickFile(dt.files, false);
+		},
+		[phase, ingest, pickFile],
+	);
 
 	const canUpload = entries.length > 0 && !!sourceId && phase === 'select';
 
@@ -213,7 +327,13 @@ export function UploadMovieModal({ isOpen, onClose, onUploaded }: UploadMovieMod
 
 	return (
 		<Modal isOpen={isOpen} onClose={handleClose} title="Upload to Library" size="md">
-			<div class={styles.content}>
+			<div
+				class={styles.content}
+				onDragEnter={handleDragEnter}
+				onDragOver={handleDragOver}
+				onDragLeave={handleDragLeave}
+				onDrop={handleDrop}
+			>
 				{phase === 'uploading' || phase === 'done' ? (
 					<div class={styles.uploading}>
 						<div class={styles.uploadingHead}>
@@ -268,19 +388,23 @@ export function UploadMovieModal({ isOpen, onClose, onUploaded }: UploadMovieMod
 							</label>
 						)}
 
-						<div class={styles.pickers}>
-							<Button
-								variant="secondary"
-								onClick={() => fileInputRef.current?.click()}
-							>
-								<Icon name="film" size={16} /> Choose file
-							</Button>
-							<Button
-								variant="secondary"
-								onClick={() => folderInputRef.current?.click()}
-							>
-								<Icon name="list-plus" size={16} /> Choose folder
-							</Button>
+						<div class={`${styles.dropZone} ${dragging ? styles.dropZoneActive : ''}`}>
+							<Icon name="upload" size={24} />
+							<p class={styles.dropHint}>Drag a movie file or folder here, or</p>
+							<div class={styles.pickers}>
+								<Button
+									variant="secondary"
+									onClick={() => fileInputRef.current?.click()}
+								>
+									<Icon name="film" size={16} /> Choose file
+								</Button>
+								<Button
+									variant="secondary"
+									onClick={() => folderInputRef.current?.click()}
+								>
+									<Icon name="list-plus" size={16} /> Choose folder
+								</Button>
+							</div>
 							<input
 								ref={fileInputRef}
 								type="file"
