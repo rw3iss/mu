@@ -36,6 +36,7 @@ import { initTheme } from '@/state/theme.state';
 import '@/state/accentColor.state';
 import '@/state/appearance.state';
 import { audioEngine } from '@/audio/audio-engine';
+import { UploadProgressToast } from '@/components/library/UploadProgressToast';
 import { GlobalPlayer } from '@/components/player/GlobalPlayer';
 import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
@@ -230,6 +231,7 @@ export function App() {
 	return (
 		<div>
 			<Toast />
+			{!isAuthRoute && <UploadProgressToast />}
 			{!isAuthRoute && <GlobalPlayer />}
 			{isPublicWatch ? (
 				<Router onChange={handleRouteChange}>
