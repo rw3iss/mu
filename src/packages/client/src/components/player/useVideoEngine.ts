@@ -39,6 +39,26 @@ const BUFFER_CONFIGS: Record<
 	max: { maxBufferLength: 180, maxMaxBufferLength: 360, maxBufferSize: 400 * 1024 * 1024 },
 };
 
+// When Web Audio effects (EQ/compressor) are engaged, a media-element buffer
+// underrun produces an audible silence gap — the MediaElementSource emits
+// silence during the stall. On a cold/evicted buffer (e.g. resuming a movie
+// after being away) the element flaps in and out of buffering for ~10s, giving
+// the repeated ~half-second "skip". So before starting playback we wait for a
+// small buffered margin ahead, bounded by a max wait so a genuinely slow
+// source still starts. (No effect on the native path — see startPlayback.)
+const PREROLL_SECONDS = 5;
+const PREROLL_MAX_WAIT_MS = 8000;
+
+/** Seconds of contiguous buffered media ahead of the current playhead. */
+function bufferedAhead(v: HTMLMediaElement): number {
+	const t = v.currentTime;
+	const r = v.buffered;
+	for (let i = 0; i < r.length; i++) {
+		if (r.start(i) - 0.25 <= t && t < r.end(i) + 0.25) return Math.max(0, r.end(i) - t);
+	}
+	return 0;
+}
+
 /**
  * Module-level singleton video element.
  *
@@ -153,6 +173,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const deferredSrcRef = useRef<{ url: string; position: number } | null>(null);
 	/** Tracks pending HLS recovery timeout so it can be cleared on destroy */
 	const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	/** Pre-roll poll: when Web Audio is engaged, playback waits for a buffered
+	 *  margin before starting (see startPlayback) to avoid the cold-buffer
+	 *  "skip". Held here so it can be cancelled on pause / teardown. */
+	const prerollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const [playbackError, setPlaybackError] = useState<string | null>(null);
 	const [hlsStatus, setHlsStatus] = useState<HlsStatus>(null);
 
@@ -373,6 +397,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
 			if (seekLockTimerRef.current) clearTimeout(seekLockTimerRef.current);
 			if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+			if (prerollTimerRef.current) {
+				clearInterval(prerollTimerRef.current);
+				prerollTimerRef.current = null;
+			}
 			if (recoveryTimerRef.current) {
 				clearTimeout(recoveryTimerRef.current);
 				recoveryTimerRef.current = null;
@@ -808,6 +836,61 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		const video = videoRef.current;
 		if (!video) return;
 
+		const clearPreroll = () => {
+			if (prerollTimerRef.current != null) {
+				clearInterval(prerollTimerRef.current);
+				prerollTimerRef.current = null;
+			}
+		};
+
+		// Start (or resume) playback. When Web Audio effects are engaged AND the
+		// buffer is thin (cold resume), hold off until a small margin is buffered
+		// ahead — otherwise the element underruns repeatedly and each stall is an
+		// audible silence gap through the MediaElementSource ("skip"). The native
+		// path, or an already-healthy buffer, starts immediately.
+		const begin = () => {
+			intendedPlayingRef.current = true;
+			audioEngine.resume();
+			if (
+				!audioEngine.isAttached() ||
+				video.readyState >= 4 ||
+				bufferedAhead(video) >= PREROLL_SECONDS
+			) {
+				video.play().catch(() => {});
+				return;
+			}
+			isBuffering.value = true;
+			const startedAt = Date.now();
+			prerollTimerRef.current = setInterval(() => {
+				const v = videoRef.current;
+				if (!v || !intendedPlayingRef.current) {
+					clearPreroll();
+					return;
+				}
+				if (
+					v.readyState >= 4 ||
+					bufferedAhead(v) >= PREROLL_SECONDS ||
+					Date.now() - startedAt > PREROLL_MAX_WAIT_MS
+				) {
+					clearPreroll();
+					isBuffering.value = false;
+					audioEngine.resume();
+					v.play().catch(() => {});
+				}
+			}, 200);
+		};
+
+		// Mid pre-roll → a tap means "pause": cancel the wait instead of playing.
+		if (prerollTimerRef.current != null) {
+			clearPreroll();
+			intendedPlayingRef.current = false;
+			isBuffering.value = false;
+			try {
+				localStorage.setItem('mu_is_playing', '0');
+			} catch {}
+			return;
+		}
+
 		// If we deferred a direct play source (loaded muted for preview frame), unmute and play
 		if (deferredSrcRef.current) {
 			deferredSrcRef.current = null;
@@ -822,9 +905,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			} else {
 				video.muted = isMuted.value;
 			}
-			intendedPlayingRef.current = true;
-			audioEngine.resume();
-			video.play().catch(() => {});
+			begin();
 			try {
 				localStorage.setItem('mu_is_playing', '1');
 			} catch {}
@@ -832,9 +913,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		}
 
 		if (video.paused) {
-			intendedPlayingRef.current = true;
-			audioEngine.resume();
-			video.play();
+			begin();
 			try {
 				localStorage.setItem('mu_is_playing', '1');
 			} catch {}
@@ -916,6 +995,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		suppressPauseRef.current = true;
 		intendedPlayingRef.current = false;
 		deferredSrcRef.current = null;
+		if (prerollTimerRef.current) {
+			clearInterval(prerollTimerRef.current);
+			prerollTimerRef.current = null;
+		}
 		if (recoveryTimerRef.current) {
 			clearTimeout(recoveryTimerRef.current);
 			recoveryTimerRef.current = null;
