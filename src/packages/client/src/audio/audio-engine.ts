@@ -152,6 +152,19 @@ export class AudioEngine {
 	private deviceChangeListener: (() => void) | null = null;
 	private interactionResumeListener: (() => void) | null = null;
 
+	// ── Keep-alive ──
+	// A started ConstantSourceNode wired straight to the destination keeps the
+	// AudioContext rendering continuously so it never idles into
+	// suspended/interrupted — that idle→resume transition is what desyncs the
+	// MediaElementSource clock and produces the periodic "skip" on replay after
+	// being away. The node's output is DC (0 Hz) so it's inaudible regardless of
+	// gain; we still drop the gain to 0 while paused and restore it on play. The
+	// *source* staying started is what holds the context alive, independent of
+	// the gain, so muting on pause doesn't defeat it.
+	private keepAliveSource: ConstantSourceNode | null = null;
+	private keepAliveGain: GainNode | null = null;
+	private static readonly KEEP_ALIVE_LEVEL = 0.0001;
+
 	// ── Stereo widening (M/S processing) ──
 	// width = 1 → no change. < 1 → narrower. > 1 → wider. 0 = mono.
 	//
@@ -481,6 +494,11 @@ export class AudioEngine {
 
 		// Recover from OS audio device changes and context state transitions.
 		this.installRecoveryHandlers();
+
+		// Silent keep-alive: hold the context in the running state so it never
+		// idles into suspend/interrupt (the resume of which desyncs the
+		// MediaElementSource clock → the periodic "skip" on replay).
+		this.setupKeepAlive();
 
 		// Master output gain — carries the user's volume/mute (the <video>
 		// element stays unmuted/full so the source node gets real signal).
@@ -1038,6 +1056,45 @@ export class AudioEngine {
 			osc.disconnect();
 			gain.disconnect();
 		}, 1000);
+	}
+
+	/**
+	 * Wire a started ConstantSourceNode → gain → destination. The started
+	 * source keeps the context rendering (so it won't idle into suspend), and
+	 * the DC output is inaudible. Idempotent.
+	 */
+	private setupKeepAlive(): void {
+		if (!this.ctx || this.keepAliveSource) return;
+		try {
+			const src = this.ctx.createConstantSource();
+			const gain = this.ctx.createGain();
+			gain.gain.value = AudioEngine.KEEP_ALIVE_LEVEL;
+			src.connect(gain).connect(this.ctx.destination);
+			src.start();
+			this.keepAliveSource = src;
+			this.keepAliveGain = gain;
+		} catch (err) {
+			dwarn('[audioEngine] keep-alive setup failed:', err);
+		}
+	}
+
+	/**
+	 * Reflect the player's play/pause state onto the keep-alive: drop its
+	 * (inaudible) level to 0 while paused and restore it on play. The source
+	 * stays started either way, so the context keeps running the whole time —
+	 * this just honours the "0 when paused, restore on play" request.
+	 */
+	setPlaybackActive(active: boolean): void {
+		if (!this.ctx || !this.keepAliveGain) return;
+		const g = this.keepAliveGain.gain;
+		const target = active ? AudioEngine.KEEP_ALIVE_LEVEL : 0;
+		try {
+			g.cancelScheduledValues(this.ctx.currentTime);
+			// Short ramp so toggling the DC branch can't click.
+			g.setTargetAtTime(target, this.ctx.currentTime, 0.02);
+		} catch {
+			g.value = target;
+		}
 	}
 
 	/** Create/resume AudioContext. Call from user gesture (click). */

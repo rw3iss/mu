@@ -275,6 +275,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			isPlaying.value = true;
 			intendedPlayingRef.current = true;
 			audioEngine.resume();
+			// Restore the keep-alive so the AudioContext stays running.
+			audioEngine.setPlaybackActive(true);
 		};
 		const onPause = () => {
 			// Ignore pause events caused by:
@@ -285,6 +287,10 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			if (movingRef.current || suppressPauseRef.current || !document.contains(video)) return;
 			isPlaying.value = false;
 			intendedPlayingRef.current = false;
+			// Mute the keep-alive's (inaudible) output while paused; the source
+			// stays started so the context keeps running and won't need a
+			// glitchy resume when playback restarts.
+			audioEngine.setPlaybackActive(false);
 		};
 		const onWaiting = () => {
 			isBuffering.value = true;
