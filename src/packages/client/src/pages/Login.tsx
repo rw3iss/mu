@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { isAuthenticated, login } from '@/state/auth.state';
@@ -15,11 +15,14 @@ export function Login(_props: LoginProps) {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState('');
 
-	// Redirect if already authenticated
-	if (isAuthenticated.value) {
-		route('/', true);
-		return null;
-	}
+	// Redirect to the dashboard if already authenticated. Must run as a
+	// post-render side effect — calling route() during render doesn't reliably
+	// navigate and left a blank page (the `return null` below with no nav).
+	useEffect(() => {
+		if (isAuthenticated.value) route('/', true);
+	}, [isAuthenticated.value]);
+
+	if (isAuthenticated.value) return null;
 
 	const handleSubmit = useCallback(
 		async (e: Event) => {
