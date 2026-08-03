@@ -11,8 +11,6 @@ export { feedback } from './feedback.ts';
 export type { ImdbRating, NewImdbRating } from './imdb-ratings.ts';
 export { imdbRatings } from './imdb-ratings.ts';
 export { imdbTitles } from './imdb-titles.ts';
-export { commentReactions, movieComments } from './movie-comments.ts';
-export { notifications } from './notifications.ts';
 export type { JobHistoryEntry, NewJobHistoryEntry } from './job-history.ts';
 export { jobHistory } from './job-history.ts';
 export type { MediaCacheEntry, NewMediaCacheEntry } from './media-cache.ts';
@@ -24,6 +22,7 @@ export type {
 	NewMetadataMatchCandidate,
 } from './metadata-match-candidates.ts';
 export { metadataMatchCandidates } from './metadata-match-candidates.ts';
+export { commentReactions, movieComments } from './movie-comments.ts';
 export type { MovieEmbedding, NewMovieEmbedding } from './movie-embeddings.ts';
 export { movieEmbeddings } from './movie-embeddings.ts';
 export type {
@@ -59,6 +58,7 @@ export type { MovieSourcePayload, NewMovieSourcePayload } from './movie-source-p
 export { movieSourcePayloads } from './movie-source-payloads.ts';
 export type { Movie, NewMovie } from './movies.ts';
 export { movies } from './movies.ts';
+export { notifications } from './notifications.ts';
 export type { NewPerson, Person } from './people.ts';
 export { people } from './people.ts';
 export type { NewPersonIdentity, PersonIdentity } from './person-identities.ts';
@@ -79,10 +79,19 @@ export type { NewScanLogEntry, ScanLogEntry } from './scan-log.ts';
 export { scanLog } from './scan-log.ts';
 export type { NewSearchCacheRow, SearchCacheRow } from './search-cache.ts';
 export { searchCache } from './search-cache.ts';
-export type { NewSoundtrackCacheRow, SoundtrackCacheRow } from './soundtrack-cache.ts';
-export { soundtrackCache } from './soundtrack-cache.ts';
 export type { NewSetting, Setting } from './settings.ts';
 export { settings } from './settings.ts';
+export type { NewSharedSessionMember, SharedSessionMember } from './shared-session-members.ts';
+export { sharedSessionMembers } from './shared-session-members.ts';
+export type {
+	NewSharedSessionMessage,
+	SharedSessionMessage,
+} from './shared-session-messages.ts';
+export { sharedSessionMessages } from './shared-session-messages.ts';
+export type { NewSharedSession, SharedSession } from './shared-sessions.ts';
+export { sharedSessions } from './shared-sessions.ts';
+export type { NewSoundtrackCacheRow, SoundtrackCacheRow } from './soundtrack-cache.ts';
+export { soundtrackCache } from './soundtrack-cache.ts';
 export type { NewStreamSession, StreamSession } from './stream-sessions.ts';
 export { streamSessions } from './stream-sessions.ts';
 export type { NewTheme, Theme } from './themes.ts';

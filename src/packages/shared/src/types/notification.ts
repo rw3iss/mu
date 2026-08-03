@@ -11,6 +11,8 @@ export enum NotificationType {
 	NewTitle = 'new-title',
 	/** Admin/system announcement shown to everyone. data: AnnouncementData */
 	Announcement = 'announcement',
+	/** You were invited to a shared watch session. data: SharedSessionInviteData */
+	SharedSessionInvite = 'shared-session-invite',
 }
 
 export interface CommentReplyData {
@@ -43,6 +45,15 @@ export interface AnnouncementData {
 	title: string;
 	body?: string;
 	link?: string;
+}
+
+export interface SharedSessionInviteData {
+	sessionId: string;
+	hostUserId: string;
+	hostName: string;
+	movieId: string;
+	movieTitle?: string;
+	posterUrl?: string | null;
 }
 
 export interface NotificationDto {

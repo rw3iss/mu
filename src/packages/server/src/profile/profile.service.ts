@@ -1,5 +1,6 @@
 import type {
 	CurrentlyWatching,
+	InvitableMember,
 	MemberSummary,
 	ProfileFavorite,
 	ProfileHistoryItem,
@@ -131,6 +132,31 @@ export class ProfileService {
 			if (isAdmin) summary.profilePublic = !!u.profilePublic;
 			return summary;
 		});
+	}
+
+	/**
+	 * Minimal roster of everyone (except the requester) for the Shared Sessions
+	 * invite picker. Intentionally NOT gated by the "Show Users Info" switch —
+	 * you can invite people to a watch party regardless of directory visibility.
+	 * Returns only id + display name + avatar (no stats / activity).
+	 */
+	listInvitableMembers(requesterId: string): InvitableMember[] {
+		return this.database.db
+			.select({
+				id: users.id,
+				username: users.username,
+				displayName: users.displayName,
+				avatarUrl: users.avatarUrl,
+			})
+			.from(users)
+			.where(sql`${users.id} != ${requesterId} AND ${users.disabled} = 0`)
+			.orderBy(users.username)
+			.all()
+			.map((u) => ({
+				id: u.id,
+				name: u.displayName?.trim() || u.username,
+				avatarUrl: u.avatarUrl ?? null,
+			}));
 	}
 
 	// ── Editing ───────────────────────────────────────────────────────────

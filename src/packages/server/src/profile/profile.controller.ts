@@ -135,4 +135,15 @@ export class MembersController {
 	async list(@CurrentUser('id') id: string, @CurrentUser('role') role: string) {
 		return { members: await this.profile.listMembers({ id, role }) };
 	}
+
+	/**
+	 * Minimal roster for the Shared Sessions invite picker — everyone but the
+	 * caller, regardless of the "Show Users Info" switch (you can invite people
+	 * to a watch party even when the directory is hidden).
+	 */
+	@RequireAction('view:own-data')
+	@Get('invitable')
+	invitable(@CurrentUser('id') id: string) {
+		return { members: this.profile.listInvitableMembers(id) };
+	}
 }

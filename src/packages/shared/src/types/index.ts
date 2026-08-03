@@ -5,6 +5,7 @@ export * from './plugin.js';
 export * from './profile.js';
 export * from './search.js';
 export * from './seo.js';
+export * from './shared-session.js';
 export * from './soundtrack.js';
 export * from './subtitle.js';
 export * from './theme.js';

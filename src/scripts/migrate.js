@@ -478,6 +478,38 @@ const alters = [
 	)`,
 	`CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id)`,
 	`CREATE INDEX IF NOT EXISTS notifications_created_idx ON notifications(created_at)`,
+	// Shared Sessions (watch party).
+	`CREATE TABLE IF NOT EXISTS shared_sessions (
+		id TEXT PRIMARY KEY,
+		movie_id TEXT NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+		admin_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		name TEXT,
+		settings TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'active',
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL,
+		ended_at TEXT
+	)`,
+	`CREATE TABLE IF NOT EXISTS shared_session_members (
+		id TEXT PRIMARY KEY,
+		session_id TEXT NOT NULL REFERENCES shared_sessions(id) ON DELETE CASCADE,
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		role TEXT NOT NULL DEFAULT 'member',
+		state TEXT NOT NULL DEFAULT 'invited',
+		invited_by TEXT,
+		joined_at TEXT,
+		left_at TEXT
+	)`,
+	`CREATE TABLE IF NOT EXISTS shared_session_messages (
+		id TEXT PRIMARY KEY,
+		session_id TEXT NOT NULL REFERENCES shared_sessions(id) ON DELETE CASCADE,
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		text TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS shared_session_members_session_idx ON shared_session_members(session_id)`,
+	`CREATE INDEX IF NOT EXISTS shared_session_members_user_idx ON shared_session_members(user_id)`,
+	`CREATE INDEX IF NOT EXISTS shared_session_messages_session_idx ON shared_session_messages(session_id)`,
 	`CREATE INDEX IF NOT EXISTS comment_reactions_comment_idx ON comment_reactions(comment_id)`,
 	'ALTER TABLE stream_sessions ADD COLUMN ip_address TEXT',
 	// Social profile fields (Members + profile pages).

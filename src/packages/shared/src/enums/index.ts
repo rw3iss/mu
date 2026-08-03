@@ -65,4 +65,24 @@ export enum WsEvent {
 	 * ok, error? }. Channel: `upload`.
 	 */
 	UPLOAD_COMPLETED = 'upload:completed',
+
+	// ── Shared Sessions (watch party) ──
+	/** A member joined a session (presence). Channel: `session:<id>`. */
+	SHARED_SESSION_JOINED = 'session:joined',
+	/** A member left a session (presence). Channel: `session:<id>`. */
+	SHARED_SESSION_LEFT = 'session:left',
+	/** Playback command relayed to the room: play|pause|seek|heartbeat. */
+	SHARED_SESSION_COMMAND = 'session:command',
+	/** A chat message relayed to the room. */
+	SHARED_SESSION_CHAT = 'session:chat',
+	/** WebRTC signaling (offer|answer|ice), targeted to a specific `user:<id>`. */
+	SHARED_SESSION_SIGNAL = 'session:signal',
+	/** Session settings changed (admin). Channel: `session:<id>`. */
+	SHARED_SESSION_SETTINGS = 'session:settings',
+	/** Admin transferred to another member. Channel: `session:<id>`. */
+	SHARED_SESSION_ADMIN = 'session:admin',
+	/** Session ended by the admin. Channel: `session:<id>`. */
+	SHARED_SESSION_ENDED = 'session:ended',
+	/** Roster + per-member voice/mute/ready state. Channel: `session:<id>`. */
+	SHARED_SESSION_PRESENCE = 'session:presence',
 }

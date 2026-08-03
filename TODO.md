@@ -128,7 +128,30 @@ Movies will only ever belong to a single group, but might otherwise
 - Other video sources?
 	- Integrate web urls or other video websites, ie. Watch youtube, stream twitch from the app, etc. Even connect with other users for video meetings?
 
-- "Buddy Watch":
+
+
+# NEW PLUGIN:
+Next we are going to develop a new feature for the Mu system called "Shared Sessions". The idea of this feature is for any member on the system to 'invite' other members to join their current session, ie. the movie they're watching, for a given video they have playing or loaded in the player. Let's call the "inviting" person the "session admin". When this happens, and the other logged-in members accept the invitation, then it should load that "shared" video into their player as well, and then start to "sync" the video play between both users. It will also expose a "chat" window (using websockets) for the session/shared Shared Sessions video. Multiple members can also be invited to the session and join it (ie. not just a "pair"), and they would also be added to the chat session as well. The Shared session will also support "audio voice", using each members connected/chosen microphone or audio input device, so they can talk to each other while watching the movie.
+The "session admin" will also have access to a "Session Settings" panel to control various options for the Shared session. Some of these settings will be:
+- allow all members to pause and play the movie (otherwise only the session admin can pause and play the movie, ie. control the play) (enabled by default).
+- enable chat (otherwise websocket chat is not available for the session, though a websocket channel should still be opened so each user can sync via 'play' and other "commands" for the shared session) (enabled by default).
+- enable voices (otherwise the audio input is disabled and no member will be able to "speak" to each other in the session) (enabled by default).
+
+That's all I can think of for now. If there's other appropriate settings for a Shared session, feel free to add them.
+
+The feature can work like this:
+- When enabled, it will expose an option in the global player 'Settings' menu in the global player control bar (the cog wheel menu), called 'Invite to Shared Session'. This should only be shown if the current user is not part of a shared session, or didn't start one already (ie. none active). If the user is part of a session already, this should change to "Leave Shared Session", and show a custom confirmation window when clicking it to confirm they want to leave it. When a user clicks the invite button to start a new session, it should show a modal to list all current members in the system, with checkboxes to select them (just clicking their rows will select them too), and then the user can select any number of members to send a Shared Session invite to. When a user sends the invites, the other users need to receive them as notifications. This should show in two ways for the other users: one way as the actual notification (ie. centered "flydown" message with the link to accept and join the session - which will unload that user's current movie, if any, and load the movie from the session they were invited to, and start queuing and syncing to it from the "session admin", waiting for "commands").
+
+
+
+
+The originating or inviting user will act as the authority for the session, and be able to set settings such as:
+	- any player can pause and play the session (ie. control it), or otherwise only the admin can play and pause it.
+	-
+- look at the existing plugins (ie. OMDB Ratings, Torrent Search, etc), to see examples, and read /home/rw3iss/Sites/mu/src/PLUGINS.md for an overview.
+- the
+
+"Buddy Watch Plugin":
 	- connect with another user and show webcam thumbnail and watch the same movie together.
 
 
