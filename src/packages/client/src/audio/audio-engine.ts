@@ -622,6 +622,17 @@ export class AudioEngine {
 	}
 
 	/**
+	 * The live playback AudioContext, or null when the engine hasn't attached
+	 * yet. Additive read-only accessor — lets an opt-in caller (e.g. the mic
+	 * engine's `mu_voice_shared_ctx` flag path) share this context instead of
+	 * spinning up a second one. Does NOT create a context; playback behaviour
+	 * is unchanged whether or not anyone calls this.
+	 */
+	getContext(): AudioContext | null {
+		return this.ctx;
+	}
+
+	/**
 	 * Apply the player's volume slider + mute state to the graph's master
 	 * gain. Called by the video engine in place of touching the <video>
 	 * element's own volume/muted while Web Audio owns output (muting the

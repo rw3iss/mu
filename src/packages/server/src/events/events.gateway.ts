@@ -1,5 +1,5 @@
 import type { IncomingMessage } from 'node:http';
-import { WsEvent } from '@mu/shared';
+import { type SessionCommand, type SignalMessage, WsEvent } from '@mu/shared';
 import { Logger } from '@nestjs/common';
 import {
 	ConnectedSocket,
@@ -11,6 +11,7 @@ import {
 	WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, WebSocket } from 'ws';
+import type { SharedSessionRelay } from '../shared-sessions/shared-session-relay.interface.js';
 import { EventsService } from './events.service.js';
 import { WsAuthService } from './ws-auth.service.js';
 
@@ -24,6 +25,12 @@ interface ClientMeta {
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 	private readonly logger = new Logger('WebSocket');
 	private clients = new Map<WebSocket, ClientMeta>();
+	/**
+	 * Shared-sessions relay authorizer. Registered by `SharedSessionsService`
+	 * on init (callback pattern) so this @Global gateway never takes a hard DI
+	 * dependency on the shared-sessions module — avoids a cycle.
+	 */
+	private sharedSessionRelay?: SharedSessionRelay;
 
 	@WebSocketServer()
 	server!: Server;
@@ -179,5 +186,111 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
 	getConnectedCount(): number {
 		return this.clients.size;
+	}
+
+	// ── Shared Sessions relay ─────────────────────────────────────────────────
+
+	/** SharedSessionsService registers its relay authorizer here (on init). */
+	registerSharedSessionRelay(relay: SharedSessionRelay): void {
+		this.sharedSessionRelay = relay;
+	}
+
+	/**
+	 * Playback-sync command relay. Authorized against the AUTHENTICATED socket
+	 * identity (never a client-supplied userId); the outgoing command's
+	 * `byUserId` is overwritten with the verified id. Broadcast to the whole
+	 * `session:<id>` room (senders dedupe on `byUserId === self`).
+	 */
+	@SubscribeMessage(WsEvent.SHARED_SESSION_COMMAND)
+	handleSessionCommand(@ConnectedSocket() client: WebSocket, @MessageBody() data: unknown) {
+		const identity = this.getIdentity(client);
+		if (!identity || !this.sharedSessionRelay) return;
+		const payload = data as { sessionId?: string; command?: SessionCommand } | undefined;
+		const sessionId = payload?.sessionId;
+		const command = payload?.command;
+		if (typeof sessionId !== 'string' || !command || typeof command.kind !== 'string') return;
+		if (!this.sharedSessionRelay.canRelayCommand(identity.userId, sessionId, command.kind))
+			return;
+		const outgoing = { sessionId, command: { ...command, byUserId: identity.userId } };
+		this.broadcastToChannel(`session:${sessionId}`, WsEvent.SHARED_SESSION_COMMAND, outgoing);
+	}
+
+	/**
+	 * Chat relay. The message is persisted with the verified author id; a null
+	 * return means "not a joined member / chat disabled / empty" → not relayed.
+	 */
+	@SubscribeMessage(WsEvent.SHARED_SESSION_CHAT)
+	handleSessionChat(@ConnectedSocket() client: WebSocket, @MessageBody() data: unknown) {
+		const identity = this.getIdentity(client);
+		if (!identity || !this.sharedSessionRelay) return;
+		const payload = data as { sessionId?: string; text?: string } | undefined;
+		const sessionId = payload?.sessionId;
+		const text = payload?.text;
+		if (typeof sessionId !== 'string' || typeof text !== 'string') return;
+		const message = this.sharedSessionRelay.recordChat(identity.userId, sessionId, text);
+		if (!message) return;
+		this.broadcastToChannel(`session:${sessionId}`, WsEvent.SHARED_SESSION_CHAT, {
+			sessionId,
+			message,
+		});
+	}
+
+	/**
+	 * WebRTC signaling relay — TARGETED to `user:<toUserId>`, not broadcast.
+	 * Both endpoints must be joined members of the same session; the outgoing
+	 * `fromUserId` is the verified sender.
+	 */
+	@SubscribeMessage(WsEvent.SHARED_SESSION_SIGNAL)
+	handleSessionSignal(@ConnectedSocket() client: WebSocket, @MessageBody() data: unknown) {
+		const identity = this.getIdentity(client);
+		if (!identity || !this.sharedSessionRelay) return;
+		const payload = data as
+			| { sessionId?: string; toUserId?: string; kind?: string; payload?: unknown }
+			| undefined;
+		const sessionId = payload?.sessionId;
+		const toUserId = payload?.toUserId;
+		const kind = payload?.kind;
+		if (
+			typeof sessionId !== 'string' ||
+			typeof toUserId !== 'string' ||
+			typeof kind !== 'string'
+		) {
+			return;
+		}
+		if (kind !== 'offer' && kind !== 'answer' && kind !== 'ice') return;
+		if (
+			!this.sharedSessionRelay.isMember(identity.userId, sessionId) ||
+			!this.sharedSessionRelay.isMember(toUserId, sessionId)
+		) {
+			return;
+		}
+		const signal: SignalMessage = {
+			sessionId,
+			fromUserId: identity.userId,
+			toUserId,
+			kind,
+			payload: payload?.payload,
+		};
+		this.broadcastToChannel(`user:${toUserId}`, WsEvent.SHARED_SESSION_SIGNAL, signal);
+	}
+
+	/**
+	 * Relay presence to the whole room (member-gated): the join sync handshake
+	 * (`{request:'sync'}`) so a fresh joiner triggers an immediate controller
+	 * heartbeat, plus live voice/mute/speaking state. Stamped with the verified
+	 * sender id; never trusts a client-supplied id.
+	 */
+	@SubscribeMessage(WsEvent.SHARED_SESSION_PRESENCE)
+	handleSessionPresence(@ConnectedSocket() client: WebSocket, @MessageBody() data: unknown) {
+		const identity = this.getIdentity(client);
+		if (!identity || !this.sharedSessionRelay) return;
+		const payload = data as { sessionId?: string } | undefined;
+		const sessionId = payload?.sessionId;
+		if (typeof sessionId !== 'string') return;
+		if (!this.sharedSessionRelay.isMember(identity.userId, sessionId)) return;
+		this.broadcastToChannel(`session:${sessionId}`, WsEvent.SHARED_SESSION_PRESENCE, {
+			...(payload as object),
+			fromUserId: identity.userId,
+		});
 	}
 }

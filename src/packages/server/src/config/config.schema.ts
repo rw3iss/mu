@@ -237,5 +237,29 @@ export const configSchema = z.object({
 		})
 		.default(() => ({}) as any),
 
+	/**
+	 * Self-hosted coTURN for Shared Sessions (watch-party) WebRTC voice.
+	 * Disabled by default — voice still works for same-LAN / friendly-NAT peers
+	 * via STUN, and clients always get the public Google STUN fallback. When
+	 * enabled, `GET /shared-sessions/ice-config` returns TURN with short-lived
+	 * HMAC credentials (coTURN `use-auth-secret`). Set up via
+	 * `scripts/coturn-setup.sh`. Secrets live in config.yml (not committed).
+	 */
+	turn: z
+		.object({
+			enabled: z.boolean().default(false),
+			/** Public host/IP peers reach coTURN at (also the advertised relay). */
+			publicHost: z.string().default(''),
+			/** coTURN `static-auth-secret` — shared HMAC secret (runtime secret). */
+			secret: z.string().default(''),
+			/** coTURN realm (e.g. the public host). */
+			realm: z.string().default(''),
+			/** Bounded UDP relay port range, e.g. `49160-49200`. */
+			relayPortRange: z.string().default('49160-49200'),
+			/** Extra STUN URLs to advertise, ahead of the public fallback. */
+			stunUrls: z.array(z.string()).default([]),
+		})
+		.default(() => ({}) as any),
+
 	dataDir: z.string().default('../../data'),
 });

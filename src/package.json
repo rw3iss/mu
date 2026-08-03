@@ -40,6 +40,7 @@
     "deploy": "bash scripts/deploy-fedora.sh",
     "autodeploy": "bash scripts/autodeploy.sh",
     "nginx:setup": "bash scripts/nginx-setup.sh",
+    "coturn:setup": "bash scripts/coturn-setup.sh",
     "setup:service": "bash scripts/setup-service.sh",
     "uninstall": "bash scripts/uninstall.sh",
     "update": "bash scripts/update.sh"

@@ -3,13 +3,16 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Icon } from '@/components/common/Icon';
+import { openInviteModal } from '@/components/player/session/session-ui.state';
 import { moviesService } from '@/services/movies.service';
 import {
 	type MoviePlaylistInfo,
 	type Playlist,
 	playlistsService,
 } from '@/services/playlists.service';
+import { sharedSessionService } from '@/services/shared-session.service';
 import { currentUser } from '@/state/auth.state';
+import { playMovie } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import {
 	notifyError,
@@ -27,6 +30,7 @@ import {
 	removeMovieFromPlaylist,
 } from '@/state/playlists.state';
 import { processingMovieIds } from '@/state/processing.state';
+import { activeSession } from '@/state/shared-session.state';
 import {
 	ensureWatchlistLoaded,
 	isInWatchlist as isInWatchlistSync,
@@ -382,6 +386,26 @@ export function MovieOptionsMenu({
 		[movie, onMovieUpdate, setOpen, watchlistPending],
 	);
 
+	const handleStartSharedSession = useCallback(
+		async (e: Event) => {
+			e.stopPropagation();
+			setOpen(false);
+			if (activeSession.value) {
+				notifyError('End your current shared session first');
+				return;
+			}
+			try {
+				// Load the movie into the player, then start the session on it.
+				await playMovie(movie.id);
+				await sharedSessionService.startSession(movie.id);
+				openInviteModal();
+			} catch {
+				notifyError('Failed to start shared session');
+			}
+		},
+		[movie.id, setOpen],
+	);
+
 	// Helper for the two async-feedback actions (rescan + refresh
 	// metadata). Their display label cycles through three values
 	// driven by the AsyncActionState; the ✓ glyph stands in for the
@@ -446,6 +470,12 @@ export function MovieOptionsMenu({
 								<Icon name={movie.watched ? 'refresh' : 'check'} />
 							</span>
 							{movie.watched ? 'Mark as Unwatched' : 'Mark as Watched'}
+						</button>
+						<button class={styles.menuItem} onClick={handleStartSharedSession}>
+							<span class={styles.menuIcon}>
+								<Icon name="film" />
+							</span>
+							Start Shared Session
 						</button>
 						<button
 							class={styles.menuItem}

@@ -5,6 +5,7 @@ import { AudioProfilesModule } from './audio-profiles/audio-profiles.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BookmarksModule } from './bookmarks/bookmarks.module.js';
 import { CacheModule } from './cache/cache.module.js';
+import { CommentsModule } from './comments/comments.module.js';
 import { CommonModule } from './common/common.module.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RequireActionGuard } from './common/guards/require-action.guard.js';
@@ -20,8 +21,6 @@ import { FeedbackModule } from './feedback/feedback.module.js';
 import { FilesystemModule } from './filesystem/filesystem.module.js';
 import { GroupingModule } from './grouping/grouping.module.js';
 import { HealthModule } from './health/health.module.js';
-import { CommentsModule } from './comments/comments.module.js';
-import { NotificationsModule } from './notifications/notifications.module.js';
 import { ImdbDatasetsModule } from './imdb-datasets/imdb-datasets.module.js';
 import { JobModule } from './jobs/job.module.js';
 import { LibraryModule } from './library/library.module.js';
@@ -29,6 +28,7 @@ import { LlmModule } from './llm/llm.module.js';
 import { MediaModule } from './media/media.module.js';
 import { MetadataModule } from './metadata/metadata.module.js';
 import { MoviesModule } from './movies/movies.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { PeopleModule } from './people/people.module.js';
 import { PluginModule } from './plugins/plugin.module.js';
 import { ProfileModule } from './profile/profile.module.js';
@@ -37,11 +37,12 @@ import { RecommendationsModule } from './recommendations/recommendations.module.
 import { RemoteModule } from './remote/remote.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { SearchModule } from './search/search.module.js';
-import { SoundtrackModule } from './soundtrack/soundtrack.module.js';
 import { SeoModule } from './seo/seo.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { ShareLinksModule } from './share-links/share-links.module.js';
+import { SharedSessionsModule } from './shared-sessions/shared-sessions.module.js';
 import { SharingModule } from './sharing/sharing.module.js';
+import { SoundtrackModule } from './soundtrack/soundtrack.module.js';
 import { MemoryCacheModule } from './stream/memory-cache/memory-cache.module.js';
 import { StreamModule } from './stream/stream.module.js';
 import { ThemesModule } from './themes/themes.module.js';
@@ -93,6 +94,7 @@ import { UsersModule } from './users/users.module.js';
 		CommentsModule,
 		NotificationsModule,
 		SoundtrackModule,
+		SharedSessionsModule,
 	],
 	providers: [
 		{

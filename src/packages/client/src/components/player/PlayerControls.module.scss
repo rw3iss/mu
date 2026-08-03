@@ -621,6 +621,26 @@
 	align-items: stretch;
 }
 
+// Chat-unread badge on the in-session toolbar button.
+.sessionBadge {
+	position: absolute;
+	top: 0;
+	right: 0;
+	min-width: 15px;
+	height: 15px;
+	padding: 0 4px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 9px;
+	font-weight: 700;
+	line-height: 1;
+	color: #fff;
+	background: var(--color-accent);
+	border-radius: 999px;
+	pointer-events: none;
+}
+
 // The player popup intentionally stays on a dark surface in both
 // themes — it overlays the video frame, so light-theme text-on-light
 // would lose contrast against the picture. Border, hover and value

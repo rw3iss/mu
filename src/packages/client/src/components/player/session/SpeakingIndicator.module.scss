@@ -1,0 +1,42 @@
+.wrap {
+  position: fixed;
+  bottom: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(15, 15, 15, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--on-dark-overlay-2);
+  border-radius: 999px;
+  box-shadow: var(--shadow-overlay);
+  z-index: calc(var(--z-player-controls) + 4);
+  pointer-events: none;
+  animation: speakingIn 140ms ease;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-accent);
+}
+
+.label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: #fff;
+  white-space: nowrap;
+}
+
+@keyframes speakingIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

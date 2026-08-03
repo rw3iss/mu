@@ -5,6 +5,7 @@ import {
 	type NewTitleData,
 	type NotificationDto,
 	NotificationType,
+	type SharedSessionInviteData,
 } from '@mu/shared';
 
 export interface FormattedNotification {
@@ -52,6 +53,18 @@ export function formatNotification(n: NotificationDto): FormattedNotification {
 			return {
 				message: `New title added: ${r.title}`,
 				href: `/movie/${r.movieId}`,
+				icon: '🎬',
+			};
+		}
+		case NotificationType.SharedSessionInvite: {
+			const r = d as unknown as SharedSessionInviteData;
+			return {
+				message: `${r.hostName} invited you to watch ${r.movieTitle ?? 'a movie'}`,
+				// Clicking routes to the movie; the invite's Accept flow lives in
+				// the shared-session service (bell + flydown both call joinSession).
+				href: `/movie/${r.movieId}`,
+				actorId: r.hostUserId,
+				actorName: r.hostName,
 				icon: '🎬',
 			};
 		}

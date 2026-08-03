@@ -1,0 +1,104 @@
+.menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: rgba(15, 15, 15, 0.97);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--on-dark-overlay-2);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--shadow-overlay);
+  z-index: calc(var(--z-player-controls) + 8);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: var(--font-size-sm);
+  color: var(--on-dark-text-primary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--on-dark-overlay-1);
+  }
+
+  &.danger {
+    color: var(--color-error);
+
+    &:hover {
+      background: rgba(239, 68, 68, 0.14);
+    }
+  }
+}
+
+.itemIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  color: var(--on-dark-text-muted);
+  flex-shrink: 0;
+}
+
+.danger .itemIcon {
+  color: var(--color-error);
+}
+
+.itemLabel {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.itemChevron {
+  display: inline-flex;
+  align-items: center;
+  color: var(--on-dark-text-muted);
+}
+
+.subGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.subMenu {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 2px 26px;
+  padding-left: 6px;
+  border-left: 1px solid var(--on-dark-overlay-2);
+}
+
+.subItem {
+  padding: 7px 10px;
+  font-size: var(--font-size-sm);
+  color: var(--on-dark-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background: var(--on-dark-overlay-1);
+    color: #fff;
+  }
+}
+
+.divider {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--on-dark-overlay-1);
+}

@@ -38,8 +38,10 @@ import '@/state/appearance.state';
 import { audioEngine } from '@/audio/audio-engine';
 import { UploadProgressToast } from '@/components/library/UploadProgressToast';
 import { GlobalPlayer } from '@/components/player/GlobalPlayer';
+import { SessionModals } from '@/components/player/session/SessionModals';
 import { useScanEvents } from '@/hooks/useScanEvents';
 import { pluginClientManager } from '@/plugins/plugin-client-manager';
+import { sharedSessionService } from '@/services/shared-session.service';
 import { socketManager } from '@/services/socket-manager';
 import { wsService } from '@/services/websocket.service';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
@@ -201,6 +203,8 @@ export function App() {
 			void fetchPlaybackSettings();
 			void loadSystemConfig();
 			initNotifications();
+			sharedSessionService.initSharedSessions();
+			void sharedSessionService.hydrate();
 		}
 	}, [isLoading.value, isAuthenticated.value]);
 
@@ -233,6 +237,7 @@ export function App() {
 			<Toast />
 			{!isAuthRoute && <UploadProgressToast />}
 			{!isAuthRoute && <GlobalPlayer />}
+			{!isAuthRoute && <SessionModals />}
 			{isPublicWatch ? (
 				<Router onChange={handleRouteChange}>
 					<PublicWatch path="/watch/:token" />

@@ -12,6 +12,7 @@ import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { shareLinksService } from '@/services/share-links.service';
+import { sharedSessionService } from '@/services/shared-session.service';
 import { subtitlesService } from '@/services/subtitles.service';
 import {
 	compressorEnabled,
@@ -45,6 +46,12 @@ import {
 } from '@/state/player.state';
 import { shareMode } from '@/state/share.state';
 import {
+	activeSession,
+	chatUnread,
+	showSessionMenu,
+	toggleSessionMenu,
+} from '@/state/shared-session.state';
+import {
 	isRecordingSnippet,
 	snippetElapsed,
 	snippetSupported,
@@ -55,6 +62,9 @@ import { copyToClipboard } from '@/utils/clipboard';
 import { timeFromPointer } from '@/utils/seek-time';
 import { VolumeControl, VolumeIcon } from './controls/VolumeControl';
 import styles from './PlayerControls.module.scss';
+import { ChatIcon, PeopleIcon } from './session/SessionIcons';
+import { SessionMenu } from './session/SessionMenu';
+import { openInviteModal } from './session/session-ui.state';
 
 interface PlayerControlsProps {
 	visible: boolean;
@@ -70,6 +80,8 @@ interface PlayerControlsProps {
 	leftSlot?: VNode | null;
 	/** When true, renders in compact split-panel layout */
 	isSplit?: boolean;
+	/** When true (shared session + no control permission), play/skip are disabled. */
+	playbackLocked?: boolean;
 }
 
 function SubtitleSettingsCollapsible() {
@@ -281,6 +293,7 @@ export function PlayerControls({
 	hasMiniThumbnail,
 	leftSlot,
 	isSplit,
+	playbackLocked = false,
 }: PlayerControlsProps) {
 	const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 	const [settingsPanel, setSettingsPanel] = useState<
@@ -847,6 +860,7 @@ export function PlayerControls({
 										>
 											<button
 												class={`${styles.controlBtn} ${styles.skipBtn} ${skipBackOpen ? styles.skipBtnHidden : ''}`}
+												disabled={playbackLocked}
 												onClick={() => {
 													if (isMobile) {
 														// Touch: tap toggles the expanded
@@ -923,6 +937,7 @@ export function PlayerControls({
 										<button
 											class={`${styles.controlBtn} ${styles.playBtn}`}
 											onClick={onTogglePlay}
+											disabled={playbackLocked}
 											aria-label={isPlaying.value ? 'Pause' : 'Play'}
 										>
 											{isPlaying.value ? (
@@ -967,6 +982,7 @@ export function PlayerControls({
 										>
 											<button
 												class={`${styles.controlBtn} ${styles.skipBtn} ${skipFwdOpen ? styles.skipBtnHidden : ''}`}
+												disabled={playbackLocked}
 												onClick={() => {
 													if (isMobile) {
 														const next = !skipFwdOpen;
@@ -1064,6 +1080,28 @@ export function PlayerControls({
 											<rect x="6" y="6" width="12" height="12" rx="2" />
 										</svg>
 									</button>
+								)}
+
+								{/* Shared Session — visible only when in a session.
+								    Sits left of Info; shows a chat-unread badge and
+								    opens the session menu. */}
+								{activeSession.value && (
+									<div class={styles.menuContainer} data-session-menu-anchor>
+										<button
+											class={`${styles.controlBtn} ${showSessionMenu.value ? styles.active : ''}`}
+											onClick={toggleSessionMenu}
+											aria-label="Shared session"
+											title="Shared Session"
+										>
+											<PeopleIcon size={20} />
+											{chatUnread.value > 0 && (
+												<span class={styles.sessionBadge}>
+													{chatUnread.value > 9 ? '9+' : chatUnread.value}
+												</span>
+											)}
+										</button>
+										{showSessionMenu.value && <SessionMenu />}
+									</div>
 								)}
 
 								{/* Info — hidden in split mode (info shown inline) */}
@@ -1242,6 +1280,32 @@ export function PlayerControls({
 															</span>
 														</button>
 													)}
+
+													{globalMovieId.value &&
+														!activeSession.value && (
+															<button
+																class={styles.menuRow}
+																onClick={() => {
+																	setShowSettingsMenu(false);
+																	void sharedSessionService
+																		.startSession(
+																			globalMovieId.value!,
+																		)
+																		.then(() =>
+																			openInviteModal(),
+																		)
+																		.catch(() =>
+																			notifyError(
+																				'Failed to start shared session.',
+																			),
+																		);
+																}}
+															>
+																<span class={styles.menuRowLabel}>
+																	Start Shared Session
+																</span>
+															</button>
+														)}
 
 													{(session?.audioTracks?.length ?? 0) > 1 && (
 														<button
@@ -1583,8 +1647,22 @@ export function PlayerControls({
 											</svg>
 										</button>
 
+										{showSessionMenu.value && <SessionMenu />}
 										{showMobileOverflow && (
 											<div class={styles.mobileOverflowMenu} role="menu">
+												{activeSession.value && (
+													<button
+														type="button"
+														class={`${styles.mobileOverflowItem} ${showSessionMenu.value ? styles.mobileOverflowItemActive : ''}`}
+														onClick={() => {
+															setShowMobileOverflow(false);
+															toggleSessionMenu();
+														}}
+													>
+														<ChatIcon size={18} />
+														<span>Session</span>
+													</button>
+												)}
 												<button
 													type="button"
 													class={styles.mobileOverflowItem}

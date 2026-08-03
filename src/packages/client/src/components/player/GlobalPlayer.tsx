@@ -3,6 +3,7 @@ import { audioEngine } from '@/audio/audio-engine';
 import { Spinner } from '@/components/common/Spinner';
 import { useSubtitleSettings } from '@/components/movie/SubtitleAppearance';
 import { getUiSetting } from '@/hooks/useUiSetting';
+import { sharedSessionService } from '@/services/shared-session.service';
 import { streamService } from '@/services/stream.service';
 import {
 	closeEffectsPanel,
@@ -45,12 +46,24 @@ import {
 	volume,
 } from '@/state/player.state';
 import { shareMode } from '@/state/share.state';
+import {
+	activeSession,
+	canControlPlayback,
+	canSeekPlayback,
+	closeSessionMenu,
+	closeSessionSettingsPanel,
+	closeVoicePanel,
+	showSessionMenu,
+	showSessionSettingsPanel,
+	showVoicePanel,
+} from '@/state/shared-session.state';
 import { setSharedVideoEngine } from '@/state/videoEngineRef';
 import { EffectsPanel } from './EffectsPanel';
 import styles from './GlobalPlayer.module.scss';
 import { InfoPanel } from './InfoPanel';
 import { PlayerControls } from './PlayerControls';
 import { SnippetDialog } from './SnippetDialog';
+import { SessionOverlays } from './session/SessionOverlays';
 import { useVideoEngine } from './useVideoEngine';
 import { VideoEnhancer } from './VideoEnhancer';
 
@@ -83,6 +96,32 @@ export function GlobalPlayer() {
 			if (playerSeek.current === engine.seek) playerSeek.current = null;
 		};
 	}, [engine.seek]);
+
+	// Shared-session play/pause + seek interception. With NO active session these
+	// are byte-for-byte the original engine calls; in a session they gate on the
+	// user's permission and broadcast the action to the party (the service's
+	// echo-guard + applyingRemote flag prevent feedback loops).
+	const handleTogglePlay = useCallback(() => {
+		if (activeSession.value && !canControlPlayback.value) return;
+		if (activeSession.value) {
+			sharedSessionService.broadcastLocalCommand(
+				isPlaying.value ? 'pause' : 'play',
+				currentTime.value,
+			);
+		}
+		engine.togglePlay();
+	}, [engine]);
+
+	const handleSessionSeek = useCallback(
+		(t: number) => {
+			if (activeSession.value) {
+				if (!canSeekPlayback.value) return;
+				sharedSessionService.broadcastLocalCommand('seek', t);
+			}
+			engine.seek(t);
+		},
+		[engine],
+	);
 	const [_isInitializing, setIsInitializing] = useState(false);
 	const [preparingMessage, setPreparingMessage] = useState<string | null>(null);
 	const playbackInitRef = useRef(false);
@@ -154,7 +193,7 @@ export function GlobalPlayer() {
 			if (playerMode.value === 'hidden') return;
 			if (e.key === ' ') {
 				e.preventDefault();
-				engine.togglePlay();
+				handleTogglePlay();
 			} else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
 				e.preventDefault();
 				const skipTimes = getUiSetting<number[]>('skip_times', [5, 10, 20]);
@@ -189,7 +228,7 @@ export function GlobalPlayer() {
 		}
 		document.addEventListener('keydown', handleGlobalKeyDown);
 		return () => document.removeEventListener('keydown', handleGlobalKeyDown);
-	}, [engine]);
+	}, [engine, handleTogglePlay]);
 
 	// When mode changes or a new movie starts, handle stream initialization.
 	// ALWAYS init paused, then restore play state from localStorage after.
@@ -335,7 +374,7 @@ export function GlobalPlayer() {
 				if (e.detail === 1) {
 					videoClickTimerRef.current = setTimeout(() => {
 						videoClickTimerRef.current = null;
-						engine.togglePlay();
+						handleTogglePlay();
 					}, 250);
 				}
 			};
@@ -372,7 +411,7 @@ export function GlobalPlayer() {
 				wrapper.removeEventListener('wheel', handleWheel);
 			};
 		}
-	}, [engine.videoRef.current, isPlayerActive.value, playerMode.value]);
+	}, [engine.videoRef.current, isPlayerActive.value, playerMode.value, handleTogglePlay]);
 
 	// Session heartbeat — keeps the server session alive during pause
 	useEffect(() => {
@@ -730,6 +769,24 @@ export function GlobalPlayer() {
 			if (showInfoPanel.value && !clickedPanel) {
 				showInfoPanel.value = false;
 			}
+			// Close the session menu if the click missed it + its anchor.
+			if (
+				showSessionMenu.value &&
+				!target.closest('[data-session-menu]') &&
+				!target.closest('[data-session-menu-anchor]')
+			) {
+				closeSessionMenu();
+			}
+			// Close the session settings panel when clicking outside it.
+			if (showSessionSettingsPanel.value) {
+				const el = document.querySelector('[data-session-settings-panel]');
+				if (!el?.contains(target)) closeSessionSettingsPanel();
+			}
+			// Close the voice panel when clicking outside it.
+			if (showVoicePanel.value) {
+				const el = document.querySelector('[data-voice-panel]');
+				if (!el?.contains(target)) closeVoicePanel();
+			}
 		};
 		document.addEventListener('mousedown', handleGlobalClick);
 		return () => document.removeEventListener('mousedown', handleGlobalClick);
@@ -958,12 +1015,15 @@ export function GlobalPlayer() {
 							// the video. Normal split mode keeps controls always visible.
 							visible={!isExclusive || showControls.value}
 							isSplit
-							onTogglePlay={engine.togglePlay}
-							onSeek={engine.seek}
+							onTogglePlay={handleTogglePlay}
+							onSeek={handleSessionSeek}
 							onToggleFullscreen={handleToggleFullscreen}
 							onToggleInfo={handleToggleInfo}
 							session={currentSession.value}
 							title={movie?.title}
+							playbackLocked={
+								activeSession.value != null && !canControlPlayback.value
+							}
 						/>
 					</div>
 
@@ -1210,6 +1270,11 @@ export function GlobalPlayer() {
 			{/* Effects panel — full/mini mode only (split has its own) */}
 			{!isSplit && <EffectsPanel />}
 
+			{/* Shared Sessions overlays — panels, modals, chat, speaking
+			    indicator. Each self-gates; inert when there's no session. All
+			    are fixed/portal-positioned so a single mount covers all modes. */}
+			<SessionOverlays />
+
 			{/* Bottom bar — full/mini mode only (split has inline controls) */}
 			{!isSplit && (
 				<div
@@ -1223,14 +1288,15 @@ export function GlobalPlayer() {
 				>
 					<PlayerControls
 						visible={barVisible}
-						onTogglePlay={engine.togglePlay}
-						onSeek={engine.seek}
+						onTogglePlay={handleTogglePlay}
+						onSeek={handleSessionSeek}
 						onToggleFullscreen={handleToggleFullscreen}
 						onToggleInfo={handleToggleInfo}
 						session={currentSession.value}
 						title={movie?.title}
 						hasMiniThumbnail={isMini}
 						leftSlot={isMini ? <div class={styles.miniSpacer} /> : null}
+						playbackLocked={activeSession.value != null && !canControlPlayback.value}
 					/>
 				</div>
 			)}

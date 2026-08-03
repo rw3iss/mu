@@ -88,6 +88,10 @@ export function initNotifications(): void {
 		// notifications respects the user's Notifications setting.
 		const isComment = n.type === 'comment-reply' || n.type === 'comment-reaction';
 		if (isComment && !shouldNotifyComments()) return;
+		// Shared-session invites get their own richer flydown (with an Accept
+		// action) from shared-session.service — skip the generic toast here so
+		// the invite isn't double-toasted. It still lands in the bell panel above.
+		if (n.type === 'shared-session-invite') return;
 		const f = formatNotification(n);
 		notifyInfo(`${f.icon ? `${f.icon} ` : ''}${f.message}`, 6000);
 	});
