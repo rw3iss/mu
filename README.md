@@ -4,6 +4,21 @@
 
 Stream your local movie collection to any device, fetch metadata and ratings automatically, share your library with others, and manage everything from a single server you control.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="33%"><a href=".github/screenshots/dashboard.png"><img src=".github/screenshots/dashboard.png" alt="Dashboard with persistent overlay player" /></a><br/><sub><b>Dashboard</b> — continue watching, trending, and the overlay player</sub></td>
+    <td width="33%"><a href=".github/screenshots/movie-detail.png"><img src=".github/screenshots/movie-detail.png" alt="Movie detail page" /></a><br/><sub><b>Movie detail</b> — metadata, ratings, trailer, and cast</sub></td>
+    <td width="33%"><a href=".github/screenshots/player-audio-effects.png"><img src=".github/screenshots/player-audio-effects.png" alt="Player with audio effects" /></a><br/><sub><b>Audio effects</b> — parametric EQ &amp; dynamic-range compressor</sub></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href=".github/screenshots/discover.png"><img src=".github/screenshots/discover.png" alt="Discover recommendations" /></a><br/><sub><b>Discover</b> — personalized recommendations from your taste profile</sub></td>
+    <td width="33%"><a href=".github/screenshots/favorites.png"><img src=".github/screenshots/favorites.png" alt="Favorites" /></a><br/><sub><b>Favorites</b> — star cast, directors, and movies</sub></td>
+    <td width="33%"><a href=".github/screenshots/settings.png"><img src=".github/screenshots/settings.png" alt="Settings" /></a><br/><sub><b>Settings</b> — playback, encoding, and watch tracking</sub></td>
+  </tr>
+</table>
+
 ---
 
 ## Features
