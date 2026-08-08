@@ -601,7 +601,9 @@ export class MetadataService {
 	 * normal ingest truncates to 20). Uses the cached details call, replaces
 	 * movie_metadata.cast with the full list, and returns it.
 	 */
-	async fetchFullCast(movieId: string): Promise<
+	async fetchFullCast(
+		movieId: string,
+	): Promise<
 		Array<{ name: string; character: string; profileUrl: string | null; tmdbId: number }>
 	> {
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
@@ -652,6 +654,12 @@ export class MetadataService {
 			imdbId: opts.imdbId ?? null,
 			priorYear: movie.year ?? null,
 			overwriteTitle: true,
+			// A manual "Select" in the metadata modal is an explicit choice to
+			// replace this movie's metadata with the picked match — not an
+			// additive refresh. Without this, re-selecting a different match is
+			// a near no-op: the merge engine's same-source (tmdb-vs-tmdb)
+			// precedence ties keep the old scalars and union the arrays.
+			replace: true,
 		});
 		if (result) {
 			this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'metadata-assign' });
@@ -667,6 +675,10 @@ export class MetadataService {
 		/** When true, write the merged title back too (user-triggered refresh).
 		 * Off by default so background fetches never clobber a manual title. */
 		overwriteTitle?: boolean;
+		/** When true, ignore the existing metadata and populate every field
+		 * fresh from the incoming contributions (explicit user match-select).
+		 * Off by default so refreshes stay additive/precedence-gated. */
+		replace?: boolean;
 	}): Promise<any> {
 		const { movieId, priorYear } = opts;
 		let { tmdbId, imdbId } = opts;
@@ -745,42 +757,80 @@ export class MetadataService {
 			.where(eq(movies.id, movieId))
 			.get();
 
-		const existingProvenance: ProvenanceMap = existingMeta?.provenance
-			? safeJsonParse(existingMeta.provenance)
-			: {};
+		// In replace mode the picked match is authoritative: start from empty
+		// provenance/record so every incoming field is a "first-set" write
+		// (scalars overwrite, arrays become just the new match's values rather
+		// than unioning with the old cast/genres).
+		const existingProvenance: ProvenanceMap = opts.replace
+			? {}
+			: existingMeta?.provenance
+				? safeJsonParse(existingMeta.provenance)
+				: {};
 
 		// Build the existing canonical record from BOTH movies hot
 		// columns AND movie_metadata so engine sees the full picture.
-		const existingCanonical = {
-			title: existingMovieRow?.title ?? null,
-			originalTitle: existingMovieRow?.originalTitle ?? null,
-			year: existingMovieRow?.year ?? priorYear ?? null,
-			overview: existingMovieRow?.overview ?? null,
-			tmdbId: existingMovieRow?.tmdbId ?? null,
-			imdbId: existingMovieRow?.imdbId ?? null,
-			posterUrl: existingMovieRow?.posterUrl ?? null,
-			backdropUrl: existingMovieRow?.backdropUrl ?? null,
-			trailerUrl: existingMovieRow?.trailerUrl ?? null,
-			releaseDate: existingMovieRow?.releaseDate ?? null,
-			runtimeMinutes: existingMovieRow?.runtimeMinutes ?? null,
-			language: existingMovieRow?.language ?? null,
-			country: existingMovieRow?.country ?? null,
-			contentRating: existingMovieRow?.contentRating ?? null,
-			genres: safeJsonParse(existingMeta?.genres) ?? [],
-			cast: safeJsonParse(existingMeta?.cast) ?? [],
-			directors: safeJsonParse(existingMeta?.directors) ?? [],
-			writers: safeJsonParse(existingMeta?.writers) ?? [],
-			keywords: safeJsonParse(existingMeta?.keywords) ?? [],
-			productionCompanies: safeJsonParse(existingMeta?.productionCompanies) ?? [],
-			budget: existingMeta?.budget ?? null,
-			revenue: existingMeta?.revenue ?? null,
-			imdbRating: existingMeta?.imdbRating ?? null,
-			imdbVotes: existingMeta?.imdbVotes ?? null,
-			tmdbRating: existingMeta?.tmdbRating ?? null,
-			tmdbVotes: existingMeta?.tmdbVotes ?? null,
-			rottenTomatoesScore: existingMeta?.rottenTomatoesScore ?? null,
-			metacriticScore: existingMeta?.metacriticScore ?? null,
-		};
+		// (Empty when replacing — see above.)
+		const existingCanonical = opts.replace
+			? {
+					title: null,
+					originalTitle: null,
+					year: null,
+					overview: null,
+					tmdbId: null,
+					imdbId: null,
+					posterUrl: null,
+					backdropUrl: null,
+					trailerUrl: null,
+					releaseDate: null,
+					runtimeMinutes: null,
+					language: null,
+					country: null,
+					contentRating: null,
+					genres: [],
+					cast: [],
+					directors: [],
+					writers: [],
+					keywords: [],
+					productionCompanies: [],
+					budget: null,
+					revenue: null,
+					imdbRating: null,
+					imdbVotes: null,
+					tmdbRating: null,
+					tmdbVotes: null,
+					rottenTomatoesScore: null,
+					metacriticScore: null,
+				}
+			: {
+					title: existingMovieRow?.title ?? null,
+					originalTitle: existingMovieRow?.originalTitle ?? null,
+					year: existingMovieRow?.year ?? priorYear ?? null,
+					overview: existingMovieRow?.overview ?? null,
+					tmdbId: existingMovieRow?.tmdbId ?? null,
+					imdbId: existingMovieRow?.imdbId ?? null,
+					posterUrl: existingMovieRow?.posterUrl ?? null,
+					backdropUrl: existingMovieRow?.backdropUrl ?? null,
+					trailerUrl: existingMovieRow?.trailerUrl ?? null,
+					releaseDate: existingMovieRow?.releaseDate ?? null,
+					runtimeMinutes: existingMovieRow?.runtimeMinutes ?? null,
+					language: existingMovieRow?.language ?? null,
+					country: existingMovieRow?.country ?? null,
+					contentRating: existingMovieRow?.contentRating ?? null,
+					genres: safeJsonParse(existingMeta?.genres) ?? [],
+					cast: safeJsonParse(existingMeta?.cast) ?? [],
+					directors: safeJsonParse(existingMeta?.directors) ?? [],
+					writers: safeJsonParse(existingMeta?.writers) ?? [],
+					keywords: safeJsonParse(existingMeta?.keywords) ?? [],
+					productionCompanies: safeJsonParse(existingMeta?.productionCompanies) ?? [],
+					budget: existingMeta?.budget ?? null,
+					revenue: existingMeta?.revenue ?? null,
+					imdbRating: existingMeta?.imdbRating ?? null,
+					imdbVotes: existingMeta?.imdbVotes ?? null,
+					tmdbRating: existingMeta?.tmdbRating ?? null,
+					tmdbVotes: existingMeta?.tmdbVotes ?? null,
+					rottenTomatoesScore: existingMeta?.rottenTomatoesScore ?? null,
+					metacriticScore: existingMeta?.metacriticScore ?? null,
+				};
 
 		const merge = this.mergeEngine.apply(existingCanonical, existingProvenance, contributions);
 		const m = merge.merged;
