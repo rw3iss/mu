@@ -39,13 +39,42 @@ function formatAge(birthday: string | null, deathday: string | null): string | n
 	return deathday ? `Died at ${age}` : `${age} years old`;
 }
 
+type CreditSort = 'year' | 'title' | 'rating' | 'votes';
+const CREDIT_SORTS: readonly CreditSort[] = ['year', 'title', 'rating', 'votes'];
+
+/** Read the "Known for" sort/filter state from the current URL query. */
+function readCreditParams(): { sort: CreditSort; minRating: string; year: string } {
+	const search = typeof window !== 'undefined' ? window.location.search : '';
+	const p = new URLSearchParams(search);
+	const sort = p.get('sort');
+	return {
+		sort: CREDIT_SORTS.includes(sort as CreditSort) ? (sort as CreditSort) : 'year',
+		minRating: p.get('minRating') ?? '',
+		year: p.get('year') ?? '',
+	};
+}
+
 export function PersonDetail({ id }: PersonDetailProps) {
 	const [person, setPerson] = useState<PersonView | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
-	const [creditSort, setCreditSort] = useState<'year' | 'title' | 'rating' | 'votes'>('year');
-	const [creditMinRating, setCreditMinRating] = useState('');
+	const [creditSort, setCreditSort] = useState<CreditSort>(() => readCreditParams().sort);
+	const [creditMinRating, setCreditMinRating] = useState(() => readCreditParams().minRating);
+	const [creditYear, setCreditYear] = useState(() => readCreditParams().year);
 	const [error, setError] = useState<string | null>(null);
 	const [showFullBio, setShowFullBio] = useState(false);
+
+	// Mirror the sort/filter state into the URL (replace — don't spam
+	// history), so it restores on refresh and when returning via Back
+	// after visiting one of the credit results.
+	const writeCreditParams = (sort: CreditSort, minRating: string, year: string) => {
+		const p = new URLSearchParams();
+		if (sort !== 'year') p.set('sort', sort);
+		if (minRating) p.set('minRating', minRating);
+		if (year) p.set('year', year);
+		const qs = p.toString();
+		const next = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+		if (next !== window.location.pathname + window.location.search) route(next, true);
+	};
 
 	useSeo(
 		person
@@ -83,6 +112,16 @@ export function PersonDetail({ id }: PersonDetailProps) {
 			.finally(() => setIsLoading(false));
 	}, [id]);
 
+	// The router reuses this component across /person/:id changes, so
+	// re-read the sort/filter state from the (new) URL when the person
+	// changes — otherwise the previous person's filters would carry over.
+	useEffect(() => {
+		const p = readCreditParams();
+		setCreditSort(p.sort);
+		setCreditMinRating(p.minRating);
+		setCreditYear(p.year);
+	}, [id]);
+
 	if (isLoading) return <PersonSkeleton />;
 
 	if (error || !person) {
@@ -101,11 +140,28 @@ export function PersonDetail({ id }: PersonDetailProps) {
 
 	// Rating used for sort + filter: prefer IMDB (owned), else TMDB.
 	const ratingOf = (c: PersonView['knownForMovies'][number]) => c.imdbRating ?? c.tmdbRating ?? 0;
+
+	// Distinct years present in the credits, newest first, for the filter.
+	const yearOptions = useMemo(() => {
+		const years = new Set<number>();
+		for (const c of person.knownForMovies) if (c.year) years.add(c.year);
+		return [
+			{ value: '', label: 'All Years' },
+			...[...years]
+				.sort((a, b) => b - a)
+				.map((y) => ({ value: String(y), label: String(y) })),
+		];
+	}, [person.knownForMovies]);
+
 	const visibleCredits = useMemo(() => {
 		const min = parseFloat(creditMinRating);
 		let list = person.knownForMovies;
 		if (Number.isFinite(min) && min > 0) {
 			list = list.filter((c) => ratingOf(c) >= min);
+		}
+		if (creditYear) {
+			const y = parseInt(creditYear, 10);
+			if (Number.isFinite(y)) list = list.filter((c) => c.year === y);
 		}
 		const sorted = [...list];
 		sorted.sort((a, b) => {
@@ -121,7 +177,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 			}
 		});
 		return sorted;
-	}, [person.knownForMovies, creditSort, creditMinRating]);
+	}, [person.knownForMovies, creditSort, creditMinRating, creditYear]);
 
 	return (
 		<div class={styles.personDetail}>
@@ -188,18 +244,38 @@ export function PersonDetail({ id }: PersonDetailProps) {
 					<div class={styles.creditsHeader}>
 						<h2 class={styles.sectionTitle}>Known for</h2>
 						<div class={styles.creditsControls}>
-							<Select
-								value={creditSort}
-								onChange={(v) =>
-									setCreditSort(v as 'year' | 'title' | 'rating' | 'votes')
-								}
-								options={[
-									{ value: 'year', label: 'Year' },
-									{ value: 'title', label: 'Title' },
-									{ value: 'rating', label: 'Rating' },
-									{ value: 'votes', label: 'Votes' },
-								]}
-							/>
+							<span class={styles.controlGroup}>
+								<span class={styles.controlLabelText}>Sort</span>
+								<Select
+									value={creditSort}
+									onChange={(v) => {
+										const s = v as CreditSort;
+										setCreditSort(s);
+										writeCreditParams(s, creditMinRating, creditYear);
+									}}
+									options={[
+										{ value: 'year', label: 'Year' },
+										{ value: 'title', label: 'Title' },
+										{ value: 'rating', label: 'Rating' },
+										{ value: 'votes', label: 'Votes' },
+									]}
+									aria-label="Sort credits by"
+								/>
+							</span>
+							<span class={styles.controlGroup}>
+								<span class={styles.controlLabelText}>Year</span>
+								<Select
+									value={creditYear}
+									onChange={(v) => {
+										const y = String(v);
+										setCreditYear(y);
+										writeCreditParams(creditSort, creditMinRating, y);
+									}}
+									options={yearOptions}
+									menuAlign="end"
+									aria-label="Filter credits by year"
+								/>
+							</span>
 							<input
 								type="number"
 								class={styles.minRatingInput}
@@ -208,9 +284,12 @@ export function PersonDetail({ id }: PersonDetailProps) {
 								step="0.1"
 								placeholder="Min ★"
 								value={creditMinRating}
-								onInput={(e) =>
-									setCreditMinRating((e.target as HTMLInputElement).value)
-								}
+								aria-label="Minimum rating"
+								onInput={(e) => {
+									const val = (e.target as HTMLInputElement).value;
+									setCreditMinRating(val);
+									writeCreditParams(creditSort, val, creditYear);
+								}}
 							/>
 						</div>
 					</div>

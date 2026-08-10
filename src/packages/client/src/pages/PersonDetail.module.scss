@@ -341,9 +341,22 @@
 .creditsControls {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--space-sm);
+	gap: var(--space-md);
+	flex-wrap: wrap;
 	// Sit a bit further right of the "Known for" title.
 	margin-left: var(--space-md);
+}
+
+.controlGroup {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-xs);
+}
+
+.controlLabelText {
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+	white-space: nowrap;
 }
 
 .minRatingInput {
