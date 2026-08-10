@@ -293,9 +293,7 @@ export class PeopleService {
 	 * rating fields with the local row's (which carries IMDB data the
 	 * TMDB credits payload doesn't). Misses pass through unchanged.
 	 */
-	private enrichCreditsWithLibrary(
-		credits: PersonCreditView[],
-	): PersonCreditView[] {
+	private enrichCreditsWithLibrary(credits: PersonCreditView[]): PersonCreditView[] {
 		const tmdbIds = credits
 			.filter((c) => c.mediaType === 'movie' && typeof c.tmdbId === 'number')
 			.map((c) => c.tmdbId);
@@ -305,6 +303,7 @@ export class PeopleService {
 			.select({
 				id: movies.id,
 				tmdbId: movies.tmdbId,
+				source: movies.source,
 				tmdbRating: movieMetadata.tmdbRating,
 				tmdbVotes: movieMetadata.tmdbVotes,
 				imdbRating: movieMetadata.imdbRating,
@@ -315,12 +314,27 @@ export class PeopleService {
 			.all();
 		if (rows.length === 0) return credits;
 
+		// Only real library rows count as "owned". Bookmark/external stubs
+		// (source !== 'library') share the movies table but are NOT in the
+		// library — the movie detail page treats them as a preview
+		// (isPreview = source != null && source !== 'library'), so the "Known
+		// For" card must match: leaving `movieId` unset shows the "Not in
+		// library" badge and links via the tmdb: key (same stub, read-only).
+		const isLibraryRow = (source: string | null) => source == null || source === 'library';
+
 		const byTmdb = new Map<number, (typeof rows)[number]>();
-		for (const r of rows) if (r.tmdbId != null) byTmdb.set(r.tmdbId, r);
+		for (const r of rows) {
+			if (r.tmdbId == null) continue;
+			const prev = byTmdb.get(r.tmdbId);
+			// Prefer a genuine library row over a stub when both exist.
+			if (!prev || (isLibraryRow(r.source) && !isLibraryRow(prev.source))) {
+				byTmdb.set(r.tmdbId, r);
+			}
+		}
 
 		return credits.map((c) => {
 			const hit = c.tmdbId != null ? byTmdb.get(c.tmdbId) : undefined;
-			if (!hit) return c;
+			if (!hit || !isLibraryRow(hit.source)) return c;
 			return {
 				...c,
 				movieId: hit.id,
@@ -440,8 +454,7 @@ export class PeopleService {
 		const all: PersonCreditView[] = [];
 		const ratingOf = (v?: number) =>
 			typeof v === 'number' && v > 0 ? Math.round(v * 10) / 10 : null;
-		const votesOf = (v?: number) =>
-			typeof v === 'number' && v > 0 ? v : null;
+		const votesOf = (v?: number) => (typeof v === 'number' && v > 0 ? v : null);
 		for (const c of credits.cast ?? []) {
 			if (!c.id) continue;
 			all.push({
