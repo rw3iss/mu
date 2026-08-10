@@ -49,7 +49,26 @@ export class SubtitleManageController {
 		}
 
 		const file = await this.tracksRepo.getAvailableMovieFile(movieId);
-		const tracks = this.tracksRepo.parseTracks(file.subtitleTracks);
+		let tracks = this.tracksRepo.parseTracks(file.subtitleTracks);
+
+		// Self-heal: the persisted list is empty for movies whose sidecar /
+		// embedded subtitles were never written at scan time — yet the player
+		// live-probes every session (stream.service extractSubtitles) and shows
+		// them, so the Manage panel would look empty while playback has tracks.
+		// Probe once and persist so both agree (mirrors setDefault below, and
+		// stabilises indices for delete / set-default).
+		if (tracks.length === 0) {
+			try {
+				const live = await this.subtitleService.extractSubtitles(file.filePath, file.id);
+				if (live.length > 0) {
+					await this.tracksRepo.setTracks(file.id, live);
+					tracks = this.tracksRepo.getPersistedTracks(file.id);
+				}
+			} catch {
+				// Fall through with the (empty) persisted list.
+			}
+		}
+
 		return {
 			subtitles: tracks.map((t) => ({
 				index: t.index,
@@ -336,9 +355,7 @@ export class SubtitleManageController {
 			// Every downloaded (external) track that isn't the default — including
 			// same-language duplicates, which we can now delete precisely by their
 			// own filename without touching the default.
-			const toRemove = tracks.filter(
-				(t) => (t.external ?? false) && t.index !== def.index,
-			);
+			const toRemove = tracks.filter((t) => (t.external ?? false) && t.index !== def.index);
 			if (toRemove.length === 0) continue;
 
 			const dir = path.dirname(file.filePath);
@@ -369,12 +386,14 @@ export class SubtitleManageController {
 				const match =
 					rebuilt.find(
 						(t) =>
-							(t.external ?? false) === defExternal &&
-							(t.language || '') === defLang,
+							(t.external ?? false) === defExternal && (t.language || '') === defLang,
 					) ?? null;
 				await this.tracksRepo.setTracks(
 					file.id,
-					rebuilt.map((t) => ({ ...t, default: match ? t.index === match.index : false })),
+					rebuilt.map((t) => ({
+						...t,
+						default: match ? t.index === match.index : false,
+					})),
 				);
 			} else {
 				const removeIdx = new Set(toRemove.map((t) => t.index));
