@@ -248,7 +248,6 @@ export function SubtitlePanel({
 									{t.label}
 								</span>
 								{t.default && <span class={styles.badgeDefault}>Default</span>}
-								{t.external && <span class={styles.badge}>External</span>}
 								{t.forced && <span class={styles.badge}>Forced</span>}
 								{t.codec && (
 									<span class={styles.badgeMuted}>{t.codec.toUpperCase()}</span>
@@ -397,7 +396,11 @@ export function SubtitlePanel({
 						{filteredResults.length > 0 && (
 							<div class={styles.resultsList} ref={resultsRef}>
 								{filteredResults.map((r) => (
-									<div key={r.fileId} class={styles.resultItem}>
+									<div
+										key={r.fileId}
+										class={styles.resultItem}
+										title={r.releaseName || r.label}
+									>
 										<div class={styles.resultInfo}>
 											<div class={styles.resultTopRow}>
 												<span class={styles.resultLang}>

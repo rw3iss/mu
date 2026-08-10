@@ -38,6 +38,11 @@
   display: flex;
   flex-direction: column;
   padding: 4px 0;
+  // Bound the list so a long set of downloaded subtitles scrolls in place
+  // instead of overflowing (and getting clipped by) the player popover.
+  // vh-capped so it never grows past a small mobile window.
+  max-height: min(260px, 40vh);
+  overflow-y: auto;
 }
 
 .trackItem {

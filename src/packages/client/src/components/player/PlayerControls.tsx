@@ -364,7 +364,13 @@ export function PlayerControls({
 	useEffect(() => {
 		if (!showSettingsMenu) return;
 		function handleClick(e: MouseEvent) {
-			if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+			const target = e.target as HTMLElement;
+			// Ignore clicks inside a portaled dialog (e.g. the delete-subtitle
+			// confirm modal), which renders under document.body via a portal —
+			// outside settingsRef. Without this, mousedown on the dialog tears
+			// the menu (and the dialog) down before its click handler runs.
+			if (target.closest?.('[role="dialog"]')) return;
+			if (settingsRef.current && !settingsRef.current.contains(target as Node)) {
 				setShowSettingsMenu(false);
 				setSettingsPanel('main');
 			}
@@ -377,10 +383,10 @@ export function PlayerControls({
 	useEffect(() => {
 		if (!showMobileOverflow) return;
 		function handleClick(e: MouseEvent) {
-			if (
-				mobileOverflowRef.current &&
-				!mobileOverflowRef.current.contains(e.target as Node)
-			) {
+			const target = e.target as HTMLElement;
+			// Same portal guard as the settings menu above.
+			if (target.closest?.('[role="dialog"]')) return;
+			if (mobileOverflowRef.current && !mobileOverflowRef.current.contains(target as Node)) {
 				setShowMobileOverflow(false);
 			}
 		}
