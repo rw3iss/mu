@@ -42,15 +42,30 @@ function formatAge(birthday: string | null, deathday: string | null): string | n
 type CreditSort = 'year' | 'title' | 'rating' | 'votes';
 const CREDIT_SORTS: readonly CreditSort[] = ['year', 'title', 'rating', 'votes'];
 
+// TMDB's combined-credits endpoint only distinguishes movie vs TV at the
+// title level (there's no "short"/"documentary" *type* — those are genres),
+// so the Type filter reflects that media_type.
+type CreditType = 'all' | 'movie' | 'tv';
+const CREDIT_TYPES: readonly CreditType[] = ['all', 'movie', 'tv'];
+
+interface CreditParams {
+	sort: CreditSort;
+	minRating: string;
+	minVotes: string;
+	type: CreditType;
+}
+
 /** Read the "Known for" sort/filter state from the current URL query. */
-function readCreditParams(): { sort: CreditSort; minRating: string; year: string } {
+function readCreditParams(): CreditParams {
 	const search = typeof window !== 'undefined' ? window.location.search : '';
 	const p = new URLSearchParams(search);
 	const sort = p.get('sort');
+	const type = p.get('type');
 	return {
 		sort: CREDIT_SORTS.includes(sort as CreditSort) ? (sort as CreditSort) : 'year',
 		minRating: p.get('minRating') ?? '',
-		year: p.get('year') ?? '',
+		minVotes: p.get('minVotes') ?? '',
+		type: CREDIT_TYPES.includes(type as CreditType) ? (type as CreditType) : 'all',
 	};
 }
 
@@ -59,19 +74,21 @@ export function PersonDetail({ id }: PersonDetailProps) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [creditSort, setCreditSort] = useState<CreditSort>(() => readCreditParams().sort);
 	const [creditMinRating, setCreditMinRating] = useState(() => readCreditParams().minRating);
-	const [creditYear, setCreditYear] = useState(() => readCreditParams().year);
+	const [creditMinVotes, setCreditMinVotes] = useState(() => readCreditParams().minVotes);
+	const [creditType, setCreditType] = useState<CreditType>(() => readCreditParams().type);
 	const [error, setError] = useState<string | null>(null);
 	const [showFullBio, setShowFullBio] = useState(false);
 
 	// Mirror the sort/filter state into the URL (replace — don't spam
 	// history), so it restores on refresh and when returning via Back
 	// after visiting one of the credit results.
-	const writeCreditParams = (sort: CreditSort, minRating: string, year: string) => {
-		const p = new URLSearchParams();
-		if (sort !== 'year') p.set('sort', sort);
-		if (minRating) p.set('minRating', minRating);
-		if (year) p.set('year', year);
-		const qs = p.toString();
+	const writeCreditParams = (p: CreditParams) => {
+		const q = new URLSearchParams();
+		if (p.sort !== 'year') q.set('sort', p.sort);
+		if (p.minRating) q.set('minRating', p.minRating);
+		if (p.minVotes) q.set('minVotes', p.minVotes);
+		if (p.type !== 'all') q.set('type', p.type);
+		const qs = q.toString();
 		const next = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
 		if (next !== window.location.pathname + window.location.search) route(next, true);
 	};
@@ -119,7 +136,8 @@ export function PersonDetail({ id }: PersonDetailProps) {
 		const p = readCreditParams();
 		setCreditSort(p.sort);
 		setCreditMinRating(p.minRating);
-		setCreditYear(p.year);
+		setCreditMinVotes(p.minVotes);
+		setCreditType(p.type);
 	}, [id]);
 
 	if (isLoading) return <PersonSkeleton />;
@@ -141,27 +159,18 @@ export function PersonDetail({ id }: PersonDetailProps) {
 	// Rating used for sort + filter: prefer IMDB (owned), else TMDB.
 	const ratingOf = (c: PersonView['knownForMovies'][number]) => c.imdbRating ?? c.tmdbRating ?? 0;
 
-	// Distinct years present in the credits, newest first, for the filter.
-	const yearOptions = useMemo(() => {
-		const years = new Set<number>();
-		for (const c of person.knownForMovies) if (c.year) years.add(c.year);
-		return [
-			{ value: '', label: 'All Years' },
-			...[...years]
-				.sort((a, b) => b - a)
-				.map((y) => ({ value: String(y), label: String(y) })),
-		];
-	}, [person.knownForMovies]);
-
 	const visibleCredits = useMemo(() => {
-		const min = parseFloat(creditMinRating);
+		const minRating = parseFloat(creditMinRating);
+		const minVotes = parseInt(creditMinVotes, 10);
 		let list = person.knownForMovies;
-		if (Number.isFinite(min) && min > 0) {
-			list = list.filter((c) => ratingOf(c) >= min);
+		if (creditType !== 'all') {
+			list = list.filter((c) => c.mediaType === creditType);
 		}
-		if (creditYear) {
-			const y = parseInt(creditYear, 10);
-			if (Number.isFinite(y)) list = list.filter((c) => c.year === y);
+		if (Number.isFinite(minRating) && minRating > 0) {
+			list = list.filter((c) => ratingOf(c) >= minRating);
+		}
+		if (Number.isFinite(minVotes) && minVotes > 0) {
+			list = list.filter((c) => (c.tmdbVotes ?? 0) >= minVotes);
 		}
 		const sorted = [...list];
 		sorted.sort((a, b) => {
@@ -177,7 +186,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 			}
 		});
 		return sorted;
-	}, [person.knownForMovies, creditSort, creditMinRating, creditYear]);
+	}, [person.knownForMovies, creditSort, creditMinRating, creditMinVotes, creditType]);
 
 	return (
 		<div class={styles.personDetail}>
@@ -251,7 +260,12 @@ export function PersonDetail({ id }: PersonDetailProps) {
 									onChange={(v) => {
 										const s = v as CreditSort;
 										setCreditSort(s);
-										writeCreditParams(s, creditMinRating, creditYear);
+										writeCreditParams({
+											sort: s,
+											minRating: creditMinRating,
+											minVotes: creditMinVotes,
+											type: creditType,
+										});
 									}}
 									options={[
 										{ value: 'year', label: 'Year' },
@@ -263,17 +277,25 @@ export function PersonDetail({ id }: PersonDetailProps) {
 								/>
 							</span>
 							<span class={styles.controlGroup}>
-								<span class={styles.controlLabelText}>Year</span>
+								<span class={styles.controlLabelText}>Type</span>
 								<Select
-									value={creditYear}
+									value={creditType}
 									onChange={(v) => {
-										const y = String(v);
-										setCreditYear(y);
-										writeCreditParams(creditSort, creditMinRating, y);
+										const t = v as CreditType;
+										setCreditType(t);
+										writeCreditParams({
+											sort: creditSort,
+											minRating: creditMinRating,
+											minVotes: creditMinVotes,
+											type: t,
+										});
 									}}
-									options={yearOptions}
-									menuAlign="end"
-									aria-label="Filter credits by year"
+									options={[
+										{ value: 'all', label: 'All Types' },
+										{ value: 'movie', label: 'Movies' },
+										{ value: 'tv', label: 'TV Shows' },
+									]}
+									aria-label="Filter credits by type"
 								/>
 							</span>
 							<input
@@ -288,7 +310,31 @@ export function PersonDetail({ id }: PersonDetailProps) {
 								onInput={(e) => {
 									const val = (e.target as HTMLInputElement).value;
 									setCreditMinRating(val);
-									writeCreditParams(creditSort, val, creditYear);
+									writeCreditParams({
+										sort: creditSort,
+										minRating: val,
+										minVotes: creditMinVotes,
+										type: creditType,
+									});
+								}}
+							/>
+							<input
+								type="number"
+								class={styles.minVotesInput}
+								min="0"
+								step="100"
+								placeholder="Min votes"
+								value={creditMinVotes}
+								aria-label="Minimum votes"
+								onInput={(e) => {
+									const val = (e.target as HTMLInputElement).value;
+									setCreditMinVotes(val);
+									writeCreditParams({
+										sort: creditSort,
+										minRating: creditMinRating,
+										minVotes: val,
+										type: creditType,
+									});
 								}}
 							/>
 						</div>
