@@ -740,6 +740,17 @@ export class MoviesService implements OnModuleInit {
 			? Number.parseInt(details.release_date.slice(0, 4), 10)
 			: null;
 
+		// `getMovieDetails` already appended `videos`, so grab the YouTube
+		// trailer inline — otherwise the trailer wouldn't appear until the
+		// async refresh below finished, so a not-in-library movie's first
+		// visit would show no trailer (same extraction as the tmdb adapter).
+		const trailerVideo = details.videos?.results?.find(
+			(v) => v.site === 'YouTube' && v.type === 'Trailer',
+		);
+		const trailerUrl = trailerVideo
+			? `https://www.youtube.com/watch?v=${trailerVideo.key}`
+			: null;
+
 		this.database.db
 			.insert(movies)
 			.values({
@@ -759,6 +770,7 @@ export class MoviesService implements OnModuleInit {
 				backdropUrl: details.backdrop_path
 					? `https://image.tmdb.org/t/p/original${details.backdrop_path}`
 					: null,
+				trailerUrl,
 				source: 'bookmark',
 				addedAt: now,
 				updatedAt: now,
