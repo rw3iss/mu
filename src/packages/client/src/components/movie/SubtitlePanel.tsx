@@ -1,11 +1,45 @@
 import type { MovieSubtitleInfo, SubtitleSearchResult } from '@mu/shared';
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Icon } from '@/components/common/Icon';
 import { subtitlesService } from '@/services/subtitles.service';
 import { globalMovie } from '@/state/globalPlayer.state';
 import { copyToClipboard } from '@/utils/clipboard';
 import styles from './SubtitlePanel.module.scss';
+
+/**
+ * Client mirror of the server's `SubtitleIngestionService.slugTag` — turns a
+ * release name into the dot-free token embedded in a downloaded sidecar's
+ * filename. Lets us detect which online results are already on disk.
+ */
+function slugTag(raw: string | undefined | null): string {
+	if (!raw) return '';
+	return raw
+		.normalize('NFKD')
+		.replace(/\.(srt|vtt|ass|ssa|sub)$/i, '')
+		.replace(/[^a-zA-Z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '')
+		.slice(0, 40)
+		.toLowerCase();
+}
+
+/**
+ * Drop a redundant leading "<LANG> · " (or "<LANG> (Forced) · ") from a track
+ * label — the row already shows the language in its own chip, so repeating it
+ * before the release name is just noise.
+ */
+function stripLangPrefix(label: string | undefined, language: string | undefined): string {
+	const text = label ?? '';
+	const dot = text.indexOf('·');
+	if (dot === -1) return text;
+	const head = text
+		.slice(0, dot)
+		.replace(/\(forced\)/i, '')
+		.trim()
+		.toUpperCase();
+	const rest = text.slice(dot + 1).trim();
+	return head === (language ?? '').toUpperCase() && rest ? rest : text;
+}
 
 interface SubtitlePanelProps {
 	movieId: string;
@@ -66,7 +100,6 @@ export function SubtitlePanel({
 	// Load the authoritative track list (real DB indices, fileName, default flag)
 	// on mount — the `existingTracks` prop is session-derived and uses array
 	// positions, which don't line up with the indices the server expects.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: run once per movie
 	useEffect(() => {
 		refreshTracks();
 	}, [movieId]);
@@ -203,18 +236,47 @@ export function SubtitlePanel({
 		});
 	}, [fileName]);
 
-	// Filter results by query
-	const filteredResults = filterQuery
-		? searchResults.filter((r) => {
-				const q = filterQuery.toLowerCase();
-				return (
-					(r.releaseName || '').toLowerCase().includes(q) ||
-					(r.language || '').toLowerCase().includes(q) ||
-					(r.label || '').toLowerCase().includes(q) ||
-					(r.format || '').toLowerCase().includes(q)
-				);
-			})
-		: searchResults;
+	// Which online results we already have downloaded — compare the slugified
+	// release name against the stored sidecar filenames (with a loose 2-letter
+	// language match so e.g. an ES download doesn't flag the EN result).
+	const downloadedResultIds = useMemo(() => {
+		const ids = new Set<string>();
+		const dls = tracks
+			.filter((t) => t.external && t.fileName)
+			.map((t) => ({
+				lang: (t.language ?? '').slice(0, 2).toLowerCase(),
+				file: (t.fileName as string).toLowerCase(),
+			}));
+		if (dls.length === 0) return ids;
+		for (const r of searchResults) {
+			const slug = slugTag(r.releaseName || r.label);
+			if (!slug) continue;
+			const rlang = (r.language ?? '').slice(0, 2).toLowerCase();
+			if (dls.some((d) => d.lang === rlang && d.file.includes(slug))) ids.add(r.fileId);
+		}
+		return ids;
+	}, [searchResults, tracks]);
+
+	// Filter: split on commas into AND terms — a result must include EVERY term
+	// (matched across release name / language / label / format) to be shown.
+	const filterTerms = filterQuery
+		.split(',')
+		.map((s) => s.trim().toLowerCase())
+		.filter(Boolean);
+	const filteredResults =
+		filterTerms.length === 0
+			? searchResults
+			: searchResults.filter((r) => {
+					const hay =
+						`${r.releaseName ?? ''} ${r.language ?? ''} ${r.label ?? ''} ${r.format ?? ''}`.toLowerCase();
+					return filterTerms.every((term) => hay.includes(term));
+				});
+
+	// Already-downloaded results float to the top (stable ordering otherwise).
+	const orderedResults = [...filteredResults].sort(
+		(a, b) =>
+			Number(downloadedResultIds.has(b.fileId)) - Number(downloadedResultIds.has(a.fileId)),
+	);
 
 	return (
 		<div class={styles.panel}>
@@ -245,7 +307,7 @@ export function SubtitlePanel({
 									{(t.language || 'und').toUpperCase()}
 								</span>
 								<span class={styles.trackLabel} title={t.fileName || t.label}>
-									{t.label}
+									{stripLangPrefix(t.label, t.language)}
 								</span>
 								{t.default && <span class={styles.badgeDefault}>Default</span>}
 								{t.forced && <span class={styles.badge}>Forced</span>}
@@ -368,7 +430,7 @@ export function SubtitlePanel({
 							<input
 								type="text"
 								class={styles.filterInput}
-								placeholder="Filter results..."
+								placeholder="Filter results (comma = all terms)..."
 								value={filterQuery}
 								onInput={(e) =>
 									setFilterQuery((e.target as HTMLInputElement).value)
@@ -385,7 +447,7 @@ export function SubtitlePanel({
 							)}
 						</div>
 
-						{searchDone && filteredResults.length === 0 && !isSearching && (
+						{searchDone && orderedResults.length === 0 && !isSearching && (
 							<div class={styles.emptyText}>
 								{searchResults.length === 0
 									? 'No subtitles found online'
@@ -393,71 +455,83 @@ export function SubtitlePanel({
 							</div>
 						)}
 
-						{filteredResults.length > 0 && (
+						{orderedResults.length > 0 && (
 							<div class={styles.resultsList} ref={resultsRef}>
-								{filteredResults.map((r) => (
-									<div
-										key={r.fileId}
-										class={styles.resultItem}
-										title={r.releaseName || r.label}
-									>
-										<div class={styles.resultInfo}>
-											<div class={styles.resultTopRow}>
-												<span class={styles.resultLang}>
-													{r.language.toUpperCase()}
-												</span>
-												{r.hashMatch && (
-													<span class={styles.badgeAccent}>
-														Hash Match
+								{orderedResults.map((r) => {
+									const isDownloaded = downloadedResultIds.has(r.fileId);
+									return (
+										<div
+											key={r.fileId}
+											class={`${styles.resultItem} ${isDownloaded ? styles.resultDownloaded : ''}`}
+											title={r.releaseName || r.label}
+										>
+											<div class={styles.resultInfo}>
+												<div class={styles.resultTopRow}>
+													<span class={styles.resultLang}>
+														{r.language.toUpperCase()}
 													</span>
-												)}
-												{r.hearingImpaired && (
-													<span class={styles.badgeMuted}>HI</span>
-												)}
-												{r.format && (
-													<span class={styles.badgeMuted}>
-														{r.format.toUpperCase()}
-													</span>
-												)}
-												{r.downloads != null && (
-													<span class={styles.resultDownloads}>
-														{r.downloads.toLocaleString()} DL
+													{isDownloaded && (
+														<span class={styles.badgeDownloaded}>
+															Downloaded
+														</span>
+													)}
+													{r.hashMatch && (
+														<span class={styles.badgeAccent}>
+															Hash Match
+														</span>
+													)}
+													{r.hearingImpaired && (
+														<span class={styles.badgeMuted}>HI</span>
+													)}
+													{r.format && (
+														<span class={styles.badgeMuted}>
+															{r.format.toUpperCase()}
+														</span>
+													)}
+													{r.downloads != null && (
+														<span class={styles.resultDownloads}>
+															{r.downloads.toLocaleString()} DL
+														</span>
+													)}
+												</div>
+												{r.releaseName && (
+													<span class={styles.resultRelease}>
+														{r.releaseName}
 													</span>
 												)}
 											</div>
-											{r.releaseName && (
-												<span class={styles.resultRelease}>
-													{r.releaseName}
-												</span>
-											)}
+											<button
+												class={styles.downloadBtn}
+												onClick={() => handleDownload(r)}
+												disabled={downloadingId === r.fileId}
+												title={
+													isDownloaded
+														? 'Already downloaded — download again'
+														: 'Download subtitle'
+												}
+											>
+												{downloadingId === r.fileId ? (
+													<span class={styles.spinner} />
+												) : (
+													<svg
+														width="14"
+														height="14"
+														viewBox="0 0 24 24"
+														fill="none"
+														stroke="currentColor"
+														stroke-width="2"
+														stroke-linecap="round"
+														stroke-linejoin="round"
+													>
+														<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+														<polyline points="7 10 12 15 17 10" />
+														<line x1="12" y1="15" x2="12" y2="3" />
+													</svg>
+												)}
+											</button>
 										</div>
-										<button
-											class={styles.downloadBtn}
-											onClick={() => handleDownload(r)}
-											disabled={downloadingId === r.fileId}
-											title="Download subtitle"
-										>
-											{downloadingId === r.fileId ? (
-												<span class={styles.spinner} />
-											) : (
-												<svg
-													width="14"
-													height="14"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													stroke-width="2"
-													stroke-linecap="round"
-													stroke-linejoin="round"
-												>
-													<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-													<polyline points="7 10 12 15 17 10" />
-													<line x1="12" y1="15" x2="12" y2="3" />
-												</svg>
-											)}
-										</button>
-									</div>
-								))}
+									);
+								})}
 							</div>
 						)}
 					</>

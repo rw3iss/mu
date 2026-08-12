@@ -317,6 +317,28 @@
   }
 }
 
+// Already-downloaded search result: green tint + left accent so it's obvious
+// at a glance (and these are sorted to the top of the list).
+.resultDownloaded {
+  background: rgba(74, 222, 128, 0.1);
+  box-shadow: inset 2px 0 0 var(--color-success, #4ade80);
+
+  &:hover {
+    background: rgba(74, 222, 128, 0.16);
+  }
+}
+
+.badgeDownloaded {
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 3px;
+  background: rgba(74, 222, 128, 0.18);
+  color: var(--color-success, #4ade80);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .resultInfo {
   flex: 1;
   min-width: 0;
