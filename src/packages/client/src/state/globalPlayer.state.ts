@@ -50,6 +50,14 @@ interface PersistedPlayerState {
 }
 
 const STORAGE_KEY = 'mu_player_state';
+/**
+ * Lightweight, eagerly-written pointer to the current movie — the authoritative
+ * source for "what was playing" on restore. Kept SEPARATE from the heavy,
+ * debounced `STORAGE_KEY` blob (which bundles the whole stream session) so the
+ * "which movie" fact can never be lost to debounce starvation or a quota failure
+ * writing the big blob. Updated the instant `globalMovieId` changes.
+ */
+const MOVIE_KEY = 'mu_last_movie';
 
 // ============================================
 // Signals
@@ -128,17 +136,33 @@ let disposeEffects: (() => void) | null = null;
 
 function setupPersistenceEffects(): void {
 	if (disposeEffects) return;
-	// Debounced save for frequently changing values (currentTime, volume, etc.)
-	// Play state is saved synchronously by video event handlers via mu_is_playing key.
+	// Debounced save for the heavy blob. `currentTime` is intentionally NOT a
+	// dependency: it ticks ~4x/sec and would perpetually reset the 1s debounce
+	// timer, starving the write entirely. Per-movie playback position is
+	// persisted separately (mu_position_<id>) by the video engine, and play
+	// state via the mu_is_playing key.
 	const dispose1 = effect(() => {
-		void currentTime.value;
 		void volume.value;
 		void isMuted.value;
 		void playerMode.value;
 		void globalMovieId.value;
 		saveState();
 	});
-	disposeEffects = dispose1;
+	// Eagerly mirror the current movie into its own tiny key the instant it
+	// changes — from ANY entry point (playMovie, shared-session, restore). This
+	// is what initGlobalPlayer trusts, so a refresh always reloads the movie you
+	// were actually watching, never a stale one.
+	const dispose2 = effect(() => {
+		const id = globalMovieId.value;
+		if (shareMode.value) return;
+		try {
+			if (id) localStorage.setItem(MOVIE_KEY, id);
+		} catch {}
+	});
+	disposeEffects = () => {
+		dispose1();
+		dispose2();
+	};
 
 	// Save on page unload so hard refresh captures final state
 	window.addEventListener('beforeunload', saveStateNow);
@@ -265,6 +289,11 @@ export async function playMovie(
 	}
 	currentSession.value = null;
 	subtitleTrack.value = null;
+	// Reset position/duration so the persisted blob doesn't briefly carry the
+	// PREVIOUS movie's position into the new movie's restore. The new stream sets
+	// the real start position from forceStartPosition / session.startPosition.
+	currentTime.value = 0;
+	duration.value = 0;
 
 	// Set up new movie — preserve current mode (full/split)
 	globalMovieId.value = movieId;
@@ -345,6 +374,7 @@ export async function closePlayer(): Promise<void> {
 
 	await endStream();
 	localStorage.removeItem(STORAGE_KEY);
+	localStorage.removeItem(MOVIE_KEY);
 	localStorage.removeItem('mu_is_playing');
 }
 
@@ -451,23 +481,29 @@ export function initGlobalPlayer(): void {
 
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
-		if (!raw) return;
+		const lastMovie = localStorage.getItem(MOVIE_KEY);
+		const saved: PersistedPlayerState | null = raw ? JSON.parse(raw) : null;
 
-		const saved: PersistedPlayerState = JSON.parse(raw);
-		if (!saved.movieId) return;
+		// The eagerly-written movie pointer is AUTHORITATIVE; the debounced blob
+		// is only a fallback (it can lag behind or fail to write). This is what
+		// guarantees a refresh reloads the movie you were actually watching.
+		const movieId = lastMovie || saved?.movieId || null;
+		if (!movieId) return;
 
-		// Restore volume/mute/duration
-		volume.value = saved.volume;
-		isMuted.value = saved.isMuted;
-		if (saved.duration > 0) duration.value = saved.duration;
+		// Restore volume/mute/duration/mode from the blob when it exists.
+		if (saved) {
+			volume.value = saved.volume;
+			isMuted.value = saved.isMuted;
+			if (saved.duration > 0) duration.value = saved.duration;
+		}
 
 		// Restore movie and mode
-		globalMovieId.value = saved.movieId;
-		playerMode.value = saved.playerMode === 'hidden' ? 'mini' : saved.playerMode;
+		globalMovieId.value = movieId;
+		playerMode.value = saved && saved.playerMode !== 'hidden' ? saved.playerMode : 'mini';
 
 		// Fetch movie metadata
 		moviesService
-			.get(saved.movieId)
+			.get(movieId)
 			.then((m) => {
 				globalMovie.value = m;
 			})
@@ -475,6 +511,7 @@ export function initGlobalPlayer(): void {
 				playerMode.value = 'hidden';
 				globalMovieId.value = null;
 				localStorage.removeItem(STORAGE_KEY);
+				localStorage.removeItem(MOVIE_KEY);
 			});
 
 		// Read the authoritative play state written synchronously by video event handlers.
@@ -486,12 +523,12 @@ export function initGlobalPlayer(): void {
 		// GlobalPlayer will create a fresh stream using forceStartPosition.
 		currentSession.value = null;
 
-		// Use the best available position: compare saved state vs per-movie localStorage
-		let bestPosition = saved.currentTime || 0;
+		// Position: the per-movie key is the freshest source; the blob's
+		// currentTime only applies when the blob is actually for THIS movie
+		// (otherwise it'd bleed the previous movie's position in).
+		let bestPosition = saved?.movieId === movieId ? saved?.currentTime || 0 : 0;
 		try {
-			const localPos = parseFloat(
-				localStorage.getItem(`mu_position_${saved.movieId}`) || '0',
-			);
+			const localPos = parseFloat(localStorage.getItem(`mu_position_${movieId}`) || '0');
 			if (localPos > bestPosition) bestPosition = localPos;
 		} catch {}
 
