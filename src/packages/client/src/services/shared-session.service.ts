@@ -107,9 +107,16 @@ class SharedSessionService {
 	async hydrate(): Promise<void> {
 		try {
 			const view = await api.get<SharedSessionView | null>('/shared-sessions/mine');
-			if (view && view.status === 'active' && view.myRole) {
-				await this.enterSession(view, { micOn: true, loadMovie: true, requestSync: true });
-			}
+			if (!view || view.status !== 'active' || !view.myRole) return;
+			// Don't let a lingering session commandeer normal solo playback: if the
+			// player has already restored a DIFFERENT movie (initGlobalPlayer runs
+			// before this), the user has moved on — skip the auto-rejoin so we don't
+			// force-load the session's movie (and subject their playback to the
+			// party's play/pause/seek commands) on every refresh. They can rejoin
+			// manually from the session menu. Rejoin only when the player is empty
+			// or already on the session's movie.
+			if (globalMovieId.value && globalMovieId.value !== view.movieId) return;
+			await this.enterSession(view, { micOn: true, loadMovie: true, requestSync: true });
 		} catch {
 			/* no active session / not reachable — ignore */
 		}
