@@ -1462,6 +1462,20 @@ export function PlayerControls({
 																	language: t.language,
 																	label: t.label,
 																}))}
+																activeLabel={
+																	(session?.subtitles ?? []).find(
+																		(t) =>
+																			t.id ===
+																			subtitleTrack.value,
+																	)?.label
+																}
+																activeLanguage={
+																	(session?.subtitles ?? []).find(
+																		(t) =>
+																			t.id ===
+																			subtitleTrack.value,
+																	)?.language
+																}
 																onTrackDeleted={(track) => {
 																	const s = currentSession.value;
 																	if (!s) return;

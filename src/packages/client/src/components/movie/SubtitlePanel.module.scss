@@ -136,6 +136,29 @@
   flex-shrink: 0;
 }
 
+// Currently-enabled subtitle: accent + bold, matching the main subtitle menu's
+// "selected" styling, plus a left accent bar.
+.trackActive {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+
+  .trackLang,
+  .trackLabel {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+}
+
+.badgePlaying {
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  background: rgba(var(--color-accent-rgb, 6, 182, 212), 0.18);
+  color: var(--color-accent);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .setDefaultBtn {
   flex-shrink: 0;
   // Reserve the spot the hover-only delete button occupies on the right.

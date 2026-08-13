@@ -55,6 +55,10 @@ interface SubtitlePanelProps {
 	onTrackDeleted?: (track: MovieSubtitleInfo) => void;
 	/** Movie file name to display above search results for reference */
 	fileName?: string;
+	/** Label + language of the subtitle currently enabled in the player, so the
+	 * matching track in this list can be highlighted like the main subtitle menu. */
+	activeLabel?: string | null;
+	activeLanguage?: string | null;
 }
 
 export function SubtitlePanel({
@@ -65,6 +69,8 @@ export function SubtitlePanel({
 	onTrackAdded,
 	onTrackDeleted,
 	fileName: fileNameProp,
+	activeLabel,
+	activeLanguage,
 }: SubtitlePanelProps) {
 	// Resolve fileName: prop > globalMovie fileInfo > filePath extraction
 	const fileName =
@@ -295,63 +301,76 @@ export function SubtitlePanel({
 					{tracks.length === 0 ? (
 						<div class={styles.emptyText}>No subtitle tracks found</div>
 					) : (
-						tracks.map((t) => (
-							<div
-								key={t.index}
-								class={styles.trackItem}
-								onClick={() => onSelect?.(t)}
-								role={onSelect ? 'button' : undefined}
-								title={t.fileName || t.label}
-							>
-								<span class={styles.trackLang}>
-									{(t.language || 'und').toUpperCase()}
-								</span>
-								<span class={styles.trackLabel} title={t.fileName || t.label}>
-									{stripLangPrefix(t.label, t.language)}
-								</span>
-								{t.default && <span class={styles.badgeDefault}>Default</span>}
-								{t.forced && <span class={styles.badge}>Forced</span>}
-								{t.codec && (
-									<span class={styles.badgeMuted}>{t.codec.toUpperCase()}</span>
-								)}
-								{!t.default && (
+						tracks.map((t) => {
+							// Highlight the track currently enabled in the player. The
+							// active subtitle is identified by label + language (both
+							// derive from the same server-parsed title, so they match).
+							const isActive =
+								activeLabel != null &&
+								t.label === activeLabel &&
+								(t.language ?? '').toLowerCase() ===
+									(activeLanguage ?? '').toLowerCase();
+							return (
+								<div
+									key={t.index}
+									class={`${styles.trackItem} ${isActive ? styles.trackActive : ''}`}
+									onClick={() => onSelect?.(t)}
+									role={onSelect ? 'button' : undefined}
+									title={t.fileName || t.label}
+								>
+									<span class={styles.trackLang}>
+										{(t.language || 'und').toUpperCase()}
+									</span>
+									<span class={styles.trackLabel} title={t.fileName || t.label}>
+										{stripLangPrefix(t.label, t.language)}
+									</span>
+									{isActive && <span class={styles.badgePlaying}>Playing</span>}
+									{t.default && <span class={styles.badgeDefault}>Default</span>}
+									{t.forced && <span class={styles.badge}>Forced</span>}
+									{t.codec && (
+										<span class={styles.badgeMuted}>
+											{t.codec.toUpperCase()}
+										</span>
+									)}
+									{!t.default && (
+										<button
+											class={styles.setDefaultBtn}
+											onClick={(e) => {
+												e.stopPropagation();
+												handleSetDefault(t);
+											}}
+											title="Set as default subtitle"
+										>
+											Set default
+										</button>
+									)}
 									<button
-										class={styles.setDefaultBtn}
+										class={styles.deleteTrackBtn}
 										onClick={(e) => {
 											e.stopPropagation();
-											handleSetDefault(t);
+											setConfirmDeleteTrack(t);
 										}}
-										title="Set as default subtitle"
+										title="Delete subtitle"
 									>
-										Set default
+										<svg
+											width="12"
+											height="12"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="3 6 5 6 21 6" />
+											<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+											<path d="M10 11v6" />
+											<path d="M14 11v6" />
+										</svg>
 									</button>
-								)}
-								<button
-									class={styles.deleteTrackBtn}
-									onClick={(e) => {
-										e.stopPropagation();
-										setConfirmDeleteTrack(t);
-									}}
-									title="Delete subtitle"
-								>
-									<svg
-										width="12"
-										height="12"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<polyline points="3 6 5 6 21 6" />
-										<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-										<path d="M10 11v6" />
-										<path d="M14 11v6" />
-									</svg>
-								</button>
-							</div>
-						))
+								</div>
+							);
+						})
 					)}
 				</div>
 			)}
