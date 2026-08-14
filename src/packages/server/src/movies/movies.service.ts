@@ -32,6 +32,7 @@ import { buildPrettyTitle, isDirtyTitle } from '../grouping/title-sanitiser.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from '../library/library.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
+import { tmdbToContribution } from '../metadata/adapters/tmdb.adapter.js';
 import { ImageService } from '../metadata/image.service.js';
 import { MetadataService } from '../metadata/metadata.service.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
@@ -740,16 +741,18 @@ export class MoviesService implements OnModuleInit {
 			? Number.parseInt(details.release_date.slice(0, 4), 10)
 			: null;
 
-		// `getMovieDetails` already appended `videos`, so grab the YouTube
-		// trailer inline — otherwise the trailer wouldn't appear until the
-		// async refresh below finished, so a not-in-library movie's first
-		// visit would show no trailer (same extraction as the tmdb adapter).
-		const trailerVideo = details.videos?.results?.find(
-			(v) => v.site === 'YouTube' && v.type === 'Trailer',
-		);
-		const trailerUrl = trailerVideo
-			? `https://www.youtube.com/watch?v=${trailerVideo.key}`
-			: null;
+		// `getMovieDetails` appends credits/videos/keywords, so normalise the
+		// SAME payload through the TMDB adapter and seed the stub from it. This
+		// is what makes a not-in-library movie's FIRST visit already carry its
+		// trailer + cast + genres — the async refresh below only backfills OMDB
+		// extras. Without it the first render is bare (the refresh lands after
+		// the response, and the client never refetches).
+		const seed = tmdbToContribution({
+			tmdbDetails: details,
+			getImageUrl: (p, s) => this.tmdb.getImageUrl(p, s),
+		}).fields;
+		const trailerUrl = (seed.trailerUrl as string | null) ?? null;
+		const jsonOf = (v: unknown) => JSON.stringify(Array.isArray(v) ? v : []);
 
 		this.database.db
 			.insert(movies)
@@ -795,6 +798,17 @@ export class MoviesService implements OnModuleInit {
 			.values({
 				id: crypto.randomUUID(),
 				movieId: stubId,
+				// Seed the structured credits/genres inline (see `seed` above) so
+				// the Cast section renders on the very first visit, exactly as it
+				// does for library movies.
+				genres: jsonOf(seed.genres),
+				cast: jsonOf(seed.cast),
+				directors: jsonOf(seed.directors),
+				writers: jsonOf(seed.writers),
+				keywords: jsonOf(seed.keywords),
+				productionCompanies: jsonOf(seed.productionCompanies),
+				budget: (seed.budget as number | null) ?? null,
+				revenue: (seed.revenue as number | null) ?? null,
 				tmdbRating,
 				tmdbVotes,
 				source: 'tmdb',
