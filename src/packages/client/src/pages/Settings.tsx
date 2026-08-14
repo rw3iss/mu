@@ -1928,14 +1928,12 @@ export function Settings(props: SettingsProps) {
 										Playing Movie Interrupt Action
 									</span>
 									<span class={styles.settingDescription}>
-										What happens to a movie playing in full mode when you follow
-										a link (a cast member or title in the info overlay, a
-										sidebar link, …): either minimize it to the mini bar, or
-										move it into split view beside the page. If the player is
-										already minimized or split, it stays as-is.
+										Where a full-mode movie goes when you follow a link. Already
+										minimized or split stays as-is.
 									</span>
 								</div>
 								<Select
+									class={styles.interruptSelect}
 									value={interruptAction}
 									onChange={(v) => setInterruptAction(v as InterruptAction)}
 									options={[

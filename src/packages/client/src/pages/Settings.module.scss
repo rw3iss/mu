@@ -189,6 +189,12 @@
   min-width: 80px;
 }
 
+/* "Minimize" / "Split" need room — the default trigger width clipped them. */
+.interruptSelect {
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
 /* Both concurrency dropdowns share one fixed width (matches the
  * narrower "Max Concurrent Jobs" control). */
 .jobsSelect {
