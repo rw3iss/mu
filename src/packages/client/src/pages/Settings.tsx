@@ -32,6 +32,7 @@ import {
 	setReduceMotion,
 } from '@/state/appearance.state';
 import { currentUser } from '@/state/auth.state';
+import { INTERRUPT_ACTION_KEY, type InterruptAction } from '@/state/globalPlayer.state';
 import { totalMovies } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
@@ -251,6 +252,10 @@ export function Settings(props: SettingsProps) {
 	const [preferredAudioLanguage, setPreferredAudioLanguage] = useState('eng');
 	const [autoplay, setAutoplay] = useState(true);
 	const [bufferSize, setBufferSizeSetting] = useUiSetting('buffer_size', 'large');
+	const [interruptAction, setInterruptAction] = useUiSetting<InterruptAction>(
+		INTERRUPT_ACTION_KEY,
+		'minimize',
+	);
 	const [skipTimes, setSkipTimes] = useUiSetting<number[]>('skip_times', [5, 10, 20]);
 
 	// Library settings
@@ -1913,6 +1918,29 @@ export function Settings(props: SettingsProps) {
 										{ value: 'normal', label: 'Normal (45s)' },
 										{ value: 'large', label: 'Large (90s)' },
 										{ value: 'max', label: 'Maximum (180s)' },
+									]}
+								/>
+							</div>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Playing Movie Interrupt Action
+									</span>
+									<span class={styles.settingDescription}>
+										What happens to a movie playing in full mode when you follow
+										a link (a cast member or title in the info overlay, a
+										sidebar link, …): either minimize it to the mini bar, or
+										move it into split view beside the page. If the player is
+										already minimized or split, it stays as-is.
+									</span>
+								</div>
+								<Select
+									value={interruptAction}
+									onChange={(v) => setInterruptAction(v as InterruptAction)}
+									options={[
+										{ value: 'minimize', label: 'Minimize' },
+										{ value: 'split', label: 'Split' },
 									]}
 								/>
 							</div>

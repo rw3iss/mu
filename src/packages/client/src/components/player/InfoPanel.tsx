@@ -14,7 +14,7 @@ import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
 import { personKeyFor } from '@/state/favorites.state';
-import { globalMovie, minimizePlayer, playerMode } from '@/state/globalPlayer.state';
+import { globalMovie, interruptPlayer } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { showInfoPanel } from '@/state/player.state';
 import { shareMode } from '@/state/share.state';
@@ -154,12 +154,22 @@ function MovieInfoContent({ movie, variant }: { movie: Movie; variant: 'inline' 
 		}
 	};
 
+	/**
+	 * Following a link out of the player overlay: apply the user's configured
+	 * interrupt action (minimize / split — Settings → Playback) so the
+	 * destination page is actually visible, then close the panel. Only applies
+	 * in `flyout` (over-the-player) mode; inline mode has no player to move, and
+	 * `interruptPlayer` itself no-ops unless the player is in full mode.
+	 */
+	const handleNavigateAway = () => {
+		if (!flyout) return;
+		interruptPlayer();
+		showInfoPanel.value = false;
+	};
+
 	const handleTitleClick = () => {
 		route(`/movie/${movie.id}`);
-		if (flyout) {
-			if (playerMode.value === 'full') minimizePlayer();
-			showInfoPanel.value = false;
-		}
+		handleNavigateAway();
 	};
 
 	const hours = Math.floor((movie.runtime ?? 0) / 60);
@@ -201,6 +211,7 @@ function MovieInfoContent({ movie, variant }: { movie: Movie; variant: 'inline' 
 							onClick={(e) => {
 								e.preventDefault();
 								route(`/person/${personKeyFor({ name: movie.director! })}`);
+								handleNavigateAway();
 							}}
 						>
 							Dir. {movie.director}
@@ -331,8 +342,13 @@ function MovieInfoContent({ movie, variant }: { movie: Movie; variant: 'inline' 
 										href={`/person/${key}`}
 										data-reveal-host
 										onClick={(e) => {
+											// The cast photo swallows its own clicks
+											// (expand popout), so this fires for the
+											// NAME / row only — which is what should
+											// move the player out of the way.
 											e.preventDefault();
 											route(`/person/${key}`);
+											handleNavigateAway();
 										}}
 									>
 										<CastPhoto

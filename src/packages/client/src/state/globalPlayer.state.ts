@@ -1,5 +1,6 @@
 import { computed, effect, signal } from '@preact/signals';
 import { audioEngine } from '@/audio/audio-engine';
+import { getUiSetting } from '@/hooks/useUiSetting';
 import { moviesService } from '@/services/movies.service';
 import {
 	closeEffectsPanel,
@@ -20,6 +21,7 @@ import {
 	duration,
 	endStream,
 	initPlayerSettings,
+	isFullscreen,
 	isMuted,
 	isPlaying,
 	startStream,
@@ -362,6 +364,34 @@ export function splitPlayer(): void {
 	// Share viewers must stay in full mode
 	if (shareMode.value) return;
 	playerMode.value = 'split';
+}
+
+export type InterruptAction = 'minimize' | 'split';
+/** Settings → Playback key for {@link interruptPlayer}'s configured action. */
+export const INTERRUPT_ACTION_KEY = 'playback_interrupt_action';
+
+/**
+ * Get the player out of the way when the user follows a link while a movie is
+ * playing in FULL mode (a cast member / title in the info-panel overlay, a
+ * sidebar link, …). The action — minimize or split — is user-configurable in
+ * Settings → Playback ("Playing Movie Interrupt Action").
+ *
+ * No-op unless the player is in `full` mode: if it's already mini or split, the
+ * layout the user deliberately chose is preserved.
+ */
+export function interruptPlayer(): void {
+	if (playerMode.value !== 'full') return;
+	// Browser fullscreen has to be released too, or the video would keep
+	// covering the page we're navigating to.
+	if (typeof document !== 'undefined' && document.fullscreenElement) {
+		document.exitFullscreen().catch(() => {});
+		isFullscreen.value = false;
+	}
+	if (getUiSetting<InterruptAction>(INTERRUPT_ACTION_KEY, 'minimize') === 'split') {
+		splitPlayer();
+	} else {
+		minimizePlayer();
+	}
 }
 
 /**
