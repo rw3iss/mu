@@ -366,28 +366,37 @@ export function splitPlayer(): void {
 	playerMode.value = 'split';
 }
 
-export type InterruptAction = 'minimize' | 'split';
+export type InterruptAction = 'minimize' | 'split' | 'nothing';
 /** Settings → Playback key for {@link interruptPlayer}'s configured action. */
 export const INTERRUPT_ACTION_KEY = 'playback_interrupt_action';
+
+/** The user's configured interrupt action (Settings → Playback). */
+export function getInterruptAction(): InterruptAction {
+	return getUiSetting<InterruptAction>(INTERRUPT_ACTION_KEY, 'minimize');
+}
 
 /**
  * Get the player out of the way when the user follows a link while a movie is
  * playing in FULL mode (a cast member / title in the info-panel overlay, a
- * sidebar link, …). The action — minimize or split — is user-configurable in
- * Settings → Playback ("Playing Movie Interrupt Action").
+ * sidebar link, …). The action — minimize, split, or nothing — is
+ * user-configurable in Settings → Playback ("Playing Movie Interrupt Action").
  *
  * No-op unless the player is in `full` mode: if it's already mini or split, the
- * layout the user deliberately chose is preserved.
+ * layout the user deliberately chose is preserved. Also a no-op for the
+ * `nothing` action, which keeps playing full-screen and lets the destination
+ * page load behind the overlay until the user moves the player themselves.
  */
 export function interruptPlayer(): void {
 	if (playerMode.value !== 'full') return;
+	const action = getInterruptAction();
+	if (action === 'nothing') return;
 	// Browser fullscreen has to be released too, or the video would keep
 	// covering the page we're navigating to.
 	if (typeof document !== 'undefined' && document.fullscreenElement) {
 		document.exitFullscreen().catch(() => {});
 		isFullscreen.value = false;
 	}
-	if (getUiSetting<InterruptAction>(INTERRUPT_ACTION_KEY, 'minimize') === 'split') {
+	if (action === 'split') {
 		splitPlayer();
 	} else {
 		minimizePlayer();

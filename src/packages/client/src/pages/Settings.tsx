@@ -1928,8 +1928,9 @@ export function Settings(props: SettingsProps) {
 										Playing Movie Interrupt Action
 									</span>
 									<span class={styles.settingDescription}>
-										Where a full-mode movie goes when you follow a link. Already
-										minimized or split stays as-is.
+										Where a full-mode movie goes when you follow a link. Nothing
+										keeps it playing full. Already minimized or split stays
+										as-is.
 									</span>
 								</div>
 								<Select
@@ -1939,6 +1940,7 @@ export function Settings(props: SettingsProps) {
 									options={[
 										{ value: 'minimize', label: 'Minimize' },
 										{ value: 'split', label: 'Split' },
+										{ value: 'nothing', label: 'Nothing' },
 									]}
 								/>
 							</div>

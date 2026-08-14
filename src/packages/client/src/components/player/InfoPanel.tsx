@@ -14,7 +14,7 @@ import { UI } from '@/plugins/ui-slots';
 import { moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
 import { personKeyFor } from '@/state/favorites.state';
-import { globalMovie, interruptPlayer } from '@/state/globalPlayer.state';
+import { getInterruptAction, globalMovie, interruptPlayer } from '@/state/globalPlayer.state';
 import type { Movie } from '@/state/library.state';
 import { showInfoPanel } from '@/state/player.state';
 import { shareMode } from '@/state/share.state';
@@ -163,6 +163,10 @@ function MovieInfoContent({ movie, variant }: { movie: Movie; variant: 'inline' 
 	 */
 	const handleNavigateAway = () => {
 		if (!flyout) return;
+		// 'Nothing': leave the player AND this panel exactly as they are — the
+		// destination page loads behind the overlay until the user moves the
+		// player themselves.
+		if (getInterruptAction() === 'nothing') return;
 		interruptPlayer();
 		showInfoPanel.value = false;
 	};
