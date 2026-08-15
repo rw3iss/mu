@@ -25,7 +25,12 @@ import {
 import { voiceMesh } from '@/services/voice-mesh';
 import { wsService } from '@/services/websocket.service';
 import { currentUser } from '@/state/auth.state';
-import { forceStartPosition, globalMovieId, playMovie } from '@/state/globalPlayer.state';
+import {
+	forceStartPosition,
+	globalMovieId,
+	playMovie,
+	sharedSessionHooks,
+} from '@/state/globalPlayer.state';
 import { notifyError, notifyInfo } from '@/state/notifications.state';
 import { currentTime, isPlaying } from '@/state/player.state';
 import {
@@ -101,6 +106,18 @@ class SharedSessionService {
 
 		// Invites arrive on the generic notification channel.
 		wsService.on(WsEvent.NOTIFICATION, (d) => this.onNotification(d as NotificationDto));
+
+		// Let the player evict us from a party when the user closes it or plays a
+		// different movie (callback, not an import — that would be circular).
+		sharedSessionHooks.leaveActiveSession = (keepForMovieId?: string) => {
+			const view = activeSession.value;
+			if (!view) return;
+			// Loading the party's OWN movie is how joining works — not a departure.
+			if (keepForMovieId && view.movieId === keepForMovieId) return;
+			void this.leaveSession().catch(() => {
+				// Best-effort: never block closing the player / starting a movie.
+			});
+		};
 	}
 
 	/** Rehydrate on app load: if the user has an active session, rejoin it. */

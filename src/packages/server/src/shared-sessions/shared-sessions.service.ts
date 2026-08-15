@@ -40,6 +40,14 @@ const TURN_TTL_SECONDS = 3600;
 /** Public STUN fallback so voice works even without our coTURN. */
 const PUBLIC_STUN = 'stun:stun.l.google.com:19302';
 
+/**
+ * A shared session untouched for this long is considered abandoned. Parties are
+ * often just closed rather than explicitly ended, and an 'active' row lives
+ * forever — which made `getMine` keep resurrecting it (and force-loading its
+ * movie) on every app load. Generous enough to survive a long watch + refreshes.
+ */
+const STALE_SESSION_MS = 12 * 60 * 60 * 1000;
+
 /** Cached relay state for the hot WS authorization path (heartbeats, chat). */
 interface RelayState {
 	adminUserId: string;
@@ -370,10 +378,22 @@ export class SharedSessionsService implements OnModuleInit, SharedSessionRelay {
 		};
 	}
 
-	/** The caller's active session (joined + status active), or null. */
+	/**
+	 * The caller's active session (joined + status active), or null.
+	 *
+	 * Sessions that haven't been touched within {@link STALE_SESSION_MS} are
+	 * treated as ABANDONED: they're marked ended and not returned. Without this
+	 * a party nobody ever explicitly ended stayed 'active' forever, and the
+	 * client's hydrate() re-joined it on every single app load — which
+	 * force-loaded that movie into the player days later.
+	 */
 	getMine(userId: string): SharedSessionView | null {
 		const row = this.database.db
-			.select({ sessionId: sharedSessionMembers.sessionId })
+			.select({
+				sessionId: sharedSessionMembers.sessionId,
+				updatedAt: sharedSessions.updatedAt,
+				createdAt: sharedSessions.createdAt,
+			})
 			.from(sharedSessionMembers)
 			.innerJoin(sharedSessions, eq(sharedSessionMembers.sessionId, sharedSessions.id))
 			.where(
@@ -385,7 +405,26 @@ export class SharedSessionsService implements OnModuleInit, SharedSessionRelay {
 			)
 			.orderBy(desc(sharedSessions.createdAt))
 			.get();
-		return row ? this.getView(row.sessionId, userId) : null;
+		if (!row) return null;
+
+		const touched = Date.parse(row.updatedAt ?? row.createdAt ?? '');
+		if (Number.isFinite(touched) && Date.now() - touched > STALE_SESSION_MS) {
+			this.endStale(row.sessionId);
+			return null;
+		}
+
+		return this.getView(row.sessionId, userId);
+	}
+
+	/** Mark an abandoned session ended so it stops being resurrected. */
+	private endStale(sessionId: string): void {
+		const now = nowISO();
+		this.database.db
+			.update(sharedSessions)
+			.set({ status: 'ended', endedAt: now, updatedAt: now })
+			.where(eq(sharedSessions.id, sessionId))
+			.run();
+		this.logger.log(`Auto-ended abandoned shared session ${sessionId}`);
 	}
 
 	/** Chat backlog for a session, oldest first. */

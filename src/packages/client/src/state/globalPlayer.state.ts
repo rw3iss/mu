@@ -66,6 +66,19 @@ const MOVIE_KEY = 'mu_last_movie';
 // Signals
 // ============================================
 
+/**
+ * Hook registered by `shared-session.service` (callback pattern — a direct
+ * import would be circular, since that service calls `playMovie`).
+ *
+ * Lets the player tell the shared-session layer "the user has moved on", so a
+ * watch-party can't keep force-loading its movie after the user closed the
+ * player or started something else.
+ */
+export const sharedSessionHooks: {
+	/** Leave the active session unless it's for `keepForMovieId`. */
+	leaveActiveSession: ((keepForMovieId?: string) => void) | null;
+} = { leaveActiveSession: null };
+
 export const globalMovieId = signal<string | null>(null);
 export const globalMovie = signal<Movie | null>(null);
 export const playerMode = signal<PlayerMode>('hidden');
@@ -285,6 +298,12 @@ export async function playMovie(
 	// navigation, leaving its subtitle <track> + a frozen cue on the singleton
 	// <video>. destroy() removes those tracks; skipping it (the old
 	// `if (currentSession.value)` guard) is what left stale subtitles on screen.
+	// Starting a DIFFERENT movie means the user has left any watch-party they
+	// were in — otherwise that session would keep force-loading its own movie on
+	// every future app load. No-op when this IS the session's movie (which is
+	// how joining a party loads it in the first place).
+	sharedSessionHooks.leaveActiveSession?.(movieId);
+
 	const oldEngine = sharedVideoEngine.value;
 	if (oldEngine) oldEngine.destroy();
 	// Belt-and-braces: the <video> element is a singleton reused across movies,
@@ -417,6 +436,11 @@ export function interruptPlayer(): void {
  * Close: end stream, hide player entirely.
  */
 export async function closePlayer(): Promise<void> {
+	// Closing the player means leaving any watch-party too — otherwise the
+	// session survives and re-loads its movie on the next refresh, which is
+	// exactly the "an old movie keeps coming back" bug.
+	sharedSessionHooks.leaveActiveSession?.();
+
 	playerMode.value = 'hidden';
 	globalMovieId.value = null;
 	globalMovie.value = null;
