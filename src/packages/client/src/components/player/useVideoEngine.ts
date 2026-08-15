@@ -27,6 +27,7 @@ import {
 } from '@/state/player.state';
 import { shareToken } from '@/state/share.state';
 import { clearWatchPosition, setLocalPosition } from '@/state/watchPositions.state';
+import { clearVideoSubtitles } from '@/utils/subtitle-dom';
 
 const BUFFER_CONFIGS: Record<
 	string,
@@ -1018,14 +1019,9 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			video.pause();
 			video.removeAttribute('src');
 			video.load();
-			// Remove all subtitle track elements and revoke blob URLs
-			for (const t of video.querySelectorAll('track')) {
-				if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
-				video.removeChild(t);
-			}
-			for (let i = 0; i < video.textTracks.length; i++) {
-				video.textTracks[i]!.mode = 'hidden';
-			}
+			// Remove every subtitle artefact (elements, blob URLs, and the
+			// cues on HLS-added TextTracks that have no element to remove).
+			clearVideoSubtitles(video);
 			// Mute to kill any lingering audio from buffered data
 			video.muted = true;
 			// Restore mute state after async cleanup. If Web Audio is attached

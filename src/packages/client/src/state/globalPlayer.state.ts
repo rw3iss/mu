@@ -32,6 +32,7 @@ import {
 import { shareMode } from '@/state/share.state';
 import { sharedVideoEngine } from '@/state/videoEngineRef';
 import { clearWatchPosition } from '@/state/watchPositions.state';
+import { clearVideoSubtitles } from '@/utils/subtitle-dom';
 
 // ============================================
 // Types
@@ -286,10 +287,19 @@ export async function playMovie(
 	// `if (currentSession.value)` guard) is what left stale subtitles on screen.
 	const oldEngine = sharedVideoEngine.value;
 	if (oldEngine) oldEngine.destroy();
+	// Belt-and-braces: the <video> element is a singleton reused across movies,
+	// so wipe every subtitle artefact off it before the new movie loads. Without
+	// this the previous movie's cues could stay painted on screen ("locked
+	// subtitles") — especially for HLS-registered TextTracks, which have no
+	// element for destroy()'s DOM sweep to remove.
+	clearVideoSubtitles(oldEngine?.videoRef.current);
 	if (currentSession.value) {
 		await endStream();
 	}
 	currentSession.value = null;
+	// Subtitles start OFF on the new movie; the stream-init path then applies
+	// that movie's own choice (saved per-movie selection, else its server-side
+	// default track) — never the previous movie's.
 	subtitleTrack.value = null;
 	// Reset position/duration so the persisted blob doesn't briefly carry the
 	// PREVIOUS movie's position into the new movie's restore. The new stream sets

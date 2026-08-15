@@ -58,6 +58,7 @@ import {
 	showVoicePanel,
 } from '@/state/shared-session.state';
 import { setSharedVideoEngine } from '@/state/videoEngineRef';
+import { clearVideoSubtitles } from '@/utils/subtitle-dom';
 import { EffectsPanel } from './EffectsPanel';
 import styles from './GlobalPlayer.module.scss';
 import { InfoPanel } from './InfoPanel';
@@ -560,15 +561,7 @@ export function GlobalPlayer() {
 		const session = currentSession.value;
 		let cancelled = false;
 
-		if (video) {
-			for (const t of video.querySelectorAll('track')) {
-				if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
-				video.removeChild(t);
-			}
-			for (let i = 0; i < video.textTracks.length; i++) {
-				video.textTracks[i]!.mode = 'hidden';
-			}
-		}
+		clearVideoSubtitles(video);
 
 		if (!video || !session) return;
 
@@ -612,10 +605,7 @@ export function GlobalPlayer() {
 					return;
 				}
 
-				for (const t of video.querySelectorAll('track')) {
-					if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
-					video.removeChild(t);
-				}
+				clearVideoSubtitles(video);
 
 				const trackEl = document.createElement('track');
 				trackEl.kind = 'subtitles';
@@ -656,15 +646,7 @@ export function GlobalPlayer() {
 			cancelled = true;
 			cueOriginalsRef.current = new WeakMap();
 			cueListRef.current = [];
-			if (video) {
-				for (const t of video.querySelectorAll('track')) {
-					if (t.src?.startsWith('blob:')) URL.revokeObjectURL(t.src);
-					video.removeChild(t);
-				}
-				for (let i = 0; i < video.textTracks.length; i++) {
-					video.textTracks[i]!.mode = 'hidden';
-				}
-			}
+			clearVideoSubtitles(video);
 		};
 	}, [subtitleTrack.value, currentSession.value?.sessionId, applySubtitleOffset]);
 
