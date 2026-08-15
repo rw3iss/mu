@@ -1,7 +1,20 @@
-import { Body, Controller, Get, Logger, Post, Req, Res, UsePipes } from '@nestjs/common';
+import type { RegistrationConfig, RegistrationResult } from '@mu/shared';
+import {
+	Body,
+	Controller,
+	Get,
+	Logger,
+	Post,
+	Put,
+	Query,
+	Req,
+	Res,
+	UsePipes,
+} from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { Public } from '../common/decorators/public.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
+import { Roles } from '../common/decorators/roles.decorator.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { ConfigService } from '../config/config.service.js';
 import { LibraryService } from '../library/library.service.js';
@@ -9,6 +22,9 @@ import { LibraryJobsService } from '../library/library-jobs.service.js';
 import { AuthService } from './auth.service.js';
 import type { LoginDto, SetupDto } from './dto/login.dto.js';
 import { loginSchema, setupSchema } from './dto/login.dto.js';
+import type { RegisterDto, RegistrationConfigDto } from './dto/register.dto.js';
+import { registerSchema, registrationConfigSchema } from './dto/register.dto.js';
+import { RegistrationService } from './registration.service.js';
 
 @Controller('auth')
 export class AuthController {
@@ -19,6 +35,7 @@ export class AuthController {
 		private readonly libraryService: LibraryService,
 		private readonly libraryJobs: LibraryJobsService,
 		private readonly config: ConfigService,
+		private readonly registration: RegistrationService,
 	) {}
 
 	/**
@@ -124,6 +141,42 @@ export class AuthController {
 		const setupComplete = await this.authService.isSetupComplete();
 		const localBypass = this.config.get<boolean>('auth.localBypass', true);
 		return { setupComplete, localBypass };
+	}
+
+	// ── Self-registration ─────────────────────────────────────────────────
+
+	/**
+	 * Public: whether sign-up is open (drives the login page's "Register" button
+	 * and the register form's confirmation copy). Deliberately readable without
+	 * auth — an anonymous visitor is exactly who needs it.
+	 */
+	@Get('registration-config')
+	@Public()
+	getRegistrationConfig(): RegistrationConfig {
+		return this.registration.getConfig();
+	}
+
+	/** Admin: update the three registration switches. */
+	@Roles('admin')
+	@RequireAction('edit:app-settings')
+	@Put('registration-config')
+	@UsePipes(new ZodValidationPipe(registrationConfigSchema))
+	setRegistrationConfig(@Body() body: RegistrationConfigDto): RegistrationConfig {
+		return this.registration.setConfig(body);
+	}
+
+	@Post('register')
+	@Public()
+	@UsePipes(new ZodValidationPipe(registerSchema))
+	async register(@Body() body: RegisterDto): Promise<RegistrationResult> {
+		return this.registration.register(body);
+	}
+
+	/** Public: consume an emailed verification token. */
+	@Get('verify-email')
+	@Public()
+	async verifyEmail(@Query('token') token: string) {
+		return this.registration.verifyEmail(token);
 	}
 }
 

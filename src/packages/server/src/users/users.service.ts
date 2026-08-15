@@ -21,6 +21,10 @@ export class UsersService {
 		role: users.role,
 		avatarUrl: users.avatarUrl,
 		disabled: users.disabled,
+		// Self-registration gates — surfaced so the admin Users panel can show
+		// "Pending approval" / "Unverified" and offer an Approve action.
+		approved: users.approved,
+		emailVerified: users.emailVerified,
 		createdAt: users.createdAt,
 		updatedAt: users.updatedAt,
 	} as const;
@@ -53,11 +57,39 @@ export class UsersService {
 				passwordHash,
 				role: data.role ?? 'viewer',
 				profilePublic: true,
+				// An admin creating an account directly vouches for it — skip the
+				// self-registration approval/verification gates.
+				approved: true,
+				emailVerified: true,
 				createdAt: now,
 				updatedAt: now,
 			})
 			.run();
 
+		return this.findById(id);
+	}
+
+	/**
+	 * Admin approval of a self-registered account. Also clears the email gate:
+	 * an admin explicitly approving the person makes a further email round-trip
+	 * pointless (and unblocks accounts when email isn't configured).
+	 */
+	approve(id: string) {
+		const user = this.database.db.select().from(users).where(eq(users.id, id)).get();
+		if (!user) throw new NotFoundException(`User ${id} not found`);
+
+		this.database.db
+			.update(users)
+			.set({
+				approved: true,
+				emailVerified: true,
+				verificationToken: null,
+				updatedAt: nowISO(),
+			})
+			.where(eq(users.id, id))
+			.run();
+
+		this.authCache.invalidateUser(id);
 		return this.findById(id);
 	}
 

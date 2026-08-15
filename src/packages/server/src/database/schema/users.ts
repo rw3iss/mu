@@ -17,6 +17,16 @@ export const users = sqliteTable('users', {
 	profilePublic: integer('profile_public', { mode: 'boolean' }).default(true),
 	/** Admin-disabled accounts cannot log in and have their sessions terminated. */
 	disabled: integer('disabled', { mode: 'boolean' }).default(false),
+	/**
+	 * Self-registration gates. Both default TRUE so every pre-existing account —
+	 * and anything an admin creates directly — can sign in untouched; only the
+	 * public registration path sets them false (per the admin's config).
+	 */
+	approved: integer('approved', { mode: 'boolean' }).default(true),
+	emailVerified: integer('email_verified', { mode: 'boolean' }).default(true),
+	/** One-shot token emailed to the user; cleared once they verify. */
+	verificationToken: text('verification_token'),
+	verificationSentAt: text('verification_sent_at'),
 	/** Updated on each successful login; feeds the profile "Active …" label. */
 	lastLoginAt: text('last_login_at'),
 	/** The login time BEFORE the current one — captured at login by copying the

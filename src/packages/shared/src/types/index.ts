@@ -3,6 +3,7 @@ export * from './movie.js';
 export * from './notification.js';
 export * from './plugin.js';
 export * from './profile.js';
+export * from './registration.js';
 export * from './search.js';
 export * from './seo.js';
 export * from './shared-session.js';

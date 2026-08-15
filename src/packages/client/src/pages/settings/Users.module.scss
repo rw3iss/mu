@@ -43,6 +43,18 @@
 	}
 }
 
+/* Sub-option of the switch above it (e.g. the registration sub-settings):
+   indented and visually tied to its parent row. */
+.systemToggleNested {
+	margin-left: var(--space-lg);
+	border-left: 2px solid var(--color-accent-subtle, var(--color-border));
+
+	@include mobile {
+		margin-left: var(--space-sm);
+	}
+}
+
+
 .systemToggleInfo {
 	display: flex;
 	flex-direction: column;
@@ -223,4 +235,15 @@
 	background: rgba(255, 255, 255, 0.08);
 	margin-left: 0.4rem;
 	color: var(--color-text-muted);
+}
+
+/* Self-registered account awaiting approval / email verification. */
+.pendingBadge {
+	font-size: 0.7rem;
+	padding: 0.1rem 0.4rem;
+	border-radius: 4px;
+	background: rgba(251, 191, 36, 0.14);
+	margin-left: 0.4rem;
+	color: var(--color-warning, #fbbf24);
+	white-space: nowrap;
 }

@@ -76,6 +76,47 @@ export class EmailService {
 		return !!this.config.get<string>('email.brevoApiKey');
 	}
 
+	/**
+	 * Email a newly-registered user their verification link.
+	 *
+	 * STUBBED until SMTP/provider config lands: when sending isn't wired we log
+	 * the link (so a self-hosted admin can still complete a verification by
+	 * hand) and return without throwing — registration must never fail because
+	 * email isn't configured yet. Once `email.enabled` + a provider key are set,
+	 * this sends for real with no further changes.
+	 */
+	async sendVerificationEmail(data: {
+		to: string;
+		username: string;
+		token: string;
+	}): Promise<void> {
+		const base = (this.config.get<string>('email.siteUrl') || '').replace(/\/+$/, '');
+		const link = `${base}/verify-email?token=${encodeURIComponent(data.token)}`;
+
+		if (!this.canSend) {
+			this.logger.warn(
+				`Email not configured — verification link for ${data.username} <${data.to}>: ${link}`,
+			);
+			return;
+		}
+
+		const html = `<div style="font-family:sans-serif;line-height:1.6;color:#e7e9ee;background:#0d1a2b;padding:24px;">
+<h2 style="margin:0 0 12px;">Verify your Mu account</h2>
+<p style="margin:0 0 16px;">Hi ${escapeHtml(data.username)}, confirm your email address to finish setting up your account.</p>
+<p style="margin:0 0 20px;"><a href="${escapeHtml(link)}" style="display:inline-block;padding:10px 18px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;">Verify email address</a></p>
+<p style="margin:0;font-size:12px;color:#9aa3b5;">If the button doesn't work, paste this into your browser:<br>${escapeHtml(link)}</p>
+</div>`;
+
+		await this.send({
+			to: data.to,
+			subject: 'Verify your Mu account',
+			html,
+			attachments: [],
+			replyTo: this.config.get<string>('email.replyTo') || undefined,
+		});
+		this.logger.log(`Sent verification email to ${data.to}`);
+	}
+
 	async sendFeedbackNotification(data: FeedbackNotificationData): Promise<void> {
 		if (!this.isConfigured) {
 			this.logger.debug(
@@ -137,7 +178,9 @@ export class EmailService {
 		}
 
 		const reportedAt = this.formatDate(data.reportedAt);
-		const heading = data.resolved ? 'Your feedback has been resolved' : 'Response to your feedback';
+		const heading = data.resolved
+			? 'Your feedback has been resolved'
+			: 'Response to your feedback';
 		const intro = data.resolved
 			? 'A note from the Mu administrator — your feedback ticket has been resolved.'
 			: `${escapeHtml(data.adminName || 'A Mu administrator')} has responded to your feedback submission:`;
@@ -188,7 +231,9 @@ export class EmailService {
 		const dispatch = (): Promise<void> => {
 			if (this.provider === 'resend') return this.sendViaResend(opts);
 			if (this.provider === 'brevo') return this.sendViaBrevo(opts);
-			this.logger.warn(`Email provider '${this.provider}' is not implemented — not sent (stub)`);
+			this.logger.warn(
+				`Email provider '${this.provider}' is not implemented — not sent (stub)`,
+			);
 			return Promise.resolve();
 		};
 		// Retry transient failures (the host's outbound network can blip — a
@@ -200,7 +245,9 @@ export class EmailService {
 				return;
 			} catch (err) {
 				lastErr = err;
-				this.logger.warn(`Email send attempt ${attempt}/3 failed: ${(err as Error).message}`);
+				this.logger.warn(
+					`Email send attempt ${attempt}/3 failed: ${(err as Error).message}`,
+				);
 				if (attempt < 3) await new Promise((r) => setTimeout(r, 600 * attempt));
 			}
 		}

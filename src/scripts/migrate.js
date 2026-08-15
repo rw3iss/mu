@@ -522,6 +522,12 @@ const alters = [
 	'ALTER TABLE users ADD COLUMN display_name TEXT',
 	// Admin can disable an account (blocks login + ends active sessions).
 	'ALTER TABLE users ADD COLUMN disabled INTEGER DEFAULT 0',
+	// Self-registration gates. Default 1 so existing accounts (and any the admin
+	// creates directly) stay signable-in; only public sign-ups set them to 0.
+	'ALTER TABLE users ADD COLUMN approved INTEGER DEFAULT 1',
+	'ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 1',
+	'ALTER TABLE users ADD COLUMN verification_token TEXT',
+	'ALTER TABLE users ADD COLUMN verification_sent_at TEXT',
 	'ALTER TABLE stream_sessions ADD COLUMN last_progress_at TEXT',
 	'ALTER TABLE feedback ADD COLUMN attachment_url TEXT',
 	'ALTER TABLE feedback ADD COLUMN attachment_type TEXT',

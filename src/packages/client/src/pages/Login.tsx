@@ -3,6 +3,7 @@ import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { isAuthenticated, login } from '@/state/auth.state';
 import { notifyError } from '@/state/notifications.state';
+import { loadRegistrationConfig, registrationConfig } from '@/state/registration.state';
 import styles from './Login.module.scss';
 
 interface LoginProps {
@@ -21,6 +22,11 @@ export function Login(_props: LoginProps) {
 	useEffect(() => {
 		if (isAuthenticated.value) route('/', true);
 	}, [isAuthenticated.value]);
+
+	// Decides whether to offer the register button (public endpoint).
+	useEffect(() => {
+		void loadRegistrationConfig();
+	}, []);
 
 	if (isAuthenticated.value) return null;
 
@@ -99,6 +105,21 @@ export function Login(_props: LoginProps) {
 						Sign In
 					</Button>
 				</form>
+
+				{/* Only offered when an admin has opened registration. */}
+				{registrationConfig.value.allowRegistration && (
+					<div class={styles.altAction}>
+						<Button
+							type="button"
+							variant="secondary"
+							size="lg"
+							fullWidth
+							onClick={() => route('/register')}
+						>
+							Register a new account
+						</Button>
+					</div>
+				)}
 			</div>
 		</div>
 	);

@@ -1,0 +1,80 @@
+/**
+ * Register-page additions ONLY.
+ *
+ * The shared auth-screen shell (.page/.card/.header/.logo/.title/.subtitle/
+ * .form/.field/.label/.input/.error) is reused verbatim from Login.module.scss
+ * rather than duplicated here — see Register.tsx, which imports both modules.
+ */
+
+.hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* Inline per-field validation message. */
+.fieldError {
+  font-size: var(--font-size-xs);
+  color: var(--color-error);
+}
+
+.required {
+  color: var(--color-error);
+  margin-left: 2px;
+}
+
+/* ── Success panel (shown after the account is created) ── */
+
+.success {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  text-align: center;
+}
+
+.successIcon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--color-success);
+}
+
+.successTitle {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.successMessage {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+/* ── Footer link row (shared by the form and the success panel) ── */
+
+.footer {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.link {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  background: none;
+  text-decoration: none;
+
+  :root:not([data-no-hover]) &:hover {
+    text-decoration: underline;
+  }
+}

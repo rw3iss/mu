@@ -75,6 +75,21 @@ export class AuthService {
 			throw new UnauthorizedException('Your account has been disabled.');
 		}
 
+		// Self-registration gates. Both default true for every account that
+		// didn't come through public sign-up, so this can't lock out existing
+		// users. Checked AFTER the password so we never reveal account state to
+		// someone who doesn't hold the credentials.
+		if (user.emailVerified === false) {
+			throw new UnauthorizedException(
+				'Please verify your email address before signing in. Check your inbox for the verification link.',
+			);
+		}
+		if (user.approved === false) {
+			throw new UnauthorizedException(
+				'Your account is still waiting for administrator approval.',
+			);
+		}
+
 		// Record the login so profiles can show an "Active …" timestamp. Capture
 		// the PRIOR login into previousLoginAt first, so the dashboard can count
 		// "new since your last session" against the previous visit, not this one.

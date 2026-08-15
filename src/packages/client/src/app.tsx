@@ -22,6 +22,7 @@ import { PlaylistDetail } from '@/pages/PlaylistDetail';
 import { Playlists } from '@/pages/Playlists';
 import { ProfilePage } from '@/pages/Profile/ProfilePage';
 import { PublicWatch } from '@/pages/PublicWatch';
+import { Register } from '@/pages/Register';
 import { Settings } from '@/pages/Settings';
 import { Setup } from '@/pages/Setup';
 import { Watchlist } from '@/pages/Watchlist';
@@ -98,7 +99,7 @@ function enforceAuth(url: string): boolean {
 	// Skip auth checks when local bypass is active
 	if (localBypass.value) return false;
 
-	if (!isAuthenticated.value && !['/login', '/setup'].includes(url)) {
+	if (!isAuthenticated.value && !['/login', '/setup', '/register'].includes(url)) {
 		route('/login', true);
 		return true;
 	}
@@ -130,6 +131,7 @@ function titleForPath(path: string): string {
 		feedback: 'Feedback',
 		login: 'Login',
 		setup: 'Setup',
+		register: 'Register',
 		watch: 'Watch',
 	};
 	const name = names[seg];
@@ -229,7 +231,7 @@ export function App() {
 	}
 
 	const path = currentPath.value;
-	const isAuthRoute = path === '/login' || path === '/setup';
+	const isAuthRoute = path === '/login' || path === '/setup' || path === '/register';
 	const isPublicWatch = path.startsWith('/watch/');
 
 	return (
@@ -247,6 +249,7 @@ export function App() {
 				<Router onChange={handleRouteChange}>
 					<Login path="/login" />
 					<Setup path="/setup" />
+					<Register path="/register" />
 					<NotFound default />
 				</Router>
 			) : (

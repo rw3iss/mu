@@ -1,13 +1,19 @@
-import { resolveDisplayName, type UserRole } from '@mu/shared';
+import { type RegistrationConfig, resolveDisplayName, type UserRole } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { Select } from '@/components/common/Select';
 import { ToggleButton } from '@/components/common/ToggleButton';
 import { useConfirm } from '@/hooks/useConfirm';
 import { api } from '@/services/api';
+import { authService } from '@/services/auth.service';
 import { profileService } from '@/services/profile.service';
 import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import {
+	loadRegistrationConfig,
+	registrationConfig,
+	setRegistrationConfigLocal,
+} from '@/state/registration.state';
 import { setShowUsersInfoLocal, showUsersInfo } from '@/state/system.state';
 import styles from './Users.module.scss';
 
@@ -18,6 +24,9 @@ interface UserRow {
 	email: string | null;
 	role: UserRole;
 	disabled?: boolean;
+	/** Self-registration gates — false only for pending public sign-ups. */
+	approved?: boolean;
+	emailVerified?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -40,6 +49,7 @@ export function Users() {
 	const [showAdd, setShowAdd] = useState(false);
 	const [editPassword, setEditPassword] = useState<UserRow | null>(null);
 	const [savingSystem, setSavingSystem] = useState(false);
+	const [savingRegistration, setSavingRegistration] = useState(false);
 	const { confirm, dialog } = useConfirm();
 
 	const me = currentUser.value;
@@ -60,6 +70,38 @@ export function Users() {
 		}
 	};
 
+	/**
+	 * Persist one registration switch. Sends the WHOLE config (the endpoint
+	 * takes all three) built from the current signal + this change, then mirrors
+	 * the server's response locally.
+	 */
+	const updateRegistration = async (patch: Partial<RegistrationConfig>) => {
+		const next = { ...registrationConfig.value, ...patch };
+		setSavingRegistration(true);
+		try {
+			const saved = await authService.setRegistrationConfig(next);
+			setRegistrationConfigLocal(saved);
+			notifySuccess('Registration settings updated');
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed to update registration settings');
+		} finally {
+			setSavingRegistration(false);
+		}
+	};
+
+	const approve = async (u: UserRow) => {
+		setBusy(u.id);
+		try {
+			await api.post(`/users/${u.id}/approve`, {});
+			notifySuccess(`Approved ${u.username}`);
+			await refresh();
+		} catch (err: any) {
+			notifyError(err?.message ?? 'Failed to approve user');
+		} finally {
+			setBusy(null);
+		}
+	};
+
 	const refresh = async () => {
 		setLoading(true);
 		try {
@@ -74,6 +116,7 @@ export function Users() {
 
 	useEffect(() => {
 		void refresh();
+		void loadRegistrationConfig(true);
 	}, []);
 
 	const changeRole = async (u: UserRow, role: UserRole) => {
@@ -180,6 +223,83 @@ export function Users() {
 				</ToggleButton>
 			</div>
 
+			{/* ── Self-registration ─────────────────────────────────────────
+			    The two sub-options only exist while registration is open, so
+			    they're rendered conditionally rather than shown disabled. */}
+			<div class={styles.systemToggle}>
+				<div class={styles.systemToggleInfo}>
+					<span class={styles.systemToggleLabel}>Allow new user registration</span>
+					<span class={styles.systemToggleDesc}>
+						When enabled, a <strong>Register a new account</strong> button appears on
+						the sign-in page and anyone who can reach this server can create an account.
+						New accounts are always created as <strong>viewers</strong>.
+					</span>
+				</div>
+				<ToggleButton
+					pressed={registrationConfig.value.allowRegistration}
+					loading={savingRegistration}
+					onClick={() =>
+						updateRegistration({
+							allowRegistration: !registrationConfig.value.allowRegistration,
+						})
+					}
+				>
+					{registrationConfig.value.allowRegistration ? 'Enabled' : 'Disabled'}
+				</ToggleButton>
+			</div>
+
+			{registrationConfig.value.allowRegistration && (
+				<>
+					<div class={`${styles.systemToggle} ${styles.systemToggleNested}`}>
+						<div class={styles.systemToggleInfo}>
+							<span class={styles.systemToggleLabel}>Require admin approval</span>
+							<span class={styles.systemToggleDesc}>
+								New accounts can't sign in until an admin approves them here.
+								Pending accounts appear in the list below with an
+								<strong> Approve</strong> button.
+							</span>
+						</div>
+						<ToggleButton
+							pressed={registrationConfig.value.requireApproval}
+							loading={savingRegistration}
+							onClick={() =>
+								updateRegistration({
+									requireApproval: !registrationConfig.value.requireApproval,
+								})
+							}
+						>
+							{registrationConfig.value.requireApproval ? 'Enabled' : 'Disabled'}
+						</ToggleButton>
+					</div>
+
+					<div class={`${styles.systemToggle} ${styles.systemToggleNested}`}>
+						<div class={styles.systemToggleInfo}>
+							<span class={styles.systemToggleLabel}>Require email verification</span>
+							<span class={styles.systemToggleDesc}>
+								New accounts must click a link emailed to them before they can sign
+								in. Requires a configured email provider — until one is set up the
+								verification link is written to the server log, and approving an
+								account here also clears its email requirement.
+							</span>
+						</div>
+						<ToggleButton
+							pressed={registrationConfig.value.requireEmailVerification}
+							loading={savingRegistration}
+							onClick={() =>
+								updateRegistration({
+									requireEmailVerification:
+										!registrationConfig.value.requireEmailVerification,
+								})
+							}
+						>
+							{registrationConfig.value.requireEmailVerification
+								? 'Enabled'
+								: 'Disabled'}
+						</ToggleButton>
+					</div>
+				</>
+			)}
+
 			<div class={styles.toolbar}>
 				<span>
 					{loading ? 'Loading…' : `${users.length} user${users.length === 1 ? '' : 's'}`}
@@ -206,6 +326,11 @@ export function Users() {
 									<span class={styles.subtle}> @{u.username}</span>
 								) : null}
 								{u.id === me?.id ? <span class={styles.selfBadge}>you</span> : null}
+								{u.approved === false ? (
+									<span class={styles.pendingBadge}>pending approval</span>
+								) : u.emailVerified === false ? (
+									<span class={styles.pendingBadge}>unverified</span>
+								) : null}
 							</td>
 							<td>{u.email ?? '—'}</td>
 							<td>
@@ -220,6 +345,18 @@ export function Users() {
 							<td>{new Date(u.createdAt).toLocaleDateString()}</td>
 							<td>
 								<div class={styles.actions}>
+									{(u.approved === false || u.emailVerified === false) && (
+										<div class={styles.actionRow}>
+											<button
+												type="button"
+												class={styles.linkButton}
+												disabled={busy === u.id}
+												onClick={() => approve(u)}
+											>
+												Approve
+											</button>
+										</div>
+									)}
 									<div class={styles.actionRow}>
 										<button
 											type="button"

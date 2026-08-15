@@ -38,6 +38,14 @@ export class UsersController {
 		return this.usersService.update(id, body);
 	}
 
+	/** Approve a self-registered account that's waiting on an admin. */
+	@Post(':id/approve')
+	@Roles('admin')
+	@RequireAction('admin:users')
+	approve(@Param('id') id: string) {
+		return this.usersService.approve(id);
+	}
+
 	@Delete(':id')
 	@Roles('admin')
 	@RequireAction('admin:users')
