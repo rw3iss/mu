@@ -35,13 +35,11 @@
     "@nestjs/websockets": "^11.1.17",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.8.0",
-    "bullmq": "^5.76.8",
     "chokidar": "^5.0.0",
     "drizzle-orm": "^0.45.1",
     "esbuild": "^0.27.4",
     "fastify": "^5.8.2",
     "fluent-ffmpeg": "^2.1.0",
-    "ioredis": "^5.10.1",
     "js-yaml": "^4.1.0",
     "lru-cache": "^11.2.7",
     "pino": "^10.3.1",
@@ -63,5 +61,13 @@
     "drizzle-kit": "^0.31.10",
     "typescript": "^5.7.0",
     "vitest": "^4.1.0"
+  },
+  "peerDependencies": {
+    "bullmq": "^5.76.8"
+  },
+  "peerDependenciesMeta": {
+    "bullmq": {
+      "optional": true
+    }
   }
 }

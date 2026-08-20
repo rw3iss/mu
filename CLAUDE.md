@@ -123,9 +123,9 @@ NestJS modules in `packages/server/src/`:
 `JobManagerService` is an abstract class. Concrete implementations:
 
 - `InMemoryJobProvider` (`jobs/in-memory-job-provider.ts`) — default. Single-process priority queue + toad-scheduler. Zero external deps.
-- `BullMqJobProvider` (`jobs/bullmq-job-provider.ts`) — Redis-backed via [BullMQ](https://docs.bullmq.io). Persistent, supports horizontal scaling.
+- `BullMqJobProvider` (`jobs/bullmq-job-provider.ts`) — Redis-backed via [BullMQ](https://docs.bullmq.io). Persistent, supports horizontal scaling. **Opt-in and NOT installed by default**: `bullmq` is an *optional peer dependency* (skipped by `pnpm install`), and the provider `await import`s it through a variable specifier so TypeScript doesn't require it at build time. Enabling = `cd packages/server && pnpm add bullmq` + `jobs.backend: bullmq`; without the package, startup throws a message naming the fix. Note the `jobs` block only reaches the app because it exists in `config.schema.ts` — zod strips unknown keys, so any new config section must be declared there.
 
-Selected at bootstrap via `jobs.backend` in `config.yml` (`in-memory` or `bullmq`). The factory in `JobModule` instantiates the chosen backend; callers always inject `JobManagerService` and never know which one is active.
+Selected at bootstrap via `jobs.backend` in `config.yml` (`in-memory` or `bullmq`). Prod runs **in-memory**; BullMQ ignores the two-tier I/O caps below, so a single-box install should stay on the default. The factory in `JobModule` instantiates the chosen backend; callers always inject `JobManagerService` and never know which one is active.
 
 **Two-tier concurrency (in-memory provider).** `encoding.maxConcurrentJobs` (default 2) caps total running jobs; `encoding.maxConcurrentIoJobs` (default **1**) is a *second, lower* cap that applies only to whole-file disk-heavy types (`sprite-sheet`, `pre-transcode`, `convert-mp4`). `processQueue` scans the priority queue and skips a heavy job that's blocked by the I/O cap, still running light jobs (metadata/scan) past it — so a fresh-scan burst of sprite/transcode work serializes off one HDD instead of thrashing it and starving playback. Both are set in `Settings → Encoding`. (BullMQ uses its own per-queue concurrency and ignores these.)
 

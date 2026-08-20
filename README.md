@@ -394,6 +394,25 @@ Mu's job runner (scan, metadata, transcode, embedding, ...) is pluggable via `jo
 
 Switching backends is non-destructive — the same `JobManagerService` interface is used everywhere, so handlers (scan, metadata, etc.) work identically across both. State is *not* migrated between backends though; in-flight jobs are lost when you flip.
 
+**BullMQ is opt-in and is NOT installed by default.** A normal install pulls no Redis client at all — `bullmq` is declared as an *optional peer dependency*, so `pnpm install` skips it (and its ~170 transitive packages). Enabling it is two steps:
+
+```bash
+# 1. install the optional package (in packages/server)
+cd packages/server && pnpm add bullmq
+
+# 2. point Mu at Redis (config.yml)
+```
+```yaml
+jobs:
+  backend: bullmq
+  redis:
+    url: redis://localhost:6379
+```
+
+You also need a running Redis server (`redis-server`, or the `redis` service from `docker/docker-compose.yml`). If you set `backend: bullmq` without installing the package, startup fails with an explicit message telling you to run `pnpm add bullmq` or switch back to `in-memory`.
+
+> **Most self-hosted installs should stay on `in-memory`.** BullMQ exists for horizontal scaling across machines. On a single box the jobs are FFmpeg work bound by that box's disk and GPU, so extra workers just contend for the same hardware — and the in-memory provider's two-tier I/O throttle (`encoding.maxConcurrentIoJobs`, which keeps sprite/transcode work from starving playback on an HDD) does **not** apply to BullMQ, which uses its own per-queue concurrency.
+
 ### IMDB Datasets (offline ratings)
 
 IMDB publishes free daily TSV bulk dumps at `datasets.imdbws.com`. Mu can sync the **ratings** table (`title.ratings.tsv.gz`, ~25 MB unpacked, ~1.4M titles) into a local SQLite table and serve all IMDB rating lookups from disk — no OMDB quota, no API latency, daily-fresh.
@@ -432,7 +451,7 @@ Mu computes a 384-dimensional plot embedding for every movie in your library and
 
 ### Standalone Workers (BullMQ only)
 
-With BullMQ active, you can run additional worker processes that pull jobs off the same queue — useful for CPU-heavy work (transcoding, embeddings) or to keep the HTTP server responsive under load.
+With BullMQ active (see the opt-in steps above — `pnpm add bullmq` + `jobs.backend: bullmq`), you can run additional worker processes that pull jobs off the same queue — useful for CPU-heavy work (transcoding, embeddings) or to keep the HTTP server responsive under load.
 
 ```bash
 # from src/

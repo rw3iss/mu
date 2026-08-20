@@ -68,8 +68,24 @@ export class BullMqJobProvider extends JobManagerService implements OnModuleDest
 	}
 
 	async initialize(): Promise<void> {
-		// Lazy ESM import — fails loudly if bullmq isn't installed.
-		const bull = await import('bullmq');
+		// Lazy ESM import. `bullmq` is an OPTIONAL dependency — it is deliberately
+		// not installed by default (see packages/server/package.json
+		// peerDependenciesMeta), so the specifier is held in a variable to keep
+		// TypeScript from requiring the package at build time. Anyone who opts
+		// into the BullMQ backend installs it first; if they haven't, this throws
+		// a clear error naming the fix.
+		const bullSpecifier = 'bullmq';
+		let bull: any;
+		try {
+			bull = await import(/* @vite-ignore */ bullSpecifier);
+		} catch (err) {
+			throw new Error(
+				'The BullMQ job backend requires the optional `bullmq` package. ' +
+					'Install it with `pnpm add bullmq` in packages/server, or set ' +
+					'`jobs.backend: in-memory` (the default) in config.yml. ' +
+					`Original error: ${(err as Error)?.message ?? err}`,
+			);
+		}
 		this.Queue = bull.Queue;
 		this.Worker = bull.Worker;
 		this.QueueEvents = bull.QueueEvents;
