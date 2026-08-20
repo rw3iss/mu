@@ -109,7 +109,11 @@ export const configSchema = z.object({
 			.positive()
 			.default(7 * 24 * 60 * 60 * 1000),
 		bcryptRounds: z.coerce.number().int().min(4).max(31).default(12),
-		allowRegistration: z.boolean().default(true),
+		// NOTE: self-registration is deliberately NOT configured here. It's an
+		// admin setting (Settings → Users), stored in the settings table and
+		// read by RegistrationService. A dead `allowRegistration` key used to
+		// live here — nothing read it, and its `true` default contradicted the
+		// real feature's off-by-default, so it was removed.
 		/**
 		 * Opaque token consumed by unattended internal services
 		 * (e.g. the scheduled-debugger remote routine) to hit
@@ -258,6 +262,31 @@ export const configSchema = z.object({
 			relayPortRange: z.string().default('49160-49200'),
 			/** Extra STUN URLs to advertise, ahead of the public fallback. */
 			stunUrls: z.array(z.string()).default([]),
+		})
+		.default(() => ({}) as any),
+
+	/**
+	 * Background-job backend. `JobModule` / `worker.ts` read these keys, but the
+	 * block was missing from this schema — and zod strips unknown keys, so a
+	 * `jobs:` section in config.yml was silently discarded and `jobs.backend`
+	 * always fell back to `in-memory`. That made the fully-implemented BullMQ
+	 * provider impossible to enable via config. Defaults below mirror the
+	 * fallbacks the code already passes to `config.get`.
+	 */
+	jobs: z
+		.object({
+			backend: z.enum(['in-memory', 'bullmq']).default('in-memory'),
+			redis: z
+				.object({
+					url: z.string().default('redis://localhost:6379'),
+				})
+				.default(() => ({}) as any),
+			bullmq: z
+				.object({
+					queueName: z.string().default('mu-jobs'),
+					concurrency: z.coerce.number().int().positive().default(2),
+				})
+				.default(() => ({}) as any),
 		})
 		.default(() => ({}) as any),
 

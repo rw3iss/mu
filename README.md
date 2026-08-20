@@ -2,7 +2,7 @@
 
 **A lightweight, self-hosted movie streaming and management platform.**
 
-Stream your local movie collection to any device, fetch metadata and ratings automatically, share your library with others, and manage everything from a single server you control.
+Stream your local movie collection to any device, fetch metadata and ratings automatically, watch together with friends, share your library with others, and manage everything from a single server you control.
 
 ## Screenshots
 
@@ -33,8 +33,11 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 
 ### Streaming & Transcoding
 - **HLS adaptive streaming** -- FFmpeg transcoding with automatic format detection, or zero-overhead direct play for compatible formats
-- **Chunked transcoding** -- movies are transcoded in independent chunks for fast startup, seek support, and crash recovery (configurable chunk size)
-- **Smart seek** -- seeking to an untranscoded position reprioritizes encoding chunks so playback resumes quickly without wasting completed work
+- **MP4 direct-play conversion** (default on) -- the preferred path. Files are converted once to a faststart H.264/AAC MP4 so they **direct-play natively** with no transcoding at watch time (this is also what makes the EQ/compressor work — HLS `blob:` MediaSource silences Web Audio). H.264 sources are losslessly remuxed; only non-H.264 video is re-encoded, and that's skipped when the result would be meaningfully larger than the source. Optionally replaces the original file (`convertOriginalFile`). New movies convert automatically (`autoConvertToMp4`); the existing library converts via *Settings → Admin → Convert and Clear Cache*.
+- **Shrink oversized files** -- `Settings → Encoding → Shrink Files Above` re-encodes any file whose bitrate exceeds a ceiling (to AV1 via NVENC, or H.264 CRF), and only when the result is actually smaller. Off by default.
+- **HEVC handling** -- browsers that can decode HEVC direct-play it as-is; others get an H.264 HLS cache. Optionally, HEVC can be re-encoded to **AV1** (browser-universal, ~HEVC-efficient) when a usable NVENC GPU is present.
+- **Chunked transcoding** (optional, off by default) -- an alternative HLS mode that transcodes movies in independent chunks for fast startup and crash recovery. Enable with the `useChunkedTranscoding` encoding setting; the default single-pass pipeline is used otherwise.
+- **Smart seek** (chunked mode) -- seeking to an untranscoded position reprioritizes encoding chunks so playback resumes quickly without wasting completed work
 - **Resumable transcoding** -- interrupted transcodes resume automatically on server restart, prioritizing recently watched movies
 - **Hardware acceleration** -- NVENC, QSV, VAAPI support with automatic software fallback when hardware encoding fails
 - **Multiple quality levels** -- 480p through 4K, selectable per-stream, capped at source resolution
@@ -48,7 +51,8 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 ### Player
 - **Persistent overlay player** -- video stays playing during navigation, with mini and full modes
 - **Resume playback** -- pick up where you left off, persisted across refreshes and restarts
-- **Subtitles** -- embedded and external subtitle support (SRT, VTT, ASS), online search via OpenSubtitles, upload, appearance customization (font size, color, shadow, background, line spacing, timing offset, vertical position)
+- **Subtitles** -- embedded and external subtitle support (SRT, VTT, ASS), online search via **OpenSubtitles and Subdl**, upload, appearance customization (font size, color, shadow, background, line spacing, timing offset, vertical position)
+- **Manage Subtitles panel** -- downloads are written straight into the movie folder as sidecar files (so they survive rescans) and multiple same-language downloads coexist. Results you already have are badged **Downloaded** and sorted first; the filter box accepts comma-separated terms (a result must match all of them). Set a **default subtitle** per movie (auto-selected on play), see which track is currently playing, and delete individual tracks.
 - **Parametric EQ** -- 10-band graphic EQ + amp slider, lazy Web Audio attach (zero overhead until enabled), saveable profiles
 - **EQ Spectrum visualizer** -- real-time FFT analyser rendered behind the slider grid, log-spaced and aligned to band frequencies (toggle with the **Spectrum** pill)
 - **Auto-EQ** -- sample the live audio for 1–10 seconds, compute the average energy at each band, and drive every slider to its flattening offset; a 0.1–1.0 **Factor** scales the strength of the correction (default 0.5 — full strength tends to over-correct)
@@ -59,6 +63,25 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 - **Saveable effect profiles** -- name, save, load, clone, delete EQ / compressor / video presets independently, restored across refreshes
 - **Skip controls** -- configurable skip forward/backward times
 - **Keyboard shortcuts** -- full keyboard control for playback, seeking, volume, fullscreen
+
+### Shared Sessions (watch party)
+- **Watch together** -- start a shared session from the player's cog menu or a movie's options menu, then invite other members. Invitees get a flydown + a bell notification; accepting loads the movie and syncs them in.
+- **Synced playback** -- play / pause / seek propagate to everyone, with a periodic position heartbeat and drift correction (soft playback-rate nudge, hard seek, or wait-for-all). The session admin can tune the pre-buffer and drift threshold.
+- **Chat** -- a draggable, resizable, dockable chat window with an unread badge. History persists for the life of the session.
+- **Voice** -- opt-in WebRTC voice (peer-to-peer mesh), with each mic passing through the same **EQ + compressor** engine used for playback, including visualizers and auto modes. Works over STUN for most networks; a self-hosted **coturn** TURN server (`pnpm coturn:setup`) covers symmetric-NAT peers.
+- **Session settings** -- the admin controls whether members can drive playback, and whether chat and voice are enabled.
+- Sessions that are abandoned (not explicitly ended) are auto-closed server-side, so an old party can't resurrect itself later.
+
+### Social & Notifications
+- **Comments** -- per-movie comments with replies, reactions, and timestamp chips that seek the player to that moment.
+- **Notifications** -- a bell + dropdown in the header with toasts for new items: comment replies and reactions, shared-session invites, and admin announcements. Delivered live over WebSocket.
+- **Soundtrack** -- a collapsible Soundtrack section on the movie page listing the released album tracklist, via MusicBrainz (keyless, cached). This is the album tracklist, not songs-per-scene.
+- **Feedback** -- any user can submit feedback (with an optional screenshot); admins triage it in Settings → Feedback and can reply by email.
+
+### Sharing & Uploads
+- **Share links** -- generate a public link to a movie that plays at `/watch/<token>` without an account.
+- **Direct uploads** -- drag and drop files *or folders* into the Library upload modal; the upload continues in a floating progress widget so you can keep browsing. Folder structure is recreated verbatim on the server, and files are streamed (never buffered), so multi-GB uploads are fine.
+- **Federated search** -- one search box spanning your local library plus TMDB, OMDB, and Trakt, streamed in over SSE with cross-source dedupe. Movies you don't own open a read-only preview page (with cast, ratings, and trailer) that you can bookmark for later.
 
 ### Interface
 - **Customizable appearance** -- theme (dark/light/auto), accent color, page/panel backgrounds, card spacing/radius/borders, font scaling (5 levels)
@@ -74,6 +97,7 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 ### Members & Profiles
 - **Social profiles** -- every user gets a profile page at **`/profile`** (their own, editable) and **`/profile/:username`** (a public read view). It's a dashboard of panels: identity + avatar, an editable blurb (≤500 chars), favorites (with movies/cast/directors filter toggles, earliest-added first), full recently-watched history with each movie's resume position, and a prominent **"Watching Now"** tout when the user has a live playback session.
 - **Display name + avatar** -- each user can set a **display name** (shown everywhere in place of the login username, falling back to the username when unset) and upload an **avatar** by clicking their profile picture. Uploads are stored under `<dataDir>/uploads/avatars/` and served at `/uploads/*` — the general `UploadsService` pattern, reused for future chat/comment media. Profiles are **public by default**.
+- **Self-registration** (off by default) -- admins can open sign-up in **Settings → Users**: *Allow new user registration*, plus *Require admin approval* (on by default) and *Require email verification*. When enabled, a **Register a new account** button appears on the login page leading to `/register` (username, email, name, password + confirmation; at least 8 characters with an uppercase letter, a lowercase letter, and a number). Username and email must be unique. New accounts are always created as **viewers**, and can't sign in until any required approval/verification is satisfied — pending accounts are badged in the admin Users list with an **Approve** action. *(Email verification needs a configured email provider; until then the verification link is written to the server log, and approving a user clears the email requirement.)*
 - **Members directory** -- a **Members** sidebar item (under Favorites) and `/members` page list registered users with basic stats and links to each profile.
 - **Visibility, two levels.** An admin **"Show Users Info"** system setting (Settings → Users) is the master switch that exposes Members + cross-user profiles to non-admins. Each user then controls their own **"Show Profile Info"** toggle (atop `/profile`, shown only when the system setting is on): when off, ordinary users get a 404 for that profile and it's hidden from the directory. **Admins always see every profile regardless of either setting.**
 - **Backend** -- the `profile` module (`GET/PATCH /profile/me`, `POST /profile/me/avatar`, `GET /profile/:username`, `GET/PUT /profile/config`, `GET /members`) aggregates favorites, watch history, and live `stream_sessions`, and enforces the visibility rules. Columns: `users.display_name`, `users.description`, `users.profile_public` (default 1). Avatar files go through the `uploads` module (`UploadsService`).
@@ -93,7 +117,8 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 | **Backend** | Node.js, NestJS 11 + Fastify, TypeScript |
 | **Database** | SQLite via Drizzle ORM (zero-config) |
 | **Frontend** | Preact + Signals, Vite, SASS modules |
-| **Streaming** | FFmpeg, HLS via hls.js |
+| **Streaming** | FFmpeg, HLS via hls.js, MP4 direct play |
+| **Realtime** | WebSocket (sync, chat, notifications), WebRTC mesh (voice) |
 | **Audio** | Web Audio API (EQ, compressor, parallel compression) |
 | **Monorepo** | Turborepo + pnpm workspaces |
 | **Linting** | Biome (tabs, single quotes, trailing commas) |
@@ -249,10 +274,11 @@ server:
 auth:
   jwtSecret: "..."              # auto-generated
   cookieSecret: "..."           # auto-generated
-  allowRegistration: true
+  # New-user self-registration is NOT configured here — it's an admin
+  # setting (Settings -> Users -> "Allow new user registration"), off by default.
 
 transcoding:
-  hwAccel: none                 # none | vaapi | nvenc | qsv
+  hwAccel: none                 # none | vaapi | nvenc | qsv | videotoolbox
 
 thirdParty:
   tmdb:
@@ -280,6 +306,23 @@ cache:
     watchedTtlHours: 24         # evict a fully-watched movie this long after last play
     unwatchedTtlHours: 48       # evict a partially-watched movie this long after staging
     idleTtlHours: 168           # hard cap: evict anything untouched this long (7d)
+
+email:                          # optional - feedback notifications + signup verification
+  enabled: false
+  provider: brevo               # brevo | resend
+  brevoApiKey: ""               # (or resendApiKey) - runtime secret, never commit
+  fromAddress: ""
+  fromName: Mu
+  replyTo: ""
+  adminEmail: ""                # recipient for admin notifications
+  siteUrl: ""                   # public URL, used to build links in emails
+
+turn:                           # optional - TURN relay for shared-session voice
+  enabled: false                # see `pnpm coturn:setup`
+  publicHost: ""
+  secret: ""                    # coTURN static-auth-secret - runtime secret
+  realm: ""
+  relayPortRange: 49160-49200
 ```
 
 **Required:** `auth.jwtSecret` and `auth.cookieSecret` are the only required settings -- both are auto-generated on first run.
@@ -288,23 +331,33 @@ cache:
 
 ### Environment Variables
 
-Override any config value with `MU_` prefixed env vars. Use double underscores for nested keys:
+Override config values with `MU_` prefixed env vars, using double underscores for nested keys:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MU_SERVER__PORT` | `4000` | Server port |
-| `MU_SERVER__LOG_LEVEL` | `info` | Log verbosity |s
-| `MU_TRANSCODING__HW_ACCEL` | `none` | Hardware acceleration |
-| `MU_THIRD_PARTY__TMDB__API_KEY` | -- | TMDB API key |
-| `MU_THIRD_PARTY__OMDB__API_KEY` | -- | OMDB API key |
-| `MU_THIRD_PARTY__OPENSUBTITLES__API_KEY` | -- | OpenSubtitles API key |
 | `MU_DATA_DIR` | `./data` | Data directory path |
+| `MU_LOGS_DIR` | `<dataDir>/logs` | Log directory |
 | `MU_CACHE_DIR` | `<dataDir>/cache` | Cache root — anchors streams, images, sprites, subtitles, hot cache |
 | `MU_CACHE__STREAMDIR` | `<cacheRoot>/streams` | Transcode cache directory (overrides the streams subdir only) |
 | `MU_JOBS__BACKEND` | `in-memory` | Job queue: `in-memory` (default) or `bullmq` (Redis) |
 | `MU_JOBS__REDIS__URL` | `redis://localhost:6379` | Redis URL (BullMQ only) |
-| `MU_JOBS__BULLMQ__QUEUE_NAME` | `mu-jobs` | BullMQ queue name |
 | `MU_JOBS__BULLMQ__CONCURRENCY` | `2` | Worker concurrency |
+| `MU_AUTH_API_TOKEN` | -- | Token for unattended internal access to `/admin/logs/*` (empty disables it) |
+| `MU_EMAIL_ENABLED` | `false` | Enable outbound email |
+| `MU_EMAIL_PROVIDER` | `brevo` | `brevo` or `resend` |
+| `MU_EMAIL_BREVO_API_KEY` / `MU_EMAIL_RESEND_API_KEY` | -- | Provider API key |
+| `MU_EMAIL_FROM_ADDRESS` / `MU_EMAIL_FROM_NAME` | -- | Sender identity |
+| `MU_EMAIL_ADMIN_EMAIL` | -- | Recipient for admin notifications (feedback) |
+| `MU_SHUTDOWN_GRACE_MS` | `5000` | Force-exit window after SIGTERM |
+
+> **Note on camelCase keys.** The env parser lowercases every path segment, so
+> `MU_X__Y` only reaches a config key that is *already lowercase*. camelCase keys
+> (`server.logLevel`, `transcoding.hwAccel`, `thirdParty.tmdb.apiKey`,
+> `jobs.bullmq.queueName`, …) are **not** reachable this way — set those in
+> `config.yml`, or use the explicitly-supported variables listed above (which are
+> special-cased in the loader). API keys are best set in **Settings → Connections**,
+> where they're stored encrypted in the database.
 
 ### Caching & Storage Tiers
 
@@ -466,6 +519,7 @@ pnpm service logs             # follow the journal (journalctl --user -u mu-serv
 pnpm service uninstall        # remove the service ONLY (keeps app + data)
 
 # Server management
+pnpm deploy                   # push + remote build + restart + verify (see Manual deploy)
 pnpm status                   # show server mode, health, uptime
 pnpm logs                     # tail local server log
 pnpm logs:prod                # tail production server log via SSH
@@ -475,6 +529,10 @@ pnpm update                   # fetch latest release, migrate, restart
 pnpm uninstall                # remove services AND app (full uninstall)
 
 # Plugins
+pnpm coturn:setup             # install/configure coTURN for shared-session voice
+pnpm cache:clean              # prune orphaned cache entries
+pnpm test                     # run the test suite
+
 pnpm plugin:generate <id>     # scaffold a new plugin
 pnpm plugin:generate-client-api <id>  # generate client API from plugin schema
 
@@ -494,14 +552,19 @@ mu/
   │   ├── client/        # Preact frontend (PWA)
   │   └── shared/        # Shared types and utilities
   ├── plugins/           # Plugin directory (server + client code per plugin)
-  ├── scripts/           # Install, log, and utility scripts
+  ├── scripts/           # Install, deploy, log, and utility scripts
   ├── docker/            # Dockerfile + docker-compose
   └── data/              # Runtime data (gitignored)
       ├── config/        #   config.yml
       ├── db/            #   SQLite database
-      ├── cache/         #   transcode and image cache
+      ├── cache/         #   transcode, image, sprite, subtitle + hot cache
+      ├── thumbnails/    #   generated poster/backdrop thumbnails
+      ├── uploads/       #   user uploads (avatars, feedback attachments)
+      ├── models/        #   local embedding model (downloaded on demand)
       └── logs/          #   server logs
 ```
+
+> The runtime `data/` directory lives at the **repo root** (`<repoRoot>/data`), not under `src/` — paths in `.env` / `config.yml` anchor to the project root so the DB is the same file whichever directory you start the server from.
 
 
 # How-To Extended:
@@ -556,6 +619,8 @@ MU_CACHE__STREAMDIR=/path/to/custom/cache/streams
 3. Restart the server
 
 ### GPU Encoding on Windows (NVENC)
+
+> Applies to **Windows installs only**. On Linux the systemd *user* service (above) already runs in your own session, so the GPU is available with no extra steps.
 
 Windows services run in **Session 0**, which has no GPU access. If Mu is running as an NSSM service with the default `SYSTEM` account, NVENC hardware encoding will fail and fall back to software (libx264).
 
@@ -630,11 +695,12 @@ What it does (platform priority: **Fedora/RHEL → Debian/Ubuntu → macOS → W
 - Opens ports 80/443 (firewalld or ufw).
 - On **SELinux** (Fedora/RHEL) sets `httpd_can_network_connect` so the proxy doesn't `502`.
 - Serves the client's immutable `/assets/` straight from disk **when nginx can read them** — and automatically **falls back to a pure proxy** when it can't (e.g. the app lives under a `0700` home dir / `user_home_t`, where the system nginx user has no access; the Mu node server then serves its own static files). Everything else (SPA shell + SSR, REST API, WebSockets, HLS/streaming) is proxied to the app, with WebSocket upgrade, `proxy_buffering off`, and long timeouts for streaming.
-- With `--letsencrypt`, installs certbot + the nginx plugin and runs `certbot --nginx` (auto-renew via certbot's systemd timer).
+- With `--letsencrypt`, installs certbot and issues the cert with the **webroot** authenticator plus the nginx *installer* (auto-renew via certbot's systemd timer). It deliberately does **not** use `certbot --nginx`: the catch-all proxy would forward the ACME challenge to the app and serve SPA HTML instead of the challenge file, so the site config serves `/.well-known/acme-challenge/` from `/var/www/certbot` directly.
 
-> **Let's Encrypt prerequisites:** the domain's DNS must point at your public IP, and your router must forward **ports 80 _and_ 443** to this host (HTTP-01 validates over port 80). If the cert step fails (e.g. "Timeout during connect"), the HTTP site keeps serving — fix forwarding/DNS and re-run just the cert step:
+> **Let's Encrypt prerequisites:** the domain's DNS must point at your public IP, and your router must forward **ports 80 _and_ 443 to nginx** — not to the app's port (HTTP-01 validates over port 80). If the cert step fails (e.g. "Timeout during connect"), the HTTP site keeps serving — fix forwarding/DNS and re-run just the cert step with the same authenticator the script uses:
 > ```bash
-> sudo certbot --nginx -d mu.example.com --redirect -m you@example.com
+> sudo certbot run --authenticator webroot --webroot-path /var/www/certbot \
+>   --installer nginx -d mu.example.com --redirect -m you@example.com --agree-tos
 > ```
 > The app's own `tls.*` config (in `config.yml`) should stay disabled when nginx terminates TLS — let nginx handle HTTPS and proxy plain HTTP to the app.
 
@@ -651,11 +717,26 @@ pnpm autodeploy uninstall   # stop + remove the watcher
 
 `scripts/auto-deploy-watch.sh` polls `origin/main` (default every 60s, `MU_DEPLOY_POLL_SECONDS`); on a new commit it runs `git reset --hard` → `pnpm install` → `pnpm build` → `pnpm db:migrate`, then **restarts the `mu-server` user service** and health-checks it. The old server keeps serving until a build succeeds, so a broken build never takes the site down. It **skips the deploy if the working tree is dirty**, so uncommitted local edits are never clobbered — commit or stash first. (On Windows it restarts the legacy "Mu Server" scheduled task instead.)
 
-### Restart Windows service/server:
-nssm stop mu-server      # stop the service
-nssm start mu-server     # start the service
-nssm restart mu-server   # restart the service
+### Manual deploy to a remote host
 
+`pnpm deploy` (`scripts/deploy-fedora.sh`) is the canonical low-downtime deploy: it pushes the current branch, then over one SSH session pauses the auto-deploy watcher, syncs, **builds while the old server keeps serving**, migrates, restarts, and waits for a healthy HTTP response — finally verifying the public URL from outside. It exits non-zero on any failure rather than silently "succeeding" with a broken site.
+
+```bash
+pnpm deploy                 # push + remote build + restart + verify
+pnpm deploy -- --no-push    # assume HEAD is already on origin
+```
+
+Configure the target with `MU_REMOTE_HOST`, `MU_REMOTE_PATH`, `MU_DEPLOY_BRANCH`, and `MU_PUBLIC_URL`.
+
+### Restarting the server
+
+```bash
+pnpm service restart     # systemd user service (Linux) — see above
+pnpm service status
+pnpm service logs
+```
+
+On a Windows install the service is managed with NSSM instead (`nssm restart mu-server`); see `pnpm setup:service` below.
 
 ### Auto-start service on boot:
 `pnpm setup:service` — Auto-start on boot
