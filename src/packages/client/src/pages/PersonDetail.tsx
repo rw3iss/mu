@@ -48,11 +48,18 @@ const CREDIT_SORTS: readonly CreditSort[] = ['year', 'title', 'rating', 'votes']
 type CreditType = 'all' | 'movie' | 'tv';
 const CREDIT_TYPES: readonly CreditType[] = ['all', 'movie', 'tv'];
 
+// A credit counts as "in library" exactly when the server resolved it to a real
+// local movie row (`movieId`) — the same signal `CreditCard` uses to decide
+// whether to show its "Not in library" badge, so filter and badge can't disagree.
+type CreditLibrary = 'all' | 'in' | 'out';
+const CREDIT_LIBRARY: readonly CreditLibrary[] = ['all', 'in', 'out'];
+
 interface CreditParams {
 	sort: CreditSort;
 	minRating: string;
 	minVotes: string;
 	type: CreditType;
+	library: CreditLibrary;
 }
 
 /** Read the "Known for" sort/filter state from the current URL query. */
@@ -61,11 +68,15 @@ function readCreditParams(): CreditParams {
 	const p = new URLSearchParams(search);
 	const sort = p.get('sort');
 	const type = p.get('type');
+	const library = p.get('library');
 	return {
 		sort: CREDIT_SORTS.includes(sort as CreditSort) ? (sort as CreditSort) : 'year',
 		minRating: p.get('minRating') ?? '',
 		minVotes: p.get('minVotes') ?? '',
 		type: CREDIT_TYPES.includes(type as CreditType) ? (type as CreditType) : 'all',
+		library: CREDIT_LIBRARY.includes(library as CreditLibrary)
+			? (library as CreditLibrary)
+			: 'all',
 	};
 }
 
@@ -76,6 +87,9 @@ export function PersonDetail({ id }: PersonDetailProps) {
 	const [creditMinRating, setCreditMinRating] = useState(() => readCreditParams().minRating);
 	const [creditMinVotes, setCreditMinVotes] = useState(() => readCreditParams().minVotes);
 	const [creditType, setCreditType] = useState<CreditType>(() => readCreditParams().type);
+	const [creditLibrary, setCreditLibrary] = useState<CreditLibrary>(
+		() => readCreditParams().library,
+	);
 	const [error, setError] = useState<string | null>(null);
 	const [showFullBio, setShowFullBio] = useState(false);
 
@@ -88,6 +102,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 		if (p.minRating) q.set('minRating', p.minRating);
 		if (p.minVotes) q.set('minVotes', p.minVotes);
 		if (p.type !== 'all') q.set('type', p.type);
+		if (p.library !== 'all') q.set('library', p.library);
 		const qs = q.toString();
 		const next = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
 		if (next !== window.location.pathname + window.location.search) route(next, true);
@@ -138,6 +153,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 		setCreditMinRating(p.minRating);
 		setCreditMinVotes(p.minVotes);
 		setCreditType(p.type);
+		setCreditLibrary(p.library);
 	}, [id]);
 
 	if (isLoading) return <PersonSkeleton />;
@@ -172,6 +188,10 @@ export function PersonDetail({ id }: PersonDetailProps) {
 		if (Number.isFinite(minVotes) && minVotes > 0) {
 			list = list.filter((c) => (c.tmdbVotes ?? 0) >= minVotes);
 		}
+		if (creditLibrary !== 'all') {
+			const owned = creditLibrary === 'in';
+			list = list.filter((c) => !!c.movieId === owned);
+		}
 		const sorted = [...list];
 		sorted.sort((a, b) => {
 			switch (creditSort) {
@@ -186,7 +206,14 @@ export function PersonDetail({ id }: PersonDetailProps) {
 			}
 		});
 		return sorted;
-	}, [person.knownForMovies, creditSort, creditMinRating, creditMinVotes, creditType]);
+	}, [
+		person.knownForMovies,
+		creditSort,
+		creditMinRating,
+		creditMinVotes,
+		creditType,
+		creditLibrary,
+	]);
 
 	return (
 		<div class={styles.personDetail}>
@@ -265,6 +292,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 											minRating: creditMinRating,
 											minVotes: creditMinVotes,
 											type: creditType,
+											library: creditLibrary,
 										});
 									}}
 									options={[
@@ -288,6 +316,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 											minRating: creditMinRating,
 											minVotes: creditMinVotes,
 											type: t,
+											library: creditLibrary,
 										});
 									}}
 									options={[
@@ -296,6 +325,29 @@ export function PersonDetail({ id }: PersonDetailProps) {
 										{ value: 'tv', label: 'TV Shows' },
 									]}
 									aria-label="Filter credits by type"
+								/>
+							</span>
+							<span class={styles.controlGroup}>
+								<span class={styles.controlLabelText}>In Library?</span>
+								<Select
+									value={creditLibrary}
+									onChange={(v) => {
+										const l = v as CreditLibrary;
+										setCreditLibrary(l);
+										writeCreditParams({
+											sort: creditSort,
+											minRating: creditMinRating,
+											minVotes: creditMinVotes,
+											type: creditType,
+											library: l,
+										});
+									}}
+									options={[
+										{ value: 'all', label: 'All' },
+										{ value: 'in', label: 'In Library' },
+										{ value: 'out', label: 'Not in Library' },
+									]}
+									aria-label="Filter credits by library status"
 								/>
 							</span>
 							<input
@@ -315,6 +367,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 										minRating: val,
 										minVotes: creditMinVotes,
 										type: creditType,
+										library: creditLibrary,
 									});
 								}}
 							/>
@@ -334,6 +387,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 										minRating: creditMinRating,
 										minVotes: val,
 										type: creditType,
+										library: creditLibrary,
 									});
 								}}
 							/>
