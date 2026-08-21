@@ -1077,6 +1077,7 @@ export class MoviesService implements OnModuleInit {
 			imdbRating: metadata?.imdbRating ?? undefined,
 			imdbVotes: metadata?.imdbVotes ?? undefined,
 			tmdbRating: metadata?.tmdbRating ?? undefined,
+			tmdbVotes: metadata?.tmdbVotes ?? undefined,
 			rtRating: metadata?.rottenTomatoesScore ?? undefined,
 			metacriticRating: metadata?.metacriticScore ?? undefined,
 			rating: userRating,

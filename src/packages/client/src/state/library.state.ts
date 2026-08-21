@@ -37,6 +37,7 @@ export interface Movie {
 	imdbRating?: number;
 	imdbVotes?: number;
 	tmdbRating?: number;
+	tmdbVotes?: number;
 	rtRating?: number;
 	metacriticRating?: number;
 	cast: Array<{ name: string; character: string; profileUrl?: string }>;

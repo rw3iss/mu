@@ -55,6 +55,13 @@
   color: #000000;
 }
 
+// TMDB — the only score available for movies that aren't in the library yet
+// (OMDB/IMDb data arrives later, or not at all).
+.tmdb {
+  background: #01b4e4;
+  color: #ffffff;
+}
+
 // Rotten Tomatoes
 .rt {
   &.fresh {
