@@ -71,6 +71,22 @@ const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
 const STALE_AFTER_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
+/**
+ * Max credits stored per person. Generous on purpose — the point is to hold a
+ * person's whole filmography, not a recent slice. Only the most prolific people
+ * come near this.
+ */
+const KNOWN_FOR_LIMIT = 250;
+
+/**
+ * Bumped whenever `deriveKnownFor` changes shape/selection. A cached row built
+ * by an older version is treated as stale so it re-fetches immediately, instead
+ * of serving a truncated filmography until the 14-day TTL expires.
+ *   1 → (implicit) year-desc, capped at 24
+ *   2 → full filmography up to KNOWN_FOR_LIMIT
+ */
+const CREDITS_VERSION = 2;
+
 export function slugifyName(name: string): string {
 	return name
 		.toLowerCase()
@@ -349,7 +365,23 @@ export class PeopleService {
 		if (!row.fetchedAt) return true;
 		const fetched = Date.parse(row.fetchedAt);
 		if (!Number.isFinite(fetched)) return true;
+		// A row cached by an older credits format is stale regardless of age —
+		// otherwise everyone keeps their truncated 24-credit list for up to two
+		// weeks after this ships.
+		if (this.creditsVersionOf(row) < CREDITS_VERSION) return true;
 		return Date.now() - fetched > STALE_AFTER_MS;
+	}
+
+	/** Credits-format version stamped into the cached metadata blob (0 = pre-versioning). */
+	private creditsVersionOf(row: Person): number {
+		if (!row.metadata) return 0;
+		try {
+			const parsed = JSON.parse(row.metadata);
+			const v = Number(parsed?.creditsVersion);
+			return Number.isFinite(v) ? v : 0;
+		} catch {
+			return 0;
+		}
 	}
 
 	private async fetchAndUpsertFromTmdb(
@@ -377,6 +409,7 @@ export class PeopleService {
 		const metadata: Record<string, unknown> = {
 			knownForMovies,
 			alsoKnownAs: details.also_known_as ?? [],
+			creditsVersion: CREDITS_VERSION,
 		};
 
 		const profileUrl = details.profile_path
@@ -488,9 +521,21 @@ export class PeopleService {
 				tmdbVotes: votesOf(c.vote_count),
 			});
 		}
-		// Sort by popularity-ish proxy: year desc, then job/cast prominence.
+		// Keep the person's WHOLE filmography (up to a generous cap) rather than
+		// the 24 most recent credits. The old `sort(year desc).slice(0, 24)`
+		// silently dropped everything older — a prolific actor's page showed only
+		// the last few years, so classics (and library movies!) went missing.
+		//
+		// If someone genuinely exceeds the cap, rank by vote count so the cut
+		// keeps the notable work instead of whatever happens to be newest. The
+		// client re-sorts (year / title / rating / votes) and filters anyway, so
+		// this ordering only decides what SURVIVES, not what's displayed first.
+		if (all.length > KNOWN_FOR_LIMIT) {
+			all.sort((a, b) => (b.tmdbVotes ?? 0) - (a.tmdbVotes ?? 0));
+			all.length = KNOWN_FOR_LIMIT;
+		}
 		all.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
-		return all.slice(0, 24);
+		return all;
 	}
 
 	/**
