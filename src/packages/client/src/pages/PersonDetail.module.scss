@@ -366,3 +366,10 @@
 .minVotesInput {
 	width: 110px;
 }
+
+/* Live count of credits passing the current filters. */
+.resultCount {
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+	white-space: nowrap;
+}

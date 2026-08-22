@@ -391,6 +391,10 @@ export function PersonDetail({ id }: PersonDetailProps) {
 									});
 								}}
 							/>
+							<span class={styles.resultCount}>
+								{visibleCredits.length}{' '}
+								{visibleCredits.length === 1 ? 'title' : 'titles'} found.
+							</span>
 						</div>
 					</div>
 					<div class={styles.creditsGrid}>
