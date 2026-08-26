@@ -56,6 +56,7 @@ const CREDIT_LIBRARY: readonly CreditLibrary[] = ['all', 'in', 'out'];
 
 interface CreditParams {
 	sort: CreditSort;
+	minYear: string;
 	minRating: string;
 	minVotes: string;
 	type: CreditType;
@@ -71,6 +72,7 @@ function readCreditParams(): CreditParams {
 	const library = p.get('library');
 	return {
 		sort: CREDIT_SORTS.includes(sort as CreditSort) ? (sort as CreditSort) : 'year',
+		minYear: p.get('minYear') ?? '',
 		minRating: p.get('minRating') ?? '',
 		minVotes: p.get('minVotes') ?? '',
 		type: CREDIT_TYPES.includes(type as CreditType) ? (type as CreditType) : 'all',
@@ -84,6 +86,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 	const [person, setPerson] = useState<PersonView | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [creditSort, setCreditSort] = useState<CreditSort>(() => readCreditParams().sort);
+	const [creditMinYear, setCreditMinYear] = useState(() => readCreditParams().minYear);
 	const [creditMinRating, setCreditMinRating] = useState(() => readCreditParams().minRating);
 	const [creditMinVotes, setCreditMinVotes] = useState(() => readCreditParams().minVotes);
 	const [creditType, setCreditType] = useState<CreditType>(() => readCreditParams().type);
@@ -99,6 +102,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 	const writeCreditParams = (p: CreditParams) => {
 		const q = new URLSearchParams();
 		if (p.sort !== 'year') q.set('sort', p.sort);
+		if (p.minYear) q.set('minYear', p.minYear);
 		if (p.minRating) q.set('minRating', p.minRating);
 		if (p.minVotes) q.set('minVotes', p.minVotes);
 		if (p.type !== 'all') q.set('type', p.type);
@@ -150,6 +154,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 	useEffect(() => {
 		const p = readCreditParams();
 		setCreditSort(p.sort);
+		setCreditMinYear(p.minYear);
 		setCreditMinRating(p.minRating);
 		setCreditMinVotes(p.minVotes);
 		setCreditType(p.type);
@@ -176,11 +181,15 @@ export function PersonDetail({ id }: PersonDetailProps) {
 	const ratingOf = (c: PersonView['knownForMovies'][number]) => c.imdbRating ?? c.tmdbRating ?? 0;
 
 	const visibleCredits = useMemo(() => {
+		const minYear = parseInt(creditMinYear, 10);
 		const minRating = parseFloat(creditMinRating);
 		const minVotes = parseInt(creditMinVotes, 10);
 		let list = person.knownForMovies;
 		if (creditType !== 'all') {
 			list = list.filter((c) => c.mediaType === creditType);
+		}
+		if (Number.isFinite(minYear) && minYear > 0) {
+			list = list.filter((c) => (c.year ?? 0) >= minYear);
 		}
 		if (Number.isFinite(minRating) && minRating > 0) {
 			list = list.filter((c) => ratingOf(c) >= minRating);
@@ -209,6 +218,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 	}, [
 		person.knownForMovies,
 		creditSort,
+		creditMinYear,
 		creditMinRating,
 		creditMinVotes,
 		creditType,
@@ -289,6 +299,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 										setCreditSort(s);
 										writeCreditParams({
 											sort: s,
+											minYear: creditMinYear,
 											minRating: creditMinRating,
 											minVotes: creditMinVotes,
 											type: creditType,
@@ -313,6 +324,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 										setCreditType(t);
 										writeCreditParams({
 											sort: creditSort,
+											minYear: creditMinYear,
 											minRating: creditMinRating,
 											minVotes: creditMinVotes,
 											type: t,
@@ -336,6 +348,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 										setCreditLibrary(l);
 										writeCreditParams({
 											sort: creditSort,
+											minYear: creditMinYear,
 											minRating: creditMinRating,
 											minVotes: creditMinVotes,
 											type: creditType,
@@ -352,6 +365,28 @@ export function PersonDetail({ id }: PersonDetailProps) {
 							</span>
 							<input
 								type="number"
+								class={styles.minYearInput}
+								min="1870"
+								max="2100"
+								step="1"
+								placeholder="Min year"
+								value={creditMinYear}
+								aria-label="Minimum year"
+								onInput={(e) => {
+									const val = (e.target as HTMLInputElement).value;
+									setCreditMinYear(val);
+									writeCreditParams({
+										sort: creditSort,
+										minYear: val,
+										minRating: creditMinRating,
+										minVotes: creditMinVotes,
+										type: creditType,
+										library: creditLibrary,
+									});
+								}}
+							/>
+							<input
+								type="number"
 								class={styles.minRatingInput}
 								min="0"
 								max="10"
@@ -364,6 +399,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 									setCreditMinRating(val);
 									writeCreditParams({
 										sort: creditSort,
+										minYear: creditMinYear,
 										minRating: val,
 										minVotes: creditMinVotes,
 										type: creditType,
@@ -384,6 +420,7 @@ export function PersonDetail({ id }: PersonDetailProps) {
 									setCreditMinVotes(val);
 									writeCreditParams({
 										sort: creditSort,
+										minYear: creditMinYear,
 										minRating: creditMinRating,
 										minVotes: val,
 										type: creditType,
