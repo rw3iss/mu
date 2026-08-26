@@ -4,6 +4,7 @@ import { currentPath, currentUrl } from '@/app';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { MultiSelect, type MultiSelectOption } from '@/components/common/MultiSelect';
+import { NumberFilterInput } from '@/components/common/NumberFilterInput';
 import { Select } from '@/components/common/Select';
 import { Tooltip } from '@/components/common/Tooltip';
 import { UploadMovieModal } from '@/components/library/UploadMovieModal';
@@ -576,80 +577,71 @@ export function Library(_props: LibraryProps) {
 						<div class={styles.filterGroup}>
 							<h3 class={styles.filterLabel}>Year</h3>
 							<div class={styles.filterNumRow}>
-								<input
-									type="number"
+								<NumberFilterInput
 									class={styles.numInput}
 									placeholder="From"
-									value={filters.value.yearMin ?? ''}
-									onChange={(e) =>
-										handleNumFilter('yearMin', e.currentTarget.value)
-									}
+									aria-label="Year from"
+									value={filters.value.yearMin}
+									onCommit={(raw) => handleNumFilter('yearMin', raw)}
 								/>
 								<span class={styles.filterDash}>–</span>
-								<input
-									type="number"
+								<NumberFilterInput
 									class={styles.numInput}
 									placeholder="To"
-									value={filters.value.yearMax ?? ''}
-									onChange={(e) =>
-										handleNumFilter('yearMax', e.currentTarget.value)
-									}
+									aria-label="Year to"
+									value={filters.value.yearMax}
+									onCommit={(raw) => handleNumFilter('yearMax', raw)}
 								/>
 							</div>
 						</div>
 
 						<div class={styles.filterGroup}>
 							<h3 class={styles.filterLabel}>Min rating</h3>
-							<input
-								type="number"
+							<NumberFilterInput
+								decimal
 								min="0"
 								max="10"
 								step="0.1"
 								class={styles.numInput}
 								placeholder="0–10"
-								value={filters.value.minRating ?? ''}
-								onChange={(e) =>
-									handleNumFilter('minRating', e.currentTarget.value)
-								}
+								aria-label="Minimum rating"
+								value={filters.value.minRating}
+								onCommit={(raw) => handleNumFilter('minRating', raw)}
 							/>
 						</div>
 
 						<div class={styles.filterGroup}>
 							<h3 class={styles.filterLabel}>Min votes</h3>
-							<input
-								type="number"
+							<NumberFilterInput
 								min="0"
 								step="100"
 								class={styles.numInput}
 								placeholder="e.g. 1000"
-								value={filters.value.minVotes ?? ''}
-								onChange={(e) => handleNumFilter('minVotes', e.currentTarget.value)}
+								aria-label="Minimum votes"
+								value={filters.value.minVotes}
+								onCommit={(raw) => handleNumFilter('minVotes', raw)}
 							/>
 						</div>
 
 						<div class={styles.filterGroup}>
 							<h3 class={styles.filterLabel}>Runtime (min)</h3>
 							<div class={styles.filterNumRow}>
-								<input
-									type="number"
+								<NumberFilterInput
 									min="0"
 									class={styles.numInput}
 									placeholder="Min"
-									value={filters.value.runtimeMin ?? ''}
-									onChange={(e) =>
-										handleNumFilter('runtimeMin', e.currentTarget.value)
-									}
+									aria-label="Minimum runtime"
+									value={filters.value.runtimeMin}
+									onCommit={(raw) => handleNumFilter('runtimeMin', raw)}
 								/>
 								<span class={styles.filterDash}>–</span>
-								<input
-									type="number"
+								<NumberFilterInput
 									min="0"
 									class={styles.numInput}
 									placeholder="Max"
-									value={filters.value.runtimeMax ?? ''}
-									onChange={(e) =>
-										handleNumFilter('runtimeMax', e.currentTarget.value)
-									}
+									aria-label="Maximum runtime"
+									value={filters.value.runtimeMax}
+									onCommit={(raw) => handleNumFilter('runtimeMax', raw)}
 								/>
 							</div>
 						</div>
