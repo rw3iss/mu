@@ -4,6 +4,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Database from 'better-sqlite3';
 import { BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { normalizeTitle } from '../common/text-normalize.js';
 import { ConfigService } from '../config/config.service.js';
 import * as schema from './schema/index.js';
 
@@ -71,6 +72,14 @@ export class DatabaseService implements OnModuleDestroy {
 		this.sqlite.pragma('journal_mode = WAL');
 		this.sqlite.pragma('foreign_keys = ON');
 		this.sqlite.pragma('busy_timeout = 5000');
+
+		// Expose the title normaliser to SQL so search can compare a normalised
+		// query against a normalised column — same JS implementation on both
+		// sides, so they can't disagree. `deterministic` lets SQLite cache the
+		// result per row; `varargs: false` keeps the arity fixed at one.
+		this.sqlite.function('mu_norm', { deterministic: true, varargs: false }, (value: unknown) =>
+			normalizeTitle(value == null ? '' : String(value)),
+		);
 
 		this._db = drizzle(this.sqlite, { schema });
 		this.logger.log(`SQLite database opened: ${dbPath}`);
