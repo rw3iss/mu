@@ -38,6 +38,7 @@ import { MetadataService } from '../metadata/metadata.service.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
+import { matchesSearchQuery, titleSearchCondition } from './title-search.js';
 
 @Injectable()
 export class MoviesService implements OnModuleInit {
@@ -151,7 +152,8 @@ export class MoviesService implements OnModuleInit {
 		}
 
 		if (query.search) {
-			conditions.push(like(movies.title, `%${query.search}%`));
+			const cond = titleSearchCondition(movies.title, query.search);
+			if (cond) conditions.push(cond);
 		}
 
 		for (const cond of this.genreConditions(query)) conditions.push(cond);
@@ -579,7 +581,10 @@ export class MoviesService implements OnModuleInit {
 		if (String(query.showHidden) !== 'true') {
 			conds.push(sql`(${movies.hidden} IS NULL OR ${movies.hidden} = 0)`);
 		}
-		if (query.search) conds.push(like(movies.title, `%${query.search}%`));
+		if (query.search) {
+			const searchCond = titleSearchCondition(movies.title, query.search);
+			if (searchCond) conds.push(searchCond);
+		}
 
 		// When any movie-level filter is active, restrict group STACKS to
 		// top-level groups with at least one matching member — otherwise every
@@ -630,7 +635,7 @@ export class MoviesService implements OnModuleInit {
 		const groupById = new Map<string, any>();
 		for (const g of this.listParentGroupsWithSummary()) {
 			if (g.totalMembers <= 0) continue;
-			if (search && !(g.name ?? '').toLowerCase().includes(search)) continue;
+			if (search && !matchesSearchQuery(g.name ?? '', search)) continue;
 			if (types && !types.has(classifyGroupType(g.groupType))) continue;
 			if (allowedGroupIds && !allowedGroupIds.has(g.id)) continue;
 			groupById.set(g.id, g);
@@ -1288,7 +1293,7 @@ export class MoviesService implements OnModuleInit {
 			})
 			.from(movies)
 			.leftJoin(userRatings, ratingJoinCond)
-			.where(like(movies.title, `%${q}%`))
+			.where(titleSearchCondition(movies.title, q) ?? like(movies.title, `%${q}%`))
 			.orderBy(asc(movies.title))
 			.limit(50)
 			.all()

@@ -148,6 +148,9 @@ export function TopBar() {
 					onKeyDown={handleKeyDown}
 					onFocus={handleFocus}
 					aria-label="Search movies"
+					title={
+						'Search movies. Use "quotes" to match a whole word — "Her" won\'t match Hero.'
+					}
 				/>
 				{searchValue && (
 					<button
