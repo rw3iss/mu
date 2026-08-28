@@ -79,6 +79,129 @@
 	}
 }
 
+/* ── Seed groups (actors / movies / playlist) ───────────────────────── */
+
+.group {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+
+	& + & {
+		padding-top: 10px;
+		border-top: 1px solid var(--color-border);
+	}
+}
+
+.groupHeader {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.groupTitleBtn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1;
+	min-width: 0;
+	padding: 0;
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	text-align: left;
+	color: inherit;
+}
+
+.groupTitle {
+	font-size: 0.8rem;
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-text-primary);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.groupCount {
+	font-size: 0.65rem;
+	color: var(--color-text-muted);
+	background: var(--color-bg-input, rgba(255, 255, 255, 0.06));
+	border-radius: 999px;
+	padding: 0 6px;
+	flex-shrink: 0;
+}
+
+.groupHint {
+	font-size: 0.7rem;
+	color: var(--color-text-muted);
+}
+
+/* Scrollable body — a long favorites list can't push the filters off screen. */
+.groupBody {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	max-height: 180px;
+	overflow-y: auto;
+	padding-right: 2px;
+	scrollbar-width: thin;
+	scrollbar-color: var(--color-text-muted) transparent;
+
+	&::-webkit-scrollbar {
+		width: 4px;
+	}
+	&::-webkit-scrollbar-thumb {
+		background: var(--color-text-muted);
+		border-radius: 2px;
+	}
+}
+
+.playlistPicker {
+	flex: 1 0 100%;
+	margin-bottom: 2px;
+}
+
+/* Master on/off switch for a whole group. */
+.switch {
+	position: relative;
+	flex-shrink: 0;
+	width: 30px;
+	height: 17px;
+	padding: 0;
+	border: 1px solid var(--color-border);
+	border-radius: 999px;
+	background: var(--color-bg-input, rgba(255, 255, 255, 0.06));
+	cursor: pointer;
+	transition:
+		background-color 140ms var(--ease-out, ease-out),
+		border-color 140ms var(--ease-out, ease-out);
+
+	&:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+}
+
+.switchOn {
+	background: var(--color-accent);
+	border-color: var(--color-accent);
+}
+
+.switchDot {
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 11px;
+	height: 11px;
+	border-radius: 50%;
+	background: var(--color-text-primary);
+	transition: transform 140ms var(--ease-out, ease-out);
+
+	.switchOn & {
+		transform: translateX(13px);
+		background: #fff;
+	}
+}
+
 .title {
 	margin: 0;
 	font-size: 0.85rem;

@@ -22,7 +22,15 @@
 
 		.hoverOverlay {
 			opacity: 1;
-			pointer-events: auto;
+			// Stay click-through: the overlay covers the whole card (inset: 0),
+			// so capturing pointer events here swallowed every click on the
+			// poster and made hovered cards un-clickable. Only the buttons
+			// inside should intercept.
+			pointer-events: none;
+
+			> * {
+				pointer-events: auto;
+			}
 		}
 	}
 

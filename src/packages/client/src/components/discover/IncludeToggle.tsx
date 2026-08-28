@@ -2,11 +2,11 @@ import type { IncludeMode } from '@/services/discover.service';
 import styles from './IncludeToggle.module.scss';
 
 const OPTIONS: { id: IncludeMode; label: string; title: string }[] = [
-	{ id: 'owned', label: 'Owned', title: 'Only movies in your library' },
-	{ id: 'all', label: 'All', title: 'Library + not-owned suggestions' },
+	{ id: 'owned', label: 'In Library', title: 'Only movies in your library' },
+	{ id: 'all', label: 'All', title: 'Library + not-in-library suggestions' },
 	{
 		id: 'notOwned',
-		label: 'Not owned',
+		label: 'Not in Library',
 		title: "Only movies you don't have yet — bookmark to remember",
 	},
 ];

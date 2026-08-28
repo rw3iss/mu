@@ -70,39 +70,51 @@ export function DiscoverFilters({
 				</Button>
 			</div>
 
+			{/* Rating + votes share a row — both are small numeric minimums. */}
 			<div class={styles.section}>
-				<label class={styles.fieldLabel}>
-					Minimum rating
-					<span class={styles.fieldValue}>{value.minRating ?? 0}</span>
-				</label>
-				<input
-					type="range"
-					min={0}
-					max={10}
-					step={0.1}
-					value={value.minRating ?? 0}
-					onInput={(e) => {
-						const v = parseFloat((e.target as HTMLInputElement).value);
-						update({ minRating: v > 0 ? v : undefined });
-					}}
-				/>
-			</div>
-
-			<div class={styles.section}>
-				<label class={styles.fieldLabel}>Minimum votes</label>
-				<input
-					type="number"
-					class={styles.numInput}
-					placeholder="e.g. 1000"
-					min={0}
-					step={100}
-					value={value.minVotes ?? ''}
-					onInput={(e) => {
-						const raw = (e.target as HTMLInputElement).value;
-						const n = raw ? parseInt(raw, 10) : NaN;
-						update({ minVotes: Number.isFinite(n) && n > 0 ? n : undefined });
-					}}
-				/>
+				<div class={styles.minRow}>
+					<div class={styles.minField}>
+						<label class={styles.fieldLabel} for="discover-min-rating">
+							Minimum rating
+						</label>
+						<input
+							id="discover-min-rating"
+							type="number"
+							class={styles.numInputSm}
+							placeholder="0-10"
+							min={0}
+							max={10}
+							step={1}
+							value={value.minRating ?? ''}
+							onInput={(e) => {
+								const raw = (e.target as HTMLInputElement).value;
+								const n = raw ? parseInt(raw, 10) : NaN;
+								update({
+									minRating: Number.isFinite(n) && n > 0 ? n : undefined,
+								});
+							}}
+						/>
+					</div>
+					<div class={styles.minField}>
+						<label class={styles.fieldLabel} for="discover-min-votes">
+							Minimum votes
+						</label>
+						<input
+							id="discover-min-votes"
+							type="number"
+							class={styles.numInputSm}
+							placeholder="e.g. 1000"
+							min={0}
+							step={100}
+							value={value.minVotes ?? ''}
+							onInput={(e) => {
+								const raw = (e.target as HTMLInputElement).value;
+								const n = raw ? parseInt(raw, 10) : NaN;
+								update({ minVotes: Number.isFinite(n) && n > 0 ? n : undefined });
+							}}
+						/>
+					</div>
+				</div>
 			</div>
 
 			<div class={styles.section}>

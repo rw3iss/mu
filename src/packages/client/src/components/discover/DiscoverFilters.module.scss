@@ -53,6 +53,21 @@
 	color: var(--color-text-muted);
 }
 
+/* Rating + votes side by side: two equal, compact numeric fields. */
+.minRow {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.minField {
+	flex: 1 1 0;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.numInputSm,
 .numInput,
 .searchInput {
 	flex: 1;
