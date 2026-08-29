@@ -68,7 +68,13 @@
 }
 
 @include mobile {
-  .main {
+  /* The sidebar is display:none on mobile (nav lives in the bottom bar), so the
+     main column must never reserve room for it. `.collapsed .main` has to be
+     listed explicitly: it's (0,2,0) against this block's (0,1,0), and a media
+     query adds no specificity — so without it the collapsed sidebar's 64px
+     margin leaked through on mobile and left a dead gap down the left edge. */
+  .main,
+  .collapsed .main {
     margin-left: 0;
     transform: none;
 
