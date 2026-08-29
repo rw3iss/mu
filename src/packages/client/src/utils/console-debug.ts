@@ -92,8 +92,7 @@ const HELP = `
   mu.player.split(50)      Set split width (25-62 percent)
 
 %cDebug:%c
-  mu.help()                Show this help\n  mu.pip()                 Picture-in-Picture support diagnostics\n  mu.pip.try()             Force a PiP attempt + report why it failed\n  mu.audio.debug(false)    Toggle audio-engine debug logging (off by default)\n  mu.debugAudio(false)     Shorthand for the above\n  mu.hls(true)             Enable HLS.js debug logging
-  mu.hls(false)            Disable HLS.js debug logging
+  mu.help()                Show this help\n  mu.pip()                 Picture-in-Picture support diagnostics\n  mu.pip.try()             Force a PiP attempt + report why it failed\n  mu.debug()               Show debug state for every channel\n  mu.debug(false)          Disable ALL debug logging\n  mu.debug.audio(false)    Toggle audio-engine logging only\n  mu.debug.hls(false)      Toggle HLS.js logging only
   mu.version               App version
 
 %cExamples:%c
@@ -131,6 +130,36 @@ function playerState() {
 		volume: volume.value,
 		splitWidth: splitWidth.value,
 	};
+	console.table(state);
+	return state;
+}
+
+/** Debug channels → the localStorage flag each is gated on. */
+const DEBUG_CHANNELS: Record<string, string> = {
+	audio: 'mu_audio_debug',
+	hls: 'mu_hls_debug',
+};
+
+function isDebug(channel: string): boolean {
+	const key = DEBUG_CHANNELS[channel];
+	return !!key && localStorage.getItem(key) === '1';
+}
+
+function setDebug(channel: string, enable: boolean): boolean {
+	const key = DEBUG_CHANNELS[channel];
+	if (!key) {
+		console.warn(`Unknown debug channel "${channel}". Known:`, Object.keys(DEBUG_CHANNELS));
+		return false;
+	}
+	if (enable) localStorage.setItem(key, '1');
+	else localStorage.removeItem(key);
+	console.log(`${channel} debug ${enable ? 'enabled' : 'disabled'}`);
+	return enable;
+}
+
+function reportDebug(): Record<string, boolean> {
+	const state: Record<string, boolean> = {};
+	for (const channel of Object.keys(DEBUG_CHANNELS)) state[channel] = isDebug(channel);
 	console.table(state);
 	return state;
 }
@@ -239,42 +268,30 @@ const mu = {
 	),
 
 	/**
-	 * Audio-engine diagnostics. The engine emits ~40 gated messages per
-	 * attach/route change, so this is off unless explicitly enabled.
-	 *   mu.audio.debug()       → current state
-	 *   mu.audio.debug(true)   → enable
-	 *   mu.audio.debug(false)  → disable
+	 * Debug logging, one switch per channel.
+	 *
+	 *   mu.debug()             → report every channel's state
+	 *   mu.debug(true|false)   → set ALL channels at once
+	 *   mu.debug.audio(false)  → set just the audio engine
+	 *   mu.debug.hls(false)    → set just HLS.js
+	 *
+	 * Flags live in localStorage so they survive reloads, and nothing in the app
+	 * turns them on by itself. Audio is read per message so it applies at once;
+	 * HLS is read when a stream starts, so it applies to the next play.
 	 */
-	audio: {
-		debug: (enable?: boolean) => {
-			if (enable === undefined) {
-				const on = localStorage.getItem('mu_audio_debug') === '1';
-				console.log(`Audio debug is ${on ? 'ENABLED' : 'disabled'}`);
-				return on;
-			}
-			if (enable) {
-				localStorage.setItem('mu_audio_debug', '1');
-				console.log('Audio debug enabled');
-			} else {
-				localStorage.removeItem('mu_audio_debug');
-				console.log('Audio debug disabled');
-			}
-			return enable;
+	debug: Object.assign(
+		(enable?: boolean) => {
+			if (enable === undefined) return reportDebug();
+			for (const channel of Object.keys(DEBUG_CHANNELS)) setDebug(channel, enable);
+			return reportDebug();
 		},
-	},
-
-	/** Shorthand for `mu.audio.debug(...)`. */
-	debugAudio: (enable?: boolean) => mu.audio.debug(enable),
-
-	hls: (enable: boolean) => {
-		if (enable) {
-			localStorage.setItem('mu_hls_debug', '1');
-			console.log('HLS debug enabled (reload player to apply)');
-		} else {
-			localStorage.removeItem('mu_hls_debug');
-			console.log('HLS debug disabled (reload player to apply)');
-		}
-	},
+		{
+			audio: (enable?: boolean) =>
+				enable === undefined ? isDebug('audio') : setDebug('audio', enable),
+			hls: (enable?: boolean) =>
+				enable === undefined ? isDebug('hls') : setDebug('hls', enable),
+		},
+	),
 };
 
 // Make `mu` in console print help automatically
