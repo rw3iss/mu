@@ -92,7 +92,7 @@ const HELP = `
   mu.player.split(50)      Set split width (25-62 percent)
 
 %cDebug:%c
-  mu.pip()                 Picture-in-Picture support diagnostics\n  mu.pip.try()             Force a PiP attempt + report why it failed\n  mu.hls(true)             Enable HLS.js debug logging
+  mu.help()                Show this help\n  mu.pip()                 Picture-in-Picture support diagnostics\n  mu.pip.try()             Force a PiP attempt + report why it failed\n  mu.audio.debug(false)    Toggle audio-engine debug logging (off by default)\n  mu.debugAudio(false)     Shorthand for the above\n  mu.hls(true)             Enable HLS.js debug logging
   mu.hls(false)            Disable HLS.js debug logging
   mu.version               App version
 
@@ -136,9 +136,14 @@ function playerState() {
 }
 
 const mu = {
-	get help() {
+	/**
+	 * Callable so `mu.help()` works. It used to be a getter that printed and
+	 * returned '' — which is why `mu.help()` printed the help and THEN threw
+	 * "mu.help is not a function": the console called the returned string.
+	 * Bare `mu` still prints help too (see the Proxy at the bottom).
+	 */
+	help: () => {
 		printHelp();
-		return '';
 	},
 
 	version: APP_VERSION,
@@ -232,6 +237,34 @@ const mu = {
 			},
 		},
 	),
+
+	/**
+	 * Audio-engine diagnostics. The engine emits ~40 gated messages per
+	 * attach/route change, so this is off unless explicitly enabled.
+	 *   mu.audio.debug()       → current state
+	 *   mu.audio.debug(true)   → enable
+	 *   mu.audio.debug(false)  → disable
+	 */
+	audio: {
+		debug: (enable?: boolean) => {
+			if (enable === undefined) {
+				const on = localStorage.getItem('mu_audio_debug') === '1';
+				console.log(`Audio debug is ${on ? 'ENABLED' : 'disabled'}`);
+				return on;
+			}
+			if (enable) {
+				localStorage.setItem('mu_audio_debug', '1');
+				console.log('Audio debug enabled');
+			} else {
+				localStorage.removeItem('mu_audio_debug');
+				console.log('Audio debug disabled');
+			}
+			return enable;
+		},
+	},
+
+	/** Shorthand for `mu.audio.debug(...)`. */
+	debugAudio: (enable?: boolean) => mu.audio.debug(enable),
 
 	hls: (enable: boolean) => {
 		if (enable) {
