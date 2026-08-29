@@ -1441,21 +1441,36 @@ export function PlayerControls({
 													>
 														Off
 													</button>
-													{(session?.subtitles ?? []).map((track) => (
-														<button
-															key={track.id}
-															class={`${styles.menuItem} ${
-																subtitleTrack.value === track.id
-																	? styles.selected
-																	: ''
-															}`}
-															onClick={() =>
-																handleSubtitleSelect(track.id)
-															}
-														>
-															{track.label}
-														</button>
-													))}
+													{/* The movie's default track is surfaced here (not just in
+													    Manage Subtitles) and floated to the top of the list. */}
+													{[...(session?.subtitles ?? [])]
+														.sort(
+															(a, b) =>
+																Number(b.default ?? false) -
+																Number(a.default ?? false),
+														)
+														.map((track) => (
+															<button
+																key={track.id}
+																class={`${styles.menuItem} ${
+																	subtitleTrack.value === track.id
+																		? styles.selected
+																		: ''
+																}`}
+																onClick={() =>
+																	handleSubtitleSelect(track.id)
+																}
+															>
+																{track.label}
+																{track.default && (
+																	<span
+																		class={styles.menuItemBadge}
+																	>
+																		Default
+																	</span>
+																)}
+															</button>
+														))}
 													<div class={styles.menuDivider} />
 													<button
 														class={styles.menuItem}

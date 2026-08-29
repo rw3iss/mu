@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { audioEngine } from '@/audio/audio-engine';
 import { Spinner } from '@/components/common/Spinner';
 import { useSubtitleSettings } from '@/components/movie/SubtitleAppearance';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { getUiSetting } from '@/hooks/useUiSetting';
 import { sharedSessionService } from '@/services/shared-session.service';
 import { streamService } from '@/services/stream.service';
@@ -123,6 +124,9 @@ export function GlobalPlayer() {
 		},
 		[engine],
 	);
+	// Portrait phones get a TOP/BOTTOM split instead of left/right — two narrow
+	// columns are unusable on a portrait viewport. Landscape keeps side-by-side.
+	const isPortraitSplit = useMediaQuery('(max-width: 767px) and (orientation: portrait)');
 	const [_isInitializing, setIsInitializing] = useState(false);
 	const [preparingMessage, setPreparingMessage] = useState<string | null>(null);
 	const playbackInitRef = useRef(false);
@@ -813,7 +817,13 @@ export function GlobalPlayer() {
 	// Spacer height = just the video (aspect ratio based on split width).
 	// The top bar (32px) is a flex child above the spacer so it pushes naturally.
 	// The site header offset is handled by CSS (panel top: var(--topbar-height)).
-	const splitVideoHeight = isSplit ? `calc((${splitWidth.value}vw - 3px) * 9 / 16)` : '0px';
+	// Portrait: the video spans the full width, so its height is fixed by the
+	// aspect ratio rather than the draggable split width.
+	const splitVideoHeight = !isSplit
+		? '0px'
+		: isPortraitSplit
+			? '56.25vw'
+			: `calc((${splitWidth.value}vw - 3px) * 9 / 16)`;
 
 	// In exclusive mode, calculate the top offset to center the video vertically
 	// The video height in px is approximately (splitWidth% of viewport width) * 9/16
@@ -875,8 +885,10 @@ export function GlobalPlayer() {
 			{/* Split mode panel — everything except the video (which stays in the shared wrapper) */}
 			{isSplit && (
 				<div
-					class={`${styles.splitPanel} ${isExclusive ? styles.splitPanelExclusive : ''}`}
-					style={{ width: `${splitWidth.value}vw` }}
+					class={`${styles.splitPanel} ${isExclusive ? styles.splitPanelExclusive : ''} ${
+						isPortraitSplit ? styles.splitPanelPortrait : ''
+					}`}
+					style={isPortraitSplit ? undefined : { width: `${splitWidth.value}vw` }}
 					onMouseMove={isExclusive ? resetControlsTimer : undefined}
 					onMouseLeave={
 						isExclusive
@@ -1071,9 +1083,11 @@ export function GlobalPlayer() {
 			{/* Persistent video wrapper — stays in DOM, CSS repositions between full/mini/split */}
 			<div
 				ref={videoWrapperRef}
-				class={`${styles.videoWrapper} ${isSplit ? styles.videoWrapperSplit : isMini ? styles.videoWrapperMini : styles.videoWrapperFull} ${!isMini && !isSplit && !showControls.value ? styles.hideCursor : ''}`}
+				class={`${styles.videoWrapper} ${isSplit ? styles.videoWrapperSplit : isMini ? styles.videoWrapperMini : styles.videoWrapperFull} ${
+					isSplit && isPortraitSplit ? styles.videoWrapperSplitPortrait : ''
+				} ${!isMini && !isSplit && !showControls.value ? styles.hideCursor : ''}`}
 				style={
-					isSplit
+					isSplit && !isPortraitSplit
 						? {
 								width: `calc(${splitWidth.value}vw - 3px)`,
 								...(exclusiveTopStyle

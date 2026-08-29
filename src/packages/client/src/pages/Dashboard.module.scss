@@ -88,6 +88,45 @@
   color: var(--color-text-muted);
 }
 
+/* Mobile header: stack it into three clean left-aligned lines —
+     1) "Welcome back, <name>"
+     2) "New titles since:"
+     3) the counts
+   The inline dot separator and the right-hand action cluster only make sense
+   on the one-line desktop layout. */
+@include mobile {
+  .welcomeRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
+
+  .welcomeGreeting {
+    flex-direction: column;
+    align-items: flex-start;
+    row-gap: 2px;
+    width: 100%;
+  }
+
+  .welcomeStat {
+    // Kill the leading "·" + its 20px margins so the line starts flush left.
+    &::before {
+      content: none;
+      margin: 0;
+    }
+  }
+
+  // Put the counts on their own row beneath the lead-in.
+  .statIntro {
+    display: block;
+    margin-right: 0;
+  }
+
+  .welcomeActions {
+    margin-left: 0;
+  }
+}
+
 .welcomeUser {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-medium);

@@ -508,3 +508,53 @@
     height: 96px;
   }
 }
+
+/* ── Mobile PORTRAIT split ────────────────────────────────────────────────
+   Landscape keeps the side-by-side split (content left, player right). In
+   portrait that leaves two unusably narrow columns, so the split rotates:
+   page content on TOP, player docked along the BOTTOM, full width.
+
+   The panel and the (separately-positioned, fixed) video wrapper must agree
+   on the panel height, so it lives in one custom property applied to both.
+   The value is quoted so Sass emits the CSS min()/max() untouched: at least
+   56vh, always enough for the top bar + a 16:9 full-width video + ~120px of
+   controls, and never more than 78vh. Both elements are anchored from the
+   BOTTOM so an unstable mobile `vh` can't drift them apart. */
+@mixin portrait-split-height {
+	--split-portrait-h: #{"min(78vh, max(56vh, calc(var(--topbar-height, 56px) + 56.25vw + 120px)))"};
+	// Docked above the mobile nav, matching the mini-player convention.
+	--split-portrait-offset: #{"calc(var(--mobile-nav-height, 56px) + env(safe-area-inset-bottom, 0px))"};
+}
+
+.splitPanelPortrait {
+	@include portrait-split-height;
+
+	top: auto;
+	right: 0;
+	left: 0;
+	bottom: var(--split-portrait-offset);
+	// Overrides the inline vw width used by the landscape/desktop split.
+	width: 100vw;
+	height: var(--split-portrait-h);
+	border-left: none;
+	border-top: 1px solid var(--on-dark-overlay-2);
+
+	// Vertical resize isn't wired in portrait — the panel is a fixed dock.
+	.splitDragHandle {
+		display: none;
+	}
+}
+
+.videoWrapperSplitPortrait {
+	@include portrait-split-height;
+
+	top: auto;
+	left: 0;
+	right: auto;
+	width: 100vw;
+	aspect-ratio: 16 / 9;
+	height: auto;
+	// Sits directly under the panel's top bar. Measured from the viewport
+	// bottom (same anchor as the panel) so the two can't disagree.
+	bottom: #{"calc(var(--split-portrait-offset) + var(--split-portrait-h) - var(--topbar-height, 56px) - 56.25vw)"};
+}

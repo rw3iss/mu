@@ -6,6 +6,7 @@ import { Icon } from '@/components/common/Icon';
 import { Tooltip } from '@/components/common/Tooltip';
 import { HorizontalMoviePager } from '@/components/movie/HorizontalMoviePager';
 import { MovieGrid } from '@/components/movie/MovieGrid';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
@@ -23,7 +24,7 @@ interface DashboardProps {
 
 /**
  * Build the dashboard header growth line:
- *   "New titles since last: session <a> · day <b> · week <c> · month <d> · year <e>"
+ *   "New titles since: <a> session · <b> day · <c> week · <d> month · <e> year"
  * Only windows with a non-zero count are shown; when every window is zero a
  * quiet fallback line renders instead. Counts use `.statNum` (accent, larger),
  * window names use `.statLabel`.
@@ -43,7 +44,7 @@ function renderNewTitles(stats: NewTitleStats | null) {
 	}
 	return (
 		<>
-			<span class={styles.statIntro}>New titles since last:</span>
+			<span class={styles.statIntro}>New titles since:</span>
 			{active.map(([label, n], i) => (
 				<span key={label}>
 					{i > 0 && <span class={styles.statSep}>·</span>}
@@ -63,6 +64,9 @@ export function Dashboard(_props: DashboardProps) {
 	const [isLoading, setIsLoading] = useState(true);
 	// One shared view mode for all three columns (was per-section).
 	const [view, setView] = useUiSetting<ViewMode>('dashboard_view', 'grid');
+	// Mobile shows every section as a horizontal rail — the grid/list toggle and
+	// the one-section-at-a-time tabs are desktop-only affordances.
+	const isMobile = useMediaQuery('(max-width: 767px)');
 	// Which section is shown in single-column / mobile mode (tab selector).
 	const [activeTab, setActiveTab] = useState(0);
 
@@ -157,7 +161,7 @@ export function Dashboard(_props: DashboardProps) {
 			movies: recentlyAdded,
 			empty: 'No movies in your library yet',
 			area: styles.areaRa,
-			horizontal: false,
+			horizontal: isMobile,
 		},
 		{
 			key: 'tr',
@@ -167,7 +171,7 @@ export function Dashboard(_props: DashboardProps) {
 			movies: trending,
 			empty: 'Nothing trending yet',
 			area: styles.areaTrending,
-			horizontal: false,
+			horizontal: isMobile,
 		},
 	];
 
@@ -191,28 +195,32 @@ export function Dashboard(_props: DashboardProps) {
 					{newTitlesMessage && <p class={styles.welcomeStat}>{newTitlesMessage}</p>}
 				</div>
 				<div class={styles.welcomeActions}>
-					<div class={styles.viewToggle} role="group" aria-label="Dashboard view">
-						<Tooltip label="Cards">
-							<button
-								class={`${styles.viewBtn} ${view === 'grid' ? styles.active : ''}`}
-								onClick={() => setView('grid')}
-								aria-label="Card view"
-								aria-pressed={view === 'grid'}
-							>
-								<Icon name="view-grid" size={14} />
-							</button>
-						</Tooltip>
-						<Tooltip label="Rows">
-							<button
-								class={`${styles.viewBtn} ${view === 'list' ? styles.active : ''}`}
-								onClick={() => setView('list')}
-								aria-label="Row view"
-								aria-pressed={view === 'list'}
-							>
-								<Icon name="view-list" size={14} />
-							</button>
-						</Tooltip>
-					</div>
+					{/* Grid/rows only apply to the desktop vertical grids — on mobile
+					    everything is a rail, so the toggle would be inert. */}
+					{!isMobile && (
+						<div class={styles.viewToggle} role="group" aria-label="Dashboard view">
+							<Tooltip label="Cards">
+								<button
+									class={`${styles.viewBtn} ${view === 'grid' ? styles.active : ''}`}
+									onClick={() => setView('grid')}
+									aria-label="Card view"
+									aria-pressed={view === 'grid'}
+								>
+									<Icon name="view-grid" size={14} />
+								</button>
+							</Tooltip>
+							<Tooltip label="Rows">
+								<button
+									class={`${styles.viewBtn} ${view === 'list' ? styles.active : ''}`}
+									onClick={() => setView('list')}
+									aria-label="Row view"
+									aria-pressed={view === 'list'}
+								>
+									<Icon name="view-list" size={14} />
+								</button>
+							</Tooltip>
+						</div>
+					)}
 					<span class={styles.welcomeLinks}>
 						<button
 							class={styles.welcomeLink}
@@ -235,26 +243,28 @@ export function Dashboard(_props: DashboardProps) {
 			    layout is driven by the container width, not the viewport, so it
 			    stays correct regardless of the sidebar. */}
 			<div class={styles.columnsWrap}>
-				<div class={styles.tabs} role="tablist" aria-label="Dashboard sections">
-					{sections.map((s, i) => (
-						<button
-							key={s.key}
-							class={`${styles.tab} ${activeTab === i ? styles.tabActive : ''}`}
-							onClick={() => setActiveTab(i)}
-							role="tab"
-							aria-selected={activeTab === i}
-						>
-							<Icon name={s.icon} size={16} />
-							<span>{s.title}</span>
-						</button>
-					))}
-				</div>
+				{!isMobile && (
+					<div class={styles.tabs} role="tablist" aria-label="Dashboard sections">
+						{sections.map((s, i) => (
+							<button
+								key={s.key}
+								class={`${styles.tab} ${activeTab === i ? styles.tabActive : ''}`}
+								onClick={() => setActiveTab(i)}
+								role="tab"
+								aria-selected={activeTab === i}
+							>
+								<Icon name={s.icon} size={16} />
+								<span>{s.title}</span>
+							</button>
+						))}
+					</div>
+				)}
 
 				<div class={styles.columns}>
 					{sections.map((s, i) => (
 						<section
 							key={s.key}
-							class={`${styles.column} ${s.area} ${activeTab === i ? styles.activeColumn : ''}`}
+							class={`${styles.column} ${s.area} ${isMobile || activeTab === i ? styles.activeColumn : ''}`}
 						>
 							<div class={styles.sectionHeader}>
 								<h2 class={styles.sectionTitle}>{s.title}</h2>

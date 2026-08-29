@@ -105,3 +105,10 @@
       radial-gradient(ellipse at 30% 80%, rgba(37, 99, 235, 0.02) 0%, transparent 50%);
   }
 }
+
+/* Portrait mobile split: the player is docked across the bottom, so content
+   needs clearance below it (mirrors the mini-player reservation above). The
+   height expression matches .splitPanelPortrait in GlobalPlayer.module.scss. */
+.withSplitPlayerBottom .content {
+  padding-bottom: #{"calc(min(78vh, max(56vh, calc(var(--topbar-height, 56px) + 56.25vw + 120px))) + var(--mobile-nav-height, 56px) + env(safe-area-inset-bottom, 0px) + var(--space-md))"};
+}
