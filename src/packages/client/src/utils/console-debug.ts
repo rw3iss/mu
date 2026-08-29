@@ -1,4 +1,5 @@
 import { APP_VERSION } from '@mu/shared';
+import { getActiveVideoElement } from '@/components/player/useVideoEngine';
 /**
  * Client-side console debug utility.
  * Exposes `window.mu` for live app control from the browser console.
@@ -16,6 +17,7 @@ import {
 	splitWidth,
 } from '@/state/globalPlayer.state';
 import { currentSession, currentTime, duration, isPlaying, volume } from '@/state/player.state';
+import { pipDiagnostics, togglePictureInPicture } from '@/utils/pip';
 
 const PREFIX = 'mu_ui_';
 
@@ -90,7 +92,7 @@ const HELP = `
   mu.player.split(50)      Set split width (25-62 percent)
 
 %cDebug:%c
-  mu.hls(true)             Enable HLS.js debug logging
+  mu.pip()                 Picture-in-Picture support diagnostics\n  mu.pip.try()             Force a PiP attempt + report why it failed\n  mu.hls(true)             Enable HLS.js debug logging
   mu.hls(false)            Disable HLS.js debug logging
   mu.version               App version
 
@@ -208,6 +210,28 @@ const mu = {
 			console.log(`Split width: ${w}%`);
 		},
 	}),
+
+	/**
+	 * Picture-in-Picture diagnostics — the fastest way to see WHY PiP isn't
+	 * available on a given device (especially Chrome for Android, which has no
+	 * Web PiP API). `mu.pip.try()` forces an attempt and reports the failure.
+	 */
+	pip: Object.assign(
+		() => {
+			const d = pipDiagnostics(getActiveVideoElement());
+			console.table(d);
+			if (d.reasonIfUnsupported) console.warn(d.reasonIfUnsupported);
+			return d;
+		},
+		{
+			try: async () => {
+				const ok = await togglePictureInPicture(getActiveVideoElement());
+				const d = pipDiagnostics(getActiveVideoElement());
+				console.log(ok ? 'PiP entered.' : 'PiP failed.', d.lastError ?? '');
+				return d;
+			},
+		},
+	),
 
 	hls: (enable: boolean) => {
 		if (enable) {

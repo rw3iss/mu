@@ -47,6 +47,7 @@ import { socketManager } from '@/services/socket-manager';
 import { wsService } from '@/services/websocket.service';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
+import { initMediaSession } from '@/state/media-session';
 import { initNotifications } from '@/state/notifications-feed.state';
 import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
 import { initProcessingState } from '@/state/processing.state';
@@ -155,6 +156,8 @@ export function App() {
 		wsService.connect();
 		socketManager.start();
 		initGlobalPlayer();
+		// Lock-screen / notification media controls (Android + iOS).
+		initMediaSession();
 		initProcessingState();
 		initConsoleDebug();
 		initDebugPanel();
