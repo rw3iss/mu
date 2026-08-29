@@ -64,9 +64,16 @@ export function Dashboard(_props: DashboardProps) {
 	const [isLoading, setIsLoading] = useState(true);
 	// One shared view mode for all three columns (was per-section).
 	const [view, setView] = useUiSetting<ViewMode>('dashboard_view', 'grid');
-	// Mobile shows every section as a horizontal rail — the grid/list toggle and
-	// the one-section-at-a-time tabs are desktop-only affordances.
-	const isMobile = useMediaQuery('(max-width: 767px)');
+	// Phone layout: every section becomes a horizontal rail, and the grid/list
+	// toggle + one-section-at-a-time tabs (desktop affordances) are hidden.
+	//
+	// Covers BOTH orientations. A phone in landscape reports a viewport far
+	// wider than the 767px mobile breakpoint, so width alone misses it; the
+	// second clause catches a short landscape viewport on a touch-primary
+	// device. `pointer: coarse` keeps desktop and resized desktop windows out.
+	const isMobile = useMediaQuery(
+		'(max-width: 767px), (orientation: landscape) and (max-height: 700px) and (pointer: coarse)',
+	);
 	// Which section is shown in single-column / mobile mode (tab selector).
 	const [activeTab, setActiveTab] = useState(0);
 

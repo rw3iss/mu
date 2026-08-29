@@ -88,13 +88,13 @@
   color: var(--color-text-muted);
 }
 
-/* Mobile header: stack it into three clean left-aligned lines —
+/* Phone header: stack it into three clean left-aligned lines —
      1) "Welcome back, <name>"
      2) "New titles since:"
      3) the counts
    The inline dot separator and the right-hand action cluster only make sense
    on the one-line desktop layout. */
-@include mobile {
+@mixin dashboard-phone-header {
   .welcomeRow {
     flex-direction: column;
     align-items: flex-start;
@@ -125,6 +125,16 @@
   .welcomeActions {
     margin-left: 0;
   }
+}
+
+@include mobile {
+  @include dashboard-phone-header;
+}
+
+/* Landscape phones: the viewport is wider than the mobile breakpoint, so match
+   on a short viewport + touch pointer instead (mirrors Dashboard.tsx). */
+@media (orientation: landscape) and (max-height: 700px) and (pointer: coarse) {
+  @include dashboard-phone-header;
 }
 
 .welcomeUser {
@@ -421,5 +431,52 @@
   &.active {
     background: var(--color-bg-elevated);
     color: var(--color-accent);
+  }
+}
+
+/* ── Landscape phones ─────────────────────────────────────────────────────
+   A phone in landscape is WIDER than the 768px desktop breakpoint and its
+   .columnsWrap clears the 720px container query, so it would otherwise inherit
+   two desktop behaviours that fight the stacked-rail layout:
+     1. a fixed-height, overflow:hidden page (columns scroll internally), and
+     2. a two-column grid.
+   Neither suits three rails on a ~660px-tall viewport, so both are undone here.
+   This block is last in the file so it outranks the earlier media/container
+   queries it overrides — they share the same (0,1,0) specificity. */
+@media (orientation: landscape) and (max-height: 700px) and (pointer: coarse) {
+  .dashboard {
+    // Let the page scroll naturally instead of clipping the rails.
+    height: auto;
+    overflow: visible;
+  }
+
+  .columnsWrap {
+    flex: none;
+    min-height: 0;
+  }
+
+  // Stack the three rails instead of the desktop two-column arrangement.
+  .columns {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-template-areas: none;
+    height: auto;
+    align-items: start;
+  }
+
+  .column {
+    height: auto;
+    min-height: 0;
+  }
+
+  // Rails must not become vertical scrollers (the >=768px .columnBody rule).
+  .columnBody {
+    flex: none;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .tabs {
+    display: none;
   }
 }
