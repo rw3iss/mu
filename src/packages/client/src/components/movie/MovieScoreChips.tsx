@@ -22,18 +22,22 @@ import styles from './MovieScoreChips.module.scss';
  * Returns null when no scores are available so callers don't have to gate.
  */
 interface MovieScoreChipsProps {
-	movie: Pick<Movie, 'imdbRating' | 'imdbVotes' | 'rtRating' | 'metacriticRating'>;
+	movie: Pick<Movie, 'imdbRating' | 'imdbVotes' | 'rtRating' | 'metacriticRating'> & {
+		/** TMDB score + votes. Often the ONLY rating on a not-in-library title. */
+		tmdbRating?: number | null;
+		tmdbVotes?: number | null;
+	};
 }
 
 export function MovieScoreChips({ movie }: MovieScoreChipsProps) {
 	const imdb = movie.imdbRating && movie.imdbRating > 0 ? movie.imdbRating : null;
-	const imdbVotes =
-		movie.imdbVotes && movie.imdbVotes > 0 ? movie.imdbVotes : null;
+	const imdbVotes = movie.imdbVotes && movie.imdbVotes > 0 ? movie.imdbVotes : null;
 	const rt = movie.rtRating && movie.rtRating > 0 ? movie.rtRating : null;
-	const mc =
-		movie.metacriticRating && movie.metacriticRating > 0 ? movie.metacriticRating : null;
+	const mc = movie.metacriticRating && movie.metacriticRating > 0 ? movie.metacriticRating : null;
+	const tmdb = movie.tmdbRating && movie.tmdbRating > 0 ? movie.tmdbRating : null;
+	const tmdbVotes = movie.tmdbVotes && movie.tmdbVotes > 0 ? movie.tmdbVotes : null;
 
-	if (imdb == null && rt == null && mc == null) return null;
+	if (imdb == null && rt == null && mc == null && tmdb == null) return null;
 
 	return (
 		<>
@@ -57,6 +61,18 @@ export function MovieScoreChips({ movie }: MovieScoreChipsProps) {
 			{mc != null && (
 				<span class={`${styles.chip} ${styles.mc}`} title={`MC: ${mc}/100`}>
 					{mc}
+				</span>
+			)}
+			{tmdb != null && (
+				<span
+					class={`${styles.chip} ${styles.tmdb}`}
+					title={
+						tmdbVotes != null
+							? `TMDB: ${tmdb.toFixed(1)} (${formatVotes(tmdbVotes)} votes)`
+							: `TMDB: ${tmdb.toFixed(1)}`
+					}
+				>
+					{tmdb.toFixed(1)}
 				</span>
 			)}
 		</>

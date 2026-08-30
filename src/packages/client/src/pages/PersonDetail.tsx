@@ -4,10 +4,10 @@ import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { Select } from '@/components/common/Select';
 import { SmartImage } from '@/components/common/SmartImage';
+import { ResultCard } from '@/components/movie/ResultCard';
 import { useSeo } from '@/hooks/useSeo';
 import { type PersonView, peopleService } from '@/services/people.service';
 import { ensureFavoritesLoaded, slugifyName } from '@/state/favorites.state';
-import { newTabNav } from '@/utils/navigation';
 import styles from './PersonDetail.module.scss';
 
 interface PersonDetailProps {
@@ -449,10 +449,10 @@ export function PersonDetail({ id }: PersonDetailProps) {
 }
 
 function CreditCard({ credit }: { credit: PersonView['knownForMovies'][number] }) {
-	// Library hit → local detail page. Otherwise, if it's a movie with
-	// a TMDB id, route to the virtual-row preview at /movie/tmdb:<id>
-	// (server creates a 'bookmark' stub on first visit). TV credits stay
-	// non-clickable until /tv/tmdb:<id> exists.
+	// Library hit → local detail page. Otherwise, if it's a movie with a TMDB
+	// id, route to the virtual-row preview at /movie/tmdb:<id> (server creates a
+	// 'bookmark' stub on first visit). TV credits stay non-clickable until
+	// /tv/tmdb:<id> exists.
 	const href = credit.movieId
 		? `/movie/${credit.movieId}`
 		: credit.mediaType === 'movie' && credit.tmdbId
@@ -464,104 +464,43 @@ function CreditCard({ credit }: { credit: PersonView['knownForMovies'][number] }
 		: credit.mediaType === 'movie' && credit.tmdbId
 			? `tmdb:${credit.tmdbId}`
 			: null;
-	const clickable = href != null;
-	// newTabNav adds middle-click / ctrl+click open-in-new-tab handling.
-	const navHandlers = href ? newTabNav(href, () => route(href)) : {};
-	const onKeyDown = href
-		? (e: KeyboardEvent) => {
-				if (e.key === 'Enter' || e.key === ' ') {
-					e.preventDefault();
-					route(href);
-				}
-			}
-		: undefined;
-	return (
-		<div
-			class={`${styles.creditCard} ${clickable ? styles.clickable : ''} ${
-				!credit.movieId ? styles.notOwned : ''
-			}`}
-			{...navHandlers}
-			onKeyDown={onKeyDown as any}
-			role={clickable ? 'button' : undefined}
-			tabIndex={clickable ? 0 : undefined}
-		>
-			<div class={styles.creditPoster}>
-				{credit.posterUrl ? (
-					<SmartImage src={credit.posterUrl} alt={credit.title} />
-				) : (
-					<div class={styles.creditPosterPlaceholder}>
-						<Icon name="film" size={28} />
-					</div>
-				)}
-				{!credit.movieId && <span class={styles.notOwnedBadge}>Not in library</span>}
-				{/* Seeds Discover from this credit. Library rows use their local id;
-				    everything else goes in as `tmdb:<id>`, which the server resolves
-				    to a stub — so it works for titles you don't own too. */}
-				{seedId && (
-					<button
-						type="button"
-						class={styles.creditSeedBtn}
-						onClick={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-							route(
-								`/discover?seedMovieId=${encodeURIComponent(seedId)}&seedLabel=${encodeURIComponent(credit.title)}`,
-							);
-						}}
-						title={`Find movies similar to ${credit.title}`}
-					>
-						See similar →
-					</button>
-				)}
-			</div>
-			<div class={styles.creditInfo}>
-				<span class={styles.creditTitle}>{credit.title}</span>
-				<span class={styles.creditMeta}>
-					{credit.year ?? '—'}
-					{credit.character ? ` · as ${credit.character}` : ''}
-					{credit.job ? ` · ${credit.job}` : ''}
-				</span>
-				<CreditRatings credit={credit} />
-			</div>
-		</div>
-	);
-}
 
-function formatVotes(n: number): string {
-	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
-	if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
-	return String(n);
-}
+	// TV credits have nowhere to go yet — keep the old inert tile for them.
+	if (!href) {
+		return (
+			<div class={`${styles.creditCard} ${styles.notOwned}`}>
+				<div class={styles.creditPoster}>
+					{credit.posterUrl ? (
+						<SmartImage src={credit.posterUrl} alt={credit.title} />
+					) : (
+						<div class={styles.creditPosterPlaceholder}>
+							<Icon name="film" size={28} />
+						</div>
+					)}
+				</div>
+				<div class={styles.creditInfo}>
+					<span class={styles.creditTitle}>{credit.title}</span>
+					<span class={styles.creditMeta}>{credit.year ?? '—'}</span>
+				</div>
+			</div>
+		);
+	}
 
-function CreditRatings({ credit }: { credit: PersonView['knownForMovies'][number] }) {
-	const imdb = credit.imdbRating != null && credit.imdbRating > 0 ? credit.imdbRating : null;
-	const tmdb = credit.tmdbRating != null && credit.tmdbRating > 0 ? credit.tmdbRating : null;
-	if (imdb == null && tmdb == null) return null;
-	const votes =
-		credit.tmdbVotes != null && credit.tmdbVotes > 0 ? formatVotes(credit.tmdbVotes) : null;
+	// Shared with the movie page's "Similar" section so both rails present the
+	// same information in the same layout.
 	return (
-		<span
-			class={styles.creditRatings}
-			title={[
-				imdb != null ? `IMDB ${imdb.toFixed(1)}` : null,
-				tmdb != null ? `TMDB ${tmdb.toFixed(1)}` : null,
-				votes ? `${votes} votes` : null,
-			]
-				.filter(Boolean)
-				.join(' · ')}
-		>
-			{imdb != null && (
-				<span class={styles.creditRatingPill}>
-					<strong>IMDB</strong> {imdb.toFixed(1)}
-				</span>
-			)}
-			{tmdb != null && (
-				<span class={styles.creditRatingPill}>
-					<strong>TMDB</strong> {tmdb.toFixed(1)}
-				</span>
-			)}
-			{votes && <span class={styles.creditVotes}>{votes} votes</span>}
-		</span>
+		<ResultCard
+			href={href}
+			title={credit.title}
+			year={credit.year}
+			posterUrl={credit.posterUrl}
+			inLibrary={!!credit.movieId}
+			imdbRating={credit.imdbRating}
+			tmdbRating={credit.tmdbRating}
+			tmdbVotes={credit.tmdbVotes}
+			role={credit.character ? `as ${credit.character}` : (credit.job ?? null)}
+			seedId={seedId}
+		/>
 	);
 }
 

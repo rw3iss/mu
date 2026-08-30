@@ -3,7 +3,7 @@ import { Collapse } from '@/components/common/Collapse';
 import { Icon } from '@/components/common/Icon';
 import { ResultFilterBar } from '@/components/common/ResultFilterBar';
 import { Spinner } from '@/components/common/Spinner';
-import { DiscoverResultCard } from '@/components/discover/DiscoverResultCard';
+import { ResultCard } from '@/components/movie/ResultCard';
 import { discoverService, type ScoredMovie } from '@/services/discover.service';
 import {
 	EMPTY_FILTERS,
@@ -121,7 +121,22 @@ export function SimilarSection({ movieId, defaultOpen = false }: SimilarSectionP
 				) : (
 					<div class={styles.grid}>
 						{visible.map((m) => (
-							<DiscoverResultCard key={m.movieId} movie={m} />
+							<ResultCard
+								key={m.movieId}
+								href={`/movie/${m.movieId}`}
+								title={m.title}
+								year={m.year}
+								posterUrl={m.posterUrl}
+								inLibrary={m.inLibrary ?? m.source === 'library'}
+								matchPercent={m.score != null ? m.score * 100 : null}
+								imdbRating={m.imdbRating}
+								imdbVotes={m.imdbVotes}
+								tmdbRating={m.tmdbRating}
+								tmdbVotes={m.tmdbVotes}
+								runtimeMinutes={m.runtimeMinutes}
+								genres={m.genres}
+								seedId={m.movieId}
+							/>
 						))}
 					</div>
 				)}

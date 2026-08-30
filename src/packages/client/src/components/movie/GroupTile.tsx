@@ -36,9 +36,10 @@ export function GroupTile({ group, viewMode = 'grid' }: GroupTileProps) {
 	const typeLabel = group.groupType === 'collection' ? 'Collection' : 'Series';
 	// Groups carry no aggregate rating today; render the row only if one ever
 	// appears so the layout is ready for it.
-	const rating = typeof (group as { rating?: number }).rating === 'number'
-		? (group as { rating?: number }).rating!
-		: 0;
+	const rating =
+		typeof (group as { rating?: number }).rating === 'number'
+			? (group as { rating?: number }).rating!
+			: 0;
 
 	return (
 		<div
