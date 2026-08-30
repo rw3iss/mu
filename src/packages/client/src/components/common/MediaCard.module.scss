@@ -243,8 +243,13 @@
 	gap: 4px;
 }
 
+/* Sits below .info and, on bordered cards, runs to the card's edge — so it
+   needs the same horizontal inset as .info plus a bottom inset of its own.
+   Only the top spacing was set before, which left the text touching the
+   left/right/bottom borders. */
 .caption {
-	margin-top: 4px;
+	padding: 0 8px 8px;
+	margin-top: 1px;
 	font-size: 12px;
 	color: var(--color-text-muted);
 	line-height: 1.35;
