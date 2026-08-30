@@ -17,15 +17,18 @@
 	color: inherit;
 }
 
+/* Matches MovieDetail's .sectionTitle (Overview / Cast / Soundtrack) so this
+   section's heading is indistinguishable from its neighbours. */
 .title {
 	margin: 0;
-	font-size: var(--font-size-xl);
+	font-size: var(--font-size-lg);
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-text-primary);
+	color: var(--color-label);
 }
 
 .arrow {
 	display: inline-flex;
+	font-size: var(--font-size-xs);
 	color: var(--color-text-muted);
 }
 
@@ -50,5 +53,7 @@
 	color: var(--color-text-muted);
 	font-size: var(--font-size-sm);
 	display: flex;
+	align-items: center;
 	justify-content: center;
+	gap: var(--space-sm);
 }

@@ -76,7 +76,11 @@
 
 .seedBtn,
 .bookmarkBtn {
-	flex: 1;
+	// NOT flex:1 — MediaCard renders the overlay as a flex COLUMN, so growing
+	// made the button stretch the poster's full height instead of reading as a
+	// button. Sized to its content instead.
+	flex: 0 0 auto;
+	align-self: center;
 	background: rgba(0, 0, 0, 0.78);
 	color: white;
 	border: none;

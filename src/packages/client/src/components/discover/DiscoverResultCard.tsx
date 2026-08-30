@@ -63,6 +63,12 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 
 	const scorePct = Math.round(movie.score * 100);
 	const reason = movie.explanation[0];
+	// Prefer the movie's full genre list over the server's "Shared genres: a, b"
+	// explanation, which is capped at three and reads as jargon on the card.
+	const caption =
+		movie.genres && movie.genres.length > 0
+			? movie.genres.join(', ')
+			: (reason ?? '').replace(/^Shared genres:\s*/i, '') || null;
 	const fullExplanation = movie.explanation.join('\n• ');
 	const tmdb = movie.tmdbRating != null && movie.tmdbRating > 0 ? movie.tmdbRating : null;
 	const imdb = movie.imdbRating != null && movie.imdbRating > 0 ? movie.imdbRating : null;
@@ -155,12 +161,8 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 				</span>
 			)}
 			{votesLabel && <span class={styles.metaPillMuted}>{votesLabel} votes</span>}
-			{movie.usedSources.length > 0 && (
-				<span class={styles.sources} title={movie.usedSources.join(' · ')}>
-					{movie.usedSources.slice(0, 2).join(' · ')}
-					{movie.usedSources.length > 2 ? ` +${movie.usedSources.length - 2}` : ''}
-				</span>
-			)}
+			{/* The matching strategy ("content-vector · embedding") is internal
+			    detail — kept out of the card, still available in explanation. */}
 		</>
 	);
 
@@ -173,6 +175,7 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 			onClick={goToDetail}
 			href={`/movie/${movie.movieId}`}
 			dim={!isOwned}
+			noPosterHoverBorder
 			class={styles.card}
 			topLeft={topLeft}
 			topRight={topRight}
@@ -186,19 +189,7 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 			}
 			title={movie.title}
 			subtitle={subtitle}
-			caption={
-				reason ? (
-					<span title={movie.explanation.length > 1 ? `• ${fullExplanation}` : reason}>
-						{reason}
-						{movie.explanation.length > 1 ? (
-							<span class={styles.moreReasonsHint}>
-								{' '}
-								+{movie.explanation.length - 1} more
-							</span>
-						) : null}
-					</span>
-				) : null
-			}
+			caption={caption ? <span title={fullExplanation || undefined}>{caption}</span> : null}
 		/>
 	);
 }

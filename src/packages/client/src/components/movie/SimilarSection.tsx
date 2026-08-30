@@ -103,9 +103,14 @@ export function SimilarSection({ movieId, defaultOpen = false }: SimilarSectionP
 					</div>
 				)}
 
-				{loading && results === null ? (
+				{/* `results === null` covers BOTH "not requested yet" and "in
+				    flight". Keying the spinner off `loading` alone let the render
+				    between opening and the effect firing fall through to the
+				    empty-state branch, which flashed "No results match". */}
+				{results === null && !error ? (
 					<div class={styles.state}>
-						<Spinner />
+						<Spinner size="sm" />
+						<span>Loading similar titles…</span>
 					</div>
 				) : error ? (
 					<div class={styles.state}>{error}</div>

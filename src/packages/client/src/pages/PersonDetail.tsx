@@ -458,6 +458,12 @@ function CreditCard({ credit }: { credit: PersonView['knownForMovies'][number] }
 		: credit.mediaType === 'movie' && credit.tmdbId
 			? `/movie/tmdb:${credit.tmdbId}`
 			: null;
+	// Discover accepts either a local movie id or a `tmdb:` key as its seed.
+	const seedId = credit.movieId
+		? credit.movieId
+		: credit.mediaType === 'movie' && credit.tmdbId
+			? `tmdb:${credit.tmdbId}`
+			: null;
 	const clickable = href != null;
 	// newTabNav adds middle-click / ctrl+click open-in-new-tab handling.
 	const navHandlers = href ? newTabNav(href, () => route(href)) : {};
@@ -488,6 +494,25 @@ function CreditCard({ credit }: { credit: PersonView['knownForMovies'][number] }
 					</div>
 				)}
 				{!credit.movieId && <span class={styles.notOwnedBadge}>Not in library</span>}
+				{/* Seeds Discover from this credit. Library rows use their local id;
+				    everything else goes in as `tmdb:<id>`, which the server resolves
+				    to a stub — so it works for titles you don't own too. */}
+				{seedId && (
+					<button
+						type="button"
+						class={styles.creditSeedBtn}
+						onClick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							route(
+								`/discover?seedMovieId=${encodeURIComponent(seedId)}&seedLabel=${encodeURIComponent(credit.title)}`,
+							);
+						}}
+						title={`Find movies similar to ${credit.title}`}
+					>
+						See similar →
+					</button>
+				)}
 			</div>
 			<div class={styles.creditInfo}>
 				<span class={styles.creditTitle}>{credit.title}</span>

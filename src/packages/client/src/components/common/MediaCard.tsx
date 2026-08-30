@@ -67,6 +67,12 @@ export interface MediaCardProps {
 	posterBadges?: ComponentChildren;
 	/** Shown on hover/focus over the poster — typically action buttons. */
 	hoverOverlay?: ComponentChildren;
+	/**
+	 * Suppress the poster's accent border on hover. Cards that already draw
+	 * their own border around the WHOLE item (e.g. DiscoverResultCard) would
+	 * otherwise show two nested highlights.
+	 */
+	noPosterHoverBorder?: boolean;
 	/** Rendered between the poster and the info block (e.g. watch-progress bar). */
 	belowPoster?: ComponentChildren;
 	/** Rendered above the info block (e.g. checkbox in selection mode). */
@@ -114,6 +120,7 @@ export function MediaCard({
 	topRight,
 	posterBadges,
 	hoverOverlay,
+	noPosterHoverBorder,
 	belowPoster,
 	preInfo,
 	infoOverlay,
@@ -134,6 +141,7 @@ export function MediaCard({
 		styles.card,
 		styles[`shape_${posterShape}`],
 		dim ? styles.dim : '',
+		noPosterHoverBorder ? styles.noPosterHoverBorder : '',
 		processing ? styles.processing : '',
 		selected ? styles.selected : '',
 		hidden ? styles.hiddenState : '',

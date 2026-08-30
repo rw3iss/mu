@@ -55,6 +55,12 @@
 	opacity: 0.7;
 }
 
+/* Consumers that draw their own border around the whole card opt out of the
+   poster highlight so the two don't nest. */
+.noPosterHoverBorder:hover .posterWrap {
+	border-color: var(--color-border);
+}
+
 .hiddenState {
 	opacity: 0.55;
 }

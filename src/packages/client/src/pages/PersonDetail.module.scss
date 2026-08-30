@@ -198,6 +198,39 @@
 	}
 }
 
+/* Hover-revealed "See similar" over the credit poster, matching the Similar
+   section's cards. Hidden until hover/focus so the grid stays clean. */
+.creditSeedBtn {
+	position: absolute;
+	left: 50%;
+	bottom: 10px;
+	transform: translate(-50%, 4px);
+	padding: 5px 10px;
+	font-size: 0.7rem;
+	font-weight: var(--font-weight-medium);
+	white-space: nowrap;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.78);
+	border: none;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 160ms ease, transform 160ms ease, background 120ms ease;
+	z-index: 2;
+
+	&:hover {
+		background: var(--color-accent);
+	}
+}
+
+.creditCard:hover .creditSeedBtn,
+.creditCard:focus-within .creditSeedBtn {
+	opacity: 1;
+	pointer-events: auto;
+	transform: translate(-50%, 0);
+}
+
 .creditPosterPlaceholder {
 	width: 100%;
 	height: 100%;
