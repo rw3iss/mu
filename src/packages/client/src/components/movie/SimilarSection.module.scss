@@ -1,5 +1,9 @@
+/* Spacing matches the other collapsible sections on the movie page
+   (fileInfo / management / soundtrack): --space-lg of margin AND padding
+   above, so every collapsed section sits the same distance apart. */
 .section {
-	margin-top: var(--space-xl);
+	margin-top: var(--space-lg);
+	padding-top: var(--space-lg);
 }
 
 /* Header row doubles as the collapse toggle, matching the Cast/Overview
