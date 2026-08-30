@@ -20,6 +20,7 @@ import { MoviePlaylists } from '@/components/movie/MoviePlaylists';
 import { PlaybackBadge } from '@/components/movie/PlaybackBadge';
 import { RatingWidget } from '@/components/movie/RatingWidget';
 import { ShareMovieModal } from '@/components/movie/ShareMovieModal';
+import { SimilarSection } from '@/components/movie/SimilarSection';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { TrailerSection } from '@/components/movie/TrailerSection';
 import { useSeo } from '@/hooks/useSeo';
@@ -1113,6 +1114,10 @@ export function MovieDetail({ id }: MovieDetailProps) {
 								</Collapse>
 							</div>
 						)}
+
+						{/* Similar — full width, collapsible, spans library + not-owned
+						    titles (same engine as Discover, seeded with this movie). */}
+						<SimilarSection movieId={movie.id} />
 
 						{/* ── Bottom sections: two 50% columns (stack on mobile) ── */}
 

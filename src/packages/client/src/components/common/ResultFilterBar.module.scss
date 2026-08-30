@@ -1,0 +1,37 @@
+.controls {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-md);
+	flex-wrap: wrap;
+}
+
+.group {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-xs);
+}
+
+.label {
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+	white-space: nowrap;
+}
+
+.yearInput {
+	width: 104px;
+}
+
+.ratingInput {
+	width: 96px;
+}
+
+.votesInput {
+	width: 110px;
+}
+
+/* Live count of rows passing the current filters. */
+.count {
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+	white-space: nowrap;
+}

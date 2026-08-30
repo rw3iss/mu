@@ -1,0 +1,54 @@
+.section {
+	margin-top: var(--space-xl);
+}
+
+/* Header row doubles as the collapse toggle, matching the Cast/Overview
+   sections above it. */
+.toggle {
+	display: flex;
+	align-items: center;
+	gap: var(--space-sm);
+	width: 100%;
+	padding: 0;
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	text-align: left;
+	color: inherit;
+}
+
+.title {
+	margin: 0;
+	font-size: var(--font-size-xl);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-text-primary);
+}
+
+.arrow {
+	display: inline-flex;
+	color: var(--color-text-muted);
+}
+
+.controlsRow {
+	margin: var(--space-md) 0;
+}
+
+.grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: var(--space-md);
+	margin-top: var(--space-sm);
+
+	@include mobile {
+		grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+		gap: var(--space-sm);
+	}
+}
+
+.state {
+	padding: var(--space-lg) 0;
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+	display: flex;
+	justify-content: center;
+}
