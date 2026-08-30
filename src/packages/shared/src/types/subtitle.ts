@@ -39,6 +39,12 @@ export interface MovieSubtitleInfo {
 	/** Source sidecar filename (external tracks) — shown on hover to
 	 * distinguish multiple downloads of the same language. */
 	fileName?: string;
+	/**
+	 * For provider downloads: the exact `<provider>:<fileId>` this sidecar came
+	 * from. Unique per search result, so the search list can flag precisely the
+	 * one result already on disk (release names are often duplicated).
+	 */
+	sourceId?: string;
 	/** Available when there's an active stream session */
 	url?: string;
 }

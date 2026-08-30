@@ -83,18 +83,44 @@ export class SubtitleIngestionService {
 		subFilePath: string;
 		lang: string;
 		labelSuffix: 'Downloaded' | 'Uploaded';
+		/** `<provider>:<fileId>` when this came from a provider download. */
+		sourceId?: string;
 	}): Promise<SubtitleTrackRow> {
-		const { fileId, filePath, subFilePath, lang, labelSuffix } = args;
+		const { fileId, filePath, subFilePath, lang, labelSuffix, sourceId } = args;
+		const wanted = path.basename(subFilePath);
+
+		// extractSubtitles rescans the disk, so it can't know about DB-only
+		// fields. Carry `sourceId` and the user's `default` choice across from
+		// the rows we already have (matched by sidecar filename), else every new
+		// download would wipe both.
+		const prior = new Map(
+			this.tracksRepo
+				.getPersistedTracks(fileId)
+				.filter((t) => t.fileName)
+				.map((t) => [t.fileName as string, t]),
+		);
 
 		await this.subtitleService.clearCache(fileId);
 		const tracks = await this.subtitleService.extractSubtitles(filePath, fileId);
 
 		if (tracks.length > 0) {
-			await this.tracksRepo.setTracks(fileId, tracks);
+			const merged = tracks.map((t) => {
+				const before = t.fileName ? prior.get(t.fileName) : undefined;
+				return {
+					...t,
+					...(before?.default ? { default: true } : {}),
+					// The row we just wrote gets the new provenance; others keep theirs.
+					...(t.fileName === wanted && sourceId
+						? { sourceId }
+						: before?.sourceId
+							? { sourceId: before.sourceId }
+							: {}),
+				};
+			});
+			await this.tracksRepo.setTracks(fileId, merged);
 			// Return the track for the file we just wrote (it may not be last now
 			// that same-language downloads coexist), matched by filename.
-			const wanted = path.basename(subFilePath);
-			return tracks.find((t) => t.fileName === wanted) ?? tracks[tracks.length - 1]!;
+			return merged.find((t) => t.fileName === wanted) ?? merged[merged.length - 1]!;
 		}
 
 		// Fallback path — manually register + convert
@@ -106,7 +132,8 @@ export class SubtitleIngestionService {
 			language: lang,
 			title: label,
 			external: true,
-			fileName: path.basename(subFilePath),
+			fileName: wanted,
+			...(sourceId ? { sourceId } : {}),
 		};
 		existing.push(newTrack);
 		await this.tracksRepo.setTracks(fileId, existing);

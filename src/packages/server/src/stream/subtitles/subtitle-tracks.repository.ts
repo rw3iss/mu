@@ -14,6 +14,12 @@ export interface SubtitleTrackRow {
 	default?: boolean;
 	/** Source sidecar filename (external tracks). */
 	fileName?: string;
+	/**
+	 * Provider-download provenance: `<provider>:<fileId>`. Uniquely identifies
+	 * the search result this sidecar came from, so the "Search Online" list can
+	 * flag exactly the downloaded one (many results share a release name).
+	 */
+	sourceId?: string;
 }
 
 /**
@@ -75,6 +81,7 @@ export class SubtitleTracksRepository {
 						// Preserve the default flag (only set when true to keep the JSON lean).
 						...(t.default ? { default: true } : {}),
 						...(t.fileName ? { fileName: t.fileName } : {}),
+						...(t.sourceId ? { sourceId: t.sourceId } : {}),
 					})),
 				),
 			})

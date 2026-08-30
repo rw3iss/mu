@@ -79,6 +79,7 @@ export class SubtitleManageController {
 				external: t.external ?? false,
 				default: t.default ?? false,
 				fileName: t.fileName,
+				sourceId: t.sourceId,
 			})),
 		};
 	}
@@ -194,6 +195,9 @@ export class SubtitleManageController {
 			subFilePath,
 			lang,
 			labelSuffix: 'Downloaded',
+			// Exact provenance so the search list can flag this one result (and
+			// only this one) as already downloaded.
+			sourceId: `${body.provider}:${body.fileId}`,
 		});
 		return {
 			subtitle: {
@@ -202,6 +206,7 @@ export class SubtitleManageController {
 				label: newTrack.title || `${lang.toUpperCase()} (Downloaded)`,
 				external: true,
 				fileName: newTrack.fileName,
+				sourceId: newTrack.sourceId,
 			},
 		};
 	}

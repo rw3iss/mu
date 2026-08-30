@@ -24,6 +24,20 @@ function slugTag(raw: string | undefined | null): string {
 }
 
 /**
+ * Pull the `<tag>` segment out of a sidecar filename shaped
+ * `<base>.<lang>[.<tag>].<ext>` — i.e. the second-to-last dot segment, which is
+ * where `writeSidecar` puts the slugified release name. Returns '' when the
+ * file carries no tag (`<base>.<lang>.<ext>`), since the base is the movie
+ * title and matching on it would flag unrelated results.
+ */
+function sidecarTag(fileName: string): string {
+	const parts = fileName.toLowerCase().split('.');
+	// Need at least base + lang + tag + ext to have a tag at all.
+	if (parts.length < 4) return '';
+	return parts[parts.length - 2] ?? '';
+}
+
+/**
  * Drop a redundant leading "<LANG> · " (or "<LANG> (Forced) · ") from a track
  * label — the row already shows the language in its own chip, so repeating it
  * before the release name is just noise.
@@ -242,23 +256,47 @@ export function SubtitlePanel({
 		});
 	}, [fileName]);
 
-	// Which online results we already have downloaded — compare the slugified
-	// release name against the stored sidecar filenames (with a loose 2-letter
-	// language match so e.g. an ES download doesn't flag the EN result).
+	// Which online results we already have on disk.
+	//
+	// Primary key is `sourceId` (`<provider>:<fileId>`), stamped at download
+	// time — unique per result, so exactly one row lights up. The old approach
+	// matched a slugified release name as a *substring* of the sidecar
+	// filename, which flagged every result once one was downloaded: providers
+	// hand back many results sharing a release name (or none at all, in which
+	// case the label falls back to "<Title> (Year)" — a substring of every
+	// sidecar, since the sidecar is named after the movie file).
+	//
+	// Legacy rows (downloaded before sourceId existed) fall back to a filename
+	// match, but now against the exact `<tag>` *segment* rather than any
+	// substring, and only when the tag is discriminating.
 	const downloadedResultIds = useMemo(() => {
 		const ids = new Set<string>();
-		const dls = tracks
-			.filter((t) => t.external && t.fileName)
+		const external = tracks.filter((t) => t.external);
+		if (external.length === 0) return ids;
+
+		const sourceIds = new Set(external.map((t) => t.sourceId).filter((v): v is string => !!v));
+		// Only legacy rows need the filename heuristic.
+		const legacy = external
+			.filter((t) => !t.sourceId && t.fileName)
 			.map((t) => ({
 				lang: (t.language ?? '').slice(0, 2).toLowerCase(),
-				file: (t.fileName as string).toLowerCase(),
-			}));
-		if (dls.length === 0) return ids;
+				tag: sidecarTag(t.fileName as string),
+			}))
+			.filter((t) => t.tag.length > 0);
+
 		for (const r of searchResults) {
-			const slug = slugTag(r.releaseName || r.label);
+			if (sourceIds.has(`${r.provider}:${r.fileId}`)) {
+				ids.add(r.fileId);
+				continue;
+			}
+			// A result with no release name yields a tag equal to the movie
+			// title, which can't distinguish it from its siblings — skip it
+			// rather than flag them all.
+			if (!r.releaseName) continue;
+			const slug = slugTag(r.releaseName);
 			if (!slug) continue;
 			const rlang = (r.language ?? '').slice(0, 2).toLowerCase();
-			if (dls.some((d) => d.lang === rlang && d.file.includes(slug))) ids.add(r.fileId);
+			if (legacy.some((d) => d.lang === rlang && d.tag === slug)) ids.add(r.fileId);
 		}
 		return ids;
 	}, [searchResults, tracks]);

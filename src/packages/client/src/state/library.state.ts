@@ -340,8 +340,36 @@ export function initViewMode(): void {
 	}
 }
 
+/**
+ * Patch a movie in the current list.
+ *
+ * `hideWatched` / `showHidden` are *server-side* query params, so a movie the
+ * user just marked watched (or hid) no longer belongs in the result set. Patching
+ * it in place left it on screen until a manual refresh — so when the update
+ * pushes it outside the active filter, drop it from the list and keep the
+ * counters honest instead.
+ */
 export function updateMovieInList(updated: Movie): void {
-	movies.value = movies.value.map((m) => (m.id === updated.id ? { ...m, ...updated } : m));
+	const current = movies.value.find((m) => m.id === updated.id);
+	if (!current) return;
+	const next = { ...current, ...updated };
+
+	const excluded = (hideWatched.value && next.watched) || (!showHidden.value && next.hidden);
+	if (excluded) {
+		movies.value = movies.value.filter((m) => m.id !== updated.id);
+		totalMovies.value = Math.max(0, totalMovies.value - 1);
+		if (next.watched && !current.watched) watchedCount.value += 1;
+		if (next.hidden && !current.hidden) hiddenCount.value += 1;
+		return;
+	}
+
+	movies.value = movies.value.map((m) => (m.id === updated.id ? next : m));
+	if (next.watched !== current.watched) {
+		watchedCount.value = Math.max(0, watchedCount.value + (next.watched ? 1 : -1));
+	}
+	if (next.hidden !== current.hidden) {
+		hiddenCount.value = Math.max(0, hiddenCount.value + (next.hidden ? 1 : -1));
+	}
 }
 
 export function removeMovieFromList(movieId: string): void {
