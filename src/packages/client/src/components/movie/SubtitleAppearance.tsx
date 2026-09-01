@@ -240,7 +240,7 @@ export function SubtitleAppearance({ compact }: SubtitleAppearanceProps) {
 				<div class={styles.control}>
 					<input
 						type="number"
-						class={styles.numberInput}
+						class={`${styles.numberInput} ${styles.timingInput}`}
 						value={settings.timingOffsetMs}
 						step={100}
 						onChange={(e) => {

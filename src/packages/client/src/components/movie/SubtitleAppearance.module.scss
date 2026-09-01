@@ -99,6 +99,13 @@
   }
 }
 
+/* Timing Offset sits in a crowded row (unit + three nudge buttons), so it
+   takes tighter side padding than the shared .numberInput. */
+.timingInput {
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
 .unit {
   font-size: 10px;
   color: var(--color-text-muted);
