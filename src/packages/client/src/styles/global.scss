@@ -353,7 +353,7 @@ input[type='tel'],
 input:not([type]),
 textarea,
 select {
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-sm) var(--space-sm);
   background: var(--color-input-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -379,7 +379,7 @@ select {
 
 // time inputs render a clock affordance — keep them on the same chrome.
 input[type='time'] {
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-sm) var(--space-sm);
   background: var(--color-input-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);

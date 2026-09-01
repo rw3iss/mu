@@ -100,8 +100,10 @@
 }
 
 /* Timing Offset sits in a crowded row (unit + three nudge buttons), so it
-   takes tighter side padding than the shared .numberInput. */
-.timingInput {
+   takes tighter side padding than the shared .numberInput.
+   Qualified with the element+attribute so it outranks global.scss's
+   `input[type='number']` baseline (0,1,1) — a bare class (0,1,0) loses. */
+input[type='number'].timingInput {
   padding-left: 5px;
   padding-right: 5px;
 }
