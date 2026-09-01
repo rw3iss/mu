@@ -757,6 +757,11 @@ export class MoviesService implements OnModuleInit {
 			getImageUrl: (p, s) => this.tmdb.getImageUrl(p, s),
 		}).fields;
 		const trailerUrl = (seed.trailerUrl as string | null) ?? null;
+		// US certification (PG / R / …), pulled from the appended `release_dates`.
+		// Seeded here for the same reason as the trailer: without it the first
+		// visit renders no rating badge and the client never refetches, so it
+		// only appeared once the background refresh happened to land.
+		const contentRating = (seed.contentRating as string | null) ?? null;
 		const jsonOf = (v: unknown) => JSON.stringify(Array.isArray(v) ? v : []);
 
 		this.database.db
@@ -779,6 +784,7 @@ export class MoviesService implements OnModuleInit {
 					? `https://image.tmdb.org/t/p/original${details.backdrop_path}`
 					: null,
 				trailerUrl,
+				contentRating,
 				source: 'bookmark',
 				addedAt: now,
 				updatedAt: now,
