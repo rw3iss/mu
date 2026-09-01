@@ -207,12 +207,29 @@ export async function endStream(): Promise<void> {
 	}
 }
 
+/**
+ * Clamp to a usable 0..1 gain.
+ *
+ * `Math.max(0, Math.min(1, NaN))` is NaN — every NaN comparison is false — so a
+ * plain clamp happily lets a bad value through. That NaN then reaches
+ * `video.volume` and the master GainNode, silencing playback for *every* movie.
+ * Because the value is persisted to `mu_volume`, the silence survives a hard
+ * refresh and ignores "Reset Audio" (which rebuilds the engine, not the volume),
+ * which makes it look like the audio stack died. Anything non-finite falls back
+ * to `fallback` rather than poisoning the chain.
+ */
+export function clampVolume(v: number, fallback = 1): number {
+	if (!Number.isFinite(v)) return fallback;
+	return Math.max(0, Math.min(1, v));
+}
+
 export function setVolume(v: number): void {
-	volume.value = Math.max(0, Math.min(1, v));
-	if (v > 0) {
+	const next = clampVolume(v, volume.value);
+	volume.value = next;
+	if (next > 0) {
 		isMuted.value = false;
 	}
-	localStorage.setItem('mu_volume', String(volume.value));
+	localStorage.setItem('mu_volume', String(next));
 }
 
 export function toggleMute(): void {
@@ -221,7 +238,14 @@ export function toggleMute(): void {
 
 export function initPlayerSettings(): void {
 	const savedVolume = localStorage.getItem('mu_volume');
-	if (savedVolume !== null) {
-		volume.value = parseFloat(savedVolume);
+	if (savedVolume === null) return;
+	const parsed = Number.parseFloat(savedVolume);
+	if (!Number.isFinite(parsed)) {
+		// Self-heal: a poisoned key would otherwise silence the app forever.
+		console.warn(`[player] Discarding invalid mu_volume=${savedVolume}; resetting to 1`);
+		localStorage.removeItem('mu_volume');
+		volume.value = 1;
+		return;
 	}
+	volume.value = clampVolume(parsed);
 }

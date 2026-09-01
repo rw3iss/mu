@@ -16,6 +16,7 @@ import { audioResetTrigger, clearAudioSuspect } from '@/state/audio-reset.state'
 import { globalMovieId } from '@/state/globalPlayer.state';
 import { notifyInfo } from '@/state/notifications.state';
 import {
+	clampVolume,
 	currentSession,
 	currentTime,
 	duration,
@@ -448,9 +449,9 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		if (audioEngine.isAttached()) {
 			video.muted = false;
 			video.volume = 1;
-			audioEngine.setMasterOutput(volume.value, isMuted.value);
+			audioEngine.setMasterOutput(clampVolume(volume.value), isMuted.value);
 		} else {
-			video.volume = volume.value;
+			video.volume = clampVolume(volume.value);
 			video.muted = isMuted.value;
 		}
 	}, [

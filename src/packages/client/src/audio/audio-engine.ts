@@ -639,7 +639,9 @@ export class AudioEngine {
 	 * element would silence the source node feeding the effect chain).
 	 */
 	setMasterOutput(volume: number, muted: boolean): void {
-		this.masterVolume = Math.max(0, Math.min(1, volume));
+		// Guard non-finite input: a NaN survives a plain min/max clamp and would
+		// set the master GainNode to NaN, i.e. total silence.
+		this.masterVolume = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
 		this.masterMuted = muted;
 		// Keep the bound element out of the gain path — it must stay unmuted
 		// + full so the MediaElementSource receives signal.
