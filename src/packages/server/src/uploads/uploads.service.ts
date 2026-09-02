@@ -81,7 +81,9 @@ export class UploadsService {
 		await mkdir(dir, { recursive: true });
 		const name = `${randomUUID()}.${ext.replace(/[^a-z0-9]/gi, '') || 'bin'}`;
 		await writeFile(join(dir, name), buffer);
-		this.logger.log(`Saved upload ${subdir}/${name} (${buffer.length} bytes, ${m || 'unknown'})`);
+		this.logger.log(
+			`Saved upload ${subdir}/${name} (${buffer.length} bytes, ${m || 'unknown'})`,
+		);
 		return `/uploads/${subdir}/${name}`;
 	}
 

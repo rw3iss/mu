@@ -40,7 +40,13 @@ let tooltipCounter = 0;
  *
  *   <Tooltip label="Grid view"><button>…</button></Tooltip>
  */
-export function Tooltip({ label, placement = 'top', delay = 350, class: className, children }: TooltipProps) {
+export function Tooltip({
+	label,
+	placement = 'top',
+	delay = 350,
+	class: className,
+	children,
+}: TooltipProps) {
 	const triggerRef = useRef<HTMLSpanElement>(null);
 	const timerRef = useRef<number | null>(null);
 	const idRef = useRef<string>();

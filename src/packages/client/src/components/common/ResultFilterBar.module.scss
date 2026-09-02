@@ -35,3 +35,81 @@
 	color: var(--color-text-muted);
 	white-space: nowrap;
 }
+
+/* ── Save search as default ─────────────────────────────────────── */
+
+/* Anchor for the transient confirmation, which is absolutely positioned so it
+   can't reflow the filter row when it appears. */
+.saveWrap {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+}
+
+.saveBtn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px;
+	background: transparent;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-sm);
+	color: var(--color-text-muted);
+	cursor: pointer;
+	transition:
+		color var(--transition-fast),
+		border-color var(--transition-fast),
+		background var(--transition-fast);
+
+	&:hover:not(:disabled) {
+		color: var(--color-accent);
+		border-color: var(--color-accent);
+	}
+
+	&:disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+}
+
+.saveBtnDone {
+	color: var(--color-success, #4ade80);
+	border-color: var(--color-success, #4ade80);
+}
+
+.saveBtnError {
+	color: var(--color-error, #f87171);
+	border-color: var(--color-error, #f87171);
+}
+
+.saveToast {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 6px);
+	z-index: 10;
+	padding: 3px 8px;
+	background: var(--color-bg-elevated);
+	border: 1px solid var(--color-success, #4ade80);
+	border-radius: var(--radius-sm);
+	color: var(--color-success, #4ade80);
+	font-size: var(--font-size-xs);
+	white-space: nowrap;
+	pointer-events: none;
+	animation: resultFilterToastIn 140ms ease;
+}
+
+.saveToastError {
+	border-color: var(--color-error, #f87171);
+	color: var(--color-error, #f87171);
+}
+
+@keyframes resultFilterToastIn {
+	from {
+		opacity: 0;
+		transform: translateY(-2px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}

@@ -48,10 +48,18 @@ export function Avatar({
 
 	if (editable) {
 		return (
-			<label class={`${styles.avatar} ${styles.editable} ${cls}`} style={style} title="Change avatar">
+			<label
+				class={`${styles.avatar} ${styles.editable} ${cls}`}
+				style={style}
+				title="Change avatar"
+			>
 				{inner}
 				<span class={styles.editOverlay} aria-hidden="true">
-					{uploading ? <Spinner size="sm" /> : <Icon name="image" size={Math.round(size * 0.3)} />}
+					{uploading ? (
+						<Spinner size="sm" />
+					) : (
+						<Icon name="image" size={Math.round(size * 0.3)} />
+					)}
 				</span>
 				<input
 					type="file"

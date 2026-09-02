@@ -4,10 +4,14 @@ import { Icon } from '@/components/common/Icon';
 import { ResultFilterBar } from '@/components/common/ResultFilterBar';
 import { Spinner } from '@/components/common/Spinner';
 import { ResultCard } from '@/components/movie/ResultCard';
+import { useMovieSearchDefaults } from '@/hooks/useMovieSearchDefaults';
 import { discoverService, type ScoredMovie } from '@/services/discover.service';
+import { hasMovieSearchDefaults, movieSearchDefaults } from '@/state/movie-search-defaults.state';
 import {
+	defaultsToFilters,
 	EMPTY_FILTERS,
 	filterAndSortResults,
+	filtersToDefaults,
 	type ResultFilterState,
 } from '@/utils/result-filters';
 import styles from './SimilarSection.module.scss';
@@ -40,12 +44,22 @@ export function SimilarSection({ movieId, defaultOpen = false }: SimilarSectionP
 	const [error, setError] = useState<string | null>(null);
 	const [filters, setFilters] = useState<ResultFilterState>(EMPTY_FILTERS);
 
+	// Seed from the user's saved "movie search defaults" (once per mount).
+	const { save } = useMovieSearchDefaults({
+		apply: (d) => setFilters(defaultsToFilters(d)),
+	});
+
 	// Reset when navigating between movies so the previous title's results
 	// can't flash in the new one's section.
 	useEffect(() => {
 		setResults(null);
 		setError(null);
-		setFilters(EMPTY_FILTERS);
+		// Reset to the user's saved defaults rather than the built-in empty set,
+		// so navigating between movies keeps their preferences applied.
+		const saved = movieSearchDefaults.value;
+		setFilters(
+			saved && hasMovieSearchDefaults(saved) ? defaultsToFilters(saved) : EMPTY_FILTERS,
+		);
 	}, [movieId]);
 
 	useEffect(() => {
@@ -99,6 +113,7 @@ export function SimilarSection({ movieId, defaultOpen = false }: SimilarSectionP
 							value={filters}
 							onChange={setFilters}
 							count={visible.length}
+							onSaveDefaults={() => save(filtersToDefaults(filters))}
 						/>
 					</div>
 				)}

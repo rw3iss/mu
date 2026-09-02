@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
-import { PermissionsService, type JwtUser } from '../common/permissions/index.js';
+import { type JwtUser, PermissionsService } from '../common/permissions/index.js';
 import { SettingsService } from './settings.service.js';
 
 /**
@@ -89,9 +89,7 @@ export class UserSettingsController {
 		const isAllowlisted = isUserSettingKey(key);
 		if (!this.permissions.canEditUserSettings(actor, id, isAllowlisted)) {
 			throw new ForbiddenException(
-				isAllowlisted
-					? 'Cannot edit another user’s settings'
-					: 'Key not user-overridable',
+				isAllowlisted ? 'Cannot edit another user’s settings' : 'Key not user-overridable',
 			);
 		}
 		const skipAllowlist = this.permissions.can(actor?.role, 'admin:any-user-setting');
@@ -107,9 +105,7 @@ export class UserSettingsController {
 		@Param('key') key: string,
 	) {
 		// Admins can drop any key; self can drop their own allowlisted keys.
-		if (
-			!this.permissions.canEditUserSettings(actor, id, isUserSettingKey(key))
-		) {
+		if (!this.permissions.canEditUserSettings(actor, id, isUserSettingKey(key))) {
 			throw new ForbiddenException('Cannot edit settings');
 		}
 		const deleted = this.settings.deleteForUser(key, id);

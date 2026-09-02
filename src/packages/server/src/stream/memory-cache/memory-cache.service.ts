@@ -109,7 +109,9 @@ export class MemoryCacheService implements OnModuleInit {
 		this.index.delete(filePath);
 		this.usedBytes -= entry.size;
 		this.evict(filePath);
-		this.logger.log(`Released from memory cache: ${basename(filePath)} (${this.fmt(entry.size)})`);
+		this.logger.log(
+			`Released from memory cache: ${basename(filePath)} (${this.fmt(entry.size)})`,
+		);
 	}
 
 	getStatus() {

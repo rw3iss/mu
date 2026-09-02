@@ -1,14 +1,7 @@
+import type { MovieSearchHit, PersonSearchHit, SearchEvent, SearchSource } from '@mu/shared';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type {
-	MovieSearchHit,
-	PersonSearchHit,
-	SearchEvent,
-	SearchSource,
-} from '@mu/shared';
 
-type Hit<T extends 'movie' | 'person'> = T extends 'movie'
-	? MovieSearchHit
-	: PersonSearchHit;
+type Hit<T extends 'movie' | 'person'> = T extends 'movie' ? MovieSearchHit : PersonSearchHit;
 
 function movieKey(h: MovieSearchHit): string {
 	if (h.imdbId) return `imdb:${h.imdbId}`;
@@ -78,9 +71,7 @@ export function useSearchStream<T extends 'movie' | 'person'>(
 		esRef.current = es;
 
 		const keyOf = (h: Hit<T>) =>
-			type === 'movie'
-				? movieKey(h as MovieSearchHit)
-				: personKey(h as PersonSearchHit);
+			type === 'movie' ? movieKey(h as MovieSearchHit) : personKey(h as PersonSearchHit);
 
 		es.onmessage = (msg) => {
 			let ev: SearchEvent<Hit<T>>;
@@ -90,19 +81,15 @@ export function useSearchStream<T extends 'movie' | 'person'>(
 				return;
 			}
 			if (ev.kind === 'results') {
-				setSources((prev) =>
-					prev.includes(ev.source) ? prev : [...prev, ev.source],
-				);
+				setSources((prev) => (prev.includes(ev.source) ? prev : [...prev, ev.source]));
 				setResults((prev) => {
 					const byKey = new Map<string, Hit<T>>();
 					for (const h of prev) byKey.set(keyOf(h), h);
 					for (const h of ev.items) byKey.set(keyOf(h), h);
 					const all = Array.from(byKey.values());
 					all.sort((a, b) => {
-						const labelA =
-							((a as any).title ?? (a as any).name ?? '') as string;
-						const labelB =
-							((b as any).title ?? (b as any).name ?? '') as string;
+						const labelA = ((a as any).title ?? (a as any).name ?? '') as string;
+						const labelB = ((b as any).title ?? (b as any).name ?? '') as string;
 						const tA = tierFor(query, a.isOwned, labelA);
 						const tB = tierFor(query, b.isOwned, labelB);
 						if (tA !== tB) return tA - tB;

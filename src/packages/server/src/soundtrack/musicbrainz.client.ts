@@ -39,10 +39,7 @@ export class MusicBrainzClient {
 	 * Find the best soundtrack release for a movie and return its tracklist.
 	 * Returns null when nothing suitable is found.
 	 */
-	async findSoundtrack(
-		title: string,
-		year: number | null,
-	): Promise<SoundtrackRelease | null> {
+	async findSoundtrack(title: string, year: number | null): Promise<SoundtrackRelease | null> {
 		// 1) Search releases tagged as soundtracks matching the movie title.
 		const query = `release:"${escapeLucene(title)}" AND secondarytype:soundtrack`;
 		const search = await this.request<{ releases?: MbReleaseSearchHit[] }>(
@@ -184,7 +181,7 @@ function creditName(credit?: Array<{ name: string }>): string | null {
 
 /** Escape Lucene special characters in a free-text title for the MB query. */
 function escapeLucene(s: string): string {
-	return s.replace(/(["\\+\-!(){}\[\]^~*?:/])/g, '\\$1');
+	return s.replace(/(["\\+\-!(){}[\]^~*?:/])/g, '\\$1');
 }
 
 function delay(ms: number): Promise<void> {

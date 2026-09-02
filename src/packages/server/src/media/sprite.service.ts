@@ -4,9 +4,9 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
-import { MemoryCacheService } from '../stream/memory-cache/memory-cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles } from '../database/schema/index.js';
+import { MemoryCacheService } from '../stream/memory-cache/memory-cache.service.js';
 
 /**
  * Project root — same five-level walk as DatabaseService. Anchors
@@ -367,9 +367,7 @@ export class SpriteService {
 			).trim();
 			const sheetHeight = Number(probe);
 			// Sheet 0's actual row count (short videos may not fill all ROWS).
-			const sheet0Rows = Math.ceil(
-				Math.min(actualTotalFrames, FRAMES_PER_SHEET) / COLUMNS,
-			);
+			const sheet0Rows = Math.ceil(Math.min(actualTotalFrames, FRAMES_PER_SHEET) / COLUMNS);
 			if (Number.isFinite(sheetHeight) && sheetHeight > 0 && sheet0Rows > 0) {
 				frameHeight = Math.round(sheetHeight / sheet0Rows);
 			}

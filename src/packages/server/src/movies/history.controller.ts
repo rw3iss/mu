@@ -27,10 +27,7 @@ export class HistoryController {
 	 */
 	@RequireAction('view:own-data')
 	@Delete('movies/:movieId/position')
-	clearPosition(
-		@CurrentUser('id') userId: string,
-		@Param('movieId') movieId: string,
-	) {
+	clearPosition(@CurrentUser('id') userId: string, @Param('movieId') movieId: string) {
 		const cleared = this.historyService.clearPosition(userId, movieId);
 		return { success: true, cleared };
 	}

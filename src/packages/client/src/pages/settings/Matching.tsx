@@ -99,9 +99,7 @@ export function Matching() {
 
 		api.get<MatchingConfig>('/settings/matching')
 			.then(setCfg)
-			.catch((err) =>
-				notifyError(`Failed to load tuning config: ${err?.message ?? err}`),
-			);
+			.catch((err) => notifyError(`Failed to load tuning config: ${err?.message ?? err}`));
 
 		void refreshImdbStatus();
 	}, []);
@@ -193,9 +191,9 @@ export function Matching() {
 			<div class={styles.intro}>
 				<h2 class={styles.heading}>Matching</h2>
 				<p class={styles.lede}>
-					Tune how Mu finds similar movies. Defaults work well — change these if you
-					want more adventurous results, longer cache retention, or tighter spend on
-					paid providers.
+					Tune how Mu finds similar movies. Defaults work well — change these if you want
+					more adventurous results, longer cache retention, or tighter spend on paid
+					providers.
 				</p>
 			</div>
 
@@ -203,10 +201,10 @@ export function Matching() {
 				<div class={styles.sectionHeader}>
 					<h3 class={styles.sectionTitle}>IMDB datasets (offline ratings)</h3>
 					<p class={styles.sectionLede}>
-						Free daily download from IMDB's public bulk dumps. The ratings table
-						(~25 MB, ~1.4M titles) lives locally so rating lookups don't burn
-						OMDB quota and ratings stay daily-fresh. Future scope: cast / title
-						metadata for fully-local similarity searches.
+						Free daily download from IMDB's public bulk dumps. The ratings table (~25
+						MB, ~1.4M titles) lives locally so rating lookups don't burn OMDB quota and
+						ratings stay daily-fresh. Future scope: cast / title metadata for
+						fully-local similarity searches.
 					</p>
 				</div>
 				<ToggleRow
@@ -289,8 +287,8 @@ export function Matching() {
 					<h3 class={styles.sectionTitle}>Strategy weights</h3>
 					<p class={styles.sectionLede}>
 						The recommender blends four strategies. Heavier weight = that strategy's
-						hits surface higher. Zero = strategy is disabled. Values are normalised
-						at scoring time, so absolute numbers don't have to sum to 1.
+						hits surface higher. Zero = strategy is disabled. Values are normalised at
+						scoring time, so absolute numbers don't have to sum to 1.
 					</p>
 				</div>
 				{STRATEGY_ORDER.map((s) => {
@@ -304,16 +302,12 @@ export function Matching() {
 								max={1}
 								step={0.05}
 								value={w}
-								disabled={
-									!cfg || saving === 'recommendations.strategyWeights'
-								}
+								disabled={!cfg || saving === 'recommendations.strategyWeights'}
 								onChange={(e) =>
 									updateWeight(
 										s,
 										Math.round(
-											parseFloat(
-												(e.target as HTMLInputElement).value,
-											) * 100,
+											parseFloat((e.target as HTMLInputElement).value) * 100,
 										) / 100,
 									)
 								}
@@ -329,8 +323,8 @@ export function Matching() {
 					<h3 class={styles.sectionTitle}>Diversity & quality</h3>
 					<p class={styles.sectionLede}>
 						MMR λ trades off relevance vs diversity (1 = pure relevance, 0 = max
-						spread). Quality floor drops candidates whose TMDB/IMDB rating falls
-						below the threshold.
+						spread). Quality floor drops candidates whose TMDB/IMDB rating falls below
+						the threshold.
 					</p>
 				</div>
 				<div class={styles.controlRow}>
@@ -346,15 +340,12 @@ export function Matching() {
 							patch(
 								'mmrLambda',
 								'recommendations.mmrLambda',
-								Math.round(
-									parseFloat((e.target as HTMLInputElement).value) * 100,
-								) / 100,
+								Math.round(parseFloat((e.target as HTMLInputElement).value) * 100) /
+									100,
 							)
 						}
 					/>
-					<span class={styles.sliderValue}>
-						{(cfg?.mmrLambda ?? 0.7).toFixed(2)}
-					</span>
+					<span class={styles.sliderValue}>{(cfg?.mmrLambda ?? 0.7).toFixed(2)}</span>
 				</div>
 				<div class={styles.controlRow}>
 					<label class={styles.controlLabel}>Quality floor (0–10)</label>
@@ -384,9 +375,9 @@ export function Matching() {
 				<div class={styles.sectionHeader}>
 					<h3 class={styles.sectionTitle}>Exclusion filters</h3>
 					<p class={styles.sectionLede}>
-						Trim results before they're returned. Same-group hides sequels of the
-						seed; watched hides already-played movies; the director cap stops a
-						single filmmaker from dominating the list.
+						Trim results before they're returned. Same-group hides sequels of the seed;
+						watched hides already-played movies; the director cap stops a single
+						filmmaker from dominating the list.
 					</p>
 				</div>
 				<ToggleRow
@@ -403,9 +394,7 @@ export function Matching() {
 					description="Hide movies you've finished. Continue-watching elsewhere is unaffected."
 					checked={cfg?.excludeWatched ?? false}
 					disabled={!cfg || saving === 'recommendations.excludeWatched'}
-					onChange={(v) =>
-						patch('excludeWatched', 'recommendations.excludeWatched', v)
-					}
+					onChange={(v) => patch('excludeWatched', 'recommendations.excludeWatched', v)}
 				/>
 				<div class={styles.toggleRow}>
 					<div class={styles.toggleInfo}>
@@ -443,9 +432,9 @@ export function Matching() {
 					<h3 class={styles.sectionTitle}>Multi-input policy</h3>
 					<p class={styles.sectionLede}>
 						When Discover has more than one seed, how should they combine? Centroid
-						averages the seeds (best for similar movies). Union-of-neighbours runs
-						each seed independently and merges (best for variety). Auto picks based
-						on seed-set variance.
+						averages the seeds (best for similar movies). Union-of-neighbours runs each
+						seed independently and merges (best for variety). Auto picks based on
+						seed-set variance.
 					</p>
 				</div>
 				<div class={styles.controlRow}>
@@ -480,15 +469,9 @@ export function Matching() {
 					label="External recommendations (TMDB / Trakt)"
 					description="Snapshot similar + recommended lists from TMDB on add. Free, fast."
 					checked={cfg?.autoEnrichExternalRecs ?? true}
-					disabled={
-						!cfg || saving === 'recommendations.autoEnrichExternalRecs'
-					}
+					disabled={!cfg || saving === 'recommendations.autoEnrichExternalRecs'}
 					onChange={(v) =>
-						patch(
-							'autoEnrichExternalRecs',
-							'recommendations.autoEnrichExternalRecs',
-							v,
-						)
+						patch('autoEnrichExternalRecs', 'recommendations.autoEnrichExternalRecs', v)
 					}
 				/>
 				<ToggleRow
@@ -497,11 +480,7 @@ export function Matching() {
 					checked={cfg?.autoEnrichEmbeddings ?? true}
 					disabled={!cfg || saving === 'recommendations.autoEnrichEmbeddings'}
 					onChange={(v) =>
-						patch(
-							'autoEnrichEmbeddings',
-							'recommendations.autoEnrichEmbeddings',
-							v,
-						)
+						patch('autoEnrichEmbeddings', 'recommendations.autoEnrichEmbeddings', v)
 					}
 				/>
 				<ToggleRow
@@ -510,11 +489,7 @@ export function Matching() {
 					checked={cfg?.autoEnrichLlmFeatures ?? true}
 					disabled={!cfg || saving === 'recommendations.autoEnrichLlmFeatures'}
 					onChange={(v) =>
-						patch(
-							'autoEnrichLlmFeatures',
-							'recommendations.autoEnrichLlmFeatures',
-							v,
-						)
+						patch('autoEnrichLlmFeatures', 'recommendations.autoEnrichLlmFeatures', v)
 					}
 				/>
 			</section>

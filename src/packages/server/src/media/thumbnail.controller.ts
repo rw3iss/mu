@@ -110,12 +110,10 @@ export class ThumbnailController {
 	 *  Skips if another job with the same payload is already pending
 	 *  or running. */
 	private enqueueSpriteJob(movieId: string, size: 'small' | 'medium' | 'large' | 'xlarge') {
-		const existing = this.jobManager.findJobsByPayload(
-			'movieId',
-			movieId,
-			SPRITE_JOB_TYPE,
-			['pending', 'running'],
-		);
+		const existing = this.jobManager.findJobsByPayload('movieId', movieId, SPRITE_JOB_TYPE, [
+			'pending',
+			'running',
+		]);
 		const sameSize = existing.find((j) => j.payload?.size === size);
 		if (sameSize) return;
 		try {

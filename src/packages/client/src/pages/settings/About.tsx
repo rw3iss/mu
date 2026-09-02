@@ -41,8 +41,8 @@ export function About() {
 			</div>
 
 			<p class={styles.aboutDescription}>
-				Mu is a self-hosted movie streaming platform that lets you organize, browse,
-				and stream your personal movie collection from anywhere.
+				Mu is a self-hosted movie streaming platform that lets you organize, browse, and
+				stream your personal movie collection from anywhere.
 			</p>
 		</div>
 	);

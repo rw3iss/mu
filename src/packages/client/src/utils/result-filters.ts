@@ -1,3 +1,4 @@
+import type { MovieSearchDefaults } from '@mu/shared';
 /**
  * Shared filter/sort logic for movie result lists.
  *
@@ -89,4 +90,33 @@ export function filterAndSortResults<T>(
 				return (y.year ?? 0) - (x.year ?? 0);
 		}
 	});
+}
+
+/**
+ * Convert a user's saved defaults into filter-bar state.
+ *
+ * `type` is deliberately not part of ResultFilterState — only the Known For
+ * rail has a Type control, so it owns that field separately (see
+ * `defaultsCreditType`).
+ */
+export function defaultsToFilters(d: MovieSearchDefaults): ResultFilterState {
+	return {
+		sort: toResultSort(d.sort),
+		library: toLibraryFilter(d.library),
+		minYear: d.minYear,
+		minRating: d.minRating,
+		minVotes: d.minVotes,
+	};
+}
+
+/** Pack the current filter-bar state (plus the optional Type) for saving. */
+export function filtersToDefaults(f: ResultFilterState, type = 'all'): MovieSearchDefaults {
+	return {
+		sort: f.sort,
+		library: f.library,
+		minYear: f.minYear,
+		minRating: f.minRating,
+		minVotes: f.minVotes,
+		type,
+	};
 }

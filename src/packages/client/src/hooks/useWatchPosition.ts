@@ -1,9 +1,6 @@
-import { getWatchPercent } from '@/utils/watch-progress';
 import { playbackSettings } from '@/state/playbackSettings.state';
-import {
-	type WatchPosition,
-	watchPositions,
-} from '@/state/watchPositions.state';
+import { type WatchPosition, watchPositions } from '@/state/watchPositions.state';
+import { getWatchPercent } from '@/utils/watch-progress';
 
 export interface WatchPositionView {
 	positionSeconds: number;

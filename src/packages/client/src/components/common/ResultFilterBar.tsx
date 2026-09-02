@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { Icon } from '@/components/common/Icon';
 import { Select } from '@/components/common/Select';
 import type { LibraryFilter, ResultFilterState, ResultSort } from '@/utils/result-filters';
 import styles from './ResultFilterBar.module.scss';
@@ -9,6 +11,12 @@ interface ResultFilterBarProps {
 	count: number;
 	/** Extra controls (e.g. a Type dropdown) rendered before the count. */
 	children?: preact.ComponentChildren;
+	/**
+	 * Persist the current filters as the user's defaults. When omitted the
+	 * save button is hidden, so the bar stays usable in contexts with no user
+	 * (e.g. a share link).
+	 */
+	onSaveDefaults?: () => Promise<void>;
 }
 
 /**
@@ -16,8 +24,31 @@ interface ResultFilterBarProps {
  * movie page's "Similar" section: sort, in-library, and minimum year / rating /
  * votes, followed by a live result count.
  */
-export function ResultFilterBar({ value, onChange, count, children }: ResultFilterBarProps) {
+export function ResultFilterBar({
+	value,
+	onChange,
+	count,
+	children,
+	onSaveDefaults,
+}: ResultFilterBarProps) {
 	const set = (patch: Partial<ResultFilterState>) => onChange({ ...value, ...patch });
+	const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+	// Held so unmounting mid-timeout can't setState on a dead component.
+	const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	useEffect(() => () => resetTimer.current && clearTimeout(resetTimer.current), []);
+
+	const handleSave = async () => {
+		if (!onSaveDefaults || saveState === 'saving') return;
+		setSaveState('saving');
+		try {
+			await onSaveDefaults();
+			setSaveState('saved');
+		} catch {
+			setSaveState('error');
+		}
+		if (resetTimer.current) clearTimeout(resetTimer.current);
+		resetTimer.current = setTimeout(() => setSaveState('idle'), 2200);
+	};
 
 	return (
 		<div class={styles.controls}>
@@ -88,6 +119,42 @@ export function ResultFilterBar({ value, onChange, count, children }: ResultFilt
 			<span class={styles.count}>
 				{count} {count === 1 ? 'title' : 'titles'} found.
 			</span>
+
+			{onSaveDefaults && (
+				<span class={styles.saveWrap}>
+					<button
+						type="button"
+						class={`${styles.saveBtn} ${
+							saveState === 'saved' ? styles.saveBtnDone : ''
+						} ${saveState === 'error' ? styles.saveBtnError : ''}`}
+						onClick={handleSave}
+						disabled={saveState === 'saving'}
+						aria-label="Save search as default"
+						title={
+							'Save search as default — the sort and filters above become ' +
+							'your defaults for every Known For and Similar list. Replaces ' +
+							'any previously saved values.'
+						}
+					>
+						<Icon
+							name={saveState === 'saved' ? 'check' : 'save'}
+							size={14}
+							aria-hidden="true"
+						/>
+					</button>
+					{/* Transient confirmation, announced for screen readers too. */}
+					{saveState !== 'idle' && saveState !== 'saving' && (
+						<span
+							class={`${styles.saveToast} ${
+								saveState === 'error' ? styles.saveToastError : ''
+							}`}
+							role="status"
+						>
+							{saveState === 'saved' ? 'Saved as default' : 'Could not save'}
+						</span>
+					)}
+				</span>
+			)}
 		</div>
 	);
 }

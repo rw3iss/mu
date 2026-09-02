@@ -101,7 +101,6 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 		}
 	}
 
-
 	async function expandChild(child: MovieGroup) {
 		if (expanded[child.id]) {
 			setExpanded((p) => ({ ...p, [child.id]: false }));

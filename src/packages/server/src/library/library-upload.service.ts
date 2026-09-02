@@ -198,7 +198,12 @@ export class LibraryUploadService {
 		const relativePath = opts.relativePath;
 		const emit = () => {
 			if (!uploadId) return;
-			events.emit(WsEvent.UPLOAD_PROGRESS, { uploadId, relativePath, bytesWritten: written, fileTotal });
+			events.emit(WsEvent.UPLOAD_PROGRESS, {
+				uploadId,
+				relativePath,
+				bytesWritten: written,
+				fileTotal,
+			});
 		};
 		const counter = new Transform({
 			transform(chunk: Buffer, _enc, cb) {

@@ -498,7 +498,9 @@ export class GroupingService implements OnModuleInit {
 	}
 
 	/** Preview for "delete group from disk": member count + common folder. */
-	getDeletePreview(groupId: string): { name: string; count: number; folder: string | null } | null {
+	getDeletePreview(
+		groupId: string,
+	): { name: string; count: number; folder: string | null } | null {
 		const group = this.repo.get(groupId);
 		if (!group) return null;
 		const ids = this.getMemberMovieIds(groupId);

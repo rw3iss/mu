@@ -1,17 +1,14 @@
 import type { MovieSearchHit, PersonSearchHit, SearchHit } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
-import {
-	MovieSearchInput,
-	PersonSearchInput,
-} from '@/components/common/EntitySearchInput';
+import { MovieSearchInput, PersonSearchInput } from '@/components/common/EntitySearchInput';
 import { Spinner } from '@/components/common/Spinner';
-import { useSeo } from '@/hooks/useSeo';
 import { DiscoverFilters as FilterPanel } from '@/components/discover/DiscoverFilters';
 import { DiscoverResultCard } from '@/components/discover/DiscoverResultCard';
 import { IncludeToggle } from '@/components/discover/IncludeToggle';
 import { QuickStartPanel } from '@/components/discover/QuickStartPanel';
 import { SeedChip } from '@/components/discover/SeedChip';
+import { useSeo } from '@/hooks/useSeo';
 import { moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
 import {
@@ -63,7 +60,8 @@ interface DiscoverProps {
 export function Discover(_props: DiscoverProps) {
 	useSeo({
 		title: 'Discover',
-		description: 'Find your next movie — recommendations based on your taste, seeds, and filters.',
+		description:
+			'Find your next movie — recommendations based on your taste, seeds, and filters.',
 		type: 'website',
 	});
 	const [genres, setGenres] = useState<string[]>([]);
@@ -166,10 +164,8 @@ export function Discover(_props: DiscoverProps) {
 			: rawList.filter((m) => {
 					const pos = positions[m.movieId];
 					if (watched === 'unwatched') return !pos || pos.positionSeconds <= 0;
-					if (watched === 'in-progress')
-						return !!pos && pos.positionSeconds > 0;
-					if (watched === 'watched')
-						return !!pos && pos.positionSeconds > 0;
+					if (watched === 'in-progress') return !!pos && pos.positionSeconds > 0;
+					if (watched === 'watched') return !!pos && pos.positionSeconds > 0;
 					return true;
 				});
 

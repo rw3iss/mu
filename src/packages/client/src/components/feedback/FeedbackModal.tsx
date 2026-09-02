@@ -165,7 +165,11 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 									// biome-ignore lint/a11y/useMediaCaption: user-supplied clip, no captions
 									<video src={preview} class={styles.preview} controls muted />
 								) : (
-									<img src={preview} alt="Attachment preview" class={styles.preview} />
+									<img
+										src={preview}
+										alt="Attachment preview"
+										class={styles.preview}
+									/>
 								)}
 								<button
 									type="button"

@@ -1,5 +1,10 @@
 import { nowISO } from '@mu/shared';
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+	ConflictException,
+	ForbiddenException,
+	Injectable,
+	NotFoundException,
+} from '@nestjs/common';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movies, playlistMovies, playlists, users } from '../database/schema/index.js';

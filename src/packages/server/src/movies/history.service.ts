@@ -2,12 +2,8 @@ import { nowISO, paginationDefaults, WsEvent } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
+import { movieFiles, movies, userWatchHistory } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
-import {
-	movieFiles,
-	movies,
-	userWatchHistory,
-} from '../database/schema/index.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 @Injectable()

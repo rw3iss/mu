@@ -50,13 +50,11 @@ export function useSeo(meta: SeoMeta | null | undefined): void {
 		if (!meta) return;
 
 		const siteName = meta.siteName ?? SITE_NAME;
-		const fullTitle =
-			meta.title === siteName ? meta.title : `${meta.title} — ${siteName}`;
+		const fullTitle = meta.title === siteName ? meta.title : `${meta.title} — ${siteName}`;
 		const description = meta.description ? clamp(meta.description, 200) : undefined;
 		const type = meta.type ?? 'website';
 		const robots = meta.robots ?? 'noindex,nofollow';
-		const twitterCard =
-			meta.twitterCard ?? (meta.image ? 'summary_large_image' : 'summary');
+		const twitterCard = meta.twitterCard ?? (meta.image ? 'summary_large_image' : 'summary');
 		const canonical = meta.canonical ?? window.location.href.split('?')[0];
 
 		document.title = fullTitle;

@@ -47,7 +47,9 @@ export class CommentsService {
 	/** Display name for a user id (falls back to username / 'Someone'). */
 	private userName(userId: string): string {
 		const u = this.database.db
-			.select({ name: sql<string>`COALESCE(${users.displayName}, ${users.username}, 'Someone')` })
+			.select({
+				name: sql<string>`COALESCE(${users.displayName}, ${users.username}, 'Someone')`,
+			})
 			.from(users)
 			.where(eq(users.id, userId))
 			.get();
@@ -206,12 +208,17 @@ export class CommentsService {
 			let guard = 0;
 			while (cursor && guard++ < CommentsService.MAX_DEPTH + 2) {
 				const row = this.database.db
-					.select({ id: movieComments.id, parentId: movieComments.parentId, movieId: movieComments.movieId })
+					.select({
+						id: movieComments.id,
+						parentId: movieComments.parentId,
+						movieId: movieComments.movieId,
+					})
 					.from(movieComments)
 					.where(eq(movieComments.id, cursor))
 					.get();
 				if (!row) break;
-				if (row.movieId !== movieId) throw new ForbiddenException('Parent belongs to another movie');
+				if (row.movieId !== movieId)
+					throw new ForbiddenException('Parent belongs to another movie');
 				chain.unshift(row.id);
 				cursor = row.parentId;
 			}

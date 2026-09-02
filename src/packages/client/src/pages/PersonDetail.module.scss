@@ -371,15 +371,6 @@
 	}
 }
 
-.creditsControls {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-md);
-	flex-wrap: wrap;
-	// Sit a bit further right of the "Known for" title.
-	margin-left: var(--space-md);
-}
-
 .controlGroup {
 	display: inline-flex;
 	align-items: center;
@@ -392,21 +383,3 @@
 	white-space: nowrap;
 }
 
-.minRatingInput {
-	width: 96px;
-}
-
-.minVotesInput {
-	width: 110px;
-}
-
-.minYearInput {
-	width: 104px;
-}
-
-/* Live count of credits passing the current filters. */
-.resultCount {
-	font-size: var(--font-size-xs);
-	color: var(--color-text-muted);
-	white-space: nowrap;
-}

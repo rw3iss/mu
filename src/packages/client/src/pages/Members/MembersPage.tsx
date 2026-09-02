@@ -73,7 +73,9 @@ export function MembersPage(_props: MembersPageProps) {
 												Logged out {relativeTime(m.loggedOutAt)}
 											</span>
 										) : m.lastActiveAt ? (
-											<span class={styles.active}>Active {relativeTime(m.lastActiveAt)}</span>
+											<span class={styles.active}>
+												Active {relativeTime(m.lastActiveAt)}
+											</span>
 										) : null}
 									</span>
 								</div>
@@ -87,7 +89,9 @@ export function MembersPage(_props: MembersPageProps) {
 								<span>
 									<strong>{m.watchedCount}</strong> watched
 								</span>
-								<span class={styles.joined}>Joined {relativeTime(m.createdAt)}</span>
+								<span class={styles.joined}>
+									Joined {relativeTime(m.createdAt)}
+								</span>
 							</div>
 						</a>
 					))}
@@ -101,7 +105,10 @@ export function MembersPage(_props: MembersPageProps) {
 function WatchingRow({ watching }: { watching: CurrentlyWatching }) {
 	const pct =
 		watching.durationSeconds && watching.durationSeconds > 0
-			? Math.min(100, Math.max(0, (watching.positionSeconds / watching.durationSeconds) * 100))
+			? Math.min(
+					100,
+					Math.max(0, (watching.positionSeconds / watching.durationSeconds) * 100),
+				)
 			: 0;
 	return (
 		<div class={styles.watching} title={`Watching ${watching.title}`}>
@@ -115,7 +122,9 @@ function WatchingRow({ watching }: { watching: CurrentlyWatching }) {
 			<div class={styles.watchBody}>
 				<span class={styles.watchTitle}>
 					{watching.title}
-					{watching.year ? <span class={styles.watchYear}> ({watching.year})</span> : null}
+					{watching.year ? (
+						<span class={styles.watchYear}> ({watching.year})</span>
+					) : null}
 				</span>
 				<span class={styles.watchSeek}>
 					<span class={styles.watchSeekFill} style={{ width: `${pct}%` }} />

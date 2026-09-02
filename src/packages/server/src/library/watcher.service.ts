@@ -236,9 +236,7 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 		for (const sourceId of rescan) {
 			this.scanner
 				.scanSource(sourceId)
-				.catch((err) =>
-					this.logger.error(`Gap re-scan failed: ${(err as Error).message}`),
-				);
+				.catch((err) => this.logger.error(`Gap re-scan failed: ${(err as Error).message}`));
 		}
 
 		return { created, removed, rearmed, active: this.watchers.size };

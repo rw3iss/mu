@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
-import { Roles } from '../common/decorators/roles.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
+import { Roles } from '../common/decorators/roles.decorator.js';
 import { NotificationsService } from './notifications.service.js';
 
 @Controller('notifications')

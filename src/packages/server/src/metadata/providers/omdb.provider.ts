@@ -96,9 +96,7 @@ export class OmdbProvider {
 	 * tiebreakers) should prefer this over `getByImdbId` to avoid
 	 * burning OMDB quota.
 	 */
-	async getRatingByImdbId(
-		imdbId: string,
-	): Promise<{ rating: number; votes: number } | null> {
+	async getRatingByImdbId(imdbId: string): Promise<{ rating: number; votes: number } | null> {
 		const local = this.ratings?.get(imdbId);
 		if (local) return { rating: local.rating, votes: local.votes };
 		const full = await this.getByImdbId(imdbId);
@@ -219,17 +217,17 @@ export class OmdbProvider {
 				Error?: string;
 			};
 			if (raw.Response === 'False' || !Array.isArray(raw.Search)) return [];
-			const out: OmdbBasicSearchHit[] = raw.Search.filter(
-				(r) => r.imdbID && r.Title,
-			).map((r) => {
-				const yearNum = r.Year ? Number.parseInt(r.Year, 10) : Number.NaN;
-				return {
-					imdbId: r.imdbID,
-					title: r.Title,
-					year: Number.isFinite(yearNum) ? yearNum : undefined,
-					posterUrl: r.Poster && r.Poster !== 'N/A' ? r.Poster : undefined,
-				};
-			});
+			const out: OmdbBasicSearchHit[] = raw.Search.filter((r) => r.imdbID && r.Title).map(
+				(r) => {
+					const yearNum = r.Year ? Number.parseInt(r.Year, 10) : Number.NaN;
+					return {
+						imdbId: r.imdbID,
+						title: r.Title,
+						year: Number.isFinite(yearNum) ? yearNum : undefined,
+						posterUrl: r.Poster && r.Poster !== 'N/A' ? r.Poster : undefined,
+					};
+				},
+			);
 			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, out, CACHE_TTL.METADATA);
 			return out;
 		} catch (err: any) {

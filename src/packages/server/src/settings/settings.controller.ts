@@ -1,4 +1,5 @@
 import { networkInterfaces } from 'node:os';
+import { EMPTY_MOVIE_SEARCH_DEFAULTS, normalizeMovieSearchDefaults } from '@mu/shared';
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Put } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
@@ -56,6 +57,35 @@ export class SettingsController {
 		if (!userId || user?.role === 'share') throw new ForbiddenException('No user context');
 		this.settingsService.setForUser('playback', body?.value ?? {}, userId);
 		return { ok: true };
+	}
+
+	/**
+	 * The current user's saved defaults for the Known For / Similar filter
+	 * bars. Declared before `@Get(':key')` so it isn't captured by the admin
+	 * route. Share tokens have no user context, so they get the empty set.
+	 */
+	@Get('movie-search-defaults')
+	@RequireAction('view:library')
+	getMovieSearchDefaults(@CurrentUser() user: JwtUser) {
+		const userId = user?.role !== 'share' ? (user?.sub ?? user?.id ?? null) : null;
+		if (!userId) return { value: EMPTY_MOVIE_SEARCH_DEFAULTS };
+		const blob = this.settingsService.getForUser<unknown>('movieSearchDefaults', userId, null);
+		return { value: normalizeMovieSearchDefaults(blob) };
+	}
+
+	/**
+	 * Replace the saved defaults wholesale — "save as default" is defined as
+	 * overwriting the previous set, not merging into it, so a field the user
+	 * cleared really does come back cleared.
+	 */
+	@Put('movie-search-defaults')
+	@RequireAction('edit:own-settings')
+	setMovieSearchDefaults(@CurrentUser() user: JwtUser, @Body() body: { value?: unknown }) {
+		const userId = user?.sub ?? user?.id;
+		if (!userId || user?.role === 'share') throw new ForbiddenException('No user context');
+		const value = normalizeMovieSearchDefaults(body?.value);
+		this.settingsService.setForUser('movieSearchDefaults', value, userId);
+		return { ok: true, value };
 	}
 
 	/**

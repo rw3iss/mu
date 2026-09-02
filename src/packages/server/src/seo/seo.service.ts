@@ -1,14 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
 import type { SeoMeta } from '@mu/shared';
+import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { ShareTokenVerifier } from '../common/share-token.verifier.js';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import {
-	movieMetadata,
-	movies,
-	people,
-} from '../database/schema/index.js';
+import { movieMetadata, movies, people } from '../database/schema/index.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { injectSeoHead, renderSeoHead } from './seo-injector.js';
 
@@ -97,11 +93,7 @@ export class SeoService {
 		// Static SPA routes — built-ins so the tab title is right.
 		const staticTitle = STATIC_ROUTE_TITLES[path];
 		if (staticTitle) {
-			return this.withCanonical(
-				{ ...DEFAULT_META, title: staticTitle },
-				path,
-				baseUrl,
-			);
+			return this.withCanonical({ ...DEFAULT_META, title: staticTitle }, path, baseUrl);
 		}
 
 		return this.withCanonical(DEFAULT_META, path, baseUrl);
@@ -122,11 +114,7 @@ export class SeoService {
 			const tmdbId = Number.parseInt(key.slice(5), 10);
 			if (Number.isFinite(tmdbId)) {
 				tmdbIdForFallback = tmdbId;
-				row = this.database.db
-					.select()
-					.from(movies)
-					.where(eq(movies.tmdbId, tmdbId))
-					.get();
+				row = this.database.db.select().from(movies).where(eq(movies.tmdbId, tmdbId)).get();
 			}
 		}
 
@@ -164,9 +152,10 @@ export class SeoService {
 					const year = details.release_date
 						? Number.parseInt(details.release_date.slice(0, 4), 10)
 						: null;
-					const title = year && Number.isFinite(year)
-						? `${details.title} (${year})`
-						: details.title;
+					const title =
+						year && Number.isFinite(year)
+							? `${details.title} (${year})`
+							: details.title;
 					return {
 						title,
 						description: details.overview ?? undefined,
@@ -187,11 +176,7 @@ export class SeoService {
 	}
 
 	private async resolvePerson(key: string, baseUrl: string): Promise<SeoMeta | null> {
-		const row = this.database.db
-			.select()
-			.from(people)
-			.where(eq(people.externalId, key))
-			.get();
+		const row = this.database.db.select().from(people).where(eq(people.externalId, key)).get();
 		if (!row) return null;
 
 		const description = row.biography
@@ -229,9 +214,9 @@ export class SeoService {
 				: `Watch: ${movie.title}`;
 			return {
 				title,
-				description:
-					movie.overview ?? 'A movie shared from a private Mu library.',
-				image: this.absUrl(movie.posterUrl ?? movie.backdropUrl ?? null, baseUrl) ?? undefined,
+				description: movie.overview ?? 'A movie shared from a private Mu library.',
+				image:
+					this.absUrl(movie.posterUrl ?? movie.backdropUrl ?? null, baseUrl) ?? undefined,
 				type: 'video.other',
 				// Public shared content can be indexed by social-card bots
 				// but we still don't want it in Google. `noindex,follow`

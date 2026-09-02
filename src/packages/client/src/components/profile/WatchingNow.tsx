@@ -39,7 +39,10 @@ export function WatchingNow({ watching }: WatchingNowProps) {
 					{watching.title}
 					{watching.year ? <span class={styles.year}> · {watching.year}</span> : null}
 					{watching.rating != null && (
-						<span class={styles.rating} title={`Rated ${watching.rating.toFixed(1)} / 10`}>
+						<span
+							class={styles.rating}
+							title={`Rated ${watching.rating.toFixed(1)} / 10`}
+						>
 							<Icon name="star-filled" size={13} />
 							{watching.rating.toFixed(1)}
 						</span>
@@ -51,10 +54,13 @@ export function WatchingNow({ watching }: WatchingNowProps) {
 					</div>
 					{watching.durationSeconds ? (
 						<span class={styles.time}>
-							{clockFromSeconds(watching.positionSeconds)} / {clockFromSeconds(watching.durationSeconds)}
+							{clockFromSeconds(watching.positionSeconds)} /{' '}
+							{clockFromSeconds(watching.durationSeconds)}
 						</span>
 					) : (
-						<span class={styles.time}>{clockFromSeconds(watching.positionSeconds)}</span>
+						<span class={styles.time}>
+							{clockFromSeconds(watching.positionSeconds)}
+						</span>
 					)}
 				</div>
 			</div>

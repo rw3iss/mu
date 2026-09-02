@@ -116,13 +116,15 @@ export class TraktHttpClient {
 		}>;
 		return arr
 			.filter((x) => x.movie?.title)
-			.map((x): TraktMovieSearchHit => ({
-				traktId: x.movie!.ids?.trakt,
-				tmdbId: x.movie!.ids?.tmdb ?? undefined,
-				imdbId: x.movie!.ids?.imdb ?? undefined,
-				title: x.movie!.title,
-				year: x.movie!.year ?? undefined,
-			}));
+			.map(
+				(x): TraktMovieSearchHit => ({
+					traktId: x.movie!.ids?.trakt,
+					tmdbId: x.movie!.ids?.tmdb ?? undefined,
+					imdbId: x.movie!.ids?.imdb ?? undefined,
+					title: x.movie!.title,
+					year: x.movie!.year ?? undefined,
+				}),
+			);
 	}
 
 	/** Multi-result person search for federated search dropdowns. */
@@ -144,11 +146,13 @@ export class TraktHttpClient {
 		}>;
 		return arr
 			.filter((x) => x.person?.name)
-			.map((x): TraktPersonSearchHit => ({
-				traktId: x.person!.ids?.trakt,
-				tmdbId: x.person!.ids?.tmdb ?? undefined,
-				imdbId: x.person!.ids?.imdb ?? undefined,
-				name: x.person!.name,
-			}));
+			.map(
+				(x): TraktPersonSearchHit => ({
+					traktId: x.person!.ids?.trakt,
+					tmdbId: x.person!.ids?.tmdb ?? undefined,
+					imdbId: x.person!.ids?.imdb ?? undefined,
+					name: x.person!.name,
+				}),
+			);
 	}
 }

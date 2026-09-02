@@ -55,12 +55,7 @@ export const ROLE_ACTIONS: Record<GrantedRole, ReadonlySet<Action>> = {
 		'edit:movie',
 		'delete:movie',
 	]),
-	viewer: new Set<Action>([
-		'view:public',
-		'view:library',
-		'view:own-data',
-		'edit:own-settings',
-	]),
+	viewer: new Set<Action>(['view:public', 'view:library', 'view:own-data', 'edit:own-settings']),
 	share: new Set<Action>(['view:public', 'view:shared-movie']),
 };
 

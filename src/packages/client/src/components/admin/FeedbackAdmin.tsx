@@ -260,9 +260,17 @@ export function FeedbackAdmin() {
 										{f.attachmentUrl ? (
 											f.attachmentType?.startsWith('video/') ? (
 												// biome-ignore lint/a11y/useMediaCaption: user-supplied clip
-												<video src={f.attachmentUrl} class={styles.shot} controls />
+												<video
+													src={f.attachmentUrl}
+													class={styles.shot}
+													controls
+												/>
 											) : (
-												<a href={f.attachmentUrl} target="_blank" rel="noreferrer">
+												<a
+													href={f.attachmentUrl}
+													target="_blank"
+													rel="noreferrer"
+												>
 													<img
 														src={f.attachmentUrl}
 														alt={f.screenshotName ?? 'attachment'}
@@ -296,18 +304,23 @@ export function FeedbackAdmin() {
 													class={styles.replyInput}
 													value={replyText}
 													onInput={(e) =>
-														setReplyText((e.target as HTMLTextAreaElement).value)
+														setReplyText(
+															(e.target as HTMLTextAreaElement).value,
+														)
 													}
 													placeholder="Write a reply to the user (optional when resolving)…"
 													rows={4}
 												/>
 												{!f.email && (
 													<p class={styles.formHint}>
-														This submitter didn't provide an email — a reply can't be
-														delivered, but you can still mark it resolved.
+														This submitter didn't provide an email — a
+														reply can't be delivered, but you can still
+														mark it resolved.
 													</p>
 												)}
-												{formError && <p class={styles.formError}>{formError}</p>}
+												{formError && (
+													<p class={styles.formError}>{formError}</p>
+												)}
 												<div class={styles.respondActions}>
 													<Button
 														variant="secondary"

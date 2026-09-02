@@ -42,10 +42,15 @@ export function ProfileHistoryList({ history }: ProfileHistoryListProps) {
 							<div class={styles.info}>
 								<div class={styles.titleRow}>
 									<span class={styles.title}>{item.title}</span>
-									{item.year ? <span class={styles.year}>{item.year}</span> : null}
+									{item.year ? (
+										<span class={styles.year}>{item.year}</span>
+									) : null}
 									{item.completed && <span class={styles.done}>Watched</span>}
 									{item.rating != null && (
-										<span class={styles.rating} title={`Rated ${item.rating.toFixed(1)} / 10`}>
+										<span
+											class={styles.rating}
+											title={`Rated ${item.rating.toFixed(1)} / 10`}
+										>
 											<Icon name="star-filled" size={12} />
 											{item.rating.toFixed(1)}
 										</span>
@@ -55,11 +60,17 @@ export function ProfileHistoryList({ history }: ProfileHistoryListProps) {
 									<span class={styles.when}>{relativeTime(item.watchedAt)}</span>
 									{item.durationSeconds ? (
 										<span class={styles.position}>
-											{clockFromSeconds(item.completed ? item.durationSeconds : item.positionSeconds)} /{' '}
-											{clockFromSeconds(item.durationSeconds)}
+											{clockFromSeconds(
+												item.completed
+													? item.durationSeconds
+													: item.positionSeconds,
+											)}{' '}
+											/ {clockFromSeconds(item.durationSeconds)}
 										</span>
 									) : item.positionSeconds > 0 ? (
-										<span class={styles.position}>{clockFromSeconds(item.positionSeconds)}</span>
+										<span class={styles.position}>
+											{clockFromSeconds(item.positionSeconds)}
+										</span>
 									) : null}
 								</div>
 								<div class={styles.bar} role="presentation">

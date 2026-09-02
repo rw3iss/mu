@@ -1,5 +1,4 @@
-import { nowISO } from '@mu/shared';
-import { type NotificationType, WsEvent } from '@mu/shared';
+import { type NotificationType, nowISO, WsEvent } from '@mu/shared';
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { desc, eq, isNull, or, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
@@ -67,7 +66,13 @@ export class NotificationsService {
 		const createdAt = nowISO();
 		this.database.db
 			.insert(notifications)
-			.values({ id, userId: userId ?? null, type: String(type), data: JSON.stringify(data), createdAt })
+			.values({
+				id,
+				userId: userId ?? null,
+				type: String(type),
+				data: JSON.stringify(data),
+				createdAt,
+			})
 			.run();
 		this.bust(userId);
 		const view: NotificationView = {
@@ -84,7 +89,11 @@ export class NotificationsService {
 	}
 
 	/** A user's notifications (their own + system-wide), newest first, paged. */
-	list(userId: string, page = 1, pageSize = 30): { notifications: NotificationView[]; hasMore: boolean } {
+	list(
+		userId: string,
+		page = 1,
+		pageSize = 30,
+	): { notifications: NotificationView[]; hasMore: boolean } {
 		const limit = Math.min(100, Math.max(1, pageSize));
 		const offset = (Math.max(1, page) - 1) * limit;
 		const rows = this.database.db
@@ -115,10 +124,19 @@ export class NotificationsService {
 	markRead(id: string, userId: string): void {
 		// Only the recipient may mark a personal one; system-wide rows are
 		// marked read globally (acceptable — they're informational).
-		const row = this.database.db.select().from(notifications).where(eq(notifications.id, id)).get();
+		const row = this.database.db
+			.select()
+			.from(notifications)
+			.where(eq(notifications.id, id))
+			.get();
 		if (!row) return;
-		if (row.userId && row.userId !== userId) throw new ForbiddenException('Not your notification');
-		this.database.db.update(notifications).set({ read: true }).where(eq(notifications.id, id)).run();
+		if (row.userId && row.userId !== userId)
+			throw new ForbiddenException('Not your notification');
+		this.database.db
+			.update(notifications)
+			.set({ read: true })
+			.where(eq(notifications.id, id))
+			.run();
 		this.bust(userId);
 	}
 
@@ -132,9 +150,14 @@ export class NotificationsService {
 	}
 
 	remove(id: string, userId: string): void {
-		const row = this.database.db.select().from(notifications).where(eq(notifications.id, id)).get();
+		const row = this.database.db
+			.select()
+			.from(notifications)
+			.where(eq(notifications.id, id))
+			.get();
 		if (!row) return;
-		if (row.userId && row.userId !== userId) throw new ForbiddenException('Not your notification');
+		if (row.userId && row.userId !== userId)
+			throw new ForbiddenException('Not your notification');
 		this.database.db.delete(notifications).where(eq(notifications.id, id)).run();
 		this.bust(userId);
 	}

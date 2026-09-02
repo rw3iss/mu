@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'preact/hooks';
+import { type RefObject, useEffect } from 'preact/hooks';
 
 /**
  * Shared outside-click + Escape-key dismissal for popovers, dropdowns,

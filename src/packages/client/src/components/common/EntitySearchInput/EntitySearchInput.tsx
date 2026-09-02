@@ -1,14 +1,9 @@
-import { route } from 'preact-router';
+import type { MovieSearchHit, PersonSearchHit, SearchHit, SearchSource } from '@mu/shared';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { route } from 'preact-router';
 import { usePopover } from '@/hooks/usePopover';
-import type {
-	MovieSearchHit,
-	PersonSearchHit,
-	SearchHit,
-	SearchSource,
-} from '@mu/shared';
-import { useSearchStream } from './useSearchStream.js';
 import styles from './EntitySearchInput.module.scss';
+import { useSearchStream } from './useSearchStream.js';
 
 export interface EntitySearchInputProps {
 	type: 'movie' | 'person';
@@ -97,9 +92,7 @@ export function EntitySearchInput({
 	usePopover({ ref: wrapRef, open, onClose: handleClose });
 
 	const disabledSet = new Set(disabledKeys ?? []);
-	const visible = (results as SearchHit[]).filter(
-		(h) => !disabledSet.has(hitKey(h)),
-	);
+	const visible = (results as SearchHit[]).filter((h) => !disabledSet.has(hitKey(h)));
 
 	const onKeyDown = (e: KeyboardEvent) => {
 		if (!open) return;
@@ -155,9 +148,9 @@ export function EntitySearchInput({
 							? (hit as PersonSearchHit).name
 							: (hit as MovieSearchHit).title;
 						const sub = isPerson
-							? (hit as PersonSearchHit).role ??
+							? ((hit as PersonSearchHit).role ??
 								(hit as PersonSearchHit).knownFor?.slice(0, 3).join(', ') ??
-								''
+								'')
 							: movieSubtitle(hit as MovieSearchHit);
 						const img = isPerson
 							? (hit as PersonSearchHit).profileUrl
@@ -172,12 +165,7 @@ export function EntitySearchInput({
 								onClick={() => pick(hit)}
 							>
 								{img ? (
-									<img
-										class={styles.thumb}
-										src={img}
-										alt=""
-										loading="lazy"
-									/>
+									<img class={styles.thumb} src={img} alt="" loading="lazy" />
 								) : (
 									<div class={`${styles.thumb} ${styles.thumbEmpty}`} />
 								)}

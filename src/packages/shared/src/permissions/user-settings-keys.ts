@@ -28,6 +28,9 @@ export const USER_SETTING_KEYS = [
 	// Notifications
 	'notifications.toastDuration',
 	'notifications.muted',
+	// Saved defaults for the Known For / Similar result filter bars, written by
+	// the "Save search as default" button. One blob so a save replaces the set.
+	'movieSearchDefaults',
 	// General
 	'general.startPage',
 	'general.dateFormat',

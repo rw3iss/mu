@@ -33,9 +33,7 @@ export const DEFAULT_THUMBNAIL_SIZE: ThumbnailSize = 'large';
 /** True if the input is one of the four canonical sizes.
  *  Use to validate untrusted input (URL query params, JSON payloads). */
 export function isThumbnailSize(value: unknown): value is ThumbnailSize {
-	return (
-		value === 'small' || value === 'medium' || value === 'large' || value === 'xlarge'
-	);
+	return value === 'small' || value === 'medium' || value === 'large' || value === 'xlarge';
 }
 
 /** Parse + fall back. Centralised so the server controller and

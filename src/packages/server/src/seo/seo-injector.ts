@@ -31,8 +31,7 @@ function clamp(s: string, n: number): string {
  */
 export function renderSeoHead(meta: SeoMeta): string {
 	const siteName = meta.siteName ?? DEFAULT_SITE_NAME;
-	const fullTitle =
-		meta.title === siteName ? meta.title : `${meta.title} — ${siteName}`;
+	const fullTitle = meta.title === siteName ? meta.title : `${meta.title} — ${siteName}`;
 	const description = meta.description ? clamp(meta.description, 200) : undefined;
 	const type = meta.type ?? 'website';
 	const robots = meta.robots ?? 'noindex,nofollow';
@@ -84,9 +83,7 @@ export function injectSeoHead(html: string, head: string): string {
 	const startIdx = html.indexOf(SEO_MARKER_START);
 	const endIdx = html.indexOf(SEO_MARKER_END);
 	if (startIdx >= 0 && endIdx > startIdx) {
-		return (
-			html.slice(0, startIdx) + head + html.slice(endIdx + SEO_MARKER_END.length)
-		);
+		return html.slice(0, startIdx) + head + html.slice(endIdx + SEO_MARKER_END.length);
 	}
 	const headCloseIdx = html.indexOf('</head>');
 	if (headCloseIdx >= 0) {

@@ -5,6 +5,7 @@ import { api } from '@/services/api';
 import { invalidateFavorites } from '@/state/favorites.state';
 import { resetHistoryCache } from '@/state/history.state';
 import { fetchUserSettings, userSettings } from '@/state/userSettings.state';
+import { resetMovieSearchDefaults } from './movie-search-defaults.state';
 
 // ============================================
 // Types
@@ -79,6 +80,7 @@ export async function logout(): Promise<void> {
 		userSettings.value = {};
 		invalidateFavorites();
 		resetHistoryCache();
+		resetMovieSearchDefaults();
 		route('/login');
 	}
 }

@@ -64,18 +64,26 @@ export function RecentlyPlayed() {
 						>
 							<button
 								class={styles.item}
-								{...newTabNav(`/movie/${movie.id}`, () => route(`/movie/${movie.id}`))}
+								{...newTabNav(`/movie/${movie.id}`, () =>
+									route(`/movie/${movie.id}`),
+								)}
 							>
 								<div class={styles.poster}>
 									{movie.posterUrl ? (
-										<img src={movie.posterUrl} alt={movie.title} loading="lazy" />
+										<img
+											src={movie.posterUrl}
+											alt={movie.title}
+											loading="lazy"
+										/>
 									) : (
 										<div class={styles.posterPlaceholder} />
 									)}
 								</div>
 								<div class={styles.info}>
 									<span class={styles.title}>{movie.title}</span>
-									{movie.year > 0 && <span class={styles.year}>{movie.year}</span>}
+									{movie.year > 0 && (
+										<span class={styles.year}>{movie.year}</span>
+									)}
 								</div>
 								{/* Watch-position bar along the bottom of the row */}
 								{(movie.watchPosition ?? 0) > 0 &&

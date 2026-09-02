@@ -140,9 +140,7 @@ export const moviesService = {
 	},
 
 	/** Fetch + persist the movie's complete cast (ingest keeps only 20). */
-	loadFullCast(
-		movieId: string,
-	): Promise<{
+	loadFullCast(movieId: string): Promise<{
 		cast: { name: string; character?: string; profileUrl?: string; tmdbId?: number }[];
 	}> {
 		return api.post(`/metadata/movies/${movieId}/full-cast`);

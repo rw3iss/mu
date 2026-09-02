@@ -2,12 +2,19 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
+import { ResultFilterBar } from '@/components/common/ResultFilterBar';
 import { Select } from '@/components/common/Select';
 import { SmartImage } from '@/components/common/SmartImage';
 import { ResultCard } from '@/components/movie/ResultCard';
+import { useMovieSearchDefaults } from '@/hooks/useMovieSearchDefaults';
 import { useSeo } from '@/hooks/useSeo';
 import { type PersonView, peopleService } from '@/services/people.service';
 import { ensureFavoritesLoaded, slugifyName } from '@/state/favorites.state';
+import {
+	defaultsToFilters,
+	filtersToDefaults,
+	type ResultFilterState,
+} from '@/utils/result-filters';
 import styles from './PersonDetail.module.scss';
 
 interface PersonDetailProps {
@@ -111,6 +118,38 @@ export function PersonDetail({ id }: PersonDetailProps) {
 		const next = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
 		if (next !== window.location.pathname + window.location.search) route(next, true);
 	};
+
+	// One entry point for the shared filter bar: fan its combined state back out
+	// to the individual signals and mirror it into the URL in a single write.
+	const applyCreditFilters = (next: ResultFilterState, type: CreditType) => {
+		setCreditSort(next.sort as CreditSort);
+		setCreditLibrary(next.library as CreditLibrary);
+		setCreditMinYear(next.minYear);
+		setCreditMinRating(next.minRating);
+		setCreditMinVotes(next.minVotes);
+		setCreditType(type);
+		writeCreditParams({
+			sort: next.sort as CreditSort,
+			minYear: next.minYear,
+			minRating: next.minRating,
+			minVotes: next.minVotes,
+			type,
+			library: next.library as CreditLibrary,
+		});
+	};
+
+	// Seed from the user's saved defaults — but never override explicit URL
+	// params, so a shared/bookmarked link keeps the filters it encodes.
+	const { save: saveDefaults } = useMovieSearchDefaults({
+		skip: typeof window !== 'undefined' && window.location.search.length > 1,
+		apply: (d) => {
+			const f = defaultsToFilters(d);
+			applyCreditFilters(
+				f,
+				CREDIT_TYPES.includes(d.type as CreditType) ? (d.type as CreditType) : 'all',
+			);
+		},
+	});
 
 	useSeo(
 		person
@@ -289,32 +328,33 @@ export function PersonDetail({ id }: PersonDetailProps) {
 				<section class={styles.section}>
 					<div class={styles.creditsHeader}>
 						<h2 class={styles.sectionTitle}>Known for</h2>
-						<div class={styles.creditsControls}>
-							<span class={styles.controlGroup}>
-								<span class={styles.controlLabelText}>Sort</span>
-								<Select
-									value={creditSort}
-									onChange={(v) => {
-										const s = v as CreditSort;
-										setCreditSort(s);
-										writeCreditParams({
-											sort: s,
+						<ResultFilterBar
+							value={{
+								sort: creditSort,
+								library: creditLibrary,
+								minYear: creditMinYear,
+								minRating: creditMinRating,
+								minVotes: creditMinVotes,
+							}}
+							onChange={(next) => applyCreditFilters(next, creditType)}
+							count={visibleCredits.length}
+							onSaveDefaults={() =>
+								saveDefaults(
+									filtersToDefaults(
+										{
+											sort: creditSort,
+											library: creditLibrary,
 											minYear: creditMinYear,
 											minRating: creditMinRating,
 											minVotes: creditMinVotes,
-											type: creditType,
-											library: creditLibrary,
-										});
-									}}
-									options={[
-										{ value: 'year', label: 'Year' },
-										{ value: 'title', label: 'Title' },
-										{ value: 'rating', label: 'Rating' },
-										{ value: 'votes', label: 'Votes' },
-									]}
-									aria-label="Sort credits by"
-								/>
-							</span>
+										},
+										creditType,
+									),
+								)
+							}
+						>
+							{/* Type is Known For-only (TMDB splits movie vs TV), so it
+							    rides in the shared bar's extra-controls slot. */}
 							<span class={styles.controlGroup}>
 								<span class={styles.controlLabelText}>Type</span>
 								<Select
@@ -334,105 +374,12 @@ export function PersonDetail({ id }: PersonDetailProps) {
 									options={[
 										{ value: 'all', label: 'All Types' },
 										{ value: 'movie', label: 'Movies' },
-										{ value: 'tv', label: 'TV Shows' },
+										{ value: 'tv', label: 'TV' },
 									]}
 									aria-label="Filter credits by type"
 								/>
 							</span>
-							<span class={styles.controlGroup}>
-								<span class={styles.controlLabelText}>In Library?</span>
-								<Select
-									value={creditLibrary}
-									onChange={(v) => {
-										const l = v as CreditLibrary;
-										setCreditLibrary(l);
-										writeCreditParams({
-											sort: creditSort,
-											minYear: creditMinYear,
-											minRating: creditMinRating,
-											minVotes: creditMinVotes,
-											type: creditType,
-											library: l,
-										});
-									}}
-									options={[
-										{ value: 'all', label: 'All' },
-										{ value: 'in', label: 'In Library' },
-										{ value: 'out', label: 'Not in Library' },
-									]}
-									aria-label="Filter credits by library status"
-								/>
-							</span>
-							<input
-								type="number"
-								class={styles.minYearInput}
-								min="1870"
-								max="2100"
-								step="1"
-								placeholder="Min year"
-								value={creditMinYear}
-								aria-label="Minimum year"
-								onInput={(e) => {
-									const val = (e.target as HTMLInputElement).value;
-									setCreditMinYear(val);
-									writeCreditParams({
-										sort: creditSort,
-										minYear: val,
-										minRating: creditMinRating,
-										minVotes: creditMinVotes,
-										type: creditType,
-										library: creditLibrary,
-									});
-								}}
-							/>
-							<input
-								type="number"
-								class={styles.minRatingInput}
-								min="0"
-								max="10"
-								step="0.1"
-								placeholder="Min ★"
-								value={creditMinRating}
-								aria-label="Minimum rating"
-								onInput={(e) => {
-									const val = (e.target as HTMLInputElement).value;
-									setCreditMinRating(val);
-									writeCreditParams({
-										sort: creditSort,
-										minYear: creditMinYear,
-										minRating: val,
-										minVotes: creditMinVotes,
-										type: creditType,
-										library: creditLibrary,
-									});
-								}}
-							/>
-							<input
-								type="number"
-								class={styles.minVotesInput}
-								min="0"
-								step="100"
-								placeholder="Min votes"
-								value={creditMinVotes}
-								aria-label="Minimum votes"
-								onInput={(e) => {
-									const val = (e.target as HTMLInputElement).value;
-									setCreditMinVotes(val);
-									writeCreditParams({
-										sort: creditSort,
-										minYear: creditMinYear,
-										minRating: creditMinRating,
-										minVotes: val,
-										type: creditType,
-										library: creditLibrary,
-									});
-								}}
-							/>
-							<span class={styles.resultCount}>
-								{visibleCredits.length}{' '}
-								{visibleCredits.length === 1 ? 'title' : 'titles'} found.
-							</span>
-						</div>
+						</ResultFilterBar>
 					</div>
 					<div class={styles.creditsGrid}>
 						{visibleCredits.map((credit) => (

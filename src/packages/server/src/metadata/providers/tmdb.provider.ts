@@ -417,7 +417,9 @@ export class TmdbProvider {
 		const params = new URLSearchParams({ api_key: this.apiKey });
 
 		try {
-			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/collection/${collectionId}?${params}`);
+			const response = await fetchWithTimeout(
+				`${TMDB_BASE_URL}/collection/${collectionId}?${params}`,
+			);
 			if (!response.ok) return null;
 			const data = (await response.json()) as TmdbCollectionDetails;
 			await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, data, CACHE_TTL.METADATA);
@@ -482,7 +484,9 @@ export class TmdbProvider {
 		});
 
 		try {
-			const response = await fetchWithTimeout(`${TMDB_BASE_URL}/person/${personId}?${params}`);
+			const response = await fetchWithTimeout(
+				`${TMDB_BASE_URL}/person/${personId}?${params}`,
+			);
 			if (!response.ok) {
 				this.logger.warn(`TMDB person details failed for ${personId}: ${response.status}`);
 				return null;
