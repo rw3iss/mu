@@ -3,8 +3,6 @@
 	flex-direction: column;
 	gap: 1rem;
 	padding: 1.5rem 1rem 4rem;
-	max-width: 1400px;
-	margin: 0 auto;
 }
 
 .header {
@@ -85,15 +83,6 @@
 	font-size: 0.8rem;
 }
 
-.sourcesBadge {
-	font-size: 0.7rem;
-	padding: 0.2rem 0.55rem;
-	background: rgba(255, 255, 255, 0.04);
-	border: 1px solid rgba(255, 255, 255, 0.1);
-	border-radius: 4px;
-	color: var(--color-text-muted);
-}
-
 .seedSearchRow {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -154,8 +143,18 @@
 
 .layout {
 	display: grid;
-	grid-template-columns: 280px 1fr;
+	grid-template-columns: 380px 1fr;
 	gap: 1.5rem;
+
+	/* Step the sidebar down before it starts crowding the result grid, rather
+	   than holding 380px until the single-column breakpoint. */
+	@media (max-width: 1280px) {
+		grid-template-columns: 320px 1fr;
+	}
+
+	@media (max-width: 1080px) {
+		grid-template-columns: 280px 1fr;
+	}
 
 	@media (max-width: 900px) {
 		grid-template-columns: 1fr;

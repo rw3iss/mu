@@ -37,7 +37,6 @@ import {
 	setSeed,
 	setUseProfile,
 	unresolvedPersonKeys,
-	usedSources,
 	useProfile,
 } from '@/state/discover.state';
 import { watchPositions } from '@/state/watchPositions.state';
@@ -215,11 +214,6 @@ export function Discover(_props: DiscoverProps) {
 						<span>Refresh</span>
 					</button>
 					<IncludeToggle value={includeMode.value} onChange={setIncludeMode} />
-					{usedSources.value.length > 0 && (
-						<span class={styles.sourcesBadge} title="Active recommendation sources">
-							{usedSources.value.join(' · ')}
-						</span>
-					)}
 					<Button variant="ghost" size="sm" onClick={() => setShowFilters((v) => !v)}>
 						{showFilters ? 'Hide filters' : 'Show filters'}
 					</Button>
