@@ -744,7 +744,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					onConfirm={handleConvertAndClearCache}
 					title="Convert and Clear Cache"
 					message="Queues only the movies that still need converting. Already direct-play files (H.264 or AV1 in MP4 with browser-compatible audio) are skipped, files already queued or converting are skipped, and any file whose re-encode is predicted to exceed the Re-encode Growth Limit is left on on-demand HLS. Each eligible file becomes a native direct-play MP4; with 'Convert Original File' enabled (Settings → Playback → Encoding) the original is verified-then-replaced on disk — irreversible. Runs in the background and can take a long time on large libraries."
-					confirmLabel="Convert Everything"
+					confirmLabel="Convert"
 					variant="danger"
 				/>
 			</details>
