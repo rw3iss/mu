@@ -279,3 +279,9 @@
 	margin: 0 0 1rem;
 	color: rgb(252, 165, 165);
 }
+
+/* Sort bar above the results grid. Sits between the header and the cards, so
+   it needs its own bottom gap — .page's flex gap doesn't reach inside <main>. */
+.resultsToolbar {
+	margin-bottom: 0.75rem;
+}

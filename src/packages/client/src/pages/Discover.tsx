@@ -1,13 +1,16 @@
 import type { MovieSearchHit, PersonSearchHit, SearchHit } from '@mu/shared';
-import { useEffect, useState } from 'preact/hooks';
+import { EMPTY_MOVIE_SEARCH_DEFAULTS } from '@mu/shared';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import { MovieSearchInput, PersonSearchInput } from '@/components/common/EntitySearchInput';
+import { ResultFilterBar } from '@/components/common/ResultFilterBar';
 import { Spinner } from '@/components/common/Spinner';
 import { DiscoverFilters as FilterPanel } from '@/components/discover/DiscoverFilters';
 import { DiscoverResultCard } from '@/components/discover/DiscoverResultCard';
 import { IncludeToggle } from '@/components/discover/IncludeToggle';
 import { QuickStartPanel } from '@/components/discover/QuickStartPanel';
 import { SeedChip } from '@/components/discover/SeedChip';
+import { useMovieSearchDefaults } from '@/hooks/useMovieSearchDefaults';
 import { useSeo } from '@/hooks/useSeo';
 import { moviesService } from '@/services/movies.service';
 import { wsService } from '@/services/websocket.service';
@@ -39,7 +42,14 @@ import {
 	unresolvedPersonKeys,
 	useProfile,
 } from '@/state/discover.state';
+import { movieSearchDefaults } from '@/state/movie-search-defaults.state';
 import { watchPositions } from '@/state/watchPositions.state';
+import {
+	defaultsToFilters,
+	EMPTY_FILTERS,
+	filterAndSortResults,
+	type ResultFilterState,
+} from '@/utils/result-filters';
 import styles from './Discover.module.scss';
 
 interface DiscoverProps {
@@ -167,6 +177,25 @@ export function Discover(_props: DiscoverProps) {
 					if (watched === 'watched') return !!pos && pos.positionSeconds > 0;
 					return true;
 				});
+
+	// Client-side sort over whatever the server returned. Discover's Refine
+	// sidebar owns the *server* filters (they change what gets fetched); this
+	// bar only reorders what came back, so the two never fight.
+	const [sortState, setSortState] = useState<ResultFilterState>(EMPTY_FILTERS);
+	const { save: saveDefaults } = useMovieSearchDefaults({
+		apply: (d) => setSortState((prev) => ({ ...prev, sort: defaultsToFilters(d).sort })),
+	});
+	const sortedList = useMemo(
+		() =>
+			filterAndSortResults(list, sortState, (m) => ({
+				title: m.title,
+				year: m.year,
+				rating: m.rating ?? null,
+				votes: m.votes ?? null,
+				inLibrary: m.inLibrary ?? m.source === 'library',
+			})),
+		[list, sortState],
+	);
 
 	const headerTitle =
 		seeds.length === 0
@@ -345,14 +374,36 @@ export function Discover(_props: DiscoverProps) {
 							</p>
 						</div>
 					) : (
-						<div
-							class={`${styles.grid} ${loading ? styles.gridLoading : ''}`}
-							aria-busy={loading || undefined}
-						>
-							{list.map((movie) => (
-								<DiscoverResultCard key={movie.movieId} movie={movie} />
-							))}
-						</div>
+						<>
+							<div class={styles.resultsToolbar}>
+								<ResultFilterBar
+									value={sortState}
+									onChange={setSortState}
+									count={sortedList.length}
+									// Refine already owns year/rating/votes (server-side) and
+									// the Include toggle owns library state — showing them
+									// again here would be two controls for one concept.
+									hide={['library', 'minYear', 'minRating', 'minVotes']}
+									onSaveDefaults={async () => {
+										// Only this bar's control is editable here, so merge
+										// rather than replace — a blanket save would wipe the
+										// filters saved from Known For / Similar.
+										const base =
+											movieSearchDefaults.value ??
+											EMPTY_MOVIE_SEARCH_DEFAULTS;
+										await saveDefaults({ ...base, sort: sortState.sort });
+									}}
+								/>
+							</div>
+							<div
+								class={`${styles.grid} ${loading ? styles.gridLoading : ''}`}
+								aria-busy={loading || undefined}
+							>
+								{sortedList.map((movie) => (
+									<DiscoverResultCard key={movie.movieId} movie={movie} />
+								))}
+							</div>
+						</>
 					)}
 				</main>
 			</div>

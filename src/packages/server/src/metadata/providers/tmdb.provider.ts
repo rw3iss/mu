@@ -238,6 +238,119 @@ export class TmdbProvider {
 		}
 	}
 
+	/**
+	 * Resolve free-text keyword names to TMDB keyword ids so they can be fed to
+	 * `/discover/movie?with_keywords=`. Returns at most `perTerm` ids per term.
+	 */
+	async searchKeywordIds(terms: string[], perTerm = 3): Promise<number[]> {
+		if (!this.apiKey || terms.length === 0) return [];
+		const ids: number[] = [];
+		for (const term of terms) {
+			const q = term.trim();
+			if (!q) continue;
+			const cacheKey = `keyword:${q.toLowerCase()}`;
+			const cached = await this.cache.get<number[]>(CACHE_NAMESPACES.METADATA, cacheKey);
+			if (cached) {
+				ids.push(...cached.slice(0, perTerm));
+				continue;
+			}
+			const params = new URLSearchParams({ api_key: this.apiKey, query: q });
+			try {
+				const res = await fetchWithTimeout(`${TMDB_BASE_URL}/search/keyword?${params}`);
+				if (!res.ok) continue;
+				const data = (await res.json()) as { results?: Array<{ id: number }> };
+				const found = (data.results ?? []).map((r) => r.id);
+				await this.cache.set(
+					CACHE_NAMESPACES.METADATA,
+					cacheKey,
+					found,
+					CACHE_TTL.METADATA,
+				);
+				ids.push(...found.slice(0, perTerm));
+			} catch (err: any) {
+				this.logger.warn(`TMDB keyword search failed for "${q}": ${err.message}`);
+			}
+		}
+		return [...new Set(ids)];
+	}
+
+	/**
+	 * Filter-driven browse over TMDB's whole catalogue via `/discover/movie`.
+	 *
+	 * This is what makes Discover work with no seeds: the local candidate pool
+	 * only contains movies already in the DB, so without this a filter-only
+	 * search could never surface a title the user doesn't own.
+	 */
+	async discoverMovies(opts: {
+		genreIds?: number[];
+		keywordIds?: number[];
+		yearFrom?: number;
+		yearTo?: number;
+		minRating?: number;
+		minVotes?: number;
+		minRuntime?: number;
+		maxRuntime?: number;
+		language?: string;
+		sortBy?: string;
+		pages?: number;
+	}): Promise<TmdbSearchResult[]> {
+		if (!this.apiKey) return [];
+
+		const base = new URLSearchParams({
+			api_key: this.apiKey,
+			include_adult: 'false',
+			// Default ordering favours well-known titles; a bare popularity sort
+			// on an unfiltered catalogue is mostly noise.
+			sort_by: opts.sortBy ?? 'popularity.desc',
+			// Without a floor TMDB happily returns 0-vote entries with no data.
+			'vote_count.gte': String(opts.minVotes ?? 50),
+		});
+		if (opts.genreIds?.length) base.set('with_genres', opts.genreIds.join(','));
+		// `|` is OR in TMDB's syntax — matching any keyword is the useful
+		// behaviour for a synonym list like "mob, mafia".
+		if (opts.keywordIds?.length) base.set('with_keywords', opts.keywordIds.join('|'));
+		if (opts.yearFrom) base.set('primary_release_date.gte', `${opts.yearFrom}-01-01`);
+		if (opts.yearTo) base.set('primary_release_date.lte', `${opts.yearTo}-12-31`);
+		if (opts.minRating) base.set('vote_average.gte', String(opts.minRating));
+		if (opts.minRuntime) base.set('with_runtime.gte', String(opts.minRuntime));
+		if (opts.maxRuntime) base.set('with_runtime.lte', String(opts.maxRuntime));
+		if (opts.language) base.set('with_original_language', opts.language);
+
+		const cacheKey = `discover:${base.toString().replace(this.apiKey, '')}:${opts.pages ?? 1}`;
+		const cached = await this.cache.get<TmdbSearchResult[]>(
+			CACHE_NAMESPACES.METADATA,
+			cacheKey,
+		);
+		if (cached) return cached;
+
+		const out: TmdbSearchResult[] = [];
+		const pages = Math.max(1, Math.min(opts.pages ?? 2, 5));
+		for (let page = 1; page <= pages; page++) {
+			const params = new URLSearchParams(base);
+			params.set('page', String(page));
+			try {
+				const res = await fetchWithTimeout(`${TMDB_BASE_URL}/discover/movie?${params}`);
+				if (!res.ok) {
+					this.logger.warn(`TMDB discover failed: ${res.status}`);
+					break;
+				}
+				const data = (await res.json()) as {
+					results?: TmdbSearchResult[];
+					total_pages?: number;
+				};
+				const results = data.results ?? [];
+				out.push(...results);
+				if (results.length === 0 || page >= (data.total_pages ?? 1)) break;
+			} catch (err: any) {
+				this.logger.error(`TMDB discover error: ${err.message}`);
+				break;
+			}
+		}
+
+		await this.cache.set(CACHE_NAMESPACES.METADATA, cacheKey, out, CACHE_TTL.METADATA);
+		return out;
+	}
+
 	async getMovieDetails(tmdbId: number): Promise<TmdbMovieDetails | null> {
 		if (!this.apiKey) return null;
 

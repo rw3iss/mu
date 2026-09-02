@@ -152,9 +152,14 @@ export class RecommendationsController {
 			};
 		}
 
-		// No seeds. If the user has opted out of taste-profile,
-		// fall through to a filter-only "cold" browse instead.
-		if (!profile) {
+		// No seeds. Two ways in:
+		//   - the user opted out of the taste profile, or
+		//   - they typed filters, which are an explicit search intent and should
+		//     drive the results rather than being overruled by their favorites.
+		// The second case is what makes "keyword: mafia" work on a fresh page:
+		// previously, with the profile toggle on (the default), any filter-only
+		// query fell through to favorites-derived seeds and ignored the filters.
+		if (!profile || filters) {
 			const cold = await this.recs.getColdDiscover(k, filters, inc);
 			return {
 				results: cold,

@@ -17,6 +17,13 @@ interface ResultFilterBarProps {
 	 * (e.g. a share link).
 	 */
 	onSaveDefaults?: () => Promise<void>;
+	/**
+	 * Controls the host page already provides elsewhere. Discover has its own
+	 * Refine sidebar (server-side year/rating/votes) and an Include toggle for
+	 * library state, so it hides all but the sort to avoid two competing copies
+	 * of the same filter.
+	 */
+	hide?: ReadonlyArray<'sort' | 'library' | 'minYear' | 'minRating' | 'minVotes'>;
 }
 
 /**
@@ -30,8 +37,10 @@ export function ResultFilterBar({
 	count,
 	children,
 	onSaveDefaults,
+	hide,
 }: ResultFilterBarProps) {
 	const set = (patch: Partial<ResultFilterState>) => onChange({ ...value, ...patch });
+	const shows = (k: NonNullable<ResultFilterBarProps['hide']>[number]) => !hide?.includes(k);
 	const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	// Held so unmounting mid-timeout can't setState on a dead component.
 	const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -52,69 +61,79 @@ export function ResultFilterBar({
 
 	return (
 		<div class={styles.controls}>
-			<span class={styles.group}>
-				<span class={styles.label}>Sort</span>
-				<Select
-					value={value.sort}
-					onChange={(v) => set({ sort: v as ResultSort })}
-					options={[
-						{ value: 'year', label: 'Year' },
-						{ value: 'title', label: 'Title' },
-						{ value: 'rating', label: 'Rating' },
-						{ value: 'votes', label: 'Votes' },
-					]}
-					aria-label="Sort results by"
-				/>
-			</span>
+			{shows('sort') && (
+				<span class={styles.group}>
+					<span class={styles.label}>Sort</span>
+					<Select
+						value={value.sort}
+						onChange={(v) => set({ sort: v as ResultSort })}
+						options={[
+							{ value: 'year', label: 'Year' },
+							{ value: 'title', label: 'Title' },
+							{ value: 'rating', label: 'Rating' },
+							{ value: 'votes', label: 'Votes' },
+						]}
+						aria-label="Sort results by"
+					/>
+				</span>
+			)}
 
-			<span class={styles.group}>
-				<span class={styles.label}>In Library?</span>
-				<Select
-					value={value.library}
-					onChange={(v) => set({ library: v as LibraryFilter })}
-					options={[
-						{ value: 'all', label: 'All' },
-						{ value: 'in', label: 'In Library' },
-						{ value: 'out', label: 'Not in Library' },
-					]}
-					aria-label="Filter results by library status"
-				/>
-			</span>
+			{shows('library') && (
+				<span class={styles.group}>
+					<span class={styles.label}>In Library?</span>
+					<Select
+						value={value.library}
+						onChange={(v) => set({ library: v as LibraryFilter })}
+						options={[
+							{ value: 'all', label: 'All' },
+							{ value: 'in', label: 'In Library' },
+							{ value: 'out', label: 'Not in Library' },
+						]}
+						aria-label="Filter results by library status"
+					/>
+				</span>
+			)}
 
 			{children}
 
-			<input
-				type="number"
-				class={styles.yearInput}
-				min="1870"
-				max="2100"
-				step="1"
-				placeholder="Min year"
-				aria-label="Minimum year"
-				value={value.minYear}
-				onInput={(e) => set({ minYear: (e.target as HTMLInputElement).value })}
-			/>
-			<input
-				type="number"
-				class={styles.ratingInput}
-				min="0"
-				max="10"
-				step="0.1"
-				placeholder="Min ★"
-				aria-label="Minimum rating"
-				value={value.minRating}
-				onInput={(e) => set({ minRating: (e.target as HTMLInputElement).value })}
-			/>
-			<input
-				type="number"
-				class={styles.votesInput}
-				min="0"
-				step="100"
-				placeholder="Min votes"
-				aria-label="Minimum votes"
-				value={value.minVotes}
-				onInput={(e) => set({ minVotes: (e.target as HTMLInputElement).value })}
-			/>
+			{shows('minYear') && (
+				<input
+					type="number"
+					class={styles.yearInput}
+					min="1870"
+					max="2100"
+					step="1"
+					placeholder="Min year"
+					aria-label="Minimum year"
+					value={value.minYear}
+					onInput={(e) => set({ minYear: (e.target as HTMLInputElement).value })}
+				/>
+			)}
+			{shows('minRating') && (
+				<input
+					type="number"
+					class={styles.ratingInput}
+					min="0"
+					max="10"
+					step="0.1"
+					placeholder="Min ★"
+					aria-label="Minimum rating"
+					value={value.minRating}
+					onInput={(e) => set({ minRating: (e.target as HTMLInputElement).value })}
+				/>
+			)}
+			{shows('minVotes') && (
+				<input
+					type="number"
+					class={styles.votesInput}
+					min="0"
+					step="100"
+					placeholder="Min votes"
+					aria-label="Minimum votes"
+					value={value.minVotes}
+					onInput={(e) => set({ minVotes: (e.target as HTMLInputElement).value })}
+				/>
+			)}
 
 			<span class={styles.count}>
 				{count} {count === 1 ? 'title' : 'titles'} found.

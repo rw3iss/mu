@@ -1,10 +1,12 @@
-import { CACHE_NAMESPACES } from '@mu/shared';
-import { Injectable } from '@nestjs/common';
+import crypto from 'node:crypto';
+import { CACHE_NAMESPACES, nowISO } from '@mu/shared';
+import { Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieMetadata, movies, userRatings, userWatchHistory } from '../database/schema/index.js';
 import { EmbeddingsService } from '../embeddings/embeddings.service.js';
+import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { ExternalCandidatesService } from './external-candidates.service.js';
 import { ExternalEnrichmentService } from './external-enrichment.service.js';
@@ -53,6 +55,7 @@ export interface RecommendResponse {
  */
 @Injectable()
 export class RecommendationsService {
+	private readonly logger = new Logger('RecommendationsService');
 	private readonly strategies: SimilarityStrategy[];
 
 	constructor(
@@ -67,6 +70,7 @@ export class RecommendationsService {
 		private readonly externalCandidates: ExternalCandidatesService,
 		private readonly externalEnrichment: ExternalEnrichmentService,
 		private readonly settings: SettingsService,
+		private readonly tmdb: TmdbProvider,
 	) {
 		// LLM rerank lives after the cheap strategies in the array but
 		// the orchestrator filters it back to a post-rank pass (see
@@ -529,6 +533,14 @@ export class RecommendationsService {
 		filters?: import('./types.js').DiscoverFilters,
 		include: IncludeMode = 'owned',
 	): Promise<ScoredMovie[]> {
+		// Filter-only browse can't rely on seeds to have harvested external
+		// candidates, so the local pool is whatever is already in the DB. When
+		// the user wants not-owned results, go straight to TMDB Discover and
+		// materialise stubs first — otherwise a keyword search could only ever
+		// return movies they already have.
+		if (include !== 'owned' && filters) {
+			await this.harvestTmdbDiscover(filters, limit);
+		}
 		const all = this.loadAllCandidates(include);
 
 		// Score: votes dominate (popularity proxy), rating breaks ties.
@@ -808,6 +820,143 @@ export class RecommendationsService {
 		const seed = hydrate(seedRow.movies, seedRow.movie_metadata);
 		const candidates = this.loadAllCandidates();
 		return { seed, candidates };
+	}
+
+	/**
+	 * TMDB's movie genre ids. Small, stable, and not worth a network round trip
+	 * on every filter-only search just to map "Thriller" -> 53.
+	 */
+	private static readonly TMDB_GENRE_IDS: Record<string, number> = {
+		action: 28,
+		adventure: 12,
+		animation: 16,
+		comedy: 35,
+		crime: 80,
+		documentary: 99,
+		drama: 18,
+		family: 10751,
+		fantasy: 14,
+		history: 36,
+		horror: 27,
+		music: 10402,
+		mystery: 9648,
+		romance: 10749,
+		'science fiction': 878,
+		'sci-fi': 878,
+		'tv movie': 10770,
+		thriller: 53,
+		war: 10752,
+		western: 37,
+	};
+
+	/**
+	 * Run the user's Discover filters against TMDB's catalogue and materialise
+	 * anything new as an `external` stub, so the normal candidate pipeline can
+	 * pick it up. Cheap by design: `/discover/movie` already returns title,
+	 * year, poster, overview and ratings, so no per-movie details call is
+	 * needed — one insert covers the whole page.
+	 *
+	 * Best-effort. Any failure just leaves the local-only result set intact.
+	 */
+	private async harvestTmdbDiscover(
+		filters: import('./types.js').DiscoverFilters,
+		limit: number,
+	): Promise<void> {
+		try {
+			const keywordTerms = (filters.keyword ?? '')
+				.split(',')
+				.map((t) => t.trim())
+				.filter(Boolean);
+			const keywordIds = keywordTerms.length
+				? await this.tmdb.searchKeywordIds(keywordTerms)
+				: [];
+			// A keyword the user typed that TMDB doesn't recognise would
+			// otherwise silently widen the search to "everything popular".
+			if (keywordTerms.length > 0 && keywordIds.length === 0) return;
+
+			const genreIds = (filters.genres ?? [])
+				.map((g) => RecommendationsService.TMDB_GENRE_IDS[g.toLowerCase()])
+				.filter((id): id is number => typeof id === 'number');
+
+			const results = await this.tmdb.discoverMovies({
+				genreIds,
+				keywordIds,
+				yearFrom: filters.yearFrom,
+				yearTo: filters.yearTo,
+				minRating: filters.minRating,
+				minVotes: filters.minVotes,
+				minRuntime: filters.minRuntime,
+				maxRuntime: filters.maxRuntime,
+				language: filters.language,
+				pages: Math.min(5, Math.max(1, Math.ceil(limit / 20))),
+			});
+			if (results.length === 0) return;
+
+			const tmdbIds = results.map((r) => r.id).filter((id) => typeof id === 'number');
+			if (tmdbIds.length === 0) return;
+
+			const existing = new Set(
+				this.database.db
+					.select({ tmdbId: movies.tmdbId })
+					.from(movies)
+					.where(inArray(movies.tmdbId, tmdbIds))
+					.all()
+					.map((r) => r.tmdbId)
+					.filter((v): v is number => v != null),
+			);
+
+			const now = nowISO();
+			const stubs: Array<Record<string, unknown>> = [];
+			const ratings: Array<Record<string, unknown>> = [];
+			for (const r of results) {
+				if (r.id == null || existing.has(r.id)) continue;
+				existing.add(r.id);
+				const id = crypto.randomUUID();
+				stubs.push({
+					id,
+					title: r.title ?? `TMDB ${r.id}`,
+					overview: r.overview ?? null,
+					year: r.release_date ? Number.parseInt(r.release_date.slice(0, 4), 10) : null,
+					releaseDate: r.release_date ?? null,
+					tmdbId: r.id,
+					posterUrl: r.poster_path
+						? `https://image.tmdb.org/t/p/w500${r.poster_path}`
+						: null,
+					source: 'external',
+					addedAt: now,
+					updatedAt: now,
+				});
+				// Seed ratings inline so the cards show scores immediately and
+				// the minRating/minVotes post-filters have something to test.
+				ratings.push({
+					id: crypto.randomUUID(),
+					movieId: id,
+					tmdbRating:
+						typeof r.vote_average === 'number' && r.vote_average > 0
+							? Math.round(r.vote_average * 10) / 10
+							: null,
+					tmdbVotes:
+						typeof r.vote_count === 'number' && r.vote_count > 0 ? r.vote_count : null,
+					source: 'tmdb',
+					fetchedAt: now,
+					updatedAt: now,
+				});
+			}
+			if (stubs.length === 0) return;
+
+			this.database.db
+				.insert(movies)
+				.values(stubs as never)
+				.run();
+			this.database.db
+				.insert(movieMetadata)
+				.values(ratings as never)
+				.onConflictDoNothing()
+				.run();
+			this.logger.debug(`TMDB discover harvested ${stubs.length} stub(s)`);
+		} catch (err: any) {
+			this.logger.warn(`TMDB discover harvest failed: ${err?.message ?? err}`);
+		}
 	}
 
 	private loadAllCandidates(include: IncludeMode = 'owned'): MovieWithMetadata[] {
