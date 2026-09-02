@@ -15,9 +15,27 @@
 // influence the recommendations. Visually communicate that by
 // desaturating + dimming so the user knows it's inert, but still
 // readable for context.
+//
+// The dim is a pseudo-element veil rather than `opacity` on the panel:
+// ancestor opacity applies to EVERY descendant with no way to opt out, so it
+// also made the playlist Select's dropdown translucent and unreadable (the
+// Select stays interactive here — the panel being inert doesn't stop you
+// picking a list). The veil sits at z-index 0 while the menu sits at
+// --z-dropdown, so the menu paints over it at full opacity.
 .disabled {
-	opacity: 0.5;
+	position: relative;
 	filter: saturate(0.4);
+
+	&::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		border-radius: inherit;
+		background: var(--color-bg-elevated);
+		opacity: 0.5;
+		pointer-events: none;
+	}
 }
 
 .header {
