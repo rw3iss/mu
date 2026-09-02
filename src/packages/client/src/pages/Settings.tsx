@@ -289,7 +289,7 @@ export function Settings(props: SettingsProps) {
 	// Direct-play MP4 conversion (default on)
 	const [autoConvertToMp4, setAutoConvertToMp4] = useState(true);
 	const [convertOriginalFile, setConvertOriginalFile] = useState(true);
-	const [conversionGrowthThreshold, setConversionGrowthThreshold] = useState('1.25');
+	const [conversionGrowthThreshold, setConversionGrowthThreshold] = useState('1.5');
 	const [convertHevcToAv1, setConvertHevcToAv1] = useState(false);
 	const [av1Cq, setAv1Cq] = useState('32');
 	// Shrink oversized H.264 files: re-encode any whose bitrate exceeds this many
@@ -602,7 +602,7 @@ export function Settings(props: SettingsProps) {
 					debugTranscoding,
 					autoConvertToMp4,
 					convertOriginalFile,
-					conversionGrowthThreshold: parseFloat(conversionGrowthThreshold) || 1.25,
+					conversionGrowthThreshold: parseFloat(conversionGrowthThreshold) || 1.5,
 					convertHevcToAv1,
 					av1Cq: parseInt(av1Cq, 10) || 32,
 					reencodeAboveMbps: parseFloat(reencodeAboveMbps) || 0,
@@ -2509,7 +2509,7 @@ export function Settings(props: SettingsProps) {
 										Safety guard, not a trigger: skip a re-encode when the
 										estimated MP4 would exceed the original size × this factor,
 										so already-efficient HEVC/AV1 files aren't bloated. 1.0 =
-										never grow; 1.25 = allow up to 25% larger (default). To
+										never grow; 1.5 = allow up to 50% larger (default). To
 										actively shrink large files, use “Shrink Files Above” below.
 									</span>
 								</div>

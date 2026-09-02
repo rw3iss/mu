@@ -60,6 +60,67 @@ const H264_REF_BITRATE: Array<[number, number]> = [
 ];
 
 /**
+ * Bitrate H.264 needs relative to the SOURCE codec for comparable quality.
+ *
+ * <1 means the source codec is less efficient than H.264, so re-encoding at a
+ * *lower* bitrate holds quality (XviD, MPEG-2). >1 means the source is more
+ * efficient and H.264 genuinely needs more bits — which is exactly the case
+ * the would-grow guard exists to catch (HEVC, VP9, AV1).
+ *
+ * Ballpark figures from the usual codec-generation comparisons; they only feed
+ * a size *estimate*, and the real encode is CRF-driven.
+ */
+const H264_BITRATE_RATIO: Record<string, number> = {
+	mpeg1video: 0.5,
+	mpeg2video: 0.55,
+	msmpeg4v3: 0.7,
+	mpeg4: 0.7,
+	xvid: 0.7,
+	divx: 0.7,
+	mp4v: 0.7,
+	wmv3: 0.85,
+	vc1: 0.9,
+	'vc-1': 0.9,
+	theora: 0.8,
+	vp8: 1.0,
+	h264: 1.0,
+	avc1: 1.0,
+	vp9: 1.5,
+	hevc: 1.6,
+	h265: 1.6,
+	hvc1: 1.6,
+	av1: 1.8,
+	av01: 1.8,
+};
+
+/**
+ * Typical bitrate per audio codec, used to split a whole-file bitrate into its
+ * video and audio parts (ffprobe's per-stream audio bitrate isn't stored).
+ * Over-estimating here would inflate the predicted video bitrate, so these lean
+ * to the low side of each codec's common range.
+ */
+const AUDIO_BPS_BY_CODEC: Record<string, number> = {
+	ac3: 384_000,
+	eac3: 384_000,
+	dts: 768_000,
+	truehd: 1_500_000,
+	flac: 900_000,
+	pcm_s16le: 1_400_000,
+	mp3: 160_000,
+	aac: 128_000,
+	mp4a: 128_000,
+	opus: 96_000,
+	vorbis: 128_000,
+};
+const DEFAULT_SOURCE_AUDIO_BPS = 192_000;
+
+/** Audio bitrate the converted file is written at (stereo AAC). */
+const OUTPUT_AUDIO_BPS = 256_000;
+
+/** Never predict a video bitrate below this — guards against absurd inputs. */
+const MIN_PREDICTED_VIDEO_BPS = 300_000;
+
+/**
  * Converts library files to native direct-play MP4 (faststart H.264/AAC).
  *
  * Strategy (see docs/features/mp4-direct-play-conversion-plan.md):
@@ -94,7 +155,7 @@ export class ConversionService {
 			// Both default ON (the destructive in-place replace was explicitly requested on).
 			convertOriginalFile: enc?.convertOriginalFile !== false,
 			autoConvertToMp4: enc?.autoConvertToMp4 !== false,
-			growthThreshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 1.25,
+			growthThreshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 1.5,
 			// Convert HEVC → AV1 MP4 (GPU). AV1 is browser-universal AND efficient
 			// (no doubling), but requires a working NVENC AV1 encoder. Default off.
 			convertHevcToAv1: enc?.convertHevcToAv1 === true,
@@ -160,6 +221,56 @@ export class ConversionService {
 		return 1080;
 	}
 
+	/**
+	 * Estimate the byte size of re-encoding `file` to H.264.
+	 *
+	 * The old estimate was resolution-only: it assumed a fresh encode would use
+	 * the full H264_REF_BITRATE for the source's height. For a modern 1080p file
+	 * that's a fair ceiling, but for an old low-bitrate SD rip it was wildly
+	 * high — a 1.47 Mbps 384p XviD was predicted at 2.5 Mbps video, i.e. 1.88x
+	 * its real size, so the would-grow guard skipped it. Every MPEG-4 file in
+	 * the library was stuck on the HLS path for that reason.
+	 *
+	 * Now it starts from what the source actually spends on video and adjusts by
+	 * the codec-generation ratio, keeping the resolution figure as a ceiling.
+	 * That preserves the guard's original purpose (HEVC/AV1 ratios are >1, so
+	 * they still predict growth and are still skipped) while letting genuinely
+	 * inefficient sources through.
+	 *
+	 * Returns null when duration/size are unknown, so callers can distinguish
+	 * "can't estimate" from "estimated large".
+	 */
+	private predictReencodeBytes(file: any): number | null {
+		const duration = Number(file.durationSeconds);
+		const originalBytes = Number(file.fileSize);
+		if (
+			!Number.isFinite(duration) ||
+			duration <= 0 ||
+			!Number.isFinite(originalBytes) ||
+			originalBytes <= 0
+		) {
+			return null;
+		}
+
+		const ceilingBps = this.h264RefBitrate(this.parseHeight(file));
+		const totalBps = (originalBytes * 8) / duration;
+
+		const audioCodec = String(file.codecAudio ?? '').toLowerCase();
+		const sourceAudioBps = AUDIO_BPS_BY_CODEC[audioCodec] ?? DEFAULT_SOURCE_AUDIO_BPS;
+		// Never attribute more than half the file to audio — a bad codec guess
+		// on a low-bitrate source would otherwise gut the video estimate.
+		const sourceVideoBps = Math.max(totalBps - sourceAudioBps, totalBps * 0.5);
+
+		const videoCodec = String(file.codecVideo ?? '').toLowerCase();
+		const ratio = H264_BITRATE_RATIO[videoCodec] ?? 1.0;
+
+		const predictedVideoBps = Math.min(
+			ceilingBps,
+			Math.max(sourceVideoBps * ratio, MIN_PREDICTED_VIDEO_BPS),
+		);
+		return Math.round(((predictedVideoBps + OUTPUT_AUDIO_BPS) / 8) * duration);
+	}
+
 	/** Decide what (if anything) to do with a file. Pure / no side effects. */
 	planConversion(file: any): ConversionPlan {
 		const ext = path.extname(String(file.filePath ?? '')).toLowerCase();
@@ -189,9 +300,9 @@ export class ConversionService {
 				Number.isFinite(originalBytes) &&
 				originalBytes > 0
 			) {
-				// Conservative predicted size (H.264 reference; AV1 lands lower).
-				const refVideo = this.h264RefBitrate(this.parseHeight(file));
-				const predictedBytes = Math.round(((refVideo + 256_000) / 8) * duration);
+				// Same estimator as the re-encode path (H.264 reference; AV1
+				// lands lower), so both decisions agree on what an encode costs.
+				const predictedBytes = this.predictReencodeBytes(file) ?? Number.MAX_SAFE_INTEGER;
 				// Only worth the re-encode (and quality cost) when the result is
 				// meaningfully smaller — at most shrinkWorthRatio of the original.
 				if (predictedBytes <= originalBytes * this.getConfig().shrinkWorthRatio) {
@@ -219,19 +330,11 @@ export class ConversionService {
 		}
 
 		// Non-H.264 → full re-encode. Guard against growing the file.
-		const duration = Number(file.durationSeconds);
 		const originalBytes = Number(file.fileSize);
-		if (
-			!Number.isFinite(duration) ||
-			duration <= 0 ||
-			!Number.isFinite(originalBytes) ||
-			originalBytes <= 0
-		) {
+		const predictedBytes = this.predictReencodeBytes(file);
+		if (predictedBytes == null) {
 			return { action: 'skip', reason: 'cannot-estimate-size' };
 		}
-		const refVideo = this.h264RefBitrate(this.parseHeight(file));
-		const audioBps = 256_000;
-		const predictedBytes = Math.round(((refVideo + audioBps) / 8) * duration);
 		const threshold = this.getConfig().growthThreshold;
 		if (predictedBytes > originalBytes * threshold) {
 			return { action: 'skip', reason: 'would-grow', predictedBytes };
