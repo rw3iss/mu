@@ -157,3 +157,12 @@ input[type='range'] {
 	width: 100%;
 	accent-color: var(--color-accent);
 }
+
+/* Sub-label under a free-text filter, explaining what it searches. */
+.fieldHint {
+	display: block;
+	margin-top: 4px;
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+	line-height: 1.35;
+}

@@ -46,10 +46,7 @@ export class LlmFeaturesListenerService implements OnModuleInit {
 		// Admin can disable auto LLM feature extraction via Settings >
 		// Matching. Default true; respects the per-provider budget
 		// even when on.
-		const enabled = this.settings.get<boolean>(
-			'recommendations.autoEnrichLlmFeatures',
-			true,
-		);
+		const enabled = this.settings.get<boolean>('recommendations.autoEnrichLlmFeatures', true);
 		if (!enabled) return;
 		if (!this.llm.isConfigured()) return;
 		if (this.inflight.has(movieId)) return;

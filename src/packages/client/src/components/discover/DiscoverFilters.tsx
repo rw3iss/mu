@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
 import type { DiscoverFilters as Filters } from '@/services/discover.service';
 import styles from './DiscoverFilters.module.scss';
@@ -58,6 +58,20 @@ export function DiscoverFilters({
 	};
 
 	const watched = value.watched ?? 'all';
+
+	// Free-text keyword is debounced: every change refetches Discover, which is
+	// an expensive call, so committing per keystroke would hammer the server.
+	const [keywordDraft, setKeywordDraft] = useState(value.keyword ?? '');
+	// Re-sync when the parent resets filters ("Clear all") or restores saved ones.
+	useEffect(() => {
+		setKeywordDraft(value.keyword ?? '');
+	}, [value.keyword]);
+	useEffect(() => {
+		const next = keywordDraft.trim();
+		if (next === (value.keyword ?? '')) return;
+		const t = setTimeout(() => update({ keyword: next || undefined }), 400);
+		return () => clearTimeout(t);
+	}, [keywordDraft]);
 	const decadeActive = (d: { from: number; to: number }): boolean =>
 		value.yearFrom === d.from && value.yearTo === d.to;
 
@@ -273,6 +287,26 @@ export function DiscoverFilters({
 						</button>
 					))}
 				</div>
+			</div>
+
+			{/* Last, because it's the broadest filter: it searches the text the
+			    genre chips above can't express ("mob", "heist", "time travel"). */}
+			<div class={styles.section}>
+				<label class={styles.fieldLabel} for="discover-keyword">
+					Keyword
+				</label>
+				<input
+					id="discover-keyword"
+					class={styles.searchInput}
+					type="text"
+					placeholder="e.g. mob, mafia"
+					value={keywordDraft}
+					onInput={(e) => setKeywordDraft((e.target as HTMLInputElement).value)}
+					title="Searches each movie's summary, TMDB keywords, title and genres. Separate terms with commas to match any of them."
+				/>
+				<span class={styles.fieldHint}>
+					Searches summaries and keywords. Commas match any term.
+				</span>
 			</div>
 		</div>
 	);

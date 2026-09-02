@@ -192,23 +192,25 @@ export function QuickStartPanel({ disabled = false }: QuickStartPanelProps) {
 					onToggle={togglePlaylist}
 					toggleDisabled={playlistMovies.length === 0}
 					disabled={disabled}
+					aside={
+						<div class={styles.playlistPicker}>
+							<Select
+								value={playlistId}
+								onChange={(v) => setPlaylistId(String(v))}
+								options={[
+									{ value: '', label: 'Select a playlist…' },
+									...playlists.map((p) => ({
+										value: p.id,
+										label: `${p.name}${p.movieCount != null ? ` (${p.movieCount})` : ''}`,
+									})),
+								]}
+								fullWidth
+								size="sm"
+								aria-label="Playlist to seed from"
+							/>
+						</div>
+					}
 				>
-					<div class={styles.playlistPicker}>
-						<Select
-							value={playlistId}
-							onChange={(v) => setPlaylistId(String(v))}
-							options={[
-								{ value: '', label: 'Select a playlist…' },
-								...playlists.map((p) => ({
-									value: p.id,
-									label: `${p.name}${p.movieCount != null ? ` (${p.movieCount})` : ''}`,
-								})),
-							]}
-							fullWidth
-							size="sm"
-							aria-label="Playlist to seed from"
-						/>
-					</div>
 					{playlistLoading ? (
 						<span class={styles.groupHint}>Loading…</span>
 					) : playlistId && playlistMovies.length === 0 ? (
@@ -241,6 +243,7 @@ function SeedGroup({
 	onToggle,
 	toggleDisabled,
 	disabled,
+	aside,
 	children,
 }: {
 	title: string;
@@ -249,9 +252,12 @@ function SeedGroup({
 	onToggle: () => void;
 	toggleDisabled?: boolean;
 	disabled?: boolean;
+	/** Fixed content above the scrolling body (e.g. the playlist picker). */
+	aside?: ComponentChildren;
 	children: ComponentChildren;
 }) {
-	const [collapsed, setCollapsed] = useState(false);
+	// Collapsed by default — three expanded chip lists buried the filters below.
+	const [collapsed, setCollapsed] = useState(true);
 
 	return (
 		<section class={styles.group}>
@@ -289,7 +295,14 @@ function SeedGroup({
 				</button>
 			</div>
 
-			{!collapsed && <div class={styles.groupBody}>{children}</div>}
+			{!collapsed && (
+				<>
+					{/* Rendered outside .groupBody so it can't consume the chip
+					    list's scroll height. */}
+					{aside && <div class={styles.groupAside}>{aside}</div>}
+					<div class={styles.groupBody}>{children}</div>
+				</>
+			)}
 		</section>
 	);
 }

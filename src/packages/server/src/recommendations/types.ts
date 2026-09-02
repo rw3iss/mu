@@ -94,6 +94,12 @@ export interface DiscoverFilters {
 	language?: string;
 	minRuntime?: number;
 	maxRuntime?: number;
+	/**
+	 * Free-text match over overview + keywords + title. Covers themes the
+	 * genre list has no term for ("mob", "heist", "time travel"). Commas are
+	 * OR — "mob, mafia" matches either.
+	 */
+	keyword?: string;
 }
 
 /** Knobs the admin / caller can pass into a recommendation call. */

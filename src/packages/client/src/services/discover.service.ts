@@ -10,6 +10,8 @@ export interface DiscoverFilters {
 	language?: string;
 	minRuntime?: number;
 	maxRuntime?: number;
+	/** Free-text over summary + TMDB keywords + title/genres. Commas = OR. */
+	keyword?: string;
 	/** Client-only: filters the rendered results by watch state. */
 	watched?: 'all' | 'watched' | 'unwatched' | 'in-progress';
 }
@@ -102,6 +104,7 @@ function toQueryParams(req: DiscoverRequest): Record<string, string> {
 		if (f.language) p.language = f.language;
 		if (f.minRuntime != null) p.minRuntime = String(f.minRuntime);
 		if (f.maxRuntime != null) p.maxRuntime = String(f.maxRuntime);
+		if (f.keyword?.trim()) p.keyword = f.keyword.trim();
 		// `watched` is client-side only — never serialise it.
 	}
 	return p;

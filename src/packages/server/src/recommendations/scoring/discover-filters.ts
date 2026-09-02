@@ -19,6 +19,13 @@ export function applyDiscoverFilters(
 
 	const personLower = filters.person?.toLowerCase().trim();
 	const wantGenres: string[] = (filters.genres ?? []).map((g) => g.toLowerCase());
+	// Comma-separated OR: "mob, mafia" should match either, since the point of
+	// this filter is to catch themes no single genre term covers.
+	const keywordTerms = (filters.keyword ?? '')
+		.toLowerCase()
+		.split(',')
+		.map((t) => t.trim())
+		.filter(Boolean);
 
 	return scored.filter((s) => {
 		const m = moviesById.get(s.movieId);
@@ -78,6 +85,14 @@ export function applyDiscoverFilters(
 		if (filters.maxRuntime != null && filters.maxRuntime > 0) {
 			if (m.runtimeMinutes != null && m.runtimeMinutes > filters.maxRuntime) return false;
 		}
+		if (keywordTerms.length > 0) {
+			// Keywords carry the precise concepts TMDB tags ("mafia",
+			// "organized crime"); the overview catches everything else.
+			const haystack = [m.title, m.overview ?? '', ...m.keywords, ...m.genres]
+				.join(' ')
+				.toLowerCase();
+			if (!keywordTerms.some((t) => haystack.includes(t))) return false;
+		}
 		return true;
 	});
 }
@@ -92,6 +107,7 @@ function hasAnyFilter(f: DiscoverFilters): boolean {
 		(f.person != null && f.person.trim() !== '') ||
 		(f.language != null && f.language !== '') ||
 		(f.minRuntime != null && f.minRuntime > 0) ||
-		(f.maxRuntime != null && f.maxRuntime > 0)
+		(f.maxRuntime != null && f.maxRuntime > 0) ||
+		(f.keyword != null && f.keyword.trim() !== '')
 	);
 }

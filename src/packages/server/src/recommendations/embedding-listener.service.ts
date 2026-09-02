@@ -44,10 +44,7 @@ export class EmbeddingListenerService implements OnModuleInit {
 	private async handle(movieId: string): Promise<void> {
 		// Admin can disable embeddings auto-enrichment via Settings >
 		// Matching. Default true so existing behaviour is preserved.
-		const enabled = this.settings.get<boolean>(
-			'recommendations.autoEnrichEmbeddings',
-			true,
-		);
+		const enabled = this.settings.get<boolean>('recommendations.autoEnrichEmbeddings', true);
 		if (!enabled) return;
 		if (this.inflight.has(movieId)) return;
 		this.inflight.add(movieId);

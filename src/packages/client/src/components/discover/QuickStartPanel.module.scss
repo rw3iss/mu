@@ -136,11 +136,21 @@
 }
 
 /* Scrollable body — a long favorites list can't push the filters off screen. */
+/* Fixed row above .groupBody — the playlist picker lives here so the chip
+   list below keeps its full scroll height. */
+.groupAside {
+	margin-bottom: 6px;
+}
+
 .groupBody {
 	display: flex;
 	flex-wrap: wrap;
+	align-content: flex-start;
 	gap: 6px;
-	max-height: 180px;
+	/* 180px fit barely two rows of chips; these lists routinely hold dozens,
+	   so the group is worth the height once it's explicitly expanded. */
+	max-height: 320px;
+	min-height: 0;
 	overflow-y: auto;
 	padding-right: 2px;
 	scrollbar-width: thin;
@@ -155,9 +165,10 @@
 	}
 }
 
+/* Now a child of .groupAside rather than the flex .groupBody, so it just
+   needs to fill the width. */
 .playlistPicker {
-	flex: 1 0 100%;
-	margin-bottom: 2px;
+	width: 100%;
 }
 
 /* Master on/off switch for a whole group. */

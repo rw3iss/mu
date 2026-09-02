@@ -59,10 +59,7 @@ export class ExternalRecsListenerService implements OnModuleInit {
 	private async handle(payload: MovieEventPayload): Promise<void> {
 		// Admin can disable auto-snapshotting via Settings > Matching.
 		// Default true so existing behaviour is preserved.
-		const enabled = this.settings.get<boolean>(
-			'recommendations.autoEnrichExternalRecs',
-			true,
-		);
+		const enabled = this.settings.get<boolean>('recommendations.autoEnrichExternalRecs', true);
 		if (!enabled) return;
 
 		const movieId = payload?.movieId;

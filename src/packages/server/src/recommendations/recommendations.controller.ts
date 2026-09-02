@@ -69,6 +69,7 @@ export class RecommendationsController {
 		@Query('language') language?: string,
 		@Query('minRuntime') minRuntime?: string,
 		@Query('maxRuntime') maxRuntime?: string,
+		@Query('keyword') keyword?: string,
 	) {
 		const filters = parseFilters({
 			minRating,
@@ -80,6 +81,7 @@ export class RecommendationsController {
 			language,
 			minRuntime,
 			maxRuntime,
+			keyword,
 		});
 		const k = parseLimit(limit);
 		const inc = parseInclude(include);
@@ -306,6 +308,7 @@ function parseFilters(raw: {
 	language?: string;
 	minRuntime?: string;
 	maxRuntime?: string;
+	keyword?: string;
 }): DiscoverFilters | undefined {
 	const out: DiscoverFilters = {};
 	const num = (s: string | undefined) => {
@@ -333,5 +336,6 @@ function parseFilters(raw: {
 	if (mn != null) out.minRuntime = mn;
 	const mx = num(raw.maxRuntime);
 	if (mx != null) out.maxRuntime = mx;
+	if (raw.keyword?.trim()) out.keyword = raw.keyword.trim();
 	return Object.keys(out).length > 0 ? out : undefined;
 }
