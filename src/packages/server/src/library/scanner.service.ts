@@ -2,7 +2,7 @@ import { opendir, stat } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
@@ -358,9 +358,15 @@ export class ScannerService {
 	}
 
 	/**
-	 * Delete every movies row that no longer has at least one available
+	 * Delete every *library* row that no longer has at least one available
 	 * file attached. Runs at the end of every scan AND on server startup
 	 * (see LibraryJobsService) to mop up orphans created by past races.
+	 *
+	 * Scoped to `source` library/NULL on purpose. `external` and `bookmark`
+	 * rows are file-less by definition — they're TMDB titles the user hasn't
+	 * got — so an unscoped purge deleted every one of them on each scan,
+	 * silently destroying saved bookmarks and any Discover harvest. "Orphan"
+	 * here means "a scanned movie whose file vanished", not "has no file".
 	 */
 	async purgeOrphanedMovies(): Promise<number> {
 		const orphanedMovies = this.database.db
@@ -370,7 +376,9 @@ export class ScannerService {
 				movieFiles,
 				and(eq(movieFiles.movieId, movies.id), eq(movieFiles.available, true)),
 			)
-			.where(isNull(movieFiles.id))
+			.where(
+				and(isNull(movieFiles.id), or(isNull(movies.source), eq(movies.source, 'library'))),
+			)
 			.all();
 
 		for (const orphan of orphanedMovies) {
