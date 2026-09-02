@@ -84,9 +84,36 @@ export class AnthropicClient implements LLMClient, OnModuleInit {
 		this.registry.register(this);
 	}
 
+	/**
+	 * Key that most recently returned 401/403. A rejected key will be rejected
+	 * every time, so retrying it per request just burns seconds of latency on
+	 * the caller's critical path (a Similar/Discover request was spending ~15s
+	 * of its runtime failing five reranks in a row). Latched on the key VALUE,
+	 * so saving a corrected key in Settings -> Connections clears the breaker
+	 * with no restart.
+	 */
+	private rejectedApiKey: string | null = null;
+
 	isConfigured(): boolean {
 		const creds = this.credentials.getRaw(this.id) as AnthropicCredentials | null;
-		return !!creds?.apiKey;
+		if (!creds?.apiKey) return false;
+		return creds.apiKey !== this.rejectedApiKey;
+	}
+
+	/**
+	 * Trip the breaker when the API says the credential itself is bad. Anything
+	 * else (429, 5xx, network) stays retryable — those are transient.
+	 */
+	private noteAuthFailure(apiKey: string, err: unknown): void {
+		const msg = (err as { message?: string })?.message ?? '';
+		if (!/^Anthropic 40[13]:/.test(msg)) return;
+		if (this.rejectedApiKey === apiKey) return;
+		this.rejectedApiKey = apiKey;
+		this.logger.error(
+			`Anthropic rejected the configured API key (${msg.slice(0, 80)}). ` +
+				'Disabling Anthropic-backed features until a new key is saved in ' +
+				'Settings -> Connections.',
+		);
 	}
 
 	async healthCheck() {
@@ -178,6 +205,12 @@ export class AnthropicClient implements LLMClient, OnModuleInit {
 		userPrompt: string,
 		maxTokens: number,
 	): Promise<{ text: string; costUsd: number }> {
+		// Fast-fail a key the API has already rejected. Covers every entry point
+		// (rerank / enrich / explain), not just the ones that check isConfigured.
+		if (creds.apiKey === this.rejectedApiKey) {
+			throw new Error('Anthropic 401: API key previously rejected; skipping call');
+		}
+
 		// Apply caller-set monthly cap, falling back to provider default.
 		const dynamicCap = creds.monthlyBudgetUsd ?? this.rateLimit.monthlyBudgetUsd;
 		const snap = this.rateLimitService.snapshot(this.id);
@@ -204,7 +237,20 @@ export class AnthropicClient implements LLMClient, OnModuleInit {
 		}
 
 		const started = Date.now();
-		const result = await this.call(creds, userPrompt, maxTokens);
+		let result: { text: string; costUsd: number };
+		try {
+			result = await this.call(creds, userPrompt, maxTokens);
+		} catch (err) {
+			// A rejected key never recovers on retry — trip the breaker so the
+			// next caller skips this provider instead of paying the round trip.
+			this.noteAuthFailure(creds.apiKey, err);
+			this.events.record({
+				providerId: this.id,
+				type: 'error',
+				durationMs: Date.now() - started,
+			});
+			throw err;
+		}
 		const durationMs = Date.now() - started;
 		this.rateLimitService.record(this.id, 1, result.costUsd);
 		this.events.record({
