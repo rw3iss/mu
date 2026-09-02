@@ -953,7 +953,14 @@ export class RecommendationsService {
 				.values(ratings as never)
 				.onConflictDoNothing()
 				.run();
-			this.logger.debug(`TMDB discover harvested ${stubs.length} stub(s)`);
+
+			// /discover/movie carries no credits, so these rows land with
+			// ratings but no cast/crew/keywords. Queue the same background
+			// enrichment the seed-based harvest uses so they fill in.
+			const queued = this.externalEnrichment.enqueueBulk(stubs.map((st) => st.id as string));
+			this.logger.debug(
+				`TMDB discover harvested ${stubs.length} stub(s); ${queued} enrichment(s) queued`,
+			);
 		} catch (err: any) {
 			this.logger.warn(`TMDB discover harvest failed: ${err?.message ?? err}`);
 		}

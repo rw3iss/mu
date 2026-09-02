@@ -40,6 +40,13 @@ import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { matchesSearchQuery, titleSearchCondition } from './title-search.js';
 
+/**
+ * Ceiling for the inline enrichment on a not-in-library movie page. Long
+ * enough for a normal TMDB round trip, short enough that a degraded provider
+ * can't make the page feel broken.
+ */
+const ON_DEMAND_ENRICH_TIMEOUT_MS = 6000;
+
 @Injectable()
 export class MoviesService implements OnModuleInit {
 	private readonly logger = new Logger('MoviesService');
@@ -882,11 +889,74 @@ export class MoviesService implements OnModuleInit {
 		}
 	}
 
+	/**
+	 * Fill in a not-in-library row that has no cast yet.
+	 *
+	 * Only fires for `external` / `bookmark` rows with a TMDB id and an empty
+	 * cast, so library movies and already-enriched stubs never pay for it. One
+	 * TMDB call, once per movie — subsequent visits find the cast persisted and
+	 * skip straight through.
+	 *
+	 * Best-effort: enrichment failures leave the page rendering exactly as it
+	 * did before rather than turning a detail view into an error.
+	 */
+	private async enrichExternalOnDemand(movie: {
+		id: string;
+		source: string | null;
+		tmdbId: number | null;
+	}): Promise<boolean> {
+		if (movie.source !== 'external' && movie.source !== 'bookmark') return false;
+		if (movie.tmdbId == null) return false;
+
+		const meta = this.database.db
+			.select({ cast: movieMetadata.cast })
+			.from(movieMetadata)
+			.where(eq(movieMetadata.movieId, movie.id))
+			.get();
+		const castJson = (meta?.cast ?? '').trim();
+		if (castJson !== '' && castJson !== '[]') return false;
+
+		try {
+			// Bounded: a slow/stalled provider must not hold the detail page
+			// open. On timeout the refresh keeps running and still persists —
+			// this visit just renders without cast, and the next one has it.
+			const timedOut = Symbol('timeout');
+			const result = await Promise.race([
+				this.metadataService.refreshMetadata(movie.id).then(() => 'done' as const),
+				new Promise<typeof timedOut>((resolve) =>
+					setTimeout(() => resolve(timedOut), ON_DEMAND_ENRICH_TIMEOUT_MS),
+				),
+			]);
+			if (result === timedOut) {
+				this.logger.debug(
+					`On-demand enrichment for ${movie.id} exceeded ` +
+						`${ON_DEMAND_ENRICH_TIMEOUT_MS}ms; continuing in background`,
+				);
+				return false;
+			}
+			return true;
+		} catch (err) {
+			this.logger.warn(
+				`On-demand enrichment failed for ${movie.id}: ${(err as Error).message}`,
+			);
+			return false;
+		}
+	}
+
 	async findById(id: string, userId?: string) {
-		const movie = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
+		let movie = this.database.db.select().from(movies).where(eq(movies.id, id)).get();
 
 		if (!movie) {
 			throw new NotFoundException(`Movie ${id} not found`);
+		}
+
+		// Not-in-library rows harvested from TMDB Discover are created from the
+		// /discover/movie payload, which has no credits — so they arrive with
+		// ratings but an empty cast. Background enrichment fills them in, but
+		// the FIRST visit would otherwise render a movie page with no Cast
+		// section. Enrich inline here so the page is complete on open.
+		if (await this.enrichExternalOnDemand(movie)) {
+			movie = this.database.db.select().from(movies).where(eq(movies.id, id)).get() ?? movie;
 		}
 
 		const metadata = this.database.db
