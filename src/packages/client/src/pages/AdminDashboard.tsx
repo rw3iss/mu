@@ -680,7 +680,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					/>
 					<ActionRow
 						label="Convert and Clear Cache"
-						description="Convert every movie to native direct-play MP4 (replacing originals) and remove all HLS/transcode caches, so nothing needs on-demand transcoding and audio effects work everywhere."
+						description="Queue only the movies that still need conversion — anything already direct-play (H.264 or AV1 in MP4 with browser audio) is skipped, as is any file whose re-encode is predicted to grow it past the Re-encode Growth Limit. Eligible files become native direct-play MP4s (replacing originals) and their stale HLS/transcode caches are cleared, so they stop needing on-demand transcoding and audio effects work on them."
 						onClick={() => setShowConvertCacheConfirm(true)}
 						loading={convertingCache}
 						danger
@@ -743,7 +743,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					onClose={() => setShowConvertCacheConfirm(false)}
 					onConfirm={handleConvertAndClearCache}
 					title="Convert and Clear Cache"
-					message="Queues every convertible movie for conversion to a native direct-play MP4 and clears all HLS/transcode caches. With 'Convert Original File' enabled (Settings → Playback → Encoding), each original is verified-then-replaced on disk — irreversible. Files whose re-encode would grow the size are skipped and left on on-demand HLS. This runs in the background and can take a long time on large libraries."
+					message="Queues only the movies that still need converting. Already direct-play files (H.264 or AV1 in MP4 with browser-compatible audio) are skipped, files already queued or converting are skipped, and any file whose re-encode is predicted to exceed the Re-encode Growth Limit is left on on-demand HLS. Each eligible file becomes a native direct-play MP4; with 'Convert Original File' enabled (Settings → Playback → Encoding) the original is verified-then-replaced on disk — irreversible. Runs in the background and can take a long time on large libraries."
 					confirmLabel="Convert Everything"
 					variant="danger"
 				/>

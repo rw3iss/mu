@@ -198,6 +198,16 @@ export class ConversionService {
 		return c === 'hevc' || c === 'h265' || c === 'h.265' || c === 'hvc1' || c === 'hev1';
 	}
 
+	/**
+	 * AV1 direct-plays in every current browser, so an AV1/MP4 file is already
+	 * converted — this is where HEVC→AV1 output lands. Mirrors the isAv1 check
+	 * in StreamService.determineStreamMode.
+	 */
+	private isAv1(codec?: string | null): boolean {
+		const c = (codec || '').toLowerCase();
+		return c === 'av1' || c === 'av01';
+	}
+
 	private isBrowserAudio(codec?: string | null): boolean {
 		const c = (codec || '').toLowerCase();
 		if (!c) return true; // no audio track → nothing to transcode
@@ -280,8 +290,20 @@ export class ConversionService {
 		if (!videoCodec) return { action: 'skip', reason: 'unprobed' };
 
 		const h264 = this.isH264(videoCodec);
+		const av1 = this.isAv1(videoCodec);
 		const isMp4 = ext === '.mp4' || ext === '.m4v';
+		// Matches determineStreamMode's browser-container set.
+		const browserContainer = isMp4 || ext === '.webm';
 		const browserAudio = this.isBrowserAudio(audioCodec);
+
+		// Already direct-play → nothing to do. AV1 was previously skipped only
+		// as a side effect of the would-grow guard (H.264 needs ~1.8x AV1's
+		// bitrate), which meant a higher growth threshold could have queued a
+		// pointless AV1→H.264 re-encode that both bloats the file and loses
+		// quality. Make it an explicit skip so it can't depend on that.
+		if (av1 && browserContainer && browserAudio) {
+			return { action: 'skip', reason: 'already-direct-play' };
+		}
 
 		// Oversized H.264 → re-encode the *video* to shrink it (the only path
 		// that touches H.264 video; remux/reencode-audio copy it verbatim, so a
