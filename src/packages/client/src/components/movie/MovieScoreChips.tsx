@@ -79,7 +79,8 @@ export function MovieScoreChips({ movie }: MovieScoreChipsProps) {
 	);
 }
 
-function formatVotes(n: number): string {
+/** Compact vote count: 1234 -> "1k", 1_250_000 -> "1.3M". */
+export function formatVotes(n: number): string {
 	if (n >= 1_000_000) {
 		const m = n / 1_000_000;
 		return `${m >= 10 ? Math.round(m) : m.toFixed(1).replace(/\.0$/, '')}M`;

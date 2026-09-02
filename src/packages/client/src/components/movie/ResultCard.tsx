@@ -1,6 +1,6 @@
 import { route } from 'preact-router';
 import { MediaCard } from '@/components/common/MediaCard';
-import { MovieScoreChips } from '@/components/movie/MovieScoreChips';
+import { formatVotes, MovieScoreChips } from '@/components/movie/MovieScoreChips';
 import styles from './ResultCard.module.scss';
 
 export interface ResultCardProps {
@@ -71,6 +71,10 @@ export function ResultCard({
 		runtimeMinutes && runtimeMinutes > 0 ? formatRuntime(runtimeMinutes) : null;
 	const primaryGenre = genres?.[0] ?? null;
 	const pct = matchPercent != null ? Math.round(matchPercent) : null;
+	// Pair the count with whichever rating is actually the headline: IMDb's
+	// vote total is meaningless on a title we only have a TMDB score for.
+	const votes = imdb != null ? (imdbVotes ?? tmdbVotes) : tmdbVotes;
+	const voteLabel = votes && votes > 0 ? `${formatVotes(votes)} votes` : null;
 
 	const topLeft = (
 		<>
@@ -150,6 +154,7 @@ export function ResultCard({
 								tmdbVotes: tmdbVotes,
 							}}
 						/>
+						{voteLabel && <span class={styles.votes}>{voteLabel}</span>}
 					</span>
 				</>
 			}

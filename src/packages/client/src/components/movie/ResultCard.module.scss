@@ -84,8 +84,13 @@
 	}
 }
 
-/* Row 1: year · runtime · genre. Roomier gaps than the default meta row. */
+/* MediaCard's .subtitle is a wrapping flex row, so these two would sit side by
+   side whenever they happened to fit. `flex: 0 0 100%` forces each onto its own
+   line regardless of content width. */
+
+/* Row 1: year · runtime · genre (· role). Roomier gaps than the default. */
 .metaRow {
+	flex: 0 0 100%;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
@@ -98,11 +103,31 @@
 	font-style: italic;
 }
 
-/* Row 2: the rating chips, always on their own line. */
+/* Row 2: the rating chips, with the vote count pushed to the right edge. */
 .chipRow {
+	flex: 0 0 100%;
 	display: flex;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
 	align-items: center;
 	gap: 4px;
 	margin-top: 4px;
+	min-width: 0;
+	overflow: hidden;
+}
+
+/* `margin-left: auto` eats the leftover space, so the count sits flush right
+   however many chips precede it. It stays on the chips' line (nowrap above),
+   and on a narrow card with all four chips it ellipsises rather than pushing
+   past the card edge. */
+.votes {
+	margin-left: auto;
+	padding-left: 6px;
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-size: 0.62rem;
+	line-height: 1.4;
+	white-space: nowrap;
+	color: var(--color-text-muted);
 }
