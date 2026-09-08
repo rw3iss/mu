@@ -11,7 +11,12 @@ import {
 	type OnModuleInit,
 } from '@nestjs/common';
 import { and, asc, count, desc, eq, inArray, like, sql } from 'drizzle-orm';
-import { parseJsonArray, parseJsonObject, stringifyJsonObject } from '../common/json-fields.js';
+import {
+	normalizeCast,
+	parseJsonArray,
+	parseJsonObject,
+	stringifyJsonObject,
+} from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
 	imdbRatings,
@@ -1142,7 +1147,7 @@ export class MoviesService implements OnModuleInit {
 			hidden: movie.hidden ?? false,
 			addedAt: movie.addedAt ?? '',
 			genres: parseJsonArray(metadata?.genres),
-			cast: parseJsonArray(metadata?.cast),
+			cast: normalizeCast(parseJsonArray(metadata?.cast)),
 			director:
 				directors.length > 0
 					? typeof directors[0] === 'string'

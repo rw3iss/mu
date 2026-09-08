@@ -1,9 +1,10 @@
 import { existsSync, statSync } from 'node:fs';
-import { CACHE_NAMESPACES, nowISO, WsEvent } from '@mu/shared';
+import { CACHE_NAMESPACES, type CastMember, nowISO, WsEvent } from '@mu/shared';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
+import { normalizeCast } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -356,7 +357,7 @@ export class MetadataService {
 		const metaValues = {
 			movieId,
 			genres: JSON.stringify(tvDetails.genres?.map((g) => g.name) ?? []),
-			cast: JSON.stringify(cast),
+			cast: JSON.stringify(normalizeCast(cast)),
 			directors: JSON.stringify(directors),
 			writers: JSON.stringify(writers),
 			keywords: JSON.stringify(tvDetails.keywords?.results?.map((k) => k.name) ?? []),
@@ -601,11 +602,10 @@ export class MetadataService {
 	 * normal ingest truncates to 20). Uses the cached details call, replaces
 	 * movie_metadata.cast with the full list, and returns it.
 	 */
-	async fetchFullCast(
-		movieId: string,
-	): Promise<
-		Array<{ name: string; character: string; profileUrl: string | null; tmdbId: number }>
-	> {
+	// CastMember (name required, the rest optional) rather than the old
+	// all-fields-required shape: an OMDB-sourced row legitimately has only a
+	// name, and the previous signature quietly misdescribed those entries.
+	async fetchFullCast(movieId: string): Promise<CastMember[]> {
 		const movie = this.database.db.select().from(movies).where(eq(movies.id, movieId)).get();
 		if (!movie) throw new NotFoundException(`Movie ${movieId} not found`);
 
@@ -614,18 +614,20 @@ export class MetadataService {
 			.from(movieMetadata)
 			.where(eq(movieMetadata.movieId, movieId))
 			.get();
-		const existing = meta?.cast ? JSON.parse(meta.cast) : [];
+		const existing = normalizeCast<CastMember>(meta?.cast ? JSON.parse(meta.cast) : []);
 
 		const tmdbId = movie.tmdbId;
 		if (!tmdbId) return existing;
 
 		const details = await this.tmdb.getMovieDetails(tmdbId);
-		const full = (details?.credits?.cast ?? []).map((c: any) => ({
-			name: c.name,
-			character: c.character,
-			profileUrl: this.tmdb.getImageUrl(c.profile_path, 'w185'),
-			tmdbId: c.id,
-		}));
+		const full = normalizeCast<CastMember>(
+			(details?.credits?.cast ?? []).map((c: any) => ({
+				name: c.name,
+				character: c.character,
+				profileUrl: this.tmdb.getImageUrl(c.profile_path, 'w185'),
+				tmdbId: c.id,
+			})),
+		);
 		if (full.length <= existing.length) return existing;
 
 		if (meta) {
@@ -912,7 +914,7 @@ export class MetadataService {
 		const metaValues = {
 			movieId,
 			genres: JSON.stringify(m.genres ?? []),
-			cast: JSON.stringify(m.cast ?? []),
+			cast: JSON.stringify(normalizeCast(m.cast)),
 			directors: JSON.stringify(m.directors ?? []),
 			writers: JSON.stringify(m.writers ?? []),
 			keywords: JSON.stringify(m.keywords ?? []),

@@ -71,3 +71,44 @@ export function stringifyJsonObject(
 	if (Object.keys(value).length === 0) return null;
 	return JSON.stringify(value);
 }
+
+/**
+ * Normalise a cast column into `CastMember` objects.
+ *
+ * Two shapes exist in the wild: TMDB contributes rich objects
+ * (`{name, character, profileUrl, tmdbId}`), while OMDB's `Actors` field is a
+ * comma string that the merge engine splits into BARE STRINGS. The client
+ * reads `member.name`, so a string-shaped row rendered as blank chips with no
+ * photo. Strings are promoted to `{ name }` here.
+ *
+ * Entries with no usable name are dropped outright — a nameless cast member
+ * can't be displayed, linked to a person page, or de-duplicated, so it is
+ * never worth storing or returning.
+ */
+export function normalizeCast<T = Record<string, unknown>>(raw: unknown): T[] {
+	if (!Array.isArray(raw)) return [];
+	const out: Array<Record<string, unknown>> = [];
+	const seen = new Set<string>();
+	for (const entry of raw) {
+		let member: Record<string, unknown> | null = null;
+		if (typeof entry === 'string') {
+			member = { name: entry };
+		} else if (entry && typeof entry === 'object') {
+			member = { ...(entry as Record<string, unknown>) };
+		}
+		if (!member) continue;
+
+		const rawName = member.name;
+		const name = typeof rawName === 'string' ? rawName.trim() : '';
+		if (!name) continue;
+		member.name = name;
+
+		// Same person can arrive from two providers; keep the first (richer
+		// TMDB entries are merged ahead of OMDB's bare names).
+		const key = name.toLowerCase();
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push(member);
+	}
+	return out as T[];
+}
