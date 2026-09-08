@@ -21,10 +21,13 @@ export function omdbToContribution(
 		source: 'omdb',
 		fetchedAt: new Date().toISOString(),
 		fields: {
-			// OMDB's trimmed `OmdbData` shape omits the title field — the
-			// provider already discarded it as superseded by TMDB. So we
-			// don't contribute a title here; engine keeps whatever TMDB
-			// said (or the existing record).
+			// Contributed, not omitted: when a match resolves to an IMDB id
+			// TMDB can't find, OMDB is the ONLY source, and skipping these
+			// left the movie on its filename-derived title with no poster.
+			// merge-rules still ranks tmdb (10) above omdb (title 6 /
+			// posterUrl 3), so TMDB wins whenever it has them.
+			title: o.title || null,
+			posterUrl: o.posterUrl || null,
 			year: o.year || null,
 			overview: o.plot || null,
 			// OMDB returns the IMDB id it queried by; we re-attach

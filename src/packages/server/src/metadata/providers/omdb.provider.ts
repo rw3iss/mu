@@ -40,6 +40,15 @@ interface OmdbResult {
 }
 
 export interface OmdbData {
+	/**
+	 * OMDB's canonical title and poster. Kept (rather than discarded as
+	 * "TMDB supersedes it") because a match can resolve to an IMDB id that
+	 * TMDB doesn't know — then OMDB is the only source, and dropping these
+	 * left the movie with its filename-derived title and no poster.
+	 * Merge precedence still puts TMDB above OMDB for both.
+	 */
+	title: string | null;
+	posterUrl: string | null;
 	imdbRating: number | null;
 	imdbVotes: number | null;
 	rottenTomatoesScore: number | null;
@@ -114,6 +123,8 @@ export class OmdbProvider {
 		const localOnlyData = (): OmdbData | null => {
 			if (!localRating) return null;
 			return {
+				title: null,
+				posterUrl: null,
 				imdbRating: localRating.rating,
 				imdbVotes: localRating.votes,
 				rottenTomatoesScore: null,
@@ -134,7 +145,10 @@ export class OmdbProvider {
 
 		if (!this.apiKey) return localOnlyData();
 
-		const cacheKey = `omdb:${imdbId}`;
+		// `v2` retires entries cached before OmdbData carried title/posterUrl —
+		// the 7-day TTL would otherwise keep serving the old shape (and so keep
+		// leaving matched movies untitled) for a week after this shipped.
+		const cacheKey = `omdb:v2:${imdbId}`;
 		const cached = await this.cache.get<OmdbData>(CACHE_NAMESPACES.METADATA, cacheKey);
 		if (cached) {
 			// Overlay the local rating onto an old cached row — the
@@ -239,7 +253,7 @@ export class OmdbProvider {
 	async searchByTitle(title: string, year?: number): Promise<OmdbSearchResult | null> {
 		if (!this.apiKey) return null;
 
-		const cacheKey = `omdb:search:${title}:${year ?? ''}`;
+		const cacheKey = `omdb:search:v2:${title}:${year ?? ''}`;
 		const cached = await this.cache.get<OmdbSearchResult>(CACHE_NAMESPACES.METADATA, cacheKey);
 		if (cached) return cached;
 
@@ -293,6 +307,8 @@ function parseOmdbResult(raw: OmdbResult): OmdbData {
 	const yearParsed = raw.Year ? parseInt(raw.Year, 10) : null;
 
 	return {
+		title: raw.Title && raw.Title !== 'N/A' ? raw.Title : null,
+		posterUrl: raw.Poster && raw.Poster !== 'N/A' ? raw.Poster : null,
 		imdbRating: raw.imdbRating && raw.imdbRating !== 'N/A' ? parseFloat(raw.imdbRating) : null,
 		imdbVotes:
 			raw.imdbVotes && raw.imdbVotes !== 'N/A'
