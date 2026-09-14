@@ -557,6 +557,11 @@ export function GlobalPlayer() {
 	}, []);
 
 	// Effect A — load the selected subtitle track
+	// Resolved URL of the selected track, so the effect below re-runs when the
+	// track list is rebuilt even though the selected id is unchanged.
+	const selectedSubtitleUrl =
+		currentSession.value?.subtitles.find((t) => t.id === subtitleTrack.value)?.url ?? null;
+
 	useEffect(() => {
 		cueOriginalsRef.current = new WeakMap();
 		cueListRef.current = [];
@@ -652,7 +657,17 @@ export function GlobalPlayer() {
 			cueListRef.current = [];
 			clearVideoSubtitles(video);
 		};
-	}, [subtitleTrack.value, currentSession.value?.sessionId, applySubtitleOffset]);
+		// `selectedSubtitleUrl` (not just the id) is a dependency on purpose:
+		// downloading a subtitle makes the server re-index every track, so the
+		// SAME id can start pointing at a different .vtt. Keying only on the id
+		// left the previously-fetched cues on screen — the "it says playing but
+		// the old language is still showing" case.
+	}, [
+		subtitleTrack.value,
+		selectedSubtitleUrl,
+		currentSession.value?.sessionId,
+		applySubtitleOffset,
+	]);
 
 	// Effect B — apply timing offset live whenever the user changes it.
 	// No fetch, no track rebuild — just shift the existing cues.

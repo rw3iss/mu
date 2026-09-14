@@ -13,7 +13,6 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { shareLinksService } from '@/services/share-links.service';
 import { sharedSessionService } from '@/services/shared-session.service';
-import { subtitlesService } from '@/services/subtitles.service';
 import {
 	compressorEnabled,
 	eqEnabled,
@@ -35,14 +34,13 @@ import {
 	isMuted,
 	isPlaying,
 	quality,
+	refreshSessionSubtitles,
 	saveAudioTrackChoice,
 	saveSubtitleChoice,
-	setVolume,
 	showControls,
 	spriteMeta,
 	subtitleTrack,
 	toggleMute,
-	volume,
 } from '@/state/player.state';
 import { shareMode } from '@/state/share.state';
 import {
@@ -1565,25 +1563,13 @@ export function PlayerControls({
 																	const mid = globalMovieId.value;
 																	if (!mid) return;
 																	try {
-																		const { subtitles: subs } =
-																			await subtitlesService.list(
-																				mid,
-																			);
-																		const s =
-																			currentSession.value;
-																		if (!s) return;
-																		currentSession.value = {
-																			...s,
-																			subtitles: subs.map(
-																				(t, i) => ({
-																					id: `sub-${i}`,
-																					label: t.label,
-																					language:
-																						t.language,
-																					url: `/api/v1/stream/${s.sessionId}/subtitles/${i}.vtt`,
-																				}),
-																			),
-																		};
+																		// Authoritative rebuild —
+																		// ids/URLs come from the
+																		// server's track index, not
+																		// array position.
+																		await refreshSessionSubtitles(
+																			mid,
+																		);
 																	} catch {}
 																}}
 																onSelect={(track) => {
@@ -1613,33 +1599,40 @@ export function PlayerControls({
 																		}
 																	}
 																}}
-																onTrackAdded={(track) => {
-																	const s = currentSession.value;
-																	if (!s) return;
-																	const trackId = `sub-${track.index}`;
-																	const newTrack = {
-																		id: trackId,
-																		label: track.label,
-																		language: track.language,
-																		url: `/api/v1/stream/${s.sessionId}/subtitles/${track.index}.vtt`,
-																	};
-																	currentSession.value = {
-																		...s,
-																		subtitles: [
-																			...s.subtitles,
-																			newTrack,
-																		],
-																	};
+																onTrackAdded={async (track) => {
 																	const movieId =
 																		globalMovieId.value;
-																	if (movieId) {
+																	if (!movieId) return;
+																	// Re-read the whole list rather
+																	// than appending a guess: a new
+																	// sidecar makes the server
+																	// re-index every track, so the
+																	// download's own index can point
+																	// at a different file by the
+																	// time we use it.
+																	const tracks =
+																		await refreshSessionSubtitles(
+																			movieId,
+																		).catch(() => []);
+																	const match =
+																		tracks.find(
+																			(t) =>
+																				t.id ===
+																				String(track.index),
+																		) ??
+																		tracks.find(
+																			(t) =>
+																				t.label ===
+																					track.label &&
+																				t.language ===
+																					track.language,
+																		);
+																	// Auto-select the download.
+																	if (match) {
 																		saveSubtitleChoice(
 																			movieId,
-																			trackId,
+																			match.id,
 																		);
-																	} else {
-																		subtitleTrack.value =
-																			trackId;
 																	}
 																}}
 															/>

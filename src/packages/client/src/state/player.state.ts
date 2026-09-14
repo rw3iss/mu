@@ -57,37 +57,100 @@ export const isFullscreen = signal(false);
 export const quality = signal<string>('auto');
 export const subtitleTrack = signal<string | null>(null);
 
+/**
+ * Sentinel for "the user explicitly turned subtitles OFF".
+ *
+ * Previously OFF deleted the key, which is indistinguishable from "never
+ * chose" — so a refresh fell back to the server default and silently switched
+ * subtitles back on. Storing the intent explicitly keeps OFF sticky.
+ */
+export const SUBTITLE_OFF = 'off';
+
 /** Save the selected subtitle track for a movie so it persists across refreshes. */
 export function saveSubtitleChoice(movieId: string, trackId: string | null): void {
 	subtitleTrack.value = trackId;
 	try {
-		if (trackId) {
-			localStorage.setItem(`mu_subtitle_${movieId}`, trackId);
-		} else {
-			localStorage.removeItem(`mu_subtitle_${movieId}`);
-		}
+		localStorage.setItem(`mu_subtitle_${movieId}`, trackId ?? SUBTITLE_OFF);
 	} catch {
 		/* ignore */
 	}
 }
 
-/** Restore the previously selected subtitle track for a movie. */
+/**
+ * Restore the previously selected subtitle track for a movie.
+ *
+ * Order: explicit OFF → saved track (if still present) → server default →
+ * nothing. `availableTracks` must be the CURRENT session list; calling this
+ * before the session has loaded would otherwise look like "saved track is
+ * gone" and turn subtitles off.
+ */
 export function restoreSubtitleChoice(movieId: string, availableTracks: SubtitleTrack[]): void {
 	try {
 		const saved = localStorage.getItem(`mu_subtitle_${movieId}`);
+		if (saved === SUBTITLE_OFF) {
+			subtitleTrack.value = null;
+			return;
+		}
 		if (saved && availableTracks.some((t) => t.id === saved)) {
 			subtitleTrack.value = saved;
-		} else if (saved == null) {
-			// No explicit per-browser choice — fall back to the movie's
-			// server-side default subtitle if one is set.
-			const def = availableTracks.find((t) => t.default);
-			subtitleTrack.value = def ? def.id : null;
-		} else {
-			subtitleTrack.value = null;
+			return;
 		}
+		// Migrate values written by the old client, which stored `sub-<index>`
+		// while the server issues a bare `<index>`. Without this every existing
+		// saved choice would silently resolve to "off" once.
+		if (saved?.startsWith('sub-')) {
+			const legacy = saved.slice(4);
+			if (availableTracks.some((t) => t.id === legacy)) {
+				subtitleTrack.value = legacy;
+				localStorage.setItem(`mu_subtitle_${movieId}`, legacy);
+				return;
+			}
+		}
+		// No usable stored choice (never set, or the track was deleted) — fall
+		// back to the movie's server-side default subtitle if one is set.
+		const def = availableTracks.find((t) => t.default);
+		subtitleTrack.value = def ? def.id : null;
 	} catch {
 		subtitleTrack.value = null;
 	}
+}
+
+/**
+ * Rebuild `currentSession.subtitles` from the server's authoritative track
+ * list and return it.
+ *
+ * The session's subtitle list is a snapshot taken when playback started, so it
+ * goes stale the moment a subtitle is downloaded or deleted. Call sites used to
+ * patch it by hand and invent ids (`sub-<i>`), but the server issues
+ * `String(track.index)` — the two never matched, which is why a saved choice
+ * never restored and why selecting a freshly downloaded track could resolve to
+ * a different file. Ids and URLs here are derived exactly as the server does,
+ * from `index`, never from array position.
+ */
+export async function refreshSessionSubtitles(movieId: string): Promise<SubtitleTrack[]> {
+	const session = currentSession.value;
+	if (!session) return [];
+	const { subtitlesService } = await import('@/services/subtitles.service');
+	const { subtitles } = await subtitlesService.list(movieId);
+	// Cache-buster. The .vtt route is served with `max-age=86400`, but a
+	// download makes the server re-index every track — so the SAME URL starts
+	// resolving to a different subtitle and the browser replays the stale one.
+	// Stamping the rebuild makes each generation a distinct URL, which also
+	// re-triggers the player's load effect.
+	const rev = Date.now();
+	const tracks: SubtitleTrack[] = subtitles.map((t) => ({
+		id: String(t.index),
+		label: t.label,
+		language: t.language,
+		url: `/api/v1/stream/${session.sessionId}/subtitles/${t.index}.vtt?v=${rev}`,
+		default: t.default,
+	}));
+	// Re-read: the session can be replaced while the request is in flight.
+	const live = currentSession.value;
+	if (live && live.sessionId === session.sessionId) {
+		currentSession.value = { ...live, subtitles: tracks };
+	}
+	return tracks;
 }
 export const audioTrack = signal<string | null>(null);
 
