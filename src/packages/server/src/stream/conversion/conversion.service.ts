@@ -616,6 +616,11 @@ export class ConversionService {
 							? 'av1'
 							: 'h264'),
 					codecAudio: probe.codecAudio ?? 'aac',
+					// Refresh from the file we just wrote. Conversion can change
+					// the track set, and a stale list made the player offer
+					// audio tracks that no longer exist in the file (picking one
+					// silently did nothing).
+					audioTracks: JSON.stringify(probe.audioTracks ?? []),
 					containerFormat: 'mp4',
 					videoWidth: probe.videoWidth ?? file.videoWidth ?? null,
 					videoHeight: probe.videoHeight ?? file.videoHeight ?? null,

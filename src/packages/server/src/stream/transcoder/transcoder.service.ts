@@ -457,6 +457,21 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		codecAudio: string | null;
 		videoWidth: number | null;
 		videoHeight: number | null;
+		/**
+		 * Every audio stream, in the same shape the scanner writes to
+		 * `movie_files.audio_tracks`. Conversion needs this to refresh the
+		 * column: the file it produces can have a different set of tracks than
+		 * the source, and leaving the old JSON in place made the player offer
+		 * audio tracks the file no longer contained.
+		 */
+		audioTracks: Array<{
+			index: number;
+			codec: string;
+			language: string;
+			title: string;
+			channels: number;
+			channelLayout: string;
+		}>;
 	} | null> {
 		try {
 			const sizeBytes = statSync(filePath).size;
@@ -474,6 +489,16 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				codecAudio: a?.codec_name ?? null,
 				videoWidth: v?.width ?? null,
 				videoHeight: v?.height ?? null,
+				audioTracks: streams
+					.filter((st) => st.codec_type === 'audio')
+					.map((st, i) => ({
+						index: i,
+						codec: st.codec_name ?? 'unknown',
+						language: st.tags?.language ?? 'und',
+						title: st.tags?.title ?? `Track ${i + 1}`,
+						channels: st.channels ?? 0,
+						channelLayout: st.channel_layout ?? '',
+					})),
 			};
 		} catch (err) {
 			this.logger.warn(`probeFile failed for ${filePath}: ${err}`);
@@ -498,7 +523,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const key = `remux-mp4:${outputPath}`;
 		return new Promise<void>((resolve, reject) => {
 			const command = this.createFfmpegCommand(filePath)
-				.outputOptions(['-map', '0:v:0', '-map', '0:a:0?'])
+				// `0:a?` (not `0:a:0?`) keeps EVERY audio stream. Mapping only
+				// the first silently discarded alternate-language tracks, and
+				// with convertOriginalFile on the original was then deleted —
+				// so a movie with ITA+ENG came out ITA-only, permanently.
+				.outputOptions(['-map', '0:v:0', '-map', '0:a?'])
 				.videoCodec('copy')
 				.audioCodec('copy')
 				// Force the MP4 muxer so the output path's extension is free
@@ -636,7 +665,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			command = command
-				.outputOptions(['-map', '0:v:0', '-map', '0:a:0?'])
+				// `0:a?` (not `0:a:0?`) keeps EVERY audio stream. Mapping only
+				// the first silently dropped alternate-language tracks, and with
+				// convertOriginalFile on the original was then deleted — so a
+				// movie with ITA+ENG came out ITA-only, permanently.
+				.outputOptions(['-map', '0:v:0', '-map', '0:a?'])
 				.outputOptions(['-f', 'mp4', '-movflags', '+faststart'])
 				.output(outputPath);
 

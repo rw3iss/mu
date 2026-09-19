@@ -1354,27 +1354,57 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	 * Parse audio tracks from the file's stored metadata.
 	 * Returns a list of { index, codec, language, title, channels } objects.
 	 */
-	private parseAudioTracks(
-		file: any,
-	): { index: number; codec: string; language: string; title: string; channels?: number }[] {
+	/**
+	 * Audio tracks for the session payload.
+	 *
+	 * Emits `id` and `label` alongside the stored `index`/`title`: the client's
+	 * AudioTrack type is `{ id, label, language, channels }`, but this used to
+	 * return the raw DB rows, so `track.id` was `undefined` for EVERY track.
+	 * The picker compares `String(track.id)`, so every entry compared equal and
+	 * the menu rendered them all as selected. `id` mirrors the subtitle
+	 * convention: the stream index as a string.
+	 */
+	private parseAudioTracks(file: any): Array<{
+		id: string;
+		index: number;
+		codec: string;
+		language: string;
+		title: string;
+		label: string;
+		channels?: number;
+	}> {
+		const decorate = (t: any, i: number) => {
+			const index = typeof t.index === 'number' ? t.index : i;
+			const title = t.title ?? '';
+			return {
+				...t,
+				id: String(index),
+				index,
+				title,
+				label: title || (t.language ?? 'und').toUpperCase(),
+			};
+		};
 		try {
 			const raw = file.audioTracks;
 			if (!raw) {
 				// Fall back to basic info from codecAudio
 				if (file.codecAudio) {
 					return [
-						{
-							index: 0,
-							codec: file.codecAudio,
-							language: 'und',
-							title: file.codecAudio.toUpperCase(),
-						},
+						decorate(
+							{
+								index: 0,
+								codec: file.codecAudio,
+								language: 'und',
+								title: file.codecAudio.toUpperCase(),
+							},
+							0,
+						),
 					];
 				}
 				return [];
 			}
 			const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-			if (Array.isArray(parsed)) return parsed;
+			if (Array.isArray(parsed)) return parsed.map(decorate);
 			return [];
 		} catch {
 			return [];
