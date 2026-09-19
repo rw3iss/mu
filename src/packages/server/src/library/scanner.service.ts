@@ -265,9 +265,38 @@ export class ScannerService {
 
 		if (existing) {
 			if (existing.fileModifiedAt !== fileModifiedAt || existing.fileSize !== fileSize) {
+				// The bytes changed, so the stream layout may have too — MP4
+				// conversion rewrites the file in place and can change the
+				// audio/subtitle track set. Only touching size/mtime left the
+				// old track JSON behind, so the player kept offering audio
+				// tracks the file no longer contained (picking one did nothing).
+				let probed: Partial<ProbeResult> = {};
+				try {
+					probed = await this.probeFile(filePath);
+				} catch (err) {
+					this.logger.warn(`Re-probe failed for ${filePath}: ${(err as Error).message}`);
+				}
 				this.database.db
 					.update(movieFiles)
-					.set({ fileSize, fileModifiedAt, available: true })
+					.set({
+						fileSize,
+						fileModifiedAt,
+						available: true,
+						...(probed.audioTracks
+							? { audioTracks: JSON.stringify(probed.audioTracks) }
+							: {}),
+						...(probed.subtitleTracks
+							? { subtitleTracks: JSON.stringify(probed.subtitleTracks) }
+							: {}),
+						...(probed.codecVideo ? { codecVideo: probed.codecVideo } : {}),
+						...(probed.codecAudio ? { codecAudio: probed.codecAudio } : {}),
+						...(probed.containerFormat
+							? { containerFormat: probed.containerFormat }
+							: {}),
+						...(probed.durationSeconds
+							? { durationSeconds: probed.durationSeconds }
+							: {}),
+					})
 					.where(eq(movieFiles.id, existing.id))
 					.run();
 			} else if (!existing.available) {
