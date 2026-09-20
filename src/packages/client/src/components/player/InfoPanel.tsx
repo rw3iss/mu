@@ -205,6 +205,9 @@ function MovieInfoContent({ movie, variant }: { movie: Movie; variant: 'inline' 
 			</div>
 
 			<div class={styles.meta}>
+				{movie.contentRating && (
+					<span class={styles.contentRatingBadge}>{movie.contentRating}</span>
+				)}
 				{movie.year > 0 && <span>{movie.year}</span>}
 				{runtimeText && <span>{runtimeText}</span>}
 				{movie.director && (

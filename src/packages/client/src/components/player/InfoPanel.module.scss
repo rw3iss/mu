@@ -193,6 +193,21 @@
   }
 }
 
+/* Certification chip (PG / R / …) leading the meta row, mirroring the movie
+   detail page. Outlined rather than filled so it reads as a label next to the
+   plain year/runtime text, and tuned to the on-dark palette this panel uses
+   over video. */
+.contentRatingBadge {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--on-dark-text-muted);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--on-dark-text-secondary, var(--on-dark-text-muted));
+  letter-spacing: 0.5px;
+}
+
 .genres {
   display: flex;
   flex-wrap: wrap;
