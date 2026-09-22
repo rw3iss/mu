@@ -275,7 +275,7 @@ export class RecommendationsService {
 		const filtered = applyFilters(scored, filterCtx);
 		const diversified = mmr(filtered, moviesById, lambda, k);
 		return {
-			results: diversified,
+			results: this.annotateResults(diversified, moviesById),
 			usedSources: ['centroid', 'embedding'],
 			reason: diversified.length === 0 ? 'no_signal' : undefined,
 		};
@@ -351,7 +351,7 @@ export class RecommendationsService {
 		const diversified = mmr(filtered, moviesById, lambda, k);
 
 		return {
-			results: diversified,
+			results: this.annotateResults(diversified, moviesById),
 			usedSources: ['union-of-neighbours', ...allUsedSources],
 			reason: diversified.length === 0 ? 'no_signal' : undefined,
 		};
@@ -761,41 +761,7 @@ export class RecommendationsService {
 		// so the UI can render badges, bookmark CTA, and rating chips
 		// without a second round-trip. `source` is already on
 		// MovieWithMetadata — no extra query.
-		const annotated: ScoredMovie[] = diversified.map((r) => {
-			const m = moviesById.get(r.movieId);
-			const src = m?.source ?? 'library';
-			// Prefer IMDB rating, fall back to TMDB. Carry the source so
-			// the badge can show "IMDB 7.4" vs "TMDB 7.4".
-			let rating: number | null = null;
-			let ratingSource: 'imdb' | 'tmdb' | null = null;
-			if (m?.imdbRating != null && m.imdbRating > 0) {
-				rating = m.imdbRating;
-				ratingSource = 'imdb';
-			} else if (m?.tmdbRating != null && m.tmdbRating > 0) {
-				rating = m.tmdbRating;
-				ratingSource = 'tmdb';
-			}
-			return {
-				...r,
-				source: src,
-				inLibrary: src === 'library',
-				tmdbId: m?.tmdbId ?? null,
-				enriching: src !== 'library' && !m?.overview,
-				rating,
-				ratingSource,
-				// Votes only available from TMDB right now; OMDB IMDB
-				// vote counts aren't surfaced on MovieWithMetadata.
-				votes: m?.tmdbVotes ?? null,
-				tmdbRating: m?.tmdbRating ?? null,
-				tmdbVotes: m?.tmdbVotes ?? null,
-				imdbRating: m?.imdbRating ?? null,
-				imdbVotes: m?.imdbVotes ?? null,
-				runtimeMinutes: m?.runtimeMinutes ?? null,
-				contentRating: m?.contentRating ?? null,
-				genres: m?.genres ?? [],
-				language: m?.language ?? null,
-			};
-		});
+		const annotated = this.annotateResults(diversified, moviesById);
 
 		const usedSources = new Set<string>();
 		for (const r of annotated) for (const s of r.usedSources) usedSources.add(s);
@@ -965,6 +931,57 @@ export class RecommendationsService {
 		} catch (err: any) {
 			this.logger.warn(`TMDB discover harvest failed: ${err?.message ?? err}`);
 		}
+	}
+
+	/**
+	 * Attach the display fields the result cards need (ratings, votes,
+	 * certification, runtime, genres, library state) to raw scored rows.
+	 *
+	 * Extracted from scoreAndRank because the multi-seed paths — `centroid`
+	 * and `unionRank` — returned their `mmr()` output directly and skipped it
+	 * entirely. A person search resolving to several owned movies therefore
+	 * produced cards with no star rating and no PG/R chip, while single-seed
+	 * searches (which do go through scoreAndRank) looked fine.
+	 */
+	private annotateResults(
+		rows: ScoredMovie[],
+		moviesById: Map<string, MovieWithMetadata>,
+	): ScoredMovie[] {
+		return rows.map((r) => {
+			const m = moviesById.get(r.movieId);
+			const src = m?.source ?? 'library';
+			// Prefer IMDB rating, fall back to TMDB. Carry the source so
+			// the badge can show "IMDB 7.4" vs "TMDB 7.4".
+			let rating: number | null = null;
+			let ratingSource: 'imdb' | 'tmdb' | null = null;
+			if (m?.imdbRating != null && m.imdbRating > 0) {
+				rating = m.imdbRating;
+				ratingSource = 'imdb';
+			} else if (m?.tmdbRating != null && m.tmdbRating > 0) {
+				rating = m.tmdbRating;
+				ratingSource = 'tmdb';
+			}
+			return {
+				...r,
+				source: src,
+				inLibrary: src === 'library',
+				tmdbId: m?.tmdbId ?? null,
+				enriching: src !== 'library' && !m?.overview,
+				rating,
+				ratingSource,
+				// Votes only available from TMDB right now; OMDB IMDB
+				// vote counts aren't surfaced on MovieWithMetadata.
+				votes: m?.tmdbVotes ?? null,
+				tmdbRating: m?.tmdbRating ?? null,
+				tmdbVotes: m?.tmdbVotes ?? null,
+				imdbRating: m?.imdbRating ?? null,
+				imdbVotes: m?.imdbVotes ?? null,
+				runtimeMinutes: m?.runtimeMinutes ?? null,
+				contentRating: m?.contentRating ?? null,
+				genres: m?.genres ?? [],
+				language: m?.language ?? null,
+			};
+		});
 	}
 
 	private loadAllCandidates(include: IncludeMode = 'owned'): MovieWithMetadata[] {
