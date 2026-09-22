@@ -10,6 +10,7 @@ function m(over: Partial<MovieWithMetadata> & { id: string }): MovieWithMetadata
 		posterUrl: null,
 		overview: null,
 		runtimeMinutes: null,
+		contentRating: null,
 		tmdbId: null,
 		imdbId: null,
 		hidden: over.hidden ?? false,

@@ -132,35 +132,68 @@ export function DiscoverResultCard({ movie, onSeed }: DiscoverResultCardProps) {
 
 	const subtitle = (
 		<>
-			<span>{movie.year ?? '—'}</span>
-			{runtimeLabel && (
-				<span class={styles.metaPillMuted} title="Runtime">
-					{runtimeLabel}
+			{/* Row 1: year + certification on the left, the star rating and vote
+			    count pushed to the right edge across from them. */}
+			<span class={styles.infoRow}>
+				<span class={styles.infoLeft}>
+					<span>{movie.year ?? '—'}</span>
+					{movie.contentRating && (
+						<span class={styles.certBadge} title="Content rating">
+							{movie.contentRating}
+						</span>
+					)}
 				</span>
-			)}
-			{primaryGenre && (
-				<span
-					class={styles.metaPillMuted}
-					title={
-						movie.genres && movie.genres.length > 1
-							? movie.genres.join(' · ')
-							: primaryGenre
-					}
-				>
-					{primaryGenre}
+				{(topRating != null || votesLabel) && (
+					<span class={styles.infoRight}>
+						{topRating != null && (
+							<span
+								class={styles.starRating}
+								title={
+									imdb != null && tmdb != null
+										? `IMDB ${imdb.toFixed(1)} · TMDB ${tmdb.toFixed(1)}`
+										: imdb != null
+											? `IMDB ${imdb.toFixed(1)}`
+											: `TMDB ${tmdb?.toFixed(1)}`
+								}
+							>
+								<span class={styles.star}>★</span>
+								{topRating.toFixed(1)}
+							</span>
+						)}
+						{votesLabel && (
+							<span
+								class={styles.votes}
+								title={`${voteCount.toLocaleString()} votes`}
+							>
+								{votesLabel} votes
+							</span>
+						)}
+					</span>
+				)}
+			</span>
+
+			{/* Row 2: the remaining context. */}
+			<span class={styles.infoRow}>
+				<span class={styles.infoLeft}>
+					{runtimeLabel && (
+						<span class={styles.metaPillMuted} title="Runtime">
+							{runtimeLabel}
+						</span>
+					)}
+					{primaryGenre && (
+						<span
+							class={styles.metaPillMuted}
+							title={
+								movie.genres && movie.genres.length > 1
+									? movie.genres.join(' · ')
+									: primaryGenre
+							}
+						>
+							{primaryGenre}
+						</span>
+					)}
 				</span>
-			)}
-			{imdb != null && (
-				<span class={styles.metaPill} title="IMDB rating">
-					IMDB {imdb.toFixed(1)}
-				</span>
-			)}
-			{tmdb != null && (
-				<span class={styles.metaPill} title="TMDB rating">
-					TMDB {tmdb.toFixed(1)}
-				</span>
-			)}
-			{votesLabel && <span class={styles.metaPillMuted}>{votesLabel} votes</span>}
+			</span>
 			{/* The matching strategy ("content-vector · embedding") is internal
 			    detail — kept out of the card, still available in explanation. */}
 		</>

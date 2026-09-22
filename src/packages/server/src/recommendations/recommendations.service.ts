@@ -791,6 +791,7 @@ export class RecommendationsService {
 				imdbRating: m?.imdbRating ?? null,
 				imdbVotes: m?.imdbVotes ?? null,
 				runtimeMinutes: m?.runtimeMinutes ?? null,
+				contentRating: m?.contentRating ?? null,
 				genres: m?.genres ?? [],
 				language: m?.language ?? null,
 			};

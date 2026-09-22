@@ -6,6 +6,7 @@ import { movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import type { JobRecord } from '../jobs/job.interface.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
+import { tmdbToContribution } from '../metadata/adapters/tmdb.adapter.js';
 import { OmdbProvider } from '../metadata/providers/omdb.provider.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { BudgetExhausted, RateLimitExceeded } from '../providers/exceptions.js';
@@ -128,6 +129,14 @@ export class ExternalEnrichmentService implements OnModuleInit {
 				language: details.spoken_languages?.[0]?.iso_639_1 ?? null,
 				country: details.production_countries?.[0]?.iso_3166_1 ?? null,
 				posterUrl: this.tmdb.getImageUrl(details.poster_path) ?? null,
+				// getMovieDetails appends release_dates, so the certification is
+				// already in hand — it was simply never written, leaving
+				// not-in-library cards with no PG/R chip.
+				contentRating:
+					(tmdbToContribution({
+						tmdbDetails: details,
+						getImageUrl: (pth, sz) => this.tmdb.getImageUrl(pth, sz),
+					}).fields.contentRating as string | null) ?? null,
 				backdropUrl: this.tmdb.getImageUrl(details.backdrop_path, 'w1280') ?? null,
 				imdbId: details.imdb_id ?? null,
 				updatedAt: now,

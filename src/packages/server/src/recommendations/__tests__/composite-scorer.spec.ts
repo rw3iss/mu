@@ -10,6 +10,7 @@ function m(id: string, title: string): MovieWithMetadata {
 		posterUrl: null,
 		overview: null,
 		runtimeMinutes: null,
+		contentRating: null,
 		tmdbId: null,
 		imdbId: null,
 		hidden: false,

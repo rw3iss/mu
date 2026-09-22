@@ -44,6 +44,8 @@ export interface ScoredMovie {
 	 * context (runtime pill, primary genre, language) without a
 	 * follow-up movie fetch. */
 	runtimeMinutes?: number | null;
+	/** Certification (PG / R / …), shown beside the year on the card. */
+	contentRating?: string | null;
 	genres?: string[];
 	language?: string | null;
 }

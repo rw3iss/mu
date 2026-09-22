@@ -14,6 +14,8 @@ export interface MovieWithMetadata {
 	posterUrl: string | null;
 	overview: string | null;
 	runtimeMinutes: number | null;
+	/** Certification (PG / R / …) from the movies row. */
+	contentRating: string | null;
 	tmdbId: number | null;
 	imdbId: string | null;
 	hidden: boolean | null;
@@ -77,6 +79,8 @@ export interface ScoredMovie {
 	 * extra context (runtime pill, primary genre, language flag) without
 	 * a follow-up movie fetch. */
 	runtimeMinutes?: number | null;
+	/** Certification (PG / R / …) so the card can show it beside the year. */
+	contentRating?: string | null;
 	genres?: string[];
 	language?: string | null;
 }
@@ -184,6 +188,7 @@ export function hydrate(
 		posterUrl: movie.posterUrl ?? null,
 		overview: movie.overview ?? null,
 		runtimeMinutes: movie.runtimeMinutes ?? null,
+		contentRating: movie.contentRating ?? null,
 		tmdbId: movie.tmdbId ?? null,
 		imdbId: movie.imdbId ?? null,
 		hidden: movie.hidden ?? null,
