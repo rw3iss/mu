@@ -137,18 +137,50 @@ export function Discover(_props: DiscoverProps) {
 	// Auto-refresh when background external-enrichment jobs finish so
 	// freshly-hydrated stubs (ratings, posters, overview) replace the
 	// "Enriching…" placeholders without the user clicking Refresh.
-	// We re-run only if we had queued enrichments AND the job that
-	// just finished is one of ours (type='external-enrichment').
+	//
+	// This used to call scheduleDiscover() on EVERY finished job, which is a
+	// feedback loop: a `notOwned` discover harvests external candidates and
+	// queues more enrichment jobs, each of which triggered another discover,
+	// which queued more again. It ran at ~40 requests/minute, and because each
+	// new request aborts the previous one client-side (while the server keeps
+	// executing the abandoned work), it saturated the backend and stalled
+	// playback.
+	//
+	// Now: coalesce a whole burst of completions into ONE refresh on a long
+	// settle timer, and cap how many times a single search may auto-refresh.
+	// The banner still tells the user they can refresh manually.
 	useEffect(() => {
+		let settleTimer: ReturnType<typeof setTimeout> | null = null;
+		let refreshes = 0;
+		const MAX_AUTO_REFRESHES = 2;
+		const SETTLE_MS = 6000;
+
 		const handle = (data: unknown) => {
 			const ev = data as { type?: string };
 			if (ev?.type !== 'external-enrichment') return;
 			if (enrichmentsQueued.value <= 0) return;
-			scheduleDiscover();
+			if (refreshes >= MAX_AUTO_REFRESHES) return;
+			if (settleTimer) clearTimeout(settleTimer);
+			settleTimer = setTimeout(() => {
+				settleTimer = null;
+				refreshes += 1;
+				scheduleDiscover();
+			}, SETTLE_MS);
 		};
+		// A user-initiated search resets the budget.
+		const disposeReset = seedMovieIds.subscribe(() => {
+			refreshes = 0;
+		});
+		const disposeReset2 = personSeedKeys.subscribe(() => {
+			refreshes = 0;
+		});
+
 		wsService.on('job:completed', handle);
 		wsService.on('job:failed', handle);
 		return () => {
+			if (settleTimer) clearTimeout(settleTimer);
+			disposeReset();
+			disposeReset2();
 			wsService.off('job:completed', handle);
 			wsService.off('job:failed', handle);
 		};

@@ -27,10 +27,42 @@ export interface TraktHttpClientOptions {
  * exceptions so the rate limiter / job runner can handle them
  * appropriately.
  */
+/**
+ * client_ids Trakt has rejected with 401/403.
+ *
+ * Module-level because a TraktHttpClient is constructed per call site — a
+ * per-instance flag would never survive. A rejected key is rejected every
+ * time, so retrying costs a network round trip per movie and nothing else:
+ * one bad credential produced 1399 failed /related calls in a single uptime,
+ * all of it competing with playback for the event loop.
+ *
+ * Cleared automatically when a different client_id is configured.
+ */
+const rejectedClientIds = new Set<string>();
+
 export class TraktHttpClient {
 	constructor(private readonly options: TraktHttpClientOptions) {}
 
+	/** True when this client_id has already been refused by Trakt. */
+	private get credentialRejected(): boolean {
+		return rejectedClientIds.has(this.options.clientId);
+	}
+
+	private rejectCredential(status: number): Error {
+		if (!rejectedClientIds.has(this.options.clientId)) {
+			rejectedClientIds.add(this.options.clientId);
+			console.warn(
+				`[Trakt] client_id refused (HTTP ${status}). Disabling Trakt calls ` +
+					'until a valid client_id is saved in Settings → Connections.',
+			);
+		}
+		return Object.assign(new Error('Trakt credential rejected'), {
+			name: 'TraktUnauthorized',
+		});
+	}
+
 	async related(idOrSlug: string | number, limit = 10): Promise<TraktRelatedMovie[]> {
+		if (this.credentialRejected) throw this.rejectCredential(403);
 		const url = `${TRAKT_BASE}/movies/${encodeURIComponent(String(idOrSlug))}/related?limit=${limit}`;
 		const res = await fetch(url, {
 			headers: {
@@ -47,10 +79,11 @@ export class TraktHttpClient {
 				retryAfterMs: retryAfter * 1000,
 			});
 		}
-		if (res.status === 401) {
-			throw Object.assign(new Error('Trakt auth failed (check client_id)'), {
-				name: 'TraktUnauthorized',
-			});
+		// 403 matters as much as 401 here: Trakt returns it for a revoked or
+		// wrong client_id, and it was previously falling through to the generic
+		// error and being retried forever.
+		if (res.status === 401 || res.status === 403) {
+			throw this.rejectCredential(res.status);
 		}
 		if (!res.ok) {
 			throw new Error(`Trakt /related failed: ${res.status} ${res.statusText}`);
