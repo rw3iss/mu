@@ -2,10 +2,11 @@ import { opendir, stat } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
+import { normalizeTitle } from '../common/text-normalize.js';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import { mediaSources, movieFiles, movies, scanLog } from '../database/schema/index.js';
@@ -313,8 +314,44 @@ export class ScannerService {
 		//    work doesn't hold a write lock.
 		const parsed = this.parseFilename(fileName);
 		const probeInfo = await this.probeFile(filePath);
-		const movieId = crypto.randomUUID();
 		const movieNow = nowISO();
+
+		// 3a. Does this title already exist? movie_files is one-to-many on
+		// purpose — the same film can live on two drives, or in two qualities —
+		// but ingestion always minted a fresh movies row per file path, so a
+		// season copied to a second drive produced a duplicate entry for every
+		// episode. Attach to the existing movie instead of duplicating it.
+		const existingMovie = this.findMovieByTitleYear(parsed.title, parsed.year ?? null);
+		if (existingMovie) {
+			try {
+				this.database.db
+					.insert(movieFiles)
+					.values(
+						this.buildMovieFileRow({
+							movieId: existingMovie.id,
+							sourceId,
+							filePath,
+							fileName,
+							fileSize,
+							parsed,
+							probeInfo,
+							movieNow,
+							fileModifiedAt,
+						}),
+					)
+					.run();
+			} catch (err: any) {
+				// Lost a UNIQUE(file_path) race — another worker attached it.
+				if (!String(err?.message ?? '').includes('UNIQUE')) throw err;
+				return { status: 'updated' };
+			}
+			this.logger.debug(
+				`Attached additional file to existing movie "${parsed.title}": ${fileName}`,
+			);
+			return { status: 'added', movieId: existingMovie.id, title: parsed.title };
+		}
+
+		const movieId = crypto.randomUUID();
 
 		// 4. Insert movies + movieFiles atomically. If another process raced
 		//    us and won the UNIQUE(file_path) insert, the transaction throws
@@ -637,6 +674,76 @@ export class ScannerService {
 				});
 			});
 		});
+	}
+
+	/**
+	 * Find an existing movie this file belongs to, matched on normalized title
+	 * plus year.
+	 *
+	 * Deliberately strict: the year must agree (both set and equal, or both
+	 * unset). Matching on title alone would fold remakes — "The Thing" 1982 and
+	 * 2011 — into one entry. Episode filenames carry SxxExx in the title, so
+	 * they're specific enough to match safely with a null year.
+	 */
+	private findMovieByTitleYear(title: string, year: number | null): { id: string } | null {
+		const wanted = normalizeTitle(title);
+		if (!wanted) return null;
+		const candidates = this.database.db
+			.select({ id: movies.id, title: movies.title, year: movies.year })
+			.from(movies)
+			.where(
+				and(
+					year == null ? isNull(movies.year) : eq(movies.year, year),
+					// Cheap prefilter; the authoritative compare is normalized.
+					sql`lower(${movies.title}) = lower(${title})`,
+				),
+			)
+			.all();
+		const hit = candidates.find((c) => normalizeTitle(c.title) === wanted);
+		return hit ? { id: hit.id } : null;
+	}
+
+	/** The movie_files row shape, shared by the new-movie and attach paths. */
+	private buildMovieFileRow(args: {
+		movieId: string;
+		sourceId: string;
+		filePath: string;
+		fileName: string;
+		fileSize: number;
+		parsed: { quality?: string | null };
+		probeInfo: any;
+		movieNow: string;
+		fileModifiedAt: string;
+	}) {
+		const { movieId, sourceId, filePath, fileName, fileSize, parsed, probeInfo } = args;
+		return {
+			id: crypto.randomUUID(),
+			movieId,
+			sourceId,
+			filePath,
+			fileName,
+			fileSize,
+			resolution: parsed.quality ?? probeInfo.resolution ?? null,
+			codecVideo: probeInfo.codecVideo ?? null,
+			codecAudio: probeInfo.codecAudio ?? null,
+			durationSeconds: probeInfo.durationSeconds ?? null,
+			bitrate: probeInfo.bitrate ?? null,
+			videoWidth: probeInfo.videoWidth ?? null,
+			videoHeight: probeInfo.videoHeight ?? null,
+			videoBitDepth: probeInfo.videoBitDepth ?? null,
+			videoFrameRate: probeInfo.videoFrameRate ?? null,
+			videoProfile: probeInfo.videoProfile ?? null,
+			videoColorSpace: probeInfo.videoColorSpace ?? null,
+			hdr: probeInfo.hdr ?? false,
+			containerFormat: probeInfo.containerFormat ?? null,
+			audioTracks: probeInfo.audioTracks ? JSON.stringify(probeInfo.audioTracks) : '[]',
+			subtitleTracks: probeInfo.subtitleTracks
+				? JSON.stringify(probeInfo.subtitleTracks)
+				: '[]',
+			available: true,
+			addedAt: args.movieNow,
+			fileModifiedAt: args.fileModifiedAt,
+		};
 	}
 
 	private parseFrameRate(rFrameRate?: string): string | undefined {
