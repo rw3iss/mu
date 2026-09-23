@@ -22,6 +22,7 @@ interface ParsedFilename {
 
 export type ImportFileResult =
 	| { status: 'skipped-size' }
+	| { status: 'skipped-duration' }
 	| { status: 'updated' }
 	| { status: 'added'; movieId: string; title: string }
 	| { status: 'race-skipped' }
@@ -316,7 +317,25 @@ export class ScannerService {
 		const probeInfo = await this.probeFile(filePath);
 		const movieNow = nowISO();
 
-		// 3a. Does this title already exist? movie_files is one-to-many on
+		// 3a. Skip clips below the configured minimum runtime. Size alone
+		// doesn't catch these — a 1080p 4-minute "NC OP" or a BluRay extra can
+		// clear the 50MB floor comfortably — so trailers, samples, music videos
+		// and disc extras were being indexed as movies. Runtime is the honest
+		// signal. 0 disables the check.
+		const minDurationSeconds = (lib?.minDurationSeconds as number | undefined) ?? 300;
+		if (
+			minDurationSeconds > 0 &&
+			probeInfo.durationSeconds != null &&
+			probeInfo.durationSeconds > 0 &&
+			probeInfo.durationSeconds < minDurationSeconds
+		) {
+			this.logger.debug(
+				`Skipping short clip (${Math.round(probeInfo.durationSeconds)}s): ${fileName}`,
+			);
+			return { status: 'skipped-duration' };
+		}
+
+		// 3b. Does this title already exist? movie_files is one-to-many on
 		// purpose — the same film can live on two drives, or in two qualities —
 		// but ingestion always minted a fresh movies row per file path, so a
 		// season copied to a second drive produced a duplicate entry for every
