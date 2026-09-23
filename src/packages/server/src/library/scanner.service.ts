@@ -321,7 +321,11 @@ export class ScannerService {
 		// but ingestion always minted a fresh movies row per file path, so a
 		// season copied to a second drive produced a duplicate entry for every
 		// episode. Attach to the existing movie instead of duplicating it.
-		const existingMovie = this.findMovieByTitleYear(parsed.title, parsed.year ?? null);
+		const existingMovie = this.findMovieByTitleYear(
+			parsed.title,
+			parsed.year ?? null,
+			probeInfo.durationSeconds ?? null,
+		);
 		if (existingMovie) {
 			try {
 				this.database.db
@@ -685,9 +689,18 @@ export class ScannerService {
 	 * 2011 — into one entry. Episode filenames carry SxxExx in the title, so
 	 * they're specific enough to match safely with a null year.
 	 */
-	private findMovieByTitleYear(title: string, year: number | null): { id: string } | null {
+	private findMovieByTitleYear(
+		title: string,
+		year: number | null,
+		durationSeconds: number | null,
+	): { id: string } | null {
 		const wanted = normalizeTitle(title);
 		if (!wanted) return null;
+		// Titles are parsed from the FILENAME, and scene releases routinely use
+		// junk names — `Sample.mp4`, `ETRG.mp4` — so two unrelated films can
+		// present the same title. Matching on title alone would merge them.
+		if (!durationSeconds || durationSeconds <= 0) return null;
+
 		const candidates = this.database.db
 			.select({ id: movies.id, title: movies.title, year: movies.year })
 			.from(movies)
@@ -699,8 +712,26 @@ export class ScannerService {
 				),
 			)
 			.all();
-		const hit = candidates.find((c) => normalizeTitle(c.title) === wanted);
-		return hit ? { id: hit.id } : null;
+
+		for (const c of candidates) {
+			if (normalizeTitle(c.title) !== wanted) continue;
+			// Confirm it's the same CONTENT, not just the same name: every
+			// existing file must run to within 2% (min 5s) of this one. That
+			// separates a 53s sample from the feature, and Dune's theatrical
+			// cut (8178s) from the extended one (10635s).
+			const files = this.database.db
+				.select({ durationSeconds: movieFiles.durationSeconds })
+				.from(movieFiles)
+				.where(eq(movieFiles.movieId, c.id))
+				.all();
+			const known = files.map((f) => f.durationSeconds ?? 0).filter((d) => d > 0);
+			if (known.length === 0) continue;
+			const tolerance = Math.max(5, durationSeconds * 0.02);
+			if (known.every((d) => Math.abs(d - durationSeconds) <= tolerance)) {
+				return { id: c.id };
+			}
+		}
+		return null;
 	}
 
 	/** The movie_files row shape, shared by the new-movie and attach paths. */
