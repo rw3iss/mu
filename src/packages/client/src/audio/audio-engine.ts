@@ -126,6 +126,9 @@ export class AudioEngine {
 	private outputNode: AudioNode | null = null;
 	/** Active recording tap; kept connected across chain rebuilds. */
 	private recorderTap: MediaStreamAudioDestinationNode | null = null;
+	/** Node the active tap hangs off, so a chain rebuild only re-attaches a
+	 *  post-effects tap (a pre-effects one is already stable). */
+	private recorderTapSource: AudioNode | null = null;
 	private outputAudio: HTMLAudioElement | null = null;
 	/**
 	 * Master output gain — the user's volume/mute is applied HERE, not on the
@@ -660,12 +663,31 @@ export class AudioEngine {
 	 * Audio graph is active (e.g. HLS/blob: playback) — callers then fall back
 	 * to the <video> element's own captureStream audio.
 	 */
-	createRecordingAudioTrack(): MediaStreamTrack | null {
-		if (!this.attached || !this.ctx || !this.outputNode) return null;
+	/**
+	 * Tap the graph for a recording stream.
+	 *
+	 * `preEffects` (the default) taps the MediaElementSource directly, BEFORE
+	 * the EQ/compressor chain. Two reasons:
+	 *
+	 *  - Isolation. The terminal node is rebuilt whenever an effect is toggled
+	 *    or a slider moves; recording off it meant every rebuild briefly
+	 *    reconnected the tap mid-capture, which is audible as a tiny gap.
+	 *  - Cost. The recorder no longer shares the effect chain's per-block work
+	 *    with the live output while MediaRecorder encodes on the main thread.
+	 *
+	 * The live output is untouched either way — this only adds a branch off the
+	 * source, so effects keep playing normally while the snippet records dry.
+	 */
+	createRecordingAudioTrack(opts: { preEffects?: boolean } = {}): MediaStreamTrack | null {
+		if (!this.attached || !this.ctx) return null;
+		const preEffects = opts.preEffects !== false;
+		const tapFrom = preEffects ? this.source : this.outputNode;
+		if (!tapFrom) return null;
 		try {
 			this.recorderTap?.disconnect();
 			this.recorderTap = this.ctx.createMediaStreamDestination();
-			this.outputNode.connect(this.recorderTap);
+			this.recorderTapSource = tapFrom;
+			tapFrom.connect(this.recorderTap);
 			return this.recorderTap.stream.getAudioTracks()[0] ?? null;
 		} catch {
 			return null;
@@ -680,6 +702,7 @@ export class AudioEngine {
 			/* ignore */
 		}
 		this.recorderTap = null;
+		this.recorderTapSource = null;
 	}
 
 	/**
@@ -1573,7 +1596,12 @@ export class AudioEngine {
 		// Remember the terminal node and re-attach an active recording tap so a
 		// chain rebuild (toggling EQ mid-recording) doesn't drop the captured audio.
 		this.outputNode = current;
-		if (this.recorderTap) current.connect(this.recorderTap);
+		// Re-attach only a POST-effects tap; a pre-effects tap hangs off the
+		// source, which this rebuild never touches.
+		if (this.recorderTap && this.recorderTapSource !== this.source) {
+			current.connect(this.recorderTap);
+			this.recorderTapSource = current;
+		}
 		traceConnect('masterGain', this.streamDest ? 'streamDest' : 'ctx.destination');
 		const chainInfo = {
 			event: 'rebuild-done',

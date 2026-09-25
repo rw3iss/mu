@@ -28,6 +28,14 @@ const MAX_SECONDS = 5 * 60;
  * pass cleanly.
  */
 const RECORD_AUDIO_BPS = 256_000;
+/**
+ * Cap the video bitrate. Left unset, the browser picks a target from the source
+ * resolution that can saturate the (main-thread) encoder on a 1280px capture —
+ * and when the encoder falls behind it starves the muxer, which shows up as
+ * brief audio dropouts rather than dropped frames. 4 Mbps is ample for a
+ * 720p-class snippet.
+ */
+const RECORD_VIDEO_BPS = 4_000_000;
 
 /**
  * Downscale the captured video to at most this width before encoding. Live
@@ -170,9 +178,15 @@ export function startSnippet(movieTitle?: string): void {
 		return;
 	}
 
-	// Audio: prefer the effects-processed graph tap (direct-play path); fall
-	// back to the element's own captured audio (HLS/blob: path).
-	const graphAudio = audioEngine.createRecordingAudioTrack();
+	// Audio: tap the graph BEFORE the EQ/compressor chain (direct-play path);
+	// fall back to the element's own captured audio (HLS/blob: path).
+	//
+	// Recording post-effects meant the tap hung off a node that gets rebuilt
+	// whenever an effect is toggled or a slider moves, and shared the chain's
+	// per-block work with the live output while MediaRecorder encodes on the
+	// main thread — both audible as tiny gaps in the saved snippet. The live
+	// output still plays with effects; only the recording is dry.
+	const graphAudio = audioEngine.createRecordingAudioTrack({ preEffects: true });
 	const audioTrack = graphAudio ?? elementStream?.getAudioTracks()[0] ?? null;
 
 	const stream = new MediaStream();
@@ -182,7 +196,11 @@ export function startSnippet(movieTitle?: string): void {
 
 	const mimeType = pickMimeType();
 	try {
-		recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: RECORD_AUDIO_BPS });
+		recorder = new MediaRecorder(stream, {
+			mimeType,
+			audioBitsPerSecond: RECORD_AUDIO_BPS,
+			videoBitsPerSecond: RECORD_VIDEO_BPS,
+		});
 	} catch {
 		// Some builds reject audioBitsPerSecond — retry with just the mime.
 		try {
@@ -218,7 +236,11 @@ export function startSnippet(movieTitle?: string): void {
 	startedAt = Date.now();
 	snippetElapsed.value = 0;
 	isRecordingSnippet.value = true;
-	recorder.start(1000); // gather data in 1s slices
+	// No timeslice. Nothing consumes partial chunks (the elapsed counter is its
+	// own interval, and the blob is assembled in onstop), and a slice boundary
+	// forces a main-thread dataavailable + Blob allocation every second — the
+	// periodic hitch that matches the reported "tiny skips".
+	recorder.start();
 	timer = setInterval(() => {
 		snippetElapsed.value = Math.floor((Date.now() - startedAt) / 1000);
 		if (snippetElapsed.value >= MAX_SECONDS) {
@@ -399,7 +421,10 @@ export async function trimVideoBlob(
 		const at = audioTrack ?? cap?.getAudioTracks()[0] ?? null;
 		if (at) out.addTrack(at);
 
-		const recOpts: MediaRecorderOptions = { audioBitsPerSecond: RECORD_AUDIO_BPS };
+		const recOpts: MediaRecorderOptions = {
+			audioBitsPerSecond: RECORD_AUDIO_BPS,
+			videoBitsPerSecond: RECORD_VIDEO_BPS,
+		};
 		if (MediaRecorder.isTypeSupported(mimeType)) recOpts.mimeType = mimeType;
 		let recorder: MediaRecorder;
 		try {
