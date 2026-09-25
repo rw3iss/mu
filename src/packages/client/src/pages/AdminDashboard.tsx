@@ -86,6 +86,36 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 		}
 	}
 
+	/**
+	 * Generic confirm for the non-destructive Quick Actions.
+	 *
+	 * These used to fire on click with only a toast for feedback, which reads
+	 * as "nothing happened" when the toast is missed or the job runs for
+	 * minutes. Routing them through one dialog gives every action the same
+	 * contract: confirm, then an immediate "started" notification. The
+	 * destructive actions keep their own bespoke dialogs and warning copy.
+	 */
+	const [pendingAction, setPendingAction] = useState<{
+		title: string;
+		message: string;
+		confirmLabel: string;
+		started: string;
+		run: () => void | Promise<void>;
+	} | null>(null);
+
+	const confirmThen = useCallback(
+		(cfg: {
+			title: string;
+			message: string;
+			confirmLabel: string;
+			started: string;
+			run: () => void | Promise<void>;
+		}) =>
+			() =>
+				setPendingAction(cfg),
+		[],
+	);
+
 	const handleScanLibrary = useCallback(async () => {
 		const startedId = notifyInfo('Scanning library…', 0);
 		try {
@@ -306,8 +336,12 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 
 	const handleCleanupSubtitles = useCallback(async () => {
 		setCleaningSubtitles(true);
+		// Every other Quick Action announces itself on start; this one only
+		// reported its result, so a slow sweep looked like a dead button.
+		const startedId = notifyInfo('Cleaning up unused subtitle files…', 0);
 		try {
 			const res = await subtitlesService.cleanupUnused();
+			removeNotification(startedId);
 			if (res.filesRemoved === 0) {
 				notifySuccess('No unused subtitle files to clean up.');
 			} else {
@@ -316,6 +350,7 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 				);
 			}
 		} catch {
+			removeNotification(startedId);
 			notifyError('Failed to clean up subtitles.');
 		} finally {
 			setCleaningSubtitles(false);
@@ -617,27 +652,63 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					<ActionRow
 						label="Scan Library"
 						description="Index any new files in your configured media sources."
-						onClick={handleScanLibrary}
+						onClick={confirmThen({
+							title: 'Scan Library',
+							message:
+								'Walks every enabled media source and indexes new or changed files. Existing entries are updated, not replaced. Safe to re-run; on a large library it can take several minutes.',
+							confirmLabel: 'Start Scan',
+							started:
+								'Library scan started — this can take several minutes on a large library.',
+							run: handleScanLibrary,
+						})}
 					/>
 					<ActionRow
 						label="Refresh All Metadata"
 						description="Re-fetch TMDB / OMDB metadata for every library movie."
-						onClick={handleRefreshMetadata}
+						onClick={confirmThen({
+							title: 'Refresh All Metadata',
+							message:
+								'Queues a metadata fetch for every movie that has no metadata row yet. Runs in the background as jobs; existing metadata is left alone.',
+							confirmLabel: 'Refresh Metadata',
+							started: 'Metadata refresh started — queuing background jobs.',
+							run: handleRefreshMetadata,
+						})}
 					/>
 					<ActionRow
 						label="Fix Missing Metadata"
 						description="Find only the movies with missing or incomplete metadata (no match, or blank overview / poster) and fetch it as rate-limited background jobs that retry on failure."
-						onClick={handleFixMissingMetadata}
+						onClick={confirmThen({
+							title: 'Fix Missing Metadata',
+							message:
+								'Finds movies with no metadata, no TMDB/IMDB id, or a blank overview/poster, and queues one metadata job each. Rate-limited and retried automatically.',
+							confirmLabel: 'Fix Missing',
+							started: 'Scanning for movies with missing metadata…',
+							run: handleFixMissingMetadata,
+						})}
 					/>
 					<ActionRow
 						label="Sync IMDB Datasets"
 						description="Download the latest IMDB ratings + movie catalog (title.basics) for instant offline search. Runs as an idle-gated background job (~5–10 min)."
-						onClick={handleImdbSync}
+						onClick={confirmThen({
+							title: 'Sync IMDB Datasets',
+							message:
+								'Downloads the IMDB bulk ratings and title datasets (~250MB) and refreshes the local copy that powers offline search. Idle-gated: it waits until no other jobs are running.',
+							confirmLabel: 'Queue Sync',
+							started: 'IMDB dataset sync queued.',
+							run: handleImdbSync,
+						})}
 					/>
 					<ActionRow
 						label="Fetch Missing Thumbnails"
 						description="Generate thumbnails for movies that don't have one yet."
-						onClick={handleGenerateThumbnails}
+						onClick={confirmThen({
+							title: 'Fetch Missing Thumbnails',
+							message:
+								'Finds movies with no poster and fetches one from the metadata providers. Existing artwork is untouched.',
+							confirmLabel: 'Fetch Thumbnails',
+							started: 'Looking for movies without thumbnails…',
+							run: handleGenerateThumbnails,
+						})}
 						loading={generatingThumbnails}
 					/>
 					<ActionRow
@@ -649,13 +720,28 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 					<ActionRow
 						label="Generate Seek Sprites"
 						description="Create seek-bar preview sprite sheets for movies missing them."
-						onClick={handleGenerateSprites}
+						onClick={confirmThen({
+							title: 'Generate Seek Sprites',
+							message:
+								'Builds the seek-preview sprite sheets used by the player scrubber for any movie missing them. Disk-heavy — it reads each file end to end, so expect it to run for a while.',
+							confirmLabel: 'Generate Sprites',
+							started:
+								'Sprite generation started — this is disk-heavy and runs in the background.',
+							run: handleGenerateSprites,
+						})}
 						loading={generatingSprites}
 					/>
 					<ActionRow
 						label="Group Similar Items"
 						description="Auto-group sequels, series, and TV episodes that share metadata."
-						onClick={handleGroupSimilarItems}
+						onClick={confirmThen({
+							title: 'Group Similar Items',
+							message:
+								'Re-analyses the library and groups movies into collections and series. Existing groups are rebuilt from scratch; no files are modified.',
+							confirmLabel: 'Group Items',
+							started: 'Grouping started — analysing the library.',
+							run: handleGroupSimilarItems,
+						})}
 						loading={groupingItems}
 					/>
 					<ActionRow
@@ -693,6 +779,26 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						danger
 					/>
 				</ul>
+				{/* One dialog serves every non-destructive Quick Action. Firing the
+				    "started" toast here — rather than inside each handler — means
+				    the user always gets immediate feedback on confirm, even for
+				    actions whose request takes seconds to return. */}
+				<ConfirmDialog
+					isOpen={pendingAction !== null}
+					onClose={() => setPendingAction(null)}
+					onConfirm={() => {
+						const action = pendingAction;
+						setPendingAction(null);
+						if (!action) return;
+						notifyInfo(action.started, 6000);
+						void action.run();
+					}}
+					title={pendingAction?.title ?? ''}
+					message={pendingAction?.message ?? ''}
+					confirmLabel={pendingAction?.confirmLabel ?? 'Run'}
+					variant="primary"
+				/>
+
 				<ConfirmDialog
 					isOpen={showSanitizeConfirm}
 					onClose={() => setShowSanitizeConfirm(false)}
