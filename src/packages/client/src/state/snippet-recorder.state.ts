@@ -71,7 +71,12 @@ function pickMimeType(): string {
 		'video/mp4;codecs=avc1.42E01E,mp4a.40.2', // H.264 baseline + AAC-LC
 		'video/mp4;codecs=avc1.640028,mp4a.40.2', // H.264 high + AAC-LC
 		'video/mp4;codecs=h264,aac',
-		'video/mp4',
+		// NB: bare 'video/mp4' is deliberately NOT in this list. Chromium
+		// reports it supported and then fills it with VP9 + OPUS — Opus-in-MP4
+		// is legal (ISO 14496-30) but poorly supported, and plays back with
+		// stutter in most players even though the stream itself is intact.
+		// Falling through to an explicit WebM profile gives a container and
+		// codec pair that actually plays.
 		// WebM: prefer VP8 over VP9. VP9 *software* encoding is heavy enough to
 		// starve the player's decode/render during live capture → the source
 		// stutters and captureStream records duplicate frames (judder on fast
