@@ -58,6 +58,7 @@ export type IconName =
 	// app surfaces
 	| 'home'
 	| 'film'
+	| 'grip'
 	| 'list-plus'
 	| 'star'
 	| 'star-filled'
@@ -177,6 +178,17 @@ const PATHS: Record<IconName, JSX.Element> = {
 		</>
 	),
 	check: <polyline points="20 6 9 17 4 12" />,
+	// Drag handle — two columns of dots, the usual reorder affordance.
+	grip: (
+		<>
+			<circle cx="9" cy="6" r="1.4" />
+			<circle cx="9" cy="12" r="1.4" />
+			<circle cx="9" cy="18" r="1.4" />
+			<circle cx="15" cy="6" r="1.4" />
+			<circle cx="15" cy="12" r="1.4" />
+			<circle cx="15" cy="18" r="1.4" />
+		</>
+	),
 	// Floppy disk — the conventional "save" affordance.
 	save: (
 		<>

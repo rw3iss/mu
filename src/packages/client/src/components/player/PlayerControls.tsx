@@ -8,6 +8,7 @@ import { Icon } from '@/components/common/Icon';
 import { Tooltip } from '@/components/common/Tooltip';
 import { SubtitleAppearance } from '@/components/movie/SubtitleAppearance';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
+import { QueuePanel } from '@/components/player/QueuePanel';
 import { getUiSetting, useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
@@ -42,6 +43,7 @@ import {
 	subtitleTrack,
 	toggleMute,
 } from '@/state/player.state';
+import { hasQueue, queueCount } from '@/state/queue.state';
 import { shareMode } from '@/state/share.state';
 import {
 	activeSession,
@@ -333,6 +335,21 @@ export function PlayerControls({
 	}, []);
 
 	const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+	const [showQueuePanel, setShowQueuePanel] = useState(false);
+	const queueRef = useRef<HTMLDivElement>(null);
+	// Close the queue flyout on an outside click, matching the settings menu.
+	useEffect(() => {
+		if (!showQueuePanel) return;
+		const onDown = (e: MouseEvent) => {
+			if (!queueRef.current?.contains(e.target as Node)) setShowQueuePanel(false);
+		};
+		document.addEventListener('mousedown', onDown);
+		return () => document.removeEventListener('mousedown', onDown);
+	}, [showQueuePanel]);
+	// An empty queue can't keep a panel open.
+	useEffect(() => {
+		if (!hasQueue.value) setShowQueuePanel(false);
+	}, [hasQueue.value]);
 	const [settingsPanel, setSettingsPanel] = useState<
 		'main' | 'quality' | 'subtitles' | 'subtitle-manage' | 'audio'
 	>('main');
@@ -1168,6 +1185,31 @@ export function PlayerControls({
 											<line x1="12" y1="8" x2="12.01" y2="8" />
 										</svg>
 									</button>
+								)}
+
+								{/* Queue — only surfaced when something is actually queued,
+								    so the toolbar stays clean for one-off playback. */}
+								{hasQueue.value && (
+									<div class={styles.queueBtnWrap} ref={queueRef}>
+										<button
+											class={`${styles.controlBtn} ${showQueuePanel ? styles.active : ''}`}
+											onClick={() => setShowQueuePanel((v) => !v)}
+											aria-label={`Play queue (${queueCount.value} queued)`}
+											title={`Queue — ${queueCount.value} up next`}
+										>
+											<Icon name="view-list" size={20} />
+											<span class={styles.queueBadge}>
+												{queueCount.value}
+											</span>
+										</button>
+										{showQueuePanel && (
+											<div class={styles.queueFlyout}>
+												<QueuePanel
+													onClose={() => setShowQueuePanel(false)}
+												/>
+											</div>
+										)}
+									</div>
 								)}
 
 								{/* Effects */}

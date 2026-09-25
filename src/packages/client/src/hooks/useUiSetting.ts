@@ -56,6 +56,15 @@ export function useUiSetting<T>(key: string, defaultValue: T): [T, (value: T) =>
 }
 
 /**
+ * The underlying shared signal for a key, for state modules that need to react
+ * to changes rather than read a value once (the play queue drives a toolbar
+ * badge and a panel, both of which must update live).
+ */
+export function getUiSettingSignal<T>(key: string, defaultValue: T): Signal<T> {
+	return getOrCreateSignal(key, defaultValue);
+}
+
+/**
  * Standalone getter/setter for use outside of components (e.g. in state modules).
  * Same shared signals and localStorage backing as the hook.
  */

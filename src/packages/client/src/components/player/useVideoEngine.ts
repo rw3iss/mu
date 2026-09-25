@@ -13,7 +13,7 @@ import {
 	stereoWidthEnabled,
 } from '@/state/audio-effects.state';
 import { audioResetTrigger, clearAudioSuspect } from '@/state/audio-reset.state';
-import { globalMovieId } from '@/state/globalPlayer.state';
+import { globalMovieId, playMovie } from '@/state/globalPlayer.state';
 import { notifyInfo } from '@/state/notifications.state';
 import {
 	clampVolume,
@@ -26,6 +26,7 @@ import {
 	updateProgress,
 	volume,
 } from '@/state/player.state';
+import { takeNextFromQueue } from '@/state/queue.state';
 import { shareToken } from '@/state/share.state';
 import { clearWatchPosition, setLocalPosition } from '@/state/watchPositions.state';
 import { clearVideoSubtitles } from '@/utils/subtitle-dom';
@@ -372,6 +373,14 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				localStorage.removeItem(`mu_position_${movieId}`);
 			} catch {}
 			void clearWatchPosition(movieId);
+
+			// Auto-advance: pop the next queued title and play it. Popping
+			// before playing means a title that fails to start can't wedge the
+			// queue retrying the same entry forever.
+			const next = takeNextFromQueue();
+			if (next) {
+				void playMovie(next.movieId, { fromBeginning: true });
+			}
 		};
 		video.addEventListener('ended', onEnded);
 

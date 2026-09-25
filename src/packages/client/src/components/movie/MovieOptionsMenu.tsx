@@ -30,6 +30,7 @@ import {
 	removeMovieFromPlaylist,
 } from '@/state/playlists.state';
 import { processingMovieIds } from '@/state/processing.state';
+import { addToQueue, playNext } from '@/state/queue.state';
 import { activeSession } from '@/state/shared-session.state';
 import {
 	ensureWatchlistLoaded,
@@ -155,6 +156,38 @@ export function MovieOptionsMenu({
 			}
 		},
 		[movie, onMovieUpdate, setOpen],
+	);
+
+	// Denormalise title/poster/year into the queue entry so the panel renders
+	// from localStorage with no per-row fetch.
+	const queueEntry = useCallback(
+		() => ({
+			movieId: movie.id,
+			title: movie.title,
+			posterUrl: movie.posterUrl ?? null,
+			year: movie.year ?? null,
+		}),
+		[movie.id, movie.title, movie.posterUrl, movie.year],
+	);
+
+	const handleAddToQueue = useCallback(
+		(e: Event) => {
+			e.stopPropagation();
+			addToQueue(queueEntry());
+			notifySuccess(`Added "${movie.title}" to the queue`);
+			setOpen(false);
+		},
+		[queueEntry, movie.title, setOpen],
+	);
+
+	const handlePlayNext = useCallback(
+		(e: Event) => {
+			e.stopPropagation();
+			playNext(queueEntry());
+			notifySuccess(`"${movie.title}" plays next`);
+			setOpen(false);
+		},
+		[queueEntry, movie.title, setOpen],
 	);
 
 	const handleWatchedToggle = useCallback(
@@ -465,6 +498,21 @@ export function MovieOptionsMenu({
 						}
 						onClick={(e: Event) => e.stopPropagation()}
 					>
+						{/* Queue actions lead the menu — they're the quickest way to
+						    line up viewing without leaving the page. */}
+						<button class={styles.menuItem} onClick={handlePlayNext}>
+							<span class={styles.menuIcon}>
+								<Icon name="arrow-up" />
+							</span>
+							Play Next
+						</button>
+						<button class={styles.menuItem} onClick={handleAddToQueue}>
+							<span class={styles.menuIcon}>
+								<Icon name="list-plus" />
+							</span>
+							Add to Queue
+						</button>
+
 						<button class={styles.menuItem} onClick={handleWatchedToggle}>
 							<span class={styles.menuIcon}>
 								<Icon name={movie.watched ? 'refresh' : 'check'} />
