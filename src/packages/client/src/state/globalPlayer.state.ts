@@ -15,11 +15,11 @@ import type { Movie } from '@/state/library.state';
 import { notifyError } from '@/state/notifications.state';
 import type { StreamSession } from '@/state/player.state';
 import {
-	audioTrack,
 	currentSession,
 	currentTime,
 	duration,
 	endStream,
+	getSavedAudioTrack,
 	initPlayerSettings,
 	isFullscreen,
 	isMuted,
@@ -463,17 +463,11 @@ export async function startGlobalStream(): Promise<StreamSession | null> {
 
 	try {
 		// Pass saved audio track preference if one exists
-		const savedAudioTrack =
-			audioTrack.value ??
-			(() => {
-				try {
-					return localStorage.getItem(`mu_audiotrack_${movieId}`);
-				} catch {
-					return null;
-				}
-			})();
+		// Per-movie saved choice only — the global `audioTrack` signal still
+		// holds the previous movie's pick at this point.
+		const savedAudioTrack = getSavedAudioTrack(movieId);
 		const session = await startStream(movieId, {
-			audioTrack: savedAudioTrack != null ? parseInt(savedAudioTrack, 10) : undefined,
+			audioTrack: savedAudioTrack ?? undefined,
 		});
 		return session;
 	} catch (err: any) {

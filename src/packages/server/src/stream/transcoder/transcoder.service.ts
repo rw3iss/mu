@@ -322,6 +322,79 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	 * When present it supersedes the source: the file can direct-play even if
 	 * its original codecs would otherwise require transcoding.
 	 */
+	/**
+	 * Cached single-audio-track MP4 for a file, or null.
+	 *
+	 * Browsers (Chrome especially) expose no API to switch the audio track of a
+	 * natively-played MP4 — they always play the first audio stream. To let the
+	 * user pick another language without dropping to HLS (which also silences
+	 * Web Audio effects), we stream-copy the video plus the chosen audio track
+	 * into its own MP4 and direct-play that instead.
+	 */
+	getAudioVariantPath(movieFileId: string, audioIndex: number): string | null {
+		const p = path.join(
+			this.getPersistentDir(movieFileId, `audio-${audioIndex}`),
+			'direct.mp4',
+		);
+		return existsSync(p) ? p : null;
+	}
+
+	/** In-flight variant builds, so concurrent requests share one ffmpeg run. */
+	private audioVariantBuilds = new Map<string, Promise<string>>();
+
+	/**
+	 * Build the single-audio-track MP4 described above. Video is always copied;
+	 * the audio is copied when the browser can play it and re-encoded to stereo
+	 * AAC otherwise (AC3/DTS/TrueHD). Written to `.part` then renamed, so a
+	 * crash never leaves a truncated file that getAudioVariantPath would serve.
+	 */
+	buildAudioVariant(
+		movieFileId: string,
+		srcPath: string,
+		audioIndex: number,
+		copyAudio: boolean,
+	): Promise<string> {
+		const key = `${movieFileId}:${audioIndex}`;
+		const inFlight = this.audioVariantBuilds.get(key);
+		if (inFlight) return inFlight;
+
+		const dir = this.getPersistentDir(movieFileId, `audio-${audioIndex}`);
+		const finalPath = path.join(dir, 'direct.mp4');
+		const tempPath = path.join(dir, 'direct.mp4.part');
+		const job = (async () => {
+			await mkdir(dir, { recursive: true });
+			await new Promise<void>((resolve, reject) => {
+				let command = this.createFfmpegCommand(srcPath)
+					.outputOptions(['-map', '0:v:0', '-map', `0:a:${audioIndex}`])
+					.videoCodec('copy');
+				command = copyAudio
+					? command.audioCodec('copy')
+					: command.audioCodec('aac').outputOptions(['-ac', '2', '-b:a', '192k']);
+				command = command
+					.outputOptions(['-f', 'mp4', '-movflags', '+faststart'])
+					.output(tempPath);
+				this.wireConversionEvents(
+					command,
+					`audio-variant:${key}`,
+					undefined,
+					resolve,
+					reject,
+				);
+				command.run();
+			});
+			const { rename } = await import('node:fs/promises');
+			if (statSync(tempPath).size < 1_000_000) {
+				await rm(tempPath, { force: true });
+				throw new Error('audio variant output is empty');
+			}
+			await rename(tempPath, finalPath);
+			return finalPath;
+		})().finally(() => this.audioVariantBuilds.delete(key));
+
+		this.audioVariantBuilds.set(key, job);
+		return job;
+	}
+
 	getCachedDirectMp4(movieFileId: string): string | null {
 		const p = path.join(this.getPersistentDir(movieFileId, 'direct'), 'direct.mp4');
 		return existsSync(p) ? p : null;

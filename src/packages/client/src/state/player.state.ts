@@ -19,6 +19,10 @@ export interface StreamSession {
 	qualities: QualityOption[];
 	startPosition: number;
 	durationSeconds?: number | null;
+	/** Audio stream index actually being served. */
+	audioTrack?: number;
+	/** Index whose single-track variant is still being built, if any. */
+	audioTrackPending?: number | null;
 }
 
 export interface SubtitleTrack {
@@ -165,6 +169,22 @@ export function saveAudioTrackChoice(movieId: string, trackIndex: string | null)
 		}
 	} catch {
 		/* ignore */
+	}
+}
+
+/**
+ * The saved audio-stream index for a movie, or null. Per-movie only: the global
+ * `audioTrack` signal carries over between movies, so reading it first made a
+ * choice on one title leak into the next.
+ */
+export function getSavedAudioTrack(movieId: string): number | null {
+	try {
+		const raw = localStorage.getItem(`mu_audiotrack_${movieId}`);
+		if (raw == null) return null;
+		const n = Number.parseInt(raw, 10);
+		return Number.isFinite(n) ? n : null;
+	} catch {
+		return null;
 	}
 }
 

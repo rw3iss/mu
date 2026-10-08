@@ -20,6 +20,7 @@ import {
 	currentSession,
 	currentTime,
 	duration,
+	getSavedAudioTrack,
 	isBuffering,
 	isMuted,
 	isPlaying,
@@ -1085,37 +1086,84 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	 * seamless — and, when the new source is direct-play, audio effects work.
 	 */
 	useEffect(() => {
-		const onSuperseded = (data: unknown) => {
-			const movieId = (data as { movieId?: string })?.movieId;
-			if (!movieId || movieId !== globalMovieId.value) return;
+		/**
+		 * Fetch a fresh session and reload the <video> at the current position.
+		 * Shared by two triggers:
+		 *  - the server's `stream:superseded` (a conversion finished, or an
+		 *    alternate-audio variant became ready);
+		 *  - a local `mu:stream-reload` (the user picked another audio track).
+		 * Always sends the saved per-movie audio choice — without it a reload
+		 * would fall back to the file's first track and undo the user's pick.
+		 */
+		const reload = (movieId: string, reason: 'superseded' | 'audio') => {
 			const video = sharedVideoElement;
 			const pos = video && Number.isFinite(video.currentTime) ? video.currentTime : 0;
 			const wasPlaying = intendedPlayingRef.current;
+			const saved = getSavedAudioTrack(movieId);
 			streamService
-				.startStream(movieId)
+				.startStream(movieId, { audioTrack: saved ?? undefined })
 				.then((session) => {
 					currentSession.value = session;
+					const pending = session.audioTrackPending;
+					// Picking a track whose variant isn't built yet: keep the
+					// current stream playing untouched; the server signals
+					// `superseded` when it's ready and we reload then.
+					if (reason === 'audio' && pending != null) {
+						const lang = (
+							session.audioTracks.find((t) => Number(t.id) === pending)?.language ||
+							'selected'
+						).toUpperCase();
+						notifyInfo(
+							`Preparing ${lang} audio track — it will switch automatically.`,
+							6000,
+						);
+						return;
+					}
 					initPlayback(
 						session.streamUrl,
 						session.directPlay,
 						pos > 0 ? pos : 0,
 						wasPlaying,
 					);
-					notifyInfo(
-						session.directPlay
-							? 'Switched to direct play — audio effects are now available.'
-							: 'Stream source updated.',
-						4000,
-					);
+					if (reason === 'audio' || (saved != null && saved > 0 && pending == null)) {
+						const lang = (
+							session.audioTracks.find((t) => Number(t.id) === session.audioTrack)
+								?.language || ''
+						).toUpperCase();
+						notifyInfo(
+							lang ? `Audio switched to ${lang}.` : 'Audio track switched.',
+							4000,
+						);
+					} else {
+						notifyInfo(
+							session.directPlay
+								? 'Switched to direct play — audio effects are now available.'
+								: 'Stream source updated.',
+							4000,
+						);
+					}
 				})
 				.catch((err) => {
-					console.error('[stream:superseded] reload failed:', err);
+					console.error(`[stream:${reason}] reload failed:`, err);
 				});
+		};
+
+		const onSuperseded = (data: unknown) => {
+			const movieId = (data as { movieId?: string })?.movieId;
+			if (!movieId || movieId !== globalMovieId.value) return;
+			reload(movieId, 'superseded');
+		};
+		const onLocalReload = (e: Event) => {
+			const movieId = (e as CustomEvent<{ movieId?: string }>).detail?.movieId;
+			if (!movieId || movieId !== globalMovieId.value) return;
+			reload(movieId, 'audio');
 		};
 		wsService.subscribe('stream');
 		wsService.on('stream:superseded', onSuperseded);
+		window.addEventListener('mu:stream-reload', onLocalReload);
 		return () => {
 			wsService.off('stream:superseded', onSuperseded);
+			window.removeEventListener('mu:stream-reload', onLocalReload);
 		};
 	}, [initPlayback]);
 

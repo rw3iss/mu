@@ -706,8 +706,13 @@ export function PlayerControls({
 		}
 		setShowSettingsMenu(false);
 		setSettingsPanel('main');
-		// Audio track change requires restarting the stream with the new track
-		// For now, notify the user — a full restart would interrupt playback
+		// The browser can't switch a native MP4's audio stream, so changing
+		// track means a new session. The player's reload hook restarts it at
+		// the current position (or waits for the server to finish preparing a
+		// single-track variant, then switches automatically).
+		if (movieId && String(currentSession.value?.audioTrack ?? 0) !== trackId) {
+			window.dispatchEvent(new CustomEvent('mu:stream-reload', { detail: { movieId } }));
+		}
 	}, []);
 
 	const toggleSettings = useCallback(() => {
@@ -1694,12 +1699,20 @@ export function PlayerControls({
 													</button>
 													{(session?.audioTracks ?? []).map((track) => {
 														const trackId = String(track.id);
-														const isSelected = audioTrack.value
-															? audioTrack.value === trackId
-															: trackId ===
-																String(
-																	session?.audioTracks?.[0]?.id,
-																);
+														// Highlight the track actually being
+														// served, not the last click — a pick
+														// can still be preparing.
+														const playingId = String(
+															session?.audioTrack ??
+																audioTrack.value ??
+																session?.audioTracks?.[0]?.id ??
+																'0',
+														);
+														const isSelected = playingId === trackId;
+														const isPreparing =
+															session?.audioTrackPending != null &&
+															String(session.audioTrackPending) ===
+																trackId;
 														const lang = (
 															track.language || 'und'
 														).toUpperCase();
@@ -1721,6 +1734,7 @@ export function PlayerControls({
 															>
 																{label}
 																{channels}
+																{isPreparing && ' · preparing…'}
 															</button>
 														);
 													})}

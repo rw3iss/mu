@@ -366,7 +366,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// Determine stream mode based on container, video codec, and audio codec.
 		// Pass the client's HEVC capability so HEVC-in-MP4 can direct-play for
 		// browsers that can decode it (others still transcode).
-		const mode = this.determineStreamMode(file, { clientHevc: options.clientHevc });
+		let mode = this.determineStreamMode(file, { clientHevc: options.clientHevc });
 
 		// Resolve preferred audio track: explicit option > preferred language > default (0)
 		if (options.audioTrack == null) {
@@ -380,6 +380,52 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				if (match) {
 					options.audioTrack = match.index;
 				}
+			}
+		}
+
+		// Alternate audio track on a natively-played file. The browser can only
+		// play an MP4's FIRST audio stream, so `audioTrack` used to be honoured
+		// only when transcoding — picking ENG on an ITA-first direct-play file
+		// silently kept playing ITA. Serve a cached video-copy MP4 holding just
+		// the chosen track instead; if it isn't built yet, start building it,
+		// play the default track meanwhile, and signal STREAM_SUPERSEDED when
+		// it's ready so the client reloads at the same position.
+		let audioVariantIndex: number | null = null;
+		let audioTrackPending: number | null = null;
+		const allAudio = this.parseAudioTracks(file);
+		const requested = options.audioTrack;
+		const videoCodec = (file.codecVideo || '').toLowerCase();
+		const browserVideo = ['h264', 'avc', 'h.264', 'av1', 'av01'].includes(videoCodec);
+		if (
+			requested != null &&
+			requested > 0 &&
+			requested < allAudio.length &&
+			browserVideo &&
+			(mode === StreamMode.DIRECT_PLAY || mode === StreamMode.DIRECT_STREAM)
+		) {
+			if (this.transcoderService.getAudioVariantPath(file.id, requested)) {
+				mode = StreamMode.DIRECT_PLAY;
+				audioVariantIndex = requested;
+			} else {
+				audioTrackPending = requested;
+				const codec = (allAudio[requested]?.codec || '').toLowerCase();
+				const copyAudio = ['aac', 'mp3', 'opus', 'flac', 'mp4a'].some((c) =>
+					codec.includes(c),
+				);
+				void this.transcoderService
+					.buildAudioVariant(file.id, file.filePath, requested, copyAudio)
+					.then(() => {
+						this.events.emit(WsEvent.STREAM_SUPERSEDED, {
+							movieId,
+							fileId: file.id,
+							audioTrack: requested,
+						});
+					})
+					.catch((err) => {
+						this.logger.warn(
+							`Audio track ${requested} variant failed for ${file.id}: ${err?.message ?? err}`,
+						);
+					});
 			}
 		}
 
@@ -635,7 +681,10 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		const directPlay = mode === StreamMode.DIRECT_PLAY;
 		let streamUrl: string;
 		if (directPlay) {
-			streamUrl = `/api/v1/stream/direct/${file.id}`;
+			streamUrl =
+				audioVariantIndex != null
+					? `/api/v1/stream/direct/${file.id}?audio=${audioVariantIndex}`
+					: `/api/v1/stream/direct/${file.id}`;
 		} else {
 			// Both TRANSCODE and DIRECT_STREAM use HLS manifest
 			streamUrl = `/api/v1/stream/${sessionId}/manifest.m3u8`;
@@ -687,6 +736,10 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				default: defaultSubIndex != null && t.index === defaultSubIndex,
 			})),
 			audioTracks,
+			// The track actually playing, and one being prepared (if any), so the
+			// picker shows the truth rather than the last click.
+			audioTrack: audioVariantIndex ?? (audioTrackPending != null ? 0 : (requested ?? 0)),
+			audioTrackPending,
 			qualities,
 			startPosition: resumePosition,
 			durationSeconds: file.durationSeconds ?? null,

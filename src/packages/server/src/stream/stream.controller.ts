@@ -319,6 +319,7 @@ export class StreamController {
 	@Get('direct/:fileId')
 	async directPlay(
 		@Param('fileId') fileId: string,
+		@Query('audio') audio: string | undefined,
 		@Req() request: FastifyRequest,
 		@Res() reply: FastifyReply,
 	) {
@@ -338,6 +339,17 @@ export class StreamController {
 		//   2. Cache-mode converted MP4 (convertOriginalFile OFF).
 		//   3. The original file. In-place conversions update file.filePath
 		//      directly, so this only matters for cache-mode.
+		// An alternate-audio request serves its single-track variant (see
+		// TranscoderService.getAudioVariantPath); falls through if it's gone.
+		const audioIdx = audio != null ? Number.parseInt(audio, 10) : Number.NaN;
+		const variant =
+			Number.isInteger(audioIdx) && audioIdx > 0
+				? this.transcoderService.getAudioVariantPath(file.id, audioIdx)
+				: null;
+		if (variant) {
+			this.memoryCache.touch(variant);
+			return this.directPlayService.serveFile(variant, request, reply);
+		}
 		const hot = this.mediaCache.getHotPath(file.id);
 		const cached = hot ?? this.transcoderService.getCachedDirectMp4(file.id);
 		const servePath = cached ?? file.filePath;
