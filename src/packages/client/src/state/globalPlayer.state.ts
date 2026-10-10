@@ -1,3 +1,4 @@
+import { type EntityRef, entityMediaKind, type MediaKind } from '@mu/shared';
 import { computed, effect, signal } from '@preact/signals';
 import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting } from '@/hooks/useUiSetting';
@@ -33,6 +34,10 @@ import { shareMode } from '@/state/share.state';
 import { sharedVideoEngine } from '@/state/videoEngineRef';
 import { clearWatchPosition } from '@/state/watchPositions.state';
 import { clearVideoSubtitles } from '@/utils/subtitle-dom';
+// Side-effect import: registers the video adapter with the registry.
+import './player/adapters/videoAdapter';
+import { getAdapter } from './player/registry';
+import type { PlayMediaOptions } from './player/types';
 
 // ============================================
 // Types
@@ -78,6 +83,16 @@ export const sharedSessionHooks: {
 	/** Leave the active session unless it's for `keepForMovieId`. */
 	leaveActiveSession: ((keepForMovieId?: string) => void) | null;
 } = { leaveActiveSession: null };
+
+/**
+ * Which media kind / entity the player shell is currently driving. Video is
+ * the only registered adapter today; `activeRef` mirrors `globalMovieId` for
+ * movies. See docs/music-support-plan.md §6.4.
+ */
+export const activeKind = signal<MediaKind>('video');
+export const activeRef = signal<EntityRef | null>(null);
+/** The adapter for `activeKind` (toolbar order, panels, surface). */
+export const activeAdapter = computed(() => getAdapter(activeKind.value));
 
 export const globalMovieId = signal<string | null>(null);
 export const globalMovie = signal<Movie | null>(null);
@@ -213,10 +228,33 @@ export async function jumpToCommentTime(movieId: string, timeSeconds: number): P
 	await playMovie(movieId);
 }
 
-export async function playMovie(
-	movieId: string,
-	opts?: { fromBeginning?: boolean },
-): Promise<void> {
+/**
+ * Play any playable entity. Resolves the player adapter from the entity's
+ * media kind; for video this runs the movie flow below.
+ */
+export async function playMedia(ref: EntityRef, opts?: PlayMediaOptions): Promise<void> {
+	const kind = entityMediaKind(ref.type);
+	const adapter = kind ? getAdapter(kind) : undefined;
+	if (!kind || !adapter) {
+		notifyError('This item cannot be played.');
+		return;
+	}
+	if (kind !== 'video') {
+		// Only the video adapter exists so far.
+		notifyError('Playback for this media type is not available yet.');
+		return;
+	}
+	activeKind.value = kind;
+	activeRef.value = ref;
+	await playVideo(ref.id, opts);
+}
+
+/** Thin wrapper kept so every existing movie call site works unchanged. */
+export function playMovie(movieId: string, opts?: PlayMediaOptions): Promise<void> {
+	return playMedia({ type: 'movie', id: movieId }, opts);
+}
+
+async function playVideo(movieId: string, opts?: PlayMediaOptions): Promise<void> {
 	initPlayerSettings();
 	closeEffectsPanel();
 	// Create/resume AudioContext within the user gesture (click) — Chrome requires this
@@ -444,6 +482,7 @@ export async function closePlayer(): Promise<void> {
 	playerMode.value = 'hidden';
 	globalMovieId.value = null;
 	globalMovie.value = null;
+	activeRef.value = null;
 
 	await endStream();
 	localStorage.removeItem(STORAGE_KEY);
@@ -455,8 +494,9 @@ export async function closePlayer(): Promise<void> {
  * Start a stream for the current globalMovieId.
  * Called by the GlobalPlayer component when it needs to initialize.
  */
-export async function startGlobalStream(): Promise<StreamSession | null> {
-	const movieId = globalMovieId.value;
+export async function startGlobalStream(
+	movieId: string | null = globalMovieId.value,
+): Promise<StreamSession | null> {
 	if (!movieId) return null;
 
 	streamError.value = null;
@@ -565,6 +605,8 @@ export function initGlobalPlayer(): void {
 		}
 
 		// Restore movie and mode
+		activeKind.value = 'video';
+		activeRef.value = { type: 'movie', id: movieId };
 		globalMovieId.value = movieId;
 		playerMode.value = saved && saved.playerMode !== 'hidden' ? saved.playerMode : 'mini';
 
@@ -577,6 +619,7 @@ export function initGlobalPlayer(): void {
 			.catch(() => {
 				playerMode.value = 'hidden';
 				globalMovieId.value = null;
+				activeRef.value = null;
 				localStorage.removeItem(STORAGE_KEY);
 				localStorage.removeItem(MOVIE_KEY);
 			});

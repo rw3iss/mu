@@ -30,7 +30,7 @@ import {
 	removeMovieFromPlaylist,
 } from '@/state/playlists.state';
 import { processingMovieIds } from '@/state/processing.state';
-import { addToQueue, playNext } from '@/state/queue.state';
+import { addToQueue, playNext, type QueueItem } from '@/state/queue.state';
 import { activeSession } from '@/state/shared-session.state';
 import {
 	ensureWatchlistLoaded,
@@ -161,11 +161,11 @@ export function MovieOptionsMenu({
 	// Denormalise title/poster/year into the queue entry so the panel renders
 	// from localStorage with no per-row fetch.
 	const queueEntry = useCallback(
-		() => ({
-			movieId: movie.id,
+		(): QueueItem => ({
+			ref: { type: 'movie', id: movie.id },
 			title: movie.title,
-			posterUrl: movie.posterUrl ?? null,
-			year: movie.year ?? null,
+			artUrl: movie.posterUrl ?? null,
+			subtitle: movie.year ? String(movie.year) : null,
 		}),
 		[movie.id, movie.title, movie.posterUrl, movie.year],
 	);
