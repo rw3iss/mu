@@ -1021,6 +1021,8 @@ interface MusicAction {
 	started: string;
 	/** Result toast; `n` is the server's `count`. */
 	done: (n: number) => string;
+	/** Job type the action queues — adds a "View jobs" link to the toast. */
+	jobType?: string;
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -1046,6 +1048,7 @@ const MUSIC_ACTIONS: MusicAction[] = [
 		confirmLabel: 'Refresh Metadata',
 		started: 'Music metadata refresh started.',
 		done: (n) => `Queued metadata jobs for ${plural(n, 'album')}.`,
+		jobType: 'music-metadata',
 	},
 	{
 		path: 'fetch-art',
@@ -1066,6 +1069,7 @@ const MUSIC_ACTIONS: MusicAction[] = [
 		confirmLabel: 'Fetch Lyrics',
 		started: 'Lyrics fetch started.',
 		done: (n) => `Queued lyrics lookups for ${plural(n, 'track')}.`,
+		jobType: 'music-lyrics',
 	},
 	{
 		path: 'reencode-unplayable',
@@ -1077,6 +1081,7 @@ const MUSIC_ACTIONS: MusicAction[] = [
 		confirmLabel: 'Re-encode',
 		started: 'Music re-encode started.',
 		done: (n) => `Queued ${plural(n, 'file')} for re-encoding.`,
+		jobType: 'audio-transcode',
 	},
 	{
 		path: 'clear-cache',
@@ -1093,7 +1098,12 @@ const MUSIC_ACTIONS: MusicAction[] = [
 async function runMusicAction(a: MusicAction): Promise<void> {
 	try {
 		const res = await api.post<{ started: boolean; count: number }>(`/music/admin/${a.path}`);
-		notifySuccess(a.done(res?.count ?? 0));
+		const n = res?.count ?? 0;
+		notifySuccess(
+			a.done(n),
+			undefined,
+			a.jobType && n > 0 ? [jobListAction(a.jobType)] : undefined,
+		);
 	} catch {
 		notifyError(`${a.label} failed.`);
 	}
