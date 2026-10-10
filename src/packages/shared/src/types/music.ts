@@ -175,3 +175,43 @@ export interface AudioStreamSession {
 	replayGainAlbum: number | null;
 	waveformUrl: string | null;
 }
+
+/** One MusicBrainz release offered as an album match (score 0..1). */
+export interface MusicMatchCandidate {
+	releaseMbid: string;
+	releaseGroupMbid: string | null;
+	title: string;
+	artistCredit: string | null;
+	year: number | null;
+	trackCount: number | null;
+	country: string | null;
+	format: string | null;
+	status: string | null;
+	primaryType: string | null;
+	secondaryTypes: string[];
+	score: number;
+}
+
+/**
+ * matched    — album has a release-group MBID (auto or manual).
+ * candidates — searched, nothing confident enough; pick one manually.
+ * none       — searched, MusicBrainz returned nothing usable.
+ * unsearched — no metadata job has run for this album yet.
+ */
+export type AlbumMatchStatus = 'matched' | 'candidates' | 'none' | 'unsearched';
+
+/** GET /music/albums/:id/match-candidates and POST /music/albums/:id/match. */
+export interface AlbumMatchState {
+	albumId: string;
+	status: AlbumMatchStatus;
+	releaseGroupMbid: string | null;
+	releaseMbid: string | null;
+	candidates: MusicMatchCandidate[];
+	searchedAt: string | null;
+}
+
+/** Response of every POST /music/admin/* quick action. */
+export interface MusicAdminActionResult {
+	started: boolean;
+	count: number;
+}
