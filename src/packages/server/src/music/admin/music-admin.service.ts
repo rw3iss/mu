@@ -3,6 +3,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import { albums, mediaSources, trackFiles } from '../../database/schema/index.js';
+import { EntityLifecycleService } from '../../entities/entity-lifecycle.service.js';
 import { LibraryJobsService } from '../../library/library-jobs.service.js';
 import { MUSIC_JOB, MusicJobsService } from '../jobs/music-jobs.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
@@ -21,6 +22,7 @@ export class MusicAdminService {
 		private readonly libraryJobs: LibraryJobsService,
 		private readonly transcoder: AudioTranscodeService,
 		private readonly musicSettings: MusicSettingsService,
+		private readonly lifecycle: EntityLifecycleService,
 	) {}
 
 	private get db() {
@@ -125,5 +127,43 @@ export class MusicAdminService {
 	async clearTranscodeCache(): Promise<MusicAdminActionResult> {
 		const removed = await this.transcoder.evict(0, () => false);
 		return { started: true, count: removed };
+	}
+
+	/**
+	 * Destructive: remove the whole music catalogue (artists, albums, tracks,
+	 * files, lyrics, art rows) and every rating / comment / favourite / history /
+	 * playlist row that points at it, then clear the transcode cache. Audio files
+	 * on disk are NOT touched — a re-scan rebuilds the catalogue from tags.
+	 */
+	async deleteLibraryData(): Promise<MusicAdminActionResult> {
+		const ids = (table: string) =>
+			this.db.all<{ id: string }>(sql`SELECT id FROM ${sql.raw(table)}`).map((r) => r.id);
+		const trackIds = ids('tracks');
+		this.lifecycle.purgeMany('track', trackIds);
+		this.lifecycle.purgeMany('album', ids('albums'));
+		this.lifecycle.purgeMany('artist', ids('artists'));
+		this.db.transaction((tx) => {
+			for (const table of [
+				'track_files',
+				'track_artists',
+				'lyrics',
+				'tracks',
+				'album_aliases',
+				'album_match_candidates',
+				'album_genres',
+				'album_artists',
+				'album_releases',
+				'albums',
+				'artist_genres',
+				'artists',
+				'music_genres',
+				'music_identities',
+				'artwork',
+			]) {
+				tx.run(sql`DELETE FROM ${sql.raw(table)}`);
+			}
+		});
+		await this.transcoder.evict(0, () => false);
+		return { started: true, count: trackIds.length };
 	}
 }

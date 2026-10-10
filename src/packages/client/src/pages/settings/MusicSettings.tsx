@@ -9,6 +9,7 @@ import {
 import type { ComponentChildren } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Button } from '@/components/common/Button';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import type { MediaPathEntryData } from '@/components/library/MediaPathList';
 import { MediaPathList } from '@/components/library/MediaPathList';
 import { api } from '@/services/api';
@@ -121,6 +122,8 @@ export function MusicSettings() {
 	const [folders, setFolders] = useState<MediaPathEntryData[]>([{ path: '', source: null }]);
 	const [isSaving, setIsSaving] = useState(false);
 	const [isScanning, setIsScanning] = useState(false);
+	const [confirmDelete, setConfirmDelete] = useState(false);
+	const [deleting, setDeleting] = useState(false);
 
 	const loadMusic = useCallback(async () => {
 		try {
@@ -191,6 +194,23 @@ export function MusicSettings() {
 			notifyError('Failed to start the music scan');
 		} finally {
 			setIsScanning(false);
+		}
+	}, []);
+
+	const handleDeleteLibrary = useCallback(async () => {
+		setDeleting(true);
+		try {
+			const res = await api.post<{ count: number }>('/music/admin/delete-library', {
+				confirm: 'DELETE',
+			});
+			notifySuccess(
+				`Music library data deleted (${res?.count ?? 0} tracks). Files on disk were kept.`,
+			);
+		} catch {
+			notifyError('Failed to delete music library data');
+		} finally {
+			setDeleting(false);
+			setConfirmDelete(false);
 		}
 	}, []);
 
@@ -449,6 +469,26 @@ export function MusicSettings() {
 							Save Changes
 						</Button>
 					</div>
+
+					<h3 class={styles.sectionTitle}>Danger Zone</h3>
+					<Row
+						label="Delete Music Library Data"
+						description="Removes every artist, album and track from Mu, with their ratings, comments, favourites, play history and playlist entries, and clears the music cache. Audio files on disk are not touched; a scan rebuilds the catalogue."
+					>
+						<Button variant="danger" onClick={() => setConfirmDelete(true)}>
+							Delete…
+						</Button>
+					</Row>
+					<ConfirmDialog
+						isOpen={confirmDelete}
+						onClose={() => setConfirmDelete(false)}
+						onConfirm={handleDeleteLibrary}
+						loading={deleting}
+						title="Delete music library data"
+						message="This permanently removes the music catalogue and all user data attached to it (ratings, comments, favourites, history, playlist entries). Audio files on disk are kept. This cannot be undone."
+						confirmLabel="Delete"
+						variant="danger"
+					/>
 				</>
 			)}
 		</div>

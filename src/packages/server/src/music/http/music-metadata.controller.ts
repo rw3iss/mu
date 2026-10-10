@@ -141,6 +141,14 @@ export class MusicMetadataController {
 	clearCache(): Promise<MusicAdminActionResult> {
 		return this.admin.clearTranscodeCache();
 	}
+
+	/** Destructive: drop the music catalogue + its user data (files on disk stay). */
+	@RequireAction('admin:server')
+	@Post('admin/delete-library')
+	deleteLibrary(@Body() body: { confirm?: string }): Promise<MusicAdminActionResult> {
+		if (body?.confirm !== 'DELETE') throw new BadRequestException('Send { confirm: "DELETE" }');
+		return this.admin.deleteLibraryData();
+	}
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import * as schema from '../../database/schema/index.js';
+import { MusicAdminService } from '../admin/music-admin.service.js';
 import { AlbumEditService } from '../catalog/album-edit.service.js';
 import { ArtworkService } from '../catalog/artwork.service.js';
 import { MusicCatalogService } from '../catalog/catalog.service.js';
@@ -137,5 +138,30 @@ describe.skipIf(!hasFfmpeg)('album merge / split', async () => {
 				.sort(),
 		).toEqual([2, 2]);
 		expect(() => edit.split(res.albumId, ids, 'x')).toThrow(/Leave at least one/);
+	});
+
+	it('delete-library drops the catalogue and its user data', async () => {
+		const purged: string[] = [];
+		const admin = new MusicAdminService(
+			database,
+			null as never,
+			null as never,
+			{ evict: async () => 0 } as never,
+			settings,
+			{
+				purgeMany: (type: string, ids: string[]) => purged.push(`${type}:${ids.length}`),
+			} as never,
+		);
+		const res = await admin.deleteLibraryData();
+		expect(res.count).toBe(4);
+		expect(purged).toEqual(['track:4', 'album:2', 'artist:1']);
+		for (const t of ['tracks', 'track_files', 'albums', 'artists', 'album_aliases']) {
+			expect(sqlite.prepare(`SELECT count(*) AS n FROM ${t}`).get()).toEqual({ n: 0 });
+		}
+		expect(
+			sqlite
+				.prepare("SELECT count(*) AS n FROM tracks_fts WHERE tracks_fts MATCH 'one'")
+				.get(),
+		).toEqual({ n: 0 });
 	});
 });
