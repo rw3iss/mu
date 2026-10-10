@@ -13,7 +13,7 @@ the two features.
 | 2 — Playback (+ waveform seek bar) | DONE 2026-10-10 — capability probe, progressive streaming (original / cached FLAC / Opus-AAC), waveform peaks + seek bar, ingest transcodes, LRU cache eviction, audio player (A/B gapless, art surfaces, list panel, shuffle/repeat, ReplayGain, MediaSession, video interplay) | `920aac9`, `a176088`, `0ec7901` |
 | 3 — Browse & detail | DONE 2026-10-10 — browse mode toggle + routing, music library tabs, artist/album/track pages, generalised favorite/rating/comments/playlists/options menu, music home rails, audio playlists | `2522959`, `bb4dbb3`, `f5d5c30` |
 | 4 — Metadata & lyrics | not started | |
-| 5 — Upload & offline | not started | |
+| 5 — Upload & offline | DONE 2026-10-10 — `POST /music/upload` (track / folder / zip, built-in zip reader with zip-slip + count + size caps, targeted import), signed offline download URLs, real Service Worker (`music-offline` cache, Range/206), Downloads list + per-device budget, LRU, Keep pins | `a961c4c`, `54652a4` |
 | 6 — Search & discovery | not started | |
 
 Open-question assumptions in §12 were accepted as written (2026-10-10).
@@ -282,6 +282,28 @@ guard), plus:
 - `finalize` triggers a targeted scan of the written paths only, not a full source
   scan.
 
+> **STATUS 2026-10-10 — DONE with changes.** Code: `music/upload/` (separate
+> `MusicUploadController`, `edit:media`). Endpoints: `GET /music/upload/targets`
+> (enabled `audio` sources), `POST /music/upload/preflight {sourceId, names}` →
+> `{conflicts}`, `POST /music/upload` (multipart, `sourceId` + `relativePath` +
+> `uploadId` + `fileTotal` fields **before** the file; 20 GB per request) →
+> `{ok, written[], skipped[], bytes}`, `POST /music/upload/finalize {sourceId, uploadId,
+> rootName}` → `{ok, files}`. Corrections: (a) **no `yauzl`** — it is not installed, so
+> `zip-reader.ts` is a small built-in central-directory reader (ZIP64 aware; `stored` +
+> `deflate` via `zlib`; encrypted / other methods rejected). Guards: unsafe names
+> reject the whole archive before anything is written, max 5000 entries, max 25 GB
+> declared *and* actual inflated size (an entry that inflates past its declared size
+> is cut off), symlink entries and disallowed types skipped, existing files never
+> overwritten. A single-root zip extracts as that folder, otherwise into a folder named
+> after the zip. (b) Loose tracks: placed at `<AlbumArtist|Artist>/<Album>/<file>` from
+> tags; a file with neither tag stays at the source root. (c) `finalize` runs
+> `AudioImporter.importFile` on the audio paths the batch wrote (in the background),
+> stamps `track_files.uploaded_by` (column already existed), then emits
+> `UPLOAD_COMPLETED {kind:'audio', imported, failed}`. `AudioImporter` now dedupes
+> concurrent imports of one path (the watcher sees the same files). Client:
+> `MusicUploadModal` (Music home + Library header, `can('edit:media')`), sharing the
+> movie upload's background progress widget.
+
 ### 5.3 Metadata pipeline
 
 | Need | Provider | Key? | Notes |
@@ -544,6 +566,34 @@ existing call sites keep working.
   forever" pin per album/playlist, "Clear offline music".
 - Auth: download URLs are short-lived signed tokens, so cached responses don't embed a
   long-lived JWT.
+
+> **STATUS 2026-10-10 — DONE with changes.**
+> - **Server** (`music/offline/`): `GET /music/offline/policy` →
+>   `{allowed, profile, maxOfflineGbPerDevice}` (allowed = `allowDownloads` and the
+>   user's role in `offline.roles`); `POST /music/offline/token {trackIds[] (≤500),
+>   caps}` → `{items: [{trackId, trackFileId, url, profile, codec, durationSeconds}],
+>   missing, expiresAt, policy}`; `GET /music/offline/files/:trackFileId?t=` — public at
+>   the JWT layer, the token is the credential. Token = `base64url(json{f,p,c,u,e}).
+>   HMAC-SHA256`, key derived from `auth.jwtSecret`, valid 30 min, bound to file +
+>   profile + caps; outstanding links stop working when the admin turns downloads off.
+>   Downloads use the admin `downloadProfile`.
+> - **Service Worker** (`public/sw.js`): API and other traffic is not intercepted;
+>   navigations and `/assets/*` are network-first with a `mu-shell-v1` fallback so the
+>   app can open offline. Any `GET …/music/files/<id>` is served from `music-offline`
+>   when that track file is downloaded — **keyed by track file id only**
+>   (`/__mu-offline/track-file/<id>`), so it matches whatever profile/caps URL the
+>   player asks for (the download profile wins over the stream profile for downloaded
+>   tracks). Range → 206/416, no Range → 200 with `Accept-Ranges`. `/music/art/` falls
+>   back to the cache when offline. Cache hits are posted to pages for LRU.
+> - **Client** (`state/musicOffline.state.ts`): the **page** downloads (not Background
+>   Fetch) — downloads run while Mu is open. Manifest in localStorage
+>   (`services/music-offline-index.ts`). Budget = min(user `music.offlineMaxGb`, admin
+>   `maxOfflineGbPerDevice`); over budget → evict least-recently-played tracks not in a
+>   **Keep** album/playlist. `navigator.storage.persist()` on first download; usage via
+>   `estimate()`. "Download" in track/album option menus and album/playlist headers;
+>   list + limit + "Clear offline music" in **Settings → Playback → Offline Music**.
+>   Offline: `startStream` falls back to a local session and `resolveTrack` to the
+>   stored summary, so queued downloaded tracks play without the server.
 
 ---
 
