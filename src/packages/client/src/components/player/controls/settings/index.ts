@@ -1,6 +1,13 @@
 import type { MediaKind } from '@mu/shared';
 import { AudioTrackPanel } from './AudioTrackPanel';
 import {
+	GaplessItem,
+	ReplayGainItem,
+	ReplayGainPanel,
+	StreamQualityItem,
+	StreamQualityPanel,
+} from './audioItems';
+import {
 	AudioTrackItem,
 	CommentBubblesItem,
 	QualityItem,
@@ -31,8 +38,22 @@ export const VIDEO_SETTINGS_MENU: SettingsMenuSpec = {
 	],
 };
 
+/** The music settings menu. */
+export const AUDIO_SETTINGS_MENU: SettingsMenuSpec = {
+	items: [
+		{ id: 'music-quality', Component: StreamQualityItem },
+		{ id: 'replaygain', Component: ReplayGainItem },
+		{ id: 'gapless', Component: GaplessItem },
+	],
+	panels: [
+		{ id: 'music-quality', Component: StreamQualityPanel },
+		{ id: 'replaygain', Component: ReplayGainPanel },
+	],
+};
+
 const SETTINGS_MENUS: Partial<Record<MediaKind, SettingsMenuSpec>> = {
 	video: VIDEO_SETTINGS_MENU,
+	audio: AUDIO_SETTINGS_MENU,
 };
 
 const EMPTY_MENU: SettingsMenuSpec = { items: [], panels: [] };

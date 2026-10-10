@@ -17,6 +17,7 @@ import {
 	profiles,
 } from '@/state/audio-profiles.state';
 import { audioOutputSuspect, requestAudioReset } from '@/state/audio-reset.state';
+import { activeKind } from '@/state/globalPlayer.state';
 import { videoEnabled } from '@/state/video-effects.state';
 import styles from './EffectsPanel.module.scss';
 import { CompressorTab } from './effects/CompressorTab';
@@ -42,7 +43,9 @@ function getActiveProfileName(allProfiles: AudioProfile[], activeId: string | nu
 export function EffectsPanel() {
 	if (!showEffectsPanel.value) return null;
 
-	const tab = effectsTab.value;
+	// Music has no picture: hide the Video tab (and fall back from it).
+	const isAudio = activeKind.value === 'audio';
+	const tab = isAudio && effectsTab.value === 'video' ? 'eq' : effectsTab.value;
 	const allProfiles = profiles.value;
 	const isEqEnabled = eqEnabled.value;
 	const isCompEnabled = compressorEnabled.value;
@@ -118,22 +121,24 @@ export function EffectsPanel() {
 						{isAnyEnhanceOn && <span class={styles.onBadge}>ON</span>}
 					</span>
 				</button>
-				<button
-					class={`${styles.tab} ${tab === 'video' ? styles.active : ''}`}
-					onClick={() => setEffectsTab('video')}
-				>
-					<span>Video{isVideoEnabled && <span class={styles.onBadge}>ON</span>}</span>
-					{videoProfileName && (
-						<span class={styles.tabProfileName}>{videoProfileName}</span>
-					)}
-				</button>
+				{!isAudio && (
+					<button
+						class={`${styles.tab} ${tab === 'video' ? styles.active : ''}`}
+						onClick={() => setEffectsTab('video')}
+					>
+						<span>Video{isVideoEnabled && <span class={styles.onBadge}>ON</span>}</span>
+						{videoProfileName && (
+							<span class={styles.tabProfileName}>{videoProfileName}</span>
+						)}
+					</button>
+				)}
 			</div>
 
 			<div class={styles.body}>
 				{tab === 'eq' && <EqTab />}
 				{tab === 'compressor' && <CompressorTab />}
 				{tab === 'enhance' && <EnhanceTab />}
-				{tab === 'video' && <VideoTab />}
+				{tab === 'video' && !isAudio && <VideoTab />}
 			</div>
 		</div>
 	);

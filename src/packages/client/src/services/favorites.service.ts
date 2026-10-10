@@ -1,6 +1,8 @@
+import type { AlbumSummary, ArtistSummary, TrackSummary } from '@mu/shared';
 import { api } from './api';
 
-export type FavoriteEntityType = 'person' | 'movie';
+export type MusicFavoriteType = 'artist' | 'album' | 'track';
+export type FavoriteEntityType = 'person' | 'movie' | MusicFavoriteType;
 
 export interface AddFavoriteInput {
 	entityType: FavoriteEntityType;
@@ -10,6 +12,8 @@ export interface AddFavoriteInput {
 	name?: string | null;
 	profileUrl?: string | null;
 	movieId?: string | null;
+	/** Entity id for music types (artist/album/track). */
+	entityId?: string | null;
 }
 
 export interface RemoveFavoriteInput {
@@ -17,11 +21,14 @@ export interface RemoveFavoriteInput {
 	tmdbId?: number | null;
 	name?: string | null;
 	movieId?: string | null;
+	entityId?: string | null;
 }
 
 export interface FavoritesKeys {
 	personKeys: string[];
 	movieIds: string[];
+	/** Music favorites as `<type>:<id>` (artist/album/track). */
+	entityKeys?: string[];
 }
 
 export interface FavoritePerson {
@@ -53,6 +60,9 @@ export interface FavoriteEntry {
 	createdAt: string;
 	person?: FavoritePerson;
 	movie?: FavoriteMovie;
+	artist?: ArtistSummary;
+	album?: AlbumSummary;
+	track?: TrackSummary;
 }
 
 export const favoritesService = {

@@ -6,6 +6,7 @@ import { Select } from '@/components/common/Select';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import { moviesService } from '@/services/movies.service';
+import { musicEnabled } from '@/state/features.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './JobsPanel.module.scss';
 
@@ -46,6 +47,12 @@ const KNOWN_JOB_TYPES = [
 	'external-enrichment',
 	'source-backfill',
 ] as const;
+
+const KIND_OPTIONS = [
+	{ value: '', label: 'All kinds' },
+	{ value: 'movies', label: 'Movies' },
+	{ value: 'music', label: 'Music' },
+];
 
 const STATUS_OPTIONS = [
 	{ value: '', label: 'All statuses' },
@@ -144,6 +151,8 @@ export function JobsPanel() {
 	const [disabledTypes, setDisabledTypes] = useState<Set<string>>(new Set());
 	const [filterOpen, setFilterOpen] = useState(false);
 	const [statusFilter, setStatusFilter] = useState<string>('');
+	/** '' = all, else a feature name ('movies' | 'music'). Shown only when Music is on. */
+	const [kindFilter, setKindFilter] = useState<string>('');
 	const filterRef = useRef<HTMLDivElement>(null);
 	const lastSelectedRef = useRef<string | null>(null);
 	/** Resolved movie titles for visible jobs, keyed by movieId.
@@ -359,6 +368,8 @@ export function JobsPanel() {
 	const filtered = jobs
 		.filter((j: any) => !disabledTypes.has(j.type))
 		.filter((j: any) => (statusFilter ? j.status === statusFilter : true))
+		// Untagged job types are movie/library work.
+		.filter((j: any) => (kindFilter ? (j.feature ?? 'movies') === kindFilter : true))
 		.filter((j: any) =>
 			!q
 				? true
@@ -427,6 +438,15 @@ export function JobsPanel() {
 								>
 									Delete All
 								</Button>
+							</div>
+						)}
+						{musicEnabled.value && (
+							<div class={styles.statusFilter}>
+								<Select
+									value={kindFilter}
+									onChange={(v) => setKindFilter(v)}
+									options={KIND_OPTIONS}
+								/>
 							</div>
 						)}
 						<div class={styles.statusFilter}>

@@ -316,3 +316,20 @@
 	opacity: 0.55;
 	cursor: not-allowed;
 }
+
+.trackList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trackItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.trackRow {
+  flex: 1;
+  min-width: 0;
+}

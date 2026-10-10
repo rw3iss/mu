@@ -1,0 +1,32 @@
+// Waveform seek bar for audio. Sits in the controls' seek row (which is
+// pulled up over the bar's top edge), so it straddles the bar like the
+// video seek line does.
+
+.waveform {
+	position: relative;
+	flex: 1;
+	height: 30px;
+	margin: 0 12px;
+	cursor: pointer;
+	touch-action: none;
+	outline: none;
+	border-radius: 2px;
+
+	&:focus-visible {
+		box-shadow: 0 0 0 1px var(--color-accent);
+	}
+
+	&.dragging {
+		cursor: grabbing;
+	}
+
+	&.mini {
+		height: 22px;
+	}
+}
+
+.canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}

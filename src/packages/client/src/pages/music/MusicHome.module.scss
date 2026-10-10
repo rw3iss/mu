@@ -1,0 +1,92 @@
+.page {
+	padding: 24px 32px;
+	animation: fadeIn 300ms ease;
+
+	@include mobile {
+		padding: 16px;
+	}
+}
+
+.header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-md);
+	margin-bottom: var(--space-lg);
+}
+
+.title {
+	font-size: var(--font-size-3xl);
+	font-weight: var(--font-weight-bold);
+	color: var(--color-text-primary);
+	margin: 0;
+
+	@include mobile {
+		font-size: var(--font-size-2xl);
+	}
+}
+
+.headerLink {
+	background: none;
+	border: none;
+	padding: 0;
+	color: var(--color-accent);
+	font-size: var(--font-size-sm);
+	cursor: pointer;
+
+	&:hover {
+		color: var(--color-accent-hover);
+		text-decoration: underline;
+	}
+}
+
+.section {
+	margin-bottom: var(--space-xl);
+}
+
+.sectionTitle {
+	font-size: var(--font-size-lg);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-label);
+	margin: 0 0 var(--space-sm);
+}
+
+.trackList {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-width: 960px;
+}
+
+.skeletonRail {
+	margin-bottom: var(--space-xl);
+}
+
+.skeletonTitle {
+	width: 180px;
+	height: 18px;
+	border-radius: var(--radius-sm);
+	margin-bottom: var(--space-sm);
+}
+
+.skeletonRow {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: 168px;
+	gap: var(--space-md);
+	overflow: hidden;
+
+	@include mobile {
+		grid-auto-columns: 136px;
+	}
+}
+
+.skeletonTile {
+	aspect-ratio: 1 / 1;
+	border-radius: var(--radius-md);
+}
+
+.comingSoon {
+	max-width: 640px;
+	margin: var(--space-2xl) auto 0;
+}

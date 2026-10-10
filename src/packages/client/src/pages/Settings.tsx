@@ -57,6 +57,8 @@ import styles from './Settings.module.scss';
 import { About } from './settings/About';
 import { Connections } from './settings/Connections';
 import { Matching } from './settings/Matching';
+import { MusicPlaybackPrefs } from './settings/MusicPlaybackPrefs';
+import { MusicSettings } from './settings/MusicSettings';
 import { Notifications } from './settings/Notifications';
 import { Users } from './settings/Users';
 
@@ -184,6 +186,7 @@ type SettingsTab =
 	| 'jobs'
 	| 'server'
 	| 'encoding'
+	| 'music'
 	| 'feedback'
 	| 'about';
 
@@ -201,6 +204,7 @@ const VALID_TABS: SettingsTab[] = [
 	'jobs',
 	'server',
 	'encoding',
+	'music',
 	'feedback',
 	'about',
 ];
@@ -778,6 +782,7 @@ export function Settings(props: SettingsProps) {
 					[
 						{ id: 'library' as SettingsTab, label: 'Library' },
 						{ id: 'encoding' as SettingsTab, label: 'Encoding' },
+						{ id: 'music' as SettingsTab, label: 'Music' },
 						{ id: 'connections' as SettingsTab, label: 'Sources' },
 						{ id: 'matching' as SettingsTab, label: 'Matching' },
 						{ id: 'plugins' as SettingsTab, label: 'Plugins' },
@@ -2073,6 +2078,8 @@ export function Settings(props: SettingsProps) {
 									</span>
 								</div>
 							</div>
+
+							<MusicPlaybackPrefs />
 
 							<div class={styles.actions}>
 								<Button
@@ -3600,6 +3607,9 @@ export function Settings(props: SettingsProps) {
 							<ServerSettings />
 						</div>
 					)}
+
+					{/* Music Tab (admin only) */}
+					{activeTab === 'music' && isAdmin && <MusicSettings />}
 
 					{/* Feedback Tab (admin only) */}
 					{activeTab === 'feedback' && isAdmin && (

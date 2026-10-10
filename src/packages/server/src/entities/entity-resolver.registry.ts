@@ -16,6 +16,11 @@ export interface EntitySummary {
 export interface EntityResolver {
 	exists(id: string): Promise<boolean>;
 	summary(id: string): Promise<EntitySummary | null>;
+	/**
+	 * Optional: the type's own list-row objects (e.g. AlbumSummary) by id, for
+	 * views that render rich cards (favourites). Missing ids are absent.
+	 */
+	cards?(ids: string[], userId?: string): Promise<Map<string, unknown>>;
 }
 
 @Injectable()

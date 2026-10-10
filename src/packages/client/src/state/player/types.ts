@@ -5,10 +5,13 @@ import type { EntityRef, MediaKind } from '@mu/shared';
  * renders whichever groups the active adapter lists, in that order, placing
  * them into fixed zones:
  *
- *  - `seek`      → the full-width seek row
- *  - `title`     → the left section (title + timing; split mode shows timing only)
- *  - `transport` → the centre (skip back / play / skip forward)
+ *  - `seek` / `waveform`             → the full-width seek row
+ *  - `title` / `trackTitle`          → the left section (title + timing; split mode shows timing only)
+ *  - `transport` / `trackTransport`  → the centre (skip/prev · play · skip/next)
  *  - everything else → the right-hand button cluster, in list order
+ *
+ * The `track*`, `waveform`, `shuffle`, `repeat` and `expand` groups belong to
+ * the audio toolbar.
  */
 export type ControlGroupId =
 	| 'seek'
@@ -24,7 +27,13 @@ export type ControlGroupId =
 	| 'settings'
 	| 'mobileOverflow'
 	| 'pip'
-	| 'fullscreen';
+	| 'fullscreen'
+	| 'waveform'
+	| 'trackTitle'
+	| 'trackTransport'
+	| 'shuffle'
+	| 'repeat'
+	| 'expand';
 
 /** A collapsible side / list panel an adapter offers (queue, info, lyrics, …). */
 export interface PanelSpec {

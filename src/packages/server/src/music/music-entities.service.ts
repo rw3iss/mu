@@ -29,6 +29,7 @@ export class MusicEntitiesService implements OnModuleInit {
 				exists: async (id) =>
 					!!db.select({ id: table.id }).from(table).where(eq(table.id, id)).get(),
 				summary: async (id) => this.query.entitySummary(type, id),
+				cards: async (ids, userId) => this.query.summariesById(type, ids, userId),
 			});
 		}
 		this.ratings.onChange((ref) => {

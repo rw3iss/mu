@@ -31,6 +31,13 @@ export const USER_SETTING_KEYS = [
 	// Saved defaults for the Known For / Similar result filter bars, written by
 	// the "Save search as default" button. One blob so a save replaces the set.
 	'movieSearchDefaults',
+	// Music (per-user overrides of the admin music defaults)
+	'music.streamProfile',
+	'music.replayGain',
+	'music.gapless',
+	'music.resumeAfterVideo',
+	'music.crossfadeSeconds',
+	'music.offlineMaxGb',
 	// General
 	'general.startPage',
 	'general.dateFormat',

@@ -70,6 +70,15 @@ else
     fi
 fi
 
+# Music is optional; Settings → Music can change it later.
+if [ -f .env ] && ! grep -q '^MU_FEATURE_MUSIC=' .env; then
+    read -r -p "  Enable the Music feature (music folders, audio player)? [y/N]: " music_yn
+    if [ "${music_yn,,}" = "y" ]; then
+        printf '\nMU_FEATURE_MUSIC=1\n' >> .env
+        log "Music enabled (MU_FEATURE_MUSIC=1 in .env)"
+    fi
+fi
+
 # ── 3. Install ────────────────────────────────────────────────────────────────
 step "3/5  Installing dependencies (pnpm install)"
 pnpm install

@@ -1,4 +1,12 @@
+import type { EntityRef, MediaKind } from '@mu/shared';
 import { api } from './api';
+
+/** Playlist kind — movies are `video`, music is `audio`. Absent = video. */
+export type PlaylistKind = MediaKind;
+
+export function playlistKindOf(p: { kind?: PlaylistKind | null }): PlaylistKind {
+	return p.kind === 'audio' ? 'audio' : 'video';
+}
 
 // ============================================
 // Types
@@ -20,6 +28,10 @@ export interface Playlist {
 	name: string;
 	description: string;
 	movieCount: number;
+	/** `audio` for music playlists; missing on legacy (movie) playlists. */
+	kind?: PlaylistKind;
+	/** Item count for music playlists (server may reuse movieCount). */
+	itemCount?: number;
 	movies?: PlaylistMovieSummary[];
 	/** Visible (read-only) to all users when true. */
 	isPublic?: boolean;
@@ -59,9 +71,11 @@ export const playlistsService = {
 	 * List all playlists for the current user.
 	 * Pass includeMovies=true to get movie summaries (title, year, poster) with each playlist.
 	 */
-	list(options?: { includeMovies?: boolean }): Promise<Playlist[]> {
-		const params = options?.includeMovies ? '?includeMovies=true' : '';
-		return api.get<Playlist[]>(`/playlists${params}`);
+	list(options?: { includeMovies?: boolean; kind?: PlaylistKind }): Promise<Playlist[]> {
+		const p: Record<string, string> = {};
+		if (options?.includeMovies) p.includeMovies = 'true';
+		if (options?.kind) p.kind = options.kind;
+		return api.get<Playlist[]>('/playlists', p);
 	},
 
 	/** Public playlists from every user (read-only). */
@@ -82,8 +96,12 @@ export const playlistsService = {
 	 * @param name - The playlist name.
 	 * @param description - An optional description for the playlist.
 	 */
-	create(name: string, description?: string): Promise<PlaylistDetail> {
-		return api.post<PlaylistDetail>('/playlists', { name, description });
+	create(name: string, description?: string, kind?: PlaylistKind): Promise<PlaylistDetail> {
+		return api.post<PlaylistDetail>('/playlists', {
+			name,
+			description,
+			...(kind ? { kind } : {}),
+		});
 	},
 
 	/**
@@ -138,5 +156,26 @@ export const playlistsService = {
 	 */
 	removeMovie(playlistId: string, movieId: string): Promise<void> {
 		return api.delete<void>(`/playlists/${playlistId}/movies/${movieId}`);
+	},
+
+	/** Playlists containing a (non-movie) item, e.g. a track or album. */
+	getByItem(ref: EntityRef): Promise<MoviePlaylistInfo[]> {
+		return api.get<MoviePlaylistInfo[]>(
+			`/playlists/by-item/${encodeURIComponent(ref.type)}/${encodeURIComponent(ref.id)}`,
+		);
+	},
+
+	/** Add any playable entity (track / album / artist) to a playlist. */
+	addItem(playlistId: string, ref: EntityRef): Promise<void> {
+		return api.post<void>(`/playlists/${playlistId}/items`, {
+			itemType: ref.type,
+			itemId: ref.id,
+		});
+	},
+
+	removeItem(playlistId: string, ref: EntityRef): Promise<void> {
+		return api.delete<void>(
+			`/playlists/${playlistId}/items/${encodeURIComponent(ref.type)}/${encodeURIComponent(ref.id)}`,
+		);
 	},
 };

@@ -7,8 +7,10 @@ import { MediaCard } from '@/components/common/MediaCard';
 import { MediaRow } from '@/components/common/MediaRow';
 import { Select } from '@/components/common/Select';
 import { type FavoriteEntry, favoritesService } from '@/services/favorites.service';
+import { browseMode } from '@/state/browseMode.state';
 import {
 	ensureFavoritesLoaded,
+	favoriteEntityKeys,
 	favoriteMovieIds,
 	favoritePersonKeys,
 } from '@/state/favorites.state';
@@ -19,7 +21,81 @@ interface FavoritesProps {
 }
 
 type SortBy = 'recent' | 'name' | 'role' | 'year';
-type FilterType = 'all' | 'person' | 'movie' | 'actor' | 'director' | 'writer';
+type FilterType =
+	| 'all'
+	| 'person'
+	| 'movie'
+	| 'actor'
+	| 'director'
+	| 'writer'
+	| 'artist'
+	| 'album'
+	| 'track';
+
+const MUSIC_TYPES = new Set<string>(['artist', 'album', 'track']);
+
+const MUSIC_FILTER_OPTIONS = [
+	{ value: 'all', label: 'All' },
+	{ value: 'artist', label: 'Artists' },
+	{ value: 'album', label: 'Albums' },
+	{ value: 'track', label: 'Tracks' },
+];
+
+/** Display name / art / subtitle / link for any favorite entry. */
+function describe(f: FavoriteEntry): {
+	name: string;
+	art: string | null | undefined;
+	sub: string;
+	href: string | undefined;
+	year: number | null;
+} {
+	switch (f.entityType) {
+		case 'person':
+			return {
+				name: f.person?.name ?? '',
+				art: f.person?.profileUrl,
+				sub: f.role ?? f.person?.knownForDepartment ?? 'Person',
+				href: `/person/${f.key}`,
+				year: f.person?.birthday ? parseInt(f.person.birthday.slice(0, 4), 10) : null,
+			};
+		case 'movie':
+			return {
+				name: f.movie?.title ?? '',
+				art: f.movie?.posterUrl,
+				sub: String(f.movie?.year ?? ''),
+				href: f.movie ? `/movie/${f.movie.id}` : undefined,
+				year: f.movie?.year ?? null,
+			};
+		case 'artist':
+			return {
+				name: f.artist?.name ?? '',
+				art: f.artist?.imageUrl,
+				sub: 'Artist',
+				href: `/artist/${f.entityId}`,
+				year: null,
+			};
+		case 'album':
+			return {
+				name: f.album?.title ?? '',
+				art: f.album?.artUrl,
+				sub: [f.album?.artistCredit, f.album?.year].filter(Boolean).join(' · ') || 'Album',
+				href: `/album/${f.entityId}`,
+				year: f.album?.year ?? null,
+			};
+		case 'track':
+			return {
+				name: f.track?.title ?? '',
+				art: f.track?.artUrl,
+				sub:
+					[f.track?.artistCredit, f.track?.albumTitle].filter(Boolean).join(' · ') ||
+					'Track',
+				href: `/track/${f.entityId}`,
+				year: null,
+			};
+		default:
+			return { name: '', art: null, sub: '', href: undefined, year: null };
+	}
+}
 type ViewMode = 'cards' | 'list';
 
 const SORT_OPTIONS = [
@@ -39,7 +115,13 @@ const FILTER_OPTIONS = [
 ];
 
 export function Favorites(_props: FavoritesProps) {
-	const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
+	const music = browseMode.value === 'music';
+	const [allFavorites, setFavorites] = useState<FavoriteEntry[]>([]);
+	// Filtered by browse mode: music shows artists/albums/tracks, movies the rest.
+	const favorites = useMemo(
+		() => allFavorites.filter((f) => MUSIC_TYPES.has(f.entityType) === music),
+		[allFavorites, music],
+	);
 	const [isLoading, setIsLoading] = useState(true);
 	const [query, setQuery] = useState('');
 	const [sortBy, setSortBy] = useState<SortBy>('recent');
@@ -58,7 +140,13 @@ export function Favorites(_props: FavoritesProps) {
 			.list()
 			.then((res) => setFavorites(res.favorites))
 			.finally(() => setIsLoading(false));
-	}, [favoritePersonKeys.value, favoriteMovieIds.value]);
+	}, [favoritePersonKeys.value, favoriteMovieIds.value, favoriteEntityKeys.value]);
+
+	// Reset a filter that doesn't exist in the other mode.
+	useEffect(() => {
+		const opts = music ? MUSIC_FILTER_OPTIONS : FILTER_OPTIONS;
+		if (!opts.some((o) => o.value === filter)) setFilter('all');
+	}, [music]);
 
 	useEffect(() => {
 		localStorage.setItem('mu_favorites_view', viewMode);
@@ -67,6 +155,7 @@ export function Favorites(_props: FavoritesProps) {
 	const visible = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		const filtered = favorites.filter((f) => {
+			if (MUSIC_TYPES.has(filter) && f.entityType !== filter) return false;
 			if (filter === 'person' && f.entityType !== 'person') return false;
 			if (filter === 'movie' && f.entityType !== 'movie') return false;
 			if (filter === 'actor' && (f.entityType !== 'person' || f.role !== 'actor')) {
@@ -79,31 +168,20 @@ export function Favorites(_props: FavoritesProps) {
 				return false;
 			}
 			if (!q) return true;
-			const name = f.person?.name ?? f.movie?.title ?? '';
-			return name.toLowerCase().includes(q);
+			return describe(f).name.toLowerCase().includes(q);
 		});
 		const sorted = [...filtered];
 		sorted.sort((a, b) => {
 			switch (sortBy) {
-				case 'name': {
-					const an = a.person?.name ?? a.movie?.title ?? '';
-					const bn = b.person?.name ?? b.movie?.title ?? '';
-					return an.localeCompare(bn);
-				}
+				case 'name':
+					return describe(a).name.localeCompare(describe(b).name);
 				case 'role': {
 					const ar = a.role ?? a.person?.knownForDepartment ?? '';
 					const br = b.role ?? b.person?.knownForDepartment ?? '';
 					return ar.localeCompare(br);
 				}
-				case 'year': {
-					const ay =
-						a.movie?.year ??
-						(a.person?.birthday ? parseInt(a.person.birthday.slice(0, 4), 10) : 0);
-					const by =
-						b.movie?.year ??
-						(b.person?.birthday ? parseInt(b.person.birthday.slice(0, 4), 10) : 0);
-					return (by ?? 0) - (ay ?? 0);
-				}
+				case 'year':
+					return (describe(b).year ?? 0) - (describe(a).year ?? 0);
 				default:
 					return b.createdAt.localeCompare(a.createdAt);
 			}
@@ -168,7 +246,7 @@ export function Favorites(_props: FavoritesProps) {
 				<Select
 					value={filter}
 					onChange={(v) => setFilter(v as FilterType)}
-					options={FILTER_OPTIONS}
+					options={music ? MUSIC_FILTER_OPTIONS : FILTER_OPTIONS}
 				/>
 				<Select
 					value={sortBy}
@@ -193,7 +271,11 @@ export function Favorites(_props: FavoritesProps) {
 						variant="dashed"
 						icon="star"
 						title="No favorites yet"
-						message="Star a cast member, director, or movie to add it here."
+						message={
+							music
+								? 'Star an artist, album, or track to add it here.'
+								: 'Star a cast member, director, or movie to add it here.'
+						}
 					/>
 				) : (
 					<EmptyState
@@ -224,7 +306,35 @@ function personHref(entry: FavoriteEntry): string {
 	return `/person/${entry.key}`;
 }
 
+function MusicFavoriteButton({ entry }: { entry: FavoriteEntry }) {
+	return (
+		<FavoriteButton
+			entityType={entry.entityType as 'artist' | 'album' | 'track'}
+			entityId={entry.entityId}
+			size="normal"
+			stopPropagation
+		/>
+	);
+}
+
 function FavoriteCard({ entry }: { entry: FavoriteEntry }) {
+	if (MUSIC_TYPES.has(entry.entityType)) {
+		const d = describe(entry);
+		return (
+			<MediaCard
+				posterUrl={d.art ?? ''}
+				alt={d.name}
+				fallbackLabel={d.name}
+				posterShape={entry.entityType === 'artist' ? 'circle' : 'square'}
+				onClick={() => d.href && route(d.href)}
+				href={d.href}
+				class={styles.mediaCard}
+				topRight={<MusicFavoriteButton entry={entry} />}
+				title={d.name}
+				subtitle={<span class={styles.metaCap}>{d.sub}</span>}
+			/>
+		);
+	}
 	const isPerson = entry.entityType === 'person';
 	const href = isPerson
 		? personHref(entry)
@@ -308,6 +418,22 @@ function FavoriteRowSkeleton() {
 }
 
 function FavoriteRow({ entry }: { entry: FavoriteEntry }) {
+	if (MUSIC_TYPES.has(entry.entityType)) {
+		const d = describe(entry);
+		return (
+			<MediaRow
+				thumbUrl={d.art ?? ''}
+				thumbAlt={d.name}
+				thumbFallbackLabel={d.name}
+				thumbShape={entry.entityType === 'artist' ? 'circle' : 'square'}
+				title={d.name}
+				subtitle={d.sub}
+				actions={<MusicFavoriteButton entry={entry} />}
+				onClick={() => d.href && route(d.href)}
+				href={d.href}
+			/>
+		);
+	}
 	const isPerson = entry.entityType === 'person';
 	const href = isPerson
 		? personHref(entry)

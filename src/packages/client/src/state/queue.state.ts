@@ -107,11 +107,13 @@ export function getQueue(kind: MediaKind): Signal<QueueItem[]> {
 export const playQueue = queues.video;
 export const audioQueue = queues.audio;
 
-/** Video-queue size / presence (the only queue surfaced in the UI today). */
+/** Video-queue size / presence. */
 export const queueCount = computed(() => playQueue.value.length);
 export const hasQueue = computed(() => playQueue.value.length > 0);
+/** Audio-queue size ("up next" badge while music is active). */
+export const audioQueueCount = computed(() => audioQueue.value.length);
 
-// ── Audio-only playback modes (persisted; no UI yet) ──
+// ── Audio-only playback modes (persisted) ──
 
 export const audioRepeat = getUiSettingSignal<RepeatMode>('play_queue_audio_repeat', 'off');
 export const audioShuffle = getUiSettingSignal<boolean>('play_queue_audio_shuffle', false);
@@ -169,6 +171,11 @@ export function removeFromQueue(ref: EntityRef): void {
 
 export function clearQueue(kind: MediaKind = 'video'): void {
 	write(kind, []);
+}
+
+/** Replace a kind's whole queue (album / playlist "play all", shuffle). */
+export function setQueue(kind: MediaKind, items: QueueItem[]): void {
+	write(kind, items);
 }
 
 /**
