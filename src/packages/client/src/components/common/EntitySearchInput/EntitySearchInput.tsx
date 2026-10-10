@@ -1,12 +1,19 @@
-import type { MovieSearchHit, PersonSearchHit, SearchHit, SearchSource } from '@mu/shared';
+import type {
+	MovieSearchHit,
+	MusicSearchHit,
+	PersonSearchHit,
+	SearchHit,
+	SearchSource,
+} from '@mu/shared';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { usePopover } from '@/hooks/usePopover';
+import { musicHitHref, musicHitKey } from '@/utils/music-links';
 import styles from './EntitySearchInput.module.scss';
-import { useSearchStream } from './useSearchStream.js';
+import { type SearchStreamType, useSearchStream } from './useSearchStream.js';
 
 export interface EntitySearchInputProps {
-	type: 'movie' | 'person';
+	type: SearchStreamType;
 	placeholder?: string;
 	onSelect: (hit: SearchHit) => void;
 	onView?: (hit: SearchHit) => void;
@@ -16,9 +23,16 @@ export interface EntitySearchInputProps {
 	class?: string;
 }
 
+const isMusic = (hit: SearchHit): hit is MusicSearchHit => 'kind' in hit;
+
 function defaultOnView(hit: SearchHit) {
 	if ('personKey' in hit) {
 		route(`/person/${hit.personKey}`);
+		return;
+	}
+	if (isMusic(hit)) {
+		const href = musicHitHref(hit);
+		if (href) route(href);
 		return;
 	}
 	if (hit.movieId) {
@@ -48,8 +62,16 @@ function movieSubtitle(hit: MovieSearchHit): string {
 	return parts.join(' · ');
 }
 
+function musicSubtitle(hit: MusicSearchHit): string {
+	const kind = hit.kind === 'artist' ? 'Artist' : hit.kind === 'album' ? 'Album' : 'Track';
+	return [kind, hit.artist, hit.kind === 'track' ? hit.album : hit.year, hit.detail]
+		.filter(Boolean)
+		.join(' · ');
+}
+
 function hitKey(hit: SearchHit): string {
 	if ('personKey' in hit) return hit.personKey;
+	if (isMusic(hit)) return musicHitKey(hit);
 	const m = hit as MovieSearchHit;
 	if (m.movieId) return m.movieId;
 	if (m.tmdbId) return `tmdb:${m.tmdbId}`;
@@ -63,6 +85,10 @@ const SOURCE_COLOR: Record<SearchSource, string> = {
 	tmdb: '#3b82f6',
 	omdb: '#f59e0b',
 	trakt: '#ef4444',
+	imdb: '#eab308',
+	musicbrainz: '#ba478f',
+	lastfm: '#d51007',
+	discogs: '#a3a3a3',
 };
 
 export function EntitySearchInput({
@@ -144,17 +170,22 @@ export function EntitySearchInput({
 					)}
 					{visible.map((hit, i) => {
 						const isPerson = 'personKey' in hit;
+						const music = isMusic(hit) ? hit : null;
 						const label = isPerson
 							? (hit as PersonSearchHit).name
-							: (hit as MovieSearchHit).title;
+							: (hit as MovieSearchHit | MusicSearchHit).title;
 						const sub = isPerson
 							? ((hit as PersonSearchHit).role ??
 								(hit as PersonSearchHit).knownFor?.slice(0, 3).join(', ') ??
 								'')
-							: movieSubtitle(hit as MovieSearchHit);
+							: music
+								? musicSubtitle(music)
+								: movieSubtitle(hit as MovieSearchHit);
 						const img = isPerson
 							? (hit as PersonSearchHit).profileUrl
-							: (hit as MovieSearchHit).posterUrl;
+							: music
+								? music.artUrl
+								: (hit as MovieSearchHit).posterUrl;
 						return (
 							<li
 								key={hitKey(hit)}

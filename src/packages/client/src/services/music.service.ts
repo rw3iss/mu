@@ -1,10 +1,16 @@
 import type {
 	AlbumDetail,
+	AlbumFilmLink,
 	AlbumSummary,
 	ArtistDetail,
 	ArtistSummary,
 	AudioQuality,
 	AudioStreamSession,
+	MbArtistPreview,
+	MbReleaseGroupPreview,
+	MusicDiscoverRequest,
+	MusicDiscoverResponse,
+	MusicDiscoverSeedSuggestion,
 	MusicSettings,
 	TrackDetail,
 	TrackSummary,
@@ -102,6 +108,24 @@ export const musicService = {
 	search(q: string): Promise<MusicSearchResult> {
 		return api.get('/music/search', { q });
 	},
+	/** Discover (plan Phase 6): seeds → grouped recommendations. */
+	discover(body: MusicDiscoverRequest): Promise<MusicDiscoverResponse> {
+		return api.post('/music/discover', body);
+	},
+	discoverSeeds(): Promise<MusicDiscoverSeedSuggestion[]> {
+		return api.get('/music/discover/seeds');
+	},
+	/** MusicBrainz previews for non-library `mb:` stub pages. */
+	mbReleaseGroup(mbid: string): Promise<MbReleaseGroupPreview> {
+		return api.get(`/music/mb/release-group/${encodeURIComponent(mbid)}`);
+	},
+	mbArtist(mbid: string): Promise<MbArtistPreview> {
+		return api.get(`/music/mb/artist/${encodeURIComponent(mbid)}`);
+	},
+	/** Library films this album is the soundtrack of. */
+	albumFilms(albumId: string): Promise<AlbumFilmLink[]> {
+		return api.get(`/music/albums/${encodeURIComponent(albumId)}/films`);
+	},
 	home(): Promise<MusicHome> {
 		return api.get('/music/home');
 	},
@@ -109,7 +133,10 @@ export const musicService = {
 	albumTrackIds(albumId: string): Promise<string[]> {
 		return api.get(`/music/albums/${encodeURIComponent(albumId)}/track-ids`);
 	},
-	startStream(trackId: string, opts: { profile?: AudioQuality } = {}): Promise<AudioStreamSession> {
+	startStream(
+		trackId: string,
+		opts: { profile?: AudioQuality } = {},
+	): Promise<AudioStreamSession> {
 		const p: Record<string, string> = { caps: audioCapabilities().join(',') };
 		if (opts.profile) p.profile = opts.profile;
 		return api.get(`/music/stream/${encodeURIComponent(trackId)}/start`, p);
@@ -123,10 +150,15 @@ export const musicService = {
 	waveform(trackFileId: string): Promise<WaveformData> {
 		return api.get(`/music/waveform/${encodeURIComponent(trackFileId)}`);
 	},
-	lyrics(trackId: string): Promise<{ plain: string | null; syncedLrc: string | null; source: string | null } | null> {
+	lyrics(
+		trackId: string,
+	): Promise<{ plain: string | null; syncedLrc: string | null; source: string | null } | null> {
 		return api.get(`/music/tracks/${encodeURIComponent(trackId)}/lyrics`);
 	},
-	saveLyrics(trackId: string, body: { plain: string | null; syncedLrc: string | null }): Promise<void> {
+	saveLyrics(
+		trackId: string,
+		body: { plain: string | null; syncedLrc: string | null },
+	): Promise<void> {
 		return api.put(`/music/tracks/${encodeURIComponent(trackId)}/lyrics`, body);
 	},
 	settings(): Promise<MusicSettings> {

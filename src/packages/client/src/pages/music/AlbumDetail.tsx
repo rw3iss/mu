@@ -14,6 +14,7 @@ import { EntityRating } from '@/components/common/EntityRating';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
+import { AlbumFilmLinks } from '@/components/music/AlbumFilmLinks';
 import { ArtistLinks, InlineLink } from '@/components/music/InlineLink';
 import { AlbumCard, MusicRail } from '@/components/music/MusicCards';
 import { TrackRow } from '@/components/music/TrackRow';
@@ -249,6 +250,7 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 								))}
 							</div>
 						)}
+						<AlbumFilmLinks albumId={album.id} class={styles.byline} />
 						<div class={styles.ratingRow}>
 							<EntityRating
 								entity={{ type: 'album', id: album.id }}

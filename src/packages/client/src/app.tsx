@@ -16,8 +16,7 @@ import { Library } from '@/pages/Library';
 import { Login } from '@/pages/Login';
 import { MembersPage } from '@/pages/Members/MembersPage';
 import { MovieDetail } from '@/pages/MovieDetail';
-import { AlbumDetail } from '@/pages/music/AlbumDetail';
-import { ArtistDetail } from '@/pages/music/ArtistDetail';
+import { AlbumRoute, ArtistRoute } from '@/pages/music/MbStubPages';
 import { MusicDiscover } from '@/pages/music/MusicDiscover';
 import { MusicHome } from '@/pages/music/MusicHome';
 import { MusicLibrary } from '@/pages/music/MusicLibrary';
@@ -310,8 +309,8 @@ export function App() {
 						<MusicGate path="/music" component={MusicHome} />
 						<MusicGate path="/music/library" component={MusicLibrary} />
 						<MusicGate path="/music/discover" component={MusicDiscover} />
-						<MusicGate path="/album/:id" component={AlbumDetail} />
-						<MusicGate path="/artist/:id" component={ArtistDetail} />
+						<MusicGate path="/album/:id" component={AlbumRoute} />
+						<MusicGate path="/artist/:id" component={ArtistRoute} />
 						<MusicGate path="/track/:id" component={TrackDetail} />
 						<Library path="/library" />
 						<MovieDetail path="/movie/:id" />

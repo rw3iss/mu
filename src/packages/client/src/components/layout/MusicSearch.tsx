@@ -1,52 +1,61 @@
+import type { MusicSearchHit } from '@mu/shared';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { currentPath, currentUrl } from '@/app';
+import { useSearchStream } from '@/components/common/EntitySearchInput/useSearchStream';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { useDebounce } from '@/hooks/useDebounce';
-import { type MusicSearchResult, musicService } from '@/services/music.service';
+import { musicHitHref, musicHitKey } from '@/utils/music-links';
 import styles from './MusicSearch.module.scss';
 import topStyles from './TopBar.module.scss';
 
 interface FlatItem {
 	kind: 'artist' | 'album' | 'track';
-	id: string;
+	key: string;
 	title: string;
 	subtitle: string;
 	art: string | null;
 	href: string;
+	owned: boolean;
 }
 
 const LIBRARY = '/music/library';
+const GROUP_LIMIT: Record<FlatItem['kind'], number> = { artist: 5, album: 6, track: 8 };
+const KIND_ORDER: FlatItem['kind'][] = ['artist', 'album', 'track'];
 
-function flatten(r: MusicSearchResult | null): FlatItem[] {
-	if (!r) return [];
-	return [
-		...r.artists.slice(0, 5).map<FlatItem>((a) => ({
-			kind: 'artist',
-			id: a.id,
-			title: a.name,
-			subtitle: a.albumCount != null ? `${a.albumCount} albums` : 'Artist',
-			art: a.imageUrl,
-			href: `/artist/${a.id}`,
-		})),
-		...r.albums.slice(0, 6).map<FlatItem>((a) => ({
-			kind: 'album',
-			id: a.id,
-			title: a.title,
-			subtitle: [a.artistCredit, a.year].filter(Boolean).join(' · '),
-			art: a.artUrl,
-			href: `/album/${a.id}`,
-		})),
-		...r.tracks.slice(0, 8).map<FlatItem>((t) => ({
-			kind: 'track',
-			id: t.id,
-			title: t.title,
-			subtitle: [t.artistCredit, t.albumTitle].filter(Boolean).join(' · '),
-			art: t.artUrl,
-			href: `/track/${t.id}`,
-		})),
-	];
+function subtitleOf(h: MusicSearchHit): string {
+	if (h.kind === 'artist') return h.detail ?? 'Artist';
+	if (h.kind === 'album') return [h.artist, h.year].filter(Boolean).join(' · ');
+	return [h.artist, h.album].filter(Boolean).join(' · ');
+}
+
+/** Group streamed hits: artists → albums → tracks; library first, then match score. */
+function flatten(hits: MusicSearchHit[]): FlatItem[] {
+	const out: FlatItem[] = [];
+	for (const kind of KIND_ORDER) {
+		const group = hits
+			.filter((h) => h.kind === kind)
+			.map((h) => ({ h, href: musicHitHref(h) }))
+			.filter((x): x is { h: MusicSearchHit; href: string } => !!x.href)
+			.sort(
+				(a, b) =>
+					Number(b.h.isOwned) - Number(a.h.isOwned) || b.h.matchScore - a.h.matchScore,
+			)
+			.slice(0, GROUP_LIMIT[kind]);
+		for (const { h, href } of group) {
+			out.push({
+				kind,
+				key: musicHitKey(h),
+				title: h.title,
+				subtitle: subtitleOf(h),
+				art: h.artUrl ?? null,
+				href,
+				owned: h.isOwned,
+			});
+		}
+	}
+	return out;
 }
 
 const GROUP_LABEL: Record<FlatItem['kind'], string> = {
@@ -67,19 +76,20 @@ function goToLibrary(q: string) {
 
 /**
  * Header search in music mode: debounced grouped dropdown (artists / albums /
- * tracks) from `musicService.search`, keyboard navigable; Enter without a
+ * tracks) streamed from the federated `/search/music/stream` (library first,
+ * then MusicBrainz → `mb:` stub pages), keyboard navigable; Enter without a
  * highlighted row searches the music library (`/music/library?q=`).
  */
 export function MusicSearch() {
 	const [value, setValue] = useState('');
-	const [results, setResults] = useState<MusicSearchResult | null>(null);
-	const [loading, setLoading] = useState(false);
 	const [open, setOpen] = useState(false);
 	const [active, setActive] = useState(-1);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const wrapRef = useRef<HTMLFormElement>(null);
-	const debounced = useDebounce(value.trim(), 200);
+	const debounced = useDebounce(value.trim(), 250);
+	const { results, isLoading: loading } = useSearchStream('music', debounced);
 	const items = useMemo(() => flatten(results), [results]);
+	const searched = debounced.length >= 2;
 
 	// Mirror ?q= from the library URL when not typing (back/forward, deep links).
 	useEffect(() => {
@@ -89,28 +99,8 @@ export function MusicSearch() {
 		setValue(q);
 	}, [currentUrl.value]);
 
-	useEffect(() => {
-		if (!debounced) {
-			setResults(null);
-			setLoading(false);
-			return;
-		}
-		let cancelled = false;
-		setLoading(true);
-		musicService
-			.search(debounced)
-			.then((r) => {
-				if (!cancelled) {
-					setResults(r);
-					setActive(-1);
-				}
-			})
-			.catch(() => !cancelled && setResults({ artists: [], albums: [], tracks: [] }))
-			.finally(() => !cancelled && setLoading(false));
-		return () => {
-			cancelled = true;
-		};
-	}, [debounced]);
+	// Reset the highlight when the query changes (not on every streamed batch).
+	useEffect(() => setActive(-1), [debounced]);
 
 	// Close on outside click.
 	useEffect(() => {
@@ -157,7 +147,6 @@ export function MusicSearch() {
 
 	const clear = () => {
 		setValue('');
-		setResults(null);
 		if (currentPath.value === LIBRARY) goToLibrary('');
 		inputRef.current?.focus();
 	};
@@ -202,14 +191,17 @@ export function MusicSearch() {
 			)}
 			{showDropdown && (
 				<div class={styles.dropdown} id={listId} role="listbox">
-					{loading && items.length === 0 && <div class={styles.empty}>Searching…</div>}
-					{!loading && results && items.length === 0 && (
+					{!searched && <div class={styles.empty}>Type at least 2 characters</div>}
+					{searched && loading && items.length === 0 && (
+						<div class={styles.empty}>Searching…</div>
+					)}
+					{searched && !loading && items.length === 0 && (
 						<div class={styles.empty}>No matches for “{value.trim()}”</div>
 					)}
 					{items.map((item, i) => {
 						const header = i === 0 || items[i - 1]!.kind !== item.kind;
 						return (
-							<div key={`${item.kind}:${item.id}`}>
+							<div key={item.key}>
 								{header && <div class={styles.group}>{GROUP_LABEL[item.kind]}</div>}
 								<div
 									id={`${listId}-${i}`}
@@ -234,10 +226,18 @@ export function MusicSearch() {
 											<span class={styles.subtitle}>{item.subtitle}</span>
 										)}
 									</span>
+									{!item.owned && (
+										<span class={styles.badge} title="Not in your library">
+											MusicBrainz
+										</span>
+									)}
 								</div>
 							</div>
 						);
 					})}
+					{searched && loading && items.length > 0 && (
+						<div class={styles.more}>Searching more sources…</div>
+					)}
 					{items.length > 0 && (
 						<button
 							type="button"

@@ -1,7 +1,37 @@
-import type { MovieSearchHit, PersonSearchHit, SearchEvent, SearchSource } from '@mu/shared';
+import type {
+	MovieSearchHit,
+	MusicSearchHit,
+	PersonSearchHit,
+	SearchEvent,
+	SearchSource,
+} from '@mu/shared';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { musicHitKey } from '@/utils/music-links';
 
-type Hit<T extends 'movie' | 'person'> = T extends 'movie' ? MovieSearchHit : PersonSearchHit;
+export type SearchStreamType = 'movie' | 'person' | 'music';
+
+type Hit<T extends SearchStreamType> = T extends 'movie'
+	? MovieSearchHit
+	: T extends 'person'
+		? PersonSearchHit
+		: MusicSearchHit;
+
+const STREAM_PATH: Record<SearchStreamType, string> = {
+	movie: 'movies',
+	person: 'people',
+	music: 'music',
+};
+
+/**
+ * Alias keys for a music hit. The server re-emits a hit once a later source
+ * adds its MBID, so an earlier copy keyed only by local id must be replaced.
+ */
+function musicAliases(h: MusicSearchHit): string[] {
+	const keys = [musicHitKey(h)];
+	if (h.localId) keys.push(`${h.kind}:local:${h.localId}`);
+	if (h.mbid) keys.push(`${h.kind}:mb:${h.mbid}`);
+	return keys;
+}
 
 function movieKey(h: MovieSearchHit): string {
 	if (h.imdbId) return `imdb:${h.imdbId}`;
@@ -23,7 +53,7 @@ function tierFor(query: string, isOwned: boolean, label: string): number {
 	return isOwned ? 4 : 5;
 }
 
-export interface UseSearchStreamResult<T extends 'movie' | 'person'> {
+export interface UseSearchStreamResult<T extends SearchStreamType> {
 	results: Hit<T>[];
 	isLoading: boolean;
 	sources: SearchSource[];
@@ -36,7 +66,7 @@ export interface UseSearchStreamResult<T extends 'movie' | 'person'> {
  * and resorts by (tier, matchScore) on each batch. Auto-closes when
  * the server emits the `done` event, on unmount, or on query change.
  */
-export function useSearchStream<T extends 'movie' | 'person'>(
+export function useSearchStream<T extends SearchStreamType>(
 	type: T,
 	query: string,
 ): UseSearchStreamResult<T> {
@@ -58,7 +88,7 @@ export function useSearchStream<T extends 'movie' | 'person'>(
 		}
 
 		setLoading(true);
-		const path = type === 'movie' ? 'movies' : 'people';
+		const path = STREAM_PATH[type];
 		// EventSource can't set Authorization headers, so the JWT
 		// rides along as a query-string token (same pattern HLS.js
 		// and subtitle endpoints use). The server's auth guard checks
@@ -71,7 +101,13 @@ export function useSearchStream<T extends 'movie' | 'person'>(
 		esRef.current = es;
 
 		const keyOf = (h: Hit<T>) =>
-			type === 'movie' ? movieKey(h as MovieSearchHit) : personKey(h as PersonSearchHit);
+			type === 'movie'
+				? movieKey(h as MovieSearchHit)
+				: type === 'person'
+					? personKey(h as PersonSearchHit)
+					: musicHitKey(h as MusicSearchHit);
+		const aliasesOf = (h: Hit<T>): string[] =>
+			type === 'music' ? musicAliases(h as MusicSearchHit) : [keyOf(h)];
 
 		es.onmessage = (msg) => {
 			let ev: SearchEvent<Hit<T>>;
@@ -85,7 +121,14 @@ export function useSearchStream<T extends 'movie' | 'person'>(
 				setResults((prev) => {
 					const byKey = new Map<string, Hit<T>>();
 					for (const h of prev) byKey.set(keyOf(h), h);
-					for (const h of ev.items) byKey.set(keyOf(h), h);
+					for (const h of ev.items) {
+						// Drop earlier copies known under another alias (local id → MBID).
+						const aliases = new Set(aliasesOf(h));
+						for (const [k, old] of byKey) {
+							if (aliasesOf(old).some((a) => aliases.has(a))) byKey.delete(k);
+						}
+						byKey.set(keyOf(h), h);
+					}
 					const all = Array.from(byKey.values());
 					all.sort((a, b) => {
 						const labelA = ((a as any).title ?? (a as any).name ?? '') as string;
