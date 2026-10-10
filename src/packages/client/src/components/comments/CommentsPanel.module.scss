@@ -181,3 +181,13 @@
 		color: var(--color-accent);
 	}
 }
+
+.atTime {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+}

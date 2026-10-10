@@ -515,13 +515,31 @@ export async function playTrack(track: TrackSummary, opts?: PlayMediaOptions): P
 	await playTrackNow(track, { startPosition: opts?.fromBeginning ? 0 : undefined });
 }
 
-export async function playTrackById(trackId: string, opts?: PlayMediaOptions): Promise<void> {
+export async function playTrackById(
+	trackId: string,
+	opts?: PlayMediaOptions & { startAt?: number },
+): Promise<void> {
 	const t = await resolveTrack(trackId);
 	if (!t) {
 		notifyError('Could not load this track.');
 		return;
 	}
+	if (opts?.startAt != null) {
+		playbackContext.value = { type: 'queue', id: null, title: 'Queue' };
+		contextTracks.value = [];
+		await playTrackNow(t, { startPosition: opts.startAt });
+		return;
+	}
 	await playTrack(t, opts);
+}
+
+/** Seek within a track: in place if it is playing, else start it at `t`. */
+export async function playTrackAt(trackId: string, t: number): Promise<void> {
+	if (currentTrack.value?.track.id === trackId) {
+		seekAudio(t);
+		return;
+	}
+	await playTrackById(trackId, { startAt: t });
 }
 
 /** Jump to an Up Next entry (dropping everything ahead of it); context kept. */
