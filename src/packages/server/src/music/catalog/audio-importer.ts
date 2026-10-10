@@ -32,7 +32,20 @@ export class AudioImporter implements MediaImporter, OnModuleInit {
 		this.registry.register(this);
 	}
 
-	async importFile(sourceId: string, filePath: string): Promise<ImportFileResult> {
+	/** In-flight imports by path: the watcher and an upload finalize can race on one file. */
+	private readonly inflight = new Map<string, Promise<ImportFileResult>>();
+
+	importFile(sourceId: string, filePath: string): Promise<ImportFileResult> {
+		const running = this.inflight.get(filePath);
+		if (running) return running;
+		const p = this.doImportFile(sourceId, filePath).finally(() =>
+			this.inflight.delete(filePath),
+		);
+		this.inflight.set(filePath, p);
+		return p;
+	}
+
+	private async doImportFile(sourceId: string, filePath: string): Promise<ImportFileResult> {
 		try {
 			const s = await stat(filePath);
 			const file = { size: s.size, modifiedAt: s.mtime.toISOString() };
