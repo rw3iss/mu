@@ -2,7 +2,7 @@ import { nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movieMetadata, movies, type NewMovie, userWatchlist } from '../database/schema/index.js';
+import { entityWatchlist, movieMetadata, movies, type NewMovie } from '../database/schema/index.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 
 export interface BookmarkInput {
@@ -21,7 +21,7 @@ export interface BookmarkInput {
  *
  * `POST /bookmarks` accepts a TMDB id (or imdb id + title fallback),
  * fetches full metadata if missing, upserts the movie row, and adds
- * a `user_watchlist` entry so it shows up alongside the user's other
+ * an `entity_watchlist` entry so it shows up alongside the user's other
  * "want to watch" list.
  *
  * `DELETE /bookmarks/:movieId` removes the watchlist entry. The movie
@@ -66,11 +66,12 @@ export class BookmarksService {
 		// Add to watchlist (idempotent — unique index catches duplicates).
 		try {
 			this.database.db
-				.insert(userWatchlist)
+				.insert(entityWatchlist)
 				.values({
 					id: crypto.randomUUID(),
 					userId,
-					movieId,
+					entityType: 'movie',
+					entityId: movieId,
 					addedAt: nowISO(),
 				})
 				.run();
@@ -87,8 +88,14 @@ export class BookmarksService {
 	/** Remove a bookmark from the user's watchlist. */
 	removeBookmark(userId: string, movieId: string): boolean {
 		const result = this.database.db
-			.delete(userWatchlist)
-			.where(and(eq(userWatchlist.userId, userId), eq(userWatchlist.movieId, movieId)))
+			.delete(entityWatchlist)
+			.where(
+				and(
+					eq(entityWatchlist.userId, userId),
+					eq(entityWatchlist.entityType, 'movie'),
+					eq(entityWatchlist.entityId, movieId),
+				),
+			)
 			.run();
 		return result.changes > 0;
 	}
@@ -113,12 +120,18 @@ export class BookmarksService {
 				overview: movies.overview,
 				tmdbId: movies.tmdbId,
 				imdbId: movies.imdbId,
-				addedAt: userWatchlist.addedAt,
+				addedAt: entityWatchlist.addedAt,
 			})
-			.from(userWatchlist)
-			.innerJoin(movies, eq(movies.id, userWatchlist.movieId))
-			.where(and(eq(userWatchlist.userId, userId), eq(movies.source, 'bookmark')))
-			.orderBy(desc(userWatchlist.addedAt))
+			.from(entityWatchlist)
+			.innerJoin(
+				movies,
+				and(
+					eq(movies.id, entityWatchlist.entityId),
+					eq(entityWatchlist.entityType, 'movie'),
+				),
+			)
+			.where(and(eq(entityWatchlist.userId, userId), eq(movies.source, 'bookmark')))
+			.orderBy(desc(entityWatchlist.addedAt))
 			.all();
 		return rows;
 	}

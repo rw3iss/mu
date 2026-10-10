@@ -1,3 +1,4 @@
+import { isEntityType } from '@mu/shared';
 import { BadRequestException, Body, Controller, Delete, Get, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
@@ -27,14 +28,19 @@ export class FavoritesController {
 	@RequireAction('view:own-data')
 	@Post()
 	async add(@CurrentUser('id') userId: string, @Body() body: AddFavoriteInput) {
-		if (!body || (body.entityType !== 'person' && body.entityType !== 'movie')) {
-			throw new BadRequestException('entityType must be "person" or "movie"');
+		if (!body || !isEntityType(body.entityType)) {
+			throw new BadRequestException(
+				'entityType must be one of "person", "movie", "artist", "album", "track"',
+			);
 		}
 		if (body.entityType === 'movie' && !body.movieId) {
 			throw new BadRequestException('movieId required for movie favorites');
 		}
 		if (body.entityType === 'person' && !body.tmdbId && !body.name) {
 			throw new BadRequestException('tmdbId or name required for person favorites');
+		}
+		if (body.entityType !== 'person' && body.entityType !== 'movie' && !body.entityId) {
+			throw new BadRequestException(`entityId required for ${body.entityType} favorites`);
 		}
 		const fav = await this.favorites.add(userId, body);
 		return { favorite: fav, ok: true };
@@ -43,8 +49,10 @@ export class FavoritesController {
 	@RequireAction('view:own-data')
 	@Delete()
 	async remove(@CurrentUser('id') userId: string, @Body() body: RemoveFavoriteInput) {
-		if (!body || (body.entityType !== 'person' && body.entityType !== 'movie')) {
-			throw new BadRequestException('entityType must be "person" or "movie"');
+		if (!body || !isEntityType(body.entityType)) {
+			throw new BadRequestException(
+				'entityType must be one of "person", "movie", "artist", "album", "track"',
+			);
 		}
 		const removed = await this.favorites.remove(userId, body);
 		return { ok: removed };

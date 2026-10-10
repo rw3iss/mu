@@ -22,10 +22,10 @@ import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { AuthCacheService } from '../common/permissions/auth-cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
+	entityRatings,
 	favorites as favoritesTable,
 	movies,
 	streamSessions,
-	userRatings,
 	users,
 } from '../database/schema/index.js';
 import { FavoritesService } from '../favorites/favorites.service.js';
@@ -433,9 +433,15 @@ export class ProfileService {
 		const map = new Map<string, number>();
 		if (movieIds.length === 0) return map;
 		const rows = this.database.db
-			.select({ movieId: userRatings.movieId, rating: userRatings.rating })
-			.from(userRatings)
-			.where(and(eq(userRatings.userId, userId), inArray(userRatings.movieId, movieIds)))
+			.select({ movieId: entityRatings.entityId, rating: entityRatings.rating })
+			.from(entityRatings)
+			.where(
+				and(
+					eq(entityRatings.userId, userId),
+					eq(entityRatings.entityType, 'movie'),
+					inArray(entityRatings.entityId, movieIds),
+				),
+			)
 			.all();
 		for (const r of rows) map.set(r.movieId, r.rating);
 		return map;

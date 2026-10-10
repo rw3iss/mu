@@ -1,4 +1,8 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { forwardRef, Module, type OnModuleInit } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
+import { DatabaseService } from '../database/database.service.js';
+import { movies } from '../database/schema/index.js';
+import { EntityResolverRegistry } from '../entities/entity-resolver.registry.js';
 import { LibraryModule } from '../library/library.module.js';
 import { MediaModule } from '../media/media.module.js';
 import { MetadataModule } from '../metadata/metadata.module.js';
@@ -33,4 +37,36 @@ import { WatchlistService } from './watchlist.service.js';
 	providers: [MoviesService, RatingsService, HistoryService, WatchlistService, PlaylistsService],
 	exports: [MoviesService, RatingsService, HistoryService, WatchlistService, PlaylistsService],
 })
-export class MoviesModule {}
+export class MoviesModule implements OnModuleInit {
+	constructor(
+		private readonly registry: EntityResolverRegistry,
+		private readonly database: DatabaseService,
+	) {}
+
+	onModuleInit() {
+		const row = (id: string) =>
+			this.database.db
+				.select({
+					id: movies.id,
+					title: movies.title,
+					poster: movies.posterUrl,
+					thumb: movies.thumbnailUrl,
+				})
+				.from(movies)
+				.where(eq(movies.id, id))
+				.get();
+		this.registry.register('movie', {
+			exists: async (id) => !!row(id),
+			summary: async (id) => {
+				const m = row(id);
+				return m
+					? {
+							title: m.title,
+							imageUrl: m.poster || m.thumb || null,
+							url: `/movie/${m.id}`,
+						}
+					: null;
+			},
+		});
+	}
+}

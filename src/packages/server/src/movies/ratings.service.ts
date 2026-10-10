@@ -1,55 +1,34 @@
-import { nowISO, paginationDefaults, RATING_MAX, RATING_MIN } from '@mu/shared';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { paginationDefaults } from '@mu/shared';
+import { Injectable } from '@nestjs/common';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movies, userRatings } from '../database/schema/index.js';
+import { entityRatings, movies } from '../database/schema/index.js';
+import { EntityRatingsService } from '../entities/entity-ratings.service.js';
 
+const isMovie = eq(entityRatings.entityType, 'movie');
+
+/** Movie-facing wrapper over the generic EntityRatingsService. */
 @Injectable()
 export class RatingsService {
-	constructor(private readonly database: DatabaseService) {}
+	constructor(
+		private readonly database: DatabaseService,
+		private readonly ratings: EntityRatingsService,
+	) {}
 
 	rate(userId: string, movieId: string, rating: number) {
-		if (rating < RATING_MIN || rating > RATING_MAX) {
-			throw new BadRequestException(`Rating must be between ${RATING_MIN} and ${RATING_MAX}`);
-		}
-
-		const now = nowISO();
-		const existing = this.database.db
-			.select()
-			.from(userRatings)
-			.where(and(eq(userRatings.userId, userId), eq(userRatings.movieId, movieId)))
-			.get();
-
-		if (existing) {
-			this.database.db
-				.update(userRatings)
-				.set({ rating, updatedAt: now })
-				.where(eq(userRatings.id, existing.id))
-				.run();
-			return { ...existing, rating, updatedAt: now };
-		}
-
-		const id = crypto.randomUUID();
-		this.database.db
-			.insert(userRatings)
-			.values({
-				id,
-				userId,
-				movieId,
-				rating,
-				createdAt: now,
-				updatedAt: now,
-			})
-			.run();
-
-		return { id, userId, movieId, rating, createdAt: now, updatedAt: now };
+		const row = this.ratings.rate(userId, { type: 'movie', id: movieId }, rating);
+		return {
+			id: row.id,
+			userId: row.userId,
+			movieId: row.entityId,
+			rating: row.rating,
+			createdAt: row.createdAt,
+			updatedAt: row.updatedAt,
+		};
 	}
 
 	removeRating(userId: string, movieId: string) {
-		this.database.db
-			.delete(userRatings)
-			.where(and(eq(userRatings.userId, userId), eq(userRatings.movieId, movieId)))
-			.run();
+		this.ratings.remove(userId, { type: 'movie', id: movieId });
 	}
 
 	getUserRatings(userId: string, page?: number, pageSize?: number) {
@@ -57,27 +36,27 @@ export class RatingsService {
 
 		const data = this.database.db
 			.select({
-				id: userRatings.id,
-				movieId: userRatings.movieId,
-				rating: userRatings.rating,
-				createdAt: userRatings.createdAt,
-				updatedAt: userRatings.updatedAt,
+				id: entityRatings.id,
+				movieId: entityRatings.entityId,
+				rating: entityRatings.rating,
+				createdAt: entityRatings.createdAt,
+				updatedAt: entityRatings.updatedAt,
 				movieTitle: movies.title,
 				movieYear: movies.year,
 				moviePosterUrl: movies.posterUrl,
 			})
-			.from(userRatings)
-			.innerJoin(movies, eq(userRatings.movieId, movies.id))
-			.where(eq(userRatings.userId, userId))
-			.orderBy(sql`${userRatings.updatedAt} DESC`)
+			.from(entityRatings)
+			.innerJoin(movies, and(isMovie, eq(entityRatings.entityId, movies.id)))
+			.where(eq(entityRatings.userId, userId))
+			.orderBy(sql`${entityRatings.updatedAt} DESC`)
 			.limit(ps)
 			.offset(offset)
 			.all();
 
 		const totalResult = this.database.db
 			.select({ count: count() })
-			.from(userRatings)
-			.where(eq(userRatings.userId, userId))
+			.from(entityRatings)
+			.where(and(eq(entityRatings.userId, userId), isMovie))
 			.get();
 		const total = totalResult?.count ?? 0;
 
@@ -98,7 +77,7 @@ export class RatingsService {
 			.from(movies)
 			.where(
 				sql`${movies.id} NOT IN (
-          SELECT ${userRatings.movieId} FROM ${userRatings} WHERE ${userRatings.userId} = ${userId}
+          SELECT ${entityRatings.entityId} FROM ${entityRatings} WHERE ${entityRatings.userId} = ${userId} AND ${entityRatings.entityType} = 'movie'
         )`,
 			)
 			.orderBy(sql`${movies.addedAt} DESC`)
@@ -111,7 +90,7 @@ export class RatingsService {
 			.from(movies)
 			.where(
 				sql`${movies.id} NOT IN (
-          SELECT ${userRatings.movieId} FROM ${userRatings} WHERE ${userRatings.userId} = ${userId}
+          SELECT ${entityRatings.entityId} FROM ${entityRatings} WHERE ${entityRatings.userId} = ${userId} AND ${entityRatings.entityType} = 'movie'
         )`,
 			)
 			.get();

@@ -1,11 +1,20 @@
 import { nowISO } from '@mu/shared';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { favorites, movies, people } from '../database/schema/index.js';
+import { EntityLifecycleService } from '../entities/entity-lifecycle.service.js';
+import {
+	EntityResolverRegistry,
+	type EntitySummary,
+} from '../entities/entity-resolver.registry.js';
 import { PeopleService, personKey } from '../people/people.service.js';
 
-export type FavoriteEntityType = 'person' | 'movie';
+export type FavoriteEntityType = 'person' | 'movie' | 'artist' | 'album' | 'track';
+
+/** Types with bespoke identifier handling; the rest go through `entityId` + resolver registry. */
+const isLegacyType = (t: FavoriteEntityType): t is 'person' | 'movie' =>
+	t === 'person' || t === 'movie';
 
 export interface AddFavoriteInput {
 	entityType: FavoriteEntityType;
@@ -17,6 +26,8 @@ export interface AddFavoriteInput {
 	profileUrl?: string | null;
 	// Movie identifier:
 	movieId?: string | null;
+	// Any other entity type (artist/album/track): its id, validated by the resolver registry.
+	entityId?: string | null;
 }
 
 export interface RemoveFavoriteInput {
@@ -58,6 +69,8 @@ export interface FavoriteView {
 		tmdbId: number | null;
 		runtimeMinutes: number | null;
 	};
+	/** Summary for non-person/movie entities (artist/album/track). */
+	entity?: EntitySummary;
 }
 
 interface CacheEntry {
@@ -66,13 +79,20 @@ interface CacheEntry {
 }
 
 @Injectable()
-export class FavoritesService {
+export class FavoritesService implements OnModuleInit {
 	private readonly keyCache = new Map<string, CacheEntry>();
 
 	constructor(
 		private readonly database: DatabaseService,
 		private readonly peopleSvc: PeopleService,
+		private readonly resolvers: EntityResolverRegistry,
+		private readonly lifecycle: EntityLifecycleService,
 	) {}
+
+	onModuleInit() {
+		// Purged entities drop their favorites rows; the per-user key cache is cheap to rebuild.
+		this.lifecycle.onPurge(() => this.keyCache.clear());
+	}
 
 	listKeys(userId: string): FavoriteKeysResponse {
 		const cached = this.keyCache.get(userId);
@@ -178,6 +198,23 @@ export class FavoritesService {
 						runtimeMinutes: m.runtimeMinutes,
 					},
 				});
+			} else if (!isLegacyType(r.entityType as FavoriteEntityType)) {
+				const summary = await this.resolvers
+					.summary({
+						type: r.entityType as Exclude<FavoriteEntityType, 'person' | 'movie'>,
+						id: r.entityId,
+					})
+					.catch(() => null);
+				if (!summary) continue;
+				out.push({
+					id: r.id,
+					entityType: r.entityType as FavoriteEntityType,
+					entityId: r.entityId,
+					key: r.entityId,
+					role: r.role,
+					createdAt: r.createdAt,
+					entity: summary,
+				});
 			}
 		}
 		return out;
@@ -249,6 +286,19 @@ export class FavoritesService {
 	}
 
 	isFavorited(userId: string, entityType: FavoriteEntityType, key: string): boolean {
+		if (!isLegacyType(entityType)) {
+			return !!this.database.db
+				.select({ id: favorites.id })
+				.from(favorites)
+				.where(
+					and(
+						eq(favorites.userId, userId),
+						eq(favorites.entityType, entityType),
+						eq(favorites.entityId, key),
+					),
+				)
+				.get();
+		}
 		const cached = this.keyCache.get(userId) ?? this.hydrate(userId);
 		return entityType === 'person' ? cached.personKeys.has(key) : cached.movieIds.has(key);
 	}
@@ -271,6 +321,13 @@ export class FavoritesService {
 				.where(eq(movies.id, input.movieId))
 				.get();
 			return exists?.id ?? null;
+		}
+		if (!isLegacyType(input.entityType)) {
+			if (!input.entityId) return null;
+			const ok = await this.resolvers
+				.exists({ type: input.entityType, id: input.entityId })
+				.catch(() => false);
+			return ok ? input.entityId : null;
 		}
 		// person — ensure people row exists, return its internal id.
 		const row = await this.peopleSvc.ensureExists({

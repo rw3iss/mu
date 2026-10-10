@@ -19,19 +19,19 @@ import {
 } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
+	entityRatings,
+	entityWatchlist,
 	imdbRatings,
 	jobHistory,
 	movieFiles,
 	movieGroups,
 	movieMetadata,
 	movies,
-	playlistMovies,
+	playHistory,
 	transcodeCache,
-	userRatings,
 	users,
-	userWatchHistory,
-	userWatchlist,
 } from '../database/schema/index.js';
+import { EntityLifecycleService } from '../entities/entity-lifecycle.service.js';
 import { EventsService } from '../events/events.service.js';
 import { buildPrettyTitle, isDirtyTitle } from '../grouping/title-sanitiser.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
@@ -67,6 +67,7 @@ export class MoviesService implements OnModuleInit {
 		private readonly tmdb: TmdbProvider,
 		private readonly metadataService: MetadataService,
 		private readonly events: EventsService,
+		private readonly entityLifecycle: EntityLifecycleService,
 	) {}
 
 	onModuleInit(): void {
@@ -155,12 +156,12 @@ export class MoviesService implements OnModuleInit {
 		// Filter watched/unwatched movies (requires userId for the join)
 		if (String(query.hideWatched) === 'true' && userId) {
 			conditions.push(
-				sql`(${userWatchHistory.completed} IS NULL OR ${userWatchHistory.completed} = 0)`,
+				sql`(${playHistory.completed} IS NULL OR ${playHistory.completed} = 0)`,
 			);
 		}
 
 		if (String(query.watchedOnly) === 'true' && userId) {
-			conditions.push(sql`${userWatchHistory.completed} = 1`);
+			conditions.push(sql`${playHistory.completed} = 1`);
 		}
 
 		if (query.search) {
@@ -245,7 +246,7 @@ export class MoviesService implements OnModuleInit {
 				orderBy = sortOrder(movies.runtimeMinutes);
 				break;
 			case 'rating':
-				orderBy = sortOrder(userRatings.rating);
+				orderBy = sortOrder(entityRatings.rating);
 				break;
 			case 'fileSize':
 				orderBy = sortOrder(
@@ -258,14 +259,22 @@ export class MoviesService implements OnModuleInit {
 
 		const selectFields = this.movieSelectFields();
 
-		// Build query — always left-join userRatings for the current user
+		// Build query — always left-join entityRatings for the current user
 		const ratingJoinCond = userId
-			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
-			: eq(movies.id, userRatings.movieId);
+			? and(
+					eq(movies.id, entityRatings.entityId),
+					eq(entityRatings.entityType, 'movie'),
+					eq(entityRatings.userId, userId),
+				)
+			: and(eq(movies.id, entityRatings.entityId), eq(entityRatings.entityType, 'movie'));
 
 		const historyJoinCond = userId
-			? and(eq(movies.id, userWatchHistory.movieId), eq(userWatchHistory.userId, userId))
-			: eq(movies.id, userWatchHistory.movieId);
+			? and(
+					eq(movies.id, playHistory.entityId),
+					eq(playHistory.entityType, 'movie'),
+					eq(playHistory.userId, userId),
+				)
+			: and(eq(movies.id, playHistory.entityId), eq(playHistory.entityType, 'movie'));
 
 		let data;
 		let total: number;
@@ -279,8 +288,8 @@ export class MoviesService implements OnModuleInit {
 				.from(movies)
 				.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
 				.leftJoin(imdbRatings, eq(movies.imdbId, imdbRatings.tconst))
-				.leftJoin(userRatings, ratingJoinCond)
-				.leftJoin(userWatchHistory, historyJoinCond)
+				.leftJoin(entityRatings, ratingJoinCond)
+				.leftJoin(playHistory, historyJoinCond)
 				.where(where)
 				.orderBy(orderBy)
 				.limit(pageSize)
@@ -291,7 +300,7 @@ export class MoviesService implements OnModuleInit {
 				.select({ count: count() })
 				.from(movies)
 				.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
-				.leftJoin(userWatchHistory, historyJoinCond)
+				.leftJoin(playHistory, historyJoinCond)
 				.where(where)
 				.get();
 			total = countResult?.count ?? 0;
@@ -301,8 +310,8 @@ export class MoviesService implements OnModuleInit {
 				.from(movies)
 				.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
 				.leftJoin(imdbRatings, eq(movies.imdbId, imdbRatings.tconst))
-				.leftJoin(userRatings, ratingJoinCond)
-				.leftJoin(userWatchHistory, historyJoinCond)
+				.leftJoin(entityRatings, ratingJoinCond)
+				.leftJoin(playHistory, historyJoinCond)
 				.where(where)
 				.orderBy(orderBy)
 				.limit(pageSize)
@@ -312,7 +321,7 @@ export class MoviesService implements OnModuleInit {
 			const countResult = this.database.db
 				.select({ count: count() })
 				.from(movies)
-				.leftJoin(userWatchHistory, historyJoinCond)
+				.leftJoin(playHistory, historyJoinCond)
 				.where(where)
 				.get();
 			total = countResult?.count ?? 0;
@@ -328,11 +337,12 @@ export class MoviesService implements OnModuleInit {
 		const watchedCountResult = userId
 			? this.database.db
 					.select({ count: count() })
-					.from(userWatchHistory)
+					.from(playHistory)
 					.where(
 						and(
-							eq(userWatchHistory.userId, userId),
-							eq(userWatchHistory.completed, true),
+							eq(playHistory.userId, userId),
+							eq(playHistory.entityType, 'movie'),
+							eq(playHistory.completed, true),
 						),
 					)
 					.get()
@@ -385,7 +395,7 @@ export class MoviesService implements OnModuleInit {
 			groupEpisodeOrdinal: movies.groupEpisodeOrdinal,
 			addedAt: movies.addedAt,
 			updatedAt: movies.updatedAt,
-			rating: userRatings.rating,
+			rating: entityRatings.rating,
 			// External-rating fields powering card chips (IMDb / RT / MC).
 			metaImdbRating: movieMetadata.imdbRating,
 			metaImdbVotes: movieMetadata.imdbVotes,
@@ -393,8 +403,8 @@ export class MoviesService implements OnModuleInit {
 			datasetImdbVotes: imdbRatings.numVotes,
 			rtRating: movieMetadata.rottenTomatoesScore,
 			metacriticRating: movieMetadata.metacriticScore,
-			watchPosition: userWatchHistory.positionSeconds,
-			watchCompleted: userWatchHistory.completed,
+			watchPosition: playHistory.positionSeconds,
+			watchCompleted: playHistory.completed,
 			durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
 		};
 	}
@@ -420,18 +430,26 @@ export class MoviesService implements OnModuleInit {
 	private getMoviesByIds(ids: string[], userId?: string) {
 		if (ids.length === 0) return [];
 		const ratingJoinCond = userId
-			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
-			: eq(movies.id, userRatings.movieId);
+			? and(
+					eq(movies.id, entityRatings.entityId),
+					eq(entityRatings.entityType, 'movie'),
+					eq(entityRatings.userId, userId),
+				)
+			: and(eq(movies.id, entityRatings.entityId), eq(entityRatings.entityType, 'movie'));
 		const historyJoinCond = userId
-			? and(eq(movies.id, userWatchHistory.movieId), eq(userWatchHistory.userId, userId))
-			: eq(movies.id, userWatchHistory.movieId);
+			? and(
+					eq(movies.id, playHistory.entityId),
+					eq(playHistory.entityType, 'movie'),
+					eq(playHistory.userId, userId),
+				)
+			: and(eq(movies.id, playHistory.entityId), eq(playHistory.entityType, 'movie'));
 		const rows = this.database.db
 			.select(this.movieSelectFields())
 			.from(movies)
 			.leftJoin(movieMetadata, eq(movies.id, movieMetadata.movieId))
 			.leftJoin(imdbRatings, eq(movies.imdbId, imdbRatings.tconst))
-			.leftJoin(userRatings, ratingJoinCond)
-			.leftJoin(userWatchHistory, historyJoinCond)
+			.leftJoin(entityRatings, ratingJoinCond)
+			.leftJoin(playHistory, historyJoinCond)
 			.where(inArray(movies.id, ids))
 			.all();
 		return rows.map((r) => this.mapMovieRow(r));
@@ -568,18 +586,20 @@ export class MoviesService implements OnModuleInit {
 		}
 		if (String(query.hideWatched) === 'true' && userId) {
 			filterConds.push(sql`NOT EXISTS (
-				SELECT 1 FROM ${userWatchHistory}
-				WHERE ${userWatchHistory.movieId} = ${movies.id}
-					AND ${userWatchHistory.userId} = ${userId}
-					AND ${userWatchHistory.completed} = 1
+				SELECT 1 FROM ${playHistory}
+				WHERE ${playHistory.entityType} = 'movie'
+					AND ${playHistory.entityId} = ${movies.id}
+					AND ${playHistory.userId} = ${userId}
+					AND ${playHistory.completed} = 1
 			)`);
 		}
 		if (String(query.watchedOnly) === 'true' && userId) {
 			filterConds.push(sql`EXISTS (
-				SELECT 1 FROM ${userWatchHistory}
-				WHERE ${userWatchHistory.movieId} = ${movies.id}
-					AND ${userWatchHistory.userId} = ${userId}
-					AND ${userWatchHistory.completed} = 1
+				SELECT 1 FROM ${playHistory}
+				WHERE ${playHistory.entityType} = 'movie'
+					AND ${playHistory.entityId} = ${movies.id}
+					AND ${playHistory.userId} = ${userId}
+					AND ${playHistory.completed} = 1
 			)`);
 		}
 		for (const cond of this.genreConditions(query)) filterConds.push(cond);
@@ -621,8 +641,12 @@ export class MoviesService implements OnModuleInit {
 		}
 
 		const ratingJoinCond = userId
-			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
-			: eq(movies.id, userRatings.movieId);
+			? and(
+					eq(movies.id, entityRatings.entityId),
+					eq(entityRatings.entityType, 'movie'),
+					eq(entityRatings.userId, userId),
+				)
+			: and(eq(movies.id, entityRatings.entityId), eq(entityRatings.entityType, 'movie'));
 
 		const includeMovies = !types || types.has('movie');
 		const movieKeys = includeMovies
@@ -633,11 +657,11 @@ export class MoviesService implements OnModuleInit {
 						year: movies.year,
 						addedAt: movies.addedAt,
 						runtime: movies.runtimeMinutes,
-						rating: userRatings.rating,
+						rating: entityRatings.rating,
 						fileSize: sql<number>`(SELECT mf.file_size FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
 					})
 					.from(movies)
-					.leftJoin(userRatings, ratingJoinCond)
+					.leftJoin(entityRatings, ratingJoinCond)
 					.where(and(...conds))
 					.all()
 			: [];
@@ -699,11 +723,12 @@ export class MoviesService implements OnModuleInit {
 		const watchedCount = userId
 			? (this.database.db
 					.select({ count: count() })
-					.from(userWatchHistory)
+					.from(playHistory)
 					.where(
 						and(
-							eq(userWatchHistory.userId, userId),
-							eq(userWatchHistory.completed, true),
+							eq(playHistory.userId, userId),
+							eq(playHistory.entityType, 'movie'),
+							eq(playHistory.completed, true),
 						),
 					)
 					.get()?.count ?? 0)
@@ -985,22 +1010,40 @@ export class MoviesService implements OnModuleInit {
 		if (userId) {
 			const watchlistEntry = this.database.db
 				.select()
-				.from(userWatchlist)
-				.where(and(eq(userWatchlist.userId, userId), eq(userWatchlist.movieId, id)))
+				.from(entityWatchlist)
+				.where(
+					and(
+						eq(entityWatchlist.userId, userId),
+						eq(entityWatchlist.entityType, 'movie'),
+						eq(entityWatchlist.entityId, id),
+					),
+				)
 				.get();
 			inWatchlist = !!watchlistEntry;
 
 			const ratingEntry = this.database.db
 				.select()
-				.from(userRatings)
-				.where(and(eq(userRatings.userId, userId), eq(userRatings.movieId, id)))
+				.from(entityRatings)
+				.where(
+					and(
+						eq(entityRatings.userId, userId),
+						eq(entityRatings.entityType, 'movie'),
+						eq(entityRatings.entityId, id),
+					),
+				)
 				.get();
 			userRating = ratingEntry?.rating ?? 0;
 
 			const historyEntry = this.database.db
 				.select()
-				.from(userWatchHistory)
-				.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, id)))
+				.from(playHistory)
+				.where(
+					and(
+						eq(playHistory.userId, userId),
+						eq(playHistory.entityType, 'movie'),
+						eq(playHistory.entityId, id),
+					),
+				)
 				.get();
 			if (historyEntry) {
 				// Position is the resume point. Don't zero it on completed —
@@ -1297,12 +1340,13 @@ export class MoviesService implements OnModuleInit {
 		// Globally newest-first; per-user slices below stay in recency order.
 		const rows = this.database.db
 			.select({
-				userId: userWatchHistory.userId,
-				movieId: userWatchHistory.movieId,
-				watchedAt: userWatchHistory.watchedAt,
+				userId: playHistory.userId,
+				movieId: playHistory.entityId,
+				watchedAt: playHistory.lastPlayedAt,
 			})
-			.from(userWatchHistory)
-			.orderBy(desc(userWatchHistory.watchedAt))
+			.from(playHistory)
+			.where(eq(playHistory.entityType, 'movie'))
+			.orderBy(desc(playHistory.lastPlayedAt))
 			.all();
 
 		// Each user's most-recent PER_USER_LIMIT watches.
@@ -1350,8 +1394,12 @@ export class MoviesService implements OnModuleInit {
 
 	search(q: string, userId?: string) {
 		const ratingJoinCond = userId
-			? and(eq(movies.id, userRatings.movieId), eq(userRatings.userId, userId))
-			: eq(movies.id, userRatings.movieId);
+			? and(
+					eq(movies.id, entityRatings.entityId),
+					eq(entityRatings.entityType, 'movie'),
+					eq(entityRatings.userId, userId),
+				)
+			: and(eq(movies.id, entityRatings.entityId), eq(entityRatings.entityType, 'movie'));
 
 		return this.database.db
 			.select({
@@ -1370,10 +1418,10 @@ export class MoviesService implements OnModuleInit {
 				groupId: movies.groupId,
 				groupEpisodeOrdinal: movies.groupEpisodeOrdinal,
 				addedAt: movies.addedAt,
-				rating: userRatings.rating,
+				rating: entityRatings.rating,
 			})
 			.from(movies)
-			.leftJoin(userRatings, ratingJoinCond)
+			.leftJoin(entityRatings, ratingJoinCond)
 			.where(titleSearchCondition(movies.title, q) ?? like(movies.title, `%${q}%`))
 			.orderBy(asc(movies.title))
 			.limit(50)
@@ -1533,9 +1581,11 @@ export class MoviesService implements OnModuleInit {
 		this.thumbnailService.clearForMovie(id);
 		await this.imageService.clearForMovie(id);
 
-		this.database.db.delete(playlistMovies).where(eq(playlistMovies.movieId, id)).run();
 		this.database.db.delete(jobHistory).where(eq(jobHistory.movieId, id)).run();
 		this.database.db.delete(movies).where(eq(movies.id, id)).run();
+		// User data (ratings, comments, history, watchlist, playlists, favorites)
+		// has no FK to movies — clean it up explicitly.
+		this.entityLifecycle.purge({ type: 'movie', id });
 
 		this.logger.log(`Purged movie: ${movie.title}`);
 	}
@@ -1549,6 +1599,7 @@ export class MoviesService implements OnModuleInit {
 		}
 
 		this.database.db.delete(movies).where(eq(movies.id, id)).run();
+		this.entityLifecycle.purge({ type: 'movie', id });
 		this.logger.log(`Deleted movie: ${existing.title}`);
 	}
 

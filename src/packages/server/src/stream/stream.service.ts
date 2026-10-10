@@ -10,7 +10,7 @@ import {
 	OnModuleDestroy,
 	OnModuleInit,
 } from '@nestjs/common';
-import { and, eq, lt } from 'drizzle-orm';
+import { and, eq, lt, sql } from 'drizzle-orm';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { parseJsonArray } from '../common/json-fields.js';
 import { SessionRegistryService } from '../common/session-registry.service.js';
@@ -19,9 +19,9 @@ import { DatabaseService } from '../database/database.service.js';
 import {
 	movieFiles,
 	movies,
+	playHistory,
 	streamSessions,
 	users,
-	userWatchHistory,
 } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -652,27 +652,33 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		if (userId !== '__shared__' && userId !== '__share__') {
 			const historyRows = await this.database.db
 				.select()
-				.from(userWatchHistory)
+				.from(playHistory)
 				.where(
-					and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, movieId)),
+					and(
+						eq(playHistory.userId, userId),
+						eq(playHistory.entityType, 'movie'),
+						eq(playHistory.entityId, movieId),
+					),
 				);
 
 			if (historyRows.length > 0) {
 				resumePosition = historyRows[0]!.positionSeconds ?? 0;
-				// Touch watchedAt so it sorts to the top of history
+				// Touch lastPlayedAt so it sorts to the top of history
 				await this.database.db
-					.update(userWatchHistory)
-					.set({ watchedAt: nowISO() })
-					.where(eq(userWatchHistory.id, historyRows[0]!.id));
+					.update(playHistory)
+					.set({ lastPlayedAt: nowISO() })
+					.where(eq(playHistory.id, historyRows[0]!.id));
 			} else {
 				// Create history entry immediately on play
-				await this.database.db.insert(userWatchHistory).values({
+				await this.database.db.insert(playHistory).values({
 					id: crypto.randomUUID(),
 					userId,
-					movieId,
+					entityType: 'movie',
+					entityId: movieId,
 					positionSeconds: 0,
 					durationWatchedSeconds: 0,
-					watchedAt: nowISO(),
+					playCount: 0,
+					lastPlayedAt: nowISO(),
 				});
 			}
 		}
@@ -954,11 +960,12 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		//                       row so it stays in the user's watch history)
 		const existing = await this.database.db
 			.select()
-			.from(userWatchHistory)
+			.from(playHistory)
 			.where(
 				and(
-					eq(userWatchHistory.userId, session.userId),
-					eq(userWatchHistory.movieId, session.movieId),
+					eq(playHistory.userId, session.userId),
+					eq(playHistory.entityType, 'movie'),
+					eq(playHistory.entityId, session.movieId),
 				),
 			);
 
@@ -972,23 +979,28 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			if (existing.length > 0) {
 				const entry = existing[0]!;
 				await this.database.db
-					.update(userWatchHistory)
+					.update(playHistory)
 					.set({
 						positionSeconds: 0,
 						durationWatchedSeconds: (entry.durationWatchedSeconds ?? 0) + increment,
 						completed: true,
-						watchedAt: nowISO(),
+						playCount: entry.completed
+							? (entry.playCount ?? 0)
+							: sql`${playHistory.playCount} + 1`,
+						lastPlayedAt: nowISO(),
 					})
-					.where(eq(userWatchHistory.id, entry.id));
+					.where(eq(playHistory.id, entry.id));
 			} else {
-				await this.database.db.insert(userWatchHistory).values({
+				await this.database.db.insert(playHistory).values({
 					id: crypto.randomUUID(),
 					userId: session.userId,
-					movieId: session.movieId,
+					entityType: 'movie',
+					entityId: session.movieId,
 					positionSeconds: 0,
 					durationWatchedSeconds: increment,
 					completed: true,
-					watchedAt: nowISO(),
+					playCount: 1,
+					lastPlayedAt: nowISO(),
 				});
 			}
 			// Tell clients so the dashboard rail / resume bars drop this title live.
@@ -1004,22 +1016,24 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			const entry = existing[0]!;
 			const newDuration = (entry.durationWatchedSeconds ?? 0) + increment;
 			await this.database.db
-				.update(userWatchHistory)
+				.update(playHistory)
 				.set({
 					positionSeconds,
 					durationWatchedSeconds: newDuration,
-					watchedAt: nowISO(),
+					lastPlayedAt: nowISO(),
 				})
-				.where(eq(userWatchHistory.id, entry.id));
+				.where(eq(playHistory.id, entry.id));
 		} else if (increment >= threshold || positionSeconds >= threshold) {
-			await this.database.db.insert(userWatchHistory).values({
+			await this.database.db.insert(playHistory).values({
 				id: crypto.randomUUID(),
 				userId: session.userId,
-				movieId: session.movieId,
+				entityType: 'movie',
+				entityId: session.movieId,
 				positionSeconds,
 				durationWatchedSeconds: increment,
 				completed: false,
-				watchedAt: nowISO(),
+				playCount: 0,
+				lastPlayedAt: nowISO(),
 			});
 		}
 	}
@@ -1082,33 +1096,40 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 		const existing = await this.database.db
 			.select()
-			.from(userWatchHistory)
+			.from(playHistory)
 			.where(
 				and(
-					eq(userWatchHistory.userId, session.userId),
-					eq(userWatchHistory.movieId, session.movieId),
+					eq(playHistory.userId, session.userId),
+					eq(playHistory.entityType, 'movie'),
+					eq(playHistory.entityId, session.movieId),
 				),
 			);
 
 		if (existing.length > 0) {
-			const wasCompleted = !!existing[0]!.completed || endedCompleted;
+			const prevCompleted = !!existing[0]!.completed;
+			const wasCompleted = prevCompleted || endedCompleted;
 			await this.database.db
-				.update(userWatchHistory)
+				.update(playHistory)
 				.set({
 					positionSeconds: wasCompleted ? 0 : finalPosition,
 					completed: wasCompleted,
-					watchedAt: nowISO(),
+					...(!prevCompleted && endedCompleted
+						? { playCount: sql`${playHistory.playCount} + 1` }
+						: {}),
+					lastPlayedAt: nowISO(),
 				})
-				.where(eq(userWatchHistory.id, existing[0]!.id));
+				.where(eq(playHistory.id, existing[0]!.id));
 		} else if (endedCompleted || finalPosition > 0) {
-			await this.database.db.insert(userWatchHistory).values({
+			await this.database.db.insert(playHistory).values({
 				id: crypto.randomUUID(),
 				userId: session.userId,
-				movieId: session.movieId,
+				entityType: 'movie',
+				entityId: session.movieId,
 				positionSeconds: endedCompleted ? 0 : finalPosition,
 				durationWatchedSeconds: 0,
 				completed: endedCompleted,
-				watchedAt: nowISO(),
+				playCount: endedCompleted ? 1 : 0,
+				lastPlayedAt: nowISO(),
 			});
 		}
 

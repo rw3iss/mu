@@ -14,7 +14,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { parseJsonArray } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
-import { movieFiles, movies, transcodeCache, userWatchHistory } from '../database/schema/index.js';
+import { movieFiles, movies, playHistory, transcodeCache } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { buildPrettyTitle } from '../grouping/title-sanitiser.js';
 import type { JobHelpers, JobRecord } from '../jobs/job.interface.js';
@@ -801,9 +801,10 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 
 		// Get recently watched movie IDs for priority ordering
 		const recentlyWatched = this.database.db
-			.select({ movieId: userWatchHistory.movieId, watchedAt: userWatchHistory.watchedAt })
-			.from(userWatchHistory)
-			.orderBy(sql`${userWatchHistory.watchedAt} DESC`)
+			.select({ movieId: playHistory.entityId, watchedAt: playHistory.lastPlayedAt })
+			.from(playHistory)
+			.where(eq(playHistory.entityType, 'movie'))
+			.orderBy(sql`${playHistory.lastPlayedAt} DESC`)
 			.limit(50)
 			.all();
 		const recentMovieIds = new Set(recentlyWatched.map((r) => r.movieId));

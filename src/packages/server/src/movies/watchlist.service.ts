@@ -2,7 +2,9 @@ import { nowISO } from '@mu/shared';
 import { ConflictException, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movies, userWatchlist } from '../database/schema/index.js';
+import { entityWatchlist, movies } from '../database/schema/index.js';
+
+const isMovie = eq(entityWatchlist.entityType, 'movie');
 
 @Injectable()
 export class WatchlistService {
@@ -11,8 +13,14 @@ export class WatchlistService {
 	add(userId: string, movieId: string, notes?: string) {
 		const existing = this.database.db
 			.select()
-			.from(userWatchlist)
-			.where(and(eq(userWatchlist.userId, userId), eq(userWatchlist.movieId, movieId)))
+			.from(entityWatchlist)
+			.where(
+				and(
+					eq(entityWatchlist.userId, userId),
+					isMovie,
+					eq(entityWatchlist.entityId, movieId),
+				),
+			)
 			.get();
 
 		if (existing) {
@@ -23,11 +31,12 @@ export class WatchlistService {
 		const now = nowISO();
 
 		this.database.db
-			.insert(userWatchlist)
+			.insert(entityWatchlist)
 			.values({
 				id,
 				userId,
-				movieId,
+				entityType: 'movie',
+				entityId: movieId,
 				addedAt: now,
 				notes: notes ?? null,
 			})
@@ -39,8 +48,14 @@ export class WatchlistService {
 	toggle(userId: string, movieId: string) {
 		const existing = this.database.db
 			.select()
-			.from(userWatchlist)
-			.where(and(eq(userWatchlist.userId, userId), eq(userWatchlist.movieId, movieId)))
+			.from(entityWatchlist)
+			.where(
+				and(
+					eq(entityWatchlist.userId, userId),
+					isMovie,
+					eq(entityWatchlist.entityId, movieId),
+				),
+			)
 			.get();
 
 		if (existing) {
@@ -54,18 +69,24 @@ export class WatchlistService {
 
 	remove(userId: string, movieId: string) {
 		this.database.db
-			.delete(userWatchlist)
-			.where(and(eq(userWatchlist.userId, userId), eq(userWatchlist.movieId, movieId)))
+			.delete(entityWatchlist)
+			.where(
+				and(
+					eq(entityWatchlist.userId, userId),
+					isMovie,
+					eq(entityWatchlist.entityId, movieId),
+				),
+			)
 			.run();
 	}
 
 	getWatchlist(userId: string) {
 		return this.database.db
 			.select({
-				id: userWatchlist.id,
-				movieId: userWatchlist.movieId,
-				addedAt: userWatchlist.addedAt,
-				notes: userWatchlist.notes,
+				id: entityWatchlist.id,
+				movieId: entityWatchlist.entityId,
+				addedAt: entityWatchlist.addedAt,
+				notes: entityWatchlist.notes,
 				movieTitle: movies.title,
 				movieYear: movies.year,
 				moviePosterUrl: movies.posterUrl,
@@ -73,10 +94,10 @@ export class WatchlistService {
 				movieOverview: movies.overview,
 				movieRuntimeMinutes: movies.runtimeMinutes,
 			})
-			.from(userWatchlist)
-			.innerJoin(movies, eq(userWatchlist.movieId, movies.id))
-			.where(eq(userWatchlist.userId, userId))
-			.orderBy(userWatchlist.addedAt)
+			.from(entityWatchlist)
+			.innerJoin(movies, and(isMovie, eq(entityWatchlist.entityId, movies.id)))
+			.where(eq(entityWatchlist.userId, userId))
+			.orderBy(entityWatchlist.addedAt)
 			.all();
 	}
 }

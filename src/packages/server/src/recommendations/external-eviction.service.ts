@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { and, eq, lte, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movies } from '../database/schema/index.js';
+import { EntityLifecycleService } from '../entities/entity-lifecycle.service.js';
 import type { JobRecord } from '../jobs/job.interface.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -33,6 +34,7 @@ export class ExternalEvictionService implements OnModuleInit {
 		private readonly database: DatabaseService,
 		private readonly settings: SettingsService,
 		private readonly jobs: JobManagerService,
+		private readonly entityLifecycle: EntityLifecycleService,
 	) {}
 
 	onModuleInit(): void {
@@ -66,11 +68,17 @@ export class ExternalEvictionService implements OnModuleInit {
 		const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 		// Cascade deletes movie_metadata / movie_files / movie_embeddings /
 		// movie_external_recs that FK back to movies(id).
-		const result = this.database.db
-			.delete(movies)
-			.where(and(eq(movies.source, 'external'), lte(movies.updatedAt, cutoff)))
-			.run();
+		const stale = and(eq(movies.source, 'external'), lte(movies.updatedAt, cutoff));
+		const ids = this.database.db
+			.select({ id: movies.id })
+			.from(movies)
+			.where(stale)
+			.all()
+			.map((r) => r.id);
+		const result = this.database.db.delete(movies).where(stale).run();
 		const removed = result.changes ?? 0;
+		// Polymorphic user data (ratings, history, playlists, …) has no FK.
+		this.entityLifecycle.purgeMany('movie', ids);
 		if (removed > 0) {
 			this.logger.log(
 				`Evicted ${removed} stale external movie(s) (older than ${days} days, < ${cutoff})`,

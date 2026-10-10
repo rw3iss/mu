@@ -4,7 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { movieMetadata, movies, userRatings, userWatchHistory } from '../database/schema/index.js';
+import { entityRatings, movieMetadata, movies, playHistory } from '../database/schema/index.js';
 import { EmbeddingsService } from '../embeddings/embeddings.service.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -585,22 +585,22 @@ export class RecommendationsService {
 		const thirty = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 		const ratings = this.database.db
 			.select({
-				movieId: userRatings.movieId,
+				movieId: entityRatings.entityId,
 				count: sql<number>`count(*)`.as('c'),
-				avg: sql<number>`avg(${userRatings.rating})`.as('a'),
+				avg: sql<number>`avg(${entityRatings.rating})`.as('a'),
 			})
-			.from(userRatings)
-			.where(gt(userRatings.createdAt, thirty))
-			.groupBy(userRatings.movieId)
+			.from(entityRatings)
+			.where(and(eq(entityRatings.entityType, 'movie'), gt(entityRatings.createdAt, thirty)))
+			.groupBy(entityRatings.entityId)
 			.all();
 		const watches = this.database.db
 			.select({
-				movieId: userWatchHistory.movieId,
+				movieId: playHistory.entityId,
 				count: sql<number>`count(*)`.as('c'),
 			})
-			.from(userWatchHistory)
-			.where(gt(userWatchHistory.watchedAt, thirty))
-			.groupBy(userWatchHistory.movieId)
+			.from(playHistory)
+			.where(and(eq(playHistory.entityType, 'movie'), gt(playHistory.lastPlayedAt, thirty)))
+			.groupBy(playHistory.entityId)
 			.all();
 
 		const map = new Map<string, { ratingCount: number; avg: number; watchCount: number }>();
@@ -1020,14 +1020,14 @@ export class RecommendationsService {
 
 	private getUserMovieIds(userId: string): Set<string> {
 		const r = this.database.db
-			.select({ movieId: userRatings.movieId })
-			.from(userRatings)
-			.where(eq(userRatings.userId, userId))
+			.select({ movieId: entityRatings.entityId })
+			.from(entityRatings)
+			.where(and(eq(entityRatings.userId, userId), eq(entityRatings.entityType, 'movie')))
 			.all();
 		const h = this.database.db
-			.select({ movieId: userWatchHistory.movieId })
-			.from(userWatchHistory)
-			.where(eq(userWatchHistory.userId, userId))
+			.select({ movieId: playHistory.entityId })
+			.from(playHistory)
+			.where(and(eq(playHistory.userId, userId), eq(playHistory.entityType, 'movie')))
 			.all();
 		return new Set([...r.map((x) => x.movieId), ...h.map((x) => x.movieId)]);
 	}

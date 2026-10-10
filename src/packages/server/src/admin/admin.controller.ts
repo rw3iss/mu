@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { Controller, Delete, Get, Logger, Param, Post } from '@nestjs/common';
-import { eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
@@ -8,9 +8,9 @@ import { DatabaseService } from '../database/database.service.js';
 import {
 	movieFiles,
 	movies,
+	playHistory,
 	streamSessions,
 	users,
-	userWatchHistory,
 } from '../database/schema/index.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { SpriteService } from '../media/sprite.service.js';
@@ -199,22 +199,23 @@ export class AdminController {
 
 		const rows = this.database.db
 			.select({
-				id: userWatchHistory.id,
-				userId: userWatchHistory.userId,
+				id: playHistory.id,
+				userId: playHistory.userId,
 				username: users.username,
 				displayName: users.displayName,
-				movieId: userWatchHistory.movieId,
+				movieId: playHistory.entityId,
 				movieTitle: movies.title,
 				movieYear: movies.year,
-				watchedAt: userWatchHistory.watchedAt,
-				durationWatchedSeconds: userWatchHistory.durationWatchedSeconds,
-				completed: userWatchHistory.completed,
-				positionSeconds: userWatchHistory.positionSeconds,
+				watchedAt: playHistory.lastPlayedAt,
+				durationWatchedSeconds: playHistory.durationWatchedSeconds,
+				completed: playHistory.completed,
+				positionSeconds: playHistory.positionSeconds,
 			})
-			.from(userWatchHistory)
-			.leftJoin(users, eq(userWatchHistory.userId, users.id))
-			.leftJoin(movies, eq(userWatchHistory.movieId, movies.id))
-			.orderBy(userWatchHistory.watchedAt)
+			.from(playHistory)
+			.leftJoin(users, eq(playHistory.userId, users.id))
+			.leftJoin(movies, eq(playHistory.entityId, movies.id))
+			.where(eq(playHistory.entityType, 'movie'))
+			.orderBy(playHistory.lastPlayedAt)
 			.all();
 
 		return rows.map((row) => ({
@@ -241,21 +242,19 @@ export class AdminController {
 		// Get all history entries
 		const allHistory = this.database.db
 			.select({
-				id: userWatchHistory.id,
-				userId: userWatchHistory.userId,
-				movieId: userWatchHistory.movieId,
+				id: playHistory.id,
+				userId: playHistory.userId,
+				movieId: playHistory.entityId,
 			})
-			.from(userWatchHistory)
+			.from(playHistory)
+			.where(eq(playHistory.entityType, 'movie'))
 			.all();
 
 		// Delete non-active entries
 		let cleared = 0;
 		for (const entry of allHistory) {
 			if (!activePairs.has(`${entry.userId}:${entry.movieId}`)) {
-				this.database.db
-					.delete(userWatchHistory)
-					.where(eq(userWatchHistory.id, entry.id))
-					.run();
+				this.database.db.delete(playHistory).where(eq(playHistory.id, entry.id)).run();
 				cleared++;
 			}
 		}

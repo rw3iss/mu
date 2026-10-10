@@ -1,8 +1,16 @@
-import { NotificationType, nowISO } from '@mu/shared';
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { asc, eq, inArray, sql } from 'drizzle-orm';
+import { type EntityRef, type EntityType, NotificationType, nowISO } from '@mu/shared';
+import {
+	ForbiddenException,
+	Injectable,
+	Logger,
+	NotFoundException,
+	type OnModuleInit,
+} from '@nestjs/common';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { commentReactions, movieComments, movies, users } from '../database/schema/index.js';
+import { entityCommentReactions, entityComments, movies, users } from '../database/schema/index.js';
+import { EntityLifecycleService } from '../entities/entity-lifecycle.service.js';
+import { EntityResolverRegistry } from '../entities/entity-resolver.registry.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 
 export interface CommentReactionSummary {
@@ -14,7 +22,10 @@ export interface CommentReactionSummary {
 
 export interface CommentView {
 	id: string;
-	movieId: string;
+	entityType: EntityType;
+	entityId: string;
+	/** Set for movie comments only (legacy field the movie UI reads). */
+	movieId?: string;
 	userId: string;
 	parentId: string | null;
 	timeSeconds: number | null;
@@ -32,17 +43,29 @@ interface RawComment extends Omit<CommentView, 'reactions' | 'replies'> {
 	reactions: { emoji: string; userIds: string[] }[];
 }
 
+const cacheKey = (ref: EntityRef) => `${ref.type}:${ref.id}`;
+const movieRef = (id: string): EntityRef => ({ type: 'movie', id });
+
 /**
- * Movie comments: general or time-anchored, one level of replies, emoji
- * reactions. Read path is cached per movie (raw, user-agnostic) and busted
- * on every mutation; the per-user `mine` flags are shaped per request.
+ * Entity comments (movies today; any EntityRef): general or time-anchored,
+ * nested replies, emoji reactions. Read path is cached per entity (raw,
+ * user-agnostic) and busted on every mutation; the per-user `mine` flags are
+ * shaped per request.
  */
 @Injectable()
-export class CommentsService {
+export class CommentsService implements OnModuleInit {
+	private readonly logger = new Logger('CommentsService');
+
 	constructor(
 		private readonly database: DatabaseService,
 		private readonly notifications: NotificationsService,
+		private readonly resolvers: EntityResolverRegistry,
+		private readonly lifecycle: EntityLifecycleService,
 	) {}
+
+	onModuleInit() {
+		this.lifecycle.onPurge((ref) => this.bust(ref));
+	}
 
 	/** Display name for a user id (falls back to username / 'Someone'). */
 	private userName(userId: string): string {
@@ -56,13 +79,36 @@ export class CommentsService {
 		return u?.name ?? 'Someone';
 	}
 
-	private movieTitle(movieId: string): string | undefined {
-		const m = this.database.db
-			.select({ title: movies.title })
-			.from(movies)
-			.where(eq(movies.id, movieId))
-			.get();
-		return m?.title ?? undefined;
+	/**
+	 * Send a comment notification with the entity's title resolved. Movies keep
+	 * the legacy `movieId`/`movieTitle` fields the client formatter reads.
+	 */
+	private notify(
+		type: NotificationType,
+		ref: EntityRef,
+		data: Record<string, unknown>,
+		recipientId: string,
+	): void {
+		void this.resolvers
+			.summary(ref)
+			.catch(() => null)
+			.then((summary) => {
+				const title = summary?.title ?? undefined;
+				this.notifications.create(
+					type,
+					{
+						...data,
+						entityType: ref.type,
+						entityId: ref.id,
+						entityTitle: title,
+						...(ref.type === 'movie' ? { movieId: ref.id, movieTitle: title } : {}),
+					},
+					recipientId,
+				);
+			})
+			.catch((err) =>
+				this.logger.warn(`comment notification failed: ${err?.message ?? err}`),
+			);
 	}
 
 	private readonly cache = new Map<string, { data: RawComment[]; expires: number }>();
@@ -70,13 +116,18 @@ export class CommentsService {
 	/** Max reply nesting depth (root = 0). Replies past this reparent up. */
 	private static readonly MAX_DEPTH = 20;
 
-	bust(movieId: string): void {
-		this.cache.delete(movieId);
+	bust(ref: EntityRef): void {
+		this.cache.delete(cacheKey(ref));
 	}
 
 	/** Comment tree for a movie, shaped for `forUserId` (mine flags). */
 	getForMovie(movieId: string, forUserId?: string): CommentView[] {
-		const raw = this.getRaw(movieId);
+		return this.getForEntity(movieRef(movieId), forUserId);
+	}
+
+	/** Comment tree for any entity, shaped for `forUserId` (mine flags). */
+	getForEntity(ref: EntityRef, forUserId?: string): CommentView[] {
+		const raw = this.getRaw(ref);
 		const shape = (c: RawComment): CommentView => ({
 			...c,
 			reactions: c.reactions.map((r) => ({
@@ -105,39 +156,44 @@ export class CommentsService {
 		return top;
 	}
 
-	count(movieId: string): number {
-		return this.getRaw(movieId).length;
+	count(ref: EntityRef): number {
+		return this.getRaw(ref).length;
 	}
 
-	private getRaw(movieId: string): RawComment[] {
-		const hit = this.cache.get(movieId);
+	private getRaw(ref: EntityRef): RawComment[] {
+		const key = cacheKey(ref);
+		const hit = this.cache.get(key);
 		if (hit && hit.expires > Date.now()) return hit.data;
 
 		const rows = this.database.db
 			.select({
-				id: movieComments.id,
-				movieId: movieComments.movieId,
-				userId: movieComments.userId,
-				parentId: movieComments.parentId,
-				timeSeconds: movieComments.timeSeconds,
-				text: movieComments.text,
-				edited: movieComments.edited,
-				createdAt: movieComments.createdAt,
-				updatedAt: movieComments.updatedAt,
+				id: entityComments.id,
+				userId: entityComments.userId,
+				parentId: entityComments.parentId,
+				timeSeconds: entityComments.timeSeconds,
+				text: entityComments.text,
+				edited: entityComments.edited,
+				createdAt: entityComments.createdAt,
+				updatedAt: entityComments.updatedAt,
 				authorName: sql<string>`COALESCE(${users.displayName}, ${users.username}, 'Unknown')`,
 			})
-			.from(movieComments)
-			.leftJoin(users, eq(movieComments.userId, users.id))
-			.where(eq(movieComments.movieId, movieId))
-			.orderBy(asc(movieComments.createdAt))
+			.from(entityComments)
+			.leftJoin(users, eq(entityComments.userId, users.id))
+			.where(
+				and(eq(entityComments.entityType, ref.type), eq(entityComments.entityId, ref.id)),
+			)
+			.orderBy(asc(entityComments.createdAt))
 			.all();
 
 		const reactions = rows.length
 			? this.database.db
 					.select()
-					.from(commentReactions)
+					.from(entityCommentReactions)
 					.where(
-						sql`${commentReactions.commentId} IN (SELECT id FROM movie_comments WHERE movie_id = ${movieId})`,
+						inArray(
+							entityCommentReactions.commentId,
+							rows.map((r) => r.id),
+						),
 					)
 					.all()
 			: [];
@@ -151,17 +207,20 @@ export class CommentsService {
 
 		const data: RawComment[] = rows.map((r) => ({
 			...r,
+			entityType: ref.type,
+			entityId: ref.id,
+			...(ref.type === 'movie' ? { movieId: ref.id } : {}),
 			edited: !!r.edited,
 			reactions: [...(byComment.get(r.id) ?? new Map()).entries()].map(
 				([emoji, userIds]) => ({ emoji, userIds }),
 			),
 		}));
-		this.cache.set(movieId, { data, expires: Date.now() + CommentsService.TTL_MS });
+		this.cache.set(key, { data, expires: Date.now() + CommentsService.TTL_MS });
 		return data;
 	}
 
 	/**
-	 * A user's comments across all movies, newest first, pageable. Joined with
+	 * A user's movie comments, newest first, pageable. Joined with
 	 * movie title/poster for profile rendering. Light query — no cache needed.
 	 */
 	listByUser(userId: string, page = 1, pageSize = 20) {
@@ -169,22 +228,22 @@ export class CommentsService {
 		const offset = (Math.max(1, page) - 1) * limit;
 		const rows = this.database.db
 			.select({
-				id: movieComments.id,
-				movieId: movieComments.movieId,
-				parentId: movieComments.parentId,
-				timeSeconds: movieComments.timeSeconds,
-				text: movieComments.text,
-				edited: movieComments.edited,
-				createdAt: movieComments.createdAt,
+				id: entityComments.id,
+				movieId: entityComments.entityId,
+				parentId: entityComments.parentId,
+				timeSeconds: entityComments.timeSeconds,
+				text: entityComments.text,
+				edited: entityComments.edited,
+				createdAt: entityComments.createdAt,
 				movieTitle: movies.title,
 				movieYear: movies.year,
 				moviePosterUrl: movies.posterUrl,
 				movieThumbnailUrl: movies.thumbnailUrl,
 			})
-			.from(movieComments)
-			.leftJoin(movies, eq(movieComments.movieId, movies.id))
-			.where(eq(movieComments.userId, userId))
-			.orderBy(sql`${movieComments.createdAt} DESC`)
+			.from(entityComments)
+			.leftJoin(movies, eq(entityComments.entityId, movies.id))
+			.where(and(eq(entityComments.userId, userId), eq(entityComments.entityType, 'movie')))
+			.orderBy(sql`${entityComments.createdAt} DESC`)
 			.limit(limit + 1)
 			.offset(offset)
 			.all();
@@ -193,7 +252,7 @@ export class CommentsService {
 	}
 
 	create(
-		movieId: string,
+		ref: EntityRef,
 		userId: string,
 		body: { text: string; timeSeconds?: number | null; parentId?: string | null },
 	) {
@@ -201,7 +260,7 @@ export class CommentsService {
 		if (!text) throw new ForbiddenException('Comment text is required');
 		if (body.parentId) {
 			// Walk the ancestor chain to validate the parent exists, belongs to
-			// the same movie, and the new reply wouldn't exceed MAX_DEPTH. If the
+			// the same entity, and the new reply wouldn't exceed MAX_DEPTH. If the
 			// chain is already at the cap, attach to the deepest allowed ancestor.
 			let cursor: string | null = body.parentId;
 			const chain: string[] = [];
@@ -209,16 +268,17 @@ export class CommentsService {
 			while (cursor && guard++ < CommentsService.MAX_DEPTH + 2) {
 				const row = this.database.db
 					.select({
-						id: movieComments.id,
-						parentId: movieComments.parentId,
-						movieId: movieComments.movieId,
+						id: entityComments.id,
+						parentId: entityComments.parentId,
+						entityType: entityComments.entityType,
+						entityId: entityComments.entityId,
 					})
-					.from(movieComments)
-					.where(eq(movieComments.id, cursor))
+					.from(entityComments)
+					.where(eq(entityComments.id, cursor))
 					.get();
 				if (!row) break;
-				if (row.movieId !== movieId)
-					throw new ForbiddenException('Parent belongs to another movie');
+				if (row.entityType !== ref.type || row.entityId !== ref.id)
+					throw new ForbiddenException(`Parent belongs to another ${ref.type}`);
 				chain.unshift(row.id);
 				cursor = row.parentId;
 			}
@@ -233,10 +293,11 @@ export class CommentsService {
 		const now = nowISO();
 		const id = crypto.randomUUID();
 		this.database.db
-			.insert(movieComments)
+			.insert(entityComments)
 			.values({
 				id,
-				movieId,
+				entityType: ref.type,
+				entityId: ref.id,
 				userId,
 				parentId: body.parentId ?? null,
 				timeSeconds:
@@ -252,18 +313,17 @@ export class CommentsService {
 		// Notify the parent comment's author of a reply (not your own).
 		if (body.parentId) {
 			const parent = this.database.db
-				.select({ userId: movieComments.userId })
-				.from(movieComments)
-				.where(eq(movieComments.id, body.parentId))
+				.select({ userId: entityComments.userId })
+				.from(entityComments)
+				.where(eq(entityComments.id, body.parentId))
 				.get();
 			if (parent && parent.userId !== userId) {
-				this.notifications.create(
+				this.notify(
 					NotificationType.CommentReply,
+					ref,
 					{
 						fromUserId: userId,
 						fromUserName: this.userName(userId),
-						movieId,
-						movieTitle: this.movieTitle(movieId),
 						commentId: body.parentId,
 						replyId: id,
 						snippet: text.slice(0, 140),
@@ -273,8 +333,8 @@ export class CommentsService {
 			}
 		}
 
-		this.bust(movieId);
-		return this.getForMovie(movieId, userId);
+		this.bust(ref);
+		return this.getForEntity(ref, userId);
 	}
 
 	update(id: string, userId: string, body: { text?: string; timeSeconds?: number | null }) {
@@ -289,16 +349,17 @@ export class CommentsService {
 					? body.timeSeconds
 					: null;
 		}
-		this.database.db.update(movieComments).set(patch).where(eq(movieComments.id, id)).run();
-		this.bust(existing.movieId);
-		return this.getForMovie(existing.movieId, userId);
+		this.database.db.update(entityComments).set(patch).where(eq(entityComments.id, id)).run();
+		const ref = this.refOf(existing);
+		this.bust(ref);
+		return this.getForEntity(ref, userId);
 	}
 
 	remove(id: string, userId: string, isAdmin = false) {
 		const existing = this.database.db
 			.select()
-			.from(movieComments)
-			.where(eq(movieComments.id, id))
+			.from(entityComments)
+			.where(eq(entityComments.id, id))
 			.get();
 		if (!existing) throw new NotFoundException('Comment not found');
 		if (existing.userId !== userId && !isAdmin) {
@@ -312,46 +373,47 @@ export class CommentsService {
 		while (queue.length && guard++ < 10_000) {
 			const parentId = queue.shift()!;
 			const children = this.database.db
-				.select({ id: movieComments.id })
-				.from(movieComments)
-				.where(eq(movieComments.parentId, parentId))
+				.select({ id: entityComments.id })
+				.from(entityComments)
+				.where(eq(entityComments.parentId, parentId))
 				.all();
 			for (const c of children) {
 				toDelete.push(c.id);
 				queue.push(c.id);
 			}
 		}
-		this.database.db.delete(movieComments).where(inArray(movieComments.id, toDelete)).run();
-		this.bust(existing.movieId);
-		return this.getForMovie(existing.movieId, userId);
+		this.database.db.delete(entityComments).where(inArray(entityComments.id, toDelete)).run();
+		const ref = this.refOf(existing);
+		this.bust(ref);
+		return this.getForEntity(ref, userId);
 	}
 
 	/** Toggle an emoji reaction for the user. */
 	toggleReaction(commentId: string, userId: string, emoji: string) {
 		const comment = this.database.db
-			.select({ movieId: movieComments.movieId })
-			.from(movieComments)
-			.where(eq(movieComments.id, commentId))
+			.select({ entityType: entityComments.entityType, entityId: entityComments.entityId })
+			.from(entityComments)
+			.where(eq(entityComments.id, commentId))
 			.get();
 		if (!comment) throw new NotFoundException('Comment not found');
 		const e = (emoji ?? '').slice(0, 16);
 		if (!e) throw new ForbiddenException('Emoji required');
 
 		const existing = this.database.db
-			.select({ id: commentReactions.id })
-			.from(commentReactions)
+			.select({ id: entityCommentReactions.id })
+			.from(entityCommentReactions)
 			.where(
-				sql`${commentReactions.commentId} = ${commentId} AND ${commentReactions.userId} = ${userId} AND ${commentReactions.emoji} = ${e}`,
+				sql`${entityCommentReactions.commentId} = ${commentId} AND ${entityCommentReactions.userId} = ${userId} AND ${entityCommentReactions.emoji} = ${e}`,
 			)
 			.get();
 		if (existing) {
 			this.database.db
-				.delete(commentReactions)
-				.where(eq(commentReactions.id, existing.id))
+				.delete(entityCommentReactions)
+				.where(eq(entityCommentReactions.id, existing.id))
 				.run();
 		} else {
 			this.database.db
-				.insert(commentReactions)
+				.insert(entityCommentReactions)
 				.values({
 					id: crypto.randomUUID(),
 					commentId,
@@ -362,18 +424,17 @@ export class CommentsService {
 				.run();
 			// Notify the comment's author of the reaction (not your own).
 			const author = this.database.db
-				.select({ userId: movieComments.userId, text: movieComments.text })
-				.from(movieComments)
-				.where(eq(movieComments.id, commentId))
+				.select({ userId: entityComments.userId, text: entityComments.text })
+				.from(entityComments)
+				.where(eq(entityComments.id, commentId))
 				.get();
 			if (author && author.userId !== userId) {
-				this.notifications.create(
+				this.notify(
 					NotificationType.CommentReaction,
+					this.refOf(comment),
 					{
 						fromUserId: userId,
 						fromUserName: this.userName(userId),
-						movieId: comment.movieId,
-						movieTitle: this.movieTitle(comment.movieId),
 						commentId,
 						emoji: e,
 						snippet: (author.text ?? '').slice(0, 140),
@@ -382,15 +443,20 @@ export class CommentsService {
 				);
 			}
 		}
-		this.bust(comment.movieId);
-		return this.getForMovie(comment.movieId, userId);
+		const ref = this.refOf(comment);
+		this.bust(ref);
+		return this.getForEntity(ref, userId);
+	}
+
+	private refOf(row: { entityType: string; entityId: string }): EntityRef {
+		return { type: row.entityType as EntityType, id: row.entityId };
 	}
 
 	private requireOwn(id: string, userId: string) {
 		const existing = this.database.db
 			.select()
-			.from(movieComments)
-			.where(eq(movieComments.id, id))
+			.from(entityComments)
+			.where(eq(entityComments.id, id))
 			.get();
 		if (!existing) throw new NotFoundException('Comment not found');
 		if (existing.userId !== userId) {

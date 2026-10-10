@@ -1,9 +1,9 @@
 import { CACHE_NAMESPACES, nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { CacheService } from '../cache/cache.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { movieMetadata, movies, userRatings, userWatchHistory } from '../database/schema/index.js';
+import { entityRatings, movieMetadata, movies, playHistory } from '../database/schema/index.js';
 
 export interface TasteProfile {
 	userId: string;
@@ -45,32 +45,32 @@ export class TasteProfileService {
 
 		const ratings = this.database.db
 			.select({
-				rating: userRatings.rating,
-				movieId: userRatings.movieId,
+				rating: entityRatings.rating,
+				movieId: entityRatings.entityId,
 				year: movies.year,
 				genres: movieMetadata.genres,
 				directors: movieMetadata.directors,
 				cast: movieMetadata.cast,
 			})
-			.from(userRatings)
-			.innerJoin(movies, eq(movies.id, userRatings.movieId))
-			.leftJoin(movieMetadata, eq(movieMetadata.movieId, userRatings.movieId))
-			.where(eq(userRatings.userId, userId))
-			.orderBy(desc(userRatings.rating))
+			.from(entityRatings)
+			.innerJoin(movies, eq(movies.id, entityRatings.entityId))
+			.leftJoin(movieMetadata, eq(movieMetadata.movieId, entityRatings.entityId))
+			.where(and(eq(entityRatings.userId, userId), eq(entityRatings.entityType, 'movie')))
+			.orderBy(desc(entityRatings.rating))
 			.all();
 
 		const history = this.database.db
 			.select({
-				movieId: userWatchHistory.movieId,
+				movieId: playHistory.entityId,
 				year: movies.year,
 				genres: movieMetadata.genres,
 				directors: movieMetadata.directors,
 				cast: movieMetadata.cast,
 			})
-			.from(userWatchHistory)
-			.innerJoin(movies, eq(movies.id, userWatchHistory.movieId))
-			.leftJoin(movieMetadata, eq(movieMetadata.movieId, userWatchHistory.movieId))
-			.where(eq(userWatchHistory.userId, userId))
+			.from(playHistory)
+			.innerJoin(movies, eq(movies.id, playHistory.entityId))
+			.leftJoin(movieMetadata, eq(movieMetadata.movieId, playHistory.entityId))
+			.where(and(eq(playHistory.userId, userId), eq(playHistory.entityType, 'movie')))
 			.all();
 
 		const genres = new Map<string, number>();
