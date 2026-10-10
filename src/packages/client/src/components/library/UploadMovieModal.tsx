@@ -47,7 +47,7 @@ const COMPANION_EXTS = new Set([
 
 const extOf = (name: string) => name.split('.').pop()?.toLowerCase() ?? '';
 
-interface Entry {
+export interface Entry {
 	file: File;
 	relativePath: string;
 }
@@ -84,7 +84,7 @@ async function walkDir(dir: FileSystemDirectoryEntry, prefix: string, out: Entry
 }
 
 /** Collect files from one dropped top-level entry (a file or a folder). */
-async function collectEntry(entry: FileSystemEntry, out: Entry[]): Promise<void> {
+export async function collectEntry(entry: FileSystemEntry, out: Entry[]): Promise<void> {
 	if (entry.isFile) {
 		const file = await entryToFile(entry as FileSystemFileEntry);
 		out.push({ file, relativePath: file.name });

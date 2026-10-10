@@ -57,6 +57,7 @@ import styles from './Settings.module.scss';
 import { About } from './settings/About';
 import { Connections } from './settings/Connections';
 import { Matching } from './settings/Matching';
+import { MusicOfflineDownloads } from './settings/MusicOfflineDownloads';
 import { MusicPlaybackPrefs } from './settings/MusicPlaybackPrefs';
 import { MusicSettings } from './settings/MusicSettings';
 import { Notifications } from './settings/Notifications';
@@ -2080,6 +2081,7 @@ export function Settings(props: SettingsProps) {
 							</div>
 
 							<MusicPlaybackPrefs />
+							<MusicOfflineDownloads />
 
 							<div class={styles.actions}>
 								<Button

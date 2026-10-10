@@ -16,6 +16,7 @@ import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
 import { ArtistLinks, InlineLink } from '@/components/music/InlineLink';
 import { AlbumCard, MusicRail } from '@/components/music/MusicCards';
+import { OfflineDownloadButton } from '@/components/music/OfflineDownloadButton';
 import { TrackRow } from '@/components/music/TrackRow';
 import { useSeo } from '@/hooks/useSeo';
 import { musicService } from '@/services/music.service';
@@ -286,6 +287,13 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 									<Icon name="list-plus" size={16} /> Add to queue
 								</span>
 							</Button>
+							<OfflineDownloadButton
+								kind="album"
+								id={album.id}
+								title={album.title}
+								tracks={album.tracks}
+								size="md"
+							/>
 							<EntityOptionsMenu
 								entity={{ type: 'album', id: album.id }}
 								item={albumQueueItem(album)}

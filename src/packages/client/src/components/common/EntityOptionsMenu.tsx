@@ -20,6 +20,13 @@ import {
 	removeFavorite,
 } from '@/state/favorites.state';
 import { playMedia } from '@/state/globalPlayer.state';
+import {
+	downloadEntity,
+	groupKey,
+	groupStatus,
+	isTrackOffline,
+	offlineAllowed,
+} from '@/state/musicOffline.state';
 import { notifyError, notifySuccess, shouldNotifyPlaylist } from '@/state/notifications.state';
 import {
 	addEntityToPlaylist,
@@ -53,7 +60,8 @@ export type EntityActionId =
 	| 'favorite'
 	| 'goArtist'
 	| 'goAlbum'
-	| 'goTrack';
+	| 'goTrack'
+	| 'download';
 
 interface EntityAction {
 	id: EntityActionId;
@@ -153,6 +161,21 @@ const ACTIONS: Record<EntityActionId, EntityAction> = {
 			route(`/album/${albumId}`);
 		},
 	},
+	download: {
+		id: 'download',
+		icon: 'download',
+		label: ({ entity }) =>
+			entity.type === 'track' && isTrackOffline(entity.id)
+				? 'Downloaded'
+				: groupStatus(groupKey('album', entity.id)) === 'downloaded'
+					? 'Downloaded'
+					: 'Download',
+		visible: ({ entity }) =>
+			offlineAllowed.value && (entity.type === 'track' || entity.type === 'album'),
+		run: ({ entity }) => {
+			void downloadEntity(entity);
+		},
+	},
 	goTrack: {
 		id: 'goTrack',
 		icon: 'info',
@@ -175,8 +198,18 @@ export const ENTITY_ACTIONS: Record<EntityType, EntityActionId[]> = {
 		'goTrack',
 		'goAlbum',
 		'goArtist',
+		'download',
 	],
-	album: ['play', 'playNext', 'addToQueue', 'playlist', 'rate', 'favorite', 'goArtist'],
+	album: [
+		'play',
+		'playNext',
+		'addToQueue',
+		'playlist',
+		'rate',
+		'favorite',
+		'goArtist',
+		'download',
+	],
 	artist: ['play', 'playNext', 'addToQueue', 'rate', 'favorite'],
 	movie: ['play', 'playNext', 'addToQueue', 'playlist', 'favorite'],
 	person: ['favorite'],

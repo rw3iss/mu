@@ -237,6 +237,7 @@ export function TrackDetail({ id }: TrackDetailProps) {
 									'favorite',
 									'goAlbum',
 									'goArtist',
+									'download',
 								]}
 							/>
 						</div>

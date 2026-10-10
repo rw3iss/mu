@@ -10,6 +10,7 @@ import { computed, effect, signal, untracked } from '@preact/signals';
 import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting, getUiSettingSignal, setUiSetting } from '@/hooks/useUiSetting';
 import { musicService } from '@/services/music.service';
+import { offlineTrackSummary } from '@/services/music-offline-index';
 import {
 	bassEnhanceEnabled,
 	compressorEnabled,
@@ -177,7 +178,8 @@ async function resolveTrack(id: string): Promise<TrackSummary | null> {
 		rememberTracks([t]);
 		return t;
 	} catch {
-		return null;
+		// Offline: a downloaded track still has its summary on this device.
+		return offlineTrackSummary(id);
 	}
 }
 

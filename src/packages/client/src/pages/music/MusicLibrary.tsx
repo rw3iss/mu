@@ -11,6 +11,7 @@ import { Tabs } from '@/components/common/Tabs';
 import { RatingWidget } from '@/components/movie/RatingWidget';
 import { ArtistLinks, InlineLink } from '@/components/music/InlineLink';
 import { AlbumCard, ArtistCard, CardGrid } from '@/components/music/MusicCards';
+import { MusicUploadButton } from '@/components/music/MusicUploadModal';
 import { useUiSetting } from '@/hooks/useUiSetting';
 import { entitiesService } from '@/services/entities.service';
 import { type MusicListQuery, musicService, type Page } from '@/services/music.service';
@@ -226,6 +227,7 @@ export function MusicLibrary(_props: MusicLibraryProps) {
 		<div class={styles.page}>
 			<header class={styles.header}>
 				<h1 class={styles.title}>Music Library</h1>
+				<MusicUploadButton />
 				{params.q && (
 					<span class={styles.queryChip}>
 						Results for “{params.q}”

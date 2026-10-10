@@ -1,5 +1,5 @@
 import { signal } from '@preact/signals';
-import { libraryUploadService } from '@/services/library-upload.service';
+import { libraryUploadService, type UploadService } from '@/services/library-upload.service';
 import { wsService } from '@/services/websocket.service';
 import { notifyError, notifyInfo, notifySuccess } from '@/state/notifications.state';
 
@@ -35,6 +35,10 @@ export interface StartUploadArgs {
 	entries: UploadEntry[];
 	rootName: string;
 	onUploaded?: () => void;
+	/** Endpoint family (default: movie library uploads). */
+	service?: UploadService;
+	/** Toast shown once every file is uploaded and finalize was accepted. */
+	successMessage?: string;
 }
 
 function teardown(): void {
@@ -58,6 +62,8 @@ export async function startUpload({
 	entries,
 	rootName,
 	onUploaded,
+	service = libraryUploadService,
+	successMessage,
 }: StartUploadArgs): Promise<void> {
 	if (activeUpload.value) {
 		notifyError('An upload is already in progress — wait for it to finish or cancel it.');
@@ -85,7 +91,7 @@ export async function startUpload({
 
 	try {
 		for (const entry of entries) {
-			await libraryUploadService.uploadFile({
+			await service.uploadFile({
 				sourceId,
 				relativePath: entry.relativePath,
 				file: entry.file,
@@ -99,9 +105,11 @@ export async function startUpload({
 			uploadSentBytes.value = base;
 		}
 
-		await libraryUploadService.finalize(sourceId, uploadId, rootName);
+		await service.finalize(sourceId, uploadId, rootName);
 		uploadComplete.value = true;
-		notifySuccess(`Uploaded "${rootName}" — scanning it into the library now.`);
+		notifySuccess(
+			successMessage ?? `Uploaded "${rootName}" — scanning it into the library now.`,
+		);
 		onUploaded?.();
 		// Let the "complete" state show briefly, then dismiss.
 		window.setTimeout(teardown, 1500);

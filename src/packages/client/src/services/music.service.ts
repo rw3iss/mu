@@ -5,12 +5,15 @@ import type {
 	ArtistSummary,
 	AudioQuality,
 	AudioStreamSession,
+	MusicOfflinePolicy,
+	MusicOfflineTokenResponse,
 	MusicSettings,
 	TrackDetail,
 	TrackSummary,
 	WaveformData,
 } from '@mu/shared';
 import { api } from './api';
+import { offlineSession } from './music-offline-index';
 
 /**
  * Music API client. Contract: docs/music-support-plan.md §5–§6.
@@ -109,10 +112,36 @@ export const musicService = {
 	albumTrackIds(albumId: string): Promise<string[]> {
 		return api.get(`/music/albums/${encodeURIComponent(albumId)}/track-ids`);
 	},
-	startStream(trackId: string, opts: { profile?: AudioQuality } = {}): Promise<AudioStreamSession> {
+	/**
+	 * Start a stream. When the server can't be reached but the track is
+	 * downloaded, falls back to a local session served by the service worker.
+	 */
+	async startStream(
+		trackId: string,
+		opts: { profile?: AudioQuality } = {},
+	): Promise<AudioStreamSession> {
 		const p: Record<string, string> = { caps: audioCapabilities().join(',') };
 		if (opts.profile) p.profile = opts.profile;
-		return api.get(`/music/stream/${encodeURIComponent(trackId)}/start`, p);
+		try {
+			return await api.get<AudioStreamSession>(
+				`/music/stream/${encodeURIComponent(trackId)}/start`,
+				p,
+			);
+		} catch (err) {
+			const local = offlineSession(trackId);
+			if (local) return local;
+			throw err;
+		}
+	},
+	offlinePolicy(): Promise<MusicOfflinePolicy> {
+		return api.get('/music/offline/policy');
+	},
+	/** Short-lived signed download URLs (no JWT in the URL) for these tracks. */
+	offlineTokens(trackIds: string[]): Promise<MusicOfflineTokenResponse> {
+		return api.post('/music/offline/token', {
+			trackIds,
+			caps: audioCapabilities().join(','),
+		});
 	},
 	reportProgress(sessionId: string, positionSeconds: number, completed = false): Promise<void> {
 		return api.post(`/music/stream/${encodeURIComponent(sessionId)}/progress`, {
@@ -123,10 +152,15 @@ export const musicService = {
 	waveform(trackFileId: string): Promise<WaveformData> {
 		return api.get(`/music/waveform/${encodeURIComponent(trackFileId)}`);
 	},
-	lyrics(trackId: string): Promise<{ plain: string | null; syncedLrc: string | null; source: string | null } | null> {
+	lyrics(
+		trackId: string,
+	): Promise<{ plain: string | null; syncedLrc: string | null; source: string | null } | null> {
 		return api.get(`/music/tracks/${encodeURIComponent(trackId)}/lyrics`);
 	},
-	saveLyrics(trackId: string, body: { plain: string | null; syncedLrc: string | null }): Promise<void> {
+	saveLyrics(
+		trackId: string,
+		body: { plain: string | null; syncedLrc: string | null },
+	): Promise<void> {
 		return api.put(`/music/tracks/${encodeURIComponent(trackId)}/lyrics`, body);
 	},
 	settings(): Promise<MusicSettings> {

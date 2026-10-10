@@ -40,6 +40,7 @@ import {
 	isSetupComplete,
 	localBypass,
 } from '@/state/auth.state';
+import { initMusicOffline } from '@/state/musicOffline.state';
 import { initMusicPrefs } from '@/state/musicPrefs.state';
 import { initTheme } from '@/state/theme.state';
 import '@/state/accentColor.state';
@@ -201,6 +202,7 @@ export function App() {
 		initTheme();
 		initFeatures();
 		initMusicPrefs();
+		initMusicOffline();
 		syncBrowseModeFromPath(window.location.pathname);
 		checkAuth();
 		wsService.connect();
