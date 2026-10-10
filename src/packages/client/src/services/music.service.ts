@@ -77,6 +77,11 @@ export function audioCapabilities(): string[] {
 	return probe.filter(([, mime]) => a.canPlayType(mime) !== '').map(([k]) => k);
 }
 
+type LyricsDto = { plain: string | null; syncedLrc: string | null; source: string | null } | null;
+
+/** Per-track lyrics promises, shared by the lyrics panel and the waveform markers. */
+const lyricsCache = new Map<string, Promise<LyricsDto>>();
+
 export const musicService = {
 	albums(q: MusicListQuery = {}): Promise<Page<AlbumSummary>> {
 		return api.get('/music/albums', params(q));
@@ -109,7 +114,10 @@ export const musicService = {
 	albumTrackIds(albumId: string): Promise<string[]> {
 		return api.get(`/music/albums/${encodeURIComponent(albumId)}/track-ids`);
 	},
-	startStream(trackId: string, opts: { profile?: AudioQuality } = {}): Promise<AudioStreamSession> {
+	startStream(
+		trackId: string,
+		opts: { profile?: AudioQuality } = {},
+	): Promise<AudioStreamSession> {
 		const p: Record<string, string> = { caps: audioCapabilities().join(',') };
 		if (opts.profile) p.profile = opts.profile;
 		return api.get(`/music/stream/${encodeURIComponent(trackId)}/start`, p);
@@ -123,10 +131,25 @@ export const musicService = {
 	waveform(trackFileId: string): Promise<WaveformData> {
 		return api.get(`/music/waveform/${encodeURIComponent(trackFileId)}`);
 	},
-	lyrics(trackId: string): Promise<{ plain: string | null; syncedLrc: string | null; source: string | null } | null> {
+	lyrics(
+		trackId: string,
+	): Promise<{ plain: string | null; syncedLrc: string | null; source: string | null } | null> {
 		return api.get(`/music/tracks/${encodeURIComponent(trackId)}/lyrics`);
 	},
-	saveLyrics(trackId: string, body: { plain: string | null; syncedLrc: string | null }): Promise<void> {
+	/** Cached `lyrics()`; failures resolve to null. Cleared by `saveLyrics`. */
+	lyricsCached(trackId: string): Promise<LyricsDto> {
+		let p = lyricsCache.get(trackId);
+		if (!p) {
+			p = this.lyrics(trackId).catch(() => null);
+			lyricsCache.set(trackId, p);
+		}
+		return p;
+	},
+	saveLyrics(
+		trackId: string,
+		body: { plain: string | null; syncedLrc: string | null },
+	): Promise<void> {
+		lyricsCache.delete(trackId);
 		return api.put(`/music/tracks/${encodeURIComponent(trackId)}/lyrics`, body);
 	},
 	settings(): Promise<MusicSettings> {

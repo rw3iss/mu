@@ -37,10 +37,6 @@ interface MusicListPanelProps {
 }
 
 const albumCache = new Map<string, Promise<AlbumDetail>>();
-const lyricsCache = new Map<
-	string,
-	Promise<{ plain: string | null; syncedLrc: string | null } | null>
->();
 const recommendedCache = new Map<string, Promise<TrackSummary[]>>();
 
 function loadAlbum(id: string): Promise<AlbumDetail> {
@@ -419,12 +415,7 @@ function RecommendedTab() {
 // ── Lyrics ──
 
 function loadLyrics(trackId: string) {
-	let p = lyricsCache.get(trackId);
-	if (!p) {
-		p = musicService.lyrics(trackId).catch(() => null);
-		lyricsCache.set(trackId, p);
-	}
-	return p;
+	return musicService.lyricsCached(trackId);
 }
 
 function LyricsTab() {
