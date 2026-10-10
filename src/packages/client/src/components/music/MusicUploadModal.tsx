@@ -16,6 +16,46 @@ const COMPANION_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'cue', 'lrc']);
 
 const extOf = (name: string) => name.split('.').pop()?.toLowerCase() ?? '';
 
+/** Extension for an audio MIME type — some mobile pickers hand over names without one. */
+const EXT_BY_MIME: Record<string, string> = {
+	'audio/mpeg': 'mp3',
+	'audio/mp3': 'mp3',
+	'audio/flac': 'flac',
+	'audio/x-flac': 'flac',
+	'audio/mp4': 'm4a',
+	'audio/x-m4a': 'm4a',
+	'audio/aac': 'aac',
+	'audio/ogg': 'ogg',
+	'audio/opus': 'opus',
+	'audio/wav': 'wav',
+	'audio/x-wav': 'wav',
+	'audio/aiff': 'aiff',
+	'audio/x-aiff': 'aiff',
+	'application/zip': 'zip',
+	'application/x-zip-compressed': 'zip',
+};
+
+/** Give extension-less audio files an extension from their MIME type. */
+function withExtension(e: Entry): Entry {
+	const ext = extOf(e.file.name);
+	if (AUDIO_EXTS.has(ext) || COMPANION_EXTS.has(ext) || ext === 'zip') return e;
+	const guess = EXT_BY_MIME[e.file.type];
+	return guess ? { ...e, relativePath: `${e.relativePath}.${guess}` } : e;
+}
+
+/**
+ * Folder picking (`webkitdirectory`) only works in desktop browsers. Phones
+ * (iOS Safari, Android Chrome) ignore it and open the plain file picker, so
+ * the button is hidden there and the user picks tracks or a .zip instead.
+ */
+const canPickFolders = (() => {
+	if (typeof document === 'undefined' || typeof navigator === 'undefined') return false;
+	const mobile =
+		/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+		(navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+	return !mobile && 'webkitdirectory' in document.createElement('input');
+})();
+
 /**
  * Top-level files may be audio tracks (placed by their tags as
  * `<Artist>/<Album>/<file>`) or `.zip` archives; files inside a folder may
@@ -23,7 +63,7 @@ const extOf = (name: string) => name.split('.').pop()?.toLowerCase() ?? '';
  */
 function filterEntries(collected: Entry[]): Entry[] {
 	return collected.filter((e) => {
-		const ext = extOf(e.file.name);
+		const ext = extOf(e.relativePath);
 		const nested = e.relativePath.includes('/');
 		if (nested) return AUDIO_EXTS.has(ext) || COMPANION_EXTS.has(ext);
 		return AUDIO_EXTS.has(ext) || ext === 'zip';
@@ -47,6 +87,8 @@ export function MusicUploadModal({ isOpen, onClose }: MusicUploadModalProps) {
 	const [error, setError] = useState<string | null>(null);
 	const [starting, setStarting] = useState(false);
 	const [dragging, setDragging] = useState(false);
+	/** True once targets loaded and there is no music folder to upload into. */
+	const [noTargets, setNoTargets] = useState(false);
 	const dragDepth = useRef(0);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const folderInputRef = useRef<HTMLInputElement>(null);
@@ -56,15 +98,14 @@ export function MusicUploadModal({ isOpen, onClose }: MusicUploadModalProps) {
 		setEntries([]);
 		setError(null);
 		setStarting(false);
+		setNoTargets(false);
 		musicUploadService
 			.getTargets()
 			.then((r) => {
 				setTargets(r.targets);
 				const def = r.targets.find((t) => t.isDefault) ?? r.targets[0];
 				setSourceId((prev) => prev || def?.id || '');
-				if (r.targets.length === 0) {
-					setError('No music folders are configured. An admin can add one in Settings.');
-				}
+				setNoTargets(r.targets.length === 0);
 			})
 			.catch(() => setError('Could not load music folders.'));
 	}, [isOpen]);
@@ -77,7 +118,7 @@ export function MusicUploadModal({ isOpen, onClose }: MusicUploadModalProps) {
 	const ingest = useCallback((collected: Entry[]) => {
 		setError(null);
 		if (collected.length === 0) return;
-		const allowed = filterEntries(collected);
+		const allowed = filterEntries(collected.map(withExtension));
 		if (allowed.length === 0) {
 			setError('Nothing to upload — choose audio files, a music folder, or a .zip.');
 			return;
@@ -195,6 +236,15 @@ export function MusicUploadModal({ isOpen, onClose }: MusicUploadModalProps) {
 					files inside folders come along.
 				</p>
 
+				{noTargets && (
+					<p class={styles.error}>
+						No music folder is set up yet, so uploads have nowhere to go.{' '}
+						{can('admin:server')
+							? 'Add one in Settings → Music → Music Folders, then try again.'
+							: 'Ask an admin to add a music folder in Settings → Music.'}
+					</p>
+				)}
+
 				{targets.length > 1 && (
 					<label class={styles.field}>
 						<span class={styles.fieldLabel}>Music folder</span>
@@ -216,15 +266,35 @@ export function MusicUploadModal({ isOpen, onClose }: MusicUploadModalProps) {
 
 				<div class={`${styles.dropZone} ${dragging ? styles.dropZoneActive : ''}`}>
 					<Icon name="upload" size={24} />
-					<p class={styles.dropHint}>Drag tracks, folders or a .zip here, or</p>
+					<p class={styles.dropHint}>
+						{canPickFolders
+							? 'Drag tracks, folders or a .zip here, or'
+							: 'Choose tracks (select several at once) or a .zip of a folder'}
+					</p>
 					<div class={styles.pickers}>
-						<Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+						<Button
+							variant="secondary"
+							disabled={noTargets}
+							onClick={() => fileInputRef.current?.click()}
+						>
 							<Icon name="music" size={16} /> Choose files
 						</Button>
-						<Button variant="secondary" onClick={() => folderInputRef.current?.click()}>
-							<Icon name="list-plus" size={16} /> Choose folder
-						</Button>
+						{canPickFolders && (
+							<Button
+								variant="secondary"
+								disabled={noTargets}
+								onClick={() => folderInputRef.current?.click()}
+							>
+								<Icon name="list-plus" size={16} /> Choose folder
+							</Button>
+						)}
 					</div>
+					{!canPickFolders && (
+						<p class={styles.dropHint}>
+							Phones can't pick folders. To upload a whole album, zip the folder
+							first, or upload from a computer.
+						</p>
+					)}
 					<input
 						ref={fileInputRef}
 						type="file"
