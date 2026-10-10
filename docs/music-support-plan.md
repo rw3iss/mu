@@ -8,10 +8,10 @@ the two features.
 
 | Phase | Status | Commit |
 |---|---|---|
-| 0 — Groundwork | IN PROGRESS — shared schema, migration + backfill, shared types DONE (`68f3208`) | |
-| 1 — Catalogue | not started | |
-| 2 — Playback (+ waveform seek bar) | IN PROGRESS — client player (audio adapter, A/B gapless, waveform seek bar, artwork surfaces, list panel, MediaSession, video interplay) DONE | |
-| 3 — Browse & detail | not started | |
+| 0 — Groundwork | DONE 2026-10-10 — feature flags, JobTypeRegistry, `media_sources.kind`, polymorphic `entity_*` tables + backfill (verified on prod: counts match), PlayerControls split, PlayerAdapter, AudioEngine source bus, MediaImporter/VideoImporter | `68f3208`…`1243358`, deployed `4ce3558` |
+| 1 — Catalogue | DONE 2026-10-10 — music schema + FTS5, AudioImporter (tags, grouping, compilations, art, duplicates), music jobs, Settings → Music, Setup Libraries step, installer prompts, Jobs kind filter, scan quick action | `0ec7901`, `4ce3558`, `dca325c` |
+| 2 — Playback (+ waveform seek bar) | DONE 2026-10-10 — capability probe, progressive streaming (original / cached FLAC / Opus-AAC), waveform peaks + seek bar, ingest transcodes, LRU cache eviction, audio player (A/B gapless, art surfaces, list panel, shuffle/repeat, ReplayGain, MediaSession, video interplay) | `920aac9`, `a176088`, `0ec7901` |
+| 3 — Browse & detail | DONE 2026-10-10 — browse mode toggle + routing, music library tabs, artist/album/track pages, generalised favorite/rating/comments/playlists/options menu, music home rails, audio playlists | `2522959`, `bb4dbb3`, `f5d5c30` |
 | 4 — Metadata & lyrics | not started | |
 | 5 — Upload & offline | not started | |
 | 6 — Search & discovery | not started | |
@@ -245,7 +245,8 @@ Migration steps (one `scripts/migrate.js` release each):
 ### 5.1 Sources and scanning
 
 - **Music folders are separate sources** (`media_sources.kind = 'audio'`), managed in
-  Settings → Library → *Music Folders*. One path should not be both kinds. If it is,
+  Settings → Music → *Music Folders* (corrected 2026-10-10: one Music tab instead of
+  sections spread over Library/Encoding/Playback). One path should not be both kinds. If it is,
   each importer only takes its own extensions.
 - `ScanOrchestrator.scanSource` walks with the importer's extension set
   (`SUPPORTED_AUDIO_EXTENSIONS`: `mp3 flac m4a aac alac ogg oga opus wav aiff aif wma ape wv dsf dff`)
@@ -346,6 +347,14 @@ and written to `.part` then renamed. On a cache miss:
    (> `music.onDemandMaxSeconds`, default 20 min) get a
    live chunked ffmpeg pipe without range support until the cached file lands.
 
+> **STATUS 2026-10-10 — corrections.** (a) `stream_sessions` keeps its FK to
+> `movies`, so music sessions are **stateless** (`<trackId>.<nonce>` ids, self-describing
+> file URLs) and progress is written straight to `play_history`. (b) The live chunked
+> pipe for very long tracks was **dropped**: every miss is build-then-serve (an
+> 80-minute track builds in seconds; requests are de-duplicated). `onDemandMaxSeconds`
+> remains in settings but is unused. (c) Albums carry a `group_key` column for the
+> grouping rule.
+
 **Cache management.** A `music-cache-evict` scheduled job: LRU under
 `music.transcodeCacheMaxGb`. Ingest-time transcodes for unplayable formats are never
 evicted while the source exists.
@@ -366,6 +375,12 @@ New `JOB_TYPE`s, registered by `MusicModule` with `JobTypeSpec` metadata:
 | `audio-transcode` | ✓ | ✓ | Unplayable → FLAC; profile pre-builds |
 | `music-fingerprint` | ✓ | – | AcoustID for untagged files |
 | `music-cache-evict` | – | – | Scheduled LRU |
+
+> **STATUS 2026-10-10.** Registered: `music-waveform` (new — waveform peaks),
+> `audio-transcode`, `music-cache-evict` (hourly), `music-metadata`, `music-lyrics`.
+> BYPASSED: `music-scan` (audio sources use the existing scan job, routed by
+> `source.kind`), `music-artwork` (folded into `music-metadata`), `music-fingerprint`
+> (AcoustID deferred — see Phase 4 status).
 
 The in-memory provider reads `ioHeavy`/`encode` from the `JobTypeRegistry` instead of
 the hard-coded lists. Music caps: `music.maxConcurrentJobs` (default 2) as a per-feature
@@ -538,8 +553,11 @@ existing call sites keep working.
 
 | Key (app setting) | Default | Where |
 |---|---|---|
-| `features.movies` | `true` | Settings → Server → Features |
-| `features.music` | `false` (installer/Setup decides) | Settings → Server → Features; Setup; installers |
+| `features.movies` | `true` | Settings → Music → Features |
+| `features.music` | `false` (installer/Setup decides) | Settings → Music → Features; Setup; installers |
+
+> **STATUS 2026-10-10.** The switches live at the top of **Settings → Music** (not
+> Server). Env defaults `MU_FEATURE_MOVIES` / `MU_FEATURE_MUSIC` accept `1/0/true/false`.
 
 Disabling Music: its routes return 404 (`@RequireFeature('music')` guard), the
 scanner skips `audio` sources, `MusicModule` job handlers refuse new work, scheduled
@@ -548,6 +566,11 @@ is kept**, so re-enabling is instant. A separate "Delete music library data" act
 does the destructive cleanup.
 
 ### 7.2 Admin settings (shown only when Music is enabled)
+
+> **STATUS 2026-10-10 — DONE, reorganised.** Everything below is one **Settings → Music**
+> tab (Features, Music Folders, Import, Encoding, Playback, Offline). Quick actions are
+> a *Music* group on the Admin page (`POST /music/admin/*`). The per-folder scan
+> interval / watch toggle reuse the source defaults.
 
 - **Library → Music Folders**: list of `audio` sources (reuses `MediaPathList` with
   `kind`), scan interval, watch on/off, `music.minDurationSeconds`, grouping rule
@@ -575,6 +598,12 @@ does the destructive cleanup.
 ---
 
 ## 8. Install and first run
+
+> **STATUS 2026-10-10 — DONE with changes.** `install.sh`/`install.ps1` ask "Enable
+> Music?" and write a `features:` block to config.yml; music folder paths are added
+> later in Settings → Music or on the Setup page (no path prompt). `setup-fedora.sh`
+> has `--music/--no-music` (writes `MU_FEATURE_MUSIC` to `.env`); `setup.sh` prompts.
+> The chromaprint offer is deferred with AcoustID.
 
 - **`install.sh` / `install.ps1`**: a Phase 3 prompt next to the IMDB datasets prompt —
   "Enable Music support? [y/N]" — then "Music folder path(s)". If yes: offer
