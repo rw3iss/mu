@@ -630,13 +630,13 @@ export class MusicQueryService {
 		if (type === 'artist') {
 			const a = this.db.select().from(artists).where(eq(artists.id, id)).get();
 			return a
-				? { title: a.name, imageUrl: artUrl(a.imageId, 256), url: `/music/artist/${a.id}` }
+				? { title: a.name, imageUrl: artUrl(a.imageId, 256), url: `/artist/${a.id}` }
 				: null;
 		}
 		if (type === 'album') {
 			const a = this.db.select().from(albums).where(eq(albums.id, id)).get();
 			return a
-				? { title: a.title, imageUrl: artUrl(a.artId, 256), url: `/music/album/${a.id}` }
+				? { title: a.title, imageUrl: artUrl(a.artId, 256), url: `/album/${a.id}` }
 				: null;
 		}
 		const t = this.db.select().from(tracks).where(eq(tracks.id, id)).get();
@@ -645,7 +645,7 @@ export class MusicQueryService {
 		return {
 			title: t.title,
 			imageUrl: artUrl(al?.artId ?? null, 256),
-			url: `/music/track/${t.id}`,
+			url: `/track/${t.id}`,
 		};
 	}
 

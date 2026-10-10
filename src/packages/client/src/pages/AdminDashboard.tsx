@@ -4,6 +4,7 @@ import { route } from 'preact-router';
 import { jobAction, jobListAction } from '@/components/admin/JobBadge';
 import { Button } from '@/components/common/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { musicEnabled } from '@/state/features.state';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import { groupsService } from '@/services/groups.service';
@@ -779,6 +780,27 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 						danger
 					/>
 				</ul>
+				{musicEnabled.value && (
+					<>
+						<h3 class={styles.actionGroupTitle}>Music</h3>
+						<ul class={styles.actionList}>
+							{MUSIC_ACTIONS.map((a) => (
+								<ActionRow
+									key={a.path}
+									label={a.label}
+									description={a.description}
+									onClick={confirmThen({
+										title: a.label,
+										message: a.message,
+										confirmLabel: a.confirmLabel,
+										started: a.started,
+										run: () => runMusicAction(a),
+									})}
+								/>
+							))}
+						</ul>
+					</>
+				)}
 				{/* One dialog serves every non-destructive Quick Action. Firing the
 				    "started" toast here — rather than inside each handler — means
 				    the user always gets immediate feedback on confirm, even for
@@ -988,6 +1010,92 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 			</details>
 		</div>
 	);
+}
+
+interface MusicAction {
+	path: string;
+	label: string;
+	description: string;
+	message: string;
+	confirmLabel: string;
+	started: string;
+	/** Result toast; `n` is the server's `count`. */
+	done: (n: number) => string;
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** Music quick actions — each POSTs `/music/admin/<path>` → `{ started, count }`. */
+const MUSIC_ACTIONS: MusicAction[] = [
+	{
+		path: 'scan',
+		label: 'Scan Music Library',
+		description: 'Index new or changed files in every music folder.',
+		message:
+			'Walks every enabled music folder and imports new or changed audio files. Existing tracks are updated, not replaced.',
+		confirmLabel: 'Start Scan',
+		started: 'Music scan started.',
+		done: (n) => `Music scan queued for ${plural(n, 'folder')}.`,
+	},
+	{
+		path: 'refresh-metadata',
+		label: 'Refresh Music Metadata',
+		description: 'Match albums and artists against MusicBrainz.',
+		message:
+			'Queues a MusicBrainz match for every album that is not matched yet, plus artist info. Runs as rate-limited background jobs (1 request per second).',
+		confirmLabel: 'Refresh Metadata',
+		started: 'Music metadata refresh started.',
+		done: (n) => `Queued metadata jobs for ${plural(n, 'album')}.`,
+	},
+	{
+		path: 'fetch-art',
+		label: 'Fetch Missing Album Art',
+		description: 'Download covers from the Cover Art Archive for albums with no art.',
+		message:
+			'Looks up a front cover for every album without artwork. Embedded and folder art is never replaced.',
+		confirmLabel: 'Fetch Art',
+		started: 'Album art fetch started.',
+		done: (n) => `Queued art lookups for ${plural(n, 'album')}.`,
+	},
+	{
+		path: 'fetch-lyrics',
+		label: 'Fetch Missing Lyrics',
+		description: 'Look up lyrics on LRCLIB for tracks that have none.',
+		message:
+			'Queues a lyrics lookup for every track without lyrics. Lyrics you edited by hand are never overwritten.',
+		confirmLabel: 'Fetch Lyrics',
+		started: 'Lyrics fetch started.',
+		done: (n) => `Queued lyrics lookups for ${plural(n, 'track')}.`,
+	},
+	{
+		path: 'reencode-unplayable',
+		label: 'Re-encode Unplayable Music',
+		description: 'Make cached FLAC copies of formats browsers cannot play (APE, WavPack, DSD…).',
+		message:
+			'Queues a FLAC transcode for every file in a format no browser plays. The original file is kept; the copy lives in the music cache.',
+		confirmLabel: 'Re-encode',
+		started: 'Music re-encode started.',
+		done: (n) => `Queued ${plural(n, 'file')} for re-encoding.`,
+	},
+	{
+		path: 'clear-cache',
+		label: 'Clear Music Transcode Cache',
+		description: 'Delete cached lower-bitrate and FLAC copies. They rebuild on demand.',
+		message:
+			'Deletes every cached music transcode. Originals are not touched. Copies rebuild the next time a track is played at that quality.',
+		confirmLabel: 'Clear Cache',
+		started: 'Clearing the music transcode cache.',
+		done: (n) => `Removed ${plural(n, 'cached file')}.`,
+	},
+];
+
+async function runMusicAction(a: MusicAction): Promise<void> {
+	try {
+		const res = await api.post<{ started: boolean; count: number }>(`/music/admin/${a.path}`);
+		notifySuccess(a.done(res?.count ?? 0));
+	} catch {
+		notifyError(`${a.label} failed.`);
+	}
 }
 
 /** One row in the Quick Actions list — label left, description right,

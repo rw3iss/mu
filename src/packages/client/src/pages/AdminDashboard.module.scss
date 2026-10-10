@@ -350,3 +350,12 @@
   color: var(--color-accent);
   font-weight: var(--font-weight-semibold);
 }
+
+.actionGroupTitle {
+  margin: var(--space-md) 0 var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
