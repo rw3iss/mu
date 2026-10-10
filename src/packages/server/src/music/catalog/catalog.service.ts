@@ -5,7 +5,6 @@ import { nowISO } from '@mu/shared';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
-import { EntityLifecycleService } from '../../entities/entity-lifecycle.service.js';
 import {
 	albumArtists,
 	albumGenres,
@@ -17,6 +16,7 @@ import {
 	trackFiles,
 	tracks,
 } from '../../database/schema/index.js';
+import { EntityLifecycleService } from '../../entities/entity-lifecycle.service.js';
 import { albumArtistCredit, albumGroupKey } from '../ingest/grouping.js';
 import { normKey, sortName, titleKey } from '../ingest/normalize.js';
 import type { TrackTags } from '../ingest/tags.js';
@@ -29,7 +29,15 @@ export type IngestResult =
 	| { status: 'updated'; trackId: string; albumId: string }
 	| { status: 'skipped-duration' };
 
-const FOLDER_ART = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png', 'front.jpg', 'front.png', 'album.jpg'];
+const FOLDER_ART = [
+	'cover.jpg',
+	'cover.png',
+	'folder.jpg',
+	'folder.png',
+	'front.jpg',
+	'front.png',
+	'album.jpg',
+];
 
 /**
  * Writes one tagged audio file into the catalogue: artist → album → track →
@@ -50,7 +58,11 @@ export class MusicCatalogService {
 	findOrCreateArtist(name: string, mbid: string | null): string {
 		const db = this.database.db;
 		if (mbid) {
-			const byMbid = db.select({ id: artists.id }).from(artists).where(eq(artists.mbid, mbid)).get();
+			const byMbid = db
+				.select({ id: artists.id })
+				.from(artists)
+				.where(eq(artists.mbid, mbid))
+				.get();
 			if (byMbid) return byMbid.id;
 		}
 		const norm = normKey(name);
@@ -60,13 +72,22 @@ export class MusicCatalogService {
 			.where(eq(artists.normName, norm))
 			.get();
 		if (byName) {
-			if (mbid && !byName.mbid) db.update(artists).set({ mbid }).where(eq(artists.id, byName.id)).run();
+			if (mbid && !byName.mbid)
+				db.update(artists).set({ mbid }).where(eq(artists.id, byName.id)).run();
 			return byName.id;
 		}
 		const id = randomUUID();
 		const now = nowISO();
 		db.insert(artists)
-			.values({ id, name, sortName: sortName(name), normName: norm, mbid, createdAt: now, updatedAt: now })
+			.values({
+				id,
+				name,
+				sortName: sortName(name),
+				normName: norm,
+				mbid,
+				createdAt: now,
+				updatedAt: now,
+			})
 			.run();
 		return id;
 	}
@@ -80,10 +101,17 @@ export class MusicCatalogService {
 			.get();
 		if (row) return row.id;
 		const id = randomUUID();
-		this.database.db.insert(musicGenres).values({ id, name, normName: norm }).onConflictDoNothing().run();
+		this.database.db
+			.insert(musicGenres)
+			.values({ id, name, normName: norm })
+			.onConflictDoNothing()
+			.run();
 		return (
-			this.database.db.select({ id: musicGenres.id }).from(musicGenres).where(eq(musicGenres.normName, norm)).get()
-				?.id ?? id
+			this.database.db
+				.select({ id: musicGenres.id })
+				.from(musicGenres)
+				.where(eq(musicGenres.normName, norm))
+				.get()?.id ?? id
 		);
 	}
 
@@ -144,7 +172,10 @@ export class MusicCatalogService {
 					})
 					.run();
 				credit.names.forEach((name, i) => {
-					const artistId = this.findOrCreateArtist(name, tags.mbid.albumArtists[i] ?? null);
+					const artistId = this.findOrCreateArtist(
+						name,
+						tags.mbid.albumArtists[i] ?? null,
+					);
 					db.insert(albumArtists)
 						.values({ albumId: id, artistId, role: 'primary', position: i })
 						.onConflictDoNothing()
@@ -152,13 +183,25 @@ export class MusicCatalogService {
 				});
 				for (const g of tags.genres) {
 					const genreId = this.findOrCreateGenre(g);
-					db.insert(albumGenres).values({ albumId: id, genreId }).onConflictDoNothing().run();
+					db.insert(albumGenres)
+						.values({ albumId: id, genreId })
+						.onConflictDoNothing()
+						.run();
 				}
-				album = { id, artId: null, year: tags.year, artistCredit: credit.credit, isCompilation: credit.various };
+				album = {
+					id,
+					artId: null,
+					year: tags.year,
+					artistCredit: credit.credit,
+					isCompilation: credit.various,
+				};
 				newAlbum = true;
 			} else {
 				if (album.year == null && tags.year != null) {
-					db.update(albums).set({ year: tags.year, updatedAt: now }).where(eq(albums.id, album.id)).run();
+					db.update(albums)
+						.set({ year: tags.year, updatedAt: now })
+						.where(eq(albums.id, album.id))
+						.run();
 				}
 				// Untagged compilation: a second performer turned up on an album
 				// whose credit came from the first track's artist. Promote it to
@@ -170,7 +213,12 @@ export class MusicCatalogService {
 					normKey(album.artistCredit) !== normKey(credit.credit)
 				) {
 					db.update(albums)
-						.set({ isCompilation: true, primaryType: 'compilation', artistCredit: 'Various Artists', updatedAt: now })
+						.set({
+							isCompilation: true,
+							primaryType: 'compilation',
+							artistCredit: 'Various Artists',
+							updatedAt: now,
+						})
 						.where(eq(albums.id, album.id))
 						.run();
 					db.delete(albumArtists).where(eq(albumArtists.albumId, album.id)).run();
@@ -181,7 +229,12 @@ export class MusicCatalogService {
 			// ── Track (same album + disc + number + title ⇒ same track) ─────
 			const tKey = titleKey(tags.title);
 			const candidates = db
-				.select({ id: tracks.id, normTitle: tracks.normTitle, trackNo: tracks.trackNo, discNo: tracks.discNo })
+				.select({
+					id: tracks.id,
+					normTitle: tracks.normTitle,
+					trackNo: tracks.trackNo,
+					discNo: tracks.discNo,
+				})
 				.from(tracks)
 				.where(eq(tracks.albumId, album.id))
 				.all();
@@ -211,13 +264,27 @@ export class MusicCatalogService {
 					})
 					.run();
 				const roles: [string, string, string | null][] = [
-					...tags.artists.map((n, i) => [n, 'primary', tags.mbid.artists[i] ?? null] as [string, string, string | null]),
-					...tags.featured.map((n) => [n, 'featured', null] as [string, string, string | null]),
-					...tags.composer.map((n) => [n, 'composer', null] as [string, string, string | null]),
+					...tags.artists.map(
+						(n, i) =>
+							[n, 'primary', tags.mbid.artists[i] ?? null] as [
+								string,
+								string,
+								string | null,
+							],
+					),
+					...tags.featured.map(
+						(n) => [n, 'featured', null] as [string, string, string | null],
+					),
+					...tags.composer.map(
+						(n) => [n, 'composer', null] as [string, string, string | null],
+					),
 				];
 				roles.forEach(([name, role, mbid], i) => {
 					const artistId = this.findOrCreateArtist(name, mbid);
-					db.insert(trackArtists).values({ trackId: id, artistId, role, position: i }).onConflictDoNothing().run();
+					db.insert(trackArtists)
+						.values({ trackId: id, artistId, role, position: i })
+						.onConflictDoNothing()
+						.run();
 					if (role === 'primary' && tags.genres.length > 0) {
 						for (const g of tags.genres) {
 							db.insert(artistGenres)
@@ -259,18 +326,33 @@ export class MusicCatalogService {
 				.run();
 
 			this.recomputeAlbumAggregates(album.id);
-			return { trackId: track.id, albumId: album.id, newAlbum, attached, needsArt: !album.artId };
+			return {
+				trackId: track.id,
+				albumId: album.id,
+				newAlbum,
+				attached,
+				needsArt: !album.artId,
+			};
 		});
 
 		if (result.needsArt) await this.attachAlbumArt(result.albumId, filePath, tags);
 
 		return result.attached
 			? { status: 'attached', trackId: result.trackId, albumId: result.albumId }
-			: { status: 'added', trackId: result.trackId, albumId: result.albumId, newAlbum: result.newAlbum };
+			: {
+					status: 'added',
+					trackId: result.trackId,
+					albumId: result.albumId,
+					newAlbum: result.newAlbum,
+				};
 	}
 
 	/** Refresh stream facts for a file whose bytes changed (re-tag / re-encode). */
-	refreshFile(trackFileId: string, tags: TrackTags, file: { size: number; modifiedAt: string }): void {
+	refreshFile(
+		trackFileId: string,
+		tags: TrackTags,
+		file: { size: number; modifiedAt: string },
+	): void {
 		this.database.db
 			.update(trackFiles)
 			.set({
@@ -304,18 +386,31 @@ export class MusicCatalogService {
 			.get();
 		this.database.db
 			.update(albums)
-			.set({ trackCount: agg?.count ?? 0, totalSeconds: Math.round(agg?.total ?? 0), updatedAt: nowISO() })
+			.set({
+				trackCount: agg?.count ?? 0,
+				totalSeconds: Math.round(agg?.total ?? 0),
+				updatedAt: nowISO(),
+			})
 			.where(eq(albums.id, albumId))
 			.run();
 	}
 
 	/** Embedded picture first, then cover.jpg/folder.jpg in the album folder. */
-	private async attachAlbumArt(albumId: string, filePath: string, tags: TrackTags): Promise<void> {
+	private async attachAlbumArt(
+		albumId: string,
+		filePath: string,
+		tags: TrackTags,
+	): Promise<void> {
 		const pref = this.musicSettings.get().artPreference;
 		let artId: string | null = null;
 		for (const p of pref) {
 			if (p === 'embedded' && tags.picture) {
-				artId = await this.artwork.store(tags.picture.data, tags.picture.mime, 'album', 'embedded');
+				artId = await this.artwork.store(
+					tags.picture.data,
+					tags.picture.mime,
+					'album',
+					'embedded',
+				);
 			} else if (p === 'folder') {
 				const dir = dirname(filePath);
 				for (const name of FOLDER_ART) {
@@ -358,9 +453,15 @@ export class MusicCatalogService {
 			);
 			db.delete(trackFiles).where(inArray(trackFiles.id, missingFileIds)).run();
 			const ids = (q: ReturnType<typeof sql>) => db.all<{ id: string }>(q).map((r) => r.id);
-			const deadTracks = ids(sql`SELECT id FROM tracks WHERE id NOT IN (SELECT DISTINCT track_id FROM track_files)`);
-			db.run(sql`DELETE FROM tracks WHERE id NOT IN (SELECT DISTINCT track_id FROM track_files)`);
-			const deadAlbums = ids(sql`SELECT id FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)`);
+			const deadTracks = ids(
+				sql`SELECT id FROM tracks WHERE id NOT IN (SELECT DISTINCT track_id FROM track_files)`,
+			);
+			db.run(
+				sql`DELETE FROM tracks WHERE id NOT IN (SELECT DISTINCT track_id FROM track_files)`,
+			);
+			const deadAlbums = ids(
+				sql`SELECT id FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)`,
+			);
 			db.run(sql`DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)`);
 			const orphanArtists = sql`SELECT id FROM artists WHERE id NOT IN (SELECT artist_id FROM album_artists) AND id NOT IN (SELECT artist_id FROM track_artists)`;
 			const deadArtists = ids(orphanArtists);

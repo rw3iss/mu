@@ -92,7 +92,12 @@ export class MusicQueryService {
 		const map = new Map<string, { id: string; name: string }[]>();
 		if (!albumIds.length) return map;
 		const rows = this.db
-			.select({ albumId: albumArtists.albumId, id: artists.id, name: artists.name, pos: albumArtists.position })
+			.select({
+				albumId: albumArtists.albumId,
+				id: artists.id,
+				name: artists.name,
+				pos: albumArtists.position,
+			})
 			.from(albumArtists)
 			.innerJoin(artists, eq(artists.id, albumArtists.artistId))
 			.where(inArray(albumArtists.albumId, albumIds))
@@ -137,7 +142,9 @@ export class MusicQueryService {
 			);
 		}
 		if (q.artistId) {
-			where.push(sql`${albums.id} IN (SELECT album_id FROM album_artists WHERE artist_id = ${q.artistId})`);
+			where.push(
+				sql`${albums.id} IN (SELECT album_id FROM album_artists WHERE artist_id = ${q.artistId})`,
+			);
 		}
 		const dir = q.order === 'asc' ? asc : desc;
 		const sort = (q.sort ?? 'added') as AlbumSort;
@@ -145,15 +152,28 @@ export class MusicQueryService {
 			sort === 'title'
 				? [q.order === 'desc' ? desc(albums.sortTitle) : asc(albums.sortTitle)]
 				: sort === 'artist'
-					? [q.order === 'desc' ? desc(albums.artistCredit) : asc(albums.artistCredit), asc(albums.year)]
+					? [
+							q.order === 'desc'
+								? desc(albums.artistCredit)
+								: asc(albums.artistCredit),
+							asc(albums.year),
+						]
 					: sort === 'year'
 						? [dir(albums.year), asc(albums.sortTitle)]
 						: sort === 'rating'
 							? [dir(albums.ratingAvg), asc(albums.sortTitle)]
 							: [dir(albums.addedAt)];
 		const cond = where.length ? and(...where) : undefined;
-		const total = this.db.select({ n: sql<number>`count(*)` }).from(albums).where(cond).get()?.n ?? 0;
-		const rows = this.db.select().from(albums).where(cond).orderBy(...orderBy).limit(pageSize).offset(offset).all();
+		const total =
+			this.db.select({ n: sql<number>`count(*)` }).from(albums).where(cond).get()?.n ?? 0;
+		const rows = this.db
+			.select()
+			.from(albums)
+			.where(cond)
+			.orderBy(...orderBy)
+			.limit(pageSize)
+			.offset(offset)
+			.all();
 		return { items: this.toAlbumSummaries(rows), total, page, pageSize };
 	}
 
@@ -180,7 +200,8 @@ export class MusicQueryService {
 					? [desc(albumCount), asc(artists.sortName)]
 					: [q.order === 'desc' ? desc(artists.sortName) : asc(artists.sortName)];
 		const cond = and(...where);
-		const total = this.db.select({ n: sql<number>`count(*)` }).from(artists).where(cond).get()?.n ?? 0;
+		const total =
+			this.db.select({ n: sql<number>`count(*)` }).from(artists).where(cond).get()?.n ?? 0;
 		const rows = this.db
 			.select({ id: artists.id, name: artists.name, imageId: artists.imageId, albumCount })
 			.from(artists)
@@ -190,20 +211,33 @@ export class MusicQueryService {
 			.offset(offset)
 			.all();
 		return {
-			items: rows.map((r) => ({ id: r.id, name: r.name, imageUrl: artUrl(r.imageId, 256), albumCount: r.albumCount })),
+			items: rows.map((r) => ({
+				id: r.id,
+				name: r.name,
+				imageUrl: artUrl(r.imageId, 256),
+				albumCount: r.albumCount,
+			})),
 			total,
 			page,
 			pageSize,
 		};
 	}
 
-	private trackSummaries(rows: { t: typeof tracks.$inferSelect; albumTitle: string; artId: string | null }[], userId?: string): TrackSummary[] {
+	private trackSummaries(
+		rows: { t: typeof tracks.$inferSelect; albumTitle: string; artId: string | null }[],
+		userId?: string,
+	): TrackSummary[] {
 		const ids = rows.map((r) => r.t.id);
 		const credits = new Map<string, { id: string; name: string; role: string }[]>();
 		const ratings = new Map<string, number>();
 		if (ids.length) {
 			for (const c of this.db
-				.select({ trackId: trackArtists.trackId, id: artists.id, name: artists.name, role: trackArtists.role })
+				.select({
+					trackId: trackArtists.trackId,
+					id: artists.id,
+					name: artists.name,
+					role: trackArtists.role,
+				})
 				.from(trackArtists)
 				.innerJoin(artists, eq(artists.id, trackArtists.artistId))
 				.where(inArray(trackArtists.trackId, ids))
@@ -217,7 +251,13 @@ export class MusicQueryService {
 				for (const r of this.db
 					.select({ id: entityRatings.entityId, rating: entityRatings.rating })
 					.from(entityRatings)
-					.where(and(eq(entityRatings.userId, userId), eq(entityRatings.entityType, 'track'), inArray(entityRatings.entityId, ids)))
+					.where(
+						and(
+							eq(entityRatings.userId, userId),
+							eq(entityRatings.entityType, 'track'),
+							inArray(entityRatings.entityId, ids),
+						),
+					)
 					.all()) {
 					ratings.set(r.id, r.rating);
 				}
@@ -257,13 +297,21 @@ export class MusicQueryService {
 		const where: SQL[] = [];
 		const ids = this.ftsIds('tracks', q.q);
 		if (ids) where.push(inArray(tracks.id, ids.length ? ids : ['-']));
-		if (q.artistId) where.push(sql`${tracks.id} IN (SELECT track_id FROM track_artists WHERE artist_id = ${q.artistId})`);
+		if (q.artistId)
+			where.push(
+				sql`${tracks.id} IN (SELECT track_id FROM track_artists WHERE artist_id = ${q.artistId})`,
+			);
 		if (q.minRating) where.push(sql`${tracks.ratingAvg} >= ${q.minRating}`);
 		const dir = q.order === 'asc' ? asc : desc;
 		const sort = (q.sort ?? 'title') as TrackSort;
 		const orderBy: SQL[] =
 			sort === 'artist'
-				? [asc(tracks.artistCredit), asc(albums.sortTitle), asc(tracks.discNo), asc(tracks.trackNo)]
+				? [
+						asc(tracks.artistCredit),
+						asc(albums.sortTitle),
+						asc(tracks.discNo),
+						asc(tracks.trackNo),
+					]
 				: sort === 'album'
 					? [asc(albums.sortTitle), asc(tracks.discNo), asc(tracks.trackNo)]
 					: sort === 'added'
@@ -272,16 +320,33 @@ export class MusicQueryService {
 							? [desc(tracks.playCount)]
 							: sort === 'rating'
 								? [dir(tracks.ratingAvg)]
-								: [q.order === 'desc' ? desc(tracks.normTitle) : asc(tracks.normTitle)];
+								: [
+										q.order === 'desc'
+											? desc(tracks.normTitle)
+											: asc(tracks.normTitle),
+									];
 		const cond = where.length ? and(...where) : undefined;
 		const total =
-			this.db.select({ n: sql<number>`count(*)` }).from(tracks).innerJoin(albums, eq(albums.id, tracks.albumId)).where(cond).get()?.n ?? 0;
-		return { items: this.trackSummaries(this.trackRows(cond, orderBy, pageSize, offset), userId), total, page, pageSize };
+			this.db
+				.select({ n: sql<number>`count(*)` })
+				.from(tracks)
+				.innerJoin(albums, eq(albums.id, tracks.albumId))
+				.where(cond)
+				.get()?.n ?? 0;
+		return {
+			items: this.trackSummaries(this.trackRows(cond, orderBy, pageSize, offset), userId),
+			total,
+			page,
+			pageSize,
+		};
 	}
 
 	listGenres(): { name: string; albumCount: number }[] {
 		return this.db
-			.select({ name: musicGenres.name, albumCount: sql<number>`count(${albumGenres.albumId})` })
+			.select({
+				name: musicGenres.name,
+				albumCount: sql<number>`count(${albumGenres.albumId})`,
+			})
 			.from(musicGenres)
 			.innerJoin(albumGenres, eq(albumGenres.genreId, musicGenres.id))
 			.groupBy(musicGenres.id)
@@ -295,7 +360,13 @@ export class MusicQueryService {
 			this.db
 				.select({ r: entityRatings.rating })
 				.from(entityRatings)
-				.where(and(eq(entityRatings.userId, userId), eq(entityRatings.entityType, type), eq(entityRatings.entityId, id)))
+				.where(
+					and(
+						eq(entityRatings.userId, userId),
+						eq(entityRatings.entityType, type),
+						eq(entityRatings.entityId, id),
+					),
+				)
 				.get()?.r ?? null
 		);
 	}
@@ -304,7 +375,11 @@ export class MusicQueryService {
 		const a = this.db.select().from(albums).where(eq(albums.id, id)).get();
 		if (!a) throw new NotFoundException(`Album ${id} not found`);
 		const [summary] = this.toAlbumSummaries([a]);
-		const releases = this.db.select().from(albumReleases).where(eq(albumReleases.albumId, id)).all();
+		const releases = this.db
+			.select()
+			.from(albumReleases)
+			.where(eq(albumReleases.albumId, id))
+			.all();
 		const genres = this.db
 			.select({ name: musicGenres.name })
 			.from(albumGenres)
@@ -313,7 +388,11 @@ export class MusicQueryService {
 			.all()
 			.map((g) => g.name);
 		const trackList = this.trackSummaries(
-			this.trackRows(eq(tracks.albumId, id), [asc(tracks.discNo), asc(tracks.trackNo), asc(tracks.normTitle)], 1000),
+			this.trackRows(
+				eq(tracks.albumId, id),
+				[asc(tracks.discNo), asc(tracks.trackNo), asc(tracks.normTitle)],
+				1000,
+			),
 			userId,
 		);
 		return {
@@ -342,7 +421,9 @@ export class MusicQueryService {
 		const own = this.db
 			.select()
 			.from(albums)
-			.where(sql`${albums.id} IN (SELECT album_id FROM album_artists WHERE artist_id = ${id})`)
+			.where(
+				sql`${albums.id} IN (SELECT album_id FROM album_artists WHERE artist_id = ${id})`,
+			)
 			.orderBy(desc(albums.year))
 			.all();
 		const ownIds = new Set(own.map((x) => x.id));
@@ -358,7 +439,11 @@ export class MusicQueryService {
 		const popular = this.trackSummaries(
 			this.trackRows(
 				sql`${tracks.id} IN (SELECT track_id FROM track_artists WHERE artist_id = ${id} AND role IN ('primary','featured'))`,
-				[desc(tracks.playCount), desc(sql`coalesce(${tracks.ratingAvg}, 0)`), asc(tracks.normTitle)],
+				[
+					desc(tracks.playCount),
+					desc(sql`coalesce(${tracks.ratingAvg}, 0)`),
+					asc(tracks.normTitle),
+				],
 				10,
 			),
 			userId,
@@ -371,7 +456,11 @@ export class MusicQueryService {
 			.all()
 			.map((g) => g.name);
 		const trackCount =
-			this.db.select({ n: sql<number>`count(*)` }).from(trackArtists).where(eq(trackArtists.artistId, id)).get()?.n ?? 0;
+			this.db
+				.select({ n: sql<number>`count(*)` })
+				.from(trackArtists)
+				.where(eq(trackArtists.artistId, id))
+				.get()?.n ?? 0;
 		return {
 			id: a.id,
 			name: a.name,
@@ -399,7 +488,11 @@ export class MusicQueryService {
 		if (!rows.length) throw new NotFoundException(`Track ${id} not found`);
 		const [summary] = this.trackSummaries(rows, userId);
 		const t = rows[0]!.t;
-		const files = this.db.select().from(trackFiles).where(and(eq(trackFiles.trackId, id), eq(trackFiles.available, true))).all();
+		const files = this.db
+			.select()
+			.from(trackFiles)
+			.where(and(eq(trackFiles.trackId, id), eq(trackFiles.available, true)))
+			.all();
 		const lyr = this.db.select().from(lyrics).where(eq(lyrics.trackId, id)).get();
 		const appears = t.mbidRecording
 			? this.db
@@ -436,7 +529,10 @@ export class MusicQueryService {
 	}
 
 	/** Grouped quick search for the header dropdown. */
-	search(q: string, limit = 8): { artists: ArtistSummary[]; albums: AlbumSummary[]; tracks: TrackSummary[] } {
+	search(
+		q: string,
+		limit = 8,
+	): { artists: ArtistSummary[]; albums: AlbumSummary[]; tracks: TrackSummary[] } {
 		return {
 			artists: this.listArtists({ q, pageSize: limit }).items,
 			albums: this.listAlbums({ q, pageSize: limit, sort: 'title' }).items,
@@ -446,11 +542,16 @@ export class MusicQueryService {
 
 	/** Dashboard rails. */
 	recentlyAdded(limit = 20): AlbumSummary[] {
-		return this.toAlbumSummaries(this.db.select().from(albums).orderBy(desc(albums.addedAt)).limit(limit).all());
+		return this.toAlbumSummaries(
+			this.db.select().from(albums).orderBy(desc(albums.addedAt)).limit(limit).all(),
+		);
 	}
 
 	mostPlayed(limit = 20, userId?: string): TrackSummary[] {
-		return this.trackSummaries(this.trackRows(sql`${tracks.playCount} > 0`, [desc(tracks.playCount)], limit), userId);
+		return this.trackSummaries(
+			this.trackRows(sql`${tracks.playCount} > 0`, [desc(tracks.playCount)], limit),
+			userId,
+		);
 	}
 
 	/** Best playable file for a track: lossless first, then highest bitrate. */
@@ -459,7 +560,11 @@ export class MusicQueryService {
 			.select()
 			.from(trackFiles)
 			.where(and(eq(trackFiles.trackId, trackId), eq(trackFiles.available, true)))
-			.orderBy(desc(trackFiles.lossless), desc(sql`coalesce(${trackFiles.bitDepth},0)`), desc(sql`coalesce(${trackFiles.bitrate},0)`))
+			.orderBy(
+				desc(trackFiles.lossless),
+				desc(sql`coalesce(${trackFiles.bitDepth},0)`),
+				desc(sql`coalesce(${trackFiles.bitrate},0)`),
+			)
 			.get();
 	}
 
@@ -474,4 +579,98 @@ export class MusicQueryService {
 			.map((r) => r.id);
 	}
 
+	/** Albums the user played most recently (distinct, newest first). */
+	continueListening(userId: string, limit = 20): AlbumSummary[] {
+		const rows = this.db.all<{ id: string }>(sql`
+			SELECT t.album_id AS id FROM play_history h JOIN tracks t ON t.id = h.entity_id
+			WHERE h.user_id = ${userId} AND h.entity_type = 'track'
+			GROUP BY t.album_id ORDER BY max(h.last_played_at) DESC LIMIT ${limit}`);
+		return this.albumsInOrder(rows.map((r) => r.id));
+	}
+
+	/** The user's favourited albums, newest first. */
+	favoriteAlbums(userId: string, limit = 20): AlbumSummary[] {
+		const rows = this.db.all<{ id: string }>(sql`
+			SELECT entity_id AS id FROM favorites
+			WHERE user_id = ${userId} AND entity_type = 'album'
+			ORDER BY created_at DESC LIMIT ${limit}`);
+		return this.albumsInOrder(rows.map((r) => r.id));
+	}
+
+	private albumsInOrder(ids: string[]): AlbumSummary[] {
+		if (!ids.length) return [];
+		const byId = new Map(
+			this.db
+				.select()
+				.from(albums)
+				.where(inArray(albums.id, ids))
+				.all()
+				.map((a) => [a.id, a]),
+		);
+		return this.toAlbumSummaries(ids.map((id) => byId.get(id)).filter((a) => !!a));
+	}
+
+	/** Re-derive the denormalised rating average for an album or track. */
+	refreshRatingAggregate(type: 'album' | 'track', id: string): void {
+		const agg = this.db.get<{ avg: number | null; n: number }>(sql`
+			SELECT avg(rating) AS avg, count(*) AS n FROM entity_ratings
+			WHERE entity_type = ${type} AND entity_id = ${id}`);
+		const values = { ratingAvg: agg?.n ? agg.avg : null, ratingCount: agg?.n ?? 0 };
+		if (type === 'album') this.db.update(albums).set(values).where(eq(albums.id, id)).run();
+		else this.db.update(tracks).set(values).where(eq(tracks.id, id)).run();
+	}
+
+	/** Title + art for the generic entity resolver (ratings, comments, favourites). */
+	entitySummary(
+		type: 'artist' | 'album' | 'track',
+		id: string,
+	): { title: string; imageUrl: string | null; url: string } | null {
+		if (type === 'artist') {
+			const a = this.db.select().from(artists).where(eq(artists.id, id)).get();
+			return a
+				? { title: a.name, imageUrl: artUrl(a.imageId, 256), url: `/music/artist/${a.id}` }
+				: null;
+		}
+		if (type === 'album') {
+			const a = this.db.select().from(albums).where(eq(albums.id, id)).get();
+			return a
+				? { title: a.title, imageUrl: artUrl(a.artId, 256), url: `/music/album/${a.id}` }
+				: null;
+		}
+		const t = this.db.select().from(tracks).where(eq(tracks.id, id)).get();
+		if (!t) return null;
+		const al = this.db.select().from(albums).where(eq(albums.id, t.albumId)).get();
+		return {
+			title: t.title,
+			imageUrl: artUrl(al?.artId ?? null, 256),
+			url: `/music/track/${t.id}`,
+		};
+	}
+
+	getLyrics(trackId: string) {
+		const row = this.db.select().from(lyrics).where(eq(lyrics.trackId, trackId)).get();
+		return row ? { plain: row.plain, syncedLrc: row.syncedLrc, source: row.source } : null;
+	}
+
+	saveLyrics(
+		trackId: string,
+		body: { plain: string | null; syncedLrc: string | null },
+		userId: string,
+	): void {
+		if (!this.db.select({ id: tracks.id }).from(tracks).where(eq(tracks.id, trackId)).get()) {
+			throw new NotFoundException('Track not found');
+		}
+		const values = {
+			plain: body.plain?.slice(0, 100_000) || null,
+			syncedLrc: body.syncedLrc?.slice(0, 200_000) || null,
+			source: 'user',
+			editedBy: userId,
+			updatedAt: new Date().toISOString(),
+		};
+		this.db
+			.insert(lyrics)
+			.values({ trackId, ...values })
+			.onConflictDoUpdate({ target: lyrics.trackId, set: values })
+			.run();
+	}
 }

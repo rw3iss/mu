@@ -30,7 +30,11 @@ export class MusicStreamService {
 		private readonly musicSettings: MusicSettingsService,
 	) {}
 
-	private plan(file: typeof trackFiles.$inferSelect, profile: AudioQuality, caps: string): StreamPlan {
+	private plan(
+		file: typeof trackFiles.$inferSelect,
+		profile: AudioQuality,
+		caps: string,
+	): StreamPlan {
 		const s = this.musicSettings.get();
 		return planStream(
 			{ codec: codecKey(file.codec, file.container), bitrate: file.bitrate },
@@ -66,10 +70,23 @@ export class MusicStreamService {
 	}
 
 	/** Resolve the bytes for a file URL: the original, or a (built-on-demand) transcode. */
-	async resolveFile(trackFileId: string, profile: string | undefined, caps: string | undefined): Promise<string> {
-		const file = this.database.db.select().from(trackFiles).where(eq(trackFiles.id, trackFileId)).get();
-		if (!file || !file.available) throw new NotFoundException(`Track file ${trackFileId} not found`);
-		const plan = this.plan(file, asQuality(profile, this.musicSettings.get().defaultProfile), caps ?? '');
+	async resolveFile(
+		trackFileId: string,
+		profile: string | undefined,
+		caps: string | undefined,
+	): Promise<string> {
+		const file = this.database.db
+			.select()
+			.from(trackFiles)
+			.where(eq(trackFiles.id, trackFileId))
+			.get();
+		if (!file || !file.available)
+			throw new NotFoundException(`Track file ${trackFileId} not found`);
+		const plan = this.plan(
+			file,
+			asQuality(profile, this.musicSettings.get().defaultProfile),
+			caps ?? '',
+		);
 		if (plan.mode === 'original') return file.filePath;
 		const cached = this.transcoder.cachedPath(file.id, plan);
 		if (cached) return cached;
@@ -80,12 +97,22 @@ export class MusicStreamService {
 	}
 
 	async waveform(trackFileId: string) {
-		if (!this.musicSettings.get().waveforms) throw new NotFoundException('Waveforms are disabled');
+		if (!this.musicSettings.get().waveforms)
+			throw new NotFoundException('Waveforms are disabled');
 		const cached = await this.transcoder.readWaveform(trackFileId);
 		if (cached) return cached;
-		const file = this.database.db.select().from(trackFiles).where(eq(trackFiles.id, trackFileId)).get();
-		if (!file?.durationSeconds) throw new NotFoundException(`Track file ${trackFileId} not found`);
-		const data = await this.transcoder.buildWaveform(file.id, file.filePath, file.durationSeconds);
+		const file = this.database.db
+			.select()
+			.from(trackFiles)
+			.where(eq(trackFiles.id, trackFileId))
+			.get();
+		if (!file?.durationSeconds)
+			throw new NotFoundException(`Track file ${trackFileId} not found`);
+		const data = await this.transcoder.buildWaveform(
+			file.id,
+			file.filePath,
+			file.durationSeconds,
+		);
 		this.database.db
 			.update(trackFiles)
 			.set({ waveformPath: this.transcoder.waveformPath(file.id) })
@@ -98,7 +125,11 @@ export class MusicStreamService {
 	progress(userId: string, sessionId: string, positionSeconds: number, completed: boolean): void {
 		const trackId = sessionId.split('.')[0] ?? '';
 		if (!trackId) throw new BadRequestException('Invalid session');
-		const track = this.database.db.select({ id: tracks.id }).from(tracks).where(eq(tracks.id, trackId)).get();
+		const track = this.database.db
+			.select({ id: tracks.id })
+			.from(tracks)
+			.where(eq(tracks.id, trackId))
+			.get();
 		if (!track) throw new NotFoundException(`Track ${trackId} not found`);
 		const db = this.database.db;
 		const now = nowISO();
@@ -106,7 +137,13 @@ export class MusicStreamService {
 		const existing = db
 			.select()
 			.from(playHistory)
-			.where(and(eq(playHistory.userId, userId), eq(playHistory.entityType, 'track'), eq(playHistory.entityId, trackId)))
+			.where(
+				and(
+					eq(playHistory.userId, userId),
+					eq(playHistory.entityType, 'track'),
+					eq(playHistory.entityId, trackId),
+				),
+			)
 			.get();
 		if (existing) {
 			db.update(playHistory)
@@ -133,8 +170,10 @@ export class MusicStreamService {
 				.run();
 		}
 		if (completed) {
-			db.update(tracks).set({ playCount: sql`${tracks.playCount} + 1` }).where(eq(tracks.id, trackId)).run();
+			db.update(tracks)
+				.set({ playCount: sql`${tracks.playCount} + 1` })
+				.where(eq(tracks.id, trackId))
+				.run();
 		}
 	}
 }
-

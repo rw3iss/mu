@@ -11,29 +11,50 @@ describe('codecKey', () => {
 		expect(codecKey('FLAC')).toBe('flac');
 		expect(codecKey('PCM', 'AIFF')).toBe('aiff');
 		expect(codecKey('PCM', 'WAVE')).toBe('pcm');
-		expect(codecKey('Monkey\'s Audio')).toBe('ape');
+		expect(codecKey("Monkey's Audio")).toBe('ape');
 	});
 });
 
 describe('planStream', () => {
 	const chrome = parseCaps('opus,vorbis');
 	it('sends FLAC untouched at original quality', () => {
-		expect(planStream({ codec: 'flac', bitrate: 900_000 }, 'original', 'original', chrome, B)).toEqual({
-			mode: 'original', profile: 'original',
+		expect(
+			planStream({ codec: 'flac', bitrate: 900_000 }, 'original', 'original', chrome, B),
+		).toEqual({
+			mode: 'original',
+			profile: 'original',
 		});
 	});
 	it('transcodes ALAC to FLAC for browsers that lack it', () => {
-		expect(planStream({ codec: 'alac', bitrate: 900_000 }, 'original', 'original', chrome, B).target?.codec).toBe('flac');
+		expect(
+			planStream({ codec: 'alac', bitrate: 900_000 }, 'original', 'original', chrome, B)
+				.target?.codec,
+		).toBe('flac');
 	});
 	it('serves ALAC natively when the client reports it (Safari)', () => {
-		expect(planStream({ codec: 'alac', bitrate: 900_000 }, 'original', 'original', parseCaps('alac'), B).mode).toBe('original');
+		expect(
+			planStream(
+				{ codec: 'alac', bitrate: 900_000 },
+				'original',
+				'original',
+				parseCaps('alac'),
+				B,
+			).mode,
+		).toBe('original');
 	});
 	it('never upscales a low-bitrate source', () => {
-		expect(planStream({ codec: 'mp3', bitrate: 128_000 }, 'high', 'original', chrome, B).mode).toBe('original');
+		expect(
+			planStream({ codec: 'mp3', bitrate: 128_000 }, 'high', 'original', chrome, B).mode,
+		).toBe('original');
 	});
 	it('uses Opus, or AAC without Opus support', () => {
-		expect(planStream({ codec: 'flac', bitrate: 900_000 }, 'normal', 'original', chrome, B).target).toEqual({ codec: 'opus', bitrateKbps: 160, ext: 'opus' });
-		expect(planStream({ codec: 'flac', bitrate: 900_000 }, 'normal', 'original', parseCaps(''), B).target?.codec).toBe('aac');
+		expect(
+			planStream({ codec: 'flac', bitrate: 900_000 }, 'normal', 'original', chrome, B).target,
+		).toEqual({ codec: 'opus', bitrateKbps: 160, ext: 'opus' });
+		expect(
+			planStream({ codec: 'flac', bitrate: 900_000 }, 'normal', 'original', parseCaps(''), B)
+				.target?.codec,
+		).toBe('aac');
 	});
 	it('applies the admin maximum', () => {
 		expect(capProfile('original', 'high')).toBe('high');

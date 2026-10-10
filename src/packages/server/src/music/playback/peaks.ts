@@ -20,12 +20,12 @@ export class PeakReducer {
 	push(chunk: Uint8Array): void {
 		let i = 0;
 		if (this.carry != null && chunk.length > 0) {
-			this.sample(((chunk[0]! << 8) | this.carry) << 16 >> 16);
+			this.sample((((chunk[0]! << 8) | this.carry) << 16) >> 16);
 			this.carry = null;
 			i = 1;
 		}
 		for (; i + 1 < chunk.length; i += 2) {
-			this.sample(((chunk[i + 1]! << 8) | chunk[i]!) << 16 >> 16);
+			this.sample((((chunk[i + 1]! << 8) | chunk[i]!) << 16) >> 16);
 		}
 		if (i < chunk.length) this.carry = chunk[i]!;
 	}

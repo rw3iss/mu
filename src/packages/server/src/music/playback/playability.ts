@@ -51,7 +51,15 @@ export function isPlayable(key: CodecKey, caps: Set<CodecKey>): boolean {
 	return caps.has(key);
 }
 
-export const LOSSLESS_KEYS: ReadonlySet<CodecKey> = new Set(['flac', 'pcm', 'alac', 'aiff', 'ape', 'wavpack', 'dsd']);
+export const LOSSLESS_KEYS: ReadonlySet<CodecKey> = new Set([
+	'flac',
+	'pcm',
+	'alac',
+	'aiff',
+	'ape',
+	'wavpack',
+	'dsd',
+]);
 
 export interface StreamPlan {
 	/** Serve the untouched source, or a cached/built transcode. */

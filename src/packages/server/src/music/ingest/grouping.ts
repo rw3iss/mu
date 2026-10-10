@@ -32,12 +32,17 @@ export function albumGroupKey(
 	// artist only joins the key when an explicit album-artist tag exists.
 	// Keying on the TRACK artist would split an untagged compilation into one
 	// album per performer.
-	const albumArtist = tags.albumArtistCredit && !tags.compilation ? normKey(tags.albumArtistCredit) : '*';
+	const albumArtist =
+		tags.albumArtistCredit && !tags.compilation ? normKey(tags.albumArtistCredit) : '*';
 	return `tf:${albumArtist}|${album}|${folder}`;
 }
 
 /** Display credit for the album: album-artist tag, "Various Artists", or the track artist. */
-export function albumArtistCredit(tags: TrackTags): { credit: string; names: string[]; various: boolean } {
+export function albumArtistCredit(tags: TrackTags): {
+	credit: string;
+	names: string[];
+	various: boolean;
+} {
 	if (tags.compilation && !tags.albumArtistCredit) {
 		return { credit: 'Various Artists', names: [], various: true };
 	}
@@ -45,7 +50,11 @@ export function albumArtistCredit(tags: TrackTags): { credit: string; names: str
 		const various = /^various( artists)?$/i.test(tags.albumArtistCredit);
 		return {
 			credit: tags.albumArtistCredit,
-			names: various ? [] : tags.albumArtists.length ? tags.albumArtists : [tags.albumArtistCredit],
+			names: various
+				? []
+				: tags.albumArtists.length
+					? tags.albumArtists
+					: [tags.albumArtistCredit],
 			various,
 		};
 	}

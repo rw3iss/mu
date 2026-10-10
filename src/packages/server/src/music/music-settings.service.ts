@@ -8,7 +8,8 @@ export class MusicSettingsService {
 	constructor(private readonly settings: SettingsService) {}
 
 	get(): MusicSettings {
-		const raw = (this.settings.get<Partial<MusicSettings>>('music', {}) ?? {}) as Partial<MusicSettings>;
+		const raw = (this.settings.get<Partial<MusicSettings>>('music', {}) ??
+			{}) as Partial<MusicSettings>;
 		return {
 			...DEFAULT_MUSIC_SETTINGS,
 			...raw,

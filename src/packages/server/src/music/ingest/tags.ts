@@ -92,7 +92,8 @@ export function parsePathFallback(filePath: string): {
 	let album: string | null = albumDir || null;
 	let year: number | null = null;
 	if (album) {
-		const y = album.match(/[([]((?:19|20)\d{2})[)\]]/) ?? album.match(/^((?:19|20)\d{2})\s*-\s*/);
+		const y =
+			album.match(/[([]((?:19|20)\d{2})[)\]]/) ?? album.match(/^((?:19|20)\d{2})\s*-\s*/);
 		if (y) {
 			year = Number(y[1]);
 			album = album.replace(y[0], '').trim();
@@ -128,7 +129,8 @@ export async function readTrackTags(filePath: string): Promise<TrackTags> {
 	// music-metadata mirrors a single ARTIST tag into `artists`, so a one-item
 	// list equal to the credit carries no extra information — split the credit
 	// instead, or "A feat. B" would be catalogued as one artist.
-	const realMulti = multiArtists.length > 1 || (multiArtists.length === 1 && multiArtists[0] !== artistCredit);
+	const realMulti =
+		multiArtists.length > 1 || (multiArtists.length === 1 && multiArtists[0] !== artistCredit);
 	const artists = realMulti ? multiArtists : split.primary;
 	const albumArtistCredit = c.albumartist?.trim() || null;
 	const albumArtists = albumArtistCredit ? splitCredit(albumArtistCredit).primary : [];
@@ -156,7 +158,10 @@ export async function readTrackTags(filePath: string): Promise<TrackTags> {
 		trackTotal: c.track?.of ?? null,
 		year: c.year ?? yearOf(c.date) ?? fallback.year,
 		originalYear: yearOf(c.originaldate) ?? yearOf(c.originalyear as unknown as string),
-		genres: (c.genre ?? []).flatMap((g) => g.split(/\s*[;/]\s*/)).map((g) => g.trim()).filter(Boolean),
+		genres: (c.genre ?? [])
+			.flatMap((g) => g.split(/\s*[;/]\s*/))
+			.map((g) => g.trim())
+			.filter(Boolean),
 		compilation: c.compilation === true,
 		isrc: first(c.isrc),
 		mbid: {

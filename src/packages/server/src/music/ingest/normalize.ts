@@ -26,16 +26,24 @@ const FEAT = /\s+(?:feat\.?|ft\.?|featuring|with)\s+/i;
  * better write a multi-value ARTISTS tag, which callers prefer over this.
  */
 export function splitCredit(credit: string): { primary: string[]; featured: string[] } {
-	const clean = credit.replace(/\s*[([](?:feat\.?|ft\.?|featuring)\s+([^)\]]+)[)\]]/i, ' feat. $1').trim();
+	const clean = credit
+		.replace(/\s*[([](?:feat\.?|ft\.?|featuring)\s+([^)\]]+)[)\]]/i, ' feat. $1')
+		.trim();
 	const [head, ...rest] = clean.split(FEAT);
 	const primary = head ? [head.trim()].filter(Boolean) : [];
-	const featured = rest.flatMap((r) => r.split(/\s*(?:,|&| and )\s*/i)).map((s) => s.trim()).filter(Boolean);
+	const featured = rest
+		.flatMap((r) => r.split(/\s*(?:,|&| and )\s*/i))
+		.map((s) => s.trim())
+		.filter(Boolean);
 	return { primary, featured };
 }
 
 /** Strip "(Remastered 2011)"-style noise when comparing titles, not for display. */
 export function titleKey(title: string): string {
 	return normKey(
-		title.replace(/\s*[([](?:\d{4}\s+)?(?:remaster(?:ed)?|deluxe|bonus track|explicit|clean)[^)\]]*[)\]]/gi, ''),
+		title.replace(
+			/\s*[([](?:\d{4}\s+)?(?:remaster(?:ed)?|deluxe|bonus track|explicit|clean)[^)\]]*[)\]]/gi,
+			'',
+		),
 	);
 }

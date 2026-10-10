@@ -25,7 +25,16 @@ const hasFfmpeg = (() => {
 
 function makeTrack(path: string, tags: Record<string, string>, freq = 440) {
 	const meta = Object.entries(tags).flatMap(([k, v]) => ['-metadata', `${k}=${v}`]);
-	execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', `sine=frequency=${freq}:duration=8`, ...meta, path]);
+	execFileSync('ffmpeg', [
+		'-v',
+		'error',
+		'-f',
+		'lavfi',
+		'-i',
+		`sine=frequency=${freq}:duration=8`,
+		...meta,
+		path,
+	]);
 }
 
 describe.skipIf(!hasFfmpeg)('music ingest pipeline', async () => {
@@ -51,16 +60,53 @@ describe.skipIf(!hasFfmpeg)('music ingest pipeline', async () => {
 	mkdirSync(albumDir, { recursive: true });
 	mkdirSync(compDir, { recursive: true });
 	const files = [
-		[join(albumDir, '01 - Airbag.flac'), { title: 'Airbag', artist: 'Radiohead', album_artist: 'Radiohead', album: 'OK Computer', track: '1', date: '1997', genre: 'Alternative' }],
-		[join(albumDir, '02 - Paranoid Android.flac'), { title: 'Paranoid Android', artist: 'Radiohead', album_artist: 'Radiohead', album: 'OK Computer', track: '2', date: '1997', genre: 'Alternative' }],
-		[join(compDir, '01.mp3'), { title: 'Porcelain', artist: 'Moby', album: 'Now 1', compilation: '1', track: '1' }],
-		[join(compDir, '02.mp3'), { title: 'Get Lucky', artist: 'Daft Punk feat. Pharrell Williams', album: 'Now 1', compilation: '1', track: '2' }],
+		[
+			join(albumDir, '01 - Airbag.flac'),
+			{
+				title: 'Airbag',
+				artist: 'Radiohead',
+				album_artist: 'Radiohead',
+				album: 'OK Computer',
+				track: '1',
+				date: '1997',
+				genre: 'Alternative',
+			},
+		],
+		[
+			join(albumDir, '02 - Paranoid Android.flac'),
+			{
+				title: 'Paranoid Android',
+				artist: 'Radiohead',
+				album_artist: 'Radiohead',
+				album: 'OK Computer',
+				track: '2',
+				date: '1997',
+				genre: 'Alternative',
+			},
+		],
+		[
+			join(compDir, '01.mp3'),
+			{ title: 'Porcelain', artist: 'Moby', album: 'Now 1', compilation: '1', track: '1' },
+		],
+		[
+			join(compDir, '02.mp3'),
+			{
+				title: 'Get Lucky',
+				artist: 'Daft Punk feat. Pharrell Williams',
+				album: 'Now 1',
+				compilation: '1',
+				track: '2',
+			},
+		],
 	] as const;
 	for (const [p, t] of files) makeTrack(p, t as Record<string, string>);
 
 	const ingest = async (p: string) => {
 		const s = statSync(p);
-		return catalog.ingest('src1', p, await readTrackTags(p), { size: s.size, modifiedAt: s.mtime.toISOString() });
+		return catalog.ingest('src1', p, await readTrackTags(p), {
+			size: s.size,
+			modifiedAt: s.mtime.toISOString(),
+		});
 	};
 
 	it('catalogues albums, tracks and artists from tags', async () => {
@@ -94,7 +140,14 @@ describe.skipIf(!hasFfmpeg)('music ingest pipeline', async () => {
 	it('attaches a second copy of a track instead of duplicating it', async () => {
 		const copyDir = join(dir, 'Radiohead', 'OK Computer (1997)');
 		const copy = join(copyDir, '01 - Airbag.mp3');
-		makeTrack(copy, { title: 'Airbag', artist: 'Radiohead', album_artist: 'Radiohead', album: 'OK Computer', track: '1', date: '1997' });
+		makeTrack(copy, {
+			title: 'Airbag',
+			artist: 'Radiohead',
+			album_artist: 'Radiohead',
+			album: 'OK Computer',
+			track: '1',
+			date: '1997',
+		});
 		expect((await ingest(copy)).status).toBe('attached');
 		const airbag = query.listTracks({ q: 'airbag' }).items;
 		expect(airbag).toHaveLength(1);
@@ -103,7 +156,9 @@ describe.skipIf(!hasFfmpeg)('music ingest pipeline', async () => {
 	});
 
 	it('purges orphans down the chain', () => {
-		const ids = sqlite.prepare("SELECT id FROM track_files WHERE file_path LIKE '%Compilations%'").all() as { id: string }[];
+		const ids = sqlite
+			.prepare("SELECT id FROM track_files WHERE file_path LIKE '%Compilations%'")
+			.all() as { id: string }[];
 		expect(catalog.purgeOrphans(ids.map((r) => r.id))).toBe(2);
 		expect(query.listAlbums({}).items.map((a) => a.title)).toEqual(['OK Computer']);
 		expect(query.listTracks({ q: 'lucky' }).total).toBe(0);

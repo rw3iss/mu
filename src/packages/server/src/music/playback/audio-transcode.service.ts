@@ -1,5 +1,5 @@
 import { existsSync, statSync } from 'node:fs';
-import { mkdir, readdir, rename, rm, stat, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { WaveformData } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
@@ -30,7 +30,9 @@ export class AudioTranscodeService {
 	) {}
 
 	get cacheRoot(): string {
-		const cache = this.config.get<string>('cache.dir') || join(this.config.get<string>('dataDir'), 'cache');
+		const cache =
+			this.config.get<string>('cache.dir') ||
+			join(this.config.get<string>('dataDir'), 'cache');
 		return join(cache, 'music');
 	}
 
@@ -71,13 +73,17 @@ export class AudioTranscodeService {
 			const part = `${out}.part`;
 			const flacLevel = this.musicSettings.get().flacCompressionLevel;
 			await new Promise<void>((resolve, reject) => {
-				let cmd = ffmpeg(srcPath).noVideo().outputOptions(['-map', '0:a:0', '-map_metadata', '0']);
+				let cmd = ffmpeg(srcPath)
+					.noVideo()
+					.outputOptions(['-map', '0:a:0', '-map_metadata', '0']);
 				if (target.codec === 'flac') {
 					cmd = cmd
 						.audioCodec('flac')
 						.outputOptions(['-compression_level', String(flacLevel)])
 						// DSD → 24-bit PCM at 88.2 kHz (DSD64's natural decimation).
-						.outputOptions(/dsf|dff$/i.test(srcPath) ? ['-ar', '88200', '-sample_fmt', 's32'] : [])
+						.outputOptions(
+							/dsf|dff$/i.test(srcPath) ? ['-ar', '88200', '-sample_fmt', 's32'] : [],
+						)
 						.format('flac');
 				} else if (target.codec === 'opus') {
 					cmd = cmd
@@ -92,7 +98,10 @@ export class AudioTranscodeService {
 						.outputOptions(['-ac', '2', '-movflags', '+faststart'])
 						.format('mp4');
 				}
-				cmd.output(part).on('end', () => resolve()).on('error', reject).run();
+				cmd.output(part)
+					.on('end', () => resolve())
+					.on('error', reject)
+					.run();
 			});
 			if (statSync(part).size < 1024) {
 				await rm(part, { force: true });
@@ -112,14 +121,20 @@ export class AudioTranscodeService {
 
 	async readWaveform(trackFileId: string): Promise<WaveformData | null> {
 		try {
-			return JSON.parse(await readFile(this.waveformPath(trackFileId), 'utf8')) as WaveformData;
+			return JSON.parse(
+				await readFile(this.waveformPath(trackFileId), 'utf8'),
+			) as WaveformData;
 		} catch {
 			return null;
 		}
 	}
 
 	/** Decode to 4 kHz mono PCM and reduce to peaks; cached as JSON. */
-	async buildWaveform(trackFileId: string, srcPath: string, durationSeconds: number): Promise<WaveformData> {
+	async buildWaveform(
+		trackFileId: string,
+		srcPath: string,
+		durationSeconds: number,
+	): Promise<WaveformData> {
 		const out = this.waveformPath(trackFileId);
 		const cached = await this.readWaveform(trackFileId);
 		if (cached) return cached;
@@ -156,8 +171,17 @@ export class AudioTranscodeService {
 	}
 
 	/** Total bytes of transcodes (excluding waveforms) — for the LRU cap. */
-	async evict(maxBytes: number, keep: (trackFileId: string, file: string) => boolean): Promise<number> {
-		const entries: { path: string; size: number; atime: number; fileId: string; name: string }[] = [];
+	async evict(
+		maxBytes: number,
+		keep: (trackFileId: string, file: string) => boolean,
+	): Promise<number> {
+		const entries: {
+			path: string;
+			size: number;
+			atime: number;
+			fileId: string;
+			name: string;
+		}[] = [];
 		let dirs: string[] = [];
 		try {
 			dirs = await readdir(this.cacheRoot);

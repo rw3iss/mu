@@ -43,7 +43,9 @@ export class ArtworkService {
 	}
 
 	private get variantsDir(): string {
-		const cache = this.config.get<string>('cache.dir') || join(this.config.get<string>('dataDir'), 'cache');
+		const cache =
+			this.config.get<string>('cache.dir') ||
+			join(this.config.get<string>('dataDir'), 'cache');
 		return join(cache, 'artwork');
 	}
 
@@ -76,11 +78,19 @@ export class ArtworkService {
 			.onConflictDoNothing()
 			.run();
 		// Lost an insert race on the hash → return the winner's id.
-		const row = this.database.db.select({ id: artwork.id }).from(artwork).where(eq(artwork.hash, hash)).get();
+		const row = this.database.db
+			.select({ id: artwork.id })
+			.from(artwork)
+			.where(eq(artwork.hash, hash))
+			.get();
 		return row?.id ?? id;
 	}
 
-	async storeFile(filePath: string, kind: 'album' | 'artist', source: string): Promise<string | null> {
+	async storeFile(
+		filePath: string,
+		kind: 'album' | 'artist',
+		source: string,
+	): Promise<string | null> {
 		try {
 			const bytes = await readFile(filePath);
 			const mime = filePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
@@ -109,7 +119,14 @@ export class ArtworkService {
 			await mkdir(dirname(out), { recursive: true });
 			await new Promise<void>((resolve, reject) => {
 				ffmpeg(row.originalPath)
-					.outputOptions(['-vf', `scale='min(${size},iw)':-2`, '-q:v', '3', '-frames:v', '1'])
+					.outputOptions([
+						'-vf',
+						`scale='min(${size},iw)':-2`,
+						'-q:v',
+						'3',
+						'-frames:v',
+						'1',
+					])
 					.output(`${out}.part.jpg`)
 					.on('end', () => resolve())
 					.on('error', reject)

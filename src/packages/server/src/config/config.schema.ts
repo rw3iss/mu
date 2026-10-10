@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+/** Boolean that also accepts env-style values (`1`/`0`, `"true"`/`"off"`, …). */
+const envBool = z.preprocess((v) => {
+	if (typeof v === 'number') return v !== 0;
+	if (typeof v === 'string')
+		return !['0', 'false', 'off', 'no', ''].includes(v.trim().toLowerCase());
+	return v;
+}, z.boolean());
+
 export const configSchema = z.object({
 	server: z
 		.object({
@@ -299,8 +307,8 @@ export const configSchema = z.object({
 	 */
 	features: z
 		.object({
-			movies: z.boolean().default(true),
-			music: z.boolean().default(false),
+			movies: envBool.default(true),
+			music: envBool.default(false),
 		})
 		// Explicit object: zod 4 returns a function default verbatim (inner
 		// defaults are NOT applied), which would leave `features` as `{}`.

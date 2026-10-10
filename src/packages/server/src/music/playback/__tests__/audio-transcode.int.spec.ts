@@ -18,13 +18,27 @@ const hasFfmpeg = (() => {
 describe.skipIf(!hasFfmpeg)('AudioTranscodeService (ffmpeg)', () => {
 	const dir = mkdtempSync(join(tmpdir(), 'mu-audio-'));
 	const src = join(dir, 'tone.flac');
-	execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=6', '-af', 'volume=0.5', src]);
+	execFileSync('ffmpeg', [
+		'-v',
+		'error',
+		'-f',
+		'lavfi',
+		'-i',
+		'sine=frequency=440:duration=6',
+		'-af',
+		'volume=0.5',
+		src,
+	]);
 	const config = { get: (k: string) => (k === 'cache.dir' ? dir : dir) } as never;
 	const settings = { get: () => DEFAULT_MUSIC_SETTINGS } as never;
 	const svc = new AudioTranscodeService(config, settings);
 
 	it('builds and caches an Opus profile once', async () => {
-		const plan = { mode: 'transcode' as const, profile: 'normal' as const, target: { codec: 'opus' as const, bitrateKbps: 160, ext: 'opus' as const } };
+		const plan = {
+			mode: 'transcode' as const,
+			profile: 'normal' as const,
+			target: { codec: 'opus' as const, bitrateKbps: 160, ext: 'opus' as const },
+		};
 		const [a, b] = await Promise.all([svc.build('f1', src, plan), svc.build('f1', src, plan)]);
 		expect(a).toBe(b);
 		expect(statSync(a).size).toBeGreaterThan(1024);
@@ -32,8 +46,16 @@ describe.skipIf(!hasFfmpeg)('AudioTranscodeService (ffmpeg)', () => {
 	});
 
 	it('builds FLAC and AAC targets', async () => {
-		const flac = await svc.build('f2', src, { mode: 'transcode', profile: 'lossless', target: { codec: 'flac', ext: 'flac' } });
-		const aac = await svc.build('f2', src, { mode: 'transcode', profile: 'low', target: { codec: 'aac', bitrateKbps: 96, ext: 'm4a' } });
+		const flac = await svc.build('f2', src, {
+			mode: 'transcode',
+			profile: 'lossless',
+			target: { codec: 'flac', ext: 'flac' },
+		});
+		const aac = await svc.build('f2', src, {
+			mode: 'transcode',
+			profile: 'low',
+			target: { codec: 'aac', bitrateKbps: 96, ext: 'm4a' },
+		});
 		expect(existsSync(flac) && existsSync(aac)).toBe(true);
 	});
 
