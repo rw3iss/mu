@@ -281,6 +281,12 @@ const TABLES = [
 	)`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS music_identities_uniq ON music_identities(source, external_id, entity_type)`,
 	`CREATE INDEX IF NOT EXISTS music_identities_entity_idx ON music_identities(entity_type, entity_id)`,
+	`CREATE TABLE IF NOT EXISTS album_match_candidates (
+		album_id TEXT PRIMARY KEY REFERENCES albums(id) ON DELETE CASCADE,
+		candidates TEXT NOT NULL DEFAULT '[]',
+		matched_by TEXT,
+		searched_at TEXT NOT NULL
+	)`,
 
 	// FTS5 (external content) — keyword search over a large catalogue without
 	// LIKE scans. Triggers keep them in sync with the base tables.

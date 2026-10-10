@@ -3,7 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movies, soundtrackCache } from '../database/schema/index.js';
-import { MusicBrainzClient } from './musicbrainz.client.js';
+import { MusicBrainzClient } from '../providers/sources/musicbrainz/musicbrainz.client.js';
+import { findSoundtrack } from './soundtrack-lookup.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** A found soundtrack is stable — cache it for a month. */
@@ -52,7 +53,7 @@ export class SoundtrackService {
 
 		let dto: SoundtrackDto;
 		try {
-			const release = await this.musicbrainz.findSoundtrack(movie.title, movie.year ?? null);
+			const release = await findSoundtrack(this.musicbrainz, movie.title, movie.year ?? null);
 			dto = {
 				movieId,
 				found: !!release,

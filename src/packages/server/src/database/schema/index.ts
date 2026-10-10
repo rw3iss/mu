@@ -138,6 +138,7 @@ export type {
 export {
 	albumArtists,
 	albumGenres,
+	albumMatchCandidates,
 	albumReleases,
 	albums,
 	artistGenres,

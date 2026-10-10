@@ -524,7 +524,7 @@ export class MusicQueryService {
 				fileSize: f.fileSize,
 				fileName: f.fileName,
 			})),
-			lyrics: lyr ? { plain: lyr.plain, syncedLrc: lyr.syncedLrc, source: lyr.source } : null,
+			lyrics: lyricsDto(lyr),
 			appearsOn: this.toAlbumSummaries(appears),
 			credits: summary!.artists.map((a) => ({ artistId: a.id, name: a.name, role: a.role })),
 		};
@@ -650,8 +650,7 @@ export class MusicQueryService {
 	}
 
 	getLyrics(trackId: string) {
-		const row = this.db.select().from(lyrics).where(eq(lyrics.trackId, trackId)).get();
-		return row ? { plain: row.plain, syncedLrc: row.syncedLrc, source: row.source } : null;
+		return lyricsDto(this.db.select().from(lyrics).where(eq(lyrics.trackId, trackId)).get());
 	}
 
 	saveLyrics(
@@ -715,4 +714,12 @@ export class MusicQueryService {
 		}
 		return out;
 	}
+}
+
+/** Lyrics row → DTO. An empty row is a cached fetch miss, reported as "no lyrics". */
+function lyricsDto(
+	row: { plain: string | null; syncedLrc: string | null; source: string | null } | undefined,
+) {
+	if (!row || (!row.plain && !row.syncedLrc)) return null;
+	return { plain: row.plain, syncedLrc: row.syncedLrc, source: row.source };
 }

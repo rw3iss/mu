@@ -12,7 +12,7 @@ the two features.
 | 1 — Catalogue | DONE 2026-10-10 — music schema + FTS5, AudioImporter (tags, grouping, compilations, art, duplicates), music jobs, Settings → Music, Setup Libraries step, installer prompts, Jobs kind filter, scan quick action | `0ec7901`, `4ce3558`, `dca325c` |
 | 2 — Playback (+ waveform seek bar) | DONE 2026-10-10 — capability probe, progressive streaming (original / cached FLAC / Opus-AAC), waveform peaks + seek bar, ingest transcodes, LRU cache eviction, audio player (A/B gapless, art surfaces, list panel, shuffle/repeat, ReplayGain, MediaSession, video interplay) | `920aac9`, `a176088`, `0ec7901` |
 | 3 — Browse & detail | DONE 2026-10-10 — browse mode toggle + routing, music library tabs, artist/album/track pages, generalised favorite/rating/comments/playlists/options menu, music home rails, audio playlists | `2522959`, `bb4dbb3`, `f5d5c30` |
-| 4 — Metadata & lyrics | not started | |
+| 4 — Metadata & lyrics | SERVER DONE 2026-10-10 — shared MusicBrainz client, album matching + candidates, Cover Art Archive, Wikidata/Wikipedia artist bio + image, LRCLIB lyrics, admin quick-action routes. Client UI (candidates picker, synced lyrics view) tracked separately. AcoustID + Last.fm deferred | `4716ab0` |
 | 5 — Upload & offline | not started | |
 | 6 — Search & discovery | not started | |
 
@@ -302,6 +302,15 @@ using a music `CanonicalField` set (tag values win for title and track numbers t
 user has edited; providers win for MBIDs, art and bio).
 
 New provider capabilities: `enrich-music`, `lyrics`, `fingerprint`, `recommend-music`.
+
+> **Status (2026-10-10) — server built; some of the plan above changed:**
+> - The shared client is `providers/sources/musicbrainz/musicbrainz.client.ts` (`MusicBrainzModule`, a Nest singleton). Soundtrack and music use **one** 1.1 s throttle queue. The soundtrack-specific code moved to `soundtrack/soundtrack-lookup.ts`.
+> - The matcher does **not** use the MergeEngine or `@RegisterProvider()`. The keyless sources (MusicBrainz, CAA, LRCLIB, Wikidata/Wikipedia/Commons) need no credentials, so they are plain injectables in `music/metadata/clients.ts`. Merge rules are in `MusicMetadataService`: tags keep titles and track numbers; MB fills the release-group MBID, type, secondary types, `originalYear`, year only when empty, the `album_releases` row (label, catalog no, format, disc count), artist MBIDs (never taken from another row) and recording MBIDs (only when the track lists line up). Genres are added, not replaced.
+> - Scoring (`music/metadata/album-match.ts`) uses title 0.35, artist 0.25, track count 0.15, year 0.10, Official status 0.05 and MB relevance 0.10. A gate applies when title or artist < 0.5. The top 2 hits are then looked up, and per-track duration agreement counts for 20%. **Auto-apply** needs ≥ 0.80 and a 0.05 lead over the best hit from a *different* release group. Otherwise the best release per group (top 10, ≥ 0.35) goes into the new `album_match_candidates` table (`matched_by` = `auto`/`manual`). A forced refresh never replaces a manual match.
+> - Cover Art Archive tries `front-1200`, then `front-500`, for the release first and then the release group. It only fills missing art, and is skipped when the admin removes `coverartarchive` from `artPreference`. `force` replaces existing art.
+> - Artist info: the MBID comes from tags or the match, or from an MB artist search (score ≥ 95 and the exact normalised name). Then MB `url-rels` → the Wikipedia REST summary (bio) and the Wikidata P18 → Commons image. **Last.fm is skipped**: the provider platform has no Last.fm credential yet.
+> - Lyrics: LRCLIB `/api/get` (with duration), falling back to `/api/search`. A miss is stored as an empty row and re-queried after 30 days. A `source='user'` row is never overwritten (SQL `setWhere` guard plus a re-check after the fetch). Gated on `fetchLyrics`.
+> - **AcoustID fingerprinting: deferred** (needs a key and `fpcalc`).
 Each registers with `@RegisterProvider()` and appears in Settings → Connections
 automatically.
 
@@ -368,10 +377,10 @@ New `JOB_TYPE`s, registered by `MusicModule` with `JobTypeSpec` metadata:
 
 | Type | ioHeavy | encode | Purpose |
 |---|---|---|---|
-| `music-scan` | – | – | Scan one audio source |
-| `music-metadata` | – | – | Per-album match/enrich |
-| `music-artwork` | – | – | Fetch/resize art |
-| `music-lyrics` | – | – | Fetch lyrics (lazy, on first track view, or bulk) |
+| `music-scan` | – | – | Scan one audio source *(2026-10-10: not a separate type — the generic `scan` job dispatches by `media_sources.kind`)* |
+| `music-metadata` | – | – | Per-album match → release-group genres → CAA art if missing → album artists' bio/image. Queued idle-only, priority 85, for each NEW album |
+| `music-artwork` | – | – | Fetch missing album art from CAA (matches first if never searched) |
+| `music-lyrics` | – | – | LRCLIB lyrics. Queued idle-only, priority 90, for each new track when `fetchLyrics` is on; also bulk or on demand |
 | `audio-transcode` | ✓ | ✓ | Unplayable → FLAC; profile pre-builds |
 | `music-fingerprint` | ✓ | – | AcoustID for untagged files |
 | `music-cache-evict` | – | – | Scheduled LRU |
@@ -589,6 +598,7 @@ does the destructive cleanup.
 - **Admin quick actions**: Scan Music Library, Refresh Music Metadata, Fetch Missing
   Album Art, Fetch Missing Lyrics, Re-encode Unplayable Music, Clear Music Transcode
   Cache. All use the existing confirm-dialog + "started" toast pattern.
+  *(2026-10-10, server: `POST /music/admin/{scan,refresh-metadata,fetch-art,fetch-lyrics,reencode-unplayable,clear-cache}`, `admin:server`, no body → `{ started, count }`. `refresh-metadata?scope=all` forces every album; the default is unmatched albums only. `fetch-lyrics` returns 400 when `fetchLyrics` is off. `clear-cache` runs synchronously, and `count` = the number of files removed.)*
 
 ### 7.3 Per-user settings (allowlist additions)
 

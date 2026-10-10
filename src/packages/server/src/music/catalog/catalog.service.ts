@@ -90,7 +90,7 @@ export class MusicCatalogService {
 		return id;
 	}
 
-	private findOrCreateGenre(name: string): string {
+	findOrCreateGenre(name: string): string {
 		const norm = normKey(name);
 		const row = this.database.db
 			.select({ id: musicGenres.id })
