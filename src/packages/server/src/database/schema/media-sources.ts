@@ -4,6 +4,8 @@ export const mediaSources = sqliteTable('media_sources', {
 	id: text('id').primaryKey(),
 	path: text('path').notNull().unique(),
 	label: text('label'),
+	/** 'video' (movies) | 'audio' (music). Routes files to the matching MediaImporter. */
+	kind: text('kind').notNull().default('video'),
 	scanIntervalHours: integer('scan_interval_hours').default(6),
 	enabled: integer('enabled', { mode: 'boolean' }).default(true),
 	/** At most one source is flagged default (upload target preselection etc). */

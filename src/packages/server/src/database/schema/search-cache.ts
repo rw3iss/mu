@@ -9,9 +9,11 @@ export const searchCache = sqliteTable(
 	'search_cache',
 	{
 		id: text('id').primaryKey(),
-		type: text('type', { enum: ['movie', 'person'] }).notNull(),
+		type: text('type', { enum: ['movie', 'person', 'artist', 'album', 'track'] }).notNull(),
 		normalizedQuery: text('normalized_query').notNull(),
-		source: text('source', { enum: ['tmdb', 'omdb', 'trakt'] }).notNull(),
+		source: text('source', {
+			enum: ['tmdb', 'omdb', 'trakt', 'musicbrainz', 'lastfm', 'discogs'],
+		}).notNull(),
 		payload: text('payload').notNull(),
 		fetchedAt: text('fetched_at').notNull(),
 	},

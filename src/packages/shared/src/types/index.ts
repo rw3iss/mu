@@ -1,5 +1,7 @@
 export * from './api.js';
+export * from './media.js';
 export * from './movie.js';
+export * from './music.js';
 export * from './movie-search-defaults.js';
 export * from './notification.js';
 export * from './plugin.js';

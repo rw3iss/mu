@@ -108,3 +108,45 @@ export type { NewUserWatchlistEntry, UserWatchlistEntry } from './user-watchlist
 export { userWatchlist } from './user-watchlist.ts';
 export type { NewUser, User } from './users.ts';
 export { users } from './users.ts';
+export type {
+	EntityComment,
+	EntityRating,
+	EntityWatchlistRow,
+	PlayHistoryRow,
+	PlaylistItem,
+} from './entities.ts';
+export {
+	entityCommentReactions,
+	entityComments,
+	entityRatings,
+	entityWatchlist,
+	playHistory,
+	playlistItems,
+} from './entities.ts';
+export type {
+	Album,
+	Artist,
+	Artwork,
+	Lyrics,
+	NewAlbum,
+	NewArtist,
+	NewTrack,
+	NewTrackFile,
+	Track,
+	TrackFile,
+} from './music.ts';
+export {
+	albumArtists,
+	albumGenres,
+	albumReleases,
+	albums,
+	artistGenres,
+	artists,
+	artwork,
+	lyrics,
+	musicGenres,
+	musicIdentities,
+	trackArtists,
+	trackFiles,
+	tracks,
+} from './music.ts';

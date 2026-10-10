@@ -12,6 +12,8 @@ export const streamSessions = sqliteTable('stream_sessions', {
 		.notNull()
 		.references(() => movies.id, { onDelete: 'cascade' }),
 	movieFileId: text('movie_file_id').references(() => movieFiles.id),
+	/** 'movie' | 'track' — which catalogue movie_id/movie_file_id point into. */
+	entityType: text('entity_type').notNull().default('movie'),
 	quality: text('quality'),
 	transcoding: integer('transcoding', { mode: 'boolean' }).default(false),
 	startedAt: text('started_at').notNull(),

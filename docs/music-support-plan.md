@@ -460,7 +460,7 @@ existing call sites keep working.
 |---|---|---|
 | Transport (prev/next) | ±10s skip | Prev/next track, ±10s on long press |
 | Shuffle / repeat | – | ✓ |
-| Seek bar | Sprite previews, comment markers | Plain or waveform (later), lyric markers |
+| Seek bar | Sprite previews, comment markers | Waveform rendering for seek, lyric markers |
 | Effects | EQ, compressor, enhance, video | EQ, compressor, enhance (video tab hidden) |
 | Settings submenu | Quality, subtitles, audio track, snippet, shared session | Stream quality, ReplayGain mode, crossfade (later), download for offline |
 | PiP / fullscreen | ✓ | – (fullscreen = "maximise") |
@@ -491,6 +491,7 @@ existing call sites keep working.
   also lets the snippet recorder tap "pre-effects" cleanly.
 - `MediaSession`: artwork from album art (several sizes), next/previous track
   actions, position state.
+- Also add a 'waveform' view and parsing of the audio files into a waveform "image" that can be shown on the player control bar, as the seek bar for playing audio.
 
 ### 6.5 Offline downloads (music)
 

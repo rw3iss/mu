@@ -667,6 +667,9 @@ try {
 	}
 }
 
+	// Media kinds (movies + music): polymorphic user data + music catalogue.
+	require('./migrations/media-kinds.js').apply(db);
+
 	// Verify
 	const tableList = db
 		.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
