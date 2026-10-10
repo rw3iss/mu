@@ -3,6 +3,7 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import type { ControlGroupId } from '@/state/player/types';
 import { EffectsButton } from './EffectsButton';
+import { ExpandButton } from './ExpandButton';
 import { FullscreenButton } from './FullscreenButton';
 import { InfoButton } from './InfoButton';
 import { MobileOverflowMenu } from './MobileOverflowMenu';
@@ -12,10 +13,14 @@ import { QueueButton } from './QueueButton';
 import { SeekBar } from './SeekBar';
 import { SettingsMenu } from './SettingsMenu';
 import { SharedSessionButton } from './SharedSessionButton';
+import { RepeatButton, ShuffleButton } from './ShuffleRepeat';
 import { SnippetIndicator } from './SnippetIndicator';
+import { TrackTitle } from './TrackTitle';
+import { TrackTransport } from './TrackTransport';
 import { TransportGroup } from './TransportGroup';
 import type { ControlGroupProps } from './types';
 import { VolumeControl } from './VolumeControl';
+import { WaveformSeekBar } from './WaveformSeekBar';
 
 /** Plugin buttons — rendered before the system buttons. */
 function PluginButtons() {
@@ -38,7 +43,24 @@ export const CONTROL_GROUPS: Record<ControlGroupId, FunctionComponent<ControlGro
 	mobileOverflow: MobileOverflowMenu,
 	pip: PipButton,
 	fullscreen: FullscreenButton,
+	waveform: WaveformSeekBar,
+	trackTitle: TrackTitle,
+	trackTransport: TrackTransport,
+	shuffle: ShuffleButton,
+	repeat: RepeatButton,
+	expand: ExpandButton,
 };
 
+/** Zone → the group ids that can fill it (first one in the toolbar wins). */
+export const ZONE_GROUPS = {
+	seek: ['seek', 'waveform'],
+	title: ['title', 'trackTitle'],
+	transport: ['transport', 'trackTransport'],
+} as const satisfies Record<string, readonly ControlGroupId[]>;
+
 /** Groups with a fixed zone in the bar; every other group goes in the right cluster. */
-export const ZONED_GROUPS: ReadonlySet<ControlGroupId> = new Set(['seek', 'title', 'transport']);
+export const ZONED_GROUPS: ReadonlySet<ControlGroupId> = new Set<ControlGroupId>([
+	...ZONE_GROUPS.seek,
+	...ZONE_GROUPS.title,
+	...ZONE_GROUPS.transport,
+]);

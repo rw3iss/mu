@@ -10,7 +10,7 @@ the two features.
 |---|---|---|
 | 0 — Groundwork | IN PROGRESS — shared schema, migration + backfill, shared types DONE (`68f3208`) | |
 | 1 — Catalogue | not started | |
-| 2 — Playback (+ waveform seek bar) | not started | |
+| 2 — Playback (+ waveform seek bar) | IN PROGRESS — client player (audio adapter, A/B gapless, waveform seek bar, artwork surfaces, list panel, MediaSession, video interplay) DONE | |
 | 3 — Browse & detail | not started | |
 | 4 — Metadata & lyrics | not started | |
 | 5 — Upload & offline | not started | |
