@@ -25,6 +25,7 @@ import {
 	isFullscreen,
 	isMuted,
 	isPlaying,
+	showInfoPanel,
 	startStream,
 	streamError,
 	subtitleTrack,
@@ -34,8 +35,18 @@ import { shareMode } from '@/state/share.state';
 import { sharedVideoEngine } from '@/state/videoEngineRef';
 import { clearWatchPosition } from '@/state/watchPositions.state';
 import { clearVideoSubtitles } from '@/utils/subtitle-dom';
-// Side-effect import: registers the video adapter with the registry.
+// Side-effect imports: register the video + audio adapters with the registry.
 import './player/adapters/videoAdapter';
+import './player/adapters/audioAdapter';
+import {
+	initMusicPlayer,
+	noteMusicBehindVideo,
+	playAudioRef,
+	restoreMusicPlayer,
+	resumeMusicAfterVideo,
+	stopMusic,
+	suspendMusicForVideo,
+} from './musicPlayer.state';
 import { getAdapter } from './player/registry';
 import type { PlayMediaOptions } from './player/types';
 
@@ -85,9 +96,9 @@ export const sharedSessionHooks: {
 } = { leaveActiveSession: null };
 
 /**
- * Which media kind / entity the player shell is currently driving. Video is
- * the only registered adapter today; `activeRef` mirrors `globalMovieId` for
- * movies. See docs/music-support-plan.md §6.4.
+ * Which media kind / entity the player shell is currently driving. Only one
+ * kind is active at a time; `activeRef` mirrors `globalMovieId` for movies
+ * and the playing track for music. See docs/music-support-plan.md §6.4.
  */
 export const activeKind = signal<MediaKind>('video');
 export const activeRef = signal<EntityRef | null>(null);
@@ -239,14 +250,56 @@ export async function playMedia(ref: EntityRef, opts?: PlayMediaOptions): Promis
 		notifyError('This item cannot be played.');
 		return;
 	}
-	if (kind !== 'video') {
-		// Only the video adapter exists so far.
-		notifyError('Playback for this media type is not available yet.');
+	if (kind === 'audio') {
+		// musicPlayer.state switches the shell over (enterAudioShell).
+		await playAudioRef(ref, opts);
 		return;
 	}
+	// A video starting while music plays: pause the music; it resumes when
+	// the video player closes (setting: music_resume_after_video).
+	if (activeKind.value === 'audio') suspendMusicForVideo();
 	activeKind.value = kind;
 	activeRef.value = ref;
 	await playVideo(ref.id, opts);
+}
+
+/**
+ * Hand the shell to music. When a video is loaded, the configured interrupt
+ * action runs first (minimise / split / nothing from full mode), then the
+ * video stops — only one kind plays at a time. Called by musicPlayer.state.
+ */
+export async function enterAudioShell(ref: EntityRef): Promise<void> {
+	if (activeKind.value !== 'audio' && globalMovieId.value) {
+		interruptPlayer();
+		const mode = playerMode.value;
+		await stopVideoForMusic();
+		playerMode.value = mode;
+	}
+	activeKind.value = 'audio';
+	activeRef.value = ref;
+	if (playerMode.value === 'hidden') playerMode.value = 'mini';
+}
+
+/** Tear the video down (session, engine, persisted pointer) without hiding the shell. */
+async function stopVideoForMusic(): Promise<void> {
+	sharedSessionHooks.leaveActiveSession?.();
+	const engine = sharedVideoEngine.value;
+	engine?.videoRef.current?.pause();
+	await endStream();
+	engine?.destroy();
+	clearVideoSubtitles(engine?.videoRef.current);
+	globalMovieId.value = null;
+	globalMovie.value = null;
+	subtitleTrack.value = null;
+	showInfoPanel.value = false;
+	localStorage.removeItem(STORAGE_KEY);
+	localStorage.removeItem(MOVIE_KEY);
+	localStorage.removeItem('mu_is_playing');
+}
+
+/** True when the shell has something loaded (a movie, or a music track). */
+function hasLoadedMedia(): boolean {
+	return !!globalMovieId.value || (activeKind.value === 'audio' && !!activeRef.value);
 }
 
 /** Thin wrapper kept so every existing movie call site works unchanged. */
@@ -394,7 +447,7 @@ async function playVideo(movieId: string, opts?: PlayMediaOptions): Promise<void
 let preMiniMode: PlayerMode | null = null;
 
 export function minimizePlayer(): void {
-	if (!globalMovieId.value) return;
+	if (!hasLoadedMedia()) return;
 	// Share viewers must stay in full mode
 	if (shareMode.value) return;
 	// Remember current mode so restoring from mini goes back to it
@@ -408,7 +461,7 @@ export function minimizePlayer(): void {
  * Maximize: expand to full player overlay.
  */
 export function maximizePlayer(): void {
-	if (!globalMovieId.value) return;
+	if (!hasLoadedMedia()) return;
 	// Restore previous mode if coming from mini, otherwise go to full
 	if (
 		playerMode.value === 'mini' &&
@@ -427,7 +480,7 @@ export function maximizePlayer(): void {
  * Split: show player as a resizable right-side panel.
  */
 export function splitPlayer(): void {
-	if (!globalMovieId.value) return;
+	if (!hasLoadedMedia()) return;
 	// Share viewers must stay in full mode
 	if (shareMode.value) return;
 	playerMode.value = 'split';
@@ -474,6 +527,15 @@ export function interruptPlayer(): void {
  * Close: end stream, hide player entirely.
  */
 export async function closePlayer(): Promise<void> {
+	// Closing the audio player stops the music (minimising keeps it playing).
+	if (activeKind.value === 'audio') {
+		playerMode.value = 'hidden';
+		activeRef.value = null;
+		stopMusic();
+		activeKind.value = 'video';
+		return;
+	}
+
 	// Closing the player means leaving any watch-party too — otherwise the
 	// session survives and re-loads its movie on the next refresh, which is
 	// exactly the "an old movie keeps coming back" bug.
@@ -488,6 +550,9 @@ export async function closePlayer(): Promise<void> {
 	localStorage.removeItem(STORAGE_KEY);
 	localStorage.removeItem(MOVIE_KEY);
 	localStorage.removeItem('mu_is_playing');
+
+	// Music paused for this video comes back now.
+	resumeMusicAfterVideo();
 }
 
 /**
@@ -585,6 +650,7 @@ async function applyPlaySettings(movie: Movie): Promise<void> {
  */
 export function initGlobalPlayer(): void {
 	setupPersistenceEffects();
+	initMusicPlayer();
 
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
@@ -595,7 +661,11 @@ export function initGlobalPlayer(): void {
 		// is only a fallback (it can lag behind or fail to write). This is what
 		// guarantees a refresh reloads the movie you were actually watching.
 		const movieId = lastMovie || saved?.movieId || null;
-		if (!movieId) return;
+		if (!movieId) {
+			// No movie to restore — bring back the last music session (paused).
+			restoreMusicPlayer();
+			return;
+		}
 
 		// Restore volume/mute/duration/mode from the blob when it exists.
 		if (saved) {
@@ -645,6 +715,9 @@ export function initGlobalPlayer(): void {
 		if (bestPosition > 0) {
 			forceStartPosition.value = bestPosition;
 		}
+
+		// A saved music session waits behind the movie until it closes.
+		noteMusicBehindVideo();
 	} catch {
 		localStorage.removeItem(STORAGE_KEY);
 	}

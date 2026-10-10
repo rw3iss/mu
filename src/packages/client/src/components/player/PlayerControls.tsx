@@ -2,7 +2,7 @@ import type { VNode } from 'preact';
 import { activeAdapter } from '@/state/globalPlayer.state';
 import { VIDEO_TOOLBAR } from '@/state/player/adapters/videoAdapter';
 import type { StreamSession } from '@/state/player.state';
-import { CONTROL_GROUPS, ZONED_GROUPS } from './controls/registry';
+import { CONTROL_GROUPS, ZONE_GROUPS, ZONED_GROUPS } from './controls/registry';
 import type { ControlGroupProps } from './controls/types';
 import styles from './PlayerControls.module.scss';
 
@@ -56,9 +56,15 @@ export function PlayerControls({
 		playbackLocked,
 	};
 	const has = (id: (typeof toolbar)[number]) => toolbar.includes(id);
-	const Seek = CONTROL_GROUPS.seek;
-	const Title = CONTROL_GROUPS.title;
-	const Transport = CONTROL_GROUPS.transport;
+	// Each fixed zone renders whichever of its groups the toolbar lists
+	// (video: seek/title/transport; audio: waveform/trackTitle/trackTransport).
+	const zone = (ids: readonly (typeof toolbar)[number][]) => ids.find(has);
+	const seekId = zone(ZONE_GROUPS.seek);
+	const titleId = zone(ZONE_GROUPS.title);
+	const transportId = zone(ZONE_GROUPS.transport);
+	const Seek = seekId ? CONTROL_GROUPS[seekId] : null;
+	const Title = titleId ? CONTROL_GROUPS[titleId] : null;
+	const Transport = transportId ? CONTROL_GROUPS[transportId] : null;
 
 	return (
 		<div
@@ -66,14 +72,14 @@ export function PlayerControls({
 			class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''} ${isSplit ? styles.splitControls : ''}`}
 		>
 			{/* ── Row 1: Seek bar — flush to top, full width ── */}
-			<div class={styles.seekRow}>{has('seek') && <Seek {...groupProps} />}</div>
+			<div class={styles.seekRow}>{Seek && <Seek {...groupProps} />}</div>
 
 			{/* ── Row 2: Content row — optional left slot + controls ── */}
 			<div class={styles.contentRow}>
 				{leftSlot}
 				<div class={styles.mainRow}>
 					{/* Left: title + timing (split mode: timing only — title shown above) */}
-					{has('title') && <Title {...groupProps} />}
+					{Title && <Title {...groupProps} />}
 
 					{/*
 					    Center (transport) + Right (secondary) wrapped in a
@@ -84,7 +90,7 @@ export function PlayerControls({
 					    spread-out row beneath the title row.
 					*/}
 					<div class={styles.controlsBottomRow}>
-						{has('transport') && <Transport {...groupProps} />}
+						{Transport && <Transport {...groupProps} />}
 
 						{/* Right: plugin buttons + secondary groups, in adapter order */}
 						<div class={styles.rightControls}>

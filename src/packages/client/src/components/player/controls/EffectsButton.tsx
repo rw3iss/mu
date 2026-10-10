@@ -5,6 +5,7 @@ import {
 	toggleEffectsPanel,
 	videoEnabled,
 } from '@/state/audio-effects.state';
+import { activeKind } from '@/state/globalPlayer.state';
 import styles from '../PlayerControls.module.scss';
 
 /** Effects panel toggle, with EQ / compressor / video active-state dots. */
@@ -19,11 +20,13 @@ export function EffectsButton() {
 					class={`${styles.effectsDot} ${compressorEnabled.value ? styles.effectsDotActive : ''}`}
 				/>
 			</div>
-			<div class={styles.effectsDotsBottom}>
-				<span
-					class={`${styles.effectsDot} ${videoEnabled.value ? styles.effectsDotActive : ''}`}
-				/>
-			</div>
+			{activeKind.value !== 'audio' && (
+				<div class={styles.effectsDotsBottom}>
+					<span
+						class={`${styles.effectsDot} ${videoEnabled.value ? styles.effectsDotActive : ''}`}
+					/>
+				</div>
+			)}
 			<button
 				class={`${styles.controlBtn} ${showEffectsPanel.value ? styles.active : ''}`}
 				onClick={toggleEffectsPanel}

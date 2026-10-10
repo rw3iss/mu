@@ -13,6 +13,7 @@ import {
 	videoEnabled,
 } from '@/state/audio-effects.state';
 import {
+	activeKind,
 	closePlayer,
 	forceStartPosition,
 	globalMovie,
@@ -60,6 +61,7 @@ import {
 } from '@/state/shared-session.state';
 import { setSharedVideoEngine } from '@/state/videoEngineRef';
 import { clearVideoSubtitles } from '@/utils/subtitle-dom';
+import { AudioPlayerSurface } from './audio/AudioPlayerSurface';
 import { EffectsPanel } from './EffectsPanel';
 import styles from './GlobalPlayer.module.scss';
 import { InfoPanel } from './InfoPanel';
@@ -89,7 +91,9 @@ function setSplitWidth(w: number) {
 }
 
 export function GlobalPlayer() {
-	const engine = useVideoEngine();
+	// The video engine stands down while music owns the shell — its frame loop
+	// would otherwise keep writing the <video>'s time into the shared signals.
+	const engine = useVideoEngine(activeKind.value !== 'audio');
 
 	// Expose the live seek to comment timestamp chips anywhere in the app.
 	useEffect(() => {
@@ -187,6 +191,8 @@ export function GlobalPlayer() {
 	// Global spacebar: toggle play/pause when player is open (full or mini)
 	useEffect(() => {
 		function handleGlobalKeyDown(e: KeyboardEvent) {
+			// Music has its own shortcuts (AudioPlayerSurface).
+			if (activeKind.value === 'audio') return;
 			// Don't intercept when typing in inputs
 			if (
 				e.target instanceof HTMLInputElement ||
@@ -416,7 +422,14 @@ export function GlobalPlayer() {
 				wrapper.removeEventListener('wheel', handleWheel);
 			};
 		}
-	}, [engine.videoRef.current, isPlayerActive.value, playerMode.value, handleTogglePlay]);
+	}, [
+		engine.videoRef.current,
+		isPlayerActive.value,
+		playerMode.value,
+		handleTogglePlay,
+		// Re-mount the <video> into a fresh wrapper after music handed back.
+		activeKind.value,
+	]);
 
 	// Session heartbeat — keeps the server session alive during pause
 	useEffect(() => {
@@ -821,6 +834,9 @@ export function GlobalPlayer() {
 
 	// Don't render anything if player is hidden
 	if (!isPlayerActive.value) return null;
+
+	// Music: artwork surface instead of the video stage (same modes).
+	if (activeKind.value === 'audio') return <AudioPlayerSurface />;
 
 	const movie = globalMovie.value;
 	const isMini = playerMode.value === 'mini';
