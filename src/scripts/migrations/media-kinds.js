@@ -145,6 +145,7 @@ const TABLES = [
 		artist_credit TEXT,
 		art_id TEXT,
 		folder_path TEXT,
+		group_key TEXT,
 		track_count INTEGER DEFAULT 0,
 		total_seconds INTEGER DEFAULT 0,
 		rating_avg REAL,
@@ -311,9 +312,13 @@ function ftsTriggers(table, cols) {
 }
 
 const ALTERS = [
+	`ALTER TABLE albums ADD COLUMN group_key TEXT`,
 	`ALTER TABLE media_sources ADD COLUMN kind TEXT NOT NULL DEFAULT 'video'`,
 	`ALTER TABLE stream_sessions ADD COLUMN entity_type TEXT NOT NULL DEFAULT 'movie'`,
 ];
+
+// Indexes on columns added by ALTERS — must run after them on existing DBs.
+const POST_ALTER = [`CREATE INDEX IF NOT EXISTS albums_group_idx ON albums(group_key)`];
 
 function tableExists(db, name) {
 	return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
@@ -340,6 +345,7 @@ function apply(db) {
 			if (!/duplicate column/i.test(String(e.message))) throw e;
 		}
 	}
+	for (const sql of POST_ALTER) db.exec(sql);
 
 	backfillOnce(db, '2026-10-entity-tables-backfill', () => {
 		if (tableExists(db, 'user_ratings')) {

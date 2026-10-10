@@ -70,8 +70,10 @@ export const albums = sqliteTable(
 		/** Display string of the album artist credit ("A & B"). */
 		artistCredit: text('artist_credit'),
 		artId: text('art_id'),
-		/** Directory the album was grouped from (tags+folder grouping key). */
+		/** Directory the album was grouped from. */
 		folderPath: text('folder_path'),
+		/** albumGroupKey() result — how the importer finds this album again. */
+		groupKey: text('group_key'),
 		trackCount: integer('track_count').default(0),
 		totalSeconds: integer('total_seconds').default(0),
 		ratingAvg: real('rating_avg'),
@@ -82,6 +84,7 @@ export const albums = sqliteTable(
 	},
 	(t) => ({
 		rgIdx: index('albums_rg_idx').on(t.mbidReleaseGroup),
+		groupIdx: index('albums_group_idx').on(t.groupKey),
 		normIdx: index('albums_norm_idx').on(t.normTitle),
 		addedIdx: index('albums_added_idx').on(t.addedAt),
 		yearIdx: index('albums_year_idx').on(t.year),

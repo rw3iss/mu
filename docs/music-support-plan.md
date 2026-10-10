@@ -1,8 +1,22 @@
 # Music Support — Audit & Implementation Plan
 
-Status: **proposal** · Date: 2026-10-09 · Scope: add an optional **Music** media type
+Status: **in progress** (started 2026-10-10) · Date: 2026-10-09 · Scope: add an optional **Music** media type
 (artists, albums, tracks) next to Movies, sharing infrastructure without coupling
 the two features.
+
+## Implementation status
+
+| Phase | Status | Commit |
+|---|---|---|
+| 0 — Groundwork | IN PROGRESS — shared schema, migration + backfill, shared types DONE (`68f3208`) | |
+| 1 — Catalogue | not started | |
+| 2 — Playback (+ waveform seek bar) | not started | |
+| 3 — Browse & detail | not started | |
+| 4 — Metadata & lyrics | not started | |
+| 5 — Upload & offline | not started | |
+| 6 — Search & discovery | not started | |
+
+Open-question assumptions in §12 were accepted as written (2026-10-10).
 
 ---
 
@@ -195,6 +209,15 @@ Indexes: `tracks(album_id, disc_no, track_no)`, `track_files(track_id)`,
 Plan: **new polymorphic tables + backfill**, then switch code, then drop old tables a
 release later. This is safer than renaming columns in place under SQLite.
 
+> **Correction (2026-10-10).** `foreign_keys = ON` in `DatabaseService`, and a
+> polymorphic `entity_id` cannot carry an FK to several tables. The new tables
+> therefore have **no FK to the entity tables**; the old `ON DELETE CASCADE`
+> becomes `EntityLifecycleService.purge(ref)`, called wherever a movie (or later an
+> artist/album/track) is hard-deleted. Comment reactions also need their own table
+> (`entity_comment_reactions`), because `comment_reactions.comment_id` references
+> `movie_comments`. The backfill runs **once**, gated by a `_migrations` row —
+> re-copying on every migrate would resurrect rows deleted from the new tables.
+
 | New table | Replaces | Shape |
 |---|---|---|
 | `entity_ratings` | `user_ratings` | `user_id, entity_type, entity_id, rating, rated_at`, unique `(user_id, entity_type, entity_id)` |
@@ -205,7 +228,7 @@ release later. This is safer than renaming columns in place under SQLite.
 | `favorites` | (exists) | Extend `FavoriteEntityType` to `artist/album/track` |
 | `search_cache` | (exists) | Widen the `type` and `source` enums |
 | `stream_sessions` | (exists) | Add `entity_type`; rename `movie_file_id` → `file_id` + `file_kind` |
-| `media_cache`, `transcode_cache` | (exist) | Add `file_kind`; document as generic |
+| `media_cache`, `transcode_cache` | (exist) | ~~Add `file_kind`~~ **BYPASSED:** music uses its own `cache/music/` transcode cache (§5.4) and does not use the NVMe hot cache, so these stay video-only |
 
 Migration steps (one `scripts/migrate.js` release each):
 

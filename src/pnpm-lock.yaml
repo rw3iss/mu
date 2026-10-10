@@ -140,6 +140,9 @@ importers:
       lru-cache:
         specifier: ^11.2.7
         version: 11.2.7
+      music-metadata:
+        specifier: ^12
+        version: 12.1.0
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -2175,6 +2178,10 @@ packages:
     resolution: {integrity: sha512-oIXISMynqSqm241k6kcQ5UwttDILMK4BiurCfGEREw6+X9jkkpEe5T9FZaApyLGGOnFuyMWZpdolTXMtvEJ08Q==}
     engines: {node: '>=18'}
 
+  content-type@3.1.1:
+    resolution: {integrity: sha512-GW4qUsfFo59d0HbUibDlWv5wPz+vAAcaTWbKIuKCf0JkC7wWkSyf8f13IpXn5JkeMlB2P8iTSSIjwXljorg2vA==}
+    engines: {node: '>=22'}
+
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
@@ -2550,6 +2557,10 @@ packages:
     resolution: {integrity: sha512-DLkUvGwep3poOV2wpzbHCOnSKGk1LzyXTv+aHFgN2VFl96wnp8YA9YjO2qPzg5PuL8q/SW9Pdi6WTkYOIh995w==}
     engines: {node: '>=20'}
 
+  file-type@22.1.1:
+    resolution: {integrity: sha512-sEB0oStmeLGtpmSAD88RDNuLsvhv4iC3u0lE25CUvfCULvj49xoQ3l3K525Vn+ZzsZ6DOLajQCV6RmhwwhqiJg==}
+    engines: {node: '>=22'}
+
   file-uri-to-path@1.0.0:
     resolution: {integrity: sha512-0Zt+s3L7Vf1biwWZ29aARiVYLx7iMGnEUl9x33fbB/j3jR81u/O2LbqK+Bm1CDSNDKVtJ/YjwY7TUd5SkeLQLw==}
 
@@ -2880,6 +2891,10 @@ packages:
     resolution: {integrity: sha512-OkeDaAZ/bQCxeFAozM55PKcKU0yJMPGifLwV4Qgjitu+5MoAfSQN4lsLJeXZ1b8w0x+/Emda6MZgXS1jvsapng==}
     engines: {node: '>=10'}
 
+  media-typer@2.0.0:
+    resolution: {integrity: sha512-kOy3OxT2HH39N70UnKgu4NWDZjLOz8W/mfyvniHjRH/DrL3f2pOfvWQ4p60offbbtDAnXWp0v9LfMIqMec269Q==}
+    engines: {node: '>=18'}
+
   memfs@3.5.3:
     resolution: {integrity: sha512-UERzLsxzllchadvbPs5aolHh65ISpKpM+ccLbOJ8/vvpBKmAWf+la7dXFy7Mr0ySHbdHrFv5kGFCUHHe6GFEmw==}
     engines: {node: '>= 4.0.0'}
@@ -2940,6 +2955,10 @@ packages:
 
   msgpackr@2.0.1:
     resolution: {integrity: sha512-9J+tqTEsbHqY8YohazYgty7LgerFIWxvMLpUjqETSmjHojtJm2WnX2kK/2a1fLI7CO7ERP1YSEUXMucz4j+yBA==}
+
+  music-metadata@12.1.0:
+    resolution: {integrity: sha512-qKh935MzhY8MNtn+l9cTQldYyQuAWbtbV/hcclWL1jNoiig7CvCCVRpUI4Y4QD4VoV4nz/e07uxa0AUwNz5bvA==}
+    engines: {node: '>=22'}
 
   mute-stream@2.0.0:
     resolution: {integrity: sha512-WWdIxpyjEn+FhQJQQv9aQAYlHoNVdzIzUySNV1gHUPDSdZJ3yZn7pAAbQcV7B56Mvu881q9FZV+0Vx2xC44VWA==}
@@ -3488,6 +3507,10 @@ packages:
     resolution: {integrity: sha512-rvKSBiC5zqCCiDZ9kAOszZcDvdAHwwIKJG33Ykj43OKcWsnmcBRL09YTU4nOeHZ8Y2a7l1MgTd08SBe9A8Qj6A==}
     engines: {node: '>=18'}
 
+  uint8array-extras@1.6.0:
+    resolution: {integrity: sha512-8iAasVS4wUx0gPLjH8Xtz2PeDzTSiy8QiLGu2DT3X5GU+egFEQhpnbtkehbAwjvDcxIERmCYcysiODFmE3Ud0Q==}
+    engines: {node: '>=18'}
+
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
@@ -3623,6 +3646,9 @@ packages:
     resolution: {integrity: sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==}
     engines: {node: '>=8'}
     hasBin: true
+
+  win-guid@0.2.1:
+    resolution: {integrity: sha512-gEIQU4mkgl2OPeoNrWflcJFJ3Ae2BPd4eCsHHA/XikslkIVms/nHhvnvzIZV7VLmBvtFlDOzLt9rrZT+n6D67A==}
 
   wrap-ansi@6.2.0:
     resolution: {integrity: sha512-r6lPcBGxZXlIcymEu7InxDMhdW0KDxpLgoFLcguasxCaJ/SOIZwINatK9KY/tf+ZrlywOKU0UDj3ATXUBfxJXA==}
@@ -5365,6 +5391,8 @@ snapshots:
 
   content-disposition@1.0.1: {}
 
+  content-type@3.1.1: {}
+
   convert-source-map@2.0.0: {}
 
   cookie@1.1.1: {}
@@ -5709,6 +5737,15 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  file-type@22.1.1:
+    dependencies:
+      '@tokenizer/inflate': 0.4.1
+      strtok3: 10.3.5
+      token-types: 6.1.2
+      uint8array-extras: 1.6.0
+    transitivePeerDependencies:
+      - supports-color
+
   file-uri-to-path@1.0.0: {}
 
   find-my-way@9.5.0:
@@ -6003,6 +6040,8 @@ snapshots:
     dependencies:
       escape-string-regexp: 4.0.0
 
+  media-typer@2.0.0: {}
+
   memfs@3.5.3:
     dependencies:
       fs-monkey: 1.1.0
@@ -6058,6 +6097,21 @@ snapshots:
   msgpackr@2.0.1:
     optionalDependencies:
       msgpackr-extract: 3.0.3
+
+  music-metadata@12.1.0:
+    dependencies:
+      '@borewit/text-codec': 0.2.2
+      '@tokenizer/token': 0.3.0
+      content-type: 3.1.1
+      debug: 4.4.3
+      file-type: 22.1.1
+      media-typer: 2.0.0
+      strtok3: 10.3.5
+      token-types: 6.1.2
+      uint8array-extras: 1.6.0
+      win-guid: 0.2.1
+    transitivePeerDependencies:
+      - supports-color
 
   mute-stream@2.0.0: {}
 
@@ -6689,6 +6743,8 @@ snapshots:
 
   uint8array-extras@1.5.0: {}
 
+  uint8array-extras@1.6.0: {}
+
   undici-types@7.18.2: {}
 
   universalify@2.0.1: {}
@@ -6810,6 +6866,8 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
+
+  win-guid@0.2.1: {}
 
   wrap-ansi@6.2.0:
     dependencies:

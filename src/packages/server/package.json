@@ -42,6 +42,7 @@
     "fluent-ffmpeg": "^2.1.0",
     "js-yaml": "^4.1.0",
     "lru-cache": "^11.2.7",
+    "music-metadata": "^12",
     "pino": "^10.3.1",
     "pino-pretty": "^13.0.0",
     "reflect-metadata": "^0.2.0",
