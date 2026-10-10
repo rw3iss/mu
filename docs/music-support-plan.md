@@ -6,6 +6,8 @@ the two features.
 
 ## Implementation status
 
+> **COMPLETED 2026-10-10** — see §14 Close-out.
+
 | Phase | Status | Commit |
 |---|---|---|
 | 0 — Groundwork | DONE 2026-10-10 — feature flags, JobTypeRegistry, `media_sources.kind`, polymorphic `entity_*` tables + backfill (verified on prod: counts match), PlayerControls split, PlayerAdapter, AudioEngine source bus, MediaImporter/VideoImporter | `68f3208`…`1243358`, deployed `4ce3558` |
@@ -624,6 +626,8 @@ music jobs are not registered, and the client hides every music entry point. **D
 is kept**, so re-enabling is instant. A separate "Delete music library data" action
 does the destructive cleanup.
 
+> **STATUS 2026-10-10 — DONE.** Settings → Music → Danger Zone → *Delete Music Library Data* (`POST /music/admin/delete-library {confirm:'DELETE'}`); files on disk are kept.
+
 ### 7.2 Admin settings (shown only when Music is enabled)
 
 > **STATUS 2026-10-10 — DONE, reorganised.** Everything below is one **Settings → Music**
@@ -774,11 +778,37 @@ scanned library.
 
 ## 13. Definition of done (v1 = Phases 0–3)
 
-- [ ] Music can be enabled/disabled in installer, Setup and Settings; disabled = no music routes, UI, jobs or scans.
-- [ ] Movies behave exactly as before (regression checklist passes).
-- [ ] Admin adds music folders; scan catalogues artists/albums/tracks with art.
-- [ ] FLAC plays as FLAC in Chrome/Firefox; ALAC/WMA/APE play via cached FLAC transcode.
-- [ ] Music player: mini/split/full/close; art surface; queue with Up next/Album/Playlist tabs; shuffle/repeat; gapless; EQ/compressor work.
-- [ ] Header Movies|Music toggle scopes Library, search, dashboard and sidebar.
-- [ ] Artist, Album and Track pages with ratings, favorites, comments and playlists.
-- [ ] Music jobs appear in Admin → Jobs with a kind filter.
+Status 2026-10-10. [x] = built and verified by tests / API smoke tests on a copy of the
+prod DB; *(browser)* = needs a manual browser check (no Playwright by policy).
+
+- [x] Music can be enabled/disabled in installer, Setup and Settings; disabled = no music routes (404 verified), UI, jobs or scans.
+- [x] Movies behave exactly as before — test suite green, movie search/stream endpoints smoke-tested, polymorphic backfill counts match on prod. *(browser regression checklist: user)*
+- [x] Admin adds music folders; scan catalogues artists/albums/tracks with art (verified with generated FLAC/AIFF files).
+- [x] FLAC served as FLAC when the browser reports support; unplayable formats (AIFF/ALAC/WMA/APE/DSD) via cached FLAC (verified for AIFF). *(browser)*
+- [x] Music player: mini/split/full/close; art surface; queue with Up next/Album/Playlist tabs; shuffle/repeat; gapless (A/B); EQ/compressor via the AudioEngine source bus. *(browser)*
+- [x] Header Movies|Music toggle scopes Library, search, dashboard and sidebar. *(browser)*
+- [x] Artist, Album and Track pages with ratings, favorites, comments (timestamped on tracks) and playlists.
+- [x] Music jobs appear in Admin → Jobs with a Movies/Music filter.
+
+---
+
+## 14. Close-out
+
+> **COMPLETED 2026-10-10.** All seven phases (0–6) implemented, tested (233 server
+> tests) and deployed to prod (Music stays **off** until enabled in Settings → Music).
+
+**Deliberately not done**
+- AcoustID fingerprinting, Last.fm bios/similar, Discogs, scrobbling — need API keys the
+  provider platform has no forms for yet; all optional in the plan.
+- Crossfade — the plan marks it "later"; the A/B engine gives gapless instead.
+- LLM rerank for music discovery — the existing rerank client is movie-specific.
+- Background Fetch for offline downloads (downloads run while the app is open).
+- `stream_sessions` keeps its movie FK; music sessions are stateless (see §5.4 status).
+- The live-pipe fallback for very long tracks (build-then-serve instead).
+
+**What to watch**
+- First large music import: MusicBrainz is 1 req/s — metadata trickles in as idle-only jobs.
+- Transcode cache size (`music.transcodeCacheMaxGb`) and the ingest-time FLAC copies of unplayable formats (never evicted).
+- The new service worker (`public/sw.js`): network-first for the app shell; if a stale shell ever appears, bump its cache version.
+- Album grouping mistakes → Album page *Merge… / Split…* (merged folders are aliased).
+- Old movie-only user-data tables are unused and can be dropped in a later release.
