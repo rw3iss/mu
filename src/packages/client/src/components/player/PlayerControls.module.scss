@@ -1668,3 +1668,21 @@
 .toggleOn {
 	color: var(--color-accent);
 }
+
+// Audio waveform: taller than the video seek line, so instead of straddling
+// the bar's top edge it sits entirely above it (bottom on the bar's top edge)
+// and never hides behind the mini artwork. Zero-height row + absolute child;
+// specificity beats the per-breakpoint `.seekRow { top }` offsets above.
+// Split mode keeps it in flow (nothing to rest on above the panel controls).
+.controls:not(.splitControls) .seekRow.seekRowWaveform {
+	top: 0;
+	height: 0;
+	overflow: visible;
+
+	> * {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+	}
+}

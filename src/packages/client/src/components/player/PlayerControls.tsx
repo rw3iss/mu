@@ -72,7 +72,9 @@ export function PlayerControls({
 			class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''} ${isSplit ? styles.splitControls : ''}`}
 		>
 			{/* ── Row 1: Seek bar — flush to top, full width ── */}
-			<div class={styles.seekRow}>{Seek && <Seek {...groupProps} />}</div>
+			<div class={`${styles.seekRow} ${seekId === 'waveform' ? styles.seekRowWaveform : ''}`}>
+				{Seek && <Seek {...groupProps} />}
+			</div>
 
 			{/* ── Row 2: Content row — optional left slot + controls ── */}
 			<div class={styles.contentRow}>
