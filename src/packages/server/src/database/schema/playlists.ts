@@ -15,6 +15,8 @@ export const playlists = sqliteTable('playlists', {
 	/** When also public, other members may ADD movies (and remove their own adds). */
 	publicEdit: integer('public_edit', { mode: 'boolean' }).default(false),
 	smartRules: text('smart_rules'),
+	/** Media kind of the items: `video` (movies) or `audio` (tracks). */
+	kind: text('kind').notNull().default('video'),
 	createdAt: text('created_at').notNull(),
 	updatedAt: text('updated_at').notNull(),
 });

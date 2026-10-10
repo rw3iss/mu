@@ -1,4 +1,6 @@
+import { isEntityType, type MediaKind } from '@mu/shared';
 import {
+	BadRequestException,
 	Body,
 	Controller,
 	Delete,
@@ -25,11 +27,13 @@ export class PlaylistsController {
 		@Query('includeMovies') includeMovies?: string,
 		@Query('sortBy') sortBy?: string,
 		@Query('sortOrder') sortOrder?: string,
+		@Query('kind') kind?: string,
 	) {
 		return this.playlistsService.findAll(userId, {
 			includeMovies: includeMovies === 'true',
 			sortBy: sortBy as any,
 			sortOrder: sortOrder === 'asc' ? 'asc' : 'desc',
+			kind: asKind(kind),
 		});
 	}
 
@@ -37,12 +41,19 @@ export class PlaylistsController {
 	@Post()
 	create(
 		@Body()
-		body: { name: string; description?: string; isPublic?: boolean; publicEdit?: boolean },
+		body: {
+			name: string;
+			description?: string;
+			isPublic?: boolean;
+			publicEdit?: boolean;
+			kind?: string;
+		},
 		@CurrentUser('id') userId: string,
 	) {
 		return this.playlistsService.create(userId, body.name, body.description, {
 			isPublic: body.isPublic,
 			publicEdit: body.publicEdit,
+			kind: asKind(body.kind),
 		});
 	}
 
@@ -55,8 +66,11 @@ export class PlaylistsController {
 	/** Public playlists across all users (read-only). */
 	@RequireAction('view:own-data')
 	@Get('public')
-	findPublic(@Query('includeMovies') includeMovies?: string) {
-		return this.playlistsService.findPublic({ includeMovies: includeMovies === 'true' });
+	findPublic(@Query('includeMovies') includeMovies?: string, @Query('kind') kind?: string) {
+		return this.playlistsService.findPublic({
+			includeMovies: includeMovies === 'true',
+			kind: asKind(kind),
+		});
 	}
 
 	@RequireAction('view:own-data')
@@ -133,4 +147,40 @@ export class PlaylistsController {
 		this.playlistsService.removeMovie(playlistId, movieId, userId);
 		return { success: true };
 	}
+
+	/** Add any entity (movie or track) to a playlist of the matching kind. */
+	@RequireAction('view:own-data')
+	@Post(':id/items')
+	async addItem(
+		@Param('id') playlistId: string,
+		@CurrentUser('id') userId: string,
+		@Body() body: { itemType: string; itemId: string },
+	) {
+		if (!isEntityType(body?.itemType) || !body.itemId) {
+			throw new BadRequestException('itemType and itemId are required');
+		}
+		await this.playlistsService.addItem(
+			playlistId,
+			{ type: body.itemType, id: body.itemId },
+			userId,
+		);
+		return { success: true };
+	}
+
+	@RequireAction('view:own-data')
+	@Delete(':id/items/:itemType/:itemId')
+	removeItem(
+		@Param('id') playlistId: string,
+		@Param('itemType') itemType: string,
+		@Param('itemId') itemId: string,
+		@CurrentUser('id') userId: string,
+	) {
+		if (!isEntityType(itemType)) throw new BadRequestException('Unknown item type');
+		this.playlistsService.removeItem(playlistId, { type: itemType, id: itemId }, userId);
+		return { success: true };
+	}
+}
+
+function asKind(v: string | undefined): MediaKind | undefined {
+	return v === 'audio' || v === 'video' ? v : undefined;
 }

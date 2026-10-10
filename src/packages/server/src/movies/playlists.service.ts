@@ -1,5 +1,6 @@
-import { nowISO } from '@mu/shared';
+import { type EntityRef, type MediaKind, nowISO } from '@mu/shared';
 import {
+	BadRequestException,
 	ConflictException,
 	ForbiddenException,
 	Injectable,
@@ -8,6 +9,7 @@ import {
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { movies, playlistItems, playlists, users } from '../database/schema/index.js';
+import { EntityResolverRegistry } from '../entities/entity-resolver.registry.js';
 
 interface PlaylistMovieSummary {
 	movieId: string;
@@ -21,9 +23,15 @@ interface PlaylistMovieSummary {
 	isRemote?: boolean;
 }
 
+/** The entity type each playlist kind holds. */
+const ITEM_TYPE: Record<MediaKind, 'movie' | 'track'> = { video: 'movie', audio: 'track' };
+
 @Injectable()
 export class PlaylistsService {
-	constructor(private readonly database: DatabaseService) {}
+	constructor(
+		private readonly database: DatabaseService,
+		private readonly resolvers: EntityResolverRegistry,
+	) {}
 
 	/**
 	 * Short-lived list cache (per-user lists + the shared public list).
@@ -81,7 +89,7 @@ export class PlaylistsService {
 		userId: string,
 		name: string,
 		description?: string,
-		opts?: { isPublic?: boolean; publicEdit?: boolean },
+		opts?: { isPublic?: boolean; publicEdit?: boolean; kind?: MediaKind },
 	) {
 		const id = crypto.randomUUID();
 		const now = nowISO();
@@ -98,6 +106,7 @@ export class PlaylistsService {
 				description: description ?? null,
 				isPublic,
 				publicEdit,
+				kind: opts?.kind === 'audio' ? 'audio' : 'video',
 				createdAt: now,
 				updatedAt: now,
 			})
@@ -113,11 +122,17 @@ export class PlaylistsService {
 			includeMovies?: boolean;
 			sortBy?: 'created' | 'updated' | 'name' | 'movieCount' | 'lastPlayed';
 			sortOrder?: 'asc' | 'desc';
+			kind?: MediaKind;
 		},
 	) {
-		const sortBy = options?.sortBy ?? 'updated';
+		const kind = options?.kind ?? 'video';
+		// "Last played" ranks by movie history; audio playlists fall back to updated.
+		const sortBy =
+			kind === 'audio' && options?.sortBy === 'lastPlayed'
+				? 'updated'
+				: (options?.sortBy ?? 'updated');
 		const order = options?.sortOrder ?? 'desc';
-		const cacheKey = `own:${userId}:${sortBy}:${order}:${!!options?.includeMovies}`;
+		const cacheKey = `own:${userId}:${kind}:${sortBy}:${order}:${!!options?.includeMovies}`;
 		const cached = this.cacheGet(cacheKey);
 		if (cached) return cached;
 		const dirFn = order === 'asc' ? asc : desc;
@@ -152,22 +167,24 @@ export class PlaylistsService {
 				userId: playlists.userId,
 				createdAt: playlists.createdAt,
 				updatedAt: playlists.updatedAt,
+				kind: playlists.kind,
 				movieCount: count(playlistItems.id),
+				itemCount: count(playlistItems.id),
 			})
 			.from(playlists)
 			.leftJoin(
 				playlistItems,
 				and(
 					eq(playlists.id, playlistItems.playlistId),
-					eq(playlistItems.itemType, 'movie'),
+					eq(playlistItems.itemType, ITEM_TYPE[kind]),
 				),
 			)
-			.where(eq(playlists.userId, userId))
+			.where(and(eq(playlists.userId, userId), eq(playlists.kind, kind)))
 			.groupBy(playlists.id)
 			.orderBy(orderExpr)
 			.all();
 
-		if (!options?.includeMovies) {
+		if (!options?.includeMovies || kind !== 'video') {
 			this.cacheSet(cacheKey, result);
 			return result;
 		}
@@ -181,8 +198,9 @@ export class PlaylistsService {
 	 * Public playlists from every user, owner username attached. Read-only
 	 * surface — viewable by anyone, editable by nobody but the author.
 	 */
-	findPublic(options?: { includeMovies?: boolean }) {
-		const cacheKey = `public:${!!options?.includeMovies}`;
+	findPublic(options?: { includeMovies?: boolean; kind?: MediaKind }) {
+		const kind = options?.kind ?? 'video';
+		const cacheKey = `public:${kind}:${!!options?.includeMovies}`;
 		const cached = this.cacheGet(cacheKey);
 		if (cached) return cached;
 
@@ -199,23 +217,26 @@ export class PlaylistsService {
 				ownerName: sql<string>`COALESCE(${users.displayName}, ${users.username})`,
 				createdAt: playlists.createdAt,
 				updatedAt: playlists.updatedAt,
+				kind: playlists.kind,
 				movieCount: count(playlistItems.id),
+				itemCount: count(playlistItems.id),
 			})
 			.from(playlists)
 			.leftJoin(
 				playlistItems,
 				and(
 					eq(playlists.id, playlistItems.playlistId),
-					eq(playlistItems.itemType, 'movie'),
+					eq(playlistItems.itemType, ITEM_TYPE[kind]),
 				),
 			)
 			.leftJoin(users, eq(playlists.userId, users.id))
-			.where(eq(playlists.isPublic, true))
+			.where(and(eq(playlists.isPublic, true), eq(playlists.kind, kind)))
 			.groupBy(playlists.id)
 			.orderBy(desc(playlists.updatedAt))
 			.all();
 
-		const final = options?.includeMovies ? this.attachMovieSummaries(result) : result;
+		const final =
+			options?.includeMovies && kind === 'video' ? this.attachMovieSummaries(result) : result;
 		this.cacheSet(cacheKey, final);
 		return final;
 	}
@@ -274,7 +295,7 @@ export class PlaylistsService {
         WHERE pm.item_type = 'movie'
         GROUP BY pm.playlist_id
       ) lp ON lp.playlist_id = p.id
-      WHERE p.user_id = ${userId}
+      WHERE p.user_id = ${userId} AND p.kind = 'video'
       ORDER BY COALESCE(lp.score, 0) ${sql.raw(dir)}, p.updated_at ${sql.raw(dir)}
     `);
 
@@ -385,6 +406,14 @@ export class PlaylistsService {
 			isRemote: !!r.remoteServerId,
 		}));
 
+		if (playlist.kind === 'audio') {
+			return {
+				...playlist,
+				ownerName: owner?.name ?? null,
+				movies: [],
+				tracks: this.trackItems(id),
+			};
+		}
 		return { ...playlist, ownerName: owner?.name ?? null, movies: items };
 	}
 
@@ -423,6 +452,37 @@ export class PlaylistsService {
 		remoteInfo?: { title: string; posterUrl?: string; serverId: string },
 		userId?: string,
 	) {
+		this.insertItem(playlistId, { type: 'movie', id: movieId }, remoteInfo, userId);
+	}
+
+	removeMovie(playlistId: string, movieId: string, userId?: string) {
+		this.removeItem(playlistId, { type: 'movie', id: movieId }, userId);
+	}
+
+	/**
+	 * Add any entity to a playlist. The item type must match the playlist's
+	 * kind (movies → video, tracks → audio) and the entity must exist.
+	 */
+	async addItem(playlistId: string, ref: EntityRef, userId: string) {
+		const pl = this.database.db
+			.select({ kind: playlists.kind })
+			.from(playlists)
+			.where(eq(playlists.id, playlistId))
+			.get();
+		if (!pl) throw new NotFoundException(`Playlist ${playlistId} not found`);
+		if (ITEM_TYPE[pl.kind as MediaKind] !== ref.type) {
+			throw new BadRequestException(`This ${pl.kind} playlist cannot hold a ${ref.type}`);
+		}
+		await this.resolvers.require(ref.type, ref.id);
+		this.insertItem(playlistId, ref, undefined, userId);
+	}
+
+	private insertItem(
+		playlistId: string,
+		ref: EntityRef,
+		remoteInfo?: { title: string; posterUrl?: string; serverId: string },
+		userId?: string,
+	) {
 		if (userId) this.assertCanContribute(playlistId, userId);
 		this.bustCache();
 		const existing = this.database.db
@@ -431,14 +491,16 @@ export class PlaylistsService {
 			.where(
 				and(
 					eq(playlistItems.playlistId, playlistId),
-					eq(playlistItems.itemType, 'movie'),
-					eq(playlistItems.itemId, movieId),
+					eq(playlistItems.itemType, ref.type),
+					eq(playlistItems.itemId, ref.id),
 				),
 			)
 			.get();
 
 		if (existing) {
-			throw new ConflictException('Movie is already in this playlist');
+			throw new ConflictException(
+				`${ref.type === 'movie' ? 'Movie' : 'Item'} is already in this playlist`,
+			);
 		}
 
 		// Get the next position
@@ -455,8 +517,8 @@ export class PlaylistsService {
 			.values({
 				id: crypto.randomUUID(),
 				playlistId,
-				itemType: 'movie',
-				itemId: movieId,
+				itemType: ref.type,
+				itemId: ref.id,
 				position,
 				addedAt: nowISO(),
 				addedBy: userId ?? null,
@@ -474,7 +536,12 @@ export class PlaylistsService {
 			.run();
 	}
 
-	removeMovie(playlistId: string, movieId: string, userId?: string) {
+	removeItem(playlistId: string, ref: EntityRef, userId?: string) {
+		const match = and(
+			eq(playlistItems.playlistId, playlistId),
+			eq(playlistItems.itemType, ref.type),
+			eq(playlistItems.itemId, ref.id),
+		);
 		if (userId) {
 			const pl = this.database.db
 				.select({ userId: playlists.userId })
@@ -487,36 +554,50 @@ export class PlaylistsService {
 				const row = this.database.db
 					.select({ addedBy: playlistItems.addedBy })
 					.from(playlistItems)
-					.where(
-						and(
-							eq(playlistItems.playlistId, playlistId),
-							eq(playlistItems.itemType, 'movie'),
-							eq(playlistItems.itemId, movieId),
-						),
-					)
+					.where(match)
 					.get();
 				if (!row || row.addedBy !== userId) {
-					throw new ForbiddenException('You can only remove movies you added');
+					throw new ForbiddenException('You can only remove items you added');
 				}
 			}
 		}
 		this.bustCache();
-		this.database.db
-			.delete(playlistItems)
-			.where(
-				and(
-					eq(playlistItems.playlistId, playlistId),
-					eq(playlistItems.itemType, 'movie'),
-					eq(playlistItems.itemId, movieId),
-				),
-			)
-			.run();
+		this.database.db.delete(playlistItems).where(match).run();
 
 		this.database.db
 			.update(playlists)
 			.set({ updatedAt: nowISO() })
 			.where(eq(playlists.id, playlistId))
 			.run();
+	}
+
+	/** Track rows of an audio playlist, in order, with album + art for display. */
+	private trackItems(playlistId: string) {
+		return this.database.db
+			.all<{
+				itemId: string;
+				position: number;
+				addedAt: string;
+				title: string | null;
+				artistCredit: string | null;
+				albumId: string | null;
+				albumTitle: string | null;
+				artId: string | null;
+				durationSeconds: number | null;
+			}>(sql`
+			SELECT pi.item_id AS itemId, pi.position, pi.added_at AS addedAt, t.title,
+				t.artist_credit AS artistCredit, t.album_id AS albumId, al.title AS albumTitle,
+				al.art_id AS artId, t.duration_seconds AS durationSeconds
+			FROM playlist_items pi
+			LEFT JOIN tracks t ON t.id = pi.item_id
+			LEFT JOIN albums al ON al.id = t.album_id
+			WHERE pi.playlist_id = ${playlistId} AND pi.item_type = 'track'
+			ORDER BY pi.position`)
+			.map(({ artId, ...r }) => ({
+				...r,
+				title: r.title ?? 'Unknown track',
+				artUrl: artId ? `/api/v1/music/art/${artId}?size=256` : null,
+			}));
 	}
 
 	findByMovie(userId: string, movieId: string) {

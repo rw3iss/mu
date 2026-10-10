@@ -319,6 +319,7 @@ const ALTERS = [
 	['albums', `ALTER TABLE albums ADD COLUMN group_key TEXT`],
 	['media_sources', `ALTER TABLE media_sources ADD COLUMN kind TEXT NOT NULL DEFAULT 'video'`],
 	['stream_sessions', `ALTER TABLE stream_sessions ADD COLUMN entity_type TEXT NOT NULL DEFAULT 'movie'`],
+	['playlists', `ALTER TABLE playlists ADD COLUMN kind TEXT NOT NULL DEFAULT 'video'`],
 ];
 
 // Indexes on columns added by ALTERS — must run after them on existing DBs.
