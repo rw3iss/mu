@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { nowISO } from '@mu/shared';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
+import { EntityLifecycleService } from '../../entities/entity-lifecycle.service.js';
 import {
 	albumArtists,
 	albumGenres,
@@ -42,6 +43,7 @@ export class MusicCatalogService {
 		private readonly database: DatabaseService,
 		private readonly artwork: ArtworkService,
 		private readonly musicSettings: MusicSettingsService,
+		@Optional() private readonly lifecycle?: EntityLifecycleService,
 	) {}
 
 	/** Find-or-create an artist by MBID, else by normalised name. */
@@ -355,11 +357,21 @@ export class MusicCatalogService {
 					.map((r) => r.albumId),
 			);
 			db.delete(trackFiles).where(inArray(trackFiles.id, missingFileIds)).run();
+			const ids = (q: ReturnType<typeof sql>) => db.all<{ id: string }>(q).map((r) => r.id);
+			const deadTracks = ids(sql`SELECT id FROM tracks WHERE id NOT IN (SELECT DISTINCT track_id FROM track_files)`);
 			db.run(sql`DELETE FROM tracks WHERE id NOT IN (SELECT DISTINCT track_id FROM track_files)`);
+			const deadAlbums = ids(sql`SELECT id FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)`);
 			db.run(sql`DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)`);
+			const orphanArtists = sql`SELECT id FROM artists WHERE id NOT IN (SELECT artist_id FROM album_artists) AND id NOT IN (SELECT artist_id FROM track_artists)`;
+			const deadArtists = ids(orphanArtists);
 			db.run(
 				sql`DELETE FROM artists WHERE id NOT IN (SELECT artist_id FROM album_artists) AND id NOT IN (SELECT artist_id FROM track_artists)`,
 			);
+			// User data (ratings, comments, favorites, playlist rows, history) has
+			// no FK to these tables — clean it explicitly, like a cascade would.
+			this.lifecycle?.purgeMany('track', deadTracks);
+			this.lifecycle?.purgeMany('album', deadAlbums);
+			this.lifecycle?.purgeMany('artist', deadArtists);
 			const surviving = db
 				.select({ id: albums.id })
 				.from(albums)

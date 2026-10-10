@@ -23,7 +23,28 @@ export interface RatingSummary {
 /** Per-user ratings for any entity (movie, person, artist, album, track). */
 @Injectable()
 export class EntityRatingsService {
+	private readonly listeners: ((ref: EntityRef) => void)[] = [];
+
 	constructor(private readonly database: DatabaseService) {}
+
+	/**
+	 * Called after a rating is set or removed. Feature modules use it to keep
+	 * denormalised aggregates (e.g. albums.rating_avg) in step without this
+	 * service knowing about them.
+	 */
+	onChange(listener: (ref: EntityRef) => void): void {
+		this.listeners.push(listener);
+	}
+
+	private changed(ref: EntityRef): void {
+		for (const l of this.listeners) {
+			try {
+				l(ref);
+			} catch {
+				/* a listener failure must not fail the rating write */
+			}
+		}
+	}
 
 	private where(userId: string, ref: EntityRef) {
 		return and(
@@ -52,6 +73,7 @@ export class EntityRatingsService {
 				.set({ rating, updatedAt: now })
 				.where(eq(entityRatings.id, existing.id))
 				.run();
+			this.changed(ref);
 			return { ...existing, rating, updatedAt: now };
 		}
 		const row: EntityRatingRow = {
@@ -64,11 +86,13 @@ export class EntityRatingsService {
 			updatedAt: now,
 		};
 		this.database.db.insert(entityRatings).values(row).run();
+		this.changed(ref);
 		return row;
 	}
 
 	remove(userId: string, ref: EntityRef): void {
 		this.database.db.delete(entityRatings).where(this.where(userId, ref)).run();
+		this.changed(ref);
 	}
 
 	summary(ref: EntityRef, userId?: string): RatingSummary {
