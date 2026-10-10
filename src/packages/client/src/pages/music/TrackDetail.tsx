@@ -151,6 +151,24 @@ export function TrackDetail({ id }: TrackDetailProps) {
 		setEditing(true);
 	};
 
+	const [fetchingLyrics, setFetchingLyrics] = useState(false);
+	const fetchLyricsNow = async () => {
+		if (!track) return;
+		setFetchingLyrics(true);
+		try {
+			const res = await musicService.fetchLyrics(track.id);
+			if (res.lyrics) setLyrics(res.lyrics);
+			if ('status' in res.result && res.result.status === 'found')
+				notifySuccess('Lyrics found');
+			else if ('skipped' in res.result) notifySuccess(`Skipped: ${res.result.skipped}`);
+			else notifyError('No lyrics found on LRCLIB');
+		} catch (err) {
+			notifyError((err as Error)?.message || 'Lyrics lookup failed');
+		} finally {
+			setFetchingLyrics(false);
+		}
+	};
+
 	const saveLyrics = async () => {
 		setSaving(true);
 		const body = {
@@ -247,11 +265,24 @@ export function TrackDetail({ id }: TrackDetailProps) {
 					<div class={styles.lyricsHeader}>
 						<h2 class={styles.sectionTitle}>Lyrics</h2>
 						{canEdit && !editing && (
-							<Button variant="ghost" size="sm" onClick={startEdit}>
-								<span class={styles.btnIcon}>
-									<Icon name="edit" size={14} /> Edit
-								</span>
-							</Button>
+							<span class={styles.btnIcon}>
+								<Button
+									variant="ghost"
+									size="sm"
+									loading={fetchingLyrics}
+									onClick={fetchLyricsNow}
+									title="Look up lyrics on LRCLIB (never replaces lyrics edited by hand)"
+								>
+									<span class={styles.btnIcon}>
+										<Icon name="download" size={14} /> Fetch
+									</span>
+								</Button>
+								<Button variant="ghost" size="sm" onClick={startEdit}>
+									<span class={styles.btnIcon}>
+										<Icon name="edit" size={14} /> Edit
+									</span>
+								</Button>
+							</span>
 						)}
 					</div>
 					{editing ? (

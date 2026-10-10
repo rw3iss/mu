@@ -1,5 +1,6 @@
 import type {
 	AlbumDetail,
+	AlbumMatchState,
 	AlbumSummary,
 	ArtistDetail,
 	ArtistSummary,
@@ -151,6 +152,33 @@ export const musicService = {
 	): Promise<void> {
 		lyricsCache.delete(trackId);
 		return api.put(`/music/tracks/${encodeURIComponent(trackId)}/lyrics`, body);
+	},
+	/** Stored MusicBrainz match state; `refresh` runs a live search (never applies). */
+	matchCandidates(
+		albumId: string,
+		opts: { refresh?: boolean; title?: string; artist?: string } = {},
+	): Promise<AlbumMatchState> {
+		const p: Record<string, string> = {};
+		if (opts.refresh) p.refresh = '1';
+		if (opts.title) p.title = opts.title;
+		if (opts.artist) p.artist = opts.artist;
+		return api.get(`/music/albums/${encodeURIComponent(albumId)}/match-candidates`, p);
+	},
+	matchAlbum(
+		albumId: string,
+		body: { releaseMbid?: string; releaseGroupMbid?: string },
+	): Promise<AlbumMatchState> {
+		return api.post(`/music/albums/${encodeURIComponent(albumId)}/match`, body);
+	},
+	refreshAlbumMetadata(albumId: string): Promise<{ started: boolean }> {
+		return api.post(`/music/albums/${encodeURIComponent(albumId)}/refresh-metadata`);
+	},
+	/** Look the track up on LRCLIB now (never overwrites user-edited lyrics). */
+	fetchLyrics(
+		trackId: string,
+	): Promise<{ result: { status: 'found' | 'miss' } | { skipped: string }; lyrics: LyricsDto }> {
+		lyricsCache.delete(trackId);
+		return api.post(`/music/tracks/${encodeURIComponent(trackId)}/lyrics/fetch`);
 	},
 	settings(): Promise<MusicSettings> {
 		return api.get('/music/settings');
