@@ -1,4 +1,4 @@
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import { trackFiles } from '../../database/schema/index.js';
@@ -32,8 +32,6 @@ jobTypeRegistry.registerMany([
  */
 @Injectable()
 export class MusicJobsService implements OnModuleInit {
-	private readonly logger = new Logger('MusicJobs');
-
 	constructor(
 		private readonly jobs: JobManagerService,
 		private readonly database: DatabaseService,

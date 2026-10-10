@@ -4,7 +4,7 @@ import { PeakReducer, waveformBucketCount } from '../peaks.js';
 function pcm(values: number[]): Uint8Array {
 	const b = new Uint8Array(values.length * 2);
 	const v = new DataView(b.buffer);
-	values.forEach((x, i) => v.setInt16(i * 2, x, true));
+	for (const [i, x] of values.entries()) v.setInt16(i * 2, x, true);
 	return b;
 }
 

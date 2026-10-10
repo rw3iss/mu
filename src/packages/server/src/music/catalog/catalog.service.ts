@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { nowISO } from '@mu/shared';
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import {
@@ -45,8 +45,6 @@ const FOLDER_ART = [
  */
 @Injectable()
 export class MusicCatalogService {
-	private readonly logger = new Logger('MusicCatalog');
-
 	constructor(
 		private readonly database: DatabaseService,
 		private readonly artwork: ArtworkService,
