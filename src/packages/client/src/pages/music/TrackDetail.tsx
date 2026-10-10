@@ -66,7 +66,7 @@ export function TrackDetail({ id }: TrackDetailProps) {
 	const [draftPlain, setDraftPlain] = useState('');
 	const [draftSynced, setDraftSynced] = useState('');
 	const [saving, setSaving] = useState(false);
-	const canEdit = can('edit:movie');
+	const canEdit = can('edit:lyrics');
 
 	useSeo(
 		track

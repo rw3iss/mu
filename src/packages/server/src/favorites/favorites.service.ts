@@ -1,6 +1,6 @@
 import { nowISO } from '@mu/shared';
 import { Injectable, NotFoundException, type OnModuleInit } from '@nestjs/common';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, notInArray } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { favorites, movies, people } from '../database/schema/index.js';
 import { EntityLifecycleService } from '../entities/entity-lifecycle.service.js';
@@ -42,6 +42,8 @@ export interface RemoveFavoriteInput {
 export interface FavoriteKeysResponse {
 	personKeys: string[];
 	movieIds: string[];
+	/** Other entity types as `<type>:<id>` (artist/album/track). */
+	entityKeys: string[];
 }
 
 export interface FavoriteView {
@@ -71,11 +73,16 @@ export interface FavoriteView {
 	};
 	/** Summary for non-person/movie entities (artist/album/track). */
 	entity?: EntitySummary;
+	/** The type's own list-row object, keyed by type (`artist`/`album`/`track`). */
+	artist?: unknown;
+	album?: unknown;
+	track?: unknown;
 }
 
 interface CacheEntry {
 	personKeys: Set<string>;
 	movieIds: Set<string>;
+	entityKeys: Set<string>;
 }
 
 @Injectable()
@@ -100,6 +107,7 @@ export class FavoritesService implements OnModuleInit {
 			return {
 				personKeys: [...cached.personKeys],
 				movieIds: [...cached.movieIds],
+				entityKeys: [...cached.entityKeys],
 			};
 		}
 		// People → externalId is the key. Movies → entityId IS the id.
@@ -115,10 +123,26 @@ export class FavoritesService implements OnModuleInit {
 			.where(and(eq(favorites.userId, userId), eq(favorites.entityType, 'movie')))
 			.all();
 
+		const otherRows = this.database.db
+			.select({ type: favorites.entityType, id: favorites.entityId })
+			.from(favorites)
+			.where(
+				and(
+					eq(favorites.userId, userId),
+					notInArray(favorites.entityType, ['person', 'movie']),
+				),
+			)
+			.all();
+
 		const personKeys = new Set(personRows.map((r) => r.externalId));
 		const movieIds = new Set(movieRows.map((r) => r.id));
-		this.keyCache.set(userId, { personKeys, movieIds });
-		return { personKeys: [...personKeys], movieIds: [...movieIds] };
+		const entityKeys = new Set(otherRows.map((r) => `${r.type}:${r.id}`));
+		this.keyCache.set(userId, { personKeys, movieIds, entityKeys });
+		return {
+			personKeys: [...personKeys],
+			movieIds: [...movieIds],
+			entityKeys: [...entityKeys],
+		};
 	}
 
 	async list(userId: string): Promise<FavoriteView[]> {
@@ -155,6 +179,18 @@ export class FavoritesService implements OnModuleInit {
 							.map((m) => [m.id, m]),
 					)
 				: new Map();
+
+		// Rich cards per other type, one batched call each.
+		const cards = new Map<string, Map<string, unknown>>();
+		for (const type of new Set(rows.map((r) => r.entityType))) {
+			if (isLegacyType(type as FavoriteEntityType)) continue;
+			const resolver = this.resolvers.get(
+				type as Exclude<FavoriteEntityType, 'person' | 'movie'>,
+			);
+			if (!resolver?.cards) continue;
+			const ids = rows.filter((r) => r.entityType === type).map((r) => r.entityId);
+			cards.set(type, await resolver.cards(ids, userId).catch(() => new Map()));
+		}
 
 		const out: FavoriteView[] = [];
 		for (const r of rows) {
@@ -214,6 +250,7 @@ export class FavoritesService implements OnModuleInit {
 					role: r.role,
 					createdAt: r.createdAt,
 					entity: summary,
+					[r.entityType]: cards.get(r.entityType)?.get(r.entityId),
 				});
 			}
 		}

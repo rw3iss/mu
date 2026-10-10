@@ -601,6 +601,11 @@ export class PlaylistsService {
 	}
 
 	findByMovie(userId: string, movieId: string) {
+		return this.findByItem(userId, { type: 'movie', id: movieId });
+	}
+
+	/** The user's playlists that contain this entity. */
+	findByItem(userId: string, ref: EntityRef) {
 		return this.database.db
 			.select({
 				id: playlists.id,
@@ -610,8 +615,8 @@ export class PlaylistsService {
 			.innerJoin(playlists, eq(playlistItems.playlistId, playlists.id))
 			.where(
 				and(
-					eq(playlistItems.itemType, 'movie'),
-					eq(playlistItems.itemId, movieId),
+					eq(playlistItems.itemType, ref.type),
+					eq(playlistItems.itemId, ref.id),
 					eq(playlists.userId, userId),
 				),
 			)

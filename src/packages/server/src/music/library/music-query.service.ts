@@ -29,7 +29,7 @@ export const artUrl = (artId: string | null | undefined, size = 600): string | n
 
 export type AlbumSort = 'added' | 'title' | 'artist' | 'year' | 'rating';
 export type ArtistSort = 'name' | 'added' | 'albums';
-export type TrackSort = 'title' | 'artist' | 'album' | 'added' | 'plays' | 'rating';
+export type TrackSort = 'title' | 'artist' | 'album' | 'duration' | 'added' | 'plays' | 'rating';
 
 export interface ListQuery {
 	q?: string;
@@ -314,17 +314,19 @@ export class MusicQueryService {
 					]
 				: sort === 'album'
 					? [asc(albums.sortTitle), asc(tracks.discNo), asc(tracks.trackNo)]
-					: sort === 'added'
-						? [dir(tracks.addedAt)]
-						: sort === 'plays'
-							? [desc(tracks.playCount)]
-							: sort === 'rating'
-								? [dir(tracks.ratingAvg)]
-								: [
-										q.order === 'desc'
-											? desc(tracks.normTitle)
-											: asc(tracks.normTitle),
-									];
+					: sort === 'duration'
+						? [dir(tracks.durationSeconds)]
+						: sort === 'added'
+							? [dir(tracks.addedAt)]
+							: sort === 'plays'
+								? [desc(tracks.playCount)]
+								: sort === 'rating'
+									? [dir(tracks.ratingAvg)]
+									: [
+											q.order === 'desc'
+												? desc(tracks.normTitle)
+												: asc(tracks.normTitle),
+										];
 		const cond = where.length ? and(...where) : undefined;
 		const total =
 			this.db
@@ -672,5 +674,45 @@ export class MusicQueryService {
 			.values({ trackId, ...values })
 			.onConflictDoUpdate({ target: lyrics.trackId, set: values })
 			.run();
+	}
+
+	/** Full list-row summaries by id (favourites, playlists). Missing ids are absent. */
+	summariesById(
+		type: 'artist' | 'album' | 'track',
+		ids: string[],
+		userId?: string,
+	): Map<string, ArtistSummary | AlbumSummary | TrackSummary> {
+		const out = new Map<string, ArtistSummary | AlbumSummary | TrackSummary>();
+		if (!ids.length) return out;
+		if (type === 'album') {
+			const rows = this.db.select().from(albums).where(inArray(albums.id, ids)).all();
+			for (const a of this.toAlbumSummaries(rows)) out.set(a.id, a);
+		} else if (type === 'track') {
+			for (const t of this.trackSummaries(
+				this.trackRows(inArray(tracks.id, ids), [], ids.length),
+				userId,
+			))
+				out.set(t.id, t);
+		} else {
+			const albumCount = sql<number>`(SELECT count(*) FROM album_artists aa WHERE aa.artist_id = ${artists.id})`;
+			for (const r of this.db
+				.select({
+					id: artists.id,
+					name: artists.name,
+					imageId: artists.imageId,
+					albumCount,
+				})
+				.from(artists)
+				.where(inArray(artists.id, ids))
+				.all()) {
+				out.set(r.id, {
+					id: r.id,
+					name: r.name,
+					imageUrl: artUrl(r.imageId, 256),
+					albumCount: r.albumCount,
+				});
+			}
+		}
+		return out;
 	}
 }

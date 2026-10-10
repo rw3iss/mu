@@ -63,6 +63,17 @@ export class PlaylistsController {
 		return this.playlistsService.findByMovie(userId, movieId);
 	}
 
+	@RequireAction('view:own-data')
+	@Get('by-item/:itemType/:itemId')
+	findByItem(
+		@Param('itemType') itemType: string,
+		@Param('itemId') itemId: string,
+		@CurrentUser('id') userId: string,
+	) {
+		if (!isEntityType(itemType)) throw new BadRequestException('Unknown item type');
+		return this.playlistsService.findByItem(userId, { type: itemType, id: itemId });
+	}
+
 	/** Public playlists across all users (read-only). */
 	@RequireAction('view:own-data')
 	@Get('public')
