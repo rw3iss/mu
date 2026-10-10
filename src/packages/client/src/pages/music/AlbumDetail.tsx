@@ -199,7 +199,7 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 
 	const playAll = () =>
 		album.tracks.length > 0
-			? playTracksFrom(album.tracks, 0)
+			? playTracksFrom(album.tracks, 0, { type: 'album', id: album.id, title: album.title })
 			: playMusic({ type: 'album', id: album.id });
 
 	return (
@@ -265,7 +265,13 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 							<Button
 								variant="secondary"
 								disabled={album.tracks.length === 0}
-								onClick={() => shuffleTracks(album.tracks)}
+								onClick={() =>
+									shuffleTracks(album.tracks, {
+										type: 'album',
+										id: album.id,
+										title: album.title,
+									})
+								}
 							>
 								<span class={styles.btnIcon}>
 									<Icon name="shuffle" size={16} /> Shuffle
@@ -317,7 +323,13 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 											index={track.trackNo ?? index + 1}
 											albumArtistIds={albumArtistIds}
 											showRating
-											onPlay={() => playTracksFrom(album.tracks, index)}
+											onPlay={() =>
+												playTracksFrom(album.tracks, index, {
+													type: 'album',
+													id: album.id,
+													title: album.title,
+												})
+											}
 										/>
 									))}
 								</div>

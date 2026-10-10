@@ -305,7 +305,7 @@ export function Playlists(_props: PlaylistsProps) {
 				setNewDescription('');
 				setNewPublic(false);
 				setNewPublicEdit(false);
-				loadPlaylists(sortBy);
+				loadPlaylists(sortBy, sortOrder);
 			} catch {
 				notifyError('Failed to create playlist');
 			}

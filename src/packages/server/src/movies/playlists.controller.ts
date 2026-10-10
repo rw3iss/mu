@@ -86,7 +86,7 @@ export class PlaylistsController {
 
 	@RequireAction('view:own-data')
 	@Get(':id')
-	findById(
+	async findById(
 		@Param('id') id: string,
 		@CurrentUser('id') userId: string,
 		@CurrentUser('role') role: string,
@@ -97,7 +97,7 @@ export class PlaylistsController {
 		if (!playlist.isPublic && playlist.userId !== userId && role !== 'admin') {
 			throw new NotFoundException(`Playlist ${id} not found`);
 		}
-		return playlist;
+		return this.playlistsService.withTrackCards(playlist, userId);
 	}
 
 	@RequireAction('view:own-data')

@@ -1,15 +1,18 @@
+import type { TrackSummary } from '@mu/shared';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
+import { TrackRow } from '@/components/music/TrackRow';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
 import { currentUser } from '@/state/auth.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { invalidatePlaylists } from '@/state/playlists.state';
+import { playTracksFrom, shuffleTracks } from '@/utils/music';
 import { newTabNav } from '@/utils/navigation';
 import styles from './PlaylistDetail.module.scss';
 
@@ -35,7 +38,10 @@ interface Playlist {
 	isPublic?: boolean;
 	publicEdit?: boolean;
 	ownerName?: string | null;
+	/** `audio` playlists hold tracks; anything else holds movies. */
+	kind?: 'video' | 'audio';
 	movies: PlaylistMovie[];
+	tracks?: TrackSummary[];
 }
 
 interface PlaylistDetailProps {
@@ -153,6 +159,24 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 		[playlist],
 	);
 
+	const handleRemoveTrack = useCallback(
+		async (trackId: string) => {
+			if (!playlist) return;
+			try {
+				await api.delete(`/playlists/${playlist.id}/items/track/${trackId}`);
+				setPlaylist({
+					...playlist,
+					tracks: (playlist.tracks ?? []).filter((t) => t.id !== trackId),
+				});
+				invalidatePlaylists();
+				notifySuccess('Track removed from playlist');
+			} catch {
+				notifyError('Failed to remove track');
+			}
+		},
+		[playlist],
+	);
+
 	function formatRuntime(minutes: number): string {
 		if (!minutes) return '';
 		const hours = Math.floor(minutes / 60);
@@ -182,6 +206,11 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 	}
 
 	const isOwner = currentUser.value?.id === playlist.userId;
+	const isAudio = playlist.kind === 'audio';
+	const tracks = playlist.tracks ?? [];
+	const itemCount = isAudio ? tracks.length : playlist.movies.length;
+	const noun = isAudio ? 'track' : 'movie';
+	const context = { type: 'playlist' as const, id: playlist.id, title: playlist.name };
 
 	return (
 		<div class={styles.playlistDetail}>
@@ -196,7 +225,7 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 						<p class={styles.description}>{playlist.description}</p>
 					)}
 					<span class={styles.movieCount}>
-						{playlist.movies.length} {playlist.movies.length === 1 ? 'movie' : 'movies'}
+						{itemCount} {itemCount === 1 ? noun : `${noun}s`}
 						{!isOwner && playlist.ownerName ? ` · by ${playlist.ownerName}` : ''}
 						{playlist.isPublic
 							? playlist.publicEdit
@@ -205,6 +234,20 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 							: ''}
 					</span>
 				</div>
+				{isAudio && tracks.length > 0 && (
+					<div class={styles.headerActions}>
+						<Button size="sm" onClick={() => playTracksFrom(tracks, 0, context)}>
+							<Icon name="play" size={12} /> Play
+						</Button>
+						<Button
+							variant="secondary"
+							size="sm"
+							onClick={() => shuffleTracks(tracks, context)}
+						>
+							<Icon name="shuffle" size={12} /> Shuffle
+						</Button>
+					</div>
+				)}
 				{isOwner && (
 					<div class={styles.headerActions}>
 						<Button variant="secondary" size="sm" onClick={handleOpenEdit}>
@@ -221,15 +264,47 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 				)}
 			</div>
 
+			{/* Track List (audio playlists) */}
+			{isAudio && tracks.length > 0 && (
+				<div class={styles.trackList}>
+					{tracks.map((track, index) => (
+						<div key={track.id} class={styles.trackItem}>
+							<div class={styles.trackRow}>
+								<TrackRow
+									track={track}
+									index={index + 1}
+									showArt
+									showAlbum
+									onPlay={() => playTracksFrom(tracks, index, context)}
+								/>
+							</div>
+							{isOwner && (
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => handleRemoveTrack(track.id)}
+									aria-label={`Remove ${track.title}`}
+								>
+									<Icon name="x" size={12} />
+								</Button>
+							)}
+						</div>
+					))}
+				</div>
+			)}
+
 			{/* Movie List */}
-			{playlist.movies.length === 0 ? (
+			{itemCount === 0 ? (
 				<div class={styles.empty}>
 					<p>This playlist is empty</p>
-					<Button variant="secondary" onClick={() => route('/library')}>
+					<Button
+						variant="secondary"
+						onClick={() => route(isAudio ? '/music/library' : '/library')}
+					>
 						Browse Library
 					</Button>
 				</div>
-			) : (
+			) : isAudio ? null : (
 				<div class={styles.movieList}>
 					{playlist.movies.map((movie, index) => (
 						<div key={movie.movieId} class={styles.movieItem}>

@@ -571,6 +571,26 @@ export class PlaylistsService {
 			.run();
 	}
 
+	/**
+	 * Full TrackSummary rows (artists, rating, art) for an audio playlist's
+	 * tracks, in playlist order, via the music module's resolver. Falls back to
+	 * the plain rows when Music isn't loaded.
+	 */
+	async withTrackCards<T extends { tracks?: { itemId: string }[] }>(
+		playlist: T,
+		userId?: string,
+	) {
+		const rows = playlist.tracks;
+		const cards = this.resolvers.get('track')?.cards;
+		if (!rows?.length || !cards) return playlist;
+		const map = await cards(
+			rows.map((r) => r.itemId),
+			userId,
+		).catch(() => null);
+		if (!map) return playlist;
+		return { ...playlist, tracks: rows.map((r) => map.get(r.itemId)).filter(Boolean) };
+	}
+
 	/** Track rows of an audio playlist, in order, with album + art for display. */
 	private trackItems(playlistId: string) {
 		return this.database.db

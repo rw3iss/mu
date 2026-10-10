@@ -4,7 +4,6 @@ import { route } from 'preact-router';
 import { jobAction, jobListAction } from '@/components/admin/JobBadge';
 import { Button } from '@/components/common/Button';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
-import { musicEnabled } from '@/state/features.state';
 import { Spinner } from '@/components/common/Spinner';
 import { api } from '@/services/api';
 import { groupsService } from '@/services/groups.service';
@@ -12,6 +11,7 @@ import type { ActiveSession, SessionHistoryEntry } from '@/services/stream.servi
 import { streamService } from '@/services/stream.service';
 import { subtitlesService } from '@/services/subtitles.service';
 import { wsService } from '@/services/websocket.service';
+import { musicEnabled } from '@/state/features.state';
 import { fetchMovies } from '@/state/library.state';
 import {
 	notifyError,
@@ -1070,7 +1070,8 @@ const MUSIC_ACTIONS: MusicAction[] = [
 	{
 		path: 'reencode-unplayable',
 		label: 'Re-encode Unplayable Music',
-		description: 'Make cached FLAC copies of formats browsers cannot play (APE, WavPack, DSD…).',
+		description:
+			'Make cached FLAC copies of formats browsers cannot play (APE, WavPack, DSD…).',
 		message:
 			'Queues a FLAC transcode for every file in a format no browser plays. The original file is kept; the copy lives in the music cache.',
 		confirmLabel: 'Re-encode',

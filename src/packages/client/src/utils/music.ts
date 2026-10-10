@@ -1,7 +1,8 @@
 import type { AlbumSummary, ArtistSummary, EntityRef, TrackSummary } from '@mu/shared';
 import { playMedia } from '@/state/globalPlayer.state';
+import { type PlaybackContext, playTracks } from '@/state/musicPlayer.state';
 import { notifyError } from '@/state/notifications.state';
-import { addToQueue, playNext, type QueueItem } from '@/state/queue.state';
+import { addToQueue, type QueueItem } from '@/state/queue.state';
 
 /** `3:07` / `1:02:45`. Null/invalid → em dash. */
 export function formatDuration(seconds: number | null | undefined): string {
@@ -87,28 +88,34 @@ export async function playMusic(ref: EntityRef): Promise<void> {
 }
 
 /**
- * Play a tracklist starting at `index`: plays that track now and lines up the
- * rest of the list (in order) at the front of the audio queue. Used for
- * "click a track row = play the album from here".
+ * Play a tracklist starting at `index`: the rest of the list becomes the audio
+ * queue (in order) and `context` labels the run for the player's list panel.
+ * Used for "click a track row = play the album from here".
  */
-export async function playTracksFrom(tracks: TrackSummary[], index: number): Promise<void> {
-	const start = tracks[index];
-	if (!start) return;
-	const rest = tracks.slice(index + 1);
-	// playNext inserts at the front, so walk backwards to keep album order.
-	for (let i = rest.length - 1; i >= 0; i--) playNext(trackQueueItem(rest[i]!));
-	await playMusic(trackRef(start.id));
+export async function playTracksFrom(
+	tracks: TrackSummary[],
+	index: number,
+	context?: PlaybackContext,
+): Promise<void> {
+	try {
+		await playTracks(tracks, index, context);
+	} catch (err) {
+		notifyError((err as Error)?.message || 'Playback is not available');
+	}
 }
 
 /** Shuffle-play a list of tracks. */
-export async function shuffleTracks(tracks: TrackSummary[]): Promise<void> {
+export async function shuffleTracks(
+	tracks: TrackSummary[],
+	context?: PlaybackContext,
+): Promise<void> {
 	if (tracks.length === 0) return;
 	const copy = [...tracks];
 	for (let i = copy.length - 1; i > 0; i--) {
 		const j = Math.floor(Math.random() * (i + 1));
 		[copy[i], copy[j]] = [copy[j]!, copy[i]!];
 	}
-	await playTracksFrom(copy, 0);
+	await playTracksFrom(copy, 0, context);
 }
 
 export function queueTracks(tracks: TrackSummary[]): void {

@@ -215,7 +215,13 @@ export function ArtistDetail({ id }: ArtistDetailProps) {
 									index={i + 1}
 									showArt
 									showAlbum
-									onPlay={() => playTracksFrom(popular, i)}
+									onPlay={() =>
+										playTracksFrom(popular, i, {
+											type: 'artist',
+											id: artist.id,
+											title: artist.name,
+										})
+									}
 								/>
 							))}
 						</div>
