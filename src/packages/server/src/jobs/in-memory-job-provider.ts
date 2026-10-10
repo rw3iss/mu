@@ -1,4 +1,4 @@
-import { nowISO, WsEvent } from '@mu/shared';
+import { DEFAULT_MUSIC_SETTINGS, type FeatureName, nowISO, WsEvent } from '@mu/shared';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { AsyncTask, SimpleIntervalJob, ToadScheduler } from 'toad-scheduler';
@@ -14,6 +14,7 @@ import type {
 	ScheduledJobOptions,
 } from './job.interface.js';
 import { JobManagerService } from './job-manager.service.js';
+import { type JobTypeRegistry, jobTypeRegistry } from './job-type-registry.js';
 
 /**
  * Single-process, in-memory implementation of `JobManagerService`.
@@ -50,20 +51,14 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 	private maxConcurrency = 2;
 
 	/**
-	 * Job types that read an entire movie file off disk (whole-file decode /
-	 * re-encode / thousands of seek-extracts). Running several of these at once
-	 * thrashes the media drive and starves playback, so they get their own,
-	 * much lower concurrency cap (`encoding.maxConcurrentIoJobs`, default 1) on
-	 * TOP of the global one. Light jobs (metadata, scan, cleanup) are unaffected.
+	 * Per-type scheduling metadata (io-heavy / encode / owning feature) comes
+	 * from the JobTypeRegistry — see job-type-registry.ts. Io-heavy types read
+	 * an entire media file off disk; running several at once thrashes the
+	 * media drive and starves playback, so they get their own, much lower
+	 * concurrency cap (`encoding.maxConcurrentIoJobs`, default 1) on TOP of
+	 * the global one. Light jobs (metadata, scan, cleanup) are unaffected.
 	 */
-	private static readonly IO_HEAVY_TYPES: ReadonlySet<string> = new Set([
-		'sprite-sheet',
-		'pre-transcode',
-		'convert-mp4',
-	]);
-
-	/** Encode job types eligible for CPU+GPU parallel scheduling. */
-	private static readonly ENCODE_TYPES = new Set(['pre-transcode', 'convert-mp4']);
+	private readonly registry: JobTypeRegistry = jobTypeRegistry;
 
 	/** Default heavy-I/O concurrency when the setting is unset — serialize. */
 	private maxIoConcurrency = 1;
@@ -135,6 +130,7 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 			priority: descriptor.priority ?? 10,
 			idleOnly: descriptor.idleOnly,
 			details: descriptor.details,
+			feature: this.registry.featureOf(descriptor.type),
 			createdAt: now,
 		};
 
@@ -482,6 +478,12 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 		let heavyRunning = this.countRunningHeavy();
 		let encodeRunning = this.countRunningEncode();
 
+		// Per-feature sub-caps (e.g. music.maxConcurrentJobs) so one feature's
+		// burst (a big music import) can't starve the other's jobs. Features
+		// without a configured cap are bounded only by the global caps.
+		const featureCaps = this.readFeatureCaps(maxConcurrency);
+		const featureRunning = this.countRunningByFeature();
+
 		// Scan the priority-ordered queue rather than always shifting the head: a
 		// heavy job that's blocked by the I/O cap is LEFT in place while we look
 		// further down for a light job that can still run. This serializes
@@ -503,8 +505,15 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 				continue;
 			}
 
-			const isEncode = InMemoryJobProvider.ENCODE_TYPES.has(job.type);
-			const isHeavy = InMemoryJobProvider.IO_HEAVY_TYPES.has(job.type);
+			const isEncode = this.registry.isEncode(job.type);
+			const isHeavy = this.registry.isIoHeavy(job.type);
+			const feature = this.registry.featureOf(job.type);
+			const featureCap = feature ? featureCaps.get(feature) : undefined;
+			if (feature && featureCap != null && (featureRunning.get(feature) ?? 0) >= featureCap) {
+				// This feature is at its sub-cap — leave it queued, look further.
+				idx++;
+				continue;
+			}
 			if (cpuParallel && isEncode) {
 				// Encode jobs ride their own GPU+CPU slot cap in parallel mode.
 				if (encodeRunning >= encodeCap) {
@@ -532,27 +541,57 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 
 			if (isHeavy) heavyRunning++;
 			if (isEncode) encodeRunning++;
+			if (feature) featureRunning.set(feature, (featureRunning.get(feature) ?? 0) + 1);
 			this.runJob(job, handler);
 		}
 	}
 
-	/** Count currently-running jobs that are heavy disk-I/O (see IO_HEAVY_TYPES). */
+	/** Count currently-running encode jobs (registry `encode: true`). */
 	private countRunningEncode(): number {
 		let n = 0;
 		for (const id of this.running) {
 			const j = this.jobs.get(id);
-			if (j && InMemoryJobProvider.ENCODE_TYPES.has(j.type)) n++;
+			if (j && this.registry.isEncode(j.type)) n++;
 		}
 		return n;
 	}
 
+	/** Count currently-running heavy disk-I/O jobs (registry `ioHeavy: true`). */
 	private countRunningHeavy(): number {
 		let n = 0;
 		for (const id of this.running) {
 			const job = this.jobs.get(id);
-			if (job && InMemoryJobProvider.IO_HEAVY_TYPES.has(job.type)) n++;
+			if (job && this.registry.isIoHeavy(job.type)) n++;
 		}
 		return n;
+	}
+
+	private countRunningByFeature(): Map<FeatureName, number> {
+		const counts = new Map<FeatureName, number>();
+		for (const id of this.running) {
+			const job = this.jobs.get(id);
+			const f = job ? this.registry.featureOf(job.type) : undefined;
+			if (f) counts.set(f, (counts.get(f) ?? 0) + 1);
+		}
+		return counts;
+	}
+
+	/**
+	 * Sub-caps per feature. Only music has one today (`music.maxConcurrentJobs`,
+	 * default from DEFAULT_MUSIC_SETTINGS); never above the global cap.
+	 */
+	private readFeatureCaps(maxConcurrency: number): Map<FeatureName, number> {
+		const caps = new Map<FeatureName, number>();
+		let musicCap = DEFAULT_MUSIC_SETTINGS.maxConcurrentJobs;
+		try {
+			const music = this.settings.get<Record<string, unknown>>('music', {}) as any;
+			const n = Number(music?.maxConcurrentJobs);
+			if (Number.isFinite(n) && n >= 1) musicCap = Math.floor(n);
+		} catch {
+			/* transient settings read failure — keep the default */
+		}
+		caps.set('music', Math.max(1, Math.min(musicCap, maxConcurrency)));
+		return caps;
 	}
 
 	private async runJob(job: JobRecord, handler: JobHandler): Promise<void> {
@@ -644,6 +683,7 @@ export class InMemoryJobProvider extends JobManagerService implements OnModuleDe
 			error: job.error,
 			details: job.details,
 			payload: job.payload,
+			feature: job.feature,
 			// Carry the result on terminal events so subscribers can
 			// react with the handler's return value (grouping summary,
 			// transcode result, etc.) without a follow-up GET.

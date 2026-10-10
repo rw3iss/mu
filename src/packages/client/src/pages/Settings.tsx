@@ -476,7 +476,7 @@ export function Settings(props: SettingsProps) {
 
 				// Load sources from the API
 				try {
-					const sources = await sourcesService.getAll();
+					const sources = await sourcesService.getAll('video');
 					if (sources.length > 0) {
 						setMediaPathEntries(sources.map((s) => ({ path: s.path, source: s })));
 					} else {
@@ -652,12 +652,12 @@ export function Settings(props: SettingsProps) {
 	const handleSaveLibrary = useCallback(async () => {
 		setIsSaving(true);
 		try {
-			// Sync media sources
+			// Sync movie (video) sources — music folders are managed separately
 			const validPaths = mediaPathEntries.map((e) => e.path.trim()).filter(Boolean);
-			await sourcesService.sync(validPaths);
+			await sourcesService.sync(validPaths, 'video');
 
 			// Reload sources to get full objects with scan status
-			const sources = await sourcesService.getAll();
+			const sources = await sourcesService.getAll('video');
 			if (sources.length > 0) {
 				setMediaPathEntries(sources.map((s) => ({ path: s.path, source: s })));
 			} else {
@@ -2788,7 +2788,7 @@ export function Settings(props: SettingsProps) {
 
 							<div class={styles.settingGroup}>
 								<div class={styles.settingInfo}>
-									<span class={styles.settingLabel}>Media Paths</span>
+									<span class={styles.settingLabel}>Movie Folders</span>
 									<span class={styles.settingDescription}>
 										Directories containing your movie files
 									</span>

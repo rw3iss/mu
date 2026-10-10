@@ -1,5 +1,5 @@
-import { nowISO } from '@mu/shared';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { type MediaKind, nowISO } from '@mu/shared';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { mediaSources } from '../database/schema/index.js';
@@ -14,8 +14,10 @@ export class LibraryService {
 		private readonly events: EventsService,
 	) {}
 
-	getSources() {
-		return this.database.db.select().from(mediaSources).all();
+	/** All media sources, optionally only those of one kind. */
+	getSources(kind?: MediaKind) {
+		const all = this.database.db.select().from(mediaSources).all();
+		return kind ? all.filter((s) => (s.kind || 'video') === kind) : all;
 	}
 
 	getSource(id: string) {
@@ -31,7 +33,17 @@ export class LibraryService {
 		return source;
 	}
 
-	addSource(path: string, label?: string) {
+	/**
+	 * Add a media source of `kind` (default `video`). A path that overlaps a
+	 * source of the OTHER kind (same dir, parent or child) is allowed — each
+	 * importer only takes its own extensions — but the result carries a
+	 * `warning` so the UI can tell the admin (plan §12 #9).
+	 */
+	addSource(path: string, label?: string, kind: MediaKind = 'video') {
+		if (kind !== 'video' && kind !== 'audio') {
+			throw new BadRequestException(`Invalid source kind "${kind}"`);
+		}
+		const warning = this.overlapWarning(path, kind);
 		const now = nowISO();
 		const id = crypto.randomUUID();
 
@@ -41,15 +53,38 @@ export class LibraryService {
 				id,
 				path,
 				label: label ?? null,
+				kind,
 				createdAt: now,
 				updatedAt: now,
 			})
 			.run();
 
-		this.logger.log(`Added media source: ${path}`);
-		this.events.emit('library:source-added', { id, path });
+		this.logger.log(`Added ${kind} media source: ${path}`);
+		if (warning) this.logger.warn(warning);
+		this.events.emit('library:source-added', { id, path, kind });
 
-		return this.getSource(id);
+		const source = this.getSource(id);
+		return warning ? { ...source, warning } : source;
+	}
+
+	/** Human-readable warning when `path` overlaps a source of a different kind. */
+	overlapWarning(path: string, kind: MediaKind): string | undefined {
+		const norm = (p: string) => p.replace(/[\\/]+$/, '');
+		const target = norm(path);
+		const clash = this.getSources().find((s) => {
+			if ((s.kind || 'video') === kind) return false;
+			const other = norm(s.path);
+			return (
+				other === target ||
+				target.startsWith(`${other}/`) ||
+				other.startsWith(`${target}/`) ||
+				target.startsWith(`${other}\\`) ||
+				other.startsWith(`${target}\\`)
+			);
+		});
+		if (!clash) return undefined;
+		const otherKind = (clash.kind || 'video') === 'audio' ? 'music' : 'movie';
+		return `This folder overlaps the ${otherKind} folder "${clash.path}". Each library only imports its own file types, but keeping movie and music folders separate is recommended.`;
 	}
 
 	removeSource(id: string) {
@@ -64,8 +99,8 @@ export class LibraryService {
 	 * the explicitly flagged default → the single source when only one
 	 * exists → the first source found. Null when no sources exist.
 	 */
-	getDefaultSource() {
-		const sources = this.getSources();
+	getDefaultSource(kind: MediaKind = 'video') {
+		const sources = this.getSources(kind);
 		if (sources.length === 0) return null;
 		return sources.find((s) => s.isDefault) ?? sources[0]!;
 	}
@@ -78,8 +113,12 @@ export class LibraryService {
 			.get();
 	}
 
-	syncSources(paths: string[]) {
-		const existing = this.getSources();
+	/**
+	 * Make the set of `kind` sources equal `paths`. Sources of other kinds are
+	 * never touched (the movie-folder list must not delete music folders).
+	 */
+	syncSources(paths: string[], kind: MediaKind = 'video') {
+		const existing = this.getSources(kind);
 		const existingPaths = new Set(existing.map((s) => s.path));
 		const newPaths = new Set(paths);
 
@@ -90,7 +129,7 @@ export class LibraryService {
 		// Add new paths
 		for (const path of paths) {
 			if (!existingPaths.has(path)) {
-				created.push(this.addSource(path));
+				created.push(this.addSource(path, undefined, kind));
 			} else {
 				const source = existing.find((s) => s.path === path)!;
 				kept.push(source);
@@ -122,11 +161,13 @@ export class LibraryService {
 			throw new NotFoundException(`Source ${id} not found`);
 		}
 
-		// Only one source may be the default — clear the flag everywhere else.
+		// Only one source per kind may be the default — clear the flag on the
+		// other sources of the same kind.
 		if (data.isDefault === true) {
 			this.database.db
 				.update(mediaSources)
 				.set({ isDefault: false, updatedAt: nowISO() })
+				.where(eq(mediaSources.kind, existing.kind || 'video'))
 				.run();
 		}
 

@@ -1,92 +1,96 @@
-import { opendir, stat } from 'node:fs/promises';
-import { basename, extname, join } from 'node:path';
-import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
-import ffmpeg from 'fluent-ffmpeg';
-import { CacheService } from '../cache/cache.service.js';
-import { GuidResolverService } from '../common/guid-resolver.service.js';
-import { normalizeTitle } from '../common/text-normalize.js';
-import { ConfigService } from '../config/config.service.js';
+import { opendir } from 'node:fs/promises';
+import { extname, join } from 'node:path';
+import { type MediaKind, nowISO, WsEvent } from '@mu/shared';
+import { Injectable, Logger } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { mediaSources, movieFiles, movies, scanLog } from '../database/schema/index.js';
+import { type MediaSource, mediaSources, scanLog } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
-import { MoviesService } from '../movies/movies.service.js';
-import { SettingsService } from '../settings/settings.service.js';
+import { FeatureFlagsService, KIND_FEATURE } from '../features/feature-flags.service.js';
+import { ImporterRegistry } from './importers/importer-registry.js';
+import type { ImportFileResult, MediaImporter } from './importers/media-importer.js';
+import { VideoImporter } from './importers/video-importer.js';
 
-interface ParsedFilename {
-	title: string;
-	year?: number;
-	quality?: string;
+export type { ImportFileResult } from './importers/media-importer.js';
+
+export interface ScanSourceResult {
+	logId: string;
+	filesFound: number;
+	filesAdded: number;
+	filesUpdated: number;
+	filesRemoved: number;
+	/** Set when the source was not scanned (no importer for its kind / feature off). */
+	skipped?: string;
 }
 
-export type ImportFileResult =
-	| { status: 'skipped-size' }
-	| { status: 'skipped-duration' }
-	| { status: 'updated' }
-	| { status: 'added'; movieId: string; title: string }
-	| { status: 'race-skipped' }
-	| { status: 'error'; reason: string };
-
-interface ProbeResult {
-	codecVideo?: string;
-	codecAudio?: string;
-	resolution?: string;
-	durationSeconds?: number;
-	bitrate?: number;
-	videoWidth?: number;
-	videoHeight?: number;
-	videoBitDepth?: number;
-	videoFrameRate?: string;
-	videoProfile?: string;
-	videoColorSpace?: string;
-	hdr?: boolean;
-	containerFormat?: string;
-	audioTracks?: {
-		index: number;
-		codec: string;
-		language: string;
-		title: string;
-		channels: number;
-		channelLayout: string;
-		sampleRate?: number;
-		bitDepth?: number;
-	}[];
-	subtitleTracks?: {
-		index: number;
-		codec: string;
-		language: string;
-		title: string;
-		forced: boolean;
-		external: boolean;
-	}[];
-}
-
+/**
+ * Scan orchestrator (plan §3.2 "ScanOrchestrator"). Kind-agnostic: walks a
+ * media source with the MediaImporter registered for the source's `kind` and
+ * dispatches every matching file to it. Sources whose kind has no importer,
+ * or whose feature is disabled (video→movies, audio→music), are skipped.
+ *
+ * The class keeps its historical name and public methods (`scanSource`,
+ * `importFile`, `purgeOrphanedMovies`, `reprobeFileRow`, `listUnprobedFiles`,
+ * `rescanMovie`) so existing callers don't change; the movie-specific ones
+ * delegate to VideoImporter.
+ */
 @Injectable()
 export class ScannerService {
 	private readonly logger = new Logger('ScannerService');
 
 	constructor(
 		private readonly database: DatabaseService,
-		readonly _config: ConfigService,
 		private readonly events: EventsService,
-		readonly _cache: CacheService,
-		private readonly guidResolver: GuidResolverService,
-		@Inject(forwardRef(() => MoviesService))
-		private readonly moviesService: MoviesService,
-		private readonly settings: SettingsService,
+		private readonly importers: ImporterRegistry,
+		private readonly features: FeatureFlagsService,
+		private readonly video: VideoImporter,
 	) {}
 
-	async scanSource(sourceId: string) {
-		const source = this.database.db
+	private getSourceRow(sourceId: string): MediaSource | undefined {
+		return this.database.db
 			.select()
 			.from(mediaSources)
 			.where(eq(mediaSources.id, sourceId))
 			.get();
+	}
 
+	/**
+	 * The importer that should handle files of this source, or a reason why
+	 * none applies. Shared with the watcher so both gate identically.
+	 */
+	resolveImporter(
+		kind: string | null | undefined,
+	): { importer: MediaImporter } | { importer: null; reason: string } {
+		const k = (kind || 'video') as MediaKind;
+		const feature = KIND_FEATURE[k];
+		if (!feature) return { importer: null, reason: `unknown source kind "${k}"` };
+		if (!this.features.isEnabled(feature)) {
+			return { importer: null, reason: `feature "${feature}" is disabled` };
+		}
+		const importer = this.importers.get(k);
+		if (!importer) return { importer: null, reason: `no importer for kind "${k}"` };
+		return { importer };
+	}
+
+	async scanSource(sourceId: string): Promise<ScanSourceResult> {
+		const source = this.getSourceRow(sourceId);
 		if (!source) {
 			throw new Error(`Source ${sourceId} not found`);
 		}
+
+		const resolved = this.resolveImporter(source.kind);
+		if (!resolved.importer) {
+			this.logger.log(`Scan skipped for ${source.path}: ${resolved.reason}`);
+			return {
+				logId: '',
+				filesFound: 0,
+				filesAdded: 0,
+				filesUpdated: 0,
+				filesRemoved: 0,
+				skipped: resolved.reason,
+			};
+		}
+		const importer = resolved.importer;
 
 		const logId = crypto.randomUUID();
 		const now = nowISO();
@@ -102,7 +106,7 @@ export class ScannerService {
 			.run();
 
 		this.events.emit(WsEvent.SCAN_STARTED, { sourceId, logId });
-		this.logger.log(`Scan started for source: ${source.path}`);
+		this.logger.log(`Scan started for ${importer.kind} source: ${source.path}`);
 
 		const scanStartTime = performance.now();
 
@@ -112,20 +116,18 @@ export class ScannerService {
 		let filesRemoved = 0;
 		const errors: string[] = [];
 		const foundPaths = new Set<string>();
-		const newMovieIds: string[] = [];
 
 		try {
-			for await (const filePath of this.walkDir(source.path, SUPPORTED_VIDEO_EXTENSIONS)) {
+			for await (const filePath of this.walkDir(source.path, importer.extensions)) {
 				filesFound++;
 				foundPaths.add(filePath);
 
 				try {
-					const result = await this.importFile(sourceId, filePath);
+					const result = await importer.importFile(sourceId, filePath);
 					if (result.status === 'updated') {
 						filesUpdated++;
 					} else if (result.status === 'added') {
 						filesAdded++;
-						newMovieIds.push(result.movieId);
 					} else if (result.status === 'error') {
 						errors.push(`Error processing ${filePath}: ${result.reason}`);
 					}
@@ -140,25 +142,10 @@ export class ScannerService {
 			}
 
 			// Mark files no longer present as unavailable
-			const dbFiles = this.database.db
-				.select({ id: movieFiles.id, filePath: movieFiles.filePath })
-				.from(movieFiles)
-				.where(and(eq(movieFiles.sourceId, sourceId), eq(movieFiles.available, true)))
-				.all();
+			filesRemoved = await importer.markMissing(sourceId, foundPaths);
 
-			for (const dbFile of dbFiles) {
-				if (!foundPaths.has(dbFile.filePath)) {
-					this.database.db
-						.update(movieFiles)
-						.set({ available: false })
-						.where(eq(movieFiles.id, dbFile.id))
-						.run();
-					filesRemoved++;
-				}
-			}
-
-			// Clean up movies with no remaining available files
-			await this.purgeOrphanedMovies();
+			// Clean up catalogue rows with no remaining available files
+			await importer.purgeOrphans();
 
 			// Update source stats
 			this.database.db
@@ -200,8 +187,8 @@ export class ScannerService {
 				`Scan completed for ${source.path} in ${scanElapsed}s: found=${filesFound} added=${filesAdded} updated=${filesUpdated} removed=${filesRemoved}`,
 			);
 
-			// Metadata + thumbnail jobs are now enqueued automatically by
-			// LibraryJobsService when it receives LIBRARY_MOVIE_ADDED events.
+			// Follow-up work (metadata, thumbnails, …) is enqueued by listeners
+			// of the importer's "added" events (e.g. LIBRARY_MOVIE_ADDED).
 		} catch (err: any) {
 			this.database.db
 				.update(scanLog)
@@ -229,585 +216,54 @@ export class ScannerService {
 	}
 
 	/**
-	 * Import a single file into the library. Single source of truth for
-	 * scanner.scanSource and watcher.handleFileAdded — both must use this so
-	 * the min-file-size filter, probe step, and movies+movieFiles atomic
-	 * insert behave identically.
-	 *
-	 * Returns:
-	 *   - 'skipped-size'  — file is below the user's minFileSizeMB threshold
-	 *   - 'updated'       — existing movieFile row touched (size/mtime/available)
-	 *   - 'added'         — new movie + movieFile created
-	 *   - 'race-skipped'  — another process won the unique-filePath insert
-	 *   - 'error'         — unexpected failure, see reason
-	 *
-	 * On 'race-skipped' or any rollback, no movies-row orphan is left behind:
-	 * both inserts run inside a SQLite transaction, so a UNIQUE-constraint
-	 * failure on movie_files.file_path rolls back the movies-row insert too.
+	 * Import one file, routed to the importer for its source's kind. Used by
+	 * the watcher; `scanSource` calls the importer directly.
 	 */
 	async importFile(sourceId: string, filePath: string): Promise<ImportFileResult> {
-		const fileStat = await stat(filePath);
-		const fileName = basename(filePath);
-		const fileModifiedAt = fileStat.mtime.toISOString();
-		const fileSize = fileStat.size;
-
-		// 1. Skip junk/promo files under the configured minimum size.
-		const lib = this.settings.get<Record<string, unknown>>('library', {}) as any;
-		const minSizeMB = lib?.minFileSizeMB ?? 50;
-		if (minSizeMB > 0 && fileSize < minSizeMB * 1024 * 1024) {
-			return { status: 'skipped-size' };
-		}
-
-		// 2. If we already have a row for this exact path, just touch it.
-		const existing = this.database.db
-			.select()
-			.from(movieFiles)
-			.where(eq(movieFiles.filePath, filePath))
-			.get();
-
-		if (existing) {
-			if (existing.fileModifiedAt !== fileModifiedAt || existing.fileSize !== fileSize) {
-				// The bytes changed, so the stream layout may have too — MP4
-				// conversion rewrites the file in place and can change the
-				// audio/subtitle track set. Only touching size/mtime left the
-				// old track JSON behind, so the player kept offering audio
-				// tracks the file no longer contained (picking one did nothing).
-				let probed: Partial<ProbeResult> = {};
-				try {
-					probed = await this.probeFile(filePath);
-				} catch (err) {
-					this.logger.warn(`Re-probe failed for ${filePath}: ${(err as Error).message}`);
-				}
-				this.database.db
-					.update(movieFiles)
-					.set({
-						fileSize,
-						fileModifiedAt,
-						available: true,
-						...(probed.audioTracks
-							? { audioTracks: JSON.stringify(probed.audioTracks) }
-							: {}),
-						...(probed.subtitleTracks
-							? { subtitleTracks: JSON.stringify(probed.subtitleTracks) }
-							: {}),
-						...(probed.codecVideo ? { codecVideo: probed.codecVideo } : {}),
-						...(probed.codecAudio ? { codecAudio: probed.codecAudio } : {}),
-						...(probed.containerFormat
-							? { containerFormat: probed.containerFormat }
-							: {}),
-						...(probed.durationSeconds
-							? { durationSeconds: probed.durationSeconds }
-							: {}),
-					})
-					.where(eq(movieFiles.id, existing.id))
-					.run();
-			} else if (!existing.available) {
-				this.database.db
-					.update(movieFiles)
-					.set({ available: true })
-					.where(eq(movieFiles.id, existing.id))
-					.run();
-			}
-			return { status: 'updated' };
-		}
-
-		// 3. New file. Probe before opening the transaction so the FFprobe
-		//    work doesn't hold a write lock.
-		const parsed = this.parseFilename(fileName);
-		const probeInfo = await this.probeFile(filePath);
-		const movieNow = nowISO();
-
-		// 3a. Skip clips below the configured minimum runtime. Size alone
-		// doesn't catch these — a 1080p 4-minute "NC OP" or a BluRay extra can
-		// clear the 50MB floor comfortably — so trailers, samples, music videos
-		// and disc extras were being indexed as movies. Runtime is the honest
-		// signal. 0 disables the check.
-		const minDurationSeconds = (lib?.minDurationSeconds as number | undefined) ?? 300;
-		if (
-			minDurationSeconds > 0 &&
-			probeInfo.durationSeconds != null &&
-			probeInfo.durationSeconds > 0 &&
-			probeInfo.durationSeconds < minDurationSeconds
-		) {
-			this.logger.debug(
-				`Skipping short clip (${Math.round(probeInfo.durationSeconds)}s): ${fileName}`,
-			);
-			return { status: 'skipped-duration' };
-		}
-
-		// 3b. Does this title already exist? movie_files is one-to-many on
-		// purpose — the same film can live on two drives, or in two qualities —
-		// but ingestion always minted a fresh movies row per file path, so a
-		// season copied to a second drive produced a duplicate entry for every
-		// episode. Attach to the existing movie instead of duplicating it.
-		const existingMovie = this.findMovieByTitleYear(
-			parsed.title,
-			parsed.year ?? null,
-			probeInfo.durationSeconds ?? null,
-		);
-		if (existingMovie) {
-			try {
-				this.database.db
-					.insert(movieFiles)
-					.values(
-						this.buildMovieFileRow({
-							movieId: existingMovie.id,
-							sourceId,
-							filePath,
-							fileName,
-							fileSize,
-							parsed,
-							probeInfo,
-							movieNow,
-							fileModifiedAt,
-						}),
-					)
-					.run();
-			} catch (err: any) {
-				// Lost a UNIQUE(file_path) race — another worker attached it.
-				if (!String(err?.message ?? '').includes('UNIQUE')) throw err;
-				return { status: 'updated' };
-			}
-			this.logger.debug(
-				`Attached additional file to existing movie "${parsed.title}": ${fileName}`,
-			);
-			return { status: 'added', movieId: existingMovie.id, title: parsed.title };
-		}
-
-		const movieId = crypto.randomUUID();
-
-		// 4. Insert movies + movieFiles atomically. If another process raced
-		//    us and won the UNIQUE(file_path) insert, the transaction throws
-		//    and BOTH inserts roll back — no orphan movies row.
-		try {
-			this.database.db.transaction((tx) => {
-				tx.insert(movies)
-					.values({
-						id: movieId,
-						title: parsed.title,
-						year: parsed.year ?? null,
-						runtimeMinutes:
-							probeInfo.durationSeconds && probeInfo.durationSeconds > 0
-								? Math.round(probeInfo.durationSeconds / 60)
-								: null,
-						addedAt: movieNow,
-						updatedAt: movieNow,
-					})
-					.run();
-
-				tx.insert(movieFiles)
-					.values({
-						id: crypto.randomUUID(),
-						movieId,
-						sourceId,
-						filePath,
-						fileName,
-						fileSize,
-						resolution: parsed.quality ?? probeInfo.resolution ?? null,
-						codecVideo: probeInfo.codecVideo ?? null,
-						codecAudio: probeInfo.codecAudio ?? null,
-						durationSeconds: probeInfo.durationSeconds ?? null,
-						bitrate: probeInfo.bitrate ?? null,
-						videoWidth: probeInfo.videoWidth ?? null,
-						videoHeight: probeInfo.videoHeight ?? null,
-						videoBitDepth: probeInfo.videoBitDepth ?? null,
-						videoFrameRate: probeInfo.videoFrameRate ?? null,
-						videoProfile: probeInfo.videoProfile ?? null,
-						videoColorSpace: probeInfo.videoColorSpace ?? null,
-						hdr: probeInfo.hdr ?? false,
-						containerFormat: probeInfo.containerFormat ?? null,
-						audioTracks: probeInfo.audioTracks
-							? JSON.stringify(probeInfo.audioTracks)
-							: '[]',
-						subtitleTracks: probeInfo.subtitleTracks
-							? JSON.stringify(probeInfo.subtitleTracks)
-							: '[]',
-						available: true,
-						addedAt: movieNow,
-						fileModifiedAt,
-					})
-					.run();
-			});
-		} catch (err: any) {
-			// UNIQUE constraint failure means another worker (this process or
-			// a duplicate server instance — see CLAUDE.md "multi-process") got
-			// to it first. Treat as a benign race; the winner's row is canonical.
-			const msg = String(err?.message ?? err);
-			if (msg.includes('UNIQUE constraint failed')) {
-				return { status: 'race-skipped' };
-			}
-			return { status: 'error', reason: msg };
-		}
-
-		this.events.emit(WsEvent.LIBRARY_MOVIE_ADDED, {
-			movieId,
-			title: parsed.title,
-		});
-		return { status: 'added', movieId, title: parsed.title };
+		const source = this.getSourceRow(sourceId);
+		const resolved = this.resolveImporter(source?.kind);
+		if (!resolved.importer) return { status: 'error', reason: resolved.reason };
+		return resolved.importer.importFile(sourceId, filePath);
 	}
 
-	/**
-	 * Delete every *library* row that no longer has at least one available
-	 * file attached. Runs at the end of every scan AND on server startup
-	 * (see LibraryJobsService) to mop up orphans created by past races.
-	 *
-	 * Scoped to `source` library/NULL on purpose. `external` and `bookmark`
-	 * rows are file-less by definition — they're TMDB titles the user hasn't
-	 * got — so an unscoped purge deleted every one of them on each scan,
-	 * silently destroying saved bookmarks and any Discover harvest. "Orphan"
-	 * here means "a scanned movie whose file vanished", not "has no file".
-	 */
-	async purgeOrphanedMovies(): Promise<number> {
-		const orphanedMovies = this.database.db
-			.select({ id: movies.id, title: movies.title })
-			.from(movies)
-			.leftJoin(
-				movieFiles,
-				and(eq(movieFiles.movieId, movies.id), eq(movieFiles.available, true)),
-			)
-			.where(
-				and(isNull(movieFiles.id), or(isNull(movies.source), eq(movies.source, 'library'))),
-			)
-			.all();
+	// ── Movie-specific delegates (kept for existing callers) ───────────────
 
-		for (const orphan of orphanedMovies) {
-			await this.moviesService.purgeMovie(orphan.id);
-		}
-
-		if (orphanedMovies.length > 0) {
-			this.logger.log(
-				`Purged ${orphanedMovies.length} orphaned movie(s) with no available files`,
-			);
-		}
-		return orphanedMovies.length;
+	purgeOrphanedMovies(): Promise<number> {
+		return this.video.purgeOrphanedMovies();
 	}
 
-	parseFilename(filename: string): ParsedFilename {
-		const ext = extname(filename);
-		const name = filename.replace(ext, '');
-
-		// Try "Movie Name (2020)" pattern
-		const parenYear = name.match(/^(.+?)\s*\((\d{4})\)/);
-		if (parenYear?.[1] && parenYear[2]) {
-			return {
-				title: parenYear[1].trim(),
-				year: parseInt(parenYear[2], 10),
-				quality: this.extractQuality(name),
-			};
-		}
-
-		// Try "Movie.Name.2020.1080p" or "Movie Name 2020 1080p" pattern
-		const dotYear = name.match(/^(.+?)[.\s](\d{4})[.\s]/);
-		if (dotYear?.[1] && dotYear[2]) {
-			const title = dotYear[1].replace(/\./g, ' ').trim();
-			return {
-				title,
-				year: parseInt(dotYear[2], 10),
-				quality: this.extractQuality(name),
-			};
-		}
-
-		// Try year at end: "Movie Name 2020"
-		const endYear = name.match(/^(.+?)\s+(\d{4})$/);
-		if (endYear?.[1] && endYear[2]) {
-			return {
-				title: endYear[1].replace(/\./g, ' ').trim(),
-				year: parseInt(endYear[2], 10),
-			};
-		}
-
-		// No year found - clean up the title
-		return {
-			title: name.replace(/\./g, ' ').replace(/\s+/g, ' ').trim(),
-			quality: this.extractQuality(name),
-		};
+	rescanMovie(movieId: string) {
+		return this.video.rescanMovie(movieId);
 	}
 
-	private extractQuality(name: string): string | undefined {
-		const match = name.match(/\b(2160p|4k|1080p|720p|480p|360p)\b/i);
-		return match?.[1]?.toLowerCase();
+	reprobeFileRow(file: { id: string; filePath: string; resolution?: string | null }) {
+		return this.video.reprobeFileRow(file);
 	}
 
-	/**
-	 * Re-probe all files for a given movie and update their codec/duration info.
-	 */
-	async rescanMovie(movieId: string) {
-		const files = this.database.db
-			.select()
-			.from(movieFiles)
-			.where(eq(movieFiles.movieId, movieId))
-			.all();
-
-		if (files.length === 0) {
-			throw new Error(`No files found for movie ${movieId}`);
-		}
-
-		const results: { fileId: string; fileName: string | null; updated: boolean }[] = [];
-
-		for (const file of files) {
-			const updated = await this.reprobeFileRow(file);
-			results.push({ fileId: file.id, fileName: file.fileName, updated });
-		}
-
-		this.logger.log(
-			`Rescanned ${results.length} file(s) for movie ${this.guidResolver.resolve(movieId)}`,
-		);
-		return { files: results };
-	}
-
-	/**
-	 * Re-probe a single movie_files row in place and persist the codec/stream
-	 * fields. Returns true when the probe yields usable info and the row is
-	 * updated. Shared by rescanMovie, the unprobed-file backfill, and the
-	 * probe-on-demand path that runs before a transcode/convert job decides.
-	 */
-	async reprobeFileRow(file: {
-		id: string;
-		filePath: string;
-		resolution?: string | null;
-	}): Promise<boolean> {
-		const probeInfo = await this.probeFile(file.filePath);
-		if (!(probeInfo.codecVideo || probeInfo.codecAudio || probeInfo.resolution)) {
-			return false;
-		}
-		this.database.db
-			.update(movieFiles)
-			.set({
-				codecVideo: probeInfo.codecVideo ?? null,
-				codecAudio: probeInfo.codecAudio ?? null,
-				resolution: probeInfo.resolution ?? file.resolution ?? null,
-				durationSeconds: probeInfo.durationSeconds ?? null,
-				bitrate: probeInfo.bitrate ?? null,
-				videoWidth: probeInfo.videoWidth ?? null,
-				videoHeight: probeInfo.videoHeight ?? null,
-				videoBitDepth: probeInfo.videoBitDepth ?? null,
-				videoFrameRate: probeInfo.videoFrameRate ?? null,
-				videoProfile: probeInfo.videoProfile ?? null,
-				videoColorSpace: probeInfo.videoColorSpace ?? null,
-				hdr: probeInfo.hdr ?? false,
-				containerFormat: probeInfo.containerFormat ?? null,
-				audioTracks: probeInfo.audioTracks ? JSON.stringify(probeInfo.audioTracks) : '[]',
-				subtitleTracks: probeInfo.subtitleTracks
-					? JSON.stringify(probeInfo.subtitleTracks)
-					: '[]',
-			})
-			.where(eq(movieFiles.id, file.id))
-			.run();
-		return true;
-	}
-
-	/** Available files that were never successfully probed (null codec_video). */
 	listUnprobedFiles() {
-		return this.database.db
-			.select()
-			.from(movieFiles)
-			.where(and(eq(movieFiles.available, true), isNull(movieFiles.codecVideo)))
-			.all();
+		return this.video.listUnprobedFiles();
 	}
 
-	/**
-	 * Use FFprobe to extract codec, resolution, duration, bitrate, and detailed
-	 * stream info from a file. Returns partial info on failure so scanning can continue.
-	 */
-	async probeFile(filePath: string): Promise<ProbeResult> {
-		return new Promise((resolve) => {
-			ffmpeg.ffprobe(filePath, (err, metadata) => {
-				if (err) {
-					this.logger.warn(`FFprobe failed for ${basename(filePath)}: ${err.message}`);
-					resolve({});
-					return;
-				}
-
-				const videoStream = metadata.streams?.find((s) => s.codec_type === 'video');
-				const audioStream = metadata.streams?.find((s) => s.codec_type === 'audio');
-
-				const width = videoStream?.width;
-				const height = videoStream?.height;
-				let resolution: string | undefined;
-				if (height) {
-					if (height >= 2160) resolution = '2160p';
-					else if (height >= 1080) resolution = '1080p';
-					else if (height >= 720) resolution = '720p';
-					else if (height >= 480) resolution = '480p';
-					else resolution = `${height}p`;
-				}
-
-				// HDR detection from color transfer/space
-				const colorTransfer = (videoStream as any)?.color_transfer ?? '';
-				const colorSpace = (videoStream as any)?.color_space ?? '';
-				const hdr =
-					colorTransfer === 'smpte2084' ||
-					colorTransfer === 'arib-std-b67' ||
-					colorSpace === 'bt2020nc' ||
-					colorSpace === 'bt2020c';
-
-				// Audio tracks
-				const audioStreams = (metadata.streams ?? []).filter(
-					(s) => s.codec_type === 'audio',
-				);
-				const audioTracks = audioStreams.map((s, i) => ({
-					index: i,
-					codec: s.codec_name ?? 'unknown',
-					language: (s as any).tags?.language ?? 'und',
-					title: (s as any).tags?.title ?? `Track ${i + 1}`,
-					channels: (s as any).channels ?? 0,
-					channelLayout: (s as any).channel_layout ?? '',
-					sampleRate: (s as any).sample_rate ? Number((s as any).sample_rate) : undefined,
-					bitDepth: (s as any).bits_per_raw_sample
-						? parseInt((s as any).bits_per_raw_sample, 10)
-						: undefined,
-				}));
-
-				// Subtitle tracks
-				const subtitleStreams = (metadata.streams ?? []).filter(
-					(s) => s.codec_type === 'subtitle',
-				);
-				const subtitleTracks = subtitleStreams.map((s, i) => ({
-					index: i,
-					codec: s.codec_name ?? 'unknown',
-					language: (s as any).tags?.language ?? 'und',
-					title: (s as any).tags?.title ?? `Track ${i + 1}`,
-					forced: (s as any).disposition?.forced === 1,
-					external: false,
-				}));
-
-				resolve({
-					codecVideo: videoStream?.codec_name ?? undefined,
-					codecAudio: audioStream?.codec_name ?? undefined,
-					resolution,
-					durationSeconds: metadata.format?.duration
-						? Math.round(metadata.format.duration)
-						: undefined,
-					bitrate: metadata.format?.bit_rate
-						? Math.round(Number(metadata.format.bit_rate))
-						: undefined,
-					videoWidth: width,
-					videoHeight: height,
-					videoBitDepth: (videoStream as any)?.bits_per_raw_sample
-						? parseInt((videoStream as any).bits_per_raw_sample, 10)
-						: undefined,
-					videoFrameRate: this.parseFrameRate((videoStream as any)?.r_frame_rate),
-					videoProfile:
-						videoStream?.profile != null ? String(videoStream.profile) : undefined,
-					videoColorSpace: colorSpace || undefined,
-					hdr,
-					containerFormat: metadata.format?.format_name ?? undefined,
-					audioTracks,
-					subtitleTracks,
-				});
-			});
-		});
+	parseFilename(filename: string) {
+		return this.video.parseFilename(filename);
 	}
 
-	/**
-	 * Find an existing movie this file belongs to, matched on normalized title
-	 * plus year.
-	 *
-	 * Deliberately strict: the year must agree (both set and equal, or both
-	 * unset). Matching on title alone would fold remakes — "The Thing" 1982 and
-	 * 2011 — into one entry. Episode filenames carry SxxExx in the title, so
-	 * they're specific enough to match safely with a null year.
-	 */
-	private findMovieByTitleYear(
-		title: string,
-		year: number | null,
-		durationSeconds: number | null,
-	): { id: string } | null {
-		const wanted = normalizeTitle(title);
-		if (!wanted) return null;
-		// Titles are parsed from the FILENAME, and scene releases routinely use
-		// junk names — `Sample.mp4`, `ETRG.mp4` — so two unrelated films can
-		// present the same title. Matching on title alone would merge them.
-		if (!durationSeconds || durationSeconds <= 0) return null;
-
-		const candidates = this.database.db
-			.select({ id: movies.id, title: movies.title, year: movies.year })
-			.from(movies)
-			.where(
-				and(
-					year == null ? isNull(movies.year) : eq(movies.year, year),
-					// Cheap prefilter; the authoritative compare is normalized.
-					sql`lower(${movies.title}) = lower(${title})`,
-				),
-			)
-			.all();
-
-		for (const c of candidates) {
-			if (normalizeTitle(c.title) !== wanted) continue;
-			// Confirm it's the same CONTENT, not just the same name: every
-			// existing file must run to within 2% (min 5s) of this one. That
-			// separates a 53s sample from the feature, and Dune's theatrical
-			// cut (8178s) from the extended one (10635s).
-			const files = this.database.db
-				.select({ durationSeconds: movieFiles.durationSeconds })
-				.from(movieFiles)
-				.where(eq(movieFiles.movieId, c.id))
-				.all();
-			const known = files.map((f) => f.durationSeconds ?? 0).filter((d) => d > 0);
-			if (known.length === 0) continue;
-			const tolerance = Math.max(5, durationSeconds * 0.02);
-			if (known.every((d) => Math.abs(d - durationSeconds) <= tolerance)) {
-				return { id: c.id };
-			}
-		}
-		return null;
+	probeFile(filePath: string) {
+		return this.video.probeFile(filePath);
 	}
 
-	/** The movie_files row shape, shared by the new-movie and attach paths. */
-	private buildMovieFileRow(args: {
-		movieId: string;
-		sourceId: string;
-		filePath: string;
-		fileName: string;
-		fileSize: number;
-		parsed: { quality?: string | null };
-		probeInfo: any;
-		movieNow: string;
-		fileModifiedAt: string;
-	}) {
-		const { movieId, sourceId, filePath, fileName, fileSize, parsed, probeInfo } = args;
-		return {
-			id: crypto.randomUUID(),
-			movieId,
-			sourceId,
-			filePath,
-			fileName,
-			fileSize,
-			resolution: parsed.quality ?? probeInfo.resolution ?? null,
-			codecVideo: probeInfo.codecVideo ?? null,
-			codecAudio: probeInfo.codecAudio ?? null,
-			durationSeconds: probeInfo.durationSeconds ?? null,
-			bitrate: probeInfo.bitrate ?? null,
-			videoWidth: probeInfo.videoWidth ?? null,
-			videoHeight: probeInfo.videoHeight ?? null,
-			videoBitDepth: probeInfo.videoBitDepth ?? null,
-			videoFrameRate: probeInfo.videoFrameRate ?? null,
-			videoProfile: probeInfo.videoProfile ?? null,
-			videoColorSpace: probeInfo.videoColorSpace ?? null,
-			hdr: probeInfo.hdr ?? false,
-			containerFormat: probeInfo.containerFormat ?? null,
-			audioTracks: probeInfo.audioTracks ? JSON.stringify(probeInfo.audioTracks) : '[]',
-			subtitleTracks: probeInfo.subtitleTracks
-				? JSON.stringify(probeInfo.subtitleTracks)
-				: '[]',
-			available: true,
-			addedAt: args.movieNow,
-			fileModifiedAt: args.fileModifiedAt,
-		};
-	}
-
-	private parseFrameRate(rFrameRate?: string): string | undefined {
-		if (!rFrameRate) return undefined;
-		const parts = rFrameRate.split('/');
-		if (parts.length !== 2) return rFrameRate;
-		const num = Number(parts[0]);
-		const den = Number(parts[1]);
-		if (!den) return rFrameRate;
-		return (num / den).toFixed(3);
-	}
-
+	/** Recursively yield files whose extension (dot-prefixed, any case) is in `extensions`. */
 	async *walkDir(dirPath: string, extensions: readonly string[]): AsyncGenerator<string> {
-		const extSet = new Set(extensions.map((e) => e.toLowerCase()));
+		const extSet = new Set(
+			extensions.map((e) => {
+				const lower = e.toLowerCase();
+				return lower.startsWith('.') ? lower : `.${lower}`;
+			}),
+		);
+		yield* this.walk(dirPath, extSet);
+	}
+
+	private async *walk(dirPath: string, extSet: ReadonlySet<string>): AsyncGenerator<string> {
 		let dir;
 		try {
 			dir = await opendir(dirPath);
@@ -818,7 +274,7 @@ export class ScannerService {
 		for await (const entry of dir) {
 			const fullPath = join(dirPath, entry.name);
 			if (entry.isDirectory()) {
-				yield* this.walkDir(fullPath, extensions);
+				yield* this.walk(fullPath, extSet);
 			} else if (entry.isFile()) {
 				const ext = extname(entry.name).toLowerCase();
 				if (extSet.has(ext)) {

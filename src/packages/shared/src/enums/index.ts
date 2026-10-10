@@ -65,6 +65,11 @@ export enum WsEvent {
 	 * ok, error? }. Channel: `upload`.
 	 */
 	UPLOAD_COMPLETED = 'upload:completed',
+	/**
+	 * Admin changed the feature flags (movies / music). Payload: FeatureFlags.
+	 * Channel: `features`.
+	 */
+	FEATURES_CHANGED = 'features:changed',
 
 	// ── Shared Sessions (watch party) ──
 	/** A member joined a session (presence). Channel: `session:<id>`. */

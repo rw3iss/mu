@@ -1,3 +1,5 @@
+import type { FeatureName } from '@mu/shared';
+
 export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'paused';
 
 export interface JobDescriptor {
@@ -36,6 +38,8 @@ export interface JobRecord {
 	error?: string;
 	details?: string;
 	idleOnly?: boolean;
+	/** Owning feature, from the JobTypeRegistry (Jobs panel Movies/Music filter). */
+	feature?: FeatureName;
 	createdAt: string;
 	startedAt?: string;
 	completedAt?: string;

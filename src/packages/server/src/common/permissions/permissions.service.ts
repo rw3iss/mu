@@ -59,6 +59,11 @@ export class PermissionsService {
 		return this.can(user?.role, 'edit:movie');
 	}
 
+	/** Kind-agnostic (movies + music) edit right. */
+	canEditMedia(user: JwtUser | undefined): boolean {
+		return this.can(user?.role, 'edit:media');
+	}
+
 	canEditAppSettings(user: JwtUser | undefined): boolean {
 		return this.can(user?.role, 'edit:app-settings');
 	}

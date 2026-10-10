@@ -17,6 +17,7 @@ import { EmailModule } from './email/email.module.js';
 import { EmbeddingsModule } from './embeddings/embeddings.module.js';
 import { EventsModule } from './events/events.module.js';
 import { FavoritesModule } from './favorites/favorites.module.js';
+import { FeaturesModule } from './features/features.module.js';
 import { FeedbackModule } from './feedback/feedback.module.js';
 import { FilesystemModule } from './filesystem/filesystem.module.js';
 import { GroupingModule } from './grouping/grouping.module.js';
@@ -58,6 +59,7 @@ import { UsersModule } from './users/users.module.js';
 		AuthModule,
 		UsersModule,
 		EventsModule,
+		FeaturesModule,
 		SchedulerModule,
 		JobModule,
 		HealthModule,

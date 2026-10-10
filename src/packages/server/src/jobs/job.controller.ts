@@ -1,7 +1,16 @@
 import { Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import type { JobRecord } from './job.interface.js';
 import { JobManagerService } from './job-manager.service.js';
+import { jobTypeRegistry } from './job-type-registry.js';
+
+/** Stamp the owning feature from the registry (backend-agnostic — BullMQ records lack it). */
+function withFeature(job: JobRecord): JobRecord {
+	if (job.feature) return job;
+	const feature = jobTypeRegistry.featureOf(job.type);
+	return feature ? { ...job, feature } : job;
+}
 
 @Controller('jobs')
 export class JobController {
@@ -11,7 +20,7 @@ export class JobController {
 	@Roles('admin')
 	@RequireAction('view:library')
 	listJobs(@Query('type') type?: string, @Query('status') status?: string) {
-		return this.jobManager.listJobs({ type, status });
+		return this.jobManager.listJobs({ type, status }).map(withFeature);
 	}
 
 	@Get('scheduled')
@@ -101,7 +110,7 @@ export class JobController {
 	getJob(@Param('id') id: string) {
 		const job = this.jobManager.getJob(id);
 		if (!job) throw new NotFoundException(`Job ${id} not found`);
-		return job;
+		return withFeature(job);
 	}
 
 	@Post(':id/cancel')

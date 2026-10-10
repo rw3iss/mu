@@ -212,6 +212,27 @@ export function loadConfig(): MuConfig {
 		merged.email = { ...((merged.email as Record<string, unknown>) ?? {}), ...emailEnv };
 	}
 
+	// Feature-flag env defaults: MU_FEATURE_MOVIES / MU_FEATURE_MUSIC (1/0,
+	// true/false). The generic parser would nest these under `feature`, which
+	// the schema doesn't know, so map them explicitly onto `features`.
+	const featureEnv: Record<string, boolean> = {};
+	const envFlag = (v: string | undefined): boolean | undefined => {
+		if (v == null || v === '') return undefined;
+		return /^(1|true|yes|on)$/i.test(v.trim());
+	};
+	const fMovies = envFlag(E.MU_FEATURE_MOVIES);
+	const fMusic = envFlag(E.MU_FEATURE_MUSIC);
+	if (fMovies !== undefined) featureEnv.movies = fMovies;
+	if (fMusic !== undefined) featureEnv.music = fMusic;
+	if (Object.keys(featureEnv).length > 0) {
+		merged.features = {
+			...((merged.features as Record<string, unknown>) ?? {}),
+			...featureEnv,
+		};
+	}
+	// The generic MU_ parser also produced a stray `feature` key; drop it.
+	delete merged.feature;
+
 	// Validate against the schema.
 	const parsed = configSchema.parse(merged);
 

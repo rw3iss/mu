@@ -25,8 +25,14 @@ export function Setup(_props: SetupProps) {
 	const [password, setPassword] = useState('');
 	const [confirmPassword, setConfirmPassword] = useState('');
 
-	// Media source fields
+	// Libraries step: Movies (on by default) and Music (off by default),
+	// each with its own folder list.
+	const [enableMovies, setEnableMovies] = useState(true);
+	const [enableMusic, setEnableMusic] = useState(false);
 	const [mediaPaths, setMediaPaths] = useState<MediaPathEntryData[]>([
+		{ path: '', source: null },
+	]);
+	const [musicPaths, setMusicPaths] = useState<MediaPathEntryData[]>([
 		{ path: '', source: null },
 	]);
 
@@ -56,16 +62,22 @@ export function Setup(_props: SetupProps) {
 	);
 
 	const doSetup = useCallback(
-		async (withMediaPaths?: string[]) => {
+		async (withMediaPaths?: string[], withMusicPaths?: string[]) => {
 			setIsLoading(true);
 			setError('');
 
 			try {
-				await setup(username.trim(), email.trim() || undefined, password, withMediaPaths);
-				const count = withMediaPaths?.length ?? 0;
+				await setup(username.trim(), email.trim() || undefined, password, withMediaPaths, {
+					// Never finish setup with every library off (e.g. both toggled
+					// off then "Skip") — fall back to Movies.
+					enableMovies: enableMovies || !enableMusic,
+					enableMusic,
+					musicPaths: withMusicPaths,
+				});
+				const count = (withMediaPaths?.length ?? 0) + (withMusicPaths?.length ?? 0);
 				notifySuccess(
 					count > 0
-						? `Account created and ${count} media ${count === 1 ? 'path' : 'paths'} configured`
+						? `Account created and ${count} library ${count === 1 ? 'folder' : 'folders'} configured`
 						: 'Admin account created',
 				);
 				setStep('complete');
@@ -77,7 +89,7 @@ export function Setup(_props: SetupProps) {
 				setIsLoading(false);
 			}
 		},
-		[username, email, password],
+		[username, email, password, enableMovies, enableMusic],
 	);
 
 	const handleMediaSubmit = useCallback(
@@ -85,17 +97,31 @@ export function Setup(_props: SetupProps) {
 			e.preventDefault();
 			setError('');
 
-			const validPaths = mediaPaths.map((entry) => entry.path.trim()).filter(Boolean);
-
-			if (validPaths.length === 0) {
-				setError('Please provide at least one media library path');
+			if (!enableMovies && !enableMusic) {
+				setError('Enable at least one library (Movies or Music)');
 				return;
 			}
 
-			doSetup(validPaths);
+			const movieFolders = enableMovies
+				? mediaPaths.map((entry) => entry.path.trim()).filter(Boolean)
+				: [];
+			const musicFolders = enableMusic
+				? musicPaths.map((entry) => entry.path.trim()).filter(Boolean)
+				: [];
+
+			if (movieFolders.length === 0 && musicFolders.length === 0) {
+				setError('Please provide at least one library folder');
+				return;
+			}
+
+			doSetup(movieFolders, musicFolders);
 		},
-		[mediaPaths, doSetup],
+		[enableMovies, enableMusic, mediaPaths, musicPaths, doSetup],
 	);
+
+	const hasLibraryFolders =
+		(enableMovies && mediaPaths.some((e) => e.path.trim())) ||
+		(enableMusic && musicPaths.some((e) => e.path.trim()));
 
 	const handleSkipMedia = useCallback(() => {
 		doSetup();
@@ -113,7 +139,7 @@ export function Setup(_props: SetupProps) {
 					<h1 class={styles.title}>Setup Mu</h1>
 					<p class={styles.subtitle}>
 						{step === 'account' && 'Create your admin account'}
-						{step === 'media' && 'Configure your media library'}
+						{step === 'media' && 'Choose your libraries'}
 						{step === 'complete' && 'Setup complete!'}
 					</p>
 				</div>
@@ -216,20 +242,74 @@ export function Setup(_props: SetupProps) {
 					</form>
 				)}
 
-				{/* Step 2: Media Source */}
+				{/* Step 2: Libraries */}
 				{step === 'media' && (
 					<form class={styles.form} onSubmit={handleMediaSubmit}>
-						<div class={styles.field}>
-							<label class={styles.label}>Media Library Paths</label>
-							<MediaPathList
-								entries={mediaPaths}
-								onChange={setMediaPaths}
-								showBrowse={false}
-							/>
-							<span class={styles.hint}>
-								The directories where your movie files are stored
-							</span>
-						</div>
+						<section class={styles.library}>
+							<label class={styles.libraryHeader}>
+								<span class={styles.libraryTitle}>
+									<Icon name="film" size={16} />
+									Movies
+								</span>
+								<span class={styles.switch}>
+									<input
+										type="checkbox"
+										checked={enableMovies}
+										onChange={(e) =>
+											setEnableMovies((e.target as HTMLInputElement).checked)
+										}
+										aria-label="Enable Movies"
+									/>
+									<span class={styles.switchTrack} />
+								</span>
+							</label>
+							{enableMovies && (
+								<div class={styles.field}>
+									<label class={styles.label}>Movie Folders</label>
+									<MediaPathList
+										entries={mediaPaths}
+										onChange={setMediaPaths}
+										showBrowse={false}
+									/>
+									<span class={styles.hint}>
+										The directories where your movie files are stored
+									</span>
+								</div>
+							)}
+						</section>
+
+						<section class={styles.library}>
+							<label class={styles.libraryHeader}>
+								<span class={styles.libraryTitle}>
+									<Icon name="music" size={16} />
+									Enable Music
+								</span>
+								<span class={styles.switch}>
+									<input
+										type="checkbox"
+										checked={enableMusic}
+										onChange={(e) =>
+											setEnableMusic((e.target as HTMLInputElement).checked)
+										}
+										aria-label="Enable Music"
+									/>
+									<span class={styles.switchTrack} />
+								</span>
+							</label>
+							{enableMusic && (
+								<div class={styles.field}>
+									<label class={styles.label}>Music Folders</label>
+									<MediaPathList
+										entries={musicPaths}
+										onChange={setMusicPaths}
+										showBrowse={false}
+									/>
+									<span class={styles.hint}>
+										The directories where your music files are stored
+									</span>
+								</div>
+							)}
+						</section>
 
 						<div class={styles.buttonRow}>
 							<Button
@@ -256,9 +336,9 @@ export function Setup(_props: SetupProps) {
 						</div>
 						<p class={styles.completeText}>
 							Everything is set up and ready to go.
-							{mediaPaths.some((e) => e.path.trim())
-								? ' Mu will now scan your media library for movies.'
-								: ' You can add a media library later in Settings.'}
+							{hasLibraryFolders
+								? ' Mu will now scan your library folders.'
+								: ' You can add library folders later in Settings.'}
 						</p>
 						<Button variant="primary" size="lg" fullWidth onClick={handleFinish}>
 							Start Using Mu
