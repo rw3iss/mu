@@ -12,7 +12,7 @@ the two features.
 | 1 — Catalogue | DONE 2026-10-10 — music schema + FTS5, AudioImporter (tags, grouping, compilations, art, duplicates), music jobs, Settings → Music, Setup Libraries step, installer prompts, Jobs kind filter, scan quick action | `0ec7901`, `4ce3558`, `dca325c` |
 | 2 — Playback (+ waveform seek bar) | DONE 2026-10-10 — capability probe, progressive streaming (original / cached FLAC / Opus-AAC), waveform peaks + seek bar, ingest transcodes, LRU cache eviction, audio player (A/B gapless, art surfaces, list panel, shuffle/repeat, ReplayGain, MediaSession, video interplay) | `920aac9`, `a176088`, `0ec7901` |
 | 3 — Browse & detail | DONE 2026-10-10 — browse mode toggle + routing, music library tabs, artist/album/track pages, generalised favorite/rating/comments/playlists/options menu, music home rails, audio playlists | `2522959`, `bb4dbb3`, `f5d5c30` |
-| 4 — Metadata & lyrics | SERVER DONE 2026-10-10 — shared MusicBrainz client, album matching + candidates, Cover Art Archive, Wikidata/Wikipedia artist bio + image, LRCLIB lyrics, admin quick-action routes. Client UI (candidates picker, synced lyrics view) tracked separately. AcoustID + Last.fm deferred | `4716ab0` |
+| 4 — Metadata & lyrics | DONE 2026-10-10 — shared MusicBrainz client, album matching + candidates (AlbumMatchModal), Cover Art Archive, Wikidata/Wikipedia artist bio + image, LRCLIB lyrics (synced view, fetch button, editing), admin quick actions, album merge/split tools (`album_aliases`). BYPASSED: AcoustID fingerprinting + Last.fm (need keys the provider platform doesn't hold yet; optional per plan) | `4716ab0`, `226f403`, `0fa194a` |
 | 5 — Upload & offline | not started | |
 | 6 — Search & discovery | not started | |
 
