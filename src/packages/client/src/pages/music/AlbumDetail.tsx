@@ -14,6 +14,7 @@ import { EntityRating } from '@/components/common/EntityRating';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
+import { AlbumEditModal } from '@/components/music/AlbumEditModal';
 import { AlbumMatchModal } from '@/components/music/AlbumMatchModal';
 import { ArtistLinks, InlineLink } from '@/components/music/InlineLink';
 import { AlbumCard, MusicRail } from '@/components/music/MusicCards';
@@ -55,6 +56,7 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 	const [files, setFiles] = useState<Record<string, TrackFileInfo[]> | null>(null);
 	const [filesLoading, setFilesLoading] = useState(false);
 	const [matchOpen, setMatchOpen] = useState(false);
+	const [editMode, setEditMode] = useState<'merge' | 'split' | null>(null);
 	const canEdit = can('edit:media');
 
 	/** Re-read the album after a metadata change (match applied). */
@@ -300,11 +302,24 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 								</span>
 							</Button>
 							{canEdit && (
-								<Button variant="secondary" onClick={() => setMatchOpen(true)}>
-									<span class={styles.btnIcon}>
-										<Icon name="search" size={16} /> Match
-									</span>
-								</Button>
+								<>
+									<Button variant="secondary" onClick={() => setMatchOpen(true)}>
+										<span class={styles.btnIcon}>
+											<Icon name="search" size={16} /> Match
+										</span>
+									</Button>
+									<Button variant="ghost" onClick={() => setEditMode('merge')}>
+										Merge…
+									</Button>
+									{album.tracks.length > 1 && (
+										<Button
+											variant="ghost"
+											onClick={() => setEditMode('split')}
+										>
+											Split…
+										</Button>
+									)}
+								</>
 							)}
 							<EntityOptionsMenu
 								entity={{ type: 'album', id: album.id }}
@@ -453,6 +468,9 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 					artistCredit={album.artistCredit}
 					onMatched={() => setTimeout(reloadAlbum, 4000)}
 				/>
+			)}
+			{canEdit && (
+				<AlbumEditModal mode={editMode} onClose={() => setEditMode(null)} album={album} />
 			)}
 		</div>
 	);

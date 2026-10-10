@@ -173,6 +173,21 @@ export const musicService = {
 	refreshAlbumMetadata(albumId: string): Promise<{ started: boolean }> {
 		return api.post(`/music/albums/${encodeURIComponent(albumId)}/refresh-metadata`);
 	},
+	/** Merge this album into another (fixes a grouping split). */
+	mergeAlbum(
+		albumId: string,
+		targetAlbumId: string,
+	): Promise<{ albumId: string; movedTracks: number }> {
+		return api.post(`/music/albums/${encodeURIComponent(albumId)}/merge`, { targetAlbumId });
+	},
+	/** Move tracks into a new album. */
+	splitAlbum(
+		albumId: string,
+		trackIds: string[],
+		title: string,
+	): Promise<{ albumId: string; movedTracks: number }> {
+		return api.post(`/music/albums/${encodeURIComponent(albumId)}/split`, { trackIds, title });
+	},
 	/** Look the track up on LRCLIB now (never overwrites user-edited lyrics). */
 	fetchLyrics(
 		trackId: string,

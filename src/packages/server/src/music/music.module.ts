@@ -4,6 +4,7 @@ import { LibraryModule } from '../library/library.module.js';
 import { MusicBrainzModule } from '../providers/sources/musicbrainz/musicbrainz.module.js';
 import { StreamModule } from '../stream/stream.module.js';
 import { MusicAdminService } from './admin/music-admin.service.js';
+import { AlbumEditService } from './catalog/album-edit.service.js';
 import { ArtworkService } from './catalog/artwork.service.js';
 import { AudioImporter } from './catalog/audio-importer.js';
 import { MusicCatalogService } from './catalog/catalog.service.js';
@@ -28,6 +29,7 @@ import { MusicStreamService } from './playback/music-stream.service.js';
 	controllers: [MusicController, MusicMetadataController],
 	providers: [
 		ArtworkService,
+		AlbumEditService,
 		MusicCatalogService,
 		MusicSettingsService,
 		MusicQueryService,

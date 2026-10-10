@@ -283,6 +283,14 @@ export const albumMatchCandidates = sqliteTable('album_match_candidates', {
 	searchedAt: text('searched_at').notNull(),
 });
 
+/** Grouping keys of merged-away albums → the album that absorbed them. */
+export const albumAliases = sqliteTable('album_aliases', {
+	groupKey: text('group_key').primaryKey(),
+	albumId: text('album_id')
+		.notNull()
+		.references(() => albums.id, { onDelete: 'cascade' }),
+});
+
 export const musicIdentities = sqliteTable(
 	'music_identities',
 	{

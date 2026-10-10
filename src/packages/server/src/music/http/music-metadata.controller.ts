@@ -3,6 +3,7 @@ import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '
 import { RequireAction } from '../../common/decorators/require-action.decorator.js';
 import { RequireFeature } from '../../features/require-feature.decorator.js';
 import { MusicAdminService } from '../admin/music-admin.service.js';
+import { AlbumEditService } from '../catalog/album-edit.service.js';
 import { MusicJobsService } from '../jobs/music-jobs.service.js';
 import { MusicQueryService } from '../library/music-query.service.js';
 import { MusicMetadataService } from '../metadata/music-metadata.service.js';
@@ -21,7 +22,27 @@ export class MusicMetadataController {
 		private readonly admin: MusicAdminService,
 		private readonly query: MusicQueryService,
 		private readonly musicSettings: MusicSettingsService,
+		private readonly albumEdit: AlbumEditService,
 	) {}
+
+	/** Merge this album into `targetAlbumId` (fix a grouping split). */
+	@RequireAction('edit:media')
+	@Post('albums/:id/merge')
+	mergeAlbum(@Param('id') id: string, @Body() body: { targetAlbumId?: string }) {
+		if (!body?.targetAlbumId) throw new BadRequestException('targetAlbumId is required');
+		return this.albumEdit.merge(id, body.targetAlbumId);
+	}
+
+	/** Move some tracks into a new album. */
+	@RequireAction('edit:media')
+	@Post('albums/:id/split')
+	splitAlbum(@Param('id') id: string, @Body() body: { trackIds?: string[]; title?: string }) {
+		return this.albumEdit.split(
+			id,
+			Array.isArray(body?.trackIds) ? body.trackIds.map(String) : [],
+			String(body?.title ?? ''),
+		);
+	}
 
 	/**
 	 * Stored match state + candidates. `?refresh=1` runs a live MusicBrainz

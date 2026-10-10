@@ -288,6 +288,13 @@ const TABLES = [
 		searched_at TEXT NOT NULL
 	)`,
 
+	// Grouping keys of albums merged away, so re-scans of their folders land
+	// in the surviving album instead of recreating the old one.
+	`CREATE TABLE IF NOT EXISTS album_aliases (
+		group_key TEXT PRIMARY KEY,
+		album_id TEXT NOT NULL REFERENCES albums(id) ON DELETE CASCADE
+	)`,
+
 	// FTS5 (external content) — keyword search over a large catalogue without
 	// LIKE scans. Triggers keep them in sync with the base tables.
 	`CREATE VIRTUAL TABLE IF NOT EXISTS artists_fts USING fts5(name, content='artists', content_rowid='rowid', tokenize='unicode61 remove_diacritics 2')`,

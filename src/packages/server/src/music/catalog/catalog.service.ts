@@ -6,6 +6,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import {
+	albumAliases,
 	albumArtists,
 	albumGenres,
 	albums,
@@ -147,6 +148,21 @@ export class MusicCatalogService {
 				.from(albums)
 				.where(eq(albums.groupKey, groupKey))
 				.get();
+			if (!album) {
+				// Folder of an album that an admin merged into another one.
+				album = db
+					.select({
+						id: albums.id,
+						artId: albums.artId,
+						year: albums.year,
+						artistCredit: albums.artistCredit,
+						isCompilation: albums.isCompilation,
+					})
+					.from(albumAliases)
+					.innerJoin(albums, eq(albums.id, albumAliases.albumId))
+					.where(eq(albumAliases.groupKey, groupKey))
+					.get();
+			}
 			let newAlbum = false;
 			if (!album) {
 				const id = randomUUID();
