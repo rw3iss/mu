@@ -354,6 +354,8 @@ echo 'tail -50 /c/Users/rw3is/Documents/Sites/other/mu/data/logs/server.log' | s
 
 ### Client Player
 - Player is a persistent overlay (no route) — `globalPlayer.state.ts` manages lifecycle
+- **Player adapters** (`state/player/`): `playMedia(ref: EntityRef)` resolves a `PlayerAdapter` by `entityMediaKind(ref.type)` (only `videoAdapter` is registered; `playMovie(id)` is a thin wrapper). `activeKind` / `activeRef` / `activeAdapter` signals live in `globalPlayer.state.ts`. The adapter's `toolbar` (ordered `ControlGroupId[]`) drives `PlayerControls`, which is a thin composer over `components/player/controls/` (`CONTROL_GROUPS` registry; `seek`/`title`/`transport` have fixed zones, the rest go in the right cluster in order). Settings rows + submenus are a per-kind `SettingsMenuSpec` (`controls/settings/index.ts`). Queue-advance on `ended` goes through `adapter.onEnded()`.
+- **Queue** (`state/queue.state.ts`): `QueueItem = { ref: EntityRef, title, subtitle?, artUrl?, durationSeconds? }`, one queue per `MediaKind` (video → `play_queue`, audio → `play_queue_audio`); legacy `{movieId,…}` entries migrate on load. Audio `audioRepeat` / `audioShuffle` signals are persisted but have no UI yet.
 - On refresh, always create a fresh stream session — never restore stale session from localStorage
 - HLS.js recovery: MAX_FULL_RELOADS=3 prevents infinite retry loops; recovery timers tracked via ref for cleanup on destroy
 - `durationSeconds` from server response overrides HLS-reported duration (which grows during live transcoding)

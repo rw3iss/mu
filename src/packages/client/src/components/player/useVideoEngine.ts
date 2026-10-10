@@ -13,8 +13,9 @@ import {
 	stereoWidthEnabled,
 } from '@/state/audio-effects.state';
 import { audioResetTrigger, clearAudioSuspect } from '@/state/audio-reset.state';
-import { globalMovieId, playMovie } from '@/state/globalPlayer.state';
+import { globalMovieId } from '@/state/globalPlayer.state';
 import { notifyInfo } from '@/state/notifications.state';
+import { getAdapter } from '@/state/player/registry';
 import {
 	clampVolume,
 	currentSession,
@@ -27,7 +28,6 @@ import {
 	updateProgress,
 	volume,
 } from '@/state/player.state';
-import { takeNextFromQueue } from '@/state/queue.state';
 import { shareToken } from '@/state/share.state';
 import { clearWatchPosition, setLocalPosition } from '@/state/watchPositions.state';
 import { clearVideoSubtitles } from '@/utils/subtitle-dom';
@@ -79,6 +79,15 @@ let sharedVideoElement: HTMLVideoElement | null = null;
 /** The persistent player <video> element (null before first play). */
 export function getActiveVideoElement(): HTMLVideoElement | null {
 	return sharedVideoElement;
+}
+
+/**
+ * Kind-agnostic alias of {@link getActiveVideoElement}. New code that only
+ * needs the playing media element (not video-specific APIs) should use this
+ * so it keeps working once an audio adapter owns its own `<audio>` elements.
+ */
+export function getActiveMediaElement(): HTMLMediaElement | null {
+	return getActiveVideoElement();
 }
 
 function getSharedVideoElement(): HTMLVideoElement {
@@ -375,13 +384,9 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			} catch {}
 			void clearWatchPosition(movieId);
 
-			// Auto-advance: pop the next queued title and play it. Popping
-			// before playing means a title that fails to start can't wedge the
-			// queue retrying the same entry forever.
-			const next = takeNextFromQueue();
-			if (next) {
-				void playMovie(next.movieId, { fromBeginning: true });
-			}
+			// Auto-advance is kind-specific — the video adapter pops the next
+			// queued title and plays it.
+			getAdapter('video')?.onEnded();
 		};
 		video.addEventListener('ended', onEnded);
 

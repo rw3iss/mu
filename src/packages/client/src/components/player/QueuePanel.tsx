@@ -1,11 +1,12 @@
 import { useState } from 'preact/hooks';
 import { Icon } from '@/components/common/Icon';
-import { playMovie } from '@/state/globalPlayer.state';
+import { playMedia } from '@/state/globalPlayer.state';
 import {
 	clearQueue,
 	moveInQueue,
 	playQueue,
 	type QueueItem,
+	queueItemKey,
 	removeFromQueue,
 	takeFromQueue,
 } from '@/state/queue.state';
@@ -38,8 +39,8 @@ export function QueuePanel({ onClose }: QueuePanelProps) {
 
 	/** Play this entry now, discarding everything queued ahead of it. */
 	const jumpTo = (item: QueueItem) => {
-		const taken = takeFromQueue(item.movieId);
-		if (taken) void playMovie(taken.movieId, { fromBeginning: true });
+		const taken = takeFromQueue(item.ref);
+		if (taken) void playMedia(taken.ref, { fromBeginning: true });
 	};
 
 	return (
@@ -51,7 +52,11 @@ export function QueuePanel({ onClose }: QueuePanelProps) {
 				</span>
 				<div class={styles.headerActions}>
 					{items.length > 0 && (
-						<button type="button" class={styles.clearBtn} onClick={clearQueue}>
+						<button
+							type="button"
+							class={styles.clearBtn}
+							onClick={() => clearQueue('video')}
+						>
 							Clear
 						</button>
 					)}
@@ -75,7 +80,7 @@ export function QueuePanel({ onClose }: QueuePanelProps) {
 				<ul class={styles.list}>
 					{items.map((item, i) => (
 						<li
-							key={item.movieId}
+							key={queueItemKey(item)}
 							class={`${styles.item} ${dragIndex === i ? styles.dragging : ''} ${
 								overIndex === i && dragIndex !== i ? styles.dragOver : ''
 							}`}
@@ -101,8 +106,8 @@ export function QueuePanel({ onClose }: QueuePanelProps) {
 							<span class={styles.position}>{i === 0 ? 'Next' : i + 1}</span>
 
 							<div class={styles.poster}>
-								{item.posterUrl ? (
-									<img src={item.posterUrl} alt={item.title} loading="lazy" />
+								{item.artUrl ? (
+									<img src={item.artUrl} alt={item.title} loading="lazy" />
 								) : (
 									<div class={styles.posterPlaceholder} />
 								)}
@@ -112,7 +117,9 @@ export function QueuePanel({ onClose }: QueuePanelProps) {
 								<span class={styles.title} title={item.title}>
 									{item.title}
 								</span>
-								{item.year ? <span class={styles.year}>{item.year}</span> : null}
+								{item.subtitle ? (
+									<span class={styles.year}>{item.subtitle}</span>
+								) : null}
 							</div>
 
 							<button
@@ -127,7 +134,7 @@ export function QueuePanel({ onClose }: QueuePanelProps) {
 							<button
 								type="button"
 								class={styles.removeBtn}
-								onClick={() => removeFromQueue(item.movieId)}
+								onClick={() => removeFromQueue(item.ref)}
 								title="Remove from queue"
 								aria-label={`Remove ${item.title} from queue`}
 							>

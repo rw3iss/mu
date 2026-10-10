@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   // Transparent — the actual video is in GlobalPlayer's videoWrapper
-  // This container only hosts the VideoPlayer's click handlers and overlays
+  // This container only hosts the route's loading / error overlays
   background: transparent;
   z-index: var(--z-player-controls);
   pointer-events: none;
