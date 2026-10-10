@@ -102,6 +102,17 @@ Stream your local movie collection to any device, fetch metadata and ratings aut
 - **Visibility, two levels.** An admin **"Show Users Info"** system setting (Settings → Users) is the master switch that exposes Members + cross-user profiles to non-admins. Each user then controls their own **"Show Profile Info"** toggle (atop `/profile`, shown only when the system setting is on): when off, ordinary users get a 404 for that profile and it's hidden from the directory. **Admins always see every profile regardless of either setting.**
 - **Backend** -- the `profile` module (`GET/PATCH /profile/me`, `POST /profile/me/avatar`, `GET /profile/:username`, `GET/PUT /profile/config`, `GET /members`) aggregates favorites, watch history, and live `stream_sessions`, and enforces the visibility rules. Columns: `users.display_name`, `users.description`, `users.profile_public` (default 1). Avatar files go through the `uploads` module (`UploadsService`).
 
+### Music (optional)
+Off by default. Turn it on during install, on the Setup page, or in **Settings → Music** (`MU_FEATURE_MUSIC=1` sets the default).
+- **Movies | Music mode** -- a header toggle switches the whole app (sidebar, search, home, playlists, favorites, history) between movies and music. Hidden when only one feature is on; turning Movies off gives a music-only server.
+- **Library** -- separate **music folders** (Settings → Music). Tags are read with `music-metadata` (album artist, featured artists, compilations, multi-disc, MusicBrainz ids); files without tags fall back to `Artist/Album (Year)/01 - Title` paths. Album art comes from embedded tags, `cover.jpg`/`folder.jpg`, then the Cover Art Archive.
+- **Pages** -- Music home (recently added, continue listening, most played, favorites), Library (artists / albums / tracks / genres with filters), and artist, album and track pages with ratings, comments, favorites and playlists.
+- **Player** -- the same persistent player with an audio layout: a **waveform seek bar**, queue, shuffle/repeat, gapless playback, ReplayGain, synced lyrics, lock-screen controls, and the existing EQ/compressor.
+- **Original quality** -- streams are progressive HTTP (no HLS). FLAC plays as FLAC when the browser can decode it; only formats no browser plays (APE, WavPack, DSD, …) are transcoded to a cached FLAC, and the High/Normal/Low profiles make cached Opus (or AAC) copies. The transcode cache is size-capped (LRU).
+- **Metadata & lyrics** -- MusicBrainz album/artist matching (1 request/second), artist bios, LRCLIB lyrics (synced when available). Lyrics can be edited by contributors.
+- **Admin** -- music quick actions on the Admin page (scan, refresh metadata, fetch art, fetch lyrics, re-encode unplayable, clear cache), and music job types with their own concurrency limit.
+- **API** -- everything is under `/api/v1/music/*` and returns 404 while Music is off. See `docs/music-support-plan.md` for the design.
+
 ### Administration
 - **Admin dashboard** -- server stats, user management, media sources, log viewer, cache management
 - **Bulk movie operations** -- multi-select cards (Edit toggle in Library and Search), bulk re-scan, refresh metadata, clear metadata, hide/unhide, mark watched/unwatched, remove from library, delete from disk; per-movie failures are isolated so one bad row doesn't kill the batch

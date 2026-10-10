@@ -25,6 +25,7 @@
 #     --user <name>       Run/service user (default: current user)
 #     --service           Install + enable the systemd 'mu' service
 #     --no-nvidia         Skip NVIDIA driver install (still installs NVENC ffmpeg)
+#     --music / --no-music  Enable/disable the Music feature (MU_FEATURE_MUSIC in .env)
 #     --yes               Non-interactive: assume yes / defaults
 #     -h, --help          Show this help
 #
@@ -55,6 +56,7 @@ PORT_OPT=""
 RUN_USER="$(id -un)"
 INSTALL_SERVICE="n"
 SKIP_NVIDIA="n"
+MUSIC_OPT=""
 ASSUME_YES="n"
 
 usage() { sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0; }
@@ -67,6 +69,8 @@ while [ $# -gt 0 ]; do
 		--user)      RUN_USER="${2:-}"; shift 2 ;;
 		--service)   INSTALL_SERVICE="y"; shift ;;
 		--no-nvidia) SKIP_NVIDIA="y"; shift ;;
+		--music)     MUSIC_OPT="1"; shift ;;
+		--no-music)  MUSIC_OPT="0"; shift ;;
 		--yes|-y)    ASSUME_YES="y"; shift ;;
 		-h|--help)   usage ;;
 		*)           die "Unknown option: $1 (try --help)" ;;
@@ -284,6 +288,20 @@ setup_env() {
 			eval "export $line" 2>/dev/null || true
 		done < "$ENV_FILE"
 		set +a
+	fi
+
+	# Music feature default (the Setup page / Settings → Music can change it later).
+	if [ -z "$MUSIC_OPT" ] && [ -z "${MU_FEATURE_MUSIC:-}" ] && [ "$ASSUME_YES" != "y" ]; then
+		if confirm "Enable the Music feature (music folders, audio player)?" n; then MUSIC_OPT="1"; else MUSIC_OPT="0"; fi
+	fi
+	if [ -n "$MUSIC_OPT" ] && [ -f "$ENV_FILE" ]; then
+		if grep -q '^MU_FEATURE_MUSIC=' "$ENV_FILE"; then
+			sed -i "s#^MU_FEATURE_MUSIC=.*#MU_FEATURE_MUSIC=$MUSIC_OPT#" "$ENV_FILE"
+		else
+			printf '\nMU_FEATURE_MUSIC=%s\n' "$MUSIC_OPT" >> "$ENV_FILE"
+		fi
+		export MU_FEATURE_MUSIC="$MUSIC_OPT"
+		log "Music feature: $([ "$MUSIC_OPT" = "1" ] && echo enabled || echo disabled) (MU_FEATURE_MUSIC=$MUSIC_OPT)"
 	fi
 
 	# Resolve data dir (option > env > default), matching migrate.js semantics.
