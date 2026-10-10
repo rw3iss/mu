@@ -18,7 +18,7 @@ export class CommentsController {
 	list(@Param('movieId') movieId: string, @CurrentUser('id') userId: string) {
 		return {
 			comments: this.comments.getForMovie(movieId, userId),
-			count: this.comments.count(movieId),
+			count: this.comments.count({ type: 'movie', id: movieId }),
 		};
 	}
 
@@ -44,7 +44,13 @@ export class CommentsController {
 		@CurrentUser('id') userId: string,
 		@Body() body: { text: string; timeSeconds?: number | null; parentId?: string | null },
 	) {
-		return { comments: this.comments.create(movieId, userId, body ?? ({} as any)) };
+		return {
+			comments: this.comments.create(
+				{ type: 'movie', id: movieId },
+				userId,
+				body ?? ({} as any),
+			),
+		};
 	}
 
 	@RequireAction('view:own-data')

@@ -3,12 +3,13 @@ import { DatabaseModule } from '../database/database.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { CommentsController } from './comments.controller.js';
 import { CommentsService } from './comments.service.js';
+import { EntityCommentsController } from './entity-comments.controller.js';
 
-/** Movie comments: general/time-anchored comments, replies, reactions. */
+/** Entity comments (movies + any EntityRef): general/time-anchored comments, replies, reactions. */
 @Module({
 	imports: [DatabaseModule, NotificationsModule],
 	providers: [CommentsService],
-	controllers: [CommentsController],
+	controllers: [CommentsController, EntityCommentsController],
 	exports: [CommentsService],
 })
 export class CommentsModule {}

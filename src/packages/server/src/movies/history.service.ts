@@ -2,7 +2,10 @@ import { nowISO, paginationDefaults, WsEvent } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movieFiles, movies, userWatchHistory } from '../database/schema/index.js';
+import { movieFiles, movies, playHistory } from '../database/schema/index.js';
+
+const isMovie = eq(playHistory.entityType, 'movie');
+
 import { EventsService } from '../events/events.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
@@ -32,23 +35,29 @@ export class HistoryService {
 
 		const existing = this.database.db
 			.select()
-			.from(userWatchHistory)
-			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, movieId)))
+			.from(playHistory)
+			.where(and(eq(playHistory.userId, userId), isMovie, eq(playHistory.entityId, movieId)))
 			.get();
 
 		if (existing) {
 			this.database.db
-				.update(userWatchHistory)
+				.update(playHistory)
 				.set({
 					positionSeconds: position,
 					durationWatchedSeconds: duration,
 					completed,
-					watchedAt: now,
+					lastPlayedAt: now,
+					// A play that just finished counts once.
+					...(completed && !existing.completed
+						? { playCount: sql`${playHistory.playCount} + 1` }
+						: {}),
 				})
-				.where(eq(userWatchHistory.id, existing.id))
+				.where(eq(playHistory.id, existing.id))
 				.run();
+			const { entityId, entityType: _t, lastPlayedAt: _l, playCount: _c, ...rest } = existing;
 			return {
-				...existing,
+				...rest,
+				movieId: entityId,
 				positionSeconds: position,
 				durationWatchedSeconds: duration,
 				completed,
@@ -58,15 +67,17 @@ export class HistoryService {
 
 		const id = crypto.randomUUID();
 		this.database.db
-			.insert(userWatchHistory)
+			.insert(playHistory)
 			.values({
 				id,
 				userId,
-				movieId,
+				entityType: 'movie',
+				entityId: movieId,
 				positionSeconds: position,
 				durationWatchedSeconds: duration,
 				completed,
-				watchedAt: now,
+				playCount: completed ? 1 : 0,
+				lastPlayedAt: now,
 			})
 			.run();
 
@@ -86,30 +97,30 @@ export class HistoryService {
 
 		const data = this.database.db
 			.select({
-				id: userWatchHistory.id,
-				movieId: userWatchHistory.movieId,
-				watchedAt: userWatchHistory.watchedAt,
-				durationWatchedSeconds: userWatchHistory.durationWatchedSeconds,
-				completed: userWatchHistory.completed,
-				positionSeconds: userWatchHistory.positionSeconds,
+				id: playHistory.id,
+				movieId: playHistory.entityId,
+				watchedAt: playHistory.lastPlayedAt,
+				durationWatchedSeconds: playHistory.durationWatchedSeconds,
+				completed: playHistory.completed,
+				positionSeconds: playHistory.positionSeconds,
 				movieTitle: movies.title,
 				movieYear: movies.year,
 				moviePosterUrl: movies.posterUrl,
 				movieThumbnailUrl: movies.thumbnailUrl,
 				movieDurationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
 			})
-			.from(userWatchHistory)
-			.innerJoin(movies, eq(userWatchHistory.movieId, movies.id))
-			.where(eq(userWatchHistory.userId, userId))
-			.orderBy(desc(userWatchHistory.watchedAt))
+			.from(playHistory)
+			.innerJoin(movies, and(isMovie, eq(playHistory.entityId, movies.id)))
+			.where(and(eq(playHistory.userId, userId), isMovie))
+			.orderBy(desc(playHistory.lastPlayedAt))
 			.limit(ps)
 			.offset(offset)
 			.all();
 
 		const totalResult = this.database.db
 			.select({ count: count() })
-			.from(userWatchHistory)
-			.where(eq(userWatchHistory.userId, userId))
+			.from(playHistory)
+			.where(and(eq(playHistory.userId, userId), isMovie))
 			.get();
 		const total = totalResult?.count ?? 0;
 
@@ -126,44 +137,49 @@ export class HistoryService {
 		const now = nowISO();
 		const existing = this.database.db
 			.select()
-			.from(userWatchHistory)
-			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, movieId)))
+			.from(playHistory)
+			.where(and(eq(playHistory.userId, userId), isMovie, eq(playHistory.entityId, movieId)))
 			.get();
 
 		if (existing) {
 			// Marking watched clears the resume position so it leaves "Continue
 			// Watching" (which only lists in-progress titles) but stays in history.
 			this.database.db
-				.update(userWatchHistory)
-				.set({ completed: true, positionSeconds: 0, watchedAt: now })
-				.where(eq(userWatchHistory.id, existing.id))
+				.update(playHistory)
+				.set({ completed: true, positionSeconds: 0, lastPlayedAt: now })
+				.where(eq(playHistory.id, existing.id))
 				.run();
 			this.emitWatchChange(userId, movieId, true);
 			return;
 		}
 
 		this.database.db
-			.insert(userWatchHistory)
+			.insert(playHistory)
 			.values({
 				id: crypto.randomUUID(),
 				userId,
-				movieId,
+				entityType: 'movie',
+				entityId: movieId,
 				positionSeconds: 0,
 				completed: true,
-				watchedAt: now,
+				playCount: 0,
+				lastPlayedAt: now,
 			})
 			.run();
 		this.emitWatchChange(userId, movieId, true);
 	}
 
 	clearHistory(userId: string) {
-		this.database.db.delete(userWatchHistory).where(eq(userWatchHistory.userId, userId)).run();
+		this.database.db
+			.delete(playHistory)
+			.where(and(eq(playHistory.userId, userId), isMovie))
+			.run();
 	}
 
 	markUnwatched(userId: string, movieId: string) {
 		this.database.db
-			.delete(userWatchHistory)
-			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, movieId)))
+			.delete(playHistory)
+			.where(and(eq(playHistory.userId, userId), isMovie, eq(playHistory.entityId, movieId)))
 			.run();
 		this.emitWatchChange(userId, movieId, false);
 	}
@@ -177,8 +193,8 @@ export class HistoryService {
 	 */
 	clearPosition(userId: string, movieId: string): boolean {
 		const result = this.database.db
-			.delete(userWatchHistory)
-			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.movieId, movieId)))
+			.delete(playHistory)
+			.where(and(eq(playHistory.userId, userId), isMovie, eq(playHistory.entityId, movieId)))
 			.run();
 		return result.changes > 0;
 	}
@@ -202,16 +218,16 @@ export class HistoryService {
 		// MIN aggregate keyed by movie_id — most movies have one file).
 		const rows = this.database.db
 			.select({
-				movieId: userWatchHistory.movieId,
-				positionSeconds: userWatchHistory.positionSeconds,
-				watchedAt: userWatchHistory.watchedAt,
+				movieId: playHistory.entityId,
+				positionSeconds: playHistory.positionSeconds,
+				watchedAt: playHistory.lastPlayedAt,
 				durationSeconds: movieFiles.durationSeconds,
 			})
-			.from(userWatchHistory)
-			.leftJoin(movieFiles, eq(movieFiles.movieId, userWatchHistory.movieId))
+			.from(playHistory)
+			.leftJoin(movieFiles, eq(movieFiles.movieId, playHistory.entityId))
 			// Only in-progress titles get a resume position — finished ones don't.
-			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, false)))
-			.orderBy(desc(userWatchHistory.watchedAt))
+			.where(and(eq(playHistory.userId, userId), isMovie, eq(playHistory.completed, false)))
+			.orderBy(desc(playHistory.lastPlayedAt))
 			.all();
 
 		// Multi-file movies will produce multiple rows per movieId; keep
@@ -252,15 +268,15 @@ export class HistoryService {
 				backdropUrl: movies.backdropUrl,
 				runtimeMinutes: movies.runtimeMinutes,
 				addedAt: movies.addedAt,
-				positionSeconds: userWatchHistory.positionSeconds,
-				completed: userWatchHistory.completed,
-				watchedAt: userWatchHistory.watchedAt,
+				positionSeconds: playHistory.positionSeconds,
+				completed: playHistory.completed,
+				watchedAt: playHistory.lastPlayedAt,
 				durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
 			})
-			.from(userWatchHistory)
-			.innerJoin(movies, eq(userWatchHistory.movieId, movies.id))
-			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, false)))
-			.orderBy(desc(userWatchHistory.watchedAt))
+			.from(playHistory)
+			.innerJoin(movies, and(isMovie, eq(playHistory.entityId, movies.id)))
+			.where(and(eq(playHistory.userId, userId), isMovie, eq(playHistory.completed, false)))
+			.orderBy(desc(playHistory.lastPlayedAt))
 			.limit(20)
 			.all();
 
@@ -295,8 +311,8 @@ export class HistoryService {
 	getHistoryCount(userId: string): number {
 		const result = this.database.db
 			.select({ count: count() })
-			.from(userWatchHistory)
-			.where(eq(userWatchHistory.userId, userId))
+			.from(playHistory)
+			.where(and(eq(playHistory.userId, userId), isMovie))
 			.get();
 		return result?.count ?? 0;
 	}
@@ -304,10 +320,10 @@ export class HistoryService {
 	/** Most recent watch timestamp for the user, or null. */
 	getLastWatchedAt(userId: string): string | null {
 		const result = this.database.db
-			.select({ watchedAt: userWatchHistory.watchedAt })
-			.from(userWatchHistory)
-			.where(eq(userWatchHistory.userId, userId))
-			.orderBy(desc(userWatchHistory.watchedAt))
+			.select({ watchedAt: playHistory.lastPlayedAt })
+			.from(playHistory)
+			.where(and(eq(playHistory.userId, userId), isMovie))
+			.orderBy(desc(playHistory.lastPlayedAt))
 			.limit(1)
 			.get();
 		return result?.watchedAt ?? null;
@@ -316,8 +332,8 @@ export class HistoryService {
 	getWatchedCount(userId: string): number {
 		const result = this.database.db
 			.select({ count: count() })
-			.from(userWatchHistory)
-			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, true)))
+			.from(playHistory)
+			.where(and(eq(playHistory.userId, userId), isMovie, eq(playHistory.completed, true)))
 			.get();
 		return result?.count ?? 0;
 	}
@@ -325,9 +341,9 @@ export class HistoryService {
 	clearWatchedFlags(userId: string): number {
 		const watchedCount = this.getWatchedCount(userId);
 		this.database.db
-			.update(userWatchHistory)
+			.update(playHistory)
 			.set({ completed: false })
-			.where(and(eq(userWatchHistory.userId, userId), eq(userWatchHistory.completed, true)))
+			.where(and(eq(playHistory.userId, userId), isMovie, eq(playHistory.completed, true)))
 			.run();
 		return watchedCount;
 	}

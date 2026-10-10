@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
-import { movies, playlistMovies, playlists, users } from '../database/schema/index.js';
+import { movies, playlistItems, playlists, users } from '../database/schema/index.js';
 
 interface PlaylistMovieSummary {
 	movieId: string;
@@ -134,7 +134,7 @@ export class PlaylistsService {
 				case 'name':
 					return dirFn(playlists.name);
 				case 'movieCount':
-					return dirFn(count(playlistMovies.id));
+					return dirFn(count(playlistItems.id));
 				default:
 					return dirFn(playlists.updatedAt);
 			}
@@ -152,10 +152,16 @@ export class PlaylistsService {
 				userId: playlists.userId,
 				createdAt: playlists.createdAt,
 				updatedAt: playlists.updatedAt,
-				movieCount: count(playlistMovies.id),
+				movieCount: count(playlistItems.id),
 			})
 			.from(playlists)
-			.leftJoin(playlistMovies, eq(playlists.id, playlistMovies.playlistId))
+			.leftJoin(
+				playlistItems,
+				and(
+					eq(playlists.id, playlistItems.playlistId),
+					eq(playlistItems.itemType, 'movie'),
+				),
+			)
 			.where(eq(playlists.userId, userId))
 			.groupBy(playlists.id)
 			.orderBy(orderExpr)
@@ -193,10 +199,16 @@ export class PlaylistsService {
 				ownerName: sql<string>`COALESCE(${users.displayName}, ${users.username})`,
 				createdAt: playlists.createdAt,
 				updatedAt: playlists.updatedAt,
-				movieCount: count(playlistMovies.id),
+				movieCount: count(playlistItems.id),
 			})
 			.from(playlists)
-			.leftJoin(playlistMovies, eq(playlists.id, playlistMovies.playlistId))
+			.leftJoin(
+				playlistItems,
+				and(
+					eq(playlists.id, playlistItems.playlistId),
+					eq(playlistItems.itemType, 'movie'),
+				),
+			)
 			.leftJoin(users, eq(playlists.userId, users.id))
 			.where(eq(playlists.isPublic, true))
 			.groupBy(playlists.id)
@@ -244,20 +256,22 @@ export class PlaylistsService {
       FROM playlists p
       LEFT JOIN (
         SELECT playlist_id, COUNT(*) AS cnt
-        FROM playlist_movies
+        FROM playlist_items
+        WHERE item_type = 'movie'
         GROUP BY playlist_id
       ) mc ON mc.playlist_id = p.id
       LEFT JOIN (
         SELECT
           pm.playlist_id,
           SUM(CASE WHEN lwh.max_watched IS NOT NULL THEN 1 ELSE 0 END) AS score
-        FROM playlist_movies pm
+        FROM playlist_items pm
         LEFT JOIN (
-          SELECT movie_id, MAX(watched_at) AS max_watched
-          FROM user_watch_history
-          WHERE user_id = ${userId}
-          GROUP BY movie_id
-        ) lwh ON lwh.movie_id = pm.movie_id
+          SELECT entity_id, MAX(last_played_at) AS max_watched
+          FROM play_history
+          WHERE user_id = ${userId} AND entity_type = 'movie'
+          GROUP BY entity_id
+        ) lwh ON lwh.entity_id = pm.item_id
+        WHERE pm.item_type = 'movie'
         GROUP BY pm.playlist_id
       ) lp ON lp.playlist_id = p.id
       WHERE p.user_id = ${userId}
@@ -286,22 +300,25 @@ export class PlaylistsService {
 		return playlists_list.map((playlist) => {
 			const rows = this.database.db
 				.select({
-					movieId: playlistMovies.movieId,
+					movieId: playlistItems.itemId,
 					title: movies.title,
 					year: movies.year,
 					posterUrl: movies.posterUrl,
 					thumbnailUrl: movies.thumbnailUrl,
 					runtimeMinutes: movies.runtimeMinutes,
 					durationSeconds: sql<number>`(SELECT mf.duration_seconds FROM movie_files mf WHERE mf.movie_id = ${movies.id} LIMIT 1)`,
-					addedAt: playlistMovies.addedAt,
-					remoteTitle: playlistMovies.remoteTitle,
-					remotePosterUrl: playlistMovies.remotePosterUrl,
-					remoteServerId: playlistMovies.remoteServerId,
+					addedAt: playlistItems.addedAt,
+					remoteTitle: playlistItems.remoteTitle,
+					remotePosterUrl: playlistItems.remotePosterUrl,
+					remoteServerId: playlistItems.remoteServerId,
 				})
-				.from(playlistMovies)
-				.leftJoin(movies, eq(playlistMovies.movieId, movies.id))
-				.where(eq(playlistMovies.playlistId, playlist.id))
-				.orderBy(asc(playlistMovies.position))
+				.from(playlistItems)
+				.leftJoin(
+					movies,
+					and(eq(playlistItems.itemId, movies.id), eq(playlistItems.itemType, 'movie')),
+				)
+				.where(eq(playlistItems.playlistId, playlist.id))
+				.orderBy(asc(playlistItems.position))
 				.all();
 
 			const movieSummaries = rows.map((r) => ({
@@ -339,23 +356,26 @@ export class PlaylistsService {
 
 		const rows = this.database.db
 			.select({
-				id: playlistMovies.id,
-				movieId: playlistMovies.movieId,
-				position: playlistMovies.position,
-				addedAt: playlistMovies.addedAt,
+				id: playlistItems.id,
+				movieId: playlistItems.itemId,
+				position: playlistItems.position,
+				addedAt: playlistItems.addedAt,
 				movieTitle: movies.title,
 				movieYear: movies.year,
 				moviePosterUrl: movies.posterUrl,
 				movieThumbnailUrl: movies.thumbnailUrl,
 				movieRuntimeMinutes: movies.runtimeMinutes,
-				remoteTitle: playlistMovies.remoteTitle,
-				remotePosterUrl: playlistMovies.remotePosterUrl,
-				remoteServerId: playlistMovies.remoteServerId,
+				remoteTitle: playlistItems.remoteTitle,
+				remotePosterUrl: playlistItems.remotePosterUrl,
+				remoteServerId: playlistItems.remoteServerId,
 			})
-			.from(playlistMovies)
-			.leftJoin(movies, eq(playlistMovies.movieId, movies.id))
-			.where(eq(playlistMovies.playlistId, id))
-			.orderBy(asc(playlistMovies.position))
+			.from(playlistItems)
+			.leftJoin(
+				movies,
+				and(eq(playlistItems.itemId, movies.id), eq(playlistItems.itemType, 'movie')),
+			)
+			.where(eq(playlistItems.playlistId, id))
+			.orderBy(asc(playlistItems.position))
 			.all();
 
 		const items = rows.map((r) => ({
@@ -407,9 +427,13 @@ export class PlaylistsService {
 		this.bustCache();
 		const existing = this.database.db
 			.select()
-			.from(playlistMovies)
+			.from(playlistItems)
 			.where(
-				and(eq(playlistMovies.playlistId, playlistId), eq(playlistMovies.movieId, movieId)),
+				and(
+					eq(playlistItems.playlistId, playlistId),
+					eq(playlistItems.itemType, 'movie'),
+					eq(playlistItems.itemId, movieId),
+				),
 			)
 			.get();
 
@@ -419,19 +443,20 @@ export class PlaylistsService {
 
 		// Get the next position
 		const maxPos = this.database.db
-			.select({ maxPosition: sql<number>`COALESCE(MAX(${playlistMovies.position}), 0)` })
-			.from(playlistMovies)
-			.where(eq(playlistMovies.playlistId, playlistId))
+			.select({ maxPosition: sql<number>`COALESCE(MAX(${playlistItems.position}), 0)` })
+			.from(playlistItems)
+			.where(eq(playlistItems.playlistId, playlistId))
 			.get();
 
 		const position = (maxPos?.maxPosition ?? 0) + 1;
 
 		this.database.db
-			.insert(playlistMovies)
+			.insert(playlistItems)
 			.values({
 				id: crypto.randomUUID(),
 				playlistId,
-				movieId,
+				itemType: 'movie',
+				itemId: movieId,
 				position,
 				addedAt: nowISO(),
 				addedBy: userId ?? null,
@@ -460,12 +485,13 @@ export class PlaylistsService {
 			if (pl.userId !== userId) {
 				// Public-edit contributors may only remove rows they added.
 				const row = this.database.db
-					.select({ addedBy: playlistMovies.addedBy })
-					.from(playlistMovies)
+					.select({ addedBy: playlistItems.addedBy })
+					.from(playlistItems)
 					.where(
 						and(
-							eq(playlistMovies.playlistId, playlistId),
-							eq(playlistMovies.movieId, movieId),
+							eq(playlistItems.playlistId, playlistId),
+							eq(playlistItems.itemType, 'movie'),
+							eq(playlistItems.itemId, movieId),
 						),
 					)
 					.get();
@@ -476,9 +502,13 @@ export class PlaylistsService {
 		}
 		this.bustCache();
 		this.database.db
-			.delete(playlistMovies)
+			.delete(playlistItems)
 			.where(
-				and(eq(playlistMovies.playlistId, playlistId), eq(playlistMovies.movieId, movieId)),
+				and(
+					eq(playlistItems.playlistId, playlistId),
+					eq(playlistItems.itemType, 'movie'),
+					eq(playlistItems.itemId, movieId),
+				),
 			)
 			.run();
 
@@ -495,9 +525,15 @@ export class PlaylistsService {
 				id: playlists.id,
 				name: playlists.name,
 			})
-			.from(playlistMovies)
-			.innerJoin(playlists, eq(playlistMovies.playlistId, playlists.id))
-			.where(and(eq(playlistMovies.movieId, movieId), eq(playlists.userId, userId)))
+			.from(playlistItems)
+			.innerJoin(playlists, eq(playlistItems.playlistId, playlists.id))
+			.where(
+				and(
+					eq(playlistItems.itemType, 'movie'),
+					eq(playlistItems.itemId, movieId),
+					eq(playlists.userId, userId),
+				),
+			)
 			.all();
 	}
 
@@ -507,12 +543,13 @@ export class PlaylistsService {
 		for (let i = 0; i < movieIds.length; i++) {
 			const movieId = movieIds[i]!;
 			this.database.db
-				.update(playlistMovies)
+				.update(playlistItems)
 				.set({ position: i + 1 })
 				.where(
 					and(
-						eq(playlistMovies.playlistId, playlistId),
-						eq(playlistMovies.movieId, movieId),
+						eq(playlistItems.playlistId, playlistId),
+						eq(playlistItems.itemType, 'movie'),
+						eq(playlistItems.itemId, movieId),
 					),
 				)
 				.run();
