@@ -4,6 +4,21 @@ export type { AudioProfile, NewAudioProfile } from './audio-profiles.ts';
 export { audioProfiles } from './audio-profiles.ts';
 export type { Device, NewDevice } from './devices.ts';
 export { devices } from './devices.ts';
+export type {
+	EntityComment,
+	EntityRating,
+	EntityWatchlistRow,
+	PlayHistoryRow,
+	PlaylistItem,
+} from './entities.ts';
+export {
+	entityCommentReactions,
+	entityComments,
+	entityRatings,
+	entityWatchlist,
+	playHistory,
+	playlistItems,
+} from './entities.ts';
 export type { Favorite, NewFavorite } from './favorites.ts';
 export { favorites } from './favorites.ts';
 export type { Feedback, NewFeedback } from './feedback.ts';
@@ -58,6 +73,35 @@ export type { MovieSourcePayload, NewMovieSourcePayload } from './movie-source-p
 export { movieSourcePayloads } from './movie-source-payloads.ts';
 export type { Movie, NewMovie } from './movies.ts';
 export { movies } from './movies.ts';
+export type {
+	Album,
+	Artist,
+	Artwork,
+	Lyrics,
+	NewAlbum,
+	NewArtist,
+	NewTrack,
+	NewTrackFile,
+	Track,
+	TrackFile,
+} from './music.ts';
+export {
+	albumAliases,
+	albumArtists,
+	albumGenres,
+	albumMatchCandidates,
+	albumReleases,
+	albums,
+	artistGenres,
+	artists,
+	artwork,
+	lyrics,
+	musicGenres,
+	musicIdentities,
+	trackArtists,
+	trackFiles,
+	tracks,
+} from './music.ts';
 export { notifications } from './notifications.ts';
 export type { NewPerson, Person } from './people.ts';
 export { people } from './people.ts';
@@ -108,45 +152,3 @@ export type { NewUserWatchlistEntry, UserWatchlistEntry } from './user-watchlist
 export { userWatchlist } from './user-watchlist.ts';
 export type { NewUser, User } from './users.ts';
 export { users } from './users.ts';
-export type {
-	EntityComment,
-	EntityRating,
-	EntityWatchlistRow,
-	PlayHistoryRow,
-	PlaylistItem,
-} from './entities.ts';
-export {
-	entityCommentReactions,
-	entityComments,
-	entityRatings,
-	entityWatchlist,
-	playHistory,
-	playlistItems,
-} from './entities.ts';
-export type {
-	Album,
-	Artist,
-	Artwork,
-	Lyrics,
-	NewAlbum,
-	NewArtist,
-	NewTrack,
-	NewTrackFile,
-	Track,
-	TrackFile,
-} from './music.ts';
-export {
-	albumArtists,
-	albumGenres,
-	albumReleases,
-	albums,
-	artistGenres,
-	artists,
-	artwork,
-	lyrics,
-	musicGenres,
-	musicIdentities,
-	trackArtists,
-	trackFiles,
-	tracks,
-} from './music.ts';

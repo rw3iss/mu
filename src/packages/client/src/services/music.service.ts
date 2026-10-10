@@ -1,5 +1,6 @@
 import type {
 	AlbumDetail,
+	AlbumMatchState,
 	AlbumSummary,
 	ArtistDetail,
 	ArtistSummary,
@@ -80,6 +81,11 @@ export function audioCapabilities(): string[] {
 	return probe.filter(([, mime]) => a.canPlayType(mime) !== '').map(([k]) => k);
 }
 
+type LyricsDto = { plain: string | null; syncedLrc: string | null; source: string | null } | null;
+
+/** Per-track lyrics promises, shared by the lyrics panel and the waveform markers. */
+const lyricsCache = new Map<string, Promise<LyricsDto>>();
+
 export const musicService = {
 	albums(q: MusicListQuery = {}): Promise<Page<AlbumSummary>> {
 		return api.get('/music/albums', params(q));
@@ -157,11 +163,63 @@ export const musicService = {
 	): Promise<{ plain: string | null; syncedLrc: string | null; source: string | null } | null> {
 		return api.get(`/music/tracks/${encodeURIComponent(trackId)}/lyrics`);
 	},
+	/** Cached `lyrics()`; failures resolve to null. Cleared by `saveLyrics`. */
+	lyricsCached(trackId: string): Promise<LyricsDto> {
+		let p = lyricsCache.get(trackId);
+		if (!p) {
+			p = this.lyrics(trackId).catch(() => null);
+			lyricsCache.set(trackId, p);
+		}
+		return p;
+	},
 	saveLyrics(
 		trackId: string,
 		body: { plain: string | null; syncedLrc: string | null },
 	): Promise<void> {
+		lyricsCache.delete(trackId);
 		return api.put(`/music/tracks/${encodeURIComponent(trackId)}/lyrics`, body);
+	},
+	/** Stored MusicBrainz match state; `refresh` runs a live search (never applies). */
+	matchCandidates(
+		albumId: string,
+		opts: { refresh?: boolean; title?: string; artist?: string } = {},
+	): Promise<AlbumMatchState> {
+		const p: Record<string, string> = {};
+		if (opts.refresh) p.refresh = '1';
+		if (opts.title) p.title = opts.title;
+		if (opts.artist) p.artist = opts.artist;
+		return api.get(`/music/albums/${encodeURIComponent(albumId)}/match-candidates`, p);
+	},
+	matchAlbum(
+		albumId: string,
+		body: { releaseMbid?: string; releaseGroupMbid?: string },
+	): Promise<AlbumMatchState> {
+		return api.post(`/music/albums/${encodeURIComponent(albumId)}/match`, body);
+	},
+	refreshAlbumMetadata(albumId: string): Promise<{ started: boolean }> {
+		return api.post(`/music/albums/${encodeURIComponent(albumId)}/refresh-metadata`);
+	},
+	/** Merge this album into another (fixes a grouping split). */
+	mergeAlbum(
+		albumId: string,
+		targetAlbumId: string,
+	): Promise<{ albumId: string; movedTracks: number }> {
+		return api.post(`/music/albums/${encodeURIComponent(albumId)}/merge`, { targetAlbumId });
+	},
+	/** Move tracks into a new album. */
+	splitAlbum(
+		albumId: string,
+		trackIds: string[],
+		title: string,
+	): Promise<{ albumId: string; movedTracks: number }> {
+		return api.post(`/music/albums/${encodeURIComponent(albumId)}/split`, { trackIds, title });
+	},
+	/** Look the track up on LRCLIB now (never overwrites user-edited lyrics). */
+	fetchLyrics(
+		trackId: string,
+	): Promise<{ result: { status: 'found' | 'miss' } | { skipped: string }; lyrics: LyricsDto }> {
+		lyricsCache.delete(trackId);
+		return api.post(`/music/tracks/${encodeURIComponent(trackId)}/lyrics/fetch`);
 	},
 	settings(): Promise<MusicSettings> {
 		return api.get('/music/settings');

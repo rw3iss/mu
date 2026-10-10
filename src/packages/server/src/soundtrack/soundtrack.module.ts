@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module.js';
-import { MusicBrainzClient } from './musicbrainz.client.js';
+import { MusicBrainzModule } from '../providers/sources/musicbrainz/musicbrainz.module.js';
 import { SoundtrackController } from './soundtrack.controller.js';
 import { SoundtrackService } from './soundtrack.service.js';
 
@@ -10,9 +10,9 @@ import { SoundtrackService } from './soundtrack.service.js';
  * MusicBrainz's 1 req/sec policy and results are cached per movie.
  */
 @Module({
-	imports: [DatabaseModule],
+	imports: [DatabaseModule, MusicBrainzModule],
 	controllers: [SoundtrackController],
-	providers: [SoundtrackService, MusicBrainzClient],
+	providers: [SoundtrackService],
 	exports: [SoundtrackService],
 })
 export class SoundtrackModule {}

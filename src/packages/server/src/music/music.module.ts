@@ -1,13 +1,19 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module.js';
 import { LibraryModule } from '../library/library.module.js';
+import { MusicBrainzModule } from '../providers/sources/musicbrainz/musicbrainz.module.js';
 import { StreamModule } from '../stream/stream.module.js';
+import { MusicAdminService } from './admin/music-admin.service.js';
+import { AlbumEditService } from './catalog/album-edit.service.js';
 import { ArtworkService } from './catalog/artwork.service.js';
 import { AudioImporter } from './catalog/audio-importer.js';
 import { MusicCatalogService } from './catalog/catalog.service.js';
 import { MusicController } from './http/music.controller.js';
+import { MusicMetadataController } from './http/music-metadata.controller.js';
 import { MusicJobsService } from './jobs/music-jobs.service.js';
 import { MusicQueryService } from './library/music-query.service.js';
+import { CoverArtClient, LrclibClient, WikiClient } from './metadata/clients.js';
+import { MusicMetadataService } from './metadata/music-metadata.service.js';
 import { MusicEntitiesService } from './music-entities.service.js';
 import { MusicSettingsService } from './music-settings.service.js';
 import { MusicOfflineController } from './offline/music-offline.controller.js';
@@ -23,10 +29,16 @@ import { MusicUploadService } from './upload/music-upload.service.js';
  * the `music` feature flag is off.
  */
 @Module({
-	imports: [DatabaseModule, LibraryModule, StreamModule],
-	controllers: [MusicController, MusicUploadController, MusicOfflineController],
+	imports: [DatabaseModule, LibraryModule, StreamModule, MusicBrainzModule],
+	controllers: [
+		MusicController,
+		MusicMetadataController,
+		MusicUploadController,
+		MusicOfflineController,
+	],
 	providers: [
 		ArtworkService,
+		AlbumEditService,
 		MusicCatalogService,
 		MusicSettingsService,
 		MusicQueryService,
@@ -35,6 +47,11 @@ import { MusicUploadService } from './upload/music-upload.service.js';
 		MusicJobsService,
 		AudioImporter,
 		MusicEntitiesService,
+		CoverArtClient,
+		LrclibClient,
+		WikiClient,
+		MusicMetadataService,
+		MusicAdminService,
 		MusicUploadService,
 		MusicOfflineService,
 	],

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { musicService } from '@/services/music.service';
 import { currentTrack } from '@/state/musicPlayer.state';
 import { currentTime, duration } from '@/state/player.state';
+import { activeLrcIndex, type LrcLine, parseLrc } from '@/utils/lrc';
 import pcStyles from '../PlayerControls.module.scss';
 import { formatTime } from './formatTime';
 import type { ControlGroupProps } from './types';
@@ -50,6 +51,8 @@ export function WaveformSeekBar({ onSeek, hasMiniThumbnail }: ControlGroupProps)
 	const [size, setSize] = useState({ w: 0, h: 0 });
 	const [hover, setHover] = useState<{ x: number; time: number } | null>(null);
 	const [dragging, setDragging] = useState(false);
+	const trackId = currentTrack.value?.track.id ?? null;
+	const [lyricLines, setLyricLines] = useState<LrcLine[] | null>(null);
 	const lastDragSeek = useRef(0);
 
 	// ── Peaks ──
@@ -79,6 +82,21 @@ export function WaveformSeekBar({ onSeek, hasMiniThumbnail }: ControlGroupProps)
 			cancelled = true;
 		};
 	}, [fileId]);
+
+	// ── Lyric markers (synced lyrics only) ──
+	useEffect(() => {
+		setLyricLines(null);
+		if (!trackId) return;
+		let cancelled = false;
+		musicService.lyricsCached(trackId).then((l) => {
+			if (cancelled || !l?.syncedLrc) return;
+			const lines = parseLrc(l.syncedLrc).filter((x) => x.text);
+			setLyricLines(lines.length ? lines : null);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [trackId]);
 
 	// ── Size ──
 	useEffect(() => {
@@ -145,7 +163,15 @@ export function WaveformSeekBar({ onSeek, hasMiniThumbnail }: ControlGroupProps)
 			ctx.fillStyle = x < playedX ? accent : x < hoverX ? hoverCol : base;
 			ctx.fillRect(x, y, BAR_W, bh);
 		}
-	}, [bars, size, progress, hover]);
+		// Lyric markers: a short tick on the top edge at each synced line.
+		if (lyricLines && total > 0) {
+			ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+			for (const l of lyricLines) {
+				const x = Math.round((l.time / total) * w);
+				ctx.fillRect(x, 0, 1, Math.max(3, h * 0.18));
+			}
+		}
+	}, [bars, size, progress, hover, lyricLines, total]);
 
 	// ── Interaction ──
 	const timeAt = useCallback((clientX: number): number | null => {
@@ -208,6 +234,11 @@ export function WaveformSeekBar({ onSeek, hasMiniThumbnail }: ControlGroupProps)
 		onSeek(Math.max(0, Math.min(d || target, target)));
 	};
 
+	const hoverLyric =
+		hover && lyricLines
+			? (lyricLines[activeLrcIndex(lyricLines, hover.time)]?.text ?? null)
+			: null;
+
 	return (
 		<div
 			ref={wrapRef}
@@ -233,6 +264,7 @@ export function WaveformSeekBar({ onSeek, hasMiniThumbnail }: ControlGroupProps)
 			{hover && (
 				<div class={pcStyles.seekTooltip} style={{ left: `${hover.x}px` }}>
 					{formatTime(hover.time)}
+					{hoverLyric && <span class={styles.lyricHint}>{hoverLyric}</span>}
 				</div>
 			)}
 		</div>

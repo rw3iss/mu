@@ -80,7 +80,19 @@ export class AudioImporter implements MediaImporter, OnModuleInit {
 				.from(trackFiles)
 				.where(eq(trackFiles.filePath, filePath))
 				.get();
-			if (tf) this.jobs.afterImport(tf.id);
+			if (tf) {
+				this.jobs.afterImport(
+					tf.id,
+					result.status === 'added'
+						? {
+								trackId: result.trackId,
+								albumId: result.albumId,
+								newAlbum: result.newAlbum,
+								title: tags.title,
+							}
+						: undefined,
+				);
+			}
 			return { status: 'added', entityId: result.trackId, title: tags.title };
 		} catch (err) {
 			const reason = (err as Error).message;

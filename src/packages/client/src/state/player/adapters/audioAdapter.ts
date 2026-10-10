@@ -464,6 +464,7 @@ export const AUDIO_TOOLBAR: ControlGroupId[] = [
 	'trackTransport',
 	'shuffle',
 	'repeat',
+	'info',
 	'queue',
 	'effects',
 	'volume',

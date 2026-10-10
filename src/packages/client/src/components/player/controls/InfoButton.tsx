@@ -8,7 +8,7 @@ export function InfoButton({ isSplit, onToggleInfo }: ControlGroupProps) {
 		<button
 			class={styles.controlBtn}
 			onClick={onToggleInfo}
-			aria-label="Movie info"
+			aria-label="Info"
 			title="Info"
 		>
 			<svg

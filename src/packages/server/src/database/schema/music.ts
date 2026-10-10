@@ -269,6 +269,28 @@ export const lyrics = sqliteTable('lyrics', {
 	updatedAt: text('updated_at').notNull(),
 });
 
+/**
+ * Last MusicBrainz match search per album: the scored candidates (JSON
+ * MusicMatchCandidate[]) shown when auto-match wasn't confident enough.
+ */
+export const albumMatchCandidates = sqliteTable('album_match_candidates', {
+	albumId: text('album_id')
+		.primaryKey()
+		.references(() => albums.id, { onDelete: 'cascade' }),
+	candidates: text('candidates').notNull().default('[]'),
+	/** 'auto' | 'manual' once a match is applied; null while unmatched. */
+	matchedBy: text('matched_by'),
+	searchedAt: text('searched_at').notNull(),
+});
+
+/** Grouping keys of merged-away albums → the album that absorbed them. */
+export const albumAliases = sqliteTable('album_aliases', {
+	groupKey: text('group_key').primaryKey(),
+	albumId: text('album_id')
+		.notNull()
+		.references(() => albums.id, { onDelete: 'cascade' }),
+});
+
 export const musicIdentities = sqliteTable(
 	'music_identities',
 	{
