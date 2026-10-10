@@ -14,7 +14,7 @@ the two features.
 | 3 — Browse & detail | not started | |
 | 4 — Metadata & lyrics | not started | |
 | 5 — Upload & offline | not started | |
-| 6 — Search & discovery | not started | |
+| 6 — Search & discovery | DONE (2026-10-10) — shared search orchestrator + source registry; federated music search (SSE); `mb:` stub pages; Discover (local content vector + ListenBrainz); album→film cross-links. Scrobbling + LLM rerank deferred (see §10) | |
 
 Open-question assumptions in §12 were accepted as written (2026-10-10).
 
@@ -603,21 +603,44 @@ during migration), plus `edit:lyrics` (default: contributor and admin). Viewers 
 
 ## 10. Search and discovery
 
-- **Federated music search** (`federated-music-search.service.ts`, same SSE shape as
-  movies): sources run in parallel with the existing 5s per-source timeout —
-  local FTS5 (first, never cached), MusicBrainz, Last.fm (optional), Discogs
-  (optional). Results are grouped: artists, albums, tracks. Dedup key order:
-  MBID → normalised `(artist, title, year)`.
-- Refactor the movie search to discover sources from the registry (capability
-  `search`) instead of hard-wired `runX` methods, so both searches share the
-  orchestrator.
-- **Discover music** (Phase 6): seeds = artists, albums or tracks; strategies =
-  content-vector over genres/tags/era (local), Last.fm similar artists,
-  ListenBrainz recommendations, and the existing LLM rerank (gated by the same
-  circuit breaker). Non-library results link to MusicBrainz-backed stub pages, like
-  `tmdb:` movie stubs.
-- **Cross-links**: the Movie *Soundtrack* section links each track to the local track
-  page when it exists in the music library, and the Album page links back to the film.
+Status 2026-10-10: **implemented** (Phase 6). Corrections to the original plan are noted inline.
+
+- **Federated music search** (`search/federated-music-search.service.ts`, same SSE event
+  shape as movies): `GET /search/music/stream?q=` (SSE) and `GET /search/music?q=` (JSON),
+  404 while Music is off. Sources: local FTS5 (first, never cached), MusicBrainz, Last.fm
+  (optional), Discogs (optional). MusicBrainz is three sources (artist, release-group,
+  recording searches) that share the app-wide 1 req/s throttle; each is cached 7d in
+  `search_cache` under its own type (`artist`/`album`/`track`). Last.fm / Discogs run only
+  when a `provider_credentials` row exists (`lastfm.apiKey`, `discogs.token`); otherwise they
+  are skipped silently. Results carry `kind` and are grouped artists / albums / tracks on the
+  client. Dedup key order: MBID → local id → normalised `(artist, title, year)` (tracks drop
+  the year; artists use the name). Dedup is multi-key: hits sharing any key merge, so a local
+  album without an MBID still merges with its MusicBrainz twin.
+- **Orchestrator refactor** — *correction*: sources are not discovered from the provider
+  registry's `search` capability (TMDB/OMDb/Trakt are not provider-platform providers).
+  Instead a search-specific `SearchSourceRegistry` holds a per-domain source list
+  (`movie` / `person` / `music`) and one `runFederatedSearch` orchestrator runs all three.
+  The movie/people SSE contract and tests are unchanged.
+- **Stub pages**: non-library MusicBrainz results open `/album/mb:<releaseGroupMbid>` and
+  `/artist/mb:<mbid>` (title, artist, year, genres, Cover Art Archive cover, tracklist of the
+  earliest official release / studio discography, "View on MusicBrainz", "Open in library"
+  when the MBID is owned). Endpoints: `GET /music/mb/release-group/:mbid`,
+  `GET /music/mb/artist/:mbid` (cached 7d). Non-library tracks link to their album stub.
+- **Discover music**: `POST /music/discover {seeds, filters, limit}` → grouped
+  `{artists, albums, tracks, strategies}` with `inLibrary` flags; seeds are local ids or
+  `mb:<mbid>`, picked via search or `GET /music/discover/seeds` (favourites + recent albums).
+  Strategies: local content vector over genres / era / artist overlap (weights 0.6 / 0.15 /
+  0.25), and ListenBrainz Labs similar-artists (keyless; verified 2026-10-10) for seed artist
+  MBIDs, blended noisy-OR. Filters: genre, year range, in-library only. *Corrections*: Last.fm
+  similar artists was not added (needs a key; ListenBrainz covers the keyless case); the LLM
+  rerank is **not** used because `AnthropicClient.rerank` takes movie-shaped seeds — a
+  music prompt is a follow-up.
+- **Cross-links**: the Movie *Soundtrack* section links each track to the local track page
+  (Phase 3), and the Album page shows "Soundtrack of <film>" via
+  `GET /music/albums/:id/films` — exact match on the `soundtrack_cache` release MBID, else a
+  soundtrack-looking album (MB secondary type or title hint) whose stripped title equals a
+  library movie title, year ±1.
+- **Deferred**: scrobbling (Last.fm / ListenBrainz submit) — optional in the roadmap, not built.
 
 ---
 

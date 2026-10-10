@@ -110,6 +110,7 @@ Off by default. Turn it on during install, on the Setup page, or in **Settings �
 - **Player** -- the same persistent player with an audio layout: a **waveform seek bar**, queue, shuffle/repeat, gapless playback, ReplayGain, synced lyrics, lock-screen controls, and the existing EQ/compressor.
 - **Original quality** -- streams are progressive HTTP (no HLS). FLAC plays as FLAC when the browser can decode it; only formats no browser plays (APE, WavPack, DSD, …) are transcoded to a cached FLAC, and the High/Normal/Low profiles make cached Opus (or AAC) copies. The transcode cache is size-capped (LRU).
 - **Metadata & lyrics** -- MusicBrainz album/artist matching (1 request/second), artist bios, LRCLIB lyrics (synced when available). Lyrics can be edited by contributors.
+- **Search & Discover** -- the header search streams library + MusicBrainz results (Last.fm / Discogs when keys are set); non-library hits open MusicBrainz preview pages (`/album/mb:…`, `/artist/mb:…`). **Discover** recommends artists, albums and tracks from seeds (genre/era/artist match + ListenBrainz similar artists), and soundtrack albums link back to their film.
 - **Admin** -- music quick actions on the Admin page (scan, refresh metadata, fetch art, fetch lyrics, re-encode unplayable, clear cache), and music job types with their own concurrency limit.
 - **API** -- everything is under `/api/v1/music/*` and returns 404 while Music is off. See `docs/music-support-plan.md` for the design.
 
