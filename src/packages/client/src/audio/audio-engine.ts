@@ -10,8 +10,10 @@ import {
  * Audio processing engine using Web Audio API.
  *
  * Chain when fully active:
- *   MediaElementSource
- *     → InputGain
+ *   MediaElementSource(s)   — one per attached element (the "source bus")
+ *     → BusInput            — shared unity gain; every source mixes in here
+ *     → ReplayGain          — per-track loudness normalisation (always in path)
+ *     → InputGain (Amp)
  *     → EQ filters (10-band)
  *     → Compressor (single- or multi-band, w/ dry/wet mix)
  *     → Stereo Width (M/S processing)
@@ -19,9 +21,39 @@ import {
  *     → HRTF Surround (Panner-based)
  *     → Destination
  *
- * Each stage is independently bypassable; when all are off the source
- * connects directly to the destination (zero-overhead pass-through).
+ * Each effect stage is independently bypassable; when all are off the bus
+ * runs BusInput → ReplayGain → MasterGain → destination.
+ *
+ * Source bus: video attaches its single shared <video> (via register/attach —
+ * it is simply the first and only source). Music attaches two <audio>
+ * elements (A/B gapless) with attachSource(); both feed the same BusInput, so
+ * an A/B swap never rebuilds the chain. Chain rebuilds only touch the nodes
+ * from ReplayGain onward — source → BusInput → ReplayGain wiring is stable.
  */
+
+/** Sane ReplayGain range — real tags sit well inside ±15 dB. */
+export const REPLAY_GAIN_MAX_DB = 15;
+
+/**
+ * ReplayGain dB → linear gain factor. `null` / non-finite → unity. The dB
+ * value is clamped to ±{@link REPLAY_GAIN_MAX_DB} so a corrupt tag can't blast
+ * or silence playback. Pure — exported for callers and future unit tests.
+ */
+export function replayGainDbToLinear(db: number | null): number {
+	if (db === null || !Number.isFinite(db)) return 1;
+	const clamped = Math.max(-REPLAY_GAIN_MAX_DB, Math.min(REPLAY_GAIN_MAX_DB, db));
+	return 10 ** (clamped / 20);
+}
+
+/**
+ * Element → its MediaElementAudioSourceNode. The browser lets
+ * createMediaElementSource() run only ONCE per element, ever, so the node is
+ * cached here and reused on re-attach. Module-level because the constraint is
+ * per element, not per engine. A node is tied to the AudioContext it was made
+ * in: after destroy() (new context) the element can't rejoin — swap it (the
+ * requestAudioReset path already does this for the <video>).
+ */
+const elementSourceNodes = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>();
 
 export interface EqBand {
 	frequency: number;
@@ -110,8 +142,17 @@ const BASS_SATURATION_CURVE = (() => {
 
 export class AudioEngine {
 	private ctx: AudioContext | null = null;
-	private source: MediaElementAudioSourceNode | null = null;
+	/** Elements currently connected to the bus (element → its source node). */
+	private sources = new Map<HTMLMediaElement, MediaElementAudioSourceNode>();
+	/** Primary / active source: drives the silence probe and dumpState. The
+	 *  <video> for video playback; the playing A/B element for music. */
 	private boundElement: HTMLMediaElement | null = null;
+	/** Shared bus input — every attached source connects here. Stable across
+	 *  chain rebuilds; the pre-effects recording tap hangs off it. */
+	private busInput: GainNode | null = null;
+	/** ReplayGain stage, wired busInput → replayGainNode once at graph init. */
+	private replayGainNode: GainNode | null = null;
+	private replayGainDb: number | null = null;
 	private pendingElement: HTMLMediaElement | null = null;
 	private inputGainNode: GainNode | null = null;
 	private filters: BiquadFilterNode[] = [];
@@ -260,12 +301,13 @@ export class AudioEngine {
 	 * an explicit element; otherwise the previously {@link register}-ed
 	 * element is used.
 	 *
-	 * Idempotent: calling with the same element is a no-op. Calling with a
-	 * different element logs a warning and is refused — browsers permanently
-	 * bind a `MediaElementSourceNode` to its element, so the only way to
-	 * "re-attach" to a new element is to destroy() the engine first. The
-	 * caller should ensure the video element is a singleton for the app
-	 * lifetime.
+	 * Idempotent: calling with an element already on the bus is a no-op.
+	 * Calling with a different element while the primary element is still
+	 * connected logs a warning and is refused — this keeps the single-<video>
+	 * contract (browsers permanently bind a `MediaElementSourceNode` to its
+	 * element, so re-binding a new <video> needs destroy() first). To feed
+	 * several elements into the chain on purpose (music A/B), use
+	 * {@link attachSource}.
 	 */
 	attach(element?: HTMLMediaElement): void {
 		const target = element ?? this.pendingElement;
@@ -283,28 +325,54 @@ export class AudioEngine {
 			return;
 		}
 		if (this.attached) {
-			if (this.boundElement !== target) {
+			if (this.sources.has(target)) {
+				debug('audio:attach', { event: 'attach', result: 'noop-same-element' });
+				dlog('[audioEngine] attach() — already attached, no-op');
+				return;
+			}
+			if (this.boundElement && this.sources.has(this.boundElement)) {
 				debug('audio:attach', { event: 'attach', result: 'refused-different-element' });
 				dwarn(
 					'[audioEngine] attach() called with a different element than the one ' +
-						'already bound. Ignoring — call destroy() first to re-bind.',
+						'already bound. Ignoring — call destroy() first to re-bind, or ' +
+						'attachSource() to add it to the bus.',
 				);
-			} else {
-				debug('audio:attach', { event: 'attach', result: 'noop-same-element' });
-				dlog('[audioEngine] attach() — already attached, no-op');
+				return;
 			}
-			return;
 		}
+		this.attachSource(target);
+	}
+
+	/**
+	 * Connect an element to the source bus so it plays through the effect
+	 * chain. Creates the AudioContext + graph on first use. The element's
+	 * `MediaElementSourceNode` is created once and cached, so detach → attach
+	 * is cheap. Several attached elements mix into the bus (music A/B gapless).
+	 * The first attached element becomes the active source unless
+	 * {@link setActiveSource} picks another.
+	 *
+	 * Refused (returns false) for HLS MediaSource-backed elements (blob: src)
+	 * — see the HARD GUARD note — and for an element already bound to a
+	 * previous (destroyed) AudioContext.
+	 *
+	 * NOTE: once an element is on a Web Audio graph its audio NEVER returns
+	 * to the native output path, even after {@link detachSource}. The engine
+	 * forces it unmuted + full volume; volume/mute go through
+	 * {@link setMasterOutput}.
+	 */
+	attachSource(element: HTMLMediaElement): boolean {
+		if (this.attached && this.sources.has(element)) return true;
 
 		// HARD GUARD: refuse to attach when the element is fed by an HLS
 		// MediaSource (blob: URL). `createMediaElementSource` on such an
-		// element produces SILENT output in Chrome (documented below) —
-		// once bound, the element's audio is captured by a Web Audio graph
-		// that emits nothing, and pausing/replaying makes the silence
-		// obvious. Leaving the engine UNATTACHED keeps audio on the native
-		// path, which works. The UI surfaces `audioEffectsHlsBlocked` so
-		// the user learns EQ/Compressor only work on direct-play files.
-		if (target.src?.startsWith('blob:')) {
+		// element produces SILENT output in Chrome (documented in
+		// createSourceNode) — once bound, the element's audio is captured by
+		// a Web Audio graph that emits nothing, and pausing/replaying makes
+		// the silence obvious. Leaving the element UNATTACHED keeps audio on
+		// the native path, which works. The UI surfaces
+		// `audioEffectsHlsBlocked` so the user learns EQ/Compressor only work
+		// on direct-play files.
+		if (element.src?.startsWith('blob:')) {
 			debug('audio:attach', { event: 'attach', result: 'refused-hls-mediasource' });
 			dwarn(
 				'[audioEngine] attach() refused — element is HLS MediaSource-backed ' +
@@ -312,10 +380,163 @@ export class AudioEngine {
 					'Audio stays on the native path; EQ/Compressor unavailable for this stream.',
 			);
 			audioEffectsHlsBlocked.value = true;
-			return;
+			return false;
 		}
 		audioEffectsHlsBlocked.value = false;
 
+		const createdGraph = !this.attached;
+		if (createdGraph && !this.initGraph()) return false;
+
+		const node = this.createSourceNode(element);
+		if (!node || !this.busInput) {
+			// Keep the old contract: a failed first bind leaves the engine
+			// unattached so the next toggle retries from scratch.
+			if (createdGraph) this.destroy();
+			return false;
+		}
+		node.connect(this.busInput);
+		this.sources.set(element, node);
+		if (!this.boundElement || !this.sources.has(this.boundElement)) {
+			this.boundElement = element;
+		}
+		// CRITICAL: the element is now a graph input. Its own muted/volume
+		// gate what the source node receives, so a muted element (set by the
+		// player for autoplay/preview/cleanup) would feed silence into the
+		// EQ/Comp chain. Force it unmuted + full volume; the user's
+		// volume/mute is honoured by masterGainNode instead (see
+		// setMasterOutput / rebuildChain).
+		element.muted = false;
+		element.volume = 1;
+		const boundInfo = {
+			event: 'media-element-source-bound',
+			tag: element.tagName,
+			src: element.src?.slice(0, 120),
+			crossOrigin: element.crossOrigin,
+			muted: element.muted,
+			volume: element.volume,
+			readyState: element.readyState,
+			usingMediaSource: !!element.src && element.src.startsWith('blob:'),
+			busSources: this.sources.size,
+		};
+		debug('audio:attach', boundInfo);
+		dlog('[audioEngine] createMediaElementSource OK; element bound', boundInfo);
+		return true;
+	}
+
+	/**
+	 * Disconnect an element from the bus. Its source node stays cached, so
+	 * {@link attachSource} can re-add it later. The element produces no sound
+	 * while detached (see the attachSource note). The graph itself stays up.
+	 */
+	detachSource(element: HTMLMediaElement): void {
+		const node = this.sources.get(element);
+		if (!node) return;
+		try {
+			node.disconnect();
+		} catch {
+			/* ignore */
+		}
+		this.sources.delete(element);
+		if (this.boundElement === element) {
+			this.boundElement = this.sources.keys().next().value ?? null;
+		}
+		debug('audio:attach', { event: 'detach-source', busSources: this.sources.size });
+	}
+
+	/**
+	 * Mark an element as the active source (the one the silence probe and
+	 * dumpState watch — e.g. the A/B element that is playing now). Attaches it
+	 * first when needed. Returns false if the attach was refused.
+	 */
+	setActiveSource(element: HTMLMediaElement): boolean {
+		if (!this.sources.has(element) && !this.attachSource(element)) return false;
+		this.boundElement = element;
+		return true;
+	}
+
+	/** True when the element is connected to the bus. */
+	hasSource(element: HTMLMediaElement): boolean {
+		return this.sources.has(element);
+	}
+
+	/**
+	 * Set per-track ReplayGain (dB). Applied by a GainNode right after the bus
+	 * input, independent of the effect toggles — it works with every effect
+	 * off. `null` → unity. Clamped to ±{@link REPLAY_GAIN_MAX_DB} dB.
+	 *
+	 * ReplayGain REQUIRES the Web Audio path. When the engine isn't attached
+	 * the value is only stored and is applied on attach; the native element
+	 * path ignores it. So callers that set a non-zero gain must attach the
+	 * element first ({@link attachSource}).
+	 */
+	setReplayGainDb(db: number | null): void {
+		this.replayGainDb =
+			db === null || !Number.isFinite(db)
+				? null
+				: Math.max(-REPLAY_GAIN_MAX_DB, Math.min(REPLAY_GAIN_MAX_DB, db));
+		if (this.replayGainNode) {
+			this.replayGainNode.gain.value = replayGainDbToLinear(this.replayGainDb);
+		}
+	}
+
+	/** Current (clamped) ReplayGain in dB, or null for unity. */
+	getReplayGainDb(): number | null {
+		return this.replayGainDb;
+	}
+
+	/**
+	 * Return the element's MediaElementSourceNode, creating it once (cached in
+	 * {@link elementSourceNodes}). Null when it can't be created or belongs to
+	 * a previous AudioContext.
+	 */
+	private createSourceNode(element: HTMLMediaElement): MediaElementAudioSourceNode | null {
+		if (!this.ctx) return null;
+		const cached = elementSourceNodes.get(element);
+		if (cached) {
+			if (cached.context === this.ctx) return cached;
+			console.error(
+				'[audioEngine] element is already bound to a MediaElementSourceNode from a ' +
+					'previous AudioContext — swap the element (requestAudioReset) to re-bind.',
+			);
+			return null;
+		}
+		try {
+			// KNOWN CHROME LIMITATION:
+			// createMediaElementSource on a <video> whose source is an
+			// HLS MediaSource (blob: URL) produces silent output in
+			// Chrome — even with crossOrigin='anonymous' and same-origin
+			// content. MDN documents MediaSource as exempt from CORS
+			// taint; Chrome's actual behavior contradicts that. Diagnostic
+			// logging on prod confirmed: chain wires correctly to
+			// ctx.destination, ctx.currentTime advances, yet speakers
+			// stay silent.
+			//
+			// captureStream() + MediaStreamSource is also broken: the
+			// MediaStreamTrack reports `live` with samples flowing per
+			// the API surface, but no audio reaches the output.
+			//
+			// We use createMediaElementSource here for direct-play
+			// content (where it works) and accept that EQ/compressor
+			// silence the chain on HLS-backed streams. This is a Chrome
+			// limitation we cannot work around from JS alone — would
+			// require either server-side audio processing or switching
+			// streams away from MediaSource (back to progressive
+			// download).
+			const node = this.ctx.createMediaElementSource(element);
+			elementSourceNodes.set(element, node);
+			return node;
+		} catch (err) {
+			console.error('[audioEngine] Failed to create MediaElementSource:', err);
+			return null;
+		}
+	}
+
+	/**
+	 * Create the AudioContext and every graph node (bus input, ReplayGain,
+	 * effect stages, master gain), then build the chain. Sources are attached
+	 * separately. Returns false if the context could not be created.
+	 */
+	private initGraph(): boolean {
 		try {
 			// Sample-rate policy.
 			//
@@ -365,57 +586,19 @@ export class AudioEngine {
 			dlog(
 				`[audioEngine] new AudioContext → state=${this.ctx.state} sampleRate=${this.ctx.sampleRate}`,
 			);
-
-			// KNOWN CHROME LIMITATION:
-			// createMediaElementSource on a <video> whose source is an
-			// HLS MediaSource (blob: URL) produces silent output in
-			// Chrome — even with crossOrigin='anonymous' and same-origin
-			// content. MDN documents MediaSource as exempt from CORS
-			// taint; Chrome's actual behavior contradicts that. Diagnostic
-			// logging on prod confirmed: chain wires correctly to
-			// ctx.destination, ctx.currentTime advances, yet speakers
-			// stay silent.
-			//
-			// captureStream() + MediaStreamSource is also broken: the
-			// MediaStreamTrack reports `live` with samples flowing per
-			// the API surface, but no audio reaches the output.
-			//
-			// We use createMediaElementSource here for direct-play
-			// content (where it works) and accept that EQ/compressor
-			// silence the chain on HLS-backed streams. This is a Chrome
-			// limitation we cannot work around from JS alone — would
-			// require either server-side audio processing or switching
-			// streams away from MediaSource (back to progressive
-			// download).
-			this.source = this.ctx.createMediaElementSource(target);
-			this.boundElement = target;
-			// CRITICAL: the element is now the graph's input. Its own
-			// muted/volume gate what the source node receives, so a muted
-			// element (set by the player for autoplay/preview/cleanup) would
-			// feed silence into the EQ/Comp chain. Force it unmuted + full
-			// volume; the user's volume/mute is honoured by masterGainNode
-			// instead (see setMasterOutput / rebuildChain).
-			target.muted = false;
-			target.volume = 1;
-			const boundInfo = {
-				event: 'media-element-source-bound',
-				tag: target.tagName,
-				src: target.src?.slice(0, 120),
-				crossOrigin: target.crossOrigin,
-				muted: target.muted,
-				volume: target.volume,
-				readyState: target.readyState,
-				usingMediaSource: !!target.src && target.src.startsWith('blob:'),
-			};
-			debug('audio:attach', boundInfo);
-			dlog('[audioEngine] createMediaElementSource OK; element bound', boundInfo);
 		} catch (err) {
-			console.error('[audioEngine] Failed to create MediaElementSource:', err);
+			console.error('[audioEngine] Failed to create AudioContext:', err);
 			this.ctx = null;
-			this.source = null;
-			this.boundElement = null;
-			return;
+			return false;
 		}
+
+		// Shared source bus + ReplayGain. Wired once; rebuildChain never
+		// touches source → busInput → replayGainNode.
+		this.busInput = this.ctx.createGain();
+		this.busInput.gain.value = 1;
+		this.replayGainNode = this.ctx.createGain();
+		this.replayGainNode.gain.value = replayGainDbToLinear(this.replayGainDb);
+		this.busInput.connect(this.replayGainNode);
 
 		dlog(
 			`[audioEngine] attached. ctx.state=${this.ctx.state} sampleRate=${this.ctx.sampleRate} baseLatency=${(this.ctx as AudioContext & { baseLatency?: number }).baseLatency ?? 'n/a'}`,
@@ -618,6 +801,7 @@ export class AudioEngine {
 
 		this.attached = true;
 		this.rebuildChain();
+		return true;
 	}
 
 	isAttached(): boolean {
@@ -646,12 +830,9 @@ export class AudioEngine {
 		// set the master GainNode to NaN, i.e. total silence.
 		this.masterVolume = Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 1;
 		this.masterMuted = muted;
-		// Keep the bound element out of the gain path — it must stay unmuted
-		// + full so the MediaElementSource receives signal.
-		if (this.boundElement) {
-			this.boundElement.muted = false;
-			this.boundElement.volume = 1;
-		}
+		// Keep the bus elements out of the gain path — they must stay unmuted
+		// + full so their MediaElementSources receive signal.
+		this.forceSourcesAudible();
 		if (this.masterGainNode) {
 			this.masterGainNode.gain.value = this.masterMuted ? 0 : this.masterVolume;
 		}
@@ -666,8 +847,9 @@ export class AudioEngine {
 	/**
 	 * Tap the graph for a recording stream.
 	 *
-	 * `preEffects` (the default) taps the MediaElementSource directly, BEFORE
-	 * the EQ/compressor chain. Two reasons:
+	 * `preEffects` (the default) taps the shared bus input, BEFORE ReplayGain
+	 * and the EQ/compressor chain, so it covers every attached source (both
+	 * music A/B elements). Two reasons:
 	 *
 	 *  - Isolation. The terminal node is rebuilt whenever an effect is toggled
 	 *    or a slider moves; recording off it meant every rebuild briefly
@@ -676,12 +858,12 @@ export class AudioEngine {
 	 *    with the live output while MediaRecorder encodes on the main thread.
 	 *
 	 * The live output is untouched either way — this only adds a branch off the
-	 * source, so effects keep playing normally while the snippet records dry.
+	 * bus input, so effects keep playing normally while the snippet records dry.
 	 */
 	createRecordingAudioTrack(opts: { preEffects?: boolean } = {}): MediaStreamTrack | null {
 		if (!this.attached || !this.ctx) return null;
 		const preEffects = opts.preEffects !== false;
-		const tapFrom = preEffects ? this.source : this.outputNode;
+		const tapFrom = preEffects ? this.busInput : this.outputNode;
 		if (!tapFrom) return null;
 		try {
 			this.recorderTap?.disconnect();
@@ -727,7 +909,9 @@ export class AudioEngine {
 						currentTime: this.ctx.currentTime,
 					}
 				: null,
-			source: this.source ? 'MediaElementSourceNode' : null,
+			source: this.sources.size > 0 ? 'MediaElementSourceNode' : null,
+			busSources: this.sources.size,
+			replayGainDb: this.replayGainDb,
 			boundElement: v
 				? {
 						tag: v.tagName,
@@ -765,6 +949,8 @@ export class AudioEngine {
 					}
 				: null,
 			gains: {
+				busInput: this.busInput?.gain.value,
+				replayGain: this.replayGainNode?.gain.value,
 				inputGain: this.inputGainNode?.gain.value,
 				makeupGain: this.makeupGainNode?.gain.value,
 				dryGain: this.dryGainNode?.gain.value,
@@ -1161,10 +1347,17 @@ export class AudioEngine {
 			navigator.mediaDevices.removeEventListener('devicechange', this.deviceChangeListener);
 			this.deviceChangeListener = null;
 		}
-		if (this.source) {
-			this.source.disconnect();
-			this.source = null;
+		for (const node of this.sources.values()) {
+			try {
+				node.disconnect();
+			} catch {
+				/* ignore */
+			}
 		}
+		// Nodes stay in elementSourceNodes; they belong to the closed context
+		// and can't be reused (see createSourceNode).
+		this.sources.clear();
+		this.stopRecordingTap();
 		if (this.ctx) {
 			this.ctx.close().catch(() => {});
 			this.ctx = null;
@@ -1177,6 +1370,13 @@ export class AudioEngine {
 		this.streamDest = null;
 		this.analyser = null;
 		this.masterGainNode = null;
+		this.busInput = null;
+		this.replayGainNode = null;
+		this.outputNode = null;
+		// Keep-alive nodes belong to the closed context; clear them so the
+		// next attach builds fresh ones (setupKeepAlive is idempotent on these).
+		this.keepAliveSource = null;
+		this.keepAliveGain = null;
 		this.inputGainNode = null;
 		this.filters = [];
 		this.compressor = null;
@@ -1363,7 +1563,7 @@ export class AudioEngine {
 	}
 
 	private rebuildChain(): void {
-		if (!this.ctx || !this.source) {
+		if (!this.ctx || !this.replayGainNode) {
 			debug('audio:chain', { event: 'rebuild', result: 'bail-no-ctx-or-source' });
 			dlog('[audioEngine] rebuildChain() — no ctx/source, bailing');
 			return;
@@ -1371,8 +1571,9 @@ export class AudioEngine {
 		const trace: string[] = [];
 		const traceConnect = (from: string, to: string) => trace.push(`${from} → ${to}`);
 
-		// Disconnect everything
-		this.source.disconnect();
+		// Disconnect everything downstream of the bus. Source nodes and the
+		// busInput → replayGainNode link are stable and never touched here.
+		this.replayGainNode.disconnect();
 		this.masterGainNode?.disconnect();
 		this.inputGainNode?.disconnect();
 		for (const f of this.filters) f.disconnect();
@@ -1410,9 +1611,12 @@ export class AudioEngine {
 		this.mbHighMakeup?.disconnect();
 		this.mbMerge?.disconnect();
 
-		// Build chain: source → [Amp] → [EQ] → [Compressor] → [Stereo Width] → [Bass] → [HRTF] → destination
-		let current: AudioNode = this.source;
-		traceConnect('source', '(start)');
+		// Build chain: bus → replayGain → [Amp] → [EQ] → [Compressor] → [Stereo Width] → [Bass] → [HRTF] → master → destination
+		let current: AudioNode = this.replayGainNode;
+		traceConnect(
+			`bus (${this.sources.size} sources)`,
+			`replayGain (val=${this.replayGainNode.gain.value})`,
+		);
 
 		const anyEffectOn =
 			this.eqEnabled ||
@@ -1571,13 +1775,10 @@ export class AudioEngine {
 			current = this.hrtfMerge;
 		}
 
-		// Defensive: the element must never be muted while it's the source —
+		// Defensive: an element must never be muted while it's a source —
 		// the player mutes it for autoplay/preview/cleanup, and a stale mute
 		// would silence the whole chain. Volume/mute lives on masterGainNode.
-		if (this.boundElement) {
-			this.boundElement.muted = false;
-			this.boundElement.volume = 1;
-		}
+		this.forceSourcesAudible();
 
 		// Master output gain (user volume/mute) sits last, just before the
 		// destination, so it attenuates the final mix regardless of which
@@ -1597,8 +1798,8 @@ export class AudioEngine {
 		// chain rebuild (toggling EQ mid-recording) doesn't drop the captured audio.
 		this.outputNode = current;
 		// Re-attach only a POST-effects tap; a pre-effects tap hangs off the
-		// source, which this rebuild never touches.
-		if (this.recorderTap && this.recorderTapSource !== this.source) {
+		// bus input, which this rebuild never touches.
+		if (this.recorderTap && this.recorderTapSource !== this.busInput) {
 			current.connect(this.recorderTap);
 			this.recorderTapSource = current;
 		}
@@ -1820,6 +2021,14 @@ export class AudioEngine {
 			this.wetGainNode.gain.value = this.compressorEnabled
 				? Math.max(wet, WET_GAIN_FLOOR)
 				: wet;
+		}
+	}
+
+	/** Keep every bus element unmuted + full volume (see attachSource). */
+	private forceSourcesAudible(): void {
+		for (const el of this.sources.keys()) {
+			el.muted = false;
+			el.volume = 1;
 		}
 	}
 
