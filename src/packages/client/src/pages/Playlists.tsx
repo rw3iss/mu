@@ -9,7 +9,12 @@ import { useUiSetting } from '@/hooks/useUiSetting';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
-import type { Playlist, PlaylistMovieSummary } from '@/services/playlists.service';
+import {
+	type Playlist,
+	type PlaylistMovieSummary,
+	playlistKindOf,
+} from '@/services/playlists.service';
+import { browseMode } from '@/state/browseMode.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { invalidatePlaylists } from '@/state/playlists.state';
 import { newTabNav, openInNewTab } from '@/utils/navigation';
@@ -118,7 +123,13 @@ function MoviePosterItem({ movie, variant = 'strip', class: className }: MoviePo
 // Shared: Horizontal scrollable movie poster strip
 // ============================================
 
-function MovieStrip({ movies }: { movies: PlaylistMovieSummary[] }) {
+function MovieStrip({
+	movies,
+	emptyLabel = 'No movies yet',
+}: {
+	movies: PlaylistMovieSummary[];
+	emptyLabel?: string;
+}) {
 	const trackRef = useRef<HTMLDivElement>(null);
 	const wrapperRef = useRef<HTMLDivElement>(null);
 	const [offset, setOffset] = useState(0);
@@ -162,7 +173,7 @@ function MovieStrip({ movies }: { movies: PlaylistMovieSummary[] }) {
 	const canScrollRight = offset < maxOffset - 1;
 
 	if (movies.length === 0) {
-		return <div class={styles.stripEmpty}>No movies yet</div>;
+		return <div class={styles.stripEmpty}>{emptyLabel}</div>;
 	}
 
 	return (
@@ -208,8 +219,19 @@ function MovieStrip({ movies }: { movies: PlaylistMovieSummary[] }) {
 // Main Playlists page
 // ============================================
 
+/** "3 movies" / "1 track" — noun follows the playlist kind. */
+function countLabel(p: Playlist): string {
+	const audio = playlistKindOf(p) === 'audio';
+	const n = audio ? (p.itemCount ?? p.movieCount) : p.movieCount;
+	const noun = audio ? (n === 1 ? 'item' : 'items') : n === 1 ? 'movie' : 'movies';
+	return `${n} ${noun}`;
+}
+
 export function Playlists(_props: PlaylistsProps) {
-	const [playlists, setPlaylists] = useState<Playlist[]>([]);
+	// Playlists are filtered by the header browse mode: movies → video, music → audio.
+	const kind = browseMode.value === 'music' ? 'audio' : 'video';
+	const emptyLabel = kind === 'audio' ? 'No items yet' : 'No movies yet';
+	const [allPlaylists, setPlaylists] = useState<Playlist[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [showCreate, setShowCreate] = useState(false);
 	const [newName, setNewName] = useState('');
@@ -223,25 +245,29 @@ export function Playlists(_props: PlaylistsProps) {
 	);
 	const [viewMode, setViewMode] = useUiSetting<PlaylistViewMode>('playlists_view', 'list');
 
-	const [publicPlaylists, setPublicPlaylists] = useState<Playlist[]>([]);
+	const [allPublicPlaylists, setPublicPlaylists] = useState<Playlist[]>([]);
+	// Server filters by ?kind= when supported; filter client-side too so a server
+	// that ignores the param still shows the right set.
+	const playlists = allPlaylists.filter((p) => playlistKindOf(p) === kind);
+	const publicPlaylists = allPublicPlaylists.filter((p) => playlistKindOf(p) === kind);
 	// Mobile: which column is shown (columns collapse to tabs).
 	const [activeList, setActiveList] = useState<'mine' | 'public'>('mine');
 
 	useEffect(() => {
 		loadPlaylists(sortBy, sortOrder);
-	}, [sortBy, sortOrder]);
+	}, [sortBy, sortOrder, kind]);
 
 	useEffect(() => {
-		api.get<Playlist[]>('/playlists/public?includeMovies=true')
+		api.get<Playlist[]>(`/playlists/public?includeMovies=true&kind=${kind}`)
 			.then(setPublicPlaylists)
 			.catch(() => {});
-	}, []);
+	}, [kind]);
 
 	async function loadPlaylists(sort: PlaylistSortBy, order: PlaylistSortOrder) {
 		setIsLoading(true);
 		try {
 			const data = await api.get<Playlist[]>(
-				`/playlists?includeMovies=true&sortBy=${sort}&sortOrder=${order}`,
+				`/playlists?includeMovies=true&sortBy=${sort}&sortOrder=${order}&kind=${kind}`,
 			);
 			setPlaylists(data);
 		} catch {
@@ -270,6 +296,7 @@ export function Playlists(_props: PlaylistsProps) {
 					description: newDescription.trim(),
 					isPublic: newPublic || newPublicEdit,
 					publicEdit: newPublicEdit,
+					kind,
 				});
 				invalidatePlaylists();
 				notifySuccess('Playlist created');
@@ -283,7 +310,7 @@ export function Playlists(_props: PlaylistsProps) {
 				notifyError('Failed to create playlist');
 			}
 		},
-		[newName, newDescription, newPublic, newPublicEdit],
+		[newName, newDescription, newPublic, newPublicEdit, kind],
 	);
 
 	const renderRow = (playlist: Playlist, showOwner = false) => (
@@ -300,11 +327,11 @@ export function Playlists(_props: PlaylistsProps) {
 					{playlist.name}
 				</h3>
 				<span class={styles.listItemCount}>
-					{playlist.movieCount} {playlist.movieCount === 1 ? 'movie' : 'movies'}
+					{countLabel(playlist)}
 					{showOwner && playlist.ownerName ? ` · by ${playlist.ownerName}` : ''}
 				</span>
 			</div>
-			<MovieStrip movies={playlist.movies ?? []} />
+			<MovieStrip movies={playlist.movies ?? []} emptyLabel={emptyLabel} />
 		</div>
 	);
 
@@ -335,7 +362,7 @@ export function Playlists(_props: PlaylistsProps) {
 						</div>
 					) : (
 						<div class={styles.emptyPoster}>
-							<span class={styles.emptyIcon}>No movies yet</span>
+							<span class={styles.emptyIcon}>{emptyLabel}</span>
 						</div>
 					)}
 				</div>
@@ -345,7 +372,7 @@ export function Playlists(_props: PlaylistsProps) {
 						<p class={styles.cardDescription}>{playlist.description}</p>
 					)}
 					<span class={styles.cardCount}>
-						{playlist.movieCount} {playlist.movieCount === 1 ? 'movie' : 'movies'}
+						{countLabel(playlist)}
 						{showOwner && playlist.ownerName ? ` · by ${playlist.ownerName}` : ''}
 					</span>
 				</div>
@@ -364,7 +391,7 @@ export function Playlists(_props: PlaylistsProps) {
 	return (
 		<div class={styles.playlists}>
 			<div class={styles.header}>
-				<h1 class={styles.title}>Playlists</h1>
+				<h1 class={styles.title}>{kind === 'audio' ? 'Music Playlists' : 'Playlists'}</h1>
 				<div class={styles.headerActions}>
 					<Select<PlaylistSortBy>
 						value={sortBy}
@@ -479,7 +506,7 @@ export function Playlists(_props: PlaylistsProps) {
 											) : (
 												<div class={styles.emptyPoster}>
 													<span class={styles.emptyIcon}>
-														No movies yet
+														{emptyLabel}
 													</span>
 												</div>
 											)}
@@ -492,8 +519,7 @@ export function Playlists(_props: PlaylistsProps) {
 												</p>
 											)}
 											<span class={styles.cardCount}>
-												{playlist.movieCount}{' '}
-												{playlist.movieCount === 1 ? 'movie' : 'movies'}
+												{countLabel(playlist)}
 											</span>
 										</div>
 									</div>

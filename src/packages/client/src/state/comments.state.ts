@@ -1,5 +1,23 @@
+import type { EntityRef } from '@mu/shared';
 import { signal } from '@preact/signals';
 import { commentsService, type MovieComment } from '@/services/comments.service';
+import { entitiesService } from '@/services/entities.service';
+
+/**
+ * A comment target: a bare string is a movie id (legacy callers); an
+ * EntityRef targets any entity via the generic /entities endpoints.
+ */
+export type CommentTarget = string | EntityRef;
+
+/** Cache key — movies keep their bare id so existing readers still work. */
+export function commentKey(t: CommentTarget): string {
+	if (typeof t === 'string') return t;
+	return t.type === 'movie' ? t.id : `${t.type}:${t.id}`;
+}
+
+function asRef(t: CommentTarget): EntityRef {
+	return typeof t === 'string' ? { type: 'movie', id: t } : t;
+}
 
 /**
  * Per-movie comment cache. One signal holding a map keyed by movieId so any
@@ -41,41 +59,46 @@ export function countComments(movieId: string): number {
 	return count(list);
 }
 
-export async function loadComments(movieId: string, force = false): Promise<MovieComment[]> {
-	if (!force && movieComments.value[movieId]) return movieComments.value[movieId]!;
-	const existing = inflight.get(movieId);
+export async function loadComments(target: CommentTarget, force = false): Promise<MovieComment[]> {
+	const key = commentKey(target);
+	if (!force && movieComments.value[key]) return movieComments.value[key]!;
+	const existing = inflight.get(key);
 	if (existing) return existing;
-	const p = commentsService
-		.list(movieId)
-		.then((r) => put(movieId, r.comments))
-		.finally(() => inflight.delete(movieId));
-	inflight.set(movieId, p);
+	const ref = asRef(target);
+	const req =
+		ref.type === 'movie' ? commentsService.list(ref.id) : entitiesService.listComments(ref);
+	const p = req.then((r) => put(key, r.comments)).finally(() => inflight.delete(key));
+	inflight.set(key, p);
 	return p;
 }
 
 export async function addComment(
-	movieId: string,
+	target: CommentTarget,
 	body: { text: string; timeSeconds?: number | null; parentId?: string | null },
 ) {
-	const r = await commentsService.create(movieId, body);
-	return put(movieId, r.comments);
+	const ref = asRef(target);
+	const r =
+		ref.type === 'movie'
+			? await commentsService.create(ref.id, body)
+			: await entitiesService.createComment(ref, body);
+	return put(commentKey(target), r.comments);
 }
 
 export async function editComment(
-	movieId: string,
+	target: CommentTarget,
 	id: string,
 	body: { text?: string; timeSeconds?: number | null },
 ) {
 	const r = await commentsService.update(id, body);
-	return put(movieId, r.comments);
+	return put(commentKey(target), r.comments);
 }
 
-export async function deleteComment(movieId: string, id: string) {
+export async function deleteComment(target: CommentTarget, id: string) {
 	const r = await commentsService.remove(id);
-	return put(movieId, r.comments);
+	return put(commentKey(target), r.comments);
 }
 
-export async function reactToComment(movieId: string, id: string, emoji: string) {
+export async function reactToComment(target: CommentTarget, id: string, emoji: string) {
 	const r = await commentsService.react(id, emoji);
-	return put(movieId, r.comments);
+	return put(commentKey(target), r.comments);
 }

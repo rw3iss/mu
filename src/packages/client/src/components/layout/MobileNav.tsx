@@ -1,6 +1,7 @@
 import { currentPath } from '@/app';
 import { Icon, type IconName } from '@/components/common/Icon';
 import { Link } from '@/components/common/Link';
+import { browseMode } from '@/state/browseMode.state';
 import styles from './MobileNav.module.scss';
 
 interface NavTab {
@@ -9,15 +10,23 @@ interface NavTab {
 	icon: IconName;
 }
 
-const tabs: NavTab[] = [
+const movieTabs: NavTab[] = [
 	{ label: 'Home', path: '/', icon: 'home' },
 	{ label: 'Library', path: '/library', icon: 'film' },
 	{ label: 'Playlists', path: '/playlists', icon: 'list-plus' },
 	{ label: 'Profile', path: '/settings', icon: 'settings' },
 ];
 
+const musicTabs: NavTab[] = [
+	{ label: 'Home', path: '/music', icon: 'home' },
+	{ label: 'Library', path: '/music/library', icon: 'music' },
+	{ label: 'Playlists', path: '/playlists', icon: 'list-plus' },
+	{ label: 'Profile', path: '/settings', icon: 'settings' },
+];
+
 export function MobileNav() {
 	const activePath = currentPath.value;
+	const tabs = browseMode.value === 'music' ? musicTabs : movieTabs;
 
 	return (
 		<nav class={styles.mobileNav} aria-label="Mobile navigation">

@@ -162,6 +162,8 @@ Preact SPA in `packages/client/src/`:
 
 The player is a persistent overlay (no route), managed by `globalPlayer.state.ts`. Video element stays in the DOM across mini/full transitions.
 
+**Browse mode (Movies | Music).** `state/features.state.ts` loads `GET /features` at start (refreshed on the `features:changed` WS event); `state/browseMode.state.ts` holds the mode (UI setting `browse_mode`, forced when only one feature is on, and the URL wins — `/music*`, `/album|artist|track/:id` set music, movie routes set movies). The TopBar segmented toggle, Sidebar/MobileNav items (`NavItem.mode`), header search (`MusicSearch` in music mode) and the shared `/playlists`, `/favorites`, `/history` pages all follow it; `/` forwards to `/music` in music mode. Music pages live in `pages/music/*` behind `MusicGate` (redirects when Music is off). Shared entity components take an `entity: EntityRef` prop (not `ref` — Preact reserves it): `EntityRating`, `EntityPlaylists` (`MoviePlaylists` wraps it), `EntityOptionsMenu` (per-type action registry), `CommentsPanel entity=…`, `FavoriteButton entityType="album" entityId=…`. Generic endpoints used: `/entities/:type/:id/{rating,rating-summary,comments}`, `/playlists/:id/items`, `/playlists/by-item/:type/:id`, favorites with `entityId` + `entityKeys` in `/favorites/keys`.
+
 ## Plugin System
 
 Plugins live in `src/plugins/<plugin-id>/` with both server and client code:

@@ -24,8 +24,8 @@ import { SmartImage } from './SmartImage';
  *   └──────────────────────────────┘
  *
  * Aspect-ratio is set per `posterShape` — `2/3` (default movie
- * poster), `1/1.4` (person portrait), `1/1` (square), or `16/9`
- * (backdrop).
+ * poster), `1/1.4` (person portrait), `1/1` (square / circle — artists),
+ * or `16/9` (backdrop).
  *
  * Open/closed: no movie-specific flags. State classes (dim,
  * processing, selected) are exposed as boolean props for
@@ -33,7 +33,7 @@ import { SmartImage } from './SmartImage';
  * the topLeft/topRight/posterBadges slots.
  */
 
-export type MediaCardPosterShape = 'poster' | 'portrait' | 'square' | 'backdrop';
+export type MediaCardPosterShape = 'poster' | 'portrait' | 'square' | 'backdrop' | 'circle';
 
 export interface MediaCardProps {
 	/** Image URL (passed straight to SmartImage). */

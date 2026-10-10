@@ -20,3 +20,14 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
+
+.musicSection {
+	margin-bottom: var(--space-xl);
+}
+
+.sectionTitle {
+	font-size: var(--font-size-lg);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-label);
+	margin: 0 0 var(--space-sm);
+}

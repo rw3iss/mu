@@ -3,6 +3,7 @@ import {
 	type AddFavoriteInput,
 	type FavoriteEntry,
 	favoritesService,
+	type MusicFavoriteType,
 	type RemoveFavoriteInput,
 } from '@/services/favorites.service';
 
@@ -14,12 +15,27 @@ import {
  */
 export const favoritePersonKeys = signal<Set<string> | null>(null);
 export const favoriteMovieIds = signal<Set<string> | null>(null);
+/** Music favorites keyed `<type>:<id>` (artist / album / track). */
+export const favoriteEntityKeys = signal<Set<string> | null>(null);
 export const favoritesLoading = signal<boolean>(false);
+
+export function entityFavoriteKey(type: MusicFavoriteType, id: string): string {
+	return `${type}:${id}`;
+}
+
+export function isEntityFavorited(type: MusicFavoriteType, id: string): boolean {
+	return favoriteEntityKeys.value?.has(entityFavoriteKey(type, id)) ?? false;
+}
 
 let keysInflight: Promise<void> | null = null;
 
 export async function ensureFavoritesLoaded(): Promise<void> {
-	if (favoritePersonKeys.value !== null && favoriteMovieIds.value !== null) return;
+	if (
+		favoritePersonKeys.value !== null &&
+		favoriteMovieIds.value !== null &&
+		favoriteEntityKeys.value !== null
+	)
+		return;
 	if (keysInflight) return keysInflight;
 	favoritesLoading.value = true;
 	keysInflight = favoritesService
@@ -27,12 +43,14 @@ export async function ensureFavoritesLoaded(): Promise<void> {
 		.then((res) => {
 			favoritePersonKeys.value = new Set(res.personKeys);
 			favoriteMovieIds.value = new Set(res.movieIds);
+			favoriteEntityKeys.value = new Set(res.entityKeys ?? []);
 		})
 		.catch(() => {
 			// Initialize with empty sets so isFavorite() stops returning
 			// indeterminate; refresh on next mutation.
 			favoritePersonKeys.value = new Set();
 			favoriteMovieIds.value = new Set();
+			favoriteEntityKeys.value = new Set();
 		})
 		.finally(() => {
 			favoritesLoading.value = false;
@@ -44,6 +62,7 @@ export async function ensureFavoritesLoaded(): Promise<void> {
 export function invalidateFavorites(): void {
 	favoritePersonKeys.value = null;
 	favoriteMovieIds.value = null;
+	favoriteEntityKeys.value = null;
 	keysInflight = null;
 }
 
@@ -62,6 +81,18 @@ function mutatePerson(key: string, op: 'add' | 'remove'): void {
 	if (op === 'add') next.add(key);
 	else next.delete(key);
 	favoritePersonKeys.value = next;
+}
+
+function mutateEntity(key: string, op: 'add' | 'remove'): void {
+	const cur = favoriteEntityKeys.value ?? new Set<string>();
+	const next = new Set(cur);
+	if (op === 'add') next.add(key);
+	else next.delete(key);
+	favoriteEntityKeys.value = next;
+}
+
+function isMusicType(t: string): t is MusicFavoriteType {
+	return t === 'artist' || t === 'album' || t === 'track';
 }
 
 function mutateMovie(id: string, op: 'add' | 'remove'): void {
@@ -88,6 +119,18 @@ export async function addFavorite(input: AddFavoriteInput): Promise<FavoriteEntr
 			throw err;
 		}
 	}
+	if (isMusicType(input.entityType) && input.entityId) {
+		const key = entityFavoriteKey(input.entityType, input.entityId);
+		if (favoriteEntityKeys.value?.has(key)) return null;
+		mutateEntity(key, 'add');
+		try {
+			const { favorite } = await favoritesService.add(input);
+			return favorite;
+		} catch (err) {
+			mutateEntity(key, 'remove');
+			throw err;
+		}
+	}
 	if (input.entityType === 'movie' && input.movieId) {
 		if (favoriteMovieIds.value?.has(input.movieId)) return null;
 		mutateMovie(input.movieId, 'add');
@@ -111,6 +154,16 @@ export async function removeFavorite(input: RemoveFavoriteInput): Promise<void> 
 			await favoritesService.remove(input);
 		} catch (err) {
 			mutatePerson(key, 'add');
+			throw err;
+		}
+	} else if (isMusicType(input.entityType) && input.entityId) {
+		const key = entityFavoriteKey(input.entityType, input.entityId);
+		if (!favoriteEntityKeys.value?.has(key)) return;
+		mutateEntity(key, 'remove');
+		try {
+			await favoritesService.remove(input);
+		} catch (err) {
+			mutateEntity(key, 'add');
 			throw err;
 		}
 	} else if (input.entityType === 'movie' && input.movieId) {

@@ -1,3 +1,4 @@
+import type { EntityRef } from '@mu/shared';
 import { effect, signal } from '@preact/signals';
 import {
 	type MoviePlaylistInfo,
@@ -174,4 +175,56 @@ export async function removeMovieFromPlaylist(playlistId: string, movieId: strin
 	if (playlists.value) {
 		playlists.value = bumpRecency(playlists.value, playlistId, -1);
 	}
+}
+
+// ============================================
+// Generic entity membership (music items + movies via the legacy routes)
+// ============================================
+
+function refKey(ref: EntityRef): string {
+	return ref.type === 'movie' ? ref.id : `${ref.type}:${ref.id}`;
+}
+
+/** Playlists containing `ref`. Movies use the legacy by-movie route. */
+export async function getEntityMembership(ref: EntityRef): Promise<MoviePlaylistInfo[]> {
+	if (ref.type === 'movie') return getMembership(ref.id);
+	const key = refKey(ref);
+	const cached = membershipCache.get(key);
+	if (cached) return cached;
+	const inflight = membershipInflight.get(key);
+	if (inflight) return inflight;
+	const promise = playlistsService
+		.getByItem(ref)
+		.then((list) => {
+			membershipCache.set(key, list);
+			return list;
+		})
+		.finally(() => membershipInflight.delete(key));
+	membershipInflight.set(key, promise);
+	return promise;
+}
+
+export async function addEntityToPlaylist(playlistId: string, ref: EntityRef): Promise<void> {
+	if (ref.type === 'movie') return addMovieToPlaylist(playlistId, ref.id);
+	await playlistsService.addItem(playlistId, ref);
+	const key = refKey(ref);
+	const target = playlists.value?.find((p) => p.id === playlistId);
+	const member = membershipCache.get(key);
+	if (member && target && !member.some((m) => m.id === playlistId)) {
+		membershipCache.set(key, [...member, { id: target.id, name: target.name }]);
+	}
+	if (playlists.value) playlists.value = bumpRecency(playlists.value, playlistId, +1);
+}
+
+export async function removeEntityFromPlaylist(playlistId: string, ref: EntityRef): Promise<void> {
+	if (ref.type === 'movie') return removeMovieFromPlaylist(playlistId, ref.id);
+	await playlistsService.removeItem(playlistId, ref);
+	const key = refKey(ref);
+	const member = membershipCache.get(key);
+	if (member)
+		membershipCache.set(
+			key,
+			member.filter((m) => m.id !== playlistId),
+		);
+	if (playlists.value) playlists.value = bumpRecency(playlists.value, playlistId, -1);
 }
