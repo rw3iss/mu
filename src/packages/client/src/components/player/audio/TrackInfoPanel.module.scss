@@ -1,0 +1,61 @@
+.art {
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay);
+  margin-bottom: var(--space-lg);
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  color: var(--on-dark-text-secondary);
+  font-size: var(--font-size-sm);
+
+  a {
+    cursor: pointer;
+  }
+}
+
+.section {
+  margin-top: var(--space-lg);
+}
+
+.heading {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--on-dark-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kv {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: 2px 0;
+  font-size: var(--font-size-sm);
+  color: var(--on-dark-text-secondary);
+
+  span:first-child {
+    color: var(--color-text-muted);
+    text-transform: capitalize;
+  }
+
+  a {
+    cursor: pointer;
+  }
+}
+
+.file {
+  margin-top: var(--space-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}

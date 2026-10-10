@@ -19,7 +19,7 @@ import {
 	skipAudio,
 	toggleAudioPlay,
 } from '@/state/musicPlayer.state';
-import { currentTime, duration, isBuffering, isPlaying } from '@/state/player.state';
+import { currentTime, duration, isBuffering, isPlaying, showInfoPanel } from '@/state/player.state';
 import { artAtSize } from '@/utils/music-art';
 import { openMusicLink } from '../controls/TrackTitle';
 import { EffectsPanel } from '../EffectsPanel';
@@ -27,6 +27,7 @@ import gp from '../GlobalPlayer.module.scss';
 import { PlayerControls } from '../PlayerControls';
 import styles from './AudioPlayerSurface.module.scss';
 import { MusicListPanel } from './MusicListPanel';
+import { TrackInfoPanel } from './TrackInfoPanel';
 
 let splitWidthSaveTimer: ReturnType<typeof setTimeout> | null = null;
 function setSplitWidth(w: number) {
@@ -257,7 +258,9 @@ export function AudioPlayerSurface() {
 			onTogglePlay={toggleAudioPlay}
 			onSeek={seekAudio}
 			onToggleFullscreen={() => (isMini ? maximizePlayer() : minimizePlayer())}
-			onToggleInfo={() => {}}
+			onToggleInfo={() => {
+				showInfoPanel.value = !showInfoPanel.value;
+			}}
 			session={null}
 			title={t?.title}
 			playbackLocked={false}
@@ -296,6 +299,12 @@ export function AudioPlayerSurface() {
 					})}
 				</div>
 				<EffectsPanel />
+				<TrackInfoPanel
+					visible={showInfoPanel.value}
+					onClose={() => {
+						showInfoPanel.value = false;
+					}}
+				/>
 			</>
 		);
 	}
@@ -407,6 +416,12 @@ export function AudioPlayerSurface() {
 			</div>
 			<div class={`${gp.playerBar} ${gp.playerBarFull}`}>{controls({})}</div>
 			<EffectsPanel />
+			<TrackInfoPanel
+				visible={showInfoPanel.value}
+				onClose={() => {
+					showInfoPanel.value = false;
+				}}
+			/>
 		</>
 	);
 }

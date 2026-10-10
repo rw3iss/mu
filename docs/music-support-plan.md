@@ -8,12 +8,12 @@ the two features.
 
 | Phase | Status | Commit |
 |---|---|---|
-| 0 — Groundwork | IN PROGRESS — shared schema, migration + backfill, shared types DONE (`68f3208`) | |
-| 1 — Catalogue | not started | |
-| 2 — Playback (+ waveform seek bar) | IN PROGRESS — client player (audio adapter, A/B gapless, waveform seek bar, artwork surfaces, list panel, MediaSession, video interplay) DONE | |
-| 3 — Browse & detail | not started | |
-| 4 — Metadata & lyrics | not started | |
-| 5 — Upload & offline | not started | |
+| 0 — Groundwork | DONE 2026-10-10 — feature flags, JobTypeRegistry, `media_sources.kind`, polymorphic `entity_*` tables + backfill (verified on prod: counts match), PlayerControls split, PlayerAdapter, AudioEngine source bus, MediaImporter/VideoImporter | `68f3208`…`1243358`, deployed `4ce3558` |
+| 1 — Catalogue | DONE 2026-10-10 — music schema + FTS5, AudioImporter (tags, grouping, compilations, art, duplicates), music jobs, Settings → Music, Setup Libraries step, installer prompts, Jobs kind filter, scan quick action | `0ec7901`, `4ce3558`, `dca325c` |
+| 2 — Playback (+ waveform seek bar) | DONE 2026-10-10 — capability probe, progressive streaming (original / cached FLAC / Opus-AAC), waveform peaks + seek bar, ingest transcodes, LRU cache eviction, audio player (A/B gapless, art surfaces, list panel, shuffle/repeat, ReplayGain, MediaSession, video interplay) | `920aac9`, `a176088`, `0ec7901` |
+| 3 — Browse & detail | DONE 2026-10-10 — browse mode toggle + routing, music library tabs, artist/album/track pages, generalised favorite/rating/comments/playlists/options menu, music home rails, audio playlists | `2522959`, `bb4dbb3`, `f5d5c30` |
+| 4 — Metadata & lyrics | DONE 2026-10-10 — shared MusicBrainz client, album matching + candidates (AlbumMatchModal), Cover Art Archive, Wikidata/Wikipedia artist bio + image, LRCLIB lyrics (synced view, fetch button, editing), admin quick actions, album merge/split tools (`album_aliases`). BYPASSED: AcoustID fingerprinting + Last.fm (need keys the provider platform doesn't hold yet; optional per plan) | `4716ab0`, `226f403`, `0fa194a` |
+| 5 — Upload & offline | DONE 2026-10-10 — `POST /music/upload` (track / folder / zip, built-in zip reader with zip-slip + count + size caps, targeted import), signed offline download URLs, real Service Worker (`music-offline` cache, Range/206), Downloads list + per-device budget, LRU, Keep pins | `a961c4c`, `54652a4` |
 | 6 — Search & discovery | DONE (2026-10-10) — shared search orchestrator + source registry; federated music search (SSE); `mb:` stub pages; Discover (local content vector + ListenBrainz); album→film cross-links. Scrobbling + LLM rerank deferred (see §10) | |
 
 Open-question assumptions in §12 were accepted as written (2026-10-10).
@@ -245,7 +245,8 @@ Migration steps (one `scripts/migrate.js` release each):
 ### 5.1 Sources and scanning
 
 - **Music folders are separate sources** (`media_sources.kind = 'audio'`), managed in
-  Settings → Library → *Music Folders*. One path should not be both kinds. If it is,
+  Settings → Music → *Music Folders* (corrected 2026-10-10: one Music tab instead of
+  sections spread over Library/Encoding/Playback). One path should not be both kinds. If it is,
   each importer only takes its own extensions.
 - `ScanOrchestrator.scanSource` walks with the importer's extension set
   (`SUPPORTED_AUDIO_EXTENSIONS`: `mp3 flac m4a aac alac ogg oga opus wav aiff aif wma ape wv dsf dff`)
@@ -281,6 +282,28 @@ guard), plus:
 - `finalize` triggers a targeted scan of the written paths only, not a full source
   scan.
 
+> **STATUS 2026-10-10 — DONE with changes.** Code: `music/upload/` (separate
+> `MusicUploadController`, `edit:media`). Endpoints: `GET /music/upload/targets`
+> (enabled `audio` sources), `POST /music/upload/preflight {sourceId, names}` →
+> `{conflicts}`, `POST /music/upload` (multipart, `sourceId` + `relativePath` +
+> `uploadId` + `fileTotal` fields **before** the file; 20 GB per request) →
+> `{ok, written[], skipped[], bytes}`, `POST /music/upload/finalize {sourceId, uploadId,
+> rootName}` → `{ok, files}`. Corrections: (a) **no `yauzl`** — it is not installed, so
+> `zip-reader.ts` is a small built-in central-directory reader (ZIP64 aware; `stored` +
+> `deflate` via `zlib`; encrypted / other methods rejected). Guards: unsafe names
+> reject the whole archive before anything is written, max 5000 entries, max 25 GB
+> declared *and* actual inflated size (an entry that inflates past its declared size
+> is cut off), symlink entries and disallowed types skipped, existing files never
+> overwritten. A single-root zip extracts as that folder, otherwise into a folder named
+> after the zip. (b) Loose tracks: placed at `<AlbumArtist|Artist>/<Album>/<file>` from
+> tags; a file with neither tag stays at the source root. (c) `finalize` runs
+> `AudioImporter.importFile` on the audio paths the batch wrote (in the background),
+> stamps `track_files.uploaded_by` (column already existed), then emits
+> `UPLOAD_COMPLETED {kind:'audio', imported, failed}`. `AudioImporter` now dedupes
+> concurrent imports of one path (the watcher sees the same files). Client:
+> `MusicUploadModal` (Music home + Library header, `can('edit:media')`), sharing the
+> movie upload's background progress widget.
+
 ### 5.3 Metadata pipeline
 
 | Need | Provider | Key? | Notes |
@@ -301,6 +324,15 @@ using a music `CanonicalField` set (tag values win for title and track numbers t
 user has edited; providers win for MBIDs, art and bio).
 
 New provider capabilities: `enrich-music`, `lyrics`, `fingerprint`, `recommend-music`.
+
+> **Status (2026-10-10) — server built; some of the plan above changed:**
+> - The shared client is `providers/sources/musicbrainz/musicbrainz.client.ts` (`MusicBrainzModule`, a Nest singleton). Soundtrack and music use **one** 1.1 s throttle queue. The soundtrack-specific code moved to `soundtrack/soundtrack-lookup.ts`.
+> - The matcher does **not** use the MergeEngine or `@RegisterProvider()`. The keyless sources (MusicBrainz, CAA, LRCLIB, Wikidata/Wikipedia/Commons) need no credentials, so they are plain injectables in `music/metadata/clients.ts`. Merge rules are in `MusicMetadataService`: tags keep titles and track numbers; MB fills the release-group MBID, type, secondary types, `originalYear`, year only when empty, the `album_releases` row (label, catalog no, format, disc count), artist MBIDs (never taken from another row) and recording MBIDs (only when the track lists line up). Genres are added, not replaced.
+> - Scoring (`music/metadata/album-match.ts`) uses title 0.35, artist 0.25, track count 0.15, year 0.10, Official status 0.05 and MB relevance 0.10. A gate applies when title or artist < 0.5. The top 2 hits are then looked up, and per-track duration agreement counts for 20%. **Auto-apply** needs ≥ 0.80 and a 0.05 lead over the best hit from a *different* release group. Otherwise the best release per group (top 10, ≥ 0.35) goes into the new `album_match_candidates` table (`matched_by` = `auto`/`manual`). A forced refresh never replaces a manual match.
+> - Cover Art Archive tries `front-1200`, then `front-500`, for the release first and then the release group. It only fills missing art, and is skipped when the admin removes `coverartarchive` from `artPreference`. `force` replaces existing art.
+> - Artist info: the MBID comes from tags or the match, or from an MB artist search (score ≥ 95 and the exact normalised name). Then MB `url-rels` → the Wikipedia REST summary (bio) and the Wikidata P18 → Commons image. **Last.fm is skipped**: the provider platform has no Last.fm credential yet.
+> - Lyrics: LRCLIB `/api/get` (with duration), falling back to `/api/search`. A miss is stored as an empty row and re-queried after 30 days. A `source='user'` row is never overwritten (SQL `setWhere` guard plus a re-check after the fetch). Gated on `fetchLyrics`.
+> - **AcoustID fingerprinting: deferred** (needs a key and `fpcalc`).
 Each registers with `@RegisterProvider()` and appears in Settings → Connections
 automatically.
 
@@ -346,6 +378,14 @@ and written to `.part` then renamed. On a cache miss:
    (> `music.onDemandMaxSeconds`, default 20 min) get a
    live chunked ffmpeg pipe without range support until the cached file lands.
 
+> **STATUS 2026-10-10 — corrections.** (a) `stream_sessions` keeps its FK to
+> `movies`, so music sessions are **stateless** (`<trackId>.<nonce>` ids, self-describing
+> file URLs) and progress is written straight to `play_history`. (b) The live chunked
+> pipe for very long tracks was **dropped**: every miss is build-then-serve (an
+> 80-minute track builds in seconds; requests are de-duplicated). `onDemandMaxSeconds`
+> remains in settings but is unused. (c) Albums carry a `group_key` column for the
+> grouping rule.
+
 **Cache management.** A `music-cache-evict` scheduled job: LRU under
 `music.transcodeCacheMaxGb`. Ingest-time transcodes for unplayable formats are never
 evicted while the source exists.
@@ -359,13 +399,19 @@ New `JOB_TYPE`s, registered by `MusicModule` with `JobTypeSpec` metadata:
 
 | Type | ioHeavy | encode | Purpose |
 |---|---|---|---|
-| `music-scan` | – | – | Scan one audio source |
-| `music-metadata` | – | – | Per-album match/enrich |
-| `music-artwork` | – | – | Fetch/resize art |
-| `music-lyrics` | – | – | Fetch lyrics (lazy, on first track view, or bulk) |
+| `music-scan` | – | – | Scan one audio source *(2026-10-10: not a separate type — the generic `scan` job dispatches by `media_sources.kind`)* |
+| `music-metadata` | – | – | Per-album match → release-group genres → CAA art if missing → album artists' bio/image. Queued idle-only, priority 85, for each NEW album |
+| `music-artwork` | – | – | Fetch missing album art from CAA (matches first if never searched) |
+| `music-lyrics` | – | – | LRCLIB lyrics. Queued idle-only, priority 90, for each new track when `fetchLyrics` is on; also bulk or on demand |
 | `audio-transcode` | ✓ | ✓ | Unplayable → FLAC; profile pre-builds |
 | `music-fingerprint` | ✓ | – | AcoustID for untagged files |
 | `music-cache-evict` | – | – | Scheduled LRU |
+
+> **STATUS 2026-10-10.** Registered: `music-waveform` (new — waveform peaks),
+> `audio-transcode`, `music-cache-evict` (hourly), `music-metadata`, `music-lyrics`.
+> BYPASSED: `music-scan` (audio sources use the existing scan job, routed by
+> `source.kind`), `music-artwork` (folded into `music-metadata`), `music-fingerprint`
+> (AcoustID deferred — see Phase 4 status).
 
 The in-memory provider reads `ioHeavy`/`encode` from the `JobTypeRegistry` instead of
 the hard-coded lists. Music caps: `music.maxConcurrentJobs` (default 2) as a per-feature
@@ -530,6 +576,34 @@ existing call sites keep working.
 - Auth: download URLs are short-lived signed tokens, so cached responses don't embed a
   long-lived JWT.
 
+> **STATUS 2026-10-10 — DONE with changes.**
+> - **Server** (`music/offline/`): `GET /music/offline/policy` →
+>   `{allowed, profile, maxOfflineGbPerDevice}` (allowed = `allowDownloads` and the
+>   user's role in `offline.roles`); `POST /music/offline/token {trackIds[] (≤500),
+>   caps}` → `{items: [{trackId, trackFileId, url, profile, codec, durationSeconds}],
+>   missing, expiresAt, policy}`; `GET /music/offline/files/:trackFileId?t=` — public at
+>   the JWT layer, the token is the credential. Token = `base64url(json{f,p,c,u,e}).
+>   HMAC-SHA256`, key derived from `auth.jwtSecret`, valid 30 min, bound to file +
+>   profile + caps; outstanding links stop working when the admin turns downloads off.
+>   Downloads use the admin `downloadProfile`.
+> - **Service Worker** (`public/sw.js`): API and other traffic is not intercepted;
+>   navigations and `/assets/*` are network-first with a `mu-shell-v1` fallback so the
+>   app can open offline. Any `GET …/music/files/<id>` is served from `music-offline`
+>   when that track file is downloaded — **keyed by track file id only**
+>   (`/__mu-offline/track-file/<id>`), so it matches whatever profile/caps URL the
+>   player asks for (the download profile wins over the stream profile for downloaded
+>   tracks). Range → 206/416, no Range → 200 with `Accept-Ranges`. `/music/art/` falls
+>   back to the cache when offline. Cache hits are posted to pages for LRU.
+> - **Client** (`state/musicOffline.state.ts`): the **page** downloads (not Background
+>   Fetch) — downloads run while Mu is open. Manifest in localStorage
+>   (`services/music-offline-index.ts`). Budget = min(user `music.offlineMaxGb`, admin
+>   `maxOfflineGbPerDevice`); over budget → evict least-recently-played tracks not in a
+>   **Keep** album/playlist. `navigator.storage.persist()` on first download; usage via
+>   `estimate()`. "Download" in track/album option menus and album/playlist headers;
+>   list + limit + "Clear offline music" in **Settings → Playback → Offline Music**.
+>   Offline: `startStream` falls back to a local session and `resolveTrack` to the
+>   stored summary, so queued downloaded tracks play without the server.
+
 ---
 
 ## 7. Settings
@@ -538,8 +612,11 @@ existing call sites keep working.
 
 | Key (app setting) | Default | Where |
 |---|---|---|
-| `features.movies` | `true` | Settings → Server → Features |
-| `features.music` | `false` (installer/Setup decides) | Settings → Server → Features; Setup; installers |
+| `features.movies` | `true` | Settings → Music → Features |
+| `features.music` | `false` (installer/Setup decides) | Settings → Music → Features; Setup; installers |
+
+> **STATUS 2026-10-10.** The switches live at the top of **Settings → Music** (not
+> Server). Env defaults `MU_FEATURE_MOVIES` / `MU_FEATURE_MUSIC` accept `1/0/true/false`.
 
 Disabling Music: its routes return 404 (`@RequireFeature('music')` guard), the
 scanner skips `audio` sources, `MusicModule` job handlers refuse new work, scheduled
@@ -548,6 +625,11 @@ is kept**, so re-enabling is instant. A separate "Delete music library data" act
 does the destructive cleanup.
 
 ### 7.2 Admin settings (shown only when Music is enabled)
+
+> **STATUS 2026-10-10 — DONE, reorganised.** Everything below is one **Settings → Music**
+> tab (Features, Music Folders, Import, Encoding, Playback, Offline). Quick actions are
+> a *Music* group on the Admin page (`POST /music/admin/*`). The per-folder scan
+> interval / watch toggle reuse the source defaults.
 
 - **Library → Music Folders**: list of `audio` sources (reuses `MediaPathList` with
   `kind`), scan interval, watch on/off, `music.minDurationSeconds`, grouping rule
@@ -566,6 +648,7 @@ does the destructive cleanup.
 - **Admin quick actions**: Scan Music Library, Refresh Music Metadata, Fetch Missing
   Album Art, Fetch Missing Lyrics, Re-encode Unplayable Music, Clear Music Transcode
   Cache. All use the existing confirm-dialog + "started" toast pattern.
+  *(2026-10-10, server: `POST /music/admin/{scan,refresh-metadata,fetch-art,fetch-lyrics,reencode-unplayable,clear-cache}`, `admin:server`, no body → `{ started, count }`. `refresh-metadata?scope=all` forces every album; the default is unmatched albums only. `fetch-lyrics` returns 400 when `fetchLyrics` is off. `clear-cache` runs synchronously, and `count` = the number of files removed.)*
 
 ### 7.3 Per-user settings (allowlist additions)
 
@@ -575,6 +658,12 @@ does the destructive cleanup.
 ---
 
 ## 8. Install and first run
+
+> **STATUS 2026-10-10 — DONE with changes.** `install.sh`/`install.ps1` ask "Enable
+> Music?" and write a `features:` block to config.yml; music folder paths are added
+> later in Settings → Music or on the Setup page (no path prompt). `setup-fedora.sh`
+> has `--music/--no-music` (writes `MU_FEATURE_MUSIC` to `.env`); `setup.sh` prompts.
+> The chromaprint offer is deferred with AcoustID.
 
 - **`install.sh` / `install.ps1`**: a Phase 3 prompt next to the IMDB datasets prompt —
   "Enable Music support? [y/N]" — then "Music folder path(s)". If yes: offer

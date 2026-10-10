@@ -10,6 +10,7 @@ import { computed, effect, signal, untracked } from '@preact/signals';
 import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting, getUiSettingSignal, setUiSetting } from '@/hooks/useUiSetting';
 import { musicService } from '@/services/music.service';
+import { offlineTrackSummary } from '@/services/music-offline-index';
 import {
 	bassEnhanceEnabled,
 	compressorEnabled,
@@ -177,7 +178,8 @@ async function resolveTrack(id: string): Promise<TrackSummary | null> {
 		rememberTracks([t]);
 		return t;
 	} catch {
-		return null;
+		// Offline: a downloaded track still has its summary on this device.
+		return offlineTrackSummary(id);
 	}
 }
 
@@ -515,13 +517,31 @@ export async function playTrack(track: TrackSummary, opts?: PlayMediaOptions): P
 	await playTrackNow(track, { startPosition: opts?.fromBeginning ? 0 : undefined });
 }
 
-export async function playTrackById(trackId: string, opts?: PlayMediaOptions): Promise<void> {
+export async function playTrackById(
+	trackId: string,
+	opts?: PlayMediaOptions & { startAt?: number },
+): Promise<void> {
 	const t = await resolveTrack(trackId);
 	if (!t) {
 		notifyError('Could not load this track.');
 		return;
 	}
+	if (opts?.startAt != null) {
+		playbackContext.value = { type: 'queue', id: null, title: 'Queue' };
+		contextTracks.value = [];
+		await playTrackNow(t, { startPosition: opts.startAt });
+		return;
+	}
 	await playTrack(t, opts);
+}
+
+/** Seek within a track: in place if it is playing, else start it at `t`. */
+export async function playTrackAt(trackId: string, t: number): Promise<void> {
+	if (currentTrack.value?.track.id === trackId) {
+		seekAudio(t);
+		return;
+	}
+	await playTrackById(trackId, { startAt: t });
 }
 
 /** Jump to an Up Next entry (dropping everything ahead of it); context kept. */

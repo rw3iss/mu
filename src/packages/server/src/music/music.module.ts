@@ -4,6 +4,7 @@ import { LibraryModule } from '../library/library.module.js';
 import { MusicBrainzModule } from '../providers/sources/musicbrainz/musicbrainz.module.js';
 import { StreamModule } from '../stream/stream.module.js';
 import { MusicAdminService } from './admin/music-admin.service.js';
+import { AlbumEditService } from './catalog/album-edit.service.js';
 import { ArtworkService } from './catalog/artwork.service.js';
 import { AudioImporter } from './catalog/audio-importer.js';
 import { MusicCatalogService } from './catalog/catalog.service.js';
@@ -15,8 +16,12 @@ import { CoverArtClient, LrclibClient, WikiClient } from './metadata/clients.js'
 import { MusicMetadataService } from './metadata/music-metadata.service.js';
 import { MusicEntitiesService } from './music-entities.service.js';
 import { MusicSettingsService } from './music-settings.service.js';
+import { MusicOfflineController } from './offline/music-offline.controller.js';
+import { MusicOfflineService } from './offline/music-offline.service.js';
 import { AudioTranscodeService } from './playback/audio-transcode.service.js';
 import { MusicStreamService } from './playback/music-stream.service.js';
+import { MusicUploadController } from './upload/music-upload.controller.js';
+import { MusicUploadService } from './upload/music-upload.service.js';
 
 /**
  * Optional Music feature (docs/music-support-plan.md). Always loaded so the
@@ -25,9 +30,15 @@ import { MusicStreamService } from './playback/music-stream.service.js';
  */
 @Module({
 	imports: [DatabaseModule, LibraryModule, StreamModule, MusicBrainzModule],
-	controllers: [MusicController, MusicMetadataController],
+	controllers: [
+		MusicController,
+		MusicMetadataController,
+		MusicUploadController,
+		MusicOfflineController,
+	],
 	providers: [
 		ArtworkService,
+		AlbumEditService,
 		MusicCatalogService,
 		MusicSettingsService,
 		MusicQueryService,
@@ -41,6 +52,8 @@ import { MusicStreamService } from './playback/music-stream.service.js';
 		WikiClient,
 		MusicMetadataService,
 		MusicAdminService,
+		MusicUploadService,
+		MusicOfflineService,
 	],
 	exports: [MusicQueryService, MusicSettingsService, MusicCatalogService],
 })

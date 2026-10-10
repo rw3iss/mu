@@ -5,6 +5,7 @@ import { Button } from '@/components/common/Button';
 import { Icon } from '@/components/common/Icon';
 import { Modal } from '@/components/common/Modal';
 import { Spinner } from '@/components/common/Spinner';
+import { OfflineDownloadButton } from '@/components/music/OfflineDownloadButton';
 import { TrackRow } from '@/components/music/TrackRow';
 import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
@@ -246,6 +247,12 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 						>
 							<Icon name="shuffle" size={12} /> Shuffle
 						</Button>
+						<OfflineDownloadButton
+							kind="playlist"
+							id={playlist.id}
+							title={playlist.name}
+							tracks={tracks}
+						/>
 					</div>
 				)}
 				{isOwner && (

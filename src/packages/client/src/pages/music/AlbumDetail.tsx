@@ -14,12 +14,16 @@ import { EntityRating } from '@/components/common/EntityRating';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { SmartImage } from '@/components/common/SmartImage';
+import { AlbumEditModal } from '@/components/music/AlbumEditModal';
 import { AlbumFilmLinks } from '@/components/music/AlbumFilmLinks';
+import { AlbumMatchModal } from '@/components/music/AlbumMatchModal';
 import { ArtistLinks, InlineLink } from '@/components/music/InlineLink';
 import { AlbumCard, MusicRail } from '@/components/music/MusicCards';
+import { OfflineDownloadButton } from '@/components/music/OfflineDownloadButton';
 import { TrackRow } from '@/components/music/TrackRow';
 import { useSeo } from '@/hooks/useSeo';
 import { musicService } from '@/services/music.service';
+import { can } from '@/state/auth.state';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
 import {
 	albumQueueItem,
@@ -53,6 +57,18 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 	const [filesOpen, setFilesOpen] = useState(false);
 	const [files, setFiles] = useState<Record<string, TrackFileInfo[]> | null>(null);
 	const [filesLoading, setFilesLoading] = useState(false);
+	const [matchOpen, setMatchOpen] = useState(false);
+	const [editMode, setEditMode] = useState<'merge' | 'split' | null>(null);
+	const canEdit = can('edit:media');
+
+	/** Re-read the album after a metadata change (match applied). */
+	const reloadAlbum = () => {
+		if (!id) return;
+		musicService
+			.album(id)
+			.then(setAlbum)
+			.catch(() => {});
+	};
 
 	useSeo(
 		album
@@ -288,6 +304,33 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 									<Icon name="list-plus" size={16} /> Add to queue
 								</span>
 							</Button>
+							<OfflineDownloadButton
+								kind="album"
+								id={album.id}
+								title={album.title}
+								tracks={album.tracks}
+								size="md"
+							/>
+							{canEdit && (
+								<>
+									<Button variant="secondary" onClick={() => setMatchOpen(true)}>
+										<span class={styles.btnIcon}>
+											<Icon name="search" size={16} /> Match
+										</span>
+									</Button>
+									<Button variant="ghost" onClick={() => setEditMode('merge')}>
+										Merge…
+									</Button>
+									{album.tracks.length > 1 && (
+										<Button
+											variant="ghost"
+											onClick={() => setEditMode('split')}
+										>
+											Split…
+										</Button>
+									)}
+								</>
+							)}
 							<EntityOptionsMenu
 								entity={{ type: 'album', id: album.id }}
 								item={albumQueueItem(album)}
@@ -426,6 +469,19 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 					<CommentsPanel entity={{ type: 'album', id: album.id }} />
 				</section>
 			</div>
+			{canEdit && (
+				<AlbumMatchModal
+					isOpen={matchOpen}
+					onClose={() => setMatchOpen(false)}
+					albumId={album.id}
+					albumTitle={album.title}
+					artistCredit={album.artistCredit}
+					onMatched={() => setTimeout(reloadAlbum, 4000)}
+				/>
+			)}
+			{canEdit && (
+				<AlbumEditModal mode={editMode} onClose={() => setEditMode(null)} album={album} />
+			)}
 		</div>
 	);
 }

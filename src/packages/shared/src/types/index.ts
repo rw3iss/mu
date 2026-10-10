@@ -4,6 +4,7 @@ export * from './movie.js';
 export * from './movie-search-defaults.js';
 export * from './music.js';
 export * from './music-discovery.js';
+export * from './music-offline.js';
 export * from './notification.js';
 export * from './plugin.js';
 export * from './profile.js';

@@ -27,68 +27,80 @@ export interface UploadFileOptions {
 	signal?: AbortSignal;
 }
 
-export const libraryUploadService = {
-	/** Enabled media-source destinations the user can upload into. */
-	getTargets(): Promise<{ targets: UploadTarget[] }> {
-		return api.get<{ targets: UploadTarget[] }>('/library/upload/targets');
-	},
+export type UploadService = ReturnType<typeof createUploadService>;
 
-	/** Check top-level names (file or root folder) against the destination. */
-	preflight(sourceId: string, names: string[]): Promise<{ conflicts: string[] }> {
-		return api.post<{ conflicts: string[] }>('/library/upload/preflight', { sourceId, names });
-	},
+/**
+ * Upload client for one endpoint family (`<base>/targets`, `/preflight`,
+ * `<base>` multipart, `/finalize`). Movies use `/library/upload`; music uses
+ * `/music/upload` (same protocol).
+ */
+export function createUploadService(base: string) {
+	return {
+		/** Enabled media-source destinations the user can upload into. */
+		getTargets(): Promise<{ targets: UploadTarget[] }> {
+			return api.get<{ targets: UploadTarget[] }>(`${base}/targets`);
+		},
 
-	/** Trigger a rescan of the destination after all files are uploaded. */
-	finalize(sourceId: string, uploadId: string, rootName: string): Promise<{ ok: boolean }> {
-		return api.post<{ ok: boolean }>('/library/upload/finalize', {
-			sourceId,
-			uploadId,
-			rootName,
-		});
-	},
+		/** Check top-level names (file or root folder) against the destination. */
+		preflight(sourceId: string, names: string[]): Promise<{ conflicts: string[] }> {
+			return api.post<{ conflicts: string[] }>(`${base}/preflight`, { sourceId, names });
+		},
 
-	/**
-	 * Stream a single file to the server with upload progress. Uses XHR (fetch
-	 * has no upload-progress events). Fields are appended before the file so the
-	 * server sees sourceId/relativePath before the stream.
-	 */
-	uploadFile(opts: UploadFileOptions): Promise<{ ok: boolean; bytes: number }> {
-		return new Promise((resolve, reject) => {
-			const xhr = new XMLHttpRequest();
-			const form = new FormData();
-			form.append('sourceId', opts.sourceId);
-			form.append('relativePath', opts.relativePath);
-			if (opts.uploadId) form.append('uploadId', opts.uploadId);
-			form.append('fileTotal', String(opts.file.size));
-			form.append('file', opts.file, opts.file.name);
+		/** Import / rescan the destination after all files are uploaded. */
+		finalize(sourceId: string, uploadId: string, rootName: string): Promise<{ ok: boolean }> {
+			return api.post<{ ok: boolean }>(`${base}/finalize`, {
+				sourceId,
+				uploadId,
+				rootName,
+			});
+		},
 
-			xhr.open('POST', `${apiBase()}/library/upload`);
-			const token = localStorage.getItem('mu_token');
-			if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+		/**
+		 * Stream a single file to the server with upload progress. Uses XHR (fetch
+		 * has no upload-progress events). Fields are appended before the file so the
+		 * server sees sourceId/relativePath before the stream.
+		 */
+		uploadFile(opts: UploadFileOptions): Promise<{ ok: boolean; bytes: number }> {
+			return new Promise((resolve, reject) => {
+				const xhr = new XMLHttpRequest();
+				const form = new FormData();
+				form.append('sourceId', opts.sourceId);
+				form.append('relativePath', opts.relativePath);
+				if (opts.uploadId) form.append('uploadId', opts.uploadId);
+				form.append('fileTotal', String(opts.file.size));
+				form.append('file', opts.file, opts.file.name);
 
-			xhr.upload.onprogress = (e) => {
-				if (e.lengthComputable) opts.onProgress?.(e.loaded, e.total);
-			};
-			xhr.onload = () => {
-				if (xhr.status >= 200 && xhr.status < 300) {
-					try {
-						resolve(JSON.parse(xhr.responseText));
-					} catch {
-						resolve({ ok: true, bytes: opts.file.size });
+				xhr.open('POST', `${apiBase()}${base}`);
+				const token = localStorage.getItem('mu_token');
+				if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+				xhr.upload.onprogress = (e) => {
+					if (e.lengthComputable) opts.onProgress?.(e.loaded, e.total);
+				};
+				xhr.onload = () => {
+					if (xhr.status >= 200 && xhr.status < 300) {
+						try {
+							resolve(JSON.parse(xhr.responseText));
+						} catch {
+							resolve({ ok: true, bytes: opts.file.size });
+						}
+						return;
 					}
-					return;
+					reject(new Error(parseError(xhr)));
+				};
+				xhr.onerror = () => reject(new Error('Network error during upload'));
+				xhr.onabort = () => reject(new Error('Upload cancelled'));
+				if (opts.signal) {
+					opts.signal.addEventListener('abort', () => xhr.abort(), { once: true });
 				}
-				reject(new Error(parseError(xhr)));
-			};
-			xhr.onerror = () => reject(new Error('Network error during upload'));
-			xhr.onabort = () => reject(new Error('Upload cancelled'));
-			if (opts.signal) {
-				opts.signal.addEventListener('abort', () => xhr.abort(), { once: true });
-			}
-			xhr.send(form);
-		});
-	},
-};
+				xhr.send(form);
+			});
+		},
+	};
+}
+
+export const libraryUploadService = createUploadService('/library/upload');
+export const musicUploadService = createUploadService('/music/upload');
 
 function parseError(xhr: XMLHttpRequest): string {
 	try {

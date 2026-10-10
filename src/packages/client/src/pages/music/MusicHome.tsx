@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { EmptyState } from '@/components/common/EmptyState';
 import { AlbumCard, MusicRail } from '@/components/music/MusicCards';
+import { MusicUploadButton } from '@/components/music/MusicUploadModal';
 import { TrackRow } from '@/components/music/TrackRow';
 import { type MusicHome as MusicHomeData, musicService } from '@/services/music.service';
 import { isAdmin } from '@/state/auth.state';
@@ -48,6 +49,7 @@ export function MusicHome(_props: MusicHomeProps) {
 		<div class={styles.page}>
 			<header class={styles.header}>
 				<h1 class={styles.title}>Music</h1>
+				<MusicUploadButton />
 				{data && !isEmpty && (
 					<button
 						type="button"

@@ -13,7 +13,9 @@ import {
 	reactToComment,
 } from '@/state/comments.state';
 import { jumpToCommentTime } from '@/state/globalPlayer.state';
+import { currentTrack, playTrackAt } from '@/state/musicPlayer.state';
 import { notifyError } from '@/state/notifications.state';
+import { currentTime } from '@/state/player.state';
 import { relativeTime } from '@/utils/time-format';
 import styles from './CommentsPanel.module.scss';
 import { openEmojiPicker } from './EmojiPicker';
@@ -52,9 +54,12 @@ export function CommentsPanel({ movieId, entity, onSeek }: CommentsPanelProps) {
 	const comments = movieComments.value[key] ?? null;
 	const [draft, setDraft] = useState('');
 	const [busy, setBusy] = useState(false);
-	// Only videos (and later tracks, once the audio player exposes a seek hook)
-	// anchor comments to a timestamp; others render plain.
-	const timed = typeof target === 'string';
+	// Movies and tracks anchor comments to a playback time; others render plain.
+	const trackId = entity?.type === 'track' ? entity.id : null;
+	const timed = typeof target === 'string' || trackId !== null;
+	// A track comment can be pinned to the current position while that track plays.
+	const trackPlaying = trackId !== null && currentTrack.value?.track.id === trackId;
+	const [atTime, setAtTime] = useState(true);
 
 	useEffect(() => {
 		if (!key) return;
@@ -66,14 +71,17 @@ export function CommentsPanel({ movieId, entity, onSeek }: CommentsPanelProps) {
 		if (!t || busy) return;
 		setBusy(true);
 		try {
-			await addComment(target, { text: t });
+			await addComment(target, {
+				text: t,
+				timeSeconds: trackPlaying && atTime ? Math.floor(currentTime.value) : undefined,
+			});
 			setDraft('');
 		} catch (err) {
 			notifyError((err as Error)?.message || 'Failed to add comment');
 		} finally {
 			setBusy(false);
 		}
-	}, [draft, busy, key]);
+	}, [draft, busy, key, trackPlaying, atTime]);
 
 	return (
 		<div class={styles.panel}>
@@ -89,6 +97,16 @@ export function CommentsPanel({ movieId, entity, onSeek }: CommentsPanelProps) {
 						if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit();
 					}}
 				/>
+				{trackPlaying && (
+					<label class={styles.atTime} title="Pin the comment to the current position">
+						<input
+							type="checkbox"
+							checked={atTime}
+							onChange={(e) => setAtTime((e.target as HTMLInputElement).checked)}
+						/>
+						at {fmtTime(currentTime.value)}
+					</label>
+				)}
 				<button class={styles.submitBtn} disabled={busy || !draft.trim()} onClick={submit}>
 					Comment
 				</button>
@@ -173,13 +191,15 @@ function CommentItem({
 		<li id={`comment-${comment.id}`} class={`${styles.item} ${depth > 0 ? styles.reply : ''}`}>
 			<div class={styles.itemHead}>
 				<span class={styles.author}>{comment.authorName}</span>
-				{timed && typeof target === 'string' && comment.timeSeconds != null && (
+				{timed && comment.timeSeconds != null && (
 					<button
 						class={styles.timeChip}
 						onClick={() =>
 							onSeek
 								? onSeek(comment.timeSeconds!)
-								: jumpToCommentTime(target, comment.timeSeconds!)
+								: typeof target === 'string'
+									? jumpToCommentTime(target, comment.timeSeconds!)
+									: void playTrackAt(target.id, comment.timeSeconds!)
 						}
 						title="Jump to this time"
 					>
