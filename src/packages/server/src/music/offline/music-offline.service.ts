@@ -1,6 +1,6 @@
 import type { MusicOfflineItem, MusicOfflinePolicy, MusicOfflineTokenResponse } from '@mu/shared';
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigService } from '../../config/config.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { MusicStreamService } from '../playback/music-stream.service.js';
 import {
