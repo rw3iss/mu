@@ -63,6 +63,8 @@ const ICON_NAMES = new Set<IconName>([
 	'layers',
 	'home',
 	'film',
+	'music',
+	'disc',
 	'list-plus',
 	'star',
 	'star-filled',

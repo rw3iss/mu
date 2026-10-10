@@ -1,6 +1,8 @@
 import { useCallback } from 'preact/hooks';
 import {
 	addFavorite,
+	entityFavoriteKey,
+	favoriteEntityKeys,
 	favoriteMovieIds,
 	favoritePersonKeys,
 	personKeyFor,
@@ -23,7 +25,12 @@ type MovieProps = {
 	movieId: string;
 };
 
-export type FavoriteButtonProps = (PersonProps | MovieProps) & {
+type MusicProps = {
+	entityType: 'artist' | 'album' | 'track';
+	entityId: string;
+};
+
+export type FavoriteButtonProps = (PersonProps | MovieProps | MusicProps) & {
 	size?: ButtonSize;
 	class?: string;
 	title?: string;
@@ -74,7 +81,11 @@ export function FavoriteButton(props: FavoriteButtonProps) {
 			? (favoritePersonKeys.value?.has(
 					personKeyFor({ tmdbId: props.tmdbId, name: props.name }),
 				) ?? false)
-			: (favoriteMovieIds.value?.has(props.movieId) ?? false);
+			: props.entityType === 'movie'
+				? (favoriteMovieIds.value?.has(props.movieId) ?? false)
+				: (favoriteEntityKeys.value?.has(
+						entityFavoriteKey(props.entityType, props.entityId),
+					) ?? false);
 
 	const handleClick = useCallback(
 		(e: MouseEvent) => {
@@ -98,12 +109,16 @@ export function FavoriteButton(props: FavoriteButtonProps) {
 						role: props.personRole ?? null,
 					});
 				}
-			} else {
+			} else if (props.entityType === 'movie') {
 				if (isFavorited) {
 					void removeFavorite({ entityType: 'movie', movieId: props.movieId });
 				} else {
 					void addFavorite({ entityType: 'movie', movieId: props.movieId });
 				}
+			} else {
+				const input = { entityType: props.entityType, entityId: props.entityId };
+				if (isFavorited) void removeFavorite(input);
+				else void addFavorite(input);
 			}
 		},
 		[isFavorited, props],

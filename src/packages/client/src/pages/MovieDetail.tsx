@@ -23,6 +23,7 @@ import { ShareMovieModal } from '@/components/movie/ShareMovieModal';
 import { SimilarSection } from '@/components/movie/SimilarSection';
 import { SubtitlePanel } from '@/components/movie/SubtitlePanel';
 import { TrailerSection } from '@/components/movie/TrailerSection';
+import { LocalTrackLink } from '@/components/music/LocalTrackLink';
 import { useSeo } from '@/hooks/useSeo';
 import { useWatchPosition } from '@/hooks/useWatchPosition';
 import { PluginSlot } from '@/plugins/PluginSlot';
@@ -1197,6 +1198,18 @@ export function MovieDetail({ id }: MovieDetailProps) {
 																				</span>
 																			)}
 																		</span>
+																		<LocalTrackLink
+																			class={
+																				styles.trackLocal
+																			}
+																			title={t.title}
+																			artist={
+																				t.artist ??
+																				soundtrack.release
+																					?.artist ??
+																				null
+																			}
+																		/>
 																		<CopyButton
 																			class={styles.trackCopy}
 																			title="Copy artist - track"

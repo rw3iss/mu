@@ -3,12 +3,15 @@ import { currentPath, currentUrl } from '@/app';
 import { Icon } from '@/components/common/Icon';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useDebounce } from '@/hooks/useDebounce';
+import { isMusicMode } from '@/state/browseMode.state';
 // The back-stack lives in library.state so the Library page's own back arrow
 // (next to its title) can consume it; the header input only maintains it.
 import { navToLibrary, searchBackStack, searchMovies } from '@/state/library.state';
 import { theme, toggleTheme } from '@/state/theme.state';
 import { type Throttled, throttle } from '@/utils/throttle';
 
+import { BrowseModeToggle } from './BrowseModeToggle';
+import { MusicSearch } from './MusicSearch';
 import styles from './TopBar.module.scss';
 
 /**
@@ -137,33 +140,38 @@ export function TopBar() {
 
 	return (
 		<header class={styles.topbar}>
-			<form class={styles.searchForm} onSubmit={handleSubmit}>
-				<input
-					ref={inputRef}
-					type="text"
-					class={styles.searchInput}
-					placeholder="Search movies..."
-					value={searchValue}
-					onInput={handleInput}
-					onKeyDown={handleKeyDown}
-					onFocus={handleFocus}
-					aria-label="Search movies"
-					title={
-						'Search movies. Use "quotes" to match a whole word — "Her" won\'t match Hero.'
-					}
-				/>
-				{searchValue && (
-					<button
-						type="button"
-						class={styles.searchClear}
-						onClick={handleClear}
-						aria-label="Clear search"
-						title="Clear search"
-					>
-						<Icon name="x" size={14} />
-					</button>
-				)}
-			</form>
+			<BrowseModeToggle />
+			{isMusicMode.value ? (
+				<MusicSearch />
+			) : (
+				<form class={styles.searchForm} onSubmit={handleSubmit}>
+					<input
+						ref={inputRef}
+						type="text"
+						class={styles.searchInput}
+						placeholder="Search movies..."
+						value={searchValue}
+						onInput={handleInput}
+						onKeyDown={handleKeyDown}
+						onFocus={handleFocus}
+						aria-label="Search movies"
+						title={
+							'Search movies. Use "quotes" to match a whole word — "Her" won\'t match Hero.'
+						}
+					/>
+					{searchValue && (
+						<button
+							type="button"
+							class={styles.searchClear}
+							onClick={handleClear}
+							aria-label="Clear search"
+							title="Clear search"
+						>
+							<Icon name="x" size={14} />
+						</button>
+					)}
+				</form>
+			)}
 
 			<div class={styles.actions}>
 				<NotificationBell />

@@ -1,4 +1,4 @@
-import { resolveDisplayName } from '@mu/shared';
+import { type BrowseMode, resolveDisplayName } from '@mu/shared';
 import { JSX } from 'preact';
 import { useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
@@ -6,6 +6,7 @@ import { currentPath } from '@/app';
 import { Avatar } from '@/components/common/Avatar';
 import { Link } from '@/components/common/Link';
 import { currentUser, logout } from '@/state/auth.state';
+import { browseMode, homePathFor } from '@/state/browseMode.state';
 import { openFeedbackModal } from '@/state/feedback.state';
 import { isPlayerActive, playerMode } from '@/state/globalPlayer.state';
 import { fetchMovies } from '@/state/library.state';
@@ -82,31 +83,30 @@ interface NavItem {
 	requiresUsersInfo?: boolean;
 	/** When set, the item runs this instead of navigating (e.g. open a modal). */
 	action?: () => void;
+	/** Only shown in this browse mode (unset = both). */
+	mode?: BrowseMode;
+	/** Highlight only on an exact path match (mode home pages). */
+	exact?: boolean;
 }
 
+const LIBRARY_ICON = (
+	<Icon2
+		d1="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"
+		d2="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+	/>
+);
+const DISCOVER_ICON = (
+	<Icon d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" />
+);
+const HOME_ICON = <Icon2 d1="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" d2="M9 22V12h6v10" />;
+
 const navItems: NavItem[] = [
-	{
-		label: 'Dashboard',
-		path: '/',
-		icon: <Icon2 d1="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" d2="M9 22V12h6v10" />,
-	},
-	{
-		label: 'Library',
-		path: '/library',
-		icon: (
-			<Icon2
-				d1="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"
-				d2="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
-			/>
-		),
-	},
-	{
-		label: 'Discover',
-		path: '/discover',
-		icon: (
-			<Icon d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z" />
-		),
-	},
+	{ label: 'Dashboard', path: '/', icon: HOME_ICON, mode: 'movies', exact: true },
+	{ label: 'Home', path: '/music', icon: HOME_ICON, mode: 'music', exact: true },
+	{ label: 'Library', path: '/library', icon: LIBRARY_ICON, mode: 'movies' },
+	{ label: 'Library', path: '/music/library', icon: LIBRARY_ICON, mode: 'music' },
+	{ label: 'Discover', path: '/discover', icon: DISCOVER_ICON, mode: 'movies' },
+	{ label: 'Discover', path: '/music/discover', icon: DISCOVER_ICON, mode: 'music' },
 	{
 		label: 'Playlists',
 		path: '/playlists',
@@ -115,6 +115,7 @@ const navItems: NavItem[] = [
 	{
 		label: 'Watchlist',
 		path: '/watchlist',
+		mode: 'movies',
 		icon: <Icon d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />,
 	},
 	{
@@ -204,18 +205,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 		route(path);
 	}, []);
 
+	const mode = browseMode.value;
 	const filteredItems = navItems.filter(
 		(item) =>
+			(!item.mode || item.mode === mode) &&
 			(!item.adminOnly || user?.role === 'admin') &&
 			(!item.requiresUsersInfo || showUsersInfo.value),
 	);
+	const home = homePathFor(mode);
 
 	return (
 		<nav
 			class={`${styles.sidebar} ${collapsed ? styles.collapsed : ''} ${showMiniPlayer ? styles.withMiniPlayer : ''}`}
 		>
 			<div class={styles.header}>
-				<Link href="/" onNavigate={() => handleNav('/')} class={styles.logo}>
+				<Link href={home} onNavigate={() => handleNav(home)} class={styles.logo}>
 					<img src="/mu_logo_small.png" alt="Mu" class={styles.logoImage} />
 				</Link>
 				<button
@@ -235,7 +239,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
 			<ul class={styles.nav}>
 				{filteredItems.map((item) => {
-					const navClass = `${styles.navItem} ${activePath === item.path || (item.path !== '/' && !item.action && activePath.startsWith(item.path)) ? styles.active : ''}`;
+					const isActive =
+						activePath === item.path ||
+						(!item.exact && !item.action && activePath.startsWith(item.path));
+					const navClass = `${styles.navItem} ${isActive ? styles.active : ''}`;
 					const inner = (
 						<>
 							<span class={styles.navIcon}>{item.icon}</span>
@@ -243,7 +250,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 						</>
 					);
 					return (
-						<li key={item.path}>
+						<li key={`${item.mode ?? 'all'}:${item.path}`}>
 							{item.action ? (
 								<button
 									class={navClass}
@@ -267,7 +274,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 				})}
 			</ul>
 
-			{!collapsed && <RecentlyPlayed />}
+			{/* Recently played lists movies; hidden while browsing music. */}
+			{!collapsed && mode !== 'music' && <RecentlyPlayed />}
 
 			{user && !collapsed && (
 				<div class={styles.userInfo}>

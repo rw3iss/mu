@@ -4,6 +4,104 @@ import { Select } from '@/components/common/Select';
 import type { LibraryFilter, ResultFilterState, ResultSort } from '@/utils/result-filters';
 import styles from './ResultFilterBar.module.scss';
 
+/**
+ * Declarative filter control. Lets non-movie surfaces (music library) reuse
+ * the bar without the movie-specific sort/library/min-votes fields.
+ */
+export type FilterField =
+	| {
+			kind: 'select';
+			key: string;
+			label?: string;
+			options: { value: string; label: string }[];
+	  }
+	| {
+			kind: 'number';
+			key: string;
+			label?: string;
+			placeholder?: string;
+			min?: number;
+			max?: number;
+			step?: number;
+			/** CSS width (default 96px). */
+			width?: string;
+	  }
+	| {
+			kind: 'text';
+			key: string;
+			label?: string;
+			placeholder?: string;
+			width?: string;
+	  };
+
+export type FilterValues = Record<string, string>;
+
+interface SchemaFilterBarProps {
+	fields: FilterField[];
+	values: FilterValues;
+	onChange: (next: FilterValues) => void;
+	/** Optional live result count. */
+	count?: number;
+	/** Noun for the count (default "result"/"results"). */
+	countNoun?: [singular: string, plural: string];
+	children?: preact.ComponentChildren;
+}
+
+/** Schema-driven variant of the filter bar. */
+export function SchemaFilterBar({
+	fields,
+	values,
+	onChange,
+	count,
+	countNoun = ['result', 'results'],
+	children,
+}: SchemaFilterBarProps) {
+	const set = (key: string, v: string) => onChange({ ...values, [key]: v });
+	return (
+		<div class={styles.controls}>
+			{fields.map((f) => {
+				if (f.kind === 'select') {
+					return (
+						<span key={f.key} class={styles.group}>
+							{f.label && <span class={styles.label}>{f.label}</span>}
+							<Select
+								value={values[f.key] ?? ''}
+								onChange={(v) => set(f.key, v)}
+								options={f.options}
+								aria-label={f.label ?? f.key}
+							/>
+						</span>
+					);
+				}
+				return (
+					<span key={f.key} class={styles.group}>
+						{f.label && <span class={styles.label}>{f.label}</span>}
+						<input
+							type={f.kind === 'number' ? 'number' : 'text'}
+							style={{ width: f.width ?? '96px' }}
+							min={f.kind === 'number' && f.min != null ? String(f.min) : undefined}
+							max={f.kind === 'number' && f.max != null ? String(f.max) : undefined}
+							step={
+								f.kind === 'number' && f.step != null ? String(f.step) : undefined
+							}
+							placeholder={f.placeholder}
+							aria-label={f.label ?? f.placeholder ?? f.key}
+							value={values[f.key] ?? ''}
+							onInput={(e) => set(f.key, (e.target as HTMLInputElement).value)}
+						/>
+					</span>
+				);
+			})}
+			{children}
+			{count != null && (
+				<span class={styles.count}>
+					{count} {count === 1 ? countNoun[0] : countNoun[1]}
+				</span>
+			)}
+		</div>
+	);
+}
+
 interface ResultFilterBarProps {
 	value: ResultFilterState;
 	onChange: (next: ResultFilterState) => void;
@@ -31,7 +129,16 @@ interface ResultFilterBarProps {
  * movie page's "Similar" section: sort, in-library, and minimum year / rating /
  * votes, followed by a live result count.
  */
-export function ResultFilterBar({
+/**
+ * Pass `fields` (a FilterField[] schema) for the generic variant; otherwise the
+ * classic movie sort / library / min-year / rating / votes controls render.
+ */
+export function ResultFilterBar(props: ResultFilterBarProps | SchemaFilterBarProps) {
+	if ('fields' in props) return <SchemaFilterBar {...props} />;
+	return <MovieResultFilterBar {...props} />;
+}
+
+function MovieResultFilterBar({
 	value,
 	onChange,
 	count,

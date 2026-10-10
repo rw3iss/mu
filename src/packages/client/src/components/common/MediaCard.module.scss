@@ -99,6 +99,8 @@
 .shape_portrait .posterWrap { aspect-ratio: 1 / 1.4; }
 .shape_square .posterWrap   { aspect-ratio: 1 / 1; }
 .shape_backdrop .posterWrap { aspect-ratio: 16 / 9; }
+.shape_circle .posterWrap   { aspect-ratio: 1 / 1; border-radius: 50%; }
+.shape_circle .info         { text-align: center; }
 
 .poster {
 	width: 100%;

@@ -1189,6 +1189,21 @@
   }
 }
 
+// Link to the same song in the local music library (only when matched).
+.trackLocal {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  margin-left: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+  }
+}
+
 // Open a YouTube search for the track, in a new tab.
 .trackOpen {
   flex-shrink: 0;

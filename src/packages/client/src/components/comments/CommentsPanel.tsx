@@ -1,8 +1,11 @@
+import type { EntityRef } from '@mu/shared';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import type { MovieComment } from '@/services/comments.service';
 import { currentUser } from '@/state/auth.state';
 import {
 	addComment,
+	type CommentTarget,
+	commentKey,
 	deleteComment,
 	editComment,
 	loadComments,
@@ -16,7 +19,13 @@ import styles from './CommentsPanel.module.scss';
 import { openEmojiPicker } from './EmojiPicker';
 
 interface CommentsPanelProps {
-	movieId: string;
+	/** Legacy alias for `entity: { type: 'movie', id }`. */
+	movieId?: string;
+	/**
+	 * Any commentable entity (movie, artist, album, track). Named `entity`
+	 * rather than `ref` because Preact reserves the `ref` prop.
+	 */
+	entity?: EntityRef;
 	/** Seek the player to a comment's time when its timestamp is clicked. */
 	onSeek?: (timeSeconds: number) => void;
 }
@@ -32,28 +41,39 @@ function fmtTime(t: number): string {
  * reply / edit (author) / delete (author) / emoji reactions. Reads the shared
  * comments state so every mounted surface updates together.
  */
-export function CommentsPanel({ movieId, onSeek }: CommentsPanelProps) {
-	const comments = movieComments.value[movieId] ?? null;
+export function CommentsPanel({ movieId, entity, onSeek }: CommentsPanelProps) {
+	// Movies normalise to their bare id (legacy cache key + timestamp seeking).
+	const target: CommentTarget = entity
+		? entity.type === 'movie'
+			? entity.id
+			: entity
+		: (movieId ?? '');
+	const key = commentKey(target);
+	const comments = movieComments.value[key] ?? null;
 	const [draft, setDraft] = useState('');
 	const [busy, setBusy] = useState(false);
+	// Only videos (and later tracks, once the audio player exposes a seek hook)
+	// anchor comments to a timestamp; others render plain.
+	const timed = typeof target === 'string';
 
 	useEffect(() => {
-		loadComments(movieId).catch(() => {});
-	}, [movieId]);
+		if (!key) return;
+		loadComments(target).catch(() => {});
+	}, [key]);
 
 	const submit = useCallback(async () => {
 		const t = draft.trim();
 		if (!t || busy) return;
 		setBusy(true);
 		try {
-			await addComment(movieId, { text: t });
+			await addComment(target, { text: t });
 			setDraft('');
 		} catch (err) {
 			notifyError((err as Error)?.message || 'Failed to add comment');
 		} finally {
 			setBusy(false);
 		}
-	}, [draft, busy, movieId]);
+	}, [draft, busy, key]);
 
 	return (
 		<div class={styles.panel}>
@@ -81,7 +101,8 @@ export function CommentsPanel({ movieId, onSeek }: CommentsPanelProps) {
 					{comments.map((c) => (
 						<CommentItem
 							key={c.id}
-							movieId={movieId}
+							target={target}
+							timed={timed}
 							comment={c}
 							onSeek={onSeek}
 							depth={0}
@@ -94,12 +115,14 @@ export function CommentsPanel({ movieId, onSeek }: CommentsPanelProps) {
 }
 
 function CommentItem({
-	movieId,
+	target,
+	timed,
 	comment,
 	onSeek,
 	depth,
 }: {
-	movieId: string;
+	target: CommentTarget;
+	timed: boolean;
 	comment: MovieComment;
 	onSeek?: (t: number) => void;
 	/** Nesting level (0 = top). Drives indent (capped) + recursion. */
@@ -137,26 +160,26 @@ function CommentItem({
 			openEmojiPicker({
 				anchor: e.currentTarget as HTMLElement,
 				onPick: (emoji) => {
-					reactToComment(movieId, comment.id, emoji).catch(() =>
+					reactToComment(target, comment.id, emoji).catch(() =>
 						notifyError('Failed to react'),
 					);
 				},
 			});
 		},
-		[movieId, comment.id],
+		[target, comment.id],
 	);
 
 	return (
 		<li id={`comment-${comment.id}`} class={`${styles.item} ${depth > 0 ? styles.reply : ''}`}>
 			<div class={styles.itemHead}>
 				<span class={styles.author}>{comment.authorName}</span>
-				{comment.timeSeconds != null && (
+				{timed && typeof target === 'string' && comment.timeSeconds != null && (
 					<button
 						class={styles.timeChip}
 						onClick={() =>
 							onSeek
 								? onSeek(comment.timeSeconds!)
-								: jumpToCommentTime(movieId, comment.timeSeconds!)
+								: jumpToCommentTime(target, comment.timeSeconds!)
 						}
 						title="Jump to this time"
 					>
@@ -185,7 +208,7 @@ function CommentItem({
 							class={styles.submitBtn}
 							disabled={busy || !draft.trim()}
 							onClick={() =>
-								act(() => editComment(movieId, comment.id, { text: draft.trim() }))
+								act(() => editComment(target, comment.id, { text: draft.trim() }))
 							}
 						>
 							Save
@@ -201,7 +224,7 @@ function CommentItem({
 					<button
 						key={r.emoji}
 						class={`${styles.reactionPill} ${r.mine ? styles.reactionMine : ''}`}
-						onClick={() => reactToComment(movieId, comment.id, r.emoji).catch(() => {})}
+						onClick={() => reactToComment(target, comment.id, r.emoji).catch(() => {})}
 					>
 						{r.emoji} {r.count}
 					</button>
@@ -233,7 +256,7 @@ function CommentItem({
 					<button
 						class={`${styles.linkBtn} ${styles.danger}`}
 						disabled={busy}
-						onClick={() => act(() => deleteComment(movieId, comment.id))}
+						onClick={() => act(() => deleteComment(target, comment.id))}
 					>
 						Delete
 					</button>
@@ -258,7 +281,7 @@ function CommentItem({
 							disabled={busy || !draft.trim()}
 							onClick={() =>
 								act(() =>
-									addComment(movieId, {
+									addComment(target, {
 										text: draft.trim(),
 										parentId: comment.id,
 									}),
@@ -282,7 +305,8 @@ function CommentItem({
 							{comment.replies!.map((r) => (
 								<CommentItem
 									key={r.id}
-									movieId={movieId}
+									target={target}
+									timed={timed}
 									comment={r}
 									onSeek={onSeek}
 									depth={depth + 1}

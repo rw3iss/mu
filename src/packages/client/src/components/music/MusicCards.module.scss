@@ -1,0 +1,82 @@
+.card {
+	min-width: 0;
+}
+
+.playBtn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	border: none;
+	background: var(--color-btn-bg);
+	color: var(--color-btn-text);
+	cursor: pointer;
+	box-shadow: var(--shadow-md);
+	transition: transform var(--transition-fast, 150ms) ease;
+
+	&:hover {
+		transform: scale(1.06);
+	}
+}
+
+.menuSlot {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: var(--space-xs);
+}
+
+.grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: var(--space-lg) var(--space-md);
+
+	@include mobile {
+		grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+		gap: var(--space-md) var(--space-sm);
+	}
+}
+
+.gridCircle {
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.rail {
+	margin-bottom: var(--space-xl);
+}
+
+.railHeader {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-md);
+	margin-bottom: var(--space-sm);
+}
+
+.railTitle {
+	font-size: var(--font-size-lg);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-label);
+	margin: 0;
+}
+
+.railScroller {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: 168px;
+	gap: var(--space-md);
+	overflow-x: auto;
+	padding-bottom: var(--space-sm);
+	scroll-snap-type: x proximity;
+	@include scrollbar;
+
+	> * {
+		scroll-snap-align: start;
+	}
+
+	@include mobile {
+		grid-auto-columns: 136px;
+		gap: var(--space-sm);
+	}
+}

@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals';
+import type { ComponentType } from 'preact';
 import { useEffect } from 'preact/hooks';
 import { Router, route } from 'preact-router';
 import { Toast } from '@/components/common/Toast';
@@ -15,6 +16,12 @@ import { Library } from '@/pages/Library';
 import { Login } from '@/pages/Login';
 import { MembersPage } from '@/pages/Members/MembersPage';
 import { MovieDetail } from '@/pages/MovieDetail';
+import { AlbumDetail } from '@/pages/music/AlbumDetail';
+import { ArtistDetail } from '@/pages/music/ArtistDetail';
+import { MusicDiscover } from '@/pages/music/MusicDiscover';
+import { MusicHome } from '@/pages/music/MusicHome';
+import { MusicLibrary } from '@/pages/music/MusicLibrary';
+import { TrackDetail } from '@/pages/music/TrackDetail';
 import { NotFound } from '@/pages/NotFound';
 import { PersonDetail } from '@/pages/PersonDetail';
 // Player is now handled entirely by GlobalPlayer (no dedicated route)
@@ -45,7 +52,9 @@ import { pluginClientManager } from '@/plugins/plugin-client-manager';
 import { sharedSessionService } from '@/services/shared-session.service';
 import { socketManager } from '@/services/socket-manager';
 import { wsService } from '@/services/websocket.service';
+import { browseMode, syncBrowseModeFromPath } from '@/state/browseMode.state';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
+import { features, featuresLoaded, initFeatures } from '@/state/features.state';
 import { initGlobalPlayer } from '@/state/globalPlayer.state';
 import { initMediaSession } from '@/state/media-session';
 import { initNotifications } from '@/state/notifications-feed.state';
@@ -84,6 +93,38 @@ function Redirect({
 		route(target, true);
 	}, []);
 	return null;
+}
+
+/**
+ * Music routes render only when the Music feature is enabled; otherwise they
+ * bounce to the dashboard. Waits for the first feature-flag load so a deep
+ * link doesn't redirect before the flags arrive.
+ */
+function MusicGate({
+	component: Component,
+	...props
+}: {
+	component: ComponentType<any>;
+	path: string;
+	[param: string]: unknown;
+}) {
+	const loaded = featuresLoaded.value;
+	const enabled = features.value.music;
+	useEffect(() => {
+		if (loaded && !enabled) route('/', true);
+	}, [loaded, enabled]);
+	if (!loaded || !enabled) return null;
+	return <Component {...props} />;
+}
+
+/** `/` is the movies dashboard; in music mode it forwards to `/music`. */
+function HomeRoute(_props: { path: string }) {
+	const toMusic = browseMode.value === 'music';
+	useEffect(() => {
+		if (toMusic) route('/music', true);
+	}, [toMusic]);
+	if (toMusic) return null;
+	return <Dashboard />;
 }
 
 function enforceAuth(url: string): boolean {
@@ -134,6 +175,10 @@ function titleForPath(path: string): string {
 		setup: 'Setup',
 		register: 'Register',
 		watch: 'Watch',
+		music: 'Music',
+		album: 'Album',
+		artist: 'Artist',
+		track: 'Track',
 	};
 	const name = names[seg];
 	return name ? `${name} — Mu` : 'Mu';
@@ -144,6 +189,7 @@ function handleRouteChange(e: { url: string }) {
 	const url = e.url.split('?')[0] ?? e.url;
 	currentPath.value = url;
 	document.title = titleForPath(url);
+	syncBrowseModeFromPath(url);
 
 	if (enforceAuth(url)) return;
 }
@@ -152,6 +198,8 @@ export function App() {
 	useEffect(() => {
 		installUserGestureListener();
 		initTheme();
+		initFeatures();
+		syncBrowseModeFromPath(window.location.pathname);
 		checkAuth();
 		wsService.connect();
 		socketManager.start();
@@ -258,7 +306,13 @@ export function App() {
 			) : (
 				<AppShell>
 					<Router onChange={handleRouteChange}>
-						<Dashboard path="/" />
+						<HomeRoute path="/" />
+						<MusicGate path="/music" component={MusicHome} />
+						<MusicGate path="/music/library" component={MusicLibrary} />
+						<MusicGate path="/music/discover" component={MusicDiscover} />
+						<MusicGate path="/album/:id" component={AlbumDetail} />
+						<MusicGate path="/artist/:id" component={ArtistDetail} />
+						<MusicGate path="/track/:id" component={TrackDetail} />
 						<Library path="/library" />
 						<MovieDetail path="/movie/:id" />
 						<GroupDetail path="/group/:id" />
