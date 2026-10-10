@@ -311,10 +311,14 @@ function ftsTriggers(table, cols) {
 	];
 }
 
+// [table, statement]. Skipped when the table doesn't exist yet: on a fresh
+// install migrate.js runs before the server has created its core tables
+// (media_sources, stream_sessions). DatabaseService re-applies this module
+// on boot, after createTablesIfNotExist, so the columns land then.
 const ALTERS = [
-	`ALTER TABLE albums ADD COLUMN group_key TEXT`,
-	`ALTER TABLE media_sources ADD COLUMN kind TEXT NOT NULL DEFAULT 'video'`,
-	`ALTER TABLE stream_sessions ADD COLUMN entity_type TEXT NOT NULL DEFAULT 'movie'`,
+	['albums', `ALTER TABLE albums ADD COLUMN group_key TEXT`],
+	['media_sources', `ALTER TABLE media_sources ADD COLUMN kind TEXT NOT NULL DEFAULT 'video'`],
+	['stream_sessions', `ALTER TABLE stream_sessions ADD COLUMN entity_type TEXT NOT NULL DEFAULT 'movie'`],
 ];
 
 // Indexes on columns added by ALTERS — must run after them on existing DBs.
@@ -338,7 +342,8 @@ function backfillOnce(db, name, fn) {
 
 function apply(db) {
 	for (const sql of TABLES) db.exec(sql);
-	for (const sql of ALTERS) {
+	for (const [table, sql] of ALTERS) {
+		if (!tableExists(db, table)) continue;
 		try {
 			db.exec(sql);
 		} catch (e) {

@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
@@ -94,6 +95,29 @@ export class DatabaseService implements OnModuleDestroy {
 			this.logger.warn('No migrations directory found - creating tables directly');
 			this.createTablesIfNotExist();
 		}
+		this.applyMediaKindsSchema();
+	}
+
+	/**
+	 * Movies + music shared schema (polymorphic user data, music catalogue).
+	 * Lives in scripts/migrations/media-kinds.js so `pnpm db:migrate` and the
+	 * server boot apply the exact same idempotent statements — on a fresh
+	 * install migrate.js runs before the core tables exist, so its ALTERs are
+	 * skipped there and land here instead.
+	 */
+	private applyMediaKindsSchema() {
+		const candidates = [
+			resolve(import.meta.dirname, '../../../../scripts/migrations/media-kinds.js'),
+			resolve(process.cwd(), 'scripts/migrations/media-kinds.js'),
+			resolve(process.cwd(), 'src/scripts/migrations/media-kinds.js'),
+		];
+		const path = candidates.find((p) => existsSync(p));
+		if (!path) {
+			this.logger.warn('media-kinds migration not found; run `pnpm db:migrate`');
+			return;
+		}
+		const mod = createRequire(import.meta.url)(path) as { apply(db: unknown): void };
+		mod.apply(this.sqlite);
 	}
 
 	private createTablesIfNotExist() {
