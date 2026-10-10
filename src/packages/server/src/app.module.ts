@@ -29,6 +29,7 @@ import { LlmModule } from './llm/llm.module.js';
 import { MediaModule } from './media/media.module.js';
 import { MetadataModule } from './metadata/metadata.module.js';
 import { MoviesModule } from './movies/movies.module.js';
+import { MusicDiscoveryModule } from './music/discovery/music-discovery.module.js';
 import { MusicModule } from './music/music.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { PeopleModule } from './people/people.module.js';
@@ -67,6 +68,7 @@ import { UsersModule } from './users/users.module.js';
 		LibraryModule,
 		MoviesModule,
 		MusicModule,
+		MusicDiscoveryModule,
 		MetadataModule,
 		MediaModule,
 		StreamModule,

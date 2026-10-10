@@ -7,6 +7,9 @@ import { normalizeQuery } from './dedup.js';
 
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+export type SearchCacheType = 'movie' | 'person' | 'artist' | 'album' | 'track';
+export type SearchCacheSource = 'tmdb' | 'omdb' | 'trakt' | 'musicbrainz' | 'lastfm' | 'discogs';
+
 @Injectable()
 export class SearchCacheService {
 	constructor(private readonly database: DatabaseService) {}
@@ -15,7 +18,7 @@ export class SearchCacheService {
 		return createHash('sha1').update(`${type}|${q}|${source}`).digest('hex');
 	}
 
-	get<T>(type: 'movie' | 'person', query: string, source: 'tmdb' | 'omdb' | 'trakt'): T[] | null {
+	get<T>(type: SearchCacheType, query: string, source: SearchCacheSource): T[] | null {
 		const q = normalizeQuery(query);
 		const id = this.hash(type, q, source);
 		const row = this.database.db.select().from(searchCache).where(eq(searchCache.id, id)).get();
@@ -29,12 +32,7 @@ export class SearchCacheService {
 		}
 	}
 
-	set<T>(
-		type: 'movie' | 'person',
-		query: string,
-		source: 'tmdb' | 'omdb' | 'trakt',
-		items: T[],
-	): void {
+	set<T>(type: SearchCacheType, query: string, source: SearchCacheSource, items: T[]): void {
 		const q = normalizeQuery(query);
 		const id = this.hash(type, q, source);
 		const payload = JSON.stringify(items);

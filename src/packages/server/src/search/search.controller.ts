@@ -1,7 +1,9 @@
 import { BadRequestException, Controller, Get, Logger, Query, Req, Sse } from '@nestjs/common';
 import { lastValueFrom, map, type Observable, toArray } from 'rxjs';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
+import { RequireFeature } from '../features/require-feature.decorator.js';
 import { FederatedMovieSearchService } from './federated-movie-search.service.js';
+import { FederatedMusicSearchService } from './federated-music-search.service.js';
 import { FederatedPeopleSearchService } from './federated-people-search.service.js';
 import type { SearchEvent } from './search-types.js';
 
@@ -12,6 +14,7 @@ export class SearchController {
 	constructor(
 		private readonly movies: FederatedMovieSearchService,
 		private readonly people: FederatedPeopleSearchService,
+		private readonly music: FederatedMusicSearchService,
 	) {}
 
 	private requireQuery(q: string | undefined): string {
@@ -38,6 +41,27 @@ export class SearchController {
 		return this.people
 			.search$(query)
 			.pipe(map((ev) => ({ data: ev }) as unknown as MessageEvent));
+	}
+
+	@RequireFeature('music')
+	@RequireAction('view:library')
+	@Sse('music/stream')
+	streamMusic(@Query('q') q: string, @Req() req: any): Observable<MessageEvent> {
+		const query = this.requireQuery(q);
+		const userId = req.user?.sub ?? req.user?.id;
+		return this.music
+			.search$(query, userId)
+			.pipe(map((ev) => ({ data: ev }) as unknown as MessageEvent));
+	}
+
+	@RequireFeature('music')
+	@RequireAction('view:library')
+	@Get('music')
+	async listMusic(@Query('q') q: string, @Req() req: any) {
+		const query = this.requireQuery(q);
+		const userId = req.user?.sub ?? req.user?.id;
+		const events = await lastValueFrom(this.music.search$(query, userId).pipe(toArray()));
+		return this.flatten(events);
 	}
 
 	@RequireAction('view:library')

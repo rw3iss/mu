@@ -1,5 +1,7 @@
 export type {
 	MovieSearchHit,
+	MusicSearchHit,
+	MusicSearchKind,
 	PersonSearchHit,
 	SearchDoneEvent,
 	SearchErrorEvent,
