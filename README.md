@@ -339,6 +339,8 @@ Override config values with `MU_` prefixed env vars, using double underscores fo
 | `MU_DATA_DIR` | `./data` | Data directory path |
 | `MU_LOGS_DIR` | `<dataDir>/logs` | Log directory |
 | `MU_CACHE_DIR` | `<dataDir>/cache` | Cache root — anchors streams, images, sprites, subtitles, hot cache |
+| `MU_FEATURE_MOVIES` | `1` | Default for the Movies feature (`0` disables). The `features` app setting (Setup page / `PUT /api/v1/features`) wins once saved |
+| `MU_FEATURE_MUSIC` | `0` | Default for the Music feature (`1` enables). Same DB-wins rule |
 | `MU_CACHE__STREAMDIR` | `<cacheRoot>/streams` | Transcode cache directory (overrides the streams subdir only) |
 | `MU_JOBS__BACKEND` | `in-memory` | Job queue: `in-memory` (default) or `bullmq` (Redis) |
 | `MU_JOBS__REDIS__URL` | `redis://localhost:6379` | Redis URL (BullMQ only) |

@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, Logger, Param, Patch, Post, Put } from '@nestjs/common';
+import type { MediaKind } from '@mu/shared';
+import {
+	BadRequestException,
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Logger,
+	Param,
+	Patch,
+	Post,
+	Put,
+	Query,
+} from '@nestjs/common';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
@@ -22,15 +35,16 @@ export class LibraryController {
 	@Get()
 	@Roles('admin')
 	@RequireAction('edit:app-settings')
-	findAll() {
-		return this.libraryService.getSources();
+	findAll(@Query('kind') kind?: string) {
+		return this.libraryService.getSources(kind ? parseKind(kind) : undefined);
 	}
 
+	/** `kind` defaults to `video`. Overlap with another kind → `warning` in the response. */
 	@Post()
 	@Roles('admin')
 	@RequireAction('edit:app-settings')
-	create(@Body() body: { path: string; label?: string }) {
-		return this.libraryService.addSource(body.path, body.label);
+	create(@Body() body: { path: string; label?: string; kind?: MediaKind }) {
+		return this.libraryService.addSource(body.path, body.label, parseKind(body.kind));
 	}
 
 	@Patch(':id')
@@ -59,8 +73,8 @@ export class LibraryController {
 	@Put('sync')
 	@Roles('admin')
 	@RequireAction('edit:app-settings')
-	sync(@Body() body: { paths: string[] }) {
-		return this.libraryService.syncSources(body.paths);
+	sync(@Body() body: { paths: string[]; kind?: MediaKind }) {
+		return this.libraryService.syncSources(body.paths, parseKind(body.kind));
 	}
 
 	@Get('scan-status')
@@ -159,4 +173,11 @@ export class LibraryController {
 			...result,
 		};
 	}
+}
+
+/** Validate a `kind` input; missing → `video`. */
+function parseKind(kind: unknown): MediaKind {
+	if (kind == null || kind === '') return 'video';
+	if (kind === 'video' || kind === 'audio') return kind;
+	throw new BadRequestException(`Invalid source kind "${String(kind)}" (expected video|audio)`);
 }

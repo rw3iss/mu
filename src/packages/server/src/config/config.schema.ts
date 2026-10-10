@@ -290,5 +290,21 @@ export const configSchema = z.object({
 		})
 		.default(() => ({}) as any),
 
+	/**
+	 * Feature-flag DEFAULTS (env-level). The `features` app setting in the DB
+	 * wins once an admin (or the Setup page) has saved it — see
+	 * FeatureFlagsService. Env: `MU_FEATURE_MOVIES=0`, `MU_FEATURE_MUSIC=1`
+	 * (mapped explicitly in config.loader.ts). Must be declared here — zod
+	 * strips unknown keys.
+	 */
+	features: z
+		.object({
+			movies: z.boolean().default(true),
+			music: z.boolean().default(false),
+		})
+		// Explicit object: zod 4 returns a function default verbatim (inner
+		// defaults are NOT applied), which would leave `features` as `{}`.
+		.default({ movies: true, music: false }),
+
 	dataDir: z.string().default('../../data'),
 });

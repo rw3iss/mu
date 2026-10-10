@@ -15,6 +15,10 @@ export type Action =
 	| 'edit:own-settings'
 	| 'edit:movie'
 	| 'delete:movie'
+	/** Kind-agnostic edit/delete (movies + music). Granted alongside the movie actions. */
+	| 'edit:media'
+	| 'delete:media'
+	| 'edit:lyrics'
 	| 'edit:app-settings'
 	| 'admin:users'
 	| 'admin:server'
@@ -39,6 +43,9 @@ export const ROLE_ACTIONS: Record<GrantedRole, ReadonlySet<Action>> = {
 		'edit:own-settings',
 		'edit:movie',
 		'delete:movie',
+		'edit:media',
+		'delete:media',
+		'edit:lyrics',
 		'edit:app-settings',
 		'admin:users',
 		'admin:server',
@@ -54,6 +61,9 @@ export const ROLE_ACTIONS: Record<GrantedRole, ReadonlySet<Action>> = {
 		'edit:own-settings',
 		'edit:movie',
 		'delete:movie',
+		'edit:media',
+		'delete:media',
+		'edit:lyrics',
 	]),
 	viewer: new Set<Action>(['view:public', 'view:library', 'view:own-data', 'edit:own-settings']),
 	share: new Set<Action>(['view:public', 'view:shared-movie']),

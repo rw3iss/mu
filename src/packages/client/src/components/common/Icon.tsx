@@ -58,6 +58,7 @@ export type IconName =
 	// app surfaces
 	| 'home'
 	| 'film'
+	| 'music'
 	| 'grip'
 	| 'list-plus'
 	| 'star'
@@ -328,6 +329,13 @@ const PATHS: Record<IconName, JSX.Element> = {
 			<line x1="2" y1="16" x2="7" y2="16" />
 			<line x1="17" y1="8" x2="22" y2="8" />
 			<line x1="17" y1="16" x2="22" y2="16" />
+		</>
+	),
+	music: (
+		<>
+			<path d="M9 18V5l12-2v13" />
+			<circle cx="6" cy="18" r="3" />
+			<circle cx="18" cy="16" r="3" />
 		</>
 	),
 	'list-plus': (

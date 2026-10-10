@@ -1,23 +1,14 @@
 import { existsSync, statSync } from 'node:fs';
 import { basename, extname } from 'node:path';
-import { SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
-import {
-	forwardRef,
-	Inject,
-	Injectable,
-	Logger,
-	OnModuleDestroy,
-	OnModuleInit,
-} from '@nestjs/common';
+import { WsEvent } from '@mu/shared';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import chokidar, { type FSWatcher } from 'chokidar';
-import { and, eq, like, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { mediaSources, movieFiles } from '../database/schema/index.js';
+import { mediaSources } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
-import { MoviesService } from '../movies/movies.service.js';
-import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
-import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
+import type { MediaImporter } from './importers/media-importer.js';
 import { ScannerService } from './scanner.service.js';
 
 /** How often the background health-check reconciles watchers against sources. */
@@ -34,17 +25,12 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 	private debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private healthTimer: ReturnType<typeof setInterval> | null = null;
-	private readonly extSet = new Set(SUPPORTED_VIDEO_EXTENSIONS.map((e) => e.toLowerCase()));
 
 	constructor(
 		private readonly database: DatabaseService,
 		private readonly scanner: ScannerService,
 		private readonly config: ConfigService,
 		private readonly events: EventsService,
-		@Inject(forwardRef(() => MoviesService))
-		private readonly moviesService: MoviesService,
-		private readonly transcoderService: TranscoderService,
-		private readonly subtitleService: SubtitleService,
 	) {}
 
 	async onModuleInit() {
@@ -58,6 +44,8 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 		);
 		this.events.on('library:source-removed', () => this.scheduleWatcherRefresh());
 		this.events.on('library:source-updated', () => this.scheduleWatcherRefresh());
+		// Enabling/disabling a feature adds/drops watchers for that kind's sources.
+		this.events.on(WsEvent.FEATURES_CHANGED, () => this.scheduleWatcherRefresh());
 
 		const watchEnabled = this.config.get<boolean>('library.watchEnabled', true);
 		if (!watchEnabled) {
@@ -163,11 +151,17 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 			return { created: 0, removed: 0, rearmed: 0, active: this.watchers.size };
 		}
 
+		// Only sources whose kind has an importer (and whose feature is on) are
+		// watched; each watcher filters by that importer's extensions.
 		const sources = this.database.db
 			.select()
 			.from(mediaSources)
 			.where(eq(mediaSources.enabled, true))
-			.all();
+			.all()
+			.flatMap((s) => {
+				const importer = this.scanner.resolveImporter(s.kind).importer;
+				return importer ? [{ ...s, importer }] : [];
+			});
 		const desired = new Set(sources.map((s) => s.id));
 
 		let created = 0;
@@ -208,7 +202,7 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 
 			if (!hasWatcher || remounted) {
 				if (hasWatcher) await this.closeWatcher(source.id);
-				this.createWatcher(source.id, source.path);
+				this.createWatcher(source.id, source.path, source.importer.extensions);
 				this.watchedInodes.set(source.id, ino);
 				if (remounted) {
 					rearmed++;
@@ -242,7 +236,8 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 		return { created, removed, rearmed, active: this.watchers.size };
 	}
 
-	private createWatcher(sourceId: string, sourcePath: string) {
+	private createWatcher(sourceId: string, sourcePath: string, extensions: readonly string[]) {
+		const extSet = new Set(extensions.map((e) => e.toLowerCase()));
 		// Polling is the reliable fallback for filesystems that don't deliver
 		// inotify events (some network shares / FUSE mounts). Off by default
 		// (native inotify is far cheaper); enable via library.watchPolling for
@@ -261,7 +256,7 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 
 		watcher.on('add', (filePath: string) => {
 			const ext = extname(filePath).toLowerCase();
-			if (!this.extSet.has(ext)) return;
+			if (!extSet.has(ext)) return;
 
 			// Debounce file additions
 			const key = `add:${filePath}`;
@@ -282,15 +277,15 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 
 		watcher.on('unlink', (filePath: string) => {
 			const ext = extname(filePath).toLowerCase();
-			if (!this.extSet.has(ext)) return;
+			if (!extSet.has(ext)) return;
 
-			this.handleFileRemoved(filePath).catch((err) => {
+			this.handleFileRemoved(sourceId, filePath).catch((err) => {
 				this.logger.error(`Error handling removed file ${filePath}: ${err.message}`);
 			});
 		});
 
 		watcher.on('unlinkDir', (dirPath: string) => {
-			this.handleDirectoryRemoved(dirPath).catch((err) => {
+			this.handleDirectoryRemoved(sourceId, dirPath).catch((err) => {
 				this.logger.error(
 					`Error handling removed directory ${dirPath}: ${(err as Error).message}`,
 				);
@@ -309,20 +304,23 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 		const fileName = basename(filePath);
 		this.logger.log(`New file detected: ${fileName}`);
 
-		// Delegate to the scanner's importFile helper so the watcher and
-		// the scanner apply the same rules (min file size, probe, atomic
-		// movies+movieFiles insert) to every file. See ScannerService.importFile.
+		// Delegate to the scanner, which routes to the importer for this
+		// source's kind — so the watcher and a full scan apply the same rules
+		// (size/duration floors, probe, atomic catalogue insert) to every file.
 		const result = await this.scanner.importFile(sourceId, filePath);
 
 		switch (result.status) {
 			case 'skipped-size':
 				this.logger.log(`Skipped (under min file size): ${fileName}`);
 				break;
+			case 'skipped-duration':
+				this.logger.log(`Skipped (under min duration): ${fileName}`);
+				break;
 			case 'updated':
 				// Existing row touched — nothing else to do.
 				break;
 			case 'added':
-				this.logger.log(`Added movie from watcher: ${result.title}`);
+				this.logger.log(`Added from watcher: ${result.title}`);
 				break;
 			case 'race-skipped':
 				this.logger.warn(
@@ -355,104 +353,34 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 		return !existsSync(owning.path);
 	}
 
-	private async handleFileRemoved(filePath: string) {
+	/** The importer for this source's kind (null if none / feature disabled). */
+	private importerFor(sourceId: string): MediaImporter | null {
+		const source = this.database.db
+			.select({ kind: mediaSources.kind })
+			.from(mediaSources)
+			.where(eq(mediaSources.id, sourceId))
+			.get();
+		if (!source) return null;
+		return this.scanner.resolveImporter(source.kind).importer;
+	}
+
+	private async handleFileRemoved(sourceId: string, filePath: string) {
 		if (this.sourceOffline(filePath)) {
 			this.logger.warn(
 				`Ignoring removal of ${basename(filePath)} — its media source is offline (drive unmounted?). Not purging.`,
 			);
 			return;
 		}
-
-		const file = this.database.db
-			.select()
-			.from(movieFiles)
-			.where(and(eq(movieFiles.filePath, filePath), eq(movieFiles.available, true)))
-			.get();
-
-		if (!file) return;
-
-		// Check if this is the last available file for the movie
-		const otherAvailable = this.database.db
-			.select({ c: sql<number>`COUNT(*)` })
-			.from(movieFiles)
-			.where(
-				and(
-					eq(movieFiles.movieId, file.movieId),
-					eq(movieFiles.available, true),
-					sql`${movieFiles.id} != ${file.id}`,
-				),
-			)
-			.get();
-
-		if (!otherAvailable || otherAvailable.c === 0) {
-			// Last file — purge the entire movie
-			await this.moviesService.purgeMovie(file.movieId);
-			this.events.emit(WsEvent.LIBRARY_MOVIE_REMOVED, { movieId: file.movieId, filePath });
-			this.logger.log(`Purged movie (last file removed): ${basename(filePath)}`);
-		} else {
-			// Other files remain — just mark unavailable and clean caches
-			this.database.db
-				.update(movieFiles)
-				.set({ available: false })
-				.where(eq(movieFiles.id, file.id))
-				.run();
-			await this.transcoderService.clearCache(file.id);
-			await this.subtitleService.clearCache(file.id);
-			this.events.emit(WsEvent.LIBRARY_MOVIE_REMOVED, { movieId: file.movieId, filePath });
-			this.logger.log(`File marked unavailable: ${basename(filePath)}`);
-		}
+		await this.importerFor(sourceId)?.handleFileRemoved?.(filePath);
 	}
 
-	private async handleDirectoryRemoved(dirPath: string) {
+	private async handleDirectoryRemoved(sourceId: string, dirPath: string) {
 		if (this.sourceOffline(dirPath)) {
 			this.logger.warn(
 				`Ignoring directory removal ${dirPath} — its media source is offline (drive unmounted?). Not purging.`,
 			);
 			return;
 		}
-		this.logger.log(`Directory removed: ${dirPath}`);
-
-		// Find all available files whose path starts with the removed directory
-		const affectedFiles = this.database.db
-			.select({
-				id: movieFiles.id,
-				movieId: movieFiles.movieId,
-				filePath: movieFiles.filePath,
-			})
-			.from(movieFiles)
-			.where(and(like(movieFiles.filePath, `${dirPath}%`), eq(movieFiles.available, true)))
-			.all();
-
-		if (affectedFiles.length === 0) return;
-
-		// Mark all affected files as unavailable
-		for (const file of affectedFiles) {
-			this.database.db
-				.update(movieFiles)
-				.set({ available: false })
-				.where(eq(movieFiles.id, file.id))
-				.run();
-		}
-
-		// Collect unique movie IDs
-		const uniqueMovieIds = [...new Set(affectedFiles.map((f) => f.movieId))];
-
-		// For each movie, check if any available files remain
-		for (const movieId of uniqueMovieIds) {
-			const remaining = this.database.db
-				.select({ c: sql<number>`COUNT(*)` })
-				.from(movieFiles)
-				.where(and(eq(movieFiles.movieId, movieId), eq(movieFiles.available, true)))
-				.get();
-
-			if (!remaining || remaining.c === 0) {
-				await this.moviesService.purgeMovie(movieId);
-				this.events.emit(WsEvent.LIBRARY_MOVIE_REMOVED, { movieId, filePath: dirPath });
-			}
-		}
-
-		this.logger.log(
-			`Directory removal affected ${affectedFiles.length} file(s), ${uniqueMovieIds.length} movie(s)`,
-		);
+		await this.importerFor(sourceId)?.handleDirectoryRemoved?.(dirPath);
 	}
 }

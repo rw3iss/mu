@@ -4,6 +4,8 @@ import { MetadataModule } from '../metadata/metadata.module.js';
 import { MoviesModule } from '../movies/movies.module.js';
 import { StreamModule } from '../stream/stream.module.js';
 import { ConvertSweepService } from './convert-sweep.service.js';
+import { ImporterRegistry } from './importers/importer-registry.js';
+import { VideoImporter } from './importers/video-importer.js';
 import { LibraryController } from './library.controller.js';
 import { LibraryService } from './library.service.js';
 import { LibraryJobsService } from './library-jobs.service.js';
@@ -17,12 +19,14 @@ import { WatcherService } from './watcher.service.js';
 	controllers: [LibraryController, LibraryUploadController],
 	providers: [
 		LibraryService,
+		ImporterRegistry,
+		VideoImporter,
 		ScannerService,
 		WatcherService,
 		LibraryJobsService,
 		LibraryUploadService,
 		ConvertSweepService,
 	],
-	exports: [LibraryService, ScannerService, WatcherService, LibraryJobsService],
+	exports: [LibraryService, ImporterRegistry, ScannerService, WatcherService, LibraryJobsService],
 })
 export class LibraryModule {}

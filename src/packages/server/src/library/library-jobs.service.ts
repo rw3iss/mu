@@ -19,6 +19,7 @@ import { EventsService } from '../events/events.service.js';
 import { buildPrettyTitle } from '../grouping/title-sanitiser.js';
 import type { JobHelpers, JobRecord } from '../jobs/job.interface.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
+import { jobTypeRegistry } from '../jobs/job-type-registry.js';
 import { parseThumbnailSize, SpriteService } from '../media/sprite.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
 import { MetadataService } from '../metadata/metadata.service.js';
@@ -45,6 +46,25 @@ export const JOB_TYPE = {
 	/** Backfill ffprobe codec info for files that were never probed (null codec). */
 	PROBE_UNPROBED: 'probe-unprobed',
 } as const;
+
+/**
+ * Scheduling metadata for the library job types (JobTypeRegistry). Registered
+ * at module load so it's in place before any job can be enqueued. io-heavy =
+ * whole-file disk readers (bounded by `encoding.maxConcurrentIoJobs`); encode
+ * = eligible for CPU+GPU parallel transcoding. Scans are kind-agnostic (the
+ * orchestrator dispatches per source kind), so they carry no feature.
+ */
+jobTypeRegistry.registerMany([
+	{ type: JOB_TYPE.SCAN, ioHeavy: false, encode: false },
+	{ type: JOB_TYPE.SCAN_ALL, ioHeavy: false, encode: false },
+	{ type: JOB_TYPE.METADATA, ioHeavy: false, encode: false, feature: 'movies' },
+	{ type: JOB_TYPE.THUMBNAIL, ioHeavy: false, encode: false, feature: 'movies' },
+	{ type: JOB_TYPE.SPRITE_SHEET, ioHeavy: true, encode: false, feature: 'movies' },
+	{ type: JOB_TYPE.CLEANUP, ioHeavy: false, encode: false },
+	{ type: JOB_TYPE.PRE_TRANSCODE, ioHeavy: true, encode: true, feature: 'movies' },
+	{ type: JOB_TYPE.CONVERT_MP4, ioHeavy: true, encode: true, feature: 'movies' },
+	{ type: JOB_TYPE.PROBE_UNPROBED, ioHeavy: false, encode: false, feature: 'movies' },
+]);
 
 /**
  * Backoff delays for auto metadata fetches on newly-scanned movies. One retry

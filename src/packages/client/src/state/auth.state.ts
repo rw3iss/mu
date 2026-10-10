@@ -134,15 +134,26 @@ export async function checkAuth(): Promise<void> {
 	}
 }
 
+/** Libraries chosen on the Setup page (feature flags + folders per kind). */
+export interface SetupLibraries {
+	enableMovies?: boolean;
+	enableMusic?: boolean;
+	musicPaths?: string[];
+}
+
 export async function setup(
 	username: string,
 	email: string | undefined,
 	password: string,
 	mediaPaths?: string[],
+	libraries?: SetupLibraries,
 ): Promise<void> {
 	const body: Record<string, unknown> = { username, password };
 	if (email) body.email = email;
 	if (mediaPaths?.length) body.mediaPaths = mediaPaths;
+	if (libraries?.enableMovies !== undefined) body.enableMovies = libraries.enableMovies;
+	if (libraries?.enableMusic !== undefined) body.enableMusic = libraries.enableMusic;
+	if (libraries?.musicPaths?.length) body.musicPaths = libraries.musicPaths;
 
 	const response = await api.post<{ user: User; accessToken: string }>('/auth/setup', body);
 

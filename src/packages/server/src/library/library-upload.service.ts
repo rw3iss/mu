@@ -92,10 +92,10 @@ export class LibraryUploadService {
 		});
 	}
 
-	/** Enabled media source paths offered as upload destinations. */
+	/** Enabled movie (video) source paths offered as upload destinations. */
 	listTargets(): UploadTarget[] {
 		return this.library
-			.getSources()
+			.getSources('video')
 			.filter((s) => s.enabled)
 			.map((s) => ({
 				id: s.id,
@@ -106,7 +106,7 @@ export class LibraryUploadService {
 	}
 
 	private resolveSource(sourceId: string) {
-		const source = this.library.getSources().find((s) => s.id === sourceId);
+		const source = this.library.getSources('video').find((s) => s.id === sourceId);
 		if (!source) throw new NotFoundException('Unknown library destination');
 		if (!source.enabled) throw new BadRequestException('That library destination is disabled');
 		return source;

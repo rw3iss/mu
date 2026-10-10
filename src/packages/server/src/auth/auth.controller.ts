@@ -1,4 +1,4 @@
-import type { RegistrationConfig, RegistrationResult } from '@mu/shared';
+import type { MediaKind, RegistrationConfig, RegistrationResult } from '@mu/shared';
 import {
 	Body,
 	Controller,
@@ -17,6 +17,8 @@ import { RequireAction } from '../common/decorators/require-action.decorator.js'
 import { Roles } from '../common/decorators/roles.decorator.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { ConfigService } from '../config/config.service.js';
+import { FeatureFlagsService } from '../features/feature-flags.service.js';
+import { ImporterRegistry } from '../library/importers/importer-registry.js';
 import { LibraryService } from '../library/library.service.js';
 import { LibraryJobsService } from '../library/library-jobs.service.js';
 import { AuthService } from './auth.service.js';
@@ -36,6 +38,8 @@ export class AuthController {
 		private readonly libraryJobs: LibraryJobsService,
 		private readonly config: ConfigService,
 		private readonly registration: RegistrationService,
+		private readonly features: FeatureFlagsService,
+		private readonly importers: ImporterRegistry,
 	) {}
 
 	/**
@@ -64,24 +68,48 @@ export class AuthController {
 
 		reply.setCookie('mu_access_token', accessToken, this.accessCookieOptions());
 
-		// Compute effective paths: prefer mediaPaths array, fall back to single mediaPath
-		const effectivePaths = (
-			body.mediaPaths?.length ? body.mediaPaths : body.mediaPath ? [body.mediaPath] : []
-		).filter((p) => p.trim());
+		// Persist the features chosen on the Libraries step before creating
+		// sources, so the scan orchestrator sees the right flags.
+		const features = this.features.set({
+			movies: body.enableMovies ?? true,
+			music: body.enableMusic ?? false,
+		});
+
+		// Movie folders: prefer mediaPaths array, fall back to single mediaPath.
+		const moviePaths = features.movies
+			? (body.mediaPaths?.length
+					? body.mediaPaths
+					: body.mediaPath
+						? [body.mediaPath]
+						: []
+				).filter((p) => p.trim())
+			: [];
+		const musicPaths = features.music ? (body.musicPaths ?? []).filter((p) => p.trim()) : [];
 
 		const sources: any[] = [];
-		for (const mediaPath of effectivePaths) {
-			try {
-				const source = this.libraryService.addSource(mediaPath);
-				sources.push(source);
-				this.libraryJobs.enqueueScan(source.id, `Initial scan: ${mediaPath}`);
-				this.logger.log(`Media source created during setup: ${mediaPath}`);
-			} catch (err: any) {
-				this.logger.warn(`Failed to create media source during setup: ${err.message}`);
+		const addAll = (paths: string[], kind: MediaKind) => {
+			for (const mediaPath of paths) {
+				try {
+					const source = this.libraryService.addSource(mediaPath.trim(), undefined, kind);
+					sources.push(source);
+					// Only enqueue when an importer handles this kind (music's
+					// importer lands in a later phase — the source is kept and
+					// scanned once it exists).
+					if (this.importers.has(kind)) {
+						this.libraryJobs.enqueueScan(source.id, `Initial scan: ${mediaPath}`);
+					}
+					this.logger.log(`${kind} source created during setup: ${mediaPath}`);
+				} catch (err: any) {
+					this.logger.warn(
+						`Failed to create ${kind} source during setup: ${err.message}`,
+					);
+				}
 			}
-		}
+		};
+		addAll(moviePaths, 'video');
+		addAll(musicPaths, 'audio');
 
-		return { user, accessToken, sources };
+		return { user, accessToken, sources, features };
 	}
 
 	@Post('login')

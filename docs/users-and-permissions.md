@@ -32,6 +32,9 @@ buttons the user can't reach).
 | `edit:own-settings` | ✓ | ✓ | ✓ | — |
 | `edit:movie` | ✓ | ✓ | — | — |
 | `delete:movie` | ✓ | ✓ | — | — |
+| `edit:media` | ✓ | ✓ | — | — |
+| `delete:media` | ✓ | ✓ | — | — |
+| `edit:lyrics` | ✓ | ✓ | — | — |
 | `edit:app-settings` | ✓ | — | — | — |
 | `admin:users` | ✓ | — | — | — |
 | `admin:server` | ✓ | — | — | — |

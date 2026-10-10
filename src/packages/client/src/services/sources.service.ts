@@ -1,9 +1,12 @@
+import type { MediaKind } from '@mu/shared';
 import { api } from './api';
 
 export interface MediaSourceDto {
 	id: string;
 	path: string;
 	label: string | null;
+	/** 'video' (movie folder) | 'audio' (music folder). */
+	kind: MediaKind;
 	scanIntervalHours: number;
 	enabled: boolean;
 	/** At most one source is the default (upload target preselection). */
@@ -13,6 +16,8 @@ export interface MediaSourceDto {
 	totalSizeBytes: number;
 	createdAt: string;
 	updatedAt: string;
+	/** Set on create when the path overlaps a source of the other kind. */
+	warning?: string;
 }
 
 export interface BrowseResult {
@@ -49,12 +54,13 @@ export interface ScanStatusResult {
 }
 
 export const sourcesService = {
-	getAll() {
-		return api.get<MediaSourceDto[]>('/sources');
+	/** All sources, or only one kind (movie folders = 'video', music = 'audio'). */
+	getAll(kind?: MediaKind) {
+		return api.get<MediaSourceDto[]>('/sources', kind ? { kind } : undefined);
 	},
 
-	create(path: string, label?: string) {
-		return api.post<MediaSourceDto>('/sources', { path, label });
+	create(path: string, label?: string, kind: MediaKind = 'video') {
+		return api.post<MediaSourceDto>('/sources', { path, label, kind });
 	},
 
 	update(id: string, data: Partial<{ label: string; enabled: boolean; isDefault: boolean }>) {
@@ -82,8 +88,9 @@ export const sourcesService = {
 		return api.post<ScanResult>('/sources/scan');
 	},
 
-	sync(paths: string[]) {
-		return api.put<SyncResult>('/sources/sync', { paths });
+	/** Replace the set of `kind` sources with `paths` (other kinds untouched). */
+	sync(paths: string[], kind: MediaKind = 'video') {
+		return api.put<SyncResult>('/sources/sync', { paths, kind });
 	},
 
 	browse(path?: string) {

@@ -22,6 +22,24 @@ const MIME_TYPES: Record<string, string> = {
 	'.mov': 'video/quicktime',
 	'.m4v': 'video/mp4',
 	'.ts': 'video/mp2t',
+	// Audio (music). Formats browsers can't decode natively are served as
+	// octet-stream; the music pipeline transcodes those (plan §5.4).
+	'.mp3': 'audio/mpeg',
+	'.flac': 'audio/flac',
+	'.m4a': 'audio/mp4',
+	'.aac': 'audio/mp4',
+	'.alac': 'audio/mp4',
+	'.ogg': 'audio/ogg',
+	'.oga': 'audio/ogg',
+	'.opus': 'audio/ogg; codecs=opus',
+	'.wav': 'audio/wav',
+	'.aiff': 'audio/aiff',
+	'.aif': 'audio/aiff',
+	'.wma': 'audio/x-ms-wma',
+	'.ape': 'application/octet-stream',
+	'.wv': 'application/octet-stream',
+	'.dsf': 'application/octet-stream',
+	'.dff': 'application/octet-stream',
 };
 
 @Injectable()
@@ -29,7 +47,7 @@ export class DirectPlayService {
 	private readonly logger = new Logger(DirectPlayService.name);
 
 	/**
-	 * Serve a video file with full HTTP range request support.
+	 * Serve a media file (video or audio) with full HTTP range request support.
 	 * Handles both full-file (200) and partial-content (206) responses.
 	 */
 	async serveFile(
