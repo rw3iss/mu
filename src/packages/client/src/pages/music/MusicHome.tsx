@@ -79,7 +79,7 @@ export function MusicHome(_props: MusicHomeProps) {
 							: 'Ask an admin to add a music folder in Settings → Library → Music Folders.'
 					}
 					actionLabel={isAdmin.value ? 'Open Music Folders' : undefined}
-					onAction={isAdmin.value ? () => route('/settings/library') : undefined}
+					onAction={isAdmin.value ? () => route('/settings/music') : undefined}
 				/>
 			) : (
 				<>
