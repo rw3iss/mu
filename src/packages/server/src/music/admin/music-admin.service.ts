@@ -13,6 +13,7 @@ import { albums, mediaSources, trackFiles } from '../../database/schema/index.js
 import { EntityLifecycleService } from '../../entities/entity-lifecycle.service.js';
 import { FeatureFlagsService } from '../../features/feature-flags.service.js';
 import { LibraryJobsService } from '../../library/library-jobs.service.js';
+import { AlbumEditService } from '../catalog/album-edit.service.js';
 import { MUSIC_JOB, MusicJobsService } from '../jobs/music-jobs.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { AudioTranscodeService } from '../playback/audio-transcode.service.js';
@@ -41,12 +42,46 @@ export class MusicAdminService implements OnApplicationBootstrap {
 		private readonly musicSettings: MusicSettingsService,
 		private readonly lifecycle: EntityLifecycleService,
 		private readonly features: FeatureFlagsService,
+		private readonly albumEdit: AlbumEditService,
 	) {}
+
+	/**
+	 * Merge albums that share a folder and title — leftovers from the old
+	 * grouping key, which split a folder when only some files carried an
+	 * album-artist (or MBID) tag. Keeps the album with the most tracks.
+	 */
+	mergeFolderDuplicates(): number {
+		const groups = this.db.all<{ folder: string; norm: string }>(sql`
+			SELECT folder_path AS folder, norm_title AS norm FROM albums
+			WHERE folder_path IS NOT NULL
+			GROUP BY folder_path, norm_title HAVING count(*) > 1`);
+		let merged = 0;
+		for (const g of groups) {
+			const rows = this.db.all<{ id: string }>(sql`
+				SELECT id FROM albums WHERE folder_path = ${g.folder} AND norm_title = ${g.norm}
+				ORDER BY track_count DESC, added_at ASC`);
+			const [keep, ...rest] = rows;
+			for (const r of rest) {
+				this.albumEdit.merge(r.id, keep!.id);
+				merged++;
+			}
+		}
+		return merged;
+	}
 
 	/** Once after boot: prune FLAC copies a stricter policy no longer wants. */
 	onApplicationBootstrap() {
 		setTimeout(() => {
 			if (!this.features.isEnabled('music')) return;
+			try {
+				const merged = this.mergeFolderDuplicates();
+				if (merged)
+					this.logger.log(
+						`Merged ${merged} duplicate album(s) split by the old grouping key`,
+					);
+			} catch (err) {
+				this.logger.warn(`Album dedupe failed: ${(err as Error).message}`);
+			}
 			this.applyTranscodePolicy()
 				.then((r) => {
 					if (r.removed || r.queued) {

@@ -155,6 +155,40 @@ describe.skipIf(!hasFfmpeg)('music ingest pipeline', async () => {
 		expect(query.bestFile(airbag[0]!.id)?.lossless).toBe(true);
 	});
 
+	it('keeps a partially album-artist-tagged folder on one album', async () => {
+		const q = join(dir, 'Quirke - Steal A Golden Hail');
+		mkdirSync(q, { recursive: true });
+		const a = join(q, '01 Luxury Red Pence.mp3');
+		const b = join(q, '03 Sample Devon.mp3');
+		makeTrack(a, {
+			title: 'Luxury Red Pence',
+			artist: 'Quirke',
+			album_artist: 'Quirke',
+			album: 'Steal A Golden Hail',
+			track: '1',
+		});
+		makeTrack(
+			b,
+			{ title: 'Sample Devon', artist: 'Quirke', album: 'Steal A Golden Hail', track: '3' },
+			330,
+		);
+		const ra = await ingest(a);
+		const rb = await ingest(b);
+		expect(ra.status === 'added' && rb.status === 'added' && ra.albumId === rb.albumId).toBe(
+			true,
+		);
+		const page = query.listAlbums({ q: 'golden' });
+		expect(page.items).toHaveLength(1);
+		expect(page.items[0]!.trackCount).toBe(2);
+		// Leave the catalogue as the next test expects.
+		const ids = (
+			sqlite.prepare("SELECT id FROM track_files WHERE file_path LIKE '%Quirke%'").all() as {
+				id: string;
+			}[]
+		).map((r) => r.id);
+		catalog.purgeOrphans(ids);
+	});
+
 	it('purges orphans down the chain', () => {
 		const ids = sqlite
 			.prepare("SELECT id FROM track_files WHERE file_path LIKE '%Compilations%'")

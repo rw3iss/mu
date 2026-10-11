@@ -163,6 +163,27 @@ export class MusicCatalogService {
 					.where(eq(albumAliases.groupKey, groupKey))
 					.get();
 			}
+			if (!album && settings.grouping !== 'tags') {
+				// Same folder + same album title = same album, whatever key format
+				// (older keys included the album artist; a partially-tagged rip or
+				// an MBID on only some files would otherwise split the folder).
+				album = db
+					.select({
+						id: albums.id,
+						artId: albums.artId,
+						year: albums.year,
+						artistCredit: albums.artistCredit,
+						isCompilation: albums.isCompilation,
+					})
+					.from(albums)
+					.where(
+						and(
+							eq(albums.folderPath, dirname(filePath)),
+							eq(albums.normTitle, normKey(tags.album ?? '(Unknown Album)')),
+						),
+					)
+					.get();
+			}
 			let newAlbum = false;
 			if (!album) {
 				const id = randomUUID();

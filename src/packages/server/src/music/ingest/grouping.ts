@@ -29,12 +29,10 @@ export function albumGroupKey(
 		return `tag:${albumArtist}|${album}`;
 	}
 	// tags+folder: the folder already separates same-titled albums, so the
-	// artist only joins the key when an explicit album-artist tag exists.
-	// Keying on the TRACK artist would split an untagged compilation into one
-	// album per performer.
-	const albumArtist =
-		tags.albumArtistCredit && !tags.compilation ? normKey(tags.albumArtistCredit) : '*';
-	return `tf:${albumArtist}|${album}|${folder}`;
+	// key is just (album title, folder). The album-artist tag is deliberately
+	// NOT part of it: rips where only some files carry ALBUMARTIST used to
+	// split one folder into two albums with the same name.
+	return `tf:${album}|${folder}`;
 }
 
 /** Display credit for the album: album-artist tag, "Various Artists", or the track artist. */

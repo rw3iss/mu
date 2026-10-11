@@ -140,6 +140,33 @@ describe.skipIf(!hasFfmpeg)('album merge / split', async () => {
 		expect(() => edit.split(res.albumId, ids, 'x')).toThrow(/Leave at least one/);
 	});
 
+	it('merges albums that share a folder and title (old grouping-key split)', () => {
+		const [album] = albumIds();
+		const row = sqlite.prepare('SELECT title FROM albums WHERE id = ?').get(album!.id) as {
+			title: string;
+		};
+		const one = (
+			sqlite.prepare('SELECT id FROM tracks WHERE album_id = ? LIMIT 1').all(album!.id) as {
+				id: string;
+			}[]
+		).map((r) => r.id);
+		// A same-titled album in the same folder — what the old key produced.
+		edit.split(album!.id, one, row.title);
+		expect(albumIds()).toHaveLength(3);
+		const admin = new MusicAdminService(
+			database,
+			null as never,
+			null as never,
+			null as never,
+			settings,
+			lifecycle,
+			{ isEnabled: () => true } as never,
+			edit,
+		);
+		expect(admin.mergeFolderDuplicates()).toBe(1);
+		expect(albumIds()).toHaveLength(2);
+	});
+
 	it('delete-library drops the catalogue and its user data', async () => {
 		const purged: string[] = [];
 		const admin = new MusicAdminService(
@@ -152,6 +179,7 @@ describe.skipIf(!hasFfmpeg)('album merge / split', async () => {
 				purgeMany: (type: string, ids: string[]) => purged.push(`${type}:${ids.length}`),
 			} as never,
 			{ isEnabled: () => true } as never,
+			edit,
 		);
 		const res = await admin.deleteLibraryData();
 		expect(res.count).toBe(4);
