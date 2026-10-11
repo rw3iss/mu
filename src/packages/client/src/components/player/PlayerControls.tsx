@@ -69,7 +69,7 @@ export function PlayerControls({
 	return (
 		<div
 			data-player-panel
-			class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''} ${isSplit ? styles.splitControls : ''}`}
+			class={`${styles.controls} ${visible ? styles.visible : ''} ${hasMiniThumbnail ? styles.miniMode : ''} ${isSplit ? styles.splitControls : ''} ${seekId === 'waveform' ? styles.waveformMode : ''}`}
 		>
 			{/* ── Row 1: Seek bar — flush to top, full width ── */}
 			<div class={`${styles.seekRow} ${seekId === 'waveform' ? styles.seekRowWaveform : ''}`}>

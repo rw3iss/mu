@@ -1687,6 +1687,32 @@
 	}
 }
 
+// With the waveform above the bar there is no seek line straddling the top
+// edge, so the button clusters lose the -10px lift that made room for it
+// (it pushed them up into the waveform). The music bar also has more right-
+// hand buttons, so the transport sits in the flex flow (centred by auto
+// margins) instead of absolutely over the middle, where it overlapped them.
+.controls.waveformMode:not(.splitControls) {
+	.centerControls {
+		position: static;
+		transform: none;
+		margin: 0 auto;
+	}
+
+	.rightControls {
+		margin-top: 0;
+		margin-bottom: 0;
+		margin-left: 0;
+	}
+
+	// Square bar-height buttons (≈105px) don't fit the music bar's 11 buttons
+	// on narrower desktops; scale with the viewport, square at wide widths.
+	.controlBtn {
+		aspect-ratio: auto;
+		width: clamp(44px, 6.2vw, 96px);
+	}
+}
+
 // Two-line menu item: name + concise spec (music stream quality).
 .menuItemStack {
 	display: flex;
