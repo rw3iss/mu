@@ -1,6 +1,7 @@
 import type { TrackDetail } from '@mu/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { route } from 'preact-router';
+import { audioEngine } from '@/audio/audio-engine';
 import { FavoriteButton } from '@/components/common/FavoriteButton';
 import { Icon } from '@/components/common/Icon';
 import { musicService } from '@/services/music.service';
@@ -8,6 +9,7 @@ import { minimizePlayer } from '@/state/globalPlayer.state';
 import { currentTrack } from '@/state/musicPlayer.state';
 import { formatBitrate, formatDuration, formatFileSize, formatSampleRate } from '@/utils/music';
 import { artAtSize } from '@/utils/music-art';
+import { formatStreamSpec, QUALITY_NAMES } from '@/utils/music-quality';
 import styles from '../InfoPanel.module.scss';
 import own from './TrackInfoPanel.module.scss';
 
@@ -128,7 +130,7 @@ export function TrackInfoPanel({ visible, onClose }: { visible: boolean; onClose
 							</span>
 						</div>
 						<div class={own.kv}>
-							<span>Quality</span>
+							<span>Source</span>
 							<span>
 								{[
 									playing.bitDepth ? `${playing.bitDepth}-bit` : null,
@@ -143,12 +145,29 @@ export function TrackInfoPanel({ visible, onClose }: { visible: boolean; onClose
 							<span>Streaming</span>
 							<span>
 								{now.session
-									? now.session.original
-										? 'Original file'
-										: `${now.session.profile} (${now.session.codec ?? 'transcode'})`
+									? [
+											now.session.original
+												? 'Original'
+												: QUALITY_NAMES[now.session.profile],
+											(now.session.codec ?? '').toUpperCase(),
+											formatStreamSpec(now.session),
+										]
+											.filter(Boolean)
+											.join(' · ')
 									: '—'}
 							</span>
 						</div>
+						{audioEngine.outputSampleRate && (
+							<div
+								class={own.kv}
+								title="Rate of the browser's audio output (the OS mixer / device). Your DAC receives this rate."
+							>
+								<span>Browser output</span>
+								<span>
+									{formatStreamSpec({ sampleRate: audioEngine.outputSampleRate })}
+								</span>
+							</div>
+						)}
 						<div class={own.kv}>
 							<span>Size</span>
 							<span>{formatFileSize(playing.fileSize)}</span>

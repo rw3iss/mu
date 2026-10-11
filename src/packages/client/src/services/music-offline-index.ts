@@ -89,6 +89,10 @@ export function offlineSession(trackId: string): AudioStreamSession | null {
 		replayGainTrack: null,
 		replayGainAlbum: null,
 		waveformUrl: null,
+		// Not recorded in the manifest; the info panel shows the source file's facts.
+		sampleRate: null,
+		bitDepth: null,
+		bitrateKbps: null,
 	};
 }
 

@@ -17,6 +17,7 @@ export const musicServerSettings = signal<MusicSettings | null>(null);
 export const QUALITY_NAMES: Record<AudioQuality, string> = {
 	original: 'Original',
 	lossless: 'Lossless',
+	max: 'Max',
 	high: 'High',
 	normal: 'Normal',
 	low: 'Low',
@@ -44,4 +45,17 @@ export function qualityOptions(
 export function qualityLabel(q: AudioQuality): string {
 	const s = musicServerSettings.value ?? DEFAULT_MUSIC_SETTINGS;
 	return `${QUALITY_NAMES[q]} (${qualitySpec(q, s)})`;
+}
+
+/** "24-bit · 96 kHz" / "48 kHz · 320 kbps" — what a stream actually carries. */
+export function formatStreamSpec(s: {
+	sampleRate?: number | null;
+	bitDepth?: number | null;
+	bitrateKbps?: number | null;
+}): string {
+	const parts: string[] = [];
+	if (s.bitDepth) parts.push(`${s.bitDepth}-bit`);
+	if (s.sampleRate) parts.push(`${+(s.sampleRate / 1000).toFixed(1)} kHz`);
+	if (s.bitrateKbps && !s.bitDepth) parts.push(`${s.bitrateKbps} kbps`);
+	return parts.join(' · ');
 }

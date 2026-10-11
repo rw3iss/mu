@@ -895,6 +895,11 @@ export class AudioEngine {
 	 * surfaced nothing when audio silently failed and we lost a day
 	 * of debugging.
 	 */
+	/** Rate the Web Audio graph runs at (= the output device rate), or null when not attached. */
+	get outputSampleRate(): number | null {
+		return this.ctx?.sampleRate ?? null;
+	}
+
 	dumpState(label: string): void {
 		const v = this.boundElement as HTMLMediaElement | null;
 		const snapshot: Record<string, unknown> = {

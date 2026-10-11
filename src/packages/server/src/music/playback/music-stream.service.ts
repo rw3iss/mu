@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { type AudioQuality, type AudioStreamSession, nowISO } from '@mu/shared';
+import { AUDIO_QUALITIES, type AudioQuality, type AudioStreamSession, nowISO } from '@mu/shared';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
@@ -9,7 +9,7 @@ import { MusicSettingsService } from '../music-settings.service.js';
 import { AudioTranscodeService } from './audio-transcode.service.js';
 import { codecKey, parseCaps, planStream, policyOf, type StreamPlan } from './playability.js';
 
-const QUALITIES: readonly AudioQuality[] = ['original', 'lossless', 'high', 'normal', 'low'];
+const QUALITIES: readonly AudioQuality[] = AUDIO_QUALITIES;
 
 function asQuality(v: string | undefined, fallback: AudioQuality): AudioQuality {
 	return QUALITIES.includes(v as AudioQuality) ? (v as AudioQuality) : fallback;
@@ -37,7 +37,12 @@ export class MusicStreamService {
 	): StreamPlan {
 		const s = this.musicSettings.get();
 		return planStream(
-			{ codec: codecKey(file.codec, file.container), bitrate: file.bitrate },
+			{
+				codec: codecKey(file.codec, file.container),
+				bitrate: file.bitrate,
+				sampleRate: file.sampleRate,
+				bitDepth: file.bitDepth,
+			},
 			profile,
 			s.maxProfile,
 			parseCaps(caps),
@@ -67,6 +72,7 @@ export class MusicStreamService {
 			replayGainTrack: file.replaygainTrack,
 			replayGainAlbum: file.replaygainAlbum,
 			waveformUrl: settings.waveforms ? `/api/v1/music/waveform/${file.id}` : null,
+			...delivered(file, plan),
 		};
 	}
 
@@ -177,4 +183,26 @@ export class MusicStreamService {
 				.run();
 		}
 	}
+}
+
+/** Sample rate / bit depth / bitrate of what the plan actually sends. */
+function delivered(
+	file: { sampleRate: number | null; bitDepth: number | null; bitrate: number | null },
+	plan: StreamPlan,
+): { sampleRate: number | null; bitDepth: number | null; bitrateKbps: number | null } {
+	if (plan.mode === 'original' || !plan.target) {
+		return {
+			sampleRate: file.sampleRate,
+			bitDepth: file.bitDepth,
+			bitrateKbps: file.bitrate ? Math.round(file.bitrate / 1000) : null,
+		};
+	}
+	const t = plan.target;
+	const lossless = t.codec === 'flac';
+	return {
+		sampleRate: t.sampleRate ?? file.sampleRate,
+		bitDepth: lossless ? (t.bitDepth ?? file.bitDepth) : null,
+		// MP3 V0 averages ~245 kbps.
+		bitrateKbps: lossless ? null : (t.bitrateKbps ?? (t.vbrQuality === 0 ? 245 : null)),
+	};
 }

@@ -5,12 +5,7 @@ import type { ControlGroupProps } from './types';
 export function InfoButton({ isSplit, onToggleInfo }: ControlGroupProps) {
 	if (isSplit) return null;
 	return (
-		<button
-			class={styles.controlBtn}
-			onClick={onToggleInfo}
-			aria-label="Info"
-			title="Info"
-		>
+		<button class={styles.controlBtn} onClick={onToggleInfo} aria-label="Info" title="Info">
 			<svg
 				width="20"
 				height="20"

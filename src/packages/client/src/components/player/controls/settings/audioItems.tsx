@@ -2,6 +2,7 @@ import type { ReplayGainMode } from '@mu/shared';
 import { Icon } from '@/components/common/Icon';
 import { setUiSetting } from '@/hooks/useUiSetting';
 import {
+	currentTrack,
 	MUSIC_GAPLESS_KEY,
 	MUSIC_REPLAYGAIN_KEY,
 	musicGapless,
@@ -9,7 +10,7 @@ import {
 	musicStreamProfile,
 	setStreamProfile,
 } from '@/state/musicPlayer.state';
-import { QUALITY_NAMES, qualityOptions } from '@/utils/music-quality';
+import { formatStreamSpec, QUALITY_NAMES, qualityOptions } from '@/utils/music-quality';
 import styles from '../../PlayerControls.module.scss';
 import type { SettingsMenuApi } from './types';
 
@@ -45,7 +46,12 @@ export function StreamQualityItem({ openPanel }: SettingsMenuApi) {
 	return (
 		<SubmenuRow
 			label="Stream Quality"
-			value={QUALITY_NAMES[musicStreamProfile.value] ?? musicStreamProfile.value}
+			value={[
+				QUALITY_NAMES[musicStreamProfile.value] ?? musicStreamProfile.value,
+				currentTrack.value?.session ? formatStreamSpec(currentTrack.value.session) : '',
+			]
+				.filter(Boolean)
+				.join(' · ')}
 			onClick={() => openPanel('music-quality')}
 		/>
 	);

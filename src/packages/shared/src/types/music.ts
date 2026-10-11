@@ -1,14 +1,18 @@
 import type { EntityRef } from './media.js';
 
 /** Audio streaming quality profiles. See docs/music-support-plan.md §5.4. */
-export type AudioQuality = 'original' | 'lossless' | 'high' | 'normal' | 'low';
+export type AudioQuality = 'original' | 'lossless' | 'max' | 'high' | 'normal' | 'low';
 export const AUDIO_QUALITIES: readonly AudioQuality[] = [
 	'original',
 	'lossless',
+	'max',
 	'high',
 	'normal',
 	'low',
 ];
+
+/** Encoding used for the `max` quality. */
+export type MaxFormat = 'aac' | 'mp3-v0';
 /** Qualities a transcode can target (everything but `original`). */
 export type TranscodeProfile = Exclude<AudioQuality, 'original'>;
 
@@ -23,20 +27,26 @@ export function availableQualities(s: { allowLossless: boolean }): AudioQuality[
 /** Short spec for a quality under the server's settings, e.g. "AAC/Opus 192 kbps · ~1.4 MB/min". */
 export function qualitySpec(
 	q: AudioQuality,
-	s: Pick<MusicSettings, 'bitrates' | 'allowLossless' | 'fallbackProfile'>,
+	s: Pick<MusicSettings, 'bitrates' | 'allowLossless' | 'fallbackProfile' | 'maxFormat'>,
 ): string {
-	if (q === 'lossless') return 'FLAC · ~5–6 MB/min';
+	if (q === 'lossless') return 'FLAC, source sample rate · ~5–6 MB/min (more for hi-res)';
 	if (q === 'original') {
-		const fb =
-			s.fallbackProfile === 'lossless' && s.allowLossless ? 'lossless' : s.fallbackProfile;
-		const fbLabel =
-			fb === 'lossless'
-				? 'FLAC'
-				: `AAC ${s.bitrates[fb as 'high' | 'normal' | 'low'] ?? 192} kbps`;
-		return `file as stored; other formats → ${fbLabel}`;
+		const fb = s.fallbackProfile === 'lossless' && !s.allowLossless ? 'high' : s.fallbackProfile;
+		const hiRes = s.allowLossless ? '; hi-res → FLAC' : '';
+		return `file as stored; other formats → ${fb === 'lossless' ? 'FLAC' : shortSpec(fb, s)}${hiRes}`;
 	}
+	if (q === 'max' && s.maxFormat === 'mp3-v0') return 'MP3 V0 VBR ~245 kbps · ~1.8 MB/min';
 	const kbps = s.bitrates[q];
-	return `AAC/Opus ${kbps} kbps · ~${mbPerMinute(kbps).toFixed(1)} MB/min`;
+	const codec = q === 'max' ? 'AAC' : 'AAC/Opus';
+	return `${codec} ${kbps} kbps · ~${mbPerMinute(kbps).toFixed(1)} MB/min`;
+}
+
+function shortSpec(
+	q: Exclude<AudioQuality, 'original' | 'lossless'>,
+	s: Pick<MusicSettings, 'bitrates' | 'maxFormat'>,
+): string {
+	if (q === 'max' && s.maxFormat === 'mp3-v0') return 'MP3 V0';
+	return `AAC ${s.bitrates[q]} kbps`;
 }
 
 /** Ordered best → worst, for "cap at admin maximum" comparisons. */
@@ -159,7 +169,9 @@ export interface MusicSettings {
 	fallbackProfile: TranscodeProfile;
 	transcodeUnplayableAtIngest: boolean;
 	flacCompressionLevel: number;
-	bitrates: { high: number; normal: number; low: number };
+	bitrates: { max: number; high: number; normal: number; low: number };
+	/** Encoding of the `max` quality: AAC at `bitrates.max`, or MP3 V0 VBR. */
+	maxFormat: MaxFormat;
 	maxConcurrentJobs: number;
 	transcodeCacheMaxGb: number;
 	onDemandMaxSeconds: number;
@@ -187,7 +199,8 @@ export const DEFAULT_MUSIC_SETTINGS: MusicSettings = {
 	fallbackProfile: 'high',
 	transcodeUnplayableAtIngest: true,
 	flacCompressionLevel: 5,
-	bitrates: { high: 192, normal: 128, low: 96 },
+	bitrates: { max: 320, high: 192, normal: 128, low: 96 },
+	maxFormat: 'aac',
 	maxConcurrentJobs: 2,
 	transcodeCacheMaxGb: 20,
 	onDemandMaxSeconds: 1200,
@@ -227,6 +240,10 @@ export interface AudioStreamSession {
 	replayGainTrack: number | null;
 	replayGainAlbum: number | null;
 	waveformUrl: string | null;
+	/** What is actually sent: sample rate (Hz), bit depth (lossless only), bitrate. */
+	sampleRate: number | null;
+	bitDepth: number | null;
+	bitrateKbps: number | null;
 }
 
 /** One MusicBrainz release offered as an album match (score 0..1). */

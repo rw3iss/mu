@@ -16,7 +16,14 @@ import { LibraryJobsService } from '../../library/library-jobs.service.js';
 import { MUSIC_JOB, MusicJobsService } from '../jobs/music-jobs.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { AudioTranscodeService } from '../playback/audio-transcode.service.js';
-import { codecKey, isPlayable, parseCaps, planStream, policyOf } from '../playback/playability.js';
+import {
+	cacheName,
+	codecKey,
+	isPlayable,
+	parseCaps,
+	planStream,
+	policyOf,
+} from '../playback/playability.js';
 
 /**
  * Admin quick actions for music. Each one only enqueues jobs (dedupe-aware)
@@ -44,7 +51,7 @@ export class MusicAdminService implements OnApplicationBootstrap {
 				.then((r) => {
 					if (r.removed || r.queued) {
 						this.logger.log(
-							`Transcode policy: removed ${r.removed} FLAC copies, queued ${r.queued}`,
+							`Transcode policy: removed ${r.removed} stale copies, queued ${r.queued}`,
 						);
 					}
 				})
@@ -121,8 +128,8 @@ export class MusicAdminService implements OnApplicationBootstrap {
 
 	/**
 	 * Bring cached copies of unplayable files in line with the transcode policy:
-	 * delete FLAC copies the policy no longer serves (lossless off, or the
-	 * fallback changed), then queue the copies it now wants. Runs after a
+	 * delete copies the policy no longer serves (lossless toggled, fallback or
+	 * bitrate changed), then queue the copies it now wants. Runs after a
 	 * settings save and once at boot. Returns how many FLAC files were removed.
 	 */
 	async applyTranscodePolicy(): Promise<{ removed: number; queued: number }> {
@@ -134,6 +141,8 @@ export class MusicAdminService implements OnApplicationBootstrap {
 				codec: trackFiles.codec,
 				container: trackFiles.container,
 				bitrate: trackFiles.bitrate,
+				sampleRate: trackFiles.sampleRate,
+				bitDepth: trackFiles.bitDepth,
 			})
 			.from(trackFiles)
 			.all();
@@ -142,18 +151,20 @@ export class MusicAdminService implements OnApplicationBootstrap {
 			const key = codecKey(f.codec, f.container);
 			if (isPlayable(key, universal)) continue;
 			const plan = planStream(
-				{ codec: key, bitrate: f.bitrate },
+				{ codec: key, bitrate: f.bitrate, sampleRate: f.sampleRate, bitDepth: f.bitDepth },
 				'original',
 				'original',
 				universal,
 				settings.bitrates,
 				policyOf(settings),
 			);
-			const wanted = plan.target ? `${plan.profile}.${plan.target.ext}` : null;
+			const wanted = cacheName(plan);
 			const dir = this.transcoder.fileDir(f.id);
 			const names = await readdir(dir).catch(() => [] as string[]);
 			for (const name of names) {
-				if (!/^(original|lossless)\.flac$/.test(name) || name === wanted) continue;
+				// Everything but the copy the policy wants (on-demand profile copies
+				// of unplayable files rebuild when next requested).
+				if (name === wanted || name === 'waveform.json' || name.endsWith('.part')) continue;
 				await rm(join(dir, name), { force: true });
 				removed++;
 			}
@@ -174,6 +185,8 @@ export class MusicAdminService implements OnApplicationBootstrap {
 				codec: trackFiles.codec,
 				container: trackFiles.container,
 				bitrate: trackFiles.bitrate,
+				sampleRate: trackFiles.sampleRate,
+				bitDepth: trackFiles.bitDepth,
 			})
 			.from(trackFiles)
 			.where(or(eq(trackFiles.available, true), isNull(trackFiles.available)))
@@ -184,7 +197,7 @@ export class MusicAdminService implements OnApplicationBootstrap {
 			const key = codecKey(f.codec, f.container);
 			if (isPlayable(key, universal)) continue;
 			const plan = planStream(
-				{ codec: key, bitrate: f.bitrate },
+				{ codec: key, bitrate: f.bitrate, sampleRate: f.sampleRate, bitDepth: f.bitDepth },
 				'original',
 				'original',
 				universal,

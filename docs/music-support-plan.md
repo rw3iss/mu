@@ -393,6 +393,11 @@ and written to `.part` then renamed. On a cache miss:
 > AAC copy at `fallbackProfile` (default `high`); `lossless` is hidden unless allowed.
 > Default bitrates lowered to 192/128/96 kbps. FLAC *sources* still play as FLAC under
 > `original`. Quality pickers show format · bitrate · MB/min.
+>
+> **STATUS 2026-10-11 — ADDED.** `max` quality (AAC 320 / MP3 V0 VBR), the hi-res rule
+> (FLAC at native rate for hi-res/DSD when lossless is allowed; DSD → 176.4/352.8k),
+> lossy output capped at 48 kHz, bitrate-aware cache names, and the delivered sample
+> rate / bit depth in the session + track info panel (with the browser output rate).
 
 **Cache management.** A `music-cache-evict` scheduled job: LRU under
 `music.transcodeCacheMaxGb`. Ingest-time transcodes for unplayable formats are never

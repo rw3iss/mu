@@ -318,7 +318,7 @@ export function MusicSettings() {
 					</Row>
 					<Row
 						label="Allow FLAC (Lossless) Transcoding"
-						description="Off: unplayable formats become a small lossy AAC copy and the Lossless quality is hidden. On: FLAC copies (~5–6 MB per minute, about 4× High) can be chosen below and by users. FLAC files you upload always play as FLAC either way."
+						description="Off: unplayable formats become a small lossy AAC copy and the Lossless quality is hidden. On: FLAC copies (~5–6 MB per minute, about 4× High) can be chosen below and by users. FLAC files you upload always play as FLAC either way. Hi-res rule: with this on, hi-res files browsers cannot play (above 48 kHz or 16-bit, and DSD) are kept as FLAC at their native rate (DSD → 176.4/352.8 kHz) instead of the lossy copy."
 					>
 						<Toggle
 							checked={settings.allowLossless}
@@ -355,6 +355,38 @@ export function MusicSettings() {
 							exclude={['original']}
 						/>
 					</Row>
+					<Row
+						label="Max Quality Format"
+						description="The top lossy option. AAC uses the bitrate below (320 kbps by default); MP3 V0 is LAME's best VBR mode (~245 kbps average). Both play in every browser. Lossy copies are capped at 48 kHz; only FLAC keeps hi-res rates."
+					>
+						<select
+							class={styles.select}
+							value={settings.maxFormat}
+							onChange={(e) =>
+								set(
+									'maxFormat',
+									(e.target as HTMLSelectElement)
+										.value as MusicSettingsDto['maxFormat'],
+								)
+							}
+						>
+							<option value="aac">AAC (bitrate below)</option>
+							<option value="mp3-v0">MP3 V0 (VBR ~245 kbps)</option>
+						</select>
+					</Row>
+					{settings.maxFormat === 'aac' && (
+						<Row
+							label="Max Bitrate (kbps)"
+							description={`AAC · ~${mbPerMinute(settings.bitrates.max).toFixed(1)} MB/min · ~${(mbPerMinute(settings.bitrates.max) * 4).toFixed(1)} MB per 4-min track`}
+						>
+							<NumberInput
+								value={settings.bitrates.max}
+								min={128}
+								max={512}
+								onChange={(v) => set('bitrates', { ...settings.bitrates, max: v })}
+							/>
+						</Row>
+					)}
 					<Row
 						label="High Bitrate (kbps)"
 						description={`AAC/Opus · ~${mbPerMinute(settings.bitrates.high).toFixed(1)} MB/min · ~${(mbPerMinute(settings.bitrates.high) * 4).toFixed(1)} MB per 4-min track`}

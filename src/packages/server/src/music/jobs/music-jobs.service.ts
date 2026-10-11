@@ -8,7 +8,14 @@ import { jobTypeRegistry } from '../../jobs/job-type-registry.js';
 import { MusicMetadataService } from '../metadata/music-metadata.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { AudioTranscodeService } from '../playback/audio-transcode.service.js';
-import { codecKey, isPlayable, parseCaps, planStream, policyOf } from '../playback/playability.js';
+import {
+	cacheName,
+	codecKey,
+	isPlayable,
+	parseCaps,
+	planStream,
+	policyOf,
+} from '../playback/playability.js';
 
 export const MUSIC_JOB = {
 	WAVEFORM: 'music-waveform',
@@ -76,7 +83,12 @@ export class MusicJobsService implements OnModuleInit {
 			const s = this.musicSettings.get();
 			// The universal browser set (no client caps) decides "unplayable".
 			const plan = planStream(
-				{ codec: codecKey(file.codec, file.container), bitrate: file.bitrate },
+				{
+					codec: codecKey(file.codec, file.container),
+					bitrate: file.bitrate,
+					sampleRate: file.sampleRate,
+					bitDepth: file.bitDepth,
+				},
 				'original',
 				'original',
 				parseCaps(''),
@@ -125,14 +137,19 @@ export class MusicJobsService implements OnModuleInit {
 				if (isPlayable(key, parseCaps(''))) return false;
 				// Keep exactly the ingest-time copy the current policy serves.
 				const plan = planStream(
-					{ codec: key, bitrate: f.bitrate },
+					{
+						codec: key,
+						bitrate: f.bitrate,
+						sampleRate: f.sampleRate,
+						bitDepth: f.bitDepth,
+					},
 					'original',
 					'original',
 					parseCaps(''),
 					settings.bitrates,
 					policyOf(settings),
 				);
-				return !!plan.target && name === `${plan.profile}.${plan.target.ext}`;
+				return name === cacheName(plan);
 			};
 			return { removed: await this.transcoder.evict(maxBytes, keep) };
 		});

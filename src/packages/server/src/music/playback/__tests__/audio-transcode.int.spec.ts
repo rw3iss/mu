@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { DEFAULT_MUSIC_SETTINGS } from '@mu/shared';
 import { describe, expect, it } from 'vitest';
 import { AudioTranscodeService } from '../audio-transcode.service.js';
+import { planStream } from '../playability.js';
 
 const hasFfmpeg = (() => {
 	try {
@@ -29,7 +30,9 @@ describe.skipIf(!hasFfmpeg)('AudioTranscodeService (ffmpeg)', () => {
 		'volume=0.5',
 		src,
 	]);
-	const config = { get: (k: string) => (k === 'cache.dir' ? dir : dir) } as never;
+	const config = {
+		get: (k: string, d?: string) => (k === 'transcoding.ffmpegPath' ? (d ?? 'ffmpeg') : dir),
+	} as never;
 	const settings = { get: () => DEFAULT_MUSIC_SETTINGS } as never;
 	const svc = new AudioTranscodeService(config, settings);
 
@@ -65,5 +68,52 @@ describe.skipIf(!hasFfmpeg)('AudioTranscodeService (ffmpeg)', () => {
 		expect(Math.max(...w.peaks)).toBe(1);
 		expect(w.peaks.filter((p) => p > 0.5).length).toBeGreaterThan(250);
 		expect((await svc.readWaveform('f3'))?.peaks.length).toBe(300);
+	});
+
+	const probe = (file: string) =>
+		JSON.parse(
+			execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-of', 'json', file], {
+				encoding: 'utf8',
+			}),
+		).streams[0] as { codec_name: string; sample_rate: string; bits_per_raw_sample?: string };
+
+	it('hi-res: max AAC / MP3 V0 resample to 48k, FLAC keeps the native rate', async () => {
+		const hires = join(dir, 'hires.aiff');
+		execFileSync('ffmpeg', [
+			'-v',
+			'error',
+			'-f',
+			'lavfi',
+			'-i',
+			'sine=frequency=440:duration=4:sample_rate=96000',
+			'-c:a',
+			'pcm_s24be',
+			hires,
+		]);
+		const src = {
+			codec: 'aiff' as const,
+			bitrate: 4_608_000,
+			sampleRate: 96_000,
+			bitDepth: 24,
+		};
+		const B = { max: 320, high: 192, normal: 128, low: 96 };
+		const caps = new Set(['mp3', 'aac', 'flac', 'pcm'] as const) as never;
+		const maxAac = planStream(src, 'max', 'original', caps, B);
+		const mp3 = planStream(src, 'max', 'original', caps, B, {
+			allowLossless: false,
+			fallback: 'high',
+			maxFormat: 'mp3-v0',
+		});
+		const flac = planStream(src, 'original', 'original', caps, B, {
+			allowLossless: true,
+			fallback: 'high',
+			maxFormat: 'aac',
+		});
+		const a = probe(await svc.build('h1', hires, maxAac));
+		const m = probe(await svc.build('h1', hires, mp3));
+		const f = probe(await svc.build('h1', hires, flac));
+		expect([a.codec_name, a.sample_rate]).toEqual(['aac', '48000']);
+		expect([m.codec_name, m.sample_rate]).toEqual(['mp3', '48000']);
+		expect([f.codec_name, f.sample_rate]).toEqual(['flac', '96000']);
 	});
 });

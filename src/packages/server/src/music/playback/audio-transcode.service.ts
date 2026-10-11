@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -7,11 +8,12 @@ import ffmpeg from 'fluent-ffmpeg';
 import { ConfigService } from '../../config/config.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { PeakReducer, waveformBucketCount } from './peaks.js';
-import type { StreamPlan } from './playability.js';
+import { cacheName, type StreamPlan } from './playability.js';
 
 /**
  * Builds and caches audio transcodes and waveform peaks.
- * Layout: <cacheRoot>/music/<trackFileId>/<profile>.<ext> and waveform.json.
+ * Layout: <cacheRoot>/music/<trackFileId>/<cacheName(plan)> (e.g. high-192.m4a,
+ * lossless-176400.flac) and waveform.json.
  * Files are written to `.part` then renamed so a crash never leaves a
  * truncated file that would be served.
  */
@@ -23,6 +25,23 @@ export class AudioTranscodeService {
 	private readonly waiters: (() => void)[] = [];
 	/** On-demand builds run at most this many at once. */
 	private static readonly MAX_PARALLEL = 2;
+	private static aac: string | null = null;
+
+	/** `libfdk_aac` if this ffmpeg build has it, else the native `aac` encoder. */
+	static aacEncoder(ffmpegPath = 'ffmpeg'): string {
+		if (AudioTranscodeService.aac) return AudioTranscodeService.aac;
+		let enc = 'aac';
+		try {
+			const out = execFileSync(ffmpegPath, ['-hide_banner', '-encoders'], {
+				encoding: 'utf8',
+			});
+			if (/\blibfdk_aac\b/.test(out)) enc = 'libfdk_aac';
+		} catch {
+			/* keep native */
+		}
+		AudioTranscodeService.aac = enc;
+		return enc;
+	}
 
 	constructor(
 		private readonly config: ConfigService,
@@ -41,8 +60,9 @@ export class AudioTranscodeService {
 	}
 
 	cachedPath(trackFileId: string, plan: StreamPlan): string | null {
-		if (plan.mode !== 'transcode' || !plan.target) return null;
-		const p = join(this.fileDir(trackFileId), `${plan.profile}.${plan.target.ext}`);
+		const name = cacheName(plan);
+		if (!name) return null;
+		const p = join(this.fileDir(trackFileId), name);
 		return existsSync(p) ? p : null;
 	}
 
@@ -63,7 +83,7 @@ export class AudioTranscodeService {
 	build(trackFileId: string, srcPath: string, plan: StreamPlan): Promise<string> {
 		if (plan.mode !== 'transcode' || !plan.target) return Promise.resolve(srcPath);
 		const target = plan.target;
-		const out = join(this.fileDir(trackFileId), `${plan.profile}.${target.ext}`);
+		const out = join(this.fileDir(trackFileId), cacheName(plan)!);
 		if (existsSync(out)) return Promise.resolve(out);
 		const existing = this.inFlight.get(out);
 		if (existing) return existing;
@@ -76,26 +96,45 @@ export class AudioTranscodeService {
 				let cmd = ffmpeg(srcPath)
 					.noVideo()
 					.outputOptions(['-map', '0:a:0', '-map_metadata', '0']);
+				const rate = target.sampleRate ? ['-ar', String(target.sampleRate)] : [];
 				if (target.codec === 'flac') {
 					cmd = cmd
 						.audioCodec('flac')
-						.outputOptions(['-compression_level', String(flacLevel)])
-						// DSD → 24-bit PCM at 88.2 kHz (DSD64's natural decimation).
+						.outputOptions(['-compression_level', String(flacLevel), ...rate])
+						// DSD decodes to float; store 24-bit (s32 container) PCM.
 						.outputOptions(
-							/dsf|dff$/i.test(srcPath) ? ['-ar', '88200', '-sample_fmt', 's32'] : [],
+							target.bitDepth
+								? ['-sample_fmt', 's32', '-bits_per_raw_sample', '24']
+								: [],
 						)
 						.format('flac');
 				} else if (target.codec === 'opus') {
 					cmd = cmd
 						.audioCodec('libopus')
 						.audioBitrate(`${target.bitrateKbps}k`)
-						.outputOptions(['-vbr', 'on', '-ac', '2'])
+						.outputOptions(['-vbr', 'on', '-ac', '2', ...rate])
 						.format('ogg');
-				} else {
+				} else if (target.codec === 'mp3') {
 					cmd = cmd
-						.audioCodec('aac')
+						.audioCodec('libmp3lame')
+						.outputOptions([
+							'-q:a',
+							String(target.vbrQuality ?? 0),
+							'-ac',
+							'2',
+							...rate,
+						])
+						.format('mp3');
+				} else {
+					// libfdk_aac (when ffmpeg has it) is clearly better than the native encoder.
+					cmd = cmd
+						.audioCodec(
+							AudioTranscodeService.aacEncoder(
+								this.config.get<string>('transcoding.ffmpegPath', 'ffmpeg'),
+							),
+						)
 						.audioBitrate(`${target.bitrateKbps}k`)
-						.outputOptions(['-ac', '2', '-movflags', '+faststart'])
+						.outputOptions(['-ac', '2', '-movflags', '+faststart', ...rate])
 						.format('mp4');
 				}
 				cmd.output(part)
