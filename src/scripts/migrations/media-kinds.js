@@ -400,6 +400,29 @@ function apply(db) {
 			db.exec(`INSERT INTO ${t}(${t}) VALUES ('rebuild')`);
 		}
 	});
+
+	// Music bitrate defaults moved 256/160/96 → 192/128/96 kbps (smaller cached
+	// copies). Saved settings still holding the untouched old defaults follow.
+	if (tableExists(db, 'settings')) {
+		backfillOnce(db, '2026-10-music-bitrates-v2', () => {
+			const row = db.prepare("SELECT value FROM settings WHERE key = 'music'").get();
+			if (!row?.value) return;
+			let music;
+			try {
+				music = JSON.parse(row.value);
+			} catch {
+				return;
+			}
+			const b = music?.bitrates;
+			if (b && b.high === 256 && b.normal === 160 && b.low === 96) {
+				music.bitrates = { high: 192, normal: 128, low: 96 };
+				db.prepare("UPDATE settings SET value = ?, updated_at = ? WHERE key = 'music'").run(
+					JSON.stringify(music),
+					new Date().toISOString(),
+				);
+			}
+		});
+	}
 }
 
 module.exports = { apply };

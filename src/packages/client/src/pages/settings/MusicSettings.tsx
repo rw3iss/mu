@@ -1,9 +1,9 @@
 import {
-	AUDIO_QUALITIES,
 	type AudioQuality,
 	DEFAULT_MUSIC_SETTINGS,
 	type FeatureFlags,
 	type MusicSettings as MusicSettingsDto,
+	mbPerMinute,
 	type ReplayGainMode,
 } from '@mu/shared';
 import type { ComponentChildren } from 'preact';
@@ -17,15 +17,8 @@ import { musicService } from '@/services/music.service';
 import { sourcesService } from '@/services/sources.service';
 import { features, loadFeatures } from '@/state/features.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
+import { musicServerSettings, qualityOptions } from '@/utils/music-quality';
 import styles from '../Settings.module.scss';
-
-const QUALITY_LABELS: Record<AudioQuality, string> = {
-	original: 'Original (no transcode)',
-	lossless: 'Lossless (FLAC)',
-	high: 'High',
-	normal: 'Normal',
-	low: 'Low',
-};
 
 const NUMBER_STYLE = { width: '110px', minWidth: 0, flex: 'none', textAlign: 'right' } as const;
 
@@ -92,9 +85,14 @@ function NumberInput({
 function QualitySelect({
 	value,
 	onChange,
+	settings,
+	exclude = [],
 }: {
 	value: AudioQuality;
 	onChange: (v: AudioQuality) => void;
+	/** Current (unsaved) settings — options and specs follow them live. */
+	settings: MusicSettingsDto;
+	exclude?: AudioQuality[];
 }) {
 	return (
 		<select
@@ -102,11 +100,13 @@ function QualitySelect({
 			value={value}
 			onChange={(e) => onChange((e.target as HTMLSelectElement).value as AudioQuality)}
 		>
-			{AUDIO_QUALITIES.map((q) => (
-				<option key={q} value={q}>
-					{QUALITY_LABELS[q]}
-				</option>
-			))}
+			{qualityOptions(settings)
+				.filter((o) => !exclude.includes(o.value))
+				.map((o) => (
+					<option key={o.value} value={o.value}>
+						{o.name} ({o.spec})
+					</option>
+				))}
 		</select>
 	);
 }
@@ -176,6 +176,7 @@ export function MusicSettings() {
 			for (const w of sync.created.map((c) => c.warning).filter(Boolean)) notifyError(w!);
 			const saved = await musicService.saveSettings(settings);
 			setSettings(saved);
+			musicServerSettings.value = saved;
 			await loadMusic();
 			notifySuccess('Music settings saved');
 		} catch {
@@ -308,14 +309,56 @@ export function MusicSettings() {
 					<h3 class={styles.sectionTitle}>Encoding</h3>
 					<Row
 						label="Transcode Unplayable Formats on Import"
-						description="Make a cached FLAC copy of formats no browser plays (APE, WavPack, DSD…) right after import, so the first play starts at once."
+						description="Make the cached copy of formats no browser plays (AIFF, ALAC, WMA, APE, WavPack, DSD…) right after import, so the first play starts at once."
 					>
 						<Toggle
 							checked={settings.transcodeUnplayableAtIngest}
 							onChange={(v) => set('transcodeUnplayableAtIngest', v)}
 						/>
 					</Row>
-					<Row label="High Bitrate (kbps)">
+					<Row
+						label="Allow FLAC (Lossless) Transcoding"
+						description="Off: unplayable formats become a small lossy AAC copy and the Lossless quality is hidden. On: FLAC copies (~5–6 MB per minute, about 4× High) can be chosen below and by users. FLAC files you upload always play as FLAC either way."
+					>
+						<Toggle
+							checked={settings.allowLossless}
+							onChange={(v) =>
+								setSettings((s) => ({
+									...s,
+									allowLossless: v,
+									fallbackProfile:
+										!v && s.fallbackProfile === 'lossless'
+											? 'high'
+											: s.fallbackProfile,
+									defaultProfile:
+										!v && s.defaultProfile === 'lossless'
+											? 'original'
+											: s.defaultProfile,
+									maxProfile:
+										!v && s.maxProfile === 'lossless'
+											? 'original'
+											: s.maxProfile,
+								}))
+							}
+						/>
+					</Row>
+					<Row
+						label="Transcode Unplayable Formats To"
+						description="The copy kept on the server for files your browser cannot play. Saving a change replaces existing copies."
+					>
+						<QualitySelect
+							settings={settings}
+							value={settings.fallbackProfile}
+							onChange={(v) =>
+								set('fallbackProfile', v as MusicSettingsDto['fallbackProfile'])
+							}
+							exclude={['original']}
+						/>
+					</Row>
+					<Row
+						label="High Bitrate (kbps)"
+						description={`AAC/Opus · ~${mbPerMinute(settings.bitrates.high).toFixed(1)} MB/min · ~${(mbPerMinute(settings.bitrates.high) * 4).toFixed(1)} MB per 4-min track`}
+					>
 						<NumberInput
 							value={settings.bitrates.high}
 							min={64}
@@ -323,7 +366,10 @@ export function MusicSettings() {
 							onChange={(v) => set('bitrates', { ...settings.bitrates, high: v })}
 						/>
 					</Row>
-					<Row label="Normal Bitrate (kbps)">
+					<Row
+						label="Normal Bitrate (kbps)"
+						description={`AAC/Opus · ~${mbPerMinute(settings.bitrates.normal).toFixed(1)} MB/min · ~${(mbPerMinute(settings.bitrates.normal) * 4).toFixed(1)} MB per 4-min track`}
+					>
 						<NumberInput
 							value={settings.bitrates.normal}
 							min={48}
@@ -331,7 +377,10 @@ export function MusicSettings() {
 							onChange={(v) => set('bitrates', { ...settings.bitrates, normal: v })}
 						/>
 					</Row>
-					<Row label="Low Bitrate (kbps)">
+					<Row
+						label="Low Bitrate (kbps)"
+						description={`AAC/Opus · ~${mbPerMinute(settings.bitrates.low).toFixed(1)} MB/min · ~${(mbPerMinute(settings.bitrates.low) * 4).toFixed(1)} MB per 4-min track`}
+					>
 						<NumberInput
 							value={settings.bitrates.low}
 							min={24}
@@ -368,6 +417,7 @@ export function MusicSettings() {
 						description="Quality used when a user has not chosen one."
 					>
 						<QualitySelect
+							settings={settings}
 							value={settings.defaultProfile}
 							onChange={(v) => set('defaultProfile', v)}
 						/>
@@ -377,6 +427,7 @@ export function MusicSettings() {
 						description="Caps every stream, e.g. to save upload bandwidth."
 					>
 						<QualitySelect
+							settings={settings}
 							value={settings.maxProfile}
 							onChange={(v) => set('maxProfile', v)}
 						/>
@@ -424,6 +475,7 @@ export function MusicSettings() {
 					</Row>
 					<Row label="Download Quality">
 						<QualitySelect
+							settings={settings}
 							value={settings.offline.downloadProfile}
 							onChange={(v) =>
 								set('offline', { ...settings.offline, downloadProfile: v })

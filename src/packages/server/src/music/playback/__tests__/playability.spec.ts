@@ -25,11 +25,47 @@ describe('planStream', () => {
 			profile: 'original',
 		});
 	});
-	it('transcodes ALAC to FLAC for browsers that lack it', () => {
+	it('transcodes unplayable sources to lossy AAC at the fallback bitrate by default', () => {
+		const p = planStream(
+			{ codec: 'aiff', bitrate: 1_411_000 },
+			'original',
+			'original',
+			chrome,
+			B,
+		);
+		expect(p).toMatchObject({
+			mode: 'transcode',
+			profile: 'high',
+			target: { codec: 'aac', bitrateKbps: 256, ext: 'm4a' },
+		});
+	});
+	it('uses FLAC for unplayable sources only when lossless is allowed and chosen', () => {
+		const flac = { allowLossless: true, fallback: 'lossless' as const };
 		expect(
-			planStream({ codec: 'alac', bitrate: 900_000 }, 'original', 'original', chrome, B)
+			planStream({ codec: 'alac', bitrate: 900_000 }, 'original', 'original', chrome, B, flac)
 				.target?.codec,
 		).toBe('flac');
+		// Allowed but fallback lossy → still AAC.
+		expect(
+			planStream({ codec: 'alac', bitrate: 900_000 }, 'original', 'original', chrome, B, {
+				allowLossless: true,
+				fallback: 'normal',
+			}).target,
+		).toMatchObject({ codec: 'aac', bitrateKbps: 160 });
+	});
+	it('treats a lossless request as original while lossless is off', () => {
+		expect(
+			planStream({ codec: 'flac', bitrate: 900_000 }, 'lossless', 'original', chrome, B),
+		).toEqual({ mode: 'original', profile: 'original' });
+		expect(
+			planStream({ codec: 'wavpack', bitrate: 900_000 }, 'lossless', 'original', chrome, B)
+				.target?.codec,
+		).toBe('aac');
+	});
+	it('keeps FLAC sources as FLAC under original', () => {
+		expect(
+			planStream({ codec: 'flac', bitrate: 900_000 }, 'original', 'original', chrome, B).mode,
+		).toBe('original');
 	});
 	it('serves ALAC natively when the client reports it (Safari)', () => {
 		expect(

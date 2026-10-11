@@ -8,7 +8,7 @@ import { jobTypeRegistry } from '../../jobs/job-type-registry.js';
 import { MusicMetadataService } from '../metadata/music-metadata.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { AudioTranscodeService } from '../playback/audio-transcode.service.js';
-import { codecKey, isPlayable, parseCaps, planStream } from '../playback/playability.js';
+import { codecKey, isPlayable, parseCaps, planStream, policyOf } from '../playback/playability.js';
 
 export const MUSIC_JOB = {
 	WAVEFORM: 'music-waveform',
@@ -81,6 +81,7 @@ export class MusicJobsService implements OnModuleInit {
 				'original',
 				parseCaps(''),
 				s.bitrates,
+				policyOf(s),
 			);
 			if (plan.mode === 'original') return { skipped: 'playable' };
 			const out = await this.transcoder.build(file.id, file.filePath, plan);
@@ -116,10 +117,22 @@ export class MusicJobsService implements OnModuleInit {
 			if (!this.features.isEnabled('music')) return { skipped: true };
 			const maxBytes = this.musicSettings.get().transcodeCacheMaxGb * 1024 ** 3;
 			// Never evict the ingest-time FLAC of a format no browser can play.
+			const settings = this.musicSettings.get();
 			const keep = (fileId: string, name: string) => {
-				if (!name.startsWith('original.') && !name.startsWith('lossless.')) return false;
 				const f = this.file(fileId);
-				return !!f && !isPlayable(codecKey(f.codec, f.container), parseCaps(''));
+				if (!f) return false;
+				const key = codecKey(f.codec, f.container);
+				if (isPlayable(key, parseCaps(''))) return false;
+				// Keep exactly the ingest-time copy the current policy serves.
+				const plan = planStream(
+					{ codec: key, bitrate: f.bitrate },
+					'original',
+					'original',
+					parseCaps(''),
+					settings.bitrates,
+					policyOf(settings),
+				);
+				return !!plan.target && name === `${plan.profile}.${plan.target.ext}`;
 			};
 			return { removed: await this.transcoder.evict(maxBytes, keep) };
 		});

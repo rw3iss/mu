@@ -151,6 +151,7 @@ describe.skipIf(!hasFfmpeg)('album merge / split', async () => {
 			{
 				purgeMany: (type: string, ids: string[]) => purged.push(`${type}:${ids.length}`),
 			} as never,
+			{ isEnabled: () => true } as never,
 		);
 		const res = await admin.deleteLibraryData();
 		expect(res.count).toBe(4);

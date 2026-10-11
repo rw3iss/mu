@@ -1,21 +1,31 @@
+import { readdir, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { MusicAdminActionResult } from '@mu/shared';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+	BadRequestException,
+	Injectable,
+	Logger,
+	type OnApplicationBootstrap,
+} from '@nestjs/common';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import { albums, mediaSources, trackFiles } from '../../database/schema/index.js';
 import { EntityLifecycleService } from '../../entities/entity-lifecycle.service.js';
+import { FeatureFlagsService } from '../../features/feature-flags.service.js';
 import { LibraryJobsService } from '../../library/library-jobs.service.js';
 import { MUSIC_JOB, MusicJobsService } from '../jobs/music-jobs.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { AudioTranscodeService } from '../playback/audio-transcode.service.js';
-import { codecKey, isPlayable, parseCaps, planStream } from '../playback/playability.js';
+import { codecKey, isPlayable, parseCaps, planStream, policyOf } from '../playback/playability.js';
 
 /**
  * Admin quick actions for music. Each one only enqueues jobs (dedupe-aware)
  * and returns how many were queued; the work runs in the job queue.
  */
 @Injectable()
-export class MusicAdminService {
+export class MusicAdminService implements OnApplicationBootstrap {
+	private readonly logger = new Logger('MusicAdmin');
+
 	constructor(
 		private readonly database: DatabaseService,
 		private readonly musicJobs: MusicJobsService,
@@ -23,7 +33,26 @@ export class MusicAdminService {
 		private readonly transcoder: AudioTranscodeService,
 		private readonly musicSettings: MusicSettingsService,
 		private readonly lifecycle: EntityLifecycleService,
+		private readonly features: FeatureFlagsService,
 	) {}
+
+	/** Once after boot: prune FLAC copies a stricter policy no longer wants. */
+	onApplicationBootstrap() {
+		setTimeout(() => {
+			if (!this.features.isEnabled('music')) return;
+			this.applyTranscodePolicy()
+				.then((r) => {
+					if (r.removed || r.queued) {
+						this.logger.log(
+							`Transcode policy: removed ${r.removed} FLAC copies, queued ${r.queued}`,
+						);
+					}
+				})
+				.catch((err) =>
+					this.logger.warn(`Transcode policy check failed: ${(err as Error).message}`),
+				);
+		}, 30_000).unref();
+	}
 
 	private get db() {
 		return this.database.db;
@@ -90,10 +119,54 @@ export class MusicAdminService {
 		return { started: true, count };
 	}
 
-	/** FLAC transcodes for files no browser plays that have no cached transcode yet. */
+	/**
+	 * Bring cached copies of unplayable files in line with the transcode policy:
+	 * delete FLAC copies the policy no longer serves (lossless off, or the
+	 * fallback changed), then queue the copies it now wants. Runs after a
+	 * settings save and once at boot. Returns how many FLAC files were removed.
+	 */
+	async applyTranscodePolicy(): Promise<{ removed: number; queued: number }> {
+		const universal = parseCaps('');
+		const settings = this.musicSettings.get();
+		const files = this.db
+			.select({
+				id: trackFiles.id,
+				codec: trackFiles.codec,
+				container: trackFiles.container,
+				bitrate: trackFiles.bitrate,
+			})
+			.from(trackFiles)
+			.all();
+		let removed = 0;
+		for (const f of files) {
+			const key = codecKey(f.codec, f.container);
+			if (isPlayable(key, universal)) continue;
+			const plan = planStream(
+				{ codec: key, bitrate: f.bitrate },
+				'original',
+				'original',
+				universal,
+				settings.bitrates,
+				policyOf(settings),
+			);
+			const wanted = plan.target ? `${plan.profile}.${plan.target.ext}` : null;
+			const dir = this.transcoder.fileDir(f.id);
+			const names = await readdir(dir).catch(() => [] as string[]);
+			for (const name of names) {
+				if (!/^(original|lossless)\.flac$/.test(name) || name === wanted) continue;
+				await rm(join(dir, name), { force: true });
+				removed++;
+			}
+		}
+		const queued = settings.transcodeUnplayableAtIngest ? this.reencodeUnplayable().count : 0;
+		return { removed, queued };
+	}
+
+	/** Transcodes for files no browser plays that have no cached copy yet (per the policy). */
 	reencodeUnplayable(): MusicAdminActionResult {
 		const universal = parseCaps('');
-		const { bitrates } = this.musicSettings.get();
+		const settings = this.musicSettings.get();
+		const { bitrates } = settings;
 		const files = this.db
 			.select({
 				id: trackFiles.id,
@@ -116,6 +189,7 @@ export class MusicAdminService {
 				'original',
 				universal,
 				bitrates,
+				policyOf(settings),
 			);
 			if (this.transcoder.cachedPath(f.id, plan)) continue;
 			if (this.musicJobs.enqueueTranscode(f.id, f.fileName, { queued })) count++;

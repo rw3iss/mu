@@ -1,6 +1,6 @@
 import type { AudioQuality, ReplayGainMode } from '@mu/shared';
 import { effect } from '@preact/signals';
-import { setUiSetting } from '@/hooks/useUiSetting';
+import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
 import { musicService } from '@/services/music.service';
 import { musicEnabled } from '@/state/features.state';
 import {
@@ -10,6 +10,7 @@ import {
 	MUSIC_RESUME_AFTER_VIDEO_KEY,
 } from '@/state/musicPlayer.state';
 import { setMine, userSettings, userSettingsReady } from '@/state/userSettings.state';
+import { musicServerSettings } from '@/utils/music-quality';
 
 /**
  * Per-user music preferences. The player reads local uiSettings (instant, per
@@ -55,6 +56,7 @@ async function sync(): Promise<void> {
 	if (synced) return;
 	synced = true;
 	const admin = await musicService.settings().catch(() => null);
+	if (admin) musicServerSettings.value = admin;
 	const mine = userSettings.value;
 	for (const p of PREFS) {
 		const serverValue = mine[p.server];
@@ -63,6 +65,14 @@ async function sync(): Promise<void> {
 		} else if (!hasLocal(p.local) && admin) {
 			setUiSetting(p.local, admin[p.adminKey]);
 		}
+	}
+	// A saved Lossless choice is meaningless once the admin turns FLAC off.
+	if (
+		admin &&
+		!admin.allowLossless &&
+		getUiSetting<AudioQuality>(MUSIC_PROFILE_KEY, 'original') === 'lossless'
+	) {
+		setUiSetting(MUSIC_PROFILE_KEY, 'original');
 	}
 }
 

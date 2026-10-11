@@ -2,7 +2,43 @@ import type { EntityRef } from './media.js';
 
 /** Audio streaming quality profiles. See docs/music-support-plan.md §5.4. */
 export type AudioQuality = 'original' | 'lossless' | 'high' | 'normal' | 'low';
-export const AUDIO_QUALITIES: readonly AudioQuality[] = ['original', 'lossless', 'high', 'normal', 'low'];
+export const AUDIO_QUALITIES: readonly AudioQuality[] = [
+	'original',
+	'lossless',
+	'high',
+	'normal',
+	'low',
+];
+/** Qualities a transcode can target (everything but `original`). */
+export type TranscodeProfile = Exclude<AudioQuality, 'original'>;
+
+/** Approximate size of a lossy stream, in MB per minute. */
+export const mbPerMinute = (kbps: number) => (kbps * 60) / 8 / 1000;
+
+/** Qualities offered to users: `lossless` only when the admin allows FLAC. */
+export function availableQualities(s: { allowLossless: boolean }): AudioQuality[] {
+	return AUDIO_QUALITIES.filter((q) => q !== 'lossless' || s.allowLossless);
+}
+
+/** Short spec for a quality under the server's settings, e.g. "AAC/Opus 192 kbps · ~1.4 MB/min". */
+export function qualitySpec(
+	q: AudioQuality,
+	s: Pick<MusicSettings, 'bitrates' | 'allowLossless' | 'fallbackProfile'>,
+): string {
+	if (q === 'lossless') return 'FLAC · ~5–6 MB/min';
+	if (q === 'original') {
+		const fb =
+			s.fallbackProfile === 'lossless' && s.allowLossless ? 'lossless' : s.fallbackProfile;
+		const fbLabel =
+			fb === 'lossless'
+				? 'FLAC'
+				: `AAC ${s.bitrates[fb as 'high' | 'normal' | 'low'] ?? 192} kbps`;
+		return `file as stored; other formats → ${fbLabel}`;
+	}
+	const kbps = s.bitrates[q];
+	return `AAC/Opus ${kbps} kbps · ~${mbPerMinute(kbps).toFixed(1)} MB/min`;
+}
+
 /** Ordered best → worst, for "cap at admin maximum" comparisons. */
 export function audioQualityRank(p: AudioQuality): number {
 	return AUDIO_QUALITIES.indexOf(p);
@@ -85,7 +121,13 @@ export interface AlbumDetail extends AlbumSummary {
 	originalYear: number | null;
 	genres: string[];
 	label: string | null;
-	releases: { id: string; label: string | null; country: string | null; releaseDate: string | null; mediaFormat: string | null }[];
+	releases: {
+		id: string;
+		label: string | null;
+		country: string | null;
+		releaseDate: string | null;
+		mediaFormat: string | null;
+	}[];
 	tracks: TrackSummary[];
 	userRating?: number | null;
 }
@@ -106,6 +148,15 @@ export interface MusicSettings {
 	artPreference: ('embedded' | 'folder' | 'coverartarchive')[];
 	defaultProfile: AudioQuality;
 	maxProfile: AudioQuality;
+	/**
+	 * Allow FLAC (lossless) transcodes. Off by default: FLAC copies are large
+	 * (~5–6 MB/min), so formats no browser plays go to `fallbackProfile` (lossy
+	 * AAC) instead, and the `lossless` quality is hidden. FLAC sources still
+	 * play as FLAC under `original`.
+	 */
+	allowLossless: boolean;
+	/** What unplayable formats (AIFF, ALAC, WMA, APE, DSD…) are transcoded to. */
+	fallbackProfile: TranscodeProfile;
 	transcodeUnplayableAtIngest: boolean;
 	flacCompressionLevel: number;
 	bitrates: { high: number; normal: number; low: number };
@@ -132,9 +183,11 @@ export const DEFAULT_MUSIC_SETTINGS: MusicSettings = {
 	artPreference: ['embedded', 'folder', 'coverartarchive'],
 	defaultProfile: 'original',
 	maxProfile: 'original',
+	allowLossless: false,
+	fallbackProfile: 'high',
 	transcodeUnplayableAtIngest: true,
 	flacCompressionLevel: 5,
-	bitrates: { high: 256, normal: 160, low: 96 },
+	bitrates: { high: 192, normal: 128, low: 96 },
 	maxConcurrentJobs: 2,
 	transcodeCacheMaxGb: 20,
 	onDemandMaxSeconds: 1200,

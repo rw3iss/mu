@@ -1,4 +1,4 @@
-import { type AudioQuality, audioQualityRank } from '@mu/shared';
+import { type AudioQuality, audioQualityRank, type MusicSettings } from '@mu/shared';
 
 /** Canonical codec keys, from music-metadata's `format.codec` strings. */
 export type CodecKey =
@@ -75,11 +75,33 @@ export function capProfile(requested: AudioQuality, max: AudioQuality): AudioQua
 	return audioQualityRank(requested) < audioQualityRank(max) ? max : requested;
 }
 
+/** Admin transcode policy, from MusicSettings. */
+export interface TranscodePolicy {
+	/** FLAC transcodes allowed at all (off by default — FLAC is large). */
+	allowLossless: boolean;
+	/** Target for formats the browser can't play. */
+	fallback: Exclude<AudioQuality, 'original'>;
+}
+
+export const DEFAULT_POLICY: TranscodePolicy = { allowLossless: false, fallback: 'high' };
+
+export function policyOf(
+	s: Pick<MusicSettings, 'allowLossless' | 'fallbackProfile'>,
+): TranscodePolicy {
+	const allowLossless = s.allowLossless === true;
+	const fallback =
+		s.fallbackProfile === 'lossless' && !allowLossless ? 'high' : (s.fallbackProfile ?? 'high');
+	return { allowLossless, fallback };
+}
+
 /**
  * Decide how to deliver one file. Rules:
- *  - original/lossless: send the source when the browser plays it; otherwise
- *    FLAC (lossless → lossless; a lossy unplayable source like WMA also goes to
- *    FLAC so quality is never lost a second time).
+ *  - original: send the source when the browser plays it (FLAC stays FLAC).
+ *    Otherwise transcode to the admin's fallback profile — lossy AAC by
+ *    default (universal, ~1.4 MB/min at 192 kbps); FLAC only when the admin
+ *    allows lossless AND picked it as the fallback.
+ *  - lossless: like original, but unplayable sources go to FLAC. Only when
+ *    lossless is allowed; otherwise it behaves as `original`.
  *  - high/normal/low: Opus (or AAC when the browser lacks Opus) at the profile
  *    bitrate — unless the source is already playable and at or below that
  *    bitrate, in which case re-encoding would only lose quality.
@@ -90,12 +112,27 @@ export function planStream(
 	max: AudioQuality,
 	caps: Set<CodecKey>,
 	bitrates: { high: number; normal: number; low: number },
+	policy: TranscodePolicy = DEFAULT_POLICY,
 ): StreamPlan {
-	const profile = capProfile(requested, max);
+	let profile = capProfile(requested, max);
+	if (profile === 'lossless' && !policy.allowLossless) profile = 'original';
 	const playable = isPlayable(source.codec, caps);
 	if (profile === 'original' || profile === 'lossless') {
 		if (playable) return { mode: 'original', profile };
-		return { mode: 'transcode', profile, target: { codec: 'flac', ext: 'flac' } };
+		const target = profile === 'lossless' ? 'lossless' : policy.fallback;
+		if (target === 'lossless') {
+			return {
+				mode: 'transcode',
+				profile: 'lossless',
+				target: { codec: 'flac', ext: 'flac' },
+			};
+		}
+		// AAC, not Opus: one cached copy that every browser (incl. Safari) plays.
+		return {
+			mode: 'transcode',
+			profile: target,
+			target: { codec: 'aac', bitrateKbps: bitrates[target], ext: 'm4a' },
+		};
 	}
 	const kbps = bitrates[profile];
 	const srcKbps = source.bitrate ? Math.round(source.bitrate / 1000) : null;

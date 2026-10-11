@@ -18,6 +18,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { RequireAction } from '../../common/decorators/require-action.decorator.js';
 import { RequireFeature } from '../../features/require-feature.decorator.js';
 import { DirectPlayService } from '../../stream/direct-play/direct-play.service.js';
+import { MusicAdminService } from '../admin/music-admin.service.js';
 import { ArtworkService } from '../catalog/artwork.service.js';
 import { type ListQuery, MusicQueryService } from '../library/music-query.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
@@ -54,6 +55,7 @@ export class MusicController {
 		private readonly artwork: ArtworkService,
 		private readonly musicSettings: MusicSettingsService,
 		private readonly directPlay: DirectPlayService,
+		private readonly admin: MusicAdminService,
 	) {}
 
 	@RequireAction('view:library')
@@ -219,6 +221,9 @@ export class MusicController {
 	@RequireAction('admin:server')
 	@Put('settings')
 	saveSettings(@Body() patch: Partial<MusicSettings>) {
-		return this.musicSettings.set(patch ?? {});
+		const next = this.musicSettings.set(patch ?? {});
+		// Prune / rebuild cached copies of unplayable files for the new policy.
+		void this.admin.applyTranscodePolicy().catch(() => {});
+		return next;
 	}
 }

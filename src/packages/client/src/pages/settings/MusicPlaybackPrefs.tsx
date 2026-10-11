@@ -1,4 +1,4 @@
-import { AUDIO_QUALITIES, type AudioQuality, type ReplayGainMode } from '@mu/shared';
+import type { AudioQuality, ReplayGainMode } from '@mu/shared';
 import { getUiSettingSignal } from '@/hooks/useUiSetting';
 import { musicEnabled } from '@/state/features.state';
 import {
@@ -8,15 +8,8 @@ import {
 	musicStreamProfile,
 } from '@/state/musicPlayer.state';
 import { setMusicPref } from '@/state/musicPrefs.state';
+import { qualityOptions } from '@/utils/music-quality';
 import styles from '../Settings.module.scss';
-
-const QUALITY_LABELS: Record<AudioQuality, string> = {
-	original: 'Original',
-	lossless: 'Lossless (FLAC)',
-	high: 'High',
-	normal: 'Normal',
-	low: 'Low (mobile data)',
-};
 
 const resumeAfterVideo = getUiSettingSignal<boolean>(MUSIC_RESUME_AFTER_VIDEO_KEY, true);
 
@@ -33,7 +26,8 @@ export function MusicPlaybackPrefs() {
 				<div class={styles.settingInfo}>
 					<span class={styles.settingLabel}>Music Quality</span>
 					<span class={styles.settingDescription}>
-						Original plays the file as stored when your browser supports it.
+						Original plays the file as stored (FLAC stays FLAC); formats your browser
+						cannot play are converted to a smaller lossy copy.
 					</span>
 				</div>
 				<select
@@ -46,9 +40,9 @@ export function MusicPlaybackPrefs() {
 						)
 					}
 				>
-					{AUDIO_QUALITIES.map((q) => (
-						<option key={q} value={q}>
-							{QUALITY_LABELS[q]}
+					{qualityOptions().map((o) => (
+						<option key={o.value} value={o.value}>
+							{o.name} ({o.spec})
 						</option>
 					))}
 				</select>

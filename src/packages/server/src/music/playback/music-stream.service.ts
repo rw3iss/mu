@@ -7,7 +7,7 @@ import { playHistory, trackFiles, tracks } from '../../database/schema/index.js'
 import { MusicQueryService } from '../library/music-query.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { AudioTranscodeService } from './audio-transcode.service.js';
-import { codecKey, parseCaps, planStream, type StreamPlan } from './playability.js';
+import { codecKey, parseCaps, planStream, policyOf, type StreamPlan } from './playability.js';
 
 const QUALITIES: readonly AudioQuality[] = ['original', 'lossless', 'high', 'normal', 'low'];
 
@@ -42,6 +42,7 @@ export class MusicStreamService {
 			s.maxProfile,
 			parseCaps(caps),
 			s.bitrates,
+			policyOf(s),
 		);
 	}
 

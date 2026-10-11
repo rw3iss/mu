@@ -1,4 +1,4 @@
-import { AUDIO_QUALITIES, type AudioQuality, type ReplayGainMode } from '@mu/shared';
+import type { ReplayGainMode } from '@mu/shared';
 import { Icon } from '@/components/common/Icon';
 import { setUiSetting } from '@/hooks/useUiSetting';
 import {
@@ -9,18 +9,11 @@ import {
 	musicStreamProfile,
 	setStreamProfile,
 } from '@/state/musicPlayer.state';
+import { QUALITY_NAMES, qualityOptions } from '@/utils/music-quality';
 import styles from '../../PlayerControls.module.scss';
 import type { SettingsMenuApi } from './types';
 
 /** Audio settings rows + submenus (stream quality, ReplayGain, gapless). */
-
-const QUALITY_LABELS: Record<AudioQuality, string> = {
-	original: 'Original',
-	lossless: 'Lossless (FLAC)',
-	high: 'High (256 kbps)',
-	normal: 'Normal (160 kbps)',
-	low: 'Low (96 kbps)',
-};
 
 const REPLAYGAIN_LABELS: Record<ReplayGainMode, string> = {
 	off: 'Off',
@@ -52,7 +45,7 @@ export function StreamQualityItem({ openPanel }: SettingsMenuApi) {
 	return (
 		<SubmenuRow
 			label="Stream Quality"
-			value={QUALITY_LABELS[musicStreamProfile.value] ?? musicStreamProfile.value}
+			value={QUALITY_NAMES[musicStreamProfile.value] ?? musicStreamProfile.value}
 			onClick={() => openPanel('music-quality')}
 		/>
 	);
@@ -64,16 +57,19 @@ export function StreamQualityPanel({ openPanel, close }: SettingsMenuApi) {
 			<button class={styles.menuBack} onClick={() => openPanel('main')}>
 				<Icon name="chevron-left" size={14} /> Stream Quality
 			</button>
-			{AUDIO_QUALITIES.map((q) => (
+			{qualityOptions().map((o) => (
 				<button
-					key={q}
-					class={`${styles.menuItem} ${musicStreamProfile.value === q ? styles.selected : ''}`}
+					key={o.value}
+					class={`${styles.menuItem} ${musicStreamProfile.value === o.value ? styles.selected : ''}`}
 					onClick={() => {
-						if (musicStreamProfile.value !== q) setStreamProfile(q);
+						if (musicStreamProfile.value !== o.value) setStreamProfile(o.value);
 						close();
 					}}
 				>
-					{QUALITY_LABELS[q]}
+					<span class={styles.menuItemStack}>
+						{o.name}
+						<span class={styles.menuItemSub}>{o.spec}</span>
+					</span>
 				</button>
 			))}
 		</>

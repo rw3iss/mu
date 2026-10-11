@@ -388,6 +388,12 @@ and written to `.part` then renamed. On a cache miss:
 > remains in settings but is unused. (c) Albums carry a `group_key` column for the
 > grouping rule.
 
+> **STATUS 2026-10-11 — CHANGED.** FLAC transcodes are now **opt-in** (`allowLossless`,
+> default off): FLAC copies run ~5–6 MB/min. Unplayable formats default to one lossy
+> AAC copy at `fallbackProfile` (default `high`); `lossless` is hidden unless allowed.
+> Default bitrates lowered to 192/128/96 kbps. FLAC *sources* still play as FLAC under
+> `original`. Quality pickers show format · bitrate · MB/min.
+
 **Cache management.** A `music-cache-evict` scheduled job: LRU under
 `music.transcodeCacheMaxGb`. Ingest-time transcodes for unplayable formats are never
 evicted while the source exists.
