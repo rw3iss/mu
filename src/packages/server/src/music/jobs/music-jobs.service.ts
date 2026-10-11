@@ -229,7 +229,7 @@ export class MusicJobsService implements OnModuleInit {
 			MUSIC_JOB.TRANSCODE,
 			'trackFileId',
 			trackFileId,
-			`Transcode to FLAC: ${fileName}`,
+			`Transcode unplayable audio: ${fileName}`,
 			60,
 			opts,
 		);

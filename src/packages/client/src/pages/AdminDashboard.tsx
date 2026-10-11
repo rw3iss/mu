@@ -1075,9 +1075,9 @@ const MUSIC_ACTIONS: MusicAction[] = [
 		path: 'reencode-unplayable',
 		label: 'Re-encode Unplayable Music',
 		description:
-			'Make cached FLAC copies of formats browsers cannot play (APE, WavPack, DSD…).',
+			'Make cached copies of formats browsers cannot play (AIFF, ALAC, APE, WavPack, DSD…), at the quality set in Settings → Music.',
 		message:
-			'Queues a FLAC transcode for every file in a format no browser plays. The original file is kept; the copy lives in the music cache.',
+			'Queues a transcode for every file in a format no browser plays — lossy AAC by default, FLAC only if allowed in Settings → Music. The original file is kept; the copy lives in the music cache.',
 		confirmLabel: 'Re-encode',
 		started: 'Music re-encode started.',
 		done: (n) => `Queued ${plural(n, 'file')} for re-encoding.`,
@@ -1086,7 +1086,7 @@ const MUSIC_ACTIONS: MusicAction[] = [
 	{
 		path: 'clear-cache',
 		label: 'Clear Music Transcode Cache',
-		description: 'Delete cached lower-bitrate and FLAC copies. They rebuild on demand.',
+		description: 'Delete cached transcoded copies. They rebuild on demand.',
 		message:
 			'Deletes every cached music transcode. Originals are not touched. Copies rebuild the next time a track is played at that quality.',
 		confirmLabel: 'Clear Cache',
