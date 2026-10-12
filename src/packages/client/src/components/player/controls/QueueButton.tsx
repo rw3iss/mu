@@ -43,8 +43,12 @@ function AudioQueueButton() {
 				aria-label={`Up next (${count} queued)`}
 				title={`Up next — ${count} queued`}
 			>
-				<Icon name="view-list" size={20} />
-				{count > 0 && <span class={styles.queueBadge}>{count}</span>}
+				<span class={styles.upNextIcon}>
+					<Icon name="view-list" size={20} />
+					{count > 0 && (
+						<span class={styles.upNextBadge}>{count > 99 ? '99+' : count}</span>
+					)}
+				</span>
 			</button>
 			{flyout && (
 				<div class={styles.queueFlyout}>
