@@ -2,7 +2,12 @@ import type { BrowseMode } from '@mu/shared';
 import { route } from 'preact-router';
 import { currentPath } from '@/app';
 import { Icon } from '@/components/common/Icon';
-import { browseMode, canToggleBrowseMode, setBrowseMode } from '@/state/browseMode.state';
+import {
+	browseMode,
+	canToggleBrowseMode,
+	equivalentPath,
+	setBrowseMode,
+} from '@/state/browseMode.state';
 import styles from './BrowseModeToggle.module.scss';
 
 const MODES: { id: BrowseMode; label: string; icon: 'film' | 'music'; library: string }[] = [
