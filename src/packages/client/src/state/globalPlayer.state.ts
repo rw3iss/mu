@@ -652,6 +652,10 @@ export function initGlobalPlayer(): void {
 	setupPersistenceEffects();
 	initMusicPlayer();
 
+	// Public share pages play only what was shared — never the visitor's own
+	// saved movie / music session.
+	if (/^\/(watch|listen)\//.test(window.location.pathname)) return;
+
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
 		const lastMovie = localStorage.getItem(MOVIE_KEY);

@@ -49,7 +49,7 @@ import {
 	takeFromQueue,
 	takeNextFromQueue,
 } from '@/state/queue.state';
-import { shareMode } from '@/state/share.state';
+import { publicMode } from '@/state/share.state';
 import { audioAdapterHooks, audioPlayback } from './player/adapters/audioAdapter';
 import type { PlayMediaOptions } from './player/types';
 
@@ -245,7 +245,7 @@ function currentPosition(): number {
 // ============================================
 
 function persistNow(): void {
-	if (shareMode.value) return;
+	if (publicMode.value) return;
 	const cur = currentTrack.value;
 	if (!cur) return;
 	const state: PersistedAudioState = {
@@ -690,7 +690,7 @@ export function resumeMusicAfterVideo(): boolean {
 
 /** Restore the last music session paused on reload. Returns true if restored. */
 export function restoreMusicPlayer(): boolean {
-	if (shareMode.value) return false;
+	if (publicMode.value) return false;
 	const saved = readPersisted();
 	if (!saved) return false;
 	applyPersisted(saved);
@@ -717,7 +717,7 @@ export function restoreMusicPlayer(): boolean {
  * keep the music behind it (paused) so closing the video brings it back.
  */
 export function noteMusicBehindVideo(): void {
-	if (shareMode.value) return;
+	if (publicMode.value) return;
 	const saved = readPersisted();
 	if (!saved) return;
 	applyPersisted(saved);

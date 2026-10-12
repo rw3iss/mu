@@ -316,3 +316,24 @@ export type TrackFile = typeof trackFiles.$inferSelect;
 export type NewTrackFile = typeof trackFiles.$inferInsert;
 export type Artwork = typeof artwork.$inferSelect;
 export type Lyrics = typeof lyrics.$inferSelect;
+
+/**
+ * Public music share links (`/listen/<id>`). The id IS the opaque token.
+ * `track_ids` holds the snapshot for `queue` shares; album/playlist shares
+ * resolve live. `art_id` feeds link previews.
+ */
+export const musicShares = sqliteTable(
+	'music_shares',
+	{
+		id: text('id').primaryKey(),
+		kind: text('kind').notNull(),
+		entityId: text('entity_id'),
+		trackIds: text('track_ids'),
+		title: text('title').notNull(),
+		artId: text('art_id'),
+		createdBy: text('created_by').notNull(),
+		createdAt: text('created_at').notNull(),
+		expiresAt: text('expires_at'),
+	},
+	(t) => ({ byUser: index('music_shares_user_idx').on(t.createdBy) }),
+);

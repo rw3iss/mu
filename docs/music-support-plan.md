@@ -823,3 +823,7 @@ prod DB; *(browser)* = needs a manual browser check (no Playwright by policy).
 - The new service worker (`public/sw.js`): network-first for the app shell; if a stale shell ever appears, bump its cache version.
 - Album grouping mistakes → Album page *Merge… / Split…* (merged folders are aliased).
 - Old movie-only user-data tables are unused and can be dropped in a later release.
+
+> **ADDED 2026-10-12 — public music sharing.** Share links for tracks, albums,
+> music playlists and queue snapshots (`/listen/<token>`), played anonymously in the
+> Mu player through token-scoped public routes. See CLAUDE.md `music` row.

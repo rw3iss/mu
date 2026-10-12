@@ -21,6 +21,8 @@ import { MusicOfflineController } from './offline/music-offline.controller.js';
 import { MusicOfflineService } from './offline/music-offline.service.js';
 import { AudioTranscodeService } from './playback/audio-transcode.service.js';
 import { MusicStreamService } from './playback/music-stream.service.js';
+import { MusicShareController } from './share/music-share.controller.js';
+import { MusicShareService } from './share/music-share.service.js';
 import { MusicUploadController } from './upload/music-upload.controller.js';
 import { MusicUploadService } from './upload/music-upload.service.js';
 
@@ -36,10 +38,12 @@ import { MusicUploadService } from './upload/music-upload.service.js';
 		MusicMetadataController,
 		MusicUploadController,
 		MusicOfflineController,
+		MusicShareController,
 	],
 	providers: [
 		ArtworkService,
 		MusicEventsService,
+		MusicShareService,
 		AlbumEditService,
 		MusicCatalogService,
 		MusicSettingsService,

@@ -349,6 +349,7 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 									'rate',
 									'favorite',
 									'goArtist',
+									'share',
 								]}
 							/>
 						</div>

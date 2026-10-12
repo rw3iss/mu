@@ -15,10 +15,14 @@ import type {
 	MusicOfflinePolicy,
 	MusicOfflineTokenResponse,
 	MusicSettings,
+	MusicShareInfo,
+	MusicShareKind,
+	MusicSharePayload,
 	TrackDetail,
 	TrackSummary,
 	WaveformData,
 } from '@mu/shared';
+import { listenToken } from '@/state/share.state';
 import { api } from './api';
 import { offlineSession } from './music-offline-index';
 
@@ -92,6 +96,14 @@ type LyricsDto = { plain: string | null; syncedLrc: string | null; source: strin
 /** Per-track lyrics promises, shared by the lyrics panel and the waveform markers. */
 const lyricsCache = new Map<string, Promise<LyricsDto>>();
 
+const NOT_IN_SHARE = 'Not available in a shared link';
+
+/** API base for the public listen routes while a `/listen/:token` link plays. */
+function publicBase(): string | null {
+	const t = listenToken.value;
+	return t ? `/music/public/${encodeURIComponent(t)}` : null;
+}
+
 export const musicService = {
 	albums(q: MusicListQuery = {}): Promise<Page<AlbumSummary>> {
 		return api.get('/music/albums', params(q));
@@ -106,12 +118,16 @@ export const musicService = {
 		return api.get('/music/genres');
 	},
 	album(id: string): Promise<AlbumDetail> {
+		if (listenToken.value) return Promise.reject(new Error(NOT_IN_SHARE));
 		return api.get(`/music/albums/${encodeURIComponent(id)}`);
 	},
 	artist(id: string): Promise<ArtistDetail> {
+		if (listenToken.value) return Promise.reject(new Error(NOT_IN_SHARE));
 		return api.get(`/music/artists/${encodeURIComponent(id)}`);
 	},
 	track(id: string): Promise<TrackDetail> {
+		const pub = publicBase();
+		if (pub) return api.get(`${pub}/tracks/${encodeURIComponent(id)}`);
 		return api.get(`/music/tracks/${encodeURIComponent(id)}`);
 	},
 	search(q: string): Promise<MusicSearchResult> {
@@ -152,6 +168,8 @@ export const musicService = {
 	): Promise<AudioStreamSession> {
 		const p: Record<string, string> = { caps: audioCapabilities().join(',') };
 		if (opts.profile) p.profile = opts.profile;
+		const pub = publicBase();
+		if (pub) return api.get(`${pub}/stream/${encodeURIComponent(trackId)}/start`, p);
 		try {
 			return await api.get<AudioStreamSession>(
 				`/music/stream/${encodeURIComponent(trackId)}/start`,
@@ -174,17 +192,23 @@ export const musicService = {
 		});
 	},
 	reportProgress(sessionId: string, positionSeconds: number, completed = false): Promise<void> {
+		// Anonymous listeners have no history.
+		if (listenToken.value) return Promise.resolve();
 		return api.post(`/music/stream/${encodeURIComponent(sessionId)}/progress`, {
 			positionSeconds,
 			completed,
 		});
 	},
 	waveform(trackFileId: string): Promise<WaveformData> {
+		const pub = publicBase();
+		if (pub) return api.get(`${pub}/waveform/${encodeURIComponent(trackFileId)}`);
 		return api.get(`/music/waveform/${encodeURIComponent(trackFileId)}`);
 	},
 	lyrics(
 		trackId: string,
 	): Promise<{ plain: string | null; syncedLrc: string | null; source: string | null } | null> {
+		const pub = publicBase();
+		if (pub) return api.get(`${pub}/lyrics/${encodeURIComponent(trackId)}`);
 		return api.get(`/music/tracks/${encodeURIComponent(trackId)}/lyrics`);
 	},
 	/** Cached `lyrics()`; failures resolve to null. Cleared by `saveLyrics`. */
@@ -250,5 +274,29 @@ export const musicService = {
 	},
 	saveSettings(patch: Partial<MusicSettings>): Promise<MusicSettings> {
 		return api.put('/music/settings', patch);
+	},
+};
+
+/** Public music share links (`/listen/:token`). */
+export const musicShareService = {
+	create(body: {
+		kind: MusicShareKind;
+		id?: string;
+		trackIds?: string[];
+	}): Promise<MusicShareInfo> {
+		return api.post('/music/share', body);
+	},
+	mine(): Promise<MusicShareInfo[]> {
+		return api.get('/music/share');
+	},
+	revoke(token: string): Promise<void> {
+		return api.delete(`/music/share/${encodeURIComponent(token)}`);
+	},
+	/** Public: the shared tracks (no login). */
+	payload(token: string): Promise<MusicSharePayload> {
+		return api.get(`/music/public/${encodeURIComponent(token)}`);
+	},
+	url(info: { path: string }): string {
+		return `${window.location.origin}${info.path}`;
 	},
 };

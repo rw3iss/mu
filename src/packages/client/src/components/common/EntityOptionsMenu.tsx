@@ -27,6 +27,7 @@ import {
 	isTrackOffline,
 	offlineAllowed,
 } from '@/state/musicOffline.state';
+import { openMusicShare } from '@/state/musicShare.state';
 import { notifyError, notifySuccess, shouldNotifyPlaylist } from '@/state/notifications.state';
 import {
 	addEntityToPlaylist,
@@ -61,7 +62,8 @@ export type EntityActionId =
 	| 'goArtist'
 	| 'goAlbum'
 	| 'goTrack'
-	| 'download';
+	| 'download'
+	| 'share';
 
 interface EntityAction {
 	id: EntityActionId;
@@ -105,6 +107,16 @@ const DETAIL_PATH: Partial<Record<EntityType, string>> = {
 
 /** Every action, keyed by id. Which ones show is decided per entity type below. */
 const ACTIONS: Record<EntityActionId, EntityAction> = {
+	share: {
+		id: 'share',
+		icon: 'share',
+		label: () => 'Share link…',
+		run: ({ entity, item }) => {
+			if (entity.type === 'track' || entity.type === 'album') {
+				openMusicShare({ kind: entity.type, id: entity.id, title: item?.title });
+			}
+		},
+	},
 	play: {
 		id: 'play',
 		icon: 'play',
@@ -199,6 +211,7 @@ export const ENTITY_ACTIONS: Record<EntityType, EntityActionId[]> = {
 		'goAlbum',
 		'goArtist',
 		'download',
+		'share',
 	],
 	album: [
 		'play',
@@ -209,6 +222,7 @@ export const ENTITY_ACTIONS: Record<EntityType, EntityActionId[]> = {
 		'favorite',
 		'goArtist',
 		'download',
+		'share',
 	],
 	artist: ['play', 'playNext', 'addToQueue', 'rate', 'favorite'],
 	movie: ['play', 'playNext', 'addToQueue', 'playlist', 'favorite'],

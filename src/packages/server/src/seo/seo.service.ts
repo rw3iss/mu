@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { ShareTokenVerifier } from '../common/share-token.verifier.js';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
-import { movieMetadata, movies, people } from '../database/schema/index.js';
+import { movieMetadata, movies, musicShares, people } from '../database/schema/index.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { injectSeoHead, renderSeoHead } from './seo-injector.js';
 
@@ -88,6 +88,13 @@ export class SeoService {
 		if (watchMatch) {
 			const w = await this.resolveWatch(watchMatch[1]!, fastifyInstance, baseUrl);
 			if (w) return this.withCanonical(w, path, baseUrl);
+		}
+
+		// /listen/:token (music share)
+		const listenMatch = path.match(/^\/listen\/([^/]+)/);
+		if (listenMatch) {
+			const l = this.resolveListen(decodeURIComponent(listenMatch[1]!), baseUrl);
+			if (l) return this.withCanonical(l, path, baseUrl);
 		}
 
 		// Static SPA routes — built-ins so the tab title is right.
@@ -191,6 +198,26 @@ export class SeoService {
 			description: description ?? undefined,
 			image: image ?? undefined,
 			type: 'profile',
+		};
+	}
+
+	/** Link preview for a music share: title + cover via the token's public art route. */
+	private resolveListen(token: string, baseUrl: string): SeoMeta | null {
+		const row = this.database.db
+			.select()
+			.from(musicShares)
+			.where(eq(musicShares.id, token))
+			.get();
+		if (!row || (row.expiresAt && Date.parse(row.expiresAt) < Date.now())) return null;
+		const image = row.artId
+			? `${baseUrl}/api/v1/music/public/${encodeURIComponent(token)}/art/${row.artId}?size=600`
+			: undefined;
+		return {
+			title: `Listen: ${row.title}`,
+			description: 'Music shared from a private Mu library.',
+			image,
+			type: 'music.album',
+			robots: 'noindex,follow',
 		};
 	}
 

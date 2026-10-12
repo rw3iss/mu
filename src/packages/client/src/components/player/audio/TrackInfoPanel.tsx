@@ -7,6 +7,7 @@ import { Icon } from '@/components/common/Icon';
 import { musicService } from '@/services/music.service';
 import { minimizePlayer } from '@/state/globalPlayer.state';
 import { currentTrack } from '@/state/musicPlayer.state';
+import { listenToken } from '@/state/share.state';
 import { formatBitrate, formatDuration, formatFileSize, formatSampleRate } from '@/utils/music';
 import { artAtSize } from '@/utils/music-art';
 import { formatStreamSpec, QUALITY_NAMES } from '@/utils/music-quality';
@@ -46,6 +47,7 @@ export function TrackInfoPanel({ visible, onClose }: { visible: boolean; onClose
 	if (!now) return null;
 	const t = detail ?? now.track;
 	const go = (href: string) => {
+		if (listenToken.value) return;
 		onClose();
 		minimizePlayer();
 		route(href);

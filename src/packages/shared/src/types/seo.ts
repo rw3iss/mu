@@ -19,7 +19,7 @@ export interface SeoMeta {
 	 * movie detail pages, `profile` for person pages, `video.other`
 	 * for watch / share pages.
 	 */
-	type?: 'website' | 'video.movie' | 'video.other' | 'profile' | 'article';
+	type?: 'website' | 'video.movie' | 'video.other' | 'music.album' | 'profile' | 'article';
 	/** Absolute canonical URL for this page. */
 	canonical?: string;
 	/**

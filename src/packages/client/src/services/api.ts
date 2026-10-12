@@ -1,6 +1,6 @@
 import { route } from 'preact-router';
 import { currentUser } from '@/state/auth.state';
-import { shareToken } from '@/state/share.state';
+import { publicMode, shareToken } from '@/state/share.state';
 
 // ============================================
 // Types
@@ -85,7 +85,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 			: null;
 		// In share-watch mode, don't redirect to /login — the PublicWatch page
 		// will surface a "share link invalid or expired" error.
-		if (!shareToken.value) {
+		if (!publicMode.value) {
 			localStorage.removeItem('mu_token');
 			currentUser.value = null;
 			route('/login', true);

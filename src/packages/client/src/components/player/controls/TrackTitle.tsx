@@ -2,6 +2,7 @@ import { route } from 'preact-router';
 import { minimizePlayer, playerMode } from '@/state/globalPlayer.state';
 import { currentTrack } from '@/state/musicPlayer.state';
 import { currentTime, duration } from '@/state/player.state';
+import { listenToken } from '@/state/share.state';
 import styles from '../PlayerControls.module.scss';
 import { formatTime } from './formatTime';
 import type { ControlGroupProps } from './types';
@@ -9,6 +10,8 @@ import type { ControlGroupProps } from './types';
 /** Go to a music page, getting the full player out of the way first. */
 export function openMusicLink(href: string, e?: Event): void {
 	e?.preventDefault();
+	// Shared-link listeners have no access to library pages.
+	if (listenToken.value) return;
 	if (playerMode.value === 'full') minimizePlayer();
 	route(href);
 }

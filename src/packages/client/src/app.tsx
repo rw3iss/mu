@@ -4,6 +4,7 @@ import { useEffect } from 'preact/hooks';
 import { Router, route } from 'preact-router';
 import { Toast } from '@/components/common/Toast';
 import { AppShell } from '@/components/layout/AppShell';
+import { MusicShareModal } from '@/components/music/MusicShareModal';
 import { Changelog } from '@/pages/Changelog';
 import { Dashboard } from '@/pages/Dashboard';
 import { Discover } from '@/pages/Discover';
@@ -14,6 +15,7 @@ import { History } from '@/pages/History';
 import { JobDetails } from '@/pages/JobDetails';
 import { Library } from '@/pages/Library';
 import { Login } from '@/pages/Login';
+import { PublicListen } from '@/pages/listen/PublicListen';
 import { MembersPage } from '@/pages/Members/MembersPage';
 import { MovieDetail } from '@/pages/MovieDetail';
 import { AlbumRoute, ArtistRoute } from '@/pages/music/MbStubPages';
@@ -133,7 +135,7 @@ function enforceAuth(url: string): boolean {
 	if (isLoading.value) return false;
 
 	// Public share-watch route bypasses all auth enforcement.
-	if (url.startsWith('/watch/')) return false;
+	if (url.startsWith('/watch/') || url.startsWith('/listen/')) return false;
 
 	if (!isSetupComplete.value && url !== '/setup') {
 		route('/setup', true);
@@ -289,6 +291,7 @@ export function App() {
 	const path = currentPath.value;
 	const isAuthRoute = path === '/login' || path === '/setup' || path === '/register';
 	const isPublicWatch = path.startsWith('/watch/');
+	const isPublicListen = path.startsWith('/listen/');
 
 	return (
 		<div>
@@ -296,9 +299,15 @@ export function App() {
 			{!isAuthRoute && <UploadProgressToast />}
 			{!isAuthRoute && <GlobalPlayer />}
 			{!isAuthRoute && <SessionModals />}
+			{!isAuthRoute && !isPublicWatch && !isPublicListen && <MusicShareModal />}
 			{isPublicWatch ? (
 				<Router onChange={handleRouteChange}>
 					<PublicWatch path="/watch/:token" />
+					<NotFound default />
+				</Router>
+			) : isPublicListen ? (
+				<Router onChange={handleRouteChange}>
+					<PublicListen path="/listen/:token" />
 					<NotFound default />
 				</Router>
 			) : isAuthRoute ? (

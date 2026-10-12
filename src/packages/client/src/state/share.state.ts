@@ -21,6 +21,16 @@ export const shareToken = signal<string | null>(readInitial());
 export const shareMovieId = signal<string | null>(null);
 export const shareMode = computed(() => shareToken.value !== null);
 
+/**
+ * Music share link (`/listen/:token`) being played. Lives only while the
+ * listen page is mounted (never stored), so a logged-in user's normal music
+ * pages in the same tab are unaffected once they leave it.
+ */
+export const listenToken = signal<string | null>(null);
+
+/** Any anonymous public playback (movie share or music listen link). */
+export const publicMode = computed(() => shareToken.value !== null || listenToken.value !== null);
+
 export function setShareToken(token: string, movieId: string): void {
 	try {
 		sessionStorage.setItem(STORAGE_KEY, token);

@@ -17,6 +17,7 @@ import {
 	seekAudio,
 	trackToQueueItem,
 } from '@/state/musicPlayer.state';
+import { openMusicShare } from '@/state/musicShare.state';
 import { currentTime } from '@/state/player.state';
 import {
 	addToQueue,
@@ -26,6 +27,7 @@ import {
 	queueItemKey,
 	removeFromQueue,
 } from '@/state/queue.state';
+import { listenToken } from '@/state/share.state';
 import { activeLrcIndex, type LrcLine, parseLrc } from '@/utils/lrc';
 import { artAtSize } from '@/utils/music-art';
 import styles from './MusicListPanel.module.scss';
@@ -86,13 +88,15 @@ export function MusicListPanel({ variant, onClose }: MusicListPanelProps) {
 	const ctx = playbackContext.value;
 	const hasContextList =
 		(ctx?.type === 'playlist' || ctx?.type === 'artist') && contextTracks.value.length > 0;
+	// Shared-link listeners only have the shared tracks: no album/recommended lookups.
+	const listen = !!listenToken.value;
 	const tabs: { id: MusicPanelTab; label: string }[] = [
 		{ id: 'upnext', label: 'Up Next' },
-		{ id: 'album', label: 'Album' },
+		...(listen ? [] : [{ id: 'album' as const, label: 'Album' }]),
 		...(hasContextList
 			? [{ id: 'playlist' as const, label: ctx?.type === 'artist' ? 'Artist' : 'Playlist' }]
 			: []),
-		{ id: 'recommended', label: 'Recommended' },
+		...(listen ? [] : [{ id: 'recommended' as const, label: 'Recommended' }]),
 		{ id: 'lyrics', label: 'Lyrics' },
 	];
 	const selected = musicPanelTab.value;
@@ -224,6 +228,24 @@ function UpNextTab() {
 				<>
 					<div class={styles.subHeader}>
 						<span>Up next</span>
+						{!listenToken.value && (
+							<button
+								type="button"
+								class={qStyles.clearBtn}
+								title="Share the current track and everything up next as a public link"
+								onClick={() =>
+									openMusicShare({
+										kind: 'queue',
+										trackIds: [
+											...(now ? [now.track.id] : []),
+											...items.map((i) => i.ref.id),
+										],
+									})
+								}
+							>
+								Share
+							</button>
+						)}
 						<button
 							type="button"
 							class={qStyles.clearBtn}

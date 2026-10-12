@@ -11,6 +11,7 @@ import { PluginSlot } from '@/plugins/PluginSlot';
 import { UI } from '@/plugins/ui-slots';
 import { api } from '@/services/api';
 import { currentUser } from '@/state/auth.state';
+import { openMusicShare } from '@/state/musicShare.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { invalidatePlaylists } from '@/state/playlists.state';
 import { playTracksFrom, shuffleTracks } from '@/utils/music';
@@ -253,6 +254,21 @@ export function PlaylistDetail({ id }: PlaylistDetailProps) {
 							title={playlist.name}
 							tracks={tracks}
 						/>
+						{(isOwner || playlist.isPublic) && (
+							<Button
+								variant="secondary"
+								size="sm"
+								onClick={() =>
+									openMusicShare({
+										kind: 'playlist',
+										id: playlist.id,
+										title: playlist.name,
+									})
+								}
+							>
+								<Icon name="share" size={12} /> Share
+							</Button>
+						)}
 					</div>
 				)}
 				{isOwner && (

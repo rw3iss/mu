@@ -292,3 +292,29 @@ export interface MusicLibraryChange {
 	albumIds: string[];
 	artistIds: string[];
 }
+
+/** What a public music share link plays. `queue` is a snapshot of track ids. */
+export type MusicShareKind = 'track' | 'album' | 'playlist' | 'queue';
+
+/** A share link as listed to its owner. */
+export interface MusicShareInfo {
+	token: string;
+	kind: MusicShareKind;
+	title: string;
+	/** Client path, e.g. `/listen/<token>`. */
+	path: string;
+	createdAt: string;
+	/** ISO time, or null when links never expire. */
+	expiresAt: string | null;
+}
+
+/** What `/listen/:token` loads: the shared tracks with public art URLs. */
+export interface MusicSharePayload {
+	token: string;
+	kind: MusicShareKind;
+	title: string;
+	subtitle: string | null;
+	artUrl: string | null;
+	tracks: TrackSummary[];
+	expiresAt: string | null;
+}

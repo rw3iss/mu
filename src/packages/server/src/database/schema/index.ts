@@ -98,6 +98,7 @@ export {
 	lyrics,
 	musicGenres,
 	musicIdentities,
+	musicShares,
 	trackArtists,
 	trackFiles,
 	tracks,

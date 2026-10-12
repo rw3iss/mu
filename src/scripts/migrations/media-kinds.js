@@ -295,6 +295,19 @@ const TABLES = [
 		album_id TEXT NOT NULL REFERENCES albums(id) ON DELETE CASCADE
 	)`,
 
+	`CREATE TABLE IF NOT EXISTS music_shares (
+		id TEXT PRIMARY KEY,
+		kind TEXT NOT NULL,
+		entity_id TEXT,
+		track_ids TEXT,
+		title TEXT NOT NULL,
+		art_id TEXT,
+		created_by TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		expires_at TEXT
+	)`,
+	`CREATE INDEX IF NOT EXISTS music_shares_user_idx ON music_shares(created_by)`,
+
 	// FTS5 (external content) — keyword search over a large catalogue without
 	// LIKE scans. Triggers keep them in sync with the base tables.
 	`CREATE VIRTUAL TABLE IF NOT EXISTS artists_fts USING fts5(name, content='artists', content_rowid='rowid', tokenize='unicode61 remove_diacritics 2')`,
