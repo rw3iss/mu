@@ -12,16 +12,23 @@ const MODES: { id: BrowseMode; label: string; icon: 'film' | 'music'; library: s
 
 /**
  * Header Movies | Music segmented control. Hidden when only one feature is
- * enabled. Each segment always opens that mode's library (/library or
- * /music/library), even when the mode is already active.
+ * enabled. Clicking the other mode switches to the equivalent page; clicking
+ * the active mode opens its library (/library or /music/library).
  */
 export function BrowseModeToggle() {
 	if (!canToggleBrowseMode.value) return null;
 	const active = browseMode.value;
 
 	const select = (m: (typeof MODES)[number]) => {
+		if (m.id === active) {
+			// Second click on the active mode: go to its library.
+			if (currentPath.value !== m.library) route(m.library);
+			return;
+		}
+		// Switch mode, staying on the equivalent page.
+		const target = equivalentPath(currentPath.value, m.id);
 		setBrowseMode(m.id);
-		if (currentPath.value !== m.library) route(m.library);
+		if (target !== currentPath.value) route(target);
 	};
 
 	return (
@@ -34,7 +41,9 @@ export function BrowseModeToggle() {
 					aria-checked={active === m.id}
 					class={`${styles.segment} ${active === m.id ? styles.active : ''}`}
 					onClick={() => select(m)}
-					title={`${m.label} library`}
+					title={
+						active === m.id ? `${m.label} library` : `Browse ${m.label.toLowerCase()}`
+					}
 				>
 					<Icon name={m.icon} size={16} />
 					<span class={styles.label}>{m.label}</span>
