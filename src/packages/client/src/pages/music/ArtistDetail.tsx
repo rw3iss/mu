@@ -12,6 +12,7 @@ import { TrackRow } from '@/components/music/TrackRow';
 import { useSeo } from '@/hooks/useSeo';
 import { musicService } from '@/services/music.service';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
+import { musicChange } from '@/state/musicLibraryEvents.state';
 import { playMusic, playTracksFrom, queueTracks } from '@/utils/music';
 import styles from './MusicDetail.module.scss';
 
@@ -81,6 +82,17 @@ export function ArtistDetail({ id }: ArtistDetailProps) {
 			cancelled = true;
 		};
 	}, [id]);
+
+	// Live refresh on any catalogue change: a new upload's album isn't in the
+	// artist's list yet, so ids can't tell whether it belongs here.
+	const version = musicChange.value.version;
+	useEffect(() => {
+		if (version === 0 || !id) return;
+		musicService
+			.artist(id)
+			.then(setArtist)
+			.catch(() => {});
+	}, [version]);
 
 	const sections = useMemo(() => {
 		if (!artist) return [];

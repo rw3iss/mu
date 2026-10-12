@@ -6,6 +6,7 @@ import { MusicUploadButton } from '@/components/music/MusicUploadModal';
 import { TrackRow } from '@/components/music/TrackRow';
 import { type MusicHome as MusicHomeData, musicService } from '@/services/music.service';
 import { isAdmin } from '@/state/auth.state';
+import { musicChange } from '@/state/musicLibraryEvents.state';
 import { playTracksFrom } from '@/utils/music';
 import styles from './MusicHome.module.scss';
 
@@ -19,9 +20,11 @@ export function MusicHome(_props: MusicHomeProps) {
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 
+	const version = musicChange.value.version;
 	useEffect(() => {
 		let cancelled = false;
-		setLoading(true);
+		// Live refresh (version > 0) keeps the current rails on screen.
+		if (version === 0) setLoading(true);
 		musicService
 			.home()
 			.then((d) => {
@@ -36,7 +39,7 @@ export function MusicHome(_props: MusicHomeProps) {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [version]);
 
 	const isEmpty =
 		!!data &&

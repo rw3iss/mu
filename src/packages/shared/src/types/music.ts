@@ -285,3 +285,10 @@ export interface MusicAdminActionResult {
 	started: boolean;
 	count: number;
 }
+
+/** Payload of `WsEvent.MUSIC_LIBRARY_CHANGED`. `all` = refresh everything. */
+export interface MusicLibraryChange {
+	all: boolean;
+	albumIds: string[];
+	artistIds: string[];
+}

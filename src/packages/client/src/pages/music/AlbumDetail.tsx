@@ -25,6 +25,7 @@ import { useSeo } from '@/hooks/useSeo';
 import { musicService } from '@/services/music.service';
 import { can } from '@/state/auth.state';
 import { ensureFavoritesLoaded } from '@/state/favorites.state';
+import { changeAffects, musicChange } from '@/state/musicLibraryEvents.state';
 import {
 	albumQueueItem,
 	formatBitrate,
@@ -69,6 +70,12 @@ export function AlbumDetail({ id }: AlbumDetailProps) {
 			.then(setAlbum)
 			.catch(() => {});
 	};
+	// Live refresh when the server reports a change to this album.
+	const change = musicChange.value;
+	useEffect(() => {
+		if (change.version === 0 || !id || !changeAffects(change, [id])) return;
+		reloadAlbum();
+	}, [change.version]);
 
 	useSeo(
 		album

@@ -80,7 +80,7 @@ function StubLoading({ label }: { label: string }) {
 function MbLink({ url }: { url: string }) {
 	return (
 		<a class={stub.mbLink} href={url} target="_blank" rel="noopener noreferrer">
-			<Icon name="external-link" size={14} /> View on MusicBrainz
+			<Icon name="arrow-up-right" size={14} /> View on MusicBrainz
 		</a>
 	);
 }

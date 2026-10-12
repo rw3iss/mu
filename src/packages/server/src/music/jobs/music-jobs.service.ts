@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnModuleInit, Optional } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import { albums, trackFiles } from '../../database/schema/index.js';
@@ -6,6 +6,7 @@ import { FeatureFlagsService } from '../../features/feature-flags.service.js';
 import { JobManagerService } from '../../jobs/job-manager.service.js';
 import { jobTypeRegistry } from '../../jobs/job-type-registry.js';
 import { MusicMetadataService } from '../metadata/music-metadata.service.js';
+import { MusicEventsService } from '../music-events.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { AudioTranscodeService } from '../playback/audio-transcode.service.js';
 import {
@@ -61,6 +62,7 @@ export class MusicJobsService implements OnModuleInit {
 		private readonly musicSettings: MusicSettingsService,
 		private readonly features: FeatureFlagsService,
 		private readonly metadata: MusicMetadataService,
+		@Optional() private readonly musicEvents?: MusicEventsService,
 	) {}
 
 	onModuleInit() {
@@ -105,6 +107,8 @@ export class MusicJobsService implements OnModuleInit {
 			if (!albumId) return { skipped: true };
 			const res = await this.metadata.enrichAlbum(albumId, { force: !!job.payload?.force });
 			helpers.setDetails(`Match: ${res.match.status}`);
+			// Title / art / year / artist info may have changed.
+			this.musicEvents?.changed({ albumIds: [albumId] });
 			return res;
 		});
 		this.jobs.registerHandler(MUSIC_JOB.ARTWORK, async (job) => {
@@ -117,7 +121,9 @@ export class MusicJobsService implements OnModuleInit {
 				this.metadata.matchState(albumId).status === 'unsearched'
 					? await this.metadata.matchAlbum(albumId)
 					: null;
-			return { match, art: await this.metadata.fetchAlbumArt(albumId, { force }) };
+			const art = await this.metadata.fetchAlbumArt(albumId, { force });
+			this.musicEvents?.changed({ albumIds: [albumId] });
+			return { match, art };
 		});
 		this.jobs.registerHandler(MUSIC_JOB.LYRICS, async (job) => {
 			this.requireMusic();

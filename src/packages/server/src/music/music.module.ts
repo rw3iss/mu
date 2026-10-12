@@ -15,6 +15,7 @@ import { MusicQueryService } from './library/music-query.service.js';
 import { CoverArtClient, LrclibClient, WikiClient } from './metadata/clients.js';
 import { MusicMetadataService } from './metadata/music-metadata.service.js';
 import { MusicEntitiesService } from './music-entities.service.js';
+import { MusicEventsService } from './music-events.service.js';
 import { MusicSettingsService } from './music-settings.service.js';
 import { MusicOfflineController } from './offline/music-offline.controller.js';
 import { MusicOfflineService } from './offline/music-offline.service.js';
@@ -38,6 +39,7 @@ import { MusicUploadService } from './upload/music-upload.service.js';
 	],
 	providers: [
 		ArtworkService,
+		MusicEventsService,
 		AlbumEditService,
 		MusicCatalogService,
 		MusicSettingsService,

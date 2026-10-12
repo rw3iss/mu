@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { nowISO } from '@mu/shared';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../../database/schema/index.js';
 import { EntityLifecycleService } from '../../entities/entity-lifecycle.service.js';
 import { normKey, sortName } from '../ingest/normalize.js';
+import { MusicEventsService } from '../music-events.service.js';
 import { MusicCatalogService } from './catalog.service.js';
 
 /** Polymorphic user-data tables whose album rows follow a merge. */
@@ -33,6 +34,7 @@ export class AlbumEditService {
 		private readonly database: DatabaseService,
 		private readonly catalog: MusicCatalogService,
 		private readonly lifecycle: EntityLifecycleService,
+		@Optional() private readonly musicEvents?: MusicEventsService,
 	) {}
 
 	private album(id: string) {
@@ -114,6 +116,7 @@ export class AlbumEditService {
 		this.lifecycle.purge({ type: 'album', id: sourceId });
 		db.delete(albums).where(eq(albums.id, sourceId)).run();
 		this.catalog.recomputeAlbumAggregates(targetId);
+		this.musicEvents?.changed({ albumIds: [sourceId, targetId] });
 		return { albumId: targetId, movedTracks: moved };
 	}
 
@@ -183,6 +186,7 @@ export class AlbumEditService {
 		});
 		this.catalog.recomputeAlbumAggregates(albumId);
 		this.catalog.recomputeAlbumAggregates(id);
+		this.musicEvents?.changed({ albumIds: [albumId, id] });
 		return { albumId: id, movedTracks: ids.length };
 	}
 }

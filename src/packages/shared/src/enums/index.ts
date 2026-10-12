@@ -70,6 +70,12 @@ export enum WsEvent {
 	 * Channel: `features`.
 	 */
 	FEATURES_CHANGED = 'features:changed',
+	/**
+	 * The music catalogue changed (import, removal, merge/split, metadata).
+	 * Coalesced server-side (~1.5s) so a scan sends one event. Payload:
+	 * MusicLibraryChange `{ all, albumIds, artistIds }`. Channel: `music`.
+	 */
+	MUSIC_LIBRARY_CHANGED = 'music:library-changed',
 
 	// ── Shared Sessions (watch party) ──
 	/** A member joined a session (presence). Channel: `session:<id>`. */

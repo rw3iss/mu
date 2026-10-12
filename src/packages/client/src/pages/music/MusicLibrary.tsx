@@ -15,6 +15,7 @@ import { MusicUploadButton } from '@/components/music/MusicUploadModal';
 import { useUiSetting } from '@/hooks/useUiSetting';
 import { entitiesService } from '@/services/entities.service';
 import { type MusicListQuery, musicService, type Page } from '@/services/music.service';
+import { musicChange } from '@/state/musicLibraryEvents.state';
 import { notifyError } from '@/state/notifications.state';
 import {
 	albumQueueItem,
@@ -173,6 +174,13 @@ function usePagedList<T>(
 		const t = setTimeout(() => void load(1, myGen), 200);
 		return () => clearTimeout(t);
 	}, [key, enabled]);
+
+	// Server says the catalogue changed: reload page 1 in place (no blank flash).
+	const version = musicChange.value.version;
+	useEffect(() => {
+		if (!enabled || version === 0) return;
+		void load(1, ++gen.current);
+	}, [version]);
 
 	const loadMore = useCallback(() => {
 		if (busy.current) return;

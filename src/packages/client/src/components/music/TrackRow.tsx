@@ -65,6 +65,11 @@ export function TrackRow({
 		</span>
 	);
 
+	const hasSubtitle =
+		artists.length > 0 ||
+		(!albumArtistIds && !!track.artistCredit) ||
+		(!!showAlbum && !!track.albumId);
+
 	return (
 		<MediaRow
 			compact
@@ -81,7 +86,10 @@ export function TrackRow({
 				) : null
 			}
 			title={track.title}
-			subtitle={artists.length > 0 || track.artistCredit || showAlbum ? subtitle : undefined}
+			// Only pass a subtitle when it renders something: on album pages the
+			// album artist is filtered out, and an empty second line pushed the
+			// title up and the track number down (row content off-centre).
+			subtitle={hasSubtitle ? subtitle : undefined}
 			onClick={onPlay}
 			aria-label={`Play ${track.title}`}
 			actions={

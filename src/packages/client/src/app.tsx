@@ -39,6 +39,7 @@ import {
 	isSetupComplete,
 	localBypass,
 } from '@/state/auth.state';
+import { initMusicLibraryEvents } from '@/state/musicLibraryEvents.state';
 import { initMusicOffline } from '@/state/musicOffline.state';
 import { initMusicPrefs } from '@/state/musicPrefs.state';
 import { initTheme } from '@/state/theme.state';
@@ -201,6 +202,7 @@ export function App() {
 		initTheme();
 		initFeatures();
 		initMusicPrefs();
+		initMusicLibraryEvents();
 		initMusicOffline();
 		syncBrowseModeFromPath(window.location.pathname);
 		checkAuth();

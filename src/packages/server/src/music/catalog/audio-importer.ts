@@ -3,11 +3,12 @@ import { SUPPORTED_AUDIO_EXTENSIONS } from '@mu/shared';
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { and, eq, like } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
-import { trackFiles } from '../../database/schema/index.js';
+import { trackFiles, tracks } from '../../database/schema/index.js';
 import { ImporterRegistry } from '../../library/importers/importer-registry.js';
 import type { ImportFileResult, MediaImporter } from '../../library/importers/media-importer.js';
 import { readTrackTags } from '../ingest/tags.js';
 import { MusicJobsService } from '../jobs/music-jobs.service.js';
+import { MusicEventsService } from '../music-events.service.js';
 import { MusicCatalogService } from './catalog.service.js';
 
 /**
@@ -26,6 +27,7 @@ export class AudioImporter implements MediaImporter, OnModuleInit {
 		private readonly database: DatabaseService,
 		private readonly catalog: MusicCatalogService,
 		private readonly jobs: MusicJobsService,
+		private readonly musicEvents: MusicEventsService,
 	) {}
 
 	onModuleInit() {
@@ -62,12 +64,14 @@ export class AudioImporter implements MediaImporter, OnModuleInit {
 					// Re-tagged or re-encoded: refresh stream facts, drop the stale waveform.
 					this.catalog.refreshFile(existing.id, await readTrackTags(filePath), file);
 					this.jobs.afterImport(existing.id);
+					this.musicEvents.changed({ albumIds: [this.albumOf(existing.trackId)] });
 				} else if (!existing.available) {
 					this.database.db
 						.update(trackFiles)
 						.set({ available: true })
 						.where(eq(trackFiles.id, existing.id))
 						.run();
+					this.musicEvents.changed({ albumIds: [this.albumOf(existing.trackId)] });
 				}
 				return { status: 'updated' };
 			}
@@ -93,6 +97,7 @@ export class AudioImporter implements MediaImporter, OnModuleInit {
 						: undefined,
 				);
 			}
+			this.musicEvents.changed({ albumIds: [result.albumId] });
 			return { status: 'added', entityId: result.trackId, title: tags.title };
 		} catch (err) {
 			const reason = (err as Error).message;
@@ -118,7 +123,18 @@ export class AudioImporter implements MediaImporter, OnModuleInit {
 				n++;
 			}
 		}
+		if (n) this.musicEvents.changed();
 		return n;
+	}
+
+	private albumOf(trackId: string): string | null {
+		return (
+			this.database.db
+				.select({ albumId: tracks.albumId })
+				.from(tracks)
+				.where(eq(tracks.id, trackId))
+				.get()?.albumId ?? null
+		);
 	}
 
 	async purgeOrphans(): Promise<number> {
@@ -128,7 +144,9 @@ export class AudioImporter implements MediaImporter, OnModuleInit {
 			.where(eq(trackFiles.available, false))
 			.all()
 			.map((r) => r.id);
-		return this.catalog.purgeOrphans(missing);
+		const n = this.catalog.purgeOrphans(missing);
+		if (n) this.musicEvents.changed();
+		return n;
 	}
 
 	async handleFileRemoved(filePath: string): Promise<void> {
@@ -137,7 +155,10 @@ export class AudioImporter implements MediaImporter, OnModuleInit {
 			.from(trackFiles)
 			.where(eq(trackFiles.filePath, filePath))
 			.get();
-		if (row) this.catalog.purgeOrphans([row.id]);
+		if (row) {
+			this.catalog.purgeOrphans([row.id]);
+			this.musicEvents.changed();
+		}
 	}
 
 	async handleDirectoryRemoved(dirPath: string): Promise<void> {
@@ -148,6 +169,9 @@ export class AudioImporter implements MediaImporter, OnModuleInit {
 			.where(like(trackFiles.filePath, `${prefix}%`))
 			.all()
 			.map((r) => r.id);
-		this.catalog.purgeOrphans(ids);
+		if (ids.length) {
+			this.catalog.purgeOrphans(ids);
+			this.musicEvents.changed();
+		}
 	}
 }

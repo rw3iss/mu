@@ -6,6 +6,7 @@ import {
 	Injectable,
 	Logger,
 	type OnApplicationBootstrap,
+	Optional,
 } from '@nestjs/common';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
@@ -15,6 +16,7 @@ import { FeatureFlagsService } from '../../features/feature-flags.service.js';
 import { LibraryJobsService } from '../../library/library-jobs.service.js';
 import { AlbumEditService } from '../catalog/album-edit.service.js';
 import { MUSIC_JOB, MusicJobsService } from '../jobs/music-jobs.service.js';
+import { MusicEventsService } from '../music-events.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { AudioTranscodeService } from '../playback/audio-transcode.service.js';
 import {
@@ -43,6 +45,7 @@ export class MusicAdminService implements OnApplicationBootstrap {
 		private readonly lifecycle: EntityLifecycleService,
 		private readonly features: FeatureFlagsService,
 		private readonly albumEdit: AlbumEditService,
+		@Optional() private readonly musicEvents?: MusicEventsService,
 	) {}
 
 	/**
@@ -286,6 +289,7 @@ export class MusicAdminService implements OnApplicationBootstrap {
 			}
 		});
 		await this.transcoder.evict(0, () => false);
+		this.musicEvents?.changed();
 		return { started: true, count: trackIds.length };
 	}
 }

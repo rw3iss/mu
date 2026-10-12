@@ -60,6 +60,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 			WsEvent.UPLOAD_PROGRESS,
 			WsEvent.UPLOAD_COMPLETED,
 			WsEvent.FEATURES_CHANGED,
+			WsEvent.MUSIC_LIBRARY_CHANGED,
 		];
 
 		for (const event of broadcastEvents) {
