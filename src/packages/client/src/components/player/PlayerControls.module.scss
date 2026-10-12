@@ -1735,23 +1735,24 @@
 
 .upNextBadge {
 	position: absolute;
-	top: 50%;
+	// Top edge just below the icon's middle; the larger disc grows downward.
+	top: calc(50% + 2px);
 	left: 50%;
 	transform: translateX(-50%);
-	min-width: 22px;
-	height: 22px;
-	padding: 0 4px;
+	min-width: 28px;
+	height: 28px;
+	padding: 0 5px;
 	box-sizing: border-box;
 	border-radius: 999px;
 	// Black disc with a thick accent ring: readable on every theme, since the
 	// number is always white on black whatever the accent colour is.
 	background: #000;
-	border: 2.5px solid var(--color-accent);
+	border: 3px solid var(--color-accent);
 	color: #fff;
-	font-size: 13px;
+	font-size: 16px;
 	font-weight: var(--font-weight-bold);
 	font-variant-numeric: tabular-nums;
-	line-height: 17px;
+	line-height: 22px;
 	text-align: center;
 	white-space: nowrap;
 	pointer-events: none;
