@@ -1,15 +1,26 @@
 import {
+	bassEnhanceEnabled,
 	compressorEnabled,
 	eqEnabled,
+	hrtfSurroundEnabled,
 	showEffectsPanel,
+	stereoWidthEnabled,
 	toggleEffectsPanel,
 	videoEnabled,
 } from '@/state/audio-effects.state';
 import { activeKind } from '@/state/globalPlayer.state';
 import styles from '../PlayerControls.module.scss';
 
-/** Effects panel toggle, with EQ / compressor / video active-state dots. */
+/**
+ * Effects panel toggle, with EQ / compressor dots on top and a third dot
+ * below: video effects for video, the Enhance tab (stereo width, bass
+ * enhance, HRTF surround) for music, where video effects don't apply.
+ */
 export function EffectsButton() {
+	const thirdOn =
+		activeKind.value === 'audio'
+			? stereoWidthEnabled.value || bassEnhanceEnabled.value || hrtfSurroundEnabled.value
+			: videoEnabled.value;
 	return (
 		<div class={styles.effectsBtnWrap}>
 			<div class={styles.effectsDots}>
@@ -20,13 +31,9 @@ export function EffectsButton() {
 					class={`${styles.effectsDot} ${compressorEnabled.value ? styles.effectsDotActive : ''}`}
 				/>
 			</div>
-			{activeKind.value !== 'audio' && (
-				<div class={styles.effectsDotsBottom}>
-					<span
-						class={`${styles.effectsDot} ${videoEnabled.value ? styles.effectsDotActive : ''}`}
-					/>
-				</div>
-			)}
+			<div class={styles.effectsDotsBottom}>
+				<span class={`${styles.effectsDot} ${thirdOn ? styles.effectsDotActive : ''}`} />
+			</div>
 			<button
 				class={`${styles.controlBtn} ${showEffectsPanel.value ? styles.active : ''}`}
 				onClick={toggleEffectsPanel}
