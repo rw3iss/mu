@@ -292,6 +292,8 @@ export function App() {
 	const isAuthRoute = path === '/login' || path === '/setup' || path === '/register';
 	const isPublicWatch = path.startsWith('/watch/');
 	const isPublicListen = path.startsWith('/listen/');
+	// No app shell (and no mobile nav) on public share pages — see global.scss.
+	document.documentElement.classList.toggle('mu-public', isPublicWatch || isPublicListen);
 
 	return (
 		<div>

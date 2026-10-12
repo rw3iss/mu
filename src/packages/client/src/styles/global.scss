@@ -387,3 +387,10 @@ input[type='time'] {
   font-size: var(--font-size-sm);
   line-height: 1.2;
 }
+
+// Public share pages (/watch/:token, /listen/:token) have no app shell and so
+// no mobile bottom nav: zero its height so the player bar and mini artwork
+// dock to the bottom of the window instead of hovering above a missing nav.
+html.mu-public {
+	--mobile-nav-height: 0px;
+}

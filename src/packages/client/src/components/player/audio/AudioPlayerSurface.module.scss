@@ -67,7 +67,7 @@
 	}
 
 	@include mobile {
-		bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+		bottom: calc(var(--mobile-nav-height, 56px) + env(safe-area-inset-bottom, 0px));
 	}
 
 	&:hover .miniPlay,

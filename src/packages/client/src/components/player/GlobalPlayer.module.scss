@@ -295,7 +295,7 @@
   @include mobile {
     width: 96px;
     height: 56px;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--mobile-nav-height, 56px) + env(safe-area-inset-bottom, 0px));
   }
 
   // Portrait gets a bigger thumbnail (the bar is also taller — see
