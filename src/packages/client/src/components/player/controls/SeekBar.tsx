@@ -122,55 +122,64 @@ export function SeekBar({ onSeek }: ControlGroupProps) {
 		setSeekBarRect({ left: rect.left, top: rect.top, width: rect.width });
 	}, []);
 
-	// ── Seek bar: drag ──
-	const handleSeekMouseDown = useCallback(
-		(e: MouseEvent) => {
-			// Only the primary (left) button drags/seeks. Right-click is reserved
+	// ── Seek bar: drag (pointer events: mouse, touch and pen) ──
+	// Mouse-only listeners meant a finger could tap but never drag on mobile.
+	// Pointer capture keeps the drag going when the finger leaves the bar.
+	const draggingRef = useRef(false);
+	const seekAtPointer = useCallback(
+		(clientX: number) => {
+			const bar = seekBarRef.current;
+			if (!bar) return;
+			const rect = bar.getBoundingClientRect();
+			const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+			onSeek(fraction * duration.value);
+		},
+		[onSeek],
+	);
+
+	const handleSeekPointerDown = useCallback(
+		(e: PointerEvent) => {
+			// Only the primary button / a touch drags. Right-click is reserved
 			// for the "Copy URL at Time" menu and must not move the playhead.
 			if (e.button !== 0) return;
 			e.preventDefault();
+			(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+			draggingRef.current = true;
 			setIsDragging(true);
 			dragLastSeek.current = 0;
+			// Touch has no hover: show the thumbnail preview while dragging.
+			if (e.pointerType !== 'mouse') handleSeekHover(e);
+			seekAtPointer(e.clientX);
+		},
+		[seekAtPointer, handleSeekHover],
+	);
 
-			const onMove = (me: MouseEvent) => {
-				const now = performance.now();
-				if (now - dragLastSeek.current < DRAG_THROTTLE_MS) return;
-				dragLastSeek.current = now;
+	const handleSeekPointerMove = useCallback(
+		(e: PointerEvent) => {
+			if (e.pointerType === 'mouse' || draggingRef.current) handleSeekHover(e);
+			if (!draggingRef.current) return;
+			const now = performance.now();
+			if (now - dragLastSeek.current < DRAG_THROTTLE_MS) return;
+			dragLastSeek.current = now;
+			seekAtPointer(e.clientX);
+		},
+		[seekAtPointer, handleSeekHover],
+	);
 
-				const bar = seekBarRef.current;
-				if (!bar) return;
-				const rect = bar.getBoundingClientRect();
-				const fraction = Math.max(0, Math.min(1, (me.clientX - rect.left) / rect.width));
-				onSeek(fraction * duration.value);
-			};
-
-			const onUp = (me: MouseEvent) => {
-				document.removeEventListener('mousemove', onMove);
-				document.removeEventListener('mouseup', onUp);
-				setIsDragging(false);
-
-				const bar = seekBarRef.current;
-				if (bar) {
-					const rect = bar.getBoundingClientRect();
-					const fraction = Math.max(
-						0,
-						Math.min(1, (me.clientX - rect.left) / rect.width),
-					);
-					onSeek(fraction * duration.value);
-				}
-			};
-
-			document.addEventListener('mousemove', onMove);
-			document.addEventListener('mouseup', onUp);
-
-			const bar = seekBarRef.current;
-			if (bar) {
-				const rect = bar.getBoundingClientRect();
-				const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-				onSeek(fraction * duration.value);
+	const handleSeekPointerUp = useCallback(
+		(e: PointerEvent) => {
+			if (!draggingRef.current) return;
+			draggingRef.current = false;
+			(e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+			if (e.type !== 'pointercancel') seekAtPointer(e.clientX);
+			// Clear the click guard after this event's click has fired.
+			setTimeout(() => setIsDragging(false), 0);
+			if (e.pointerType !== 'mouse') {
+				setSeekHover(null);
+				setSeekBarRect(null);
 			}
 		},
-		[onSeek],
+		[seekAtPointer],
 	);
 
 	// Sprite preview tooltip rendered via portal so it escapes the
@@ -219,9 +228,12 @@ export function SeekBar({ onSeek }: ControlGroupProps) {
 				class={`${styles.seekBar} ${isDragging ? styles.dragging : ''}`}
 				onClick={handleSeekBarClick}
 				onContextMenu={handleSeekContext}
-				onMouseDown={handleSeekMouseDown}
-				onMouseMove={handleSeekHover}
+				onPointerDown={handleSeekPointerDown}
+				onPointerMove={handleSeekPointerMove}
+				onPointerUp={handleSeekPointerUp}
+				onPointerCancel={handleSeekPointerUp}
 				onMouseLeave={() => {
+					if (draggingRef.current) return;
 					setSeekHover(null);
 					setSeekBarRect(null);
 				}}
@@ -253,6 +265,7 @@ export function SeekBar({ onSeek }: ControlGroupProps) {
 									left: `${Math.min(100, ((c.timeSeconds ?? 0) / duration.value) * 100)}%`,
 								}}
 								onClick={(e: Event) => e.stopPropagation()}
+								onPointerDown={(e: Event) => e.stopPropagation()}
 								onMouseDown={(e: Event) => e.stopPropagation()}
 								onMouseEnter={(e: MouseEvent) => {
 									cancelHoverCommentClose();

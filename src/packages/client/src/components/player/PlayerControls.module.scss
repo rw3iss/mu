@@ -40,6 +40,8 @@
 	display: flex;
 	align-items: center;
 	cursor: pointer;
+	// The page must not pan/scroll while a finger drags the playhead.
+	touch-action: none;
 
 	&.dragging {
 		cursor: grabbing;
