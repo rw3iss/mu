@@ -1534,9 +1534,25 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		}
 
 		try {
-			const { execSync } = await import('node:child_process');
-			const cmd = `ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,channels -of json "${segmentPath}"`;
-			const out = JSON.parse(execSync(cmd, { encoding: 'utf-8', timeout: 10000 }));
+			// execFileSync (no shell): the path is an argument, never shell text.
+			const { execFileSync } = await import('node:child_process');
+			const probeArgs = (entries: string, stream: string, of: string) => [
+				'-v',
+				'error',
+				'-select_streams',
+				stream,
+				'-show_entries',
+				entries,
+				'-of',
+				of,
+				segmentPath,
+			];
+			const out = JSON.parse(
+				execFileSync('ffprobe', probeArgs('stream=codec_name,channels', 'a:0', 'json'), {
+					encoding: 'utf-8',
+					timeout: 10000,
+				}),
+			);
 			const audioStream = (out.streams || [])[0];
 
 			if (audioStream) {
@@ -1559,8 +1575,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			// Check video codec (take first line only — MPEG-TS can report multiple streams)
-			const vidCmd = `ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "${segmentPath}"`;
-			const videoCodec = execSync(vidCmd, { encoding: 'utf-8', timeout: 10000 })
+			const videoCodec = execFileSync('ffprobe', probeArgs('stream=codec_name', 'v:0', 'csv=p=0'), {
+				encoding: 'utf-8',
+				timeout: 10000,
+			})
 				.trim()
 				.split('\n')[0]
 				?.trim();

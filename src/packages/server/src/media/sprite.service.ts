@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'node:child_process';
+import { execFileSync, execSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
@@ -361,8 +361,20 @@ export class SpriteService {
 		// rows) instead of assuming 16:9 (which skewed previews for 2.35:1 etc).
 		let frameHeight = Math.round((frameWidth / 16) * 9);
 		try {
-			const probe = execSync(
-				`"${ffmpegPath.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1')}" -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "${join(movieDir, '0.jpg')}"`,
+			// execFileSync (no shell): the path is an argument, never shell text.
+			const probe = execFileSync(
+				ffmpegPath.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1'),
+				[
+					'-v',
+					'error',
+					'-select_streams',
+					'v:0',
+					'-show_entries',
+					'stream=height',
+					'-of',
+					'csv=p=0',
+					join(movieDir, '0.jpg'),
+				],
 				{ encoding: 'utf8' },
 			).trim();
 			const sheetHeight = Number(probe);
