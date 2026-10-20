@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { WaveformData } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import ffmpeg from 'fluent-ffmpeg';
+import { SAFE_INPUT_OPTIONS } from '../../common/ffmpeg-input.js';
 import { ConfigService } from '../../config/config.service.js';
 import { MusicSettingsService } from '../music-settings.service.js';
 import { PeakReducer, waveformBucketCount } from './peaks.js';
@@ -94,6 +95,7 @@ export class AudioTranscodeService {
 			const flacLevel = this.musicSettings.get().flacCompressionLevel;
 			await new Promise<void>((resolve, reject) => {
 				let cmd = ffmpeg(srcPath)
+					.inputOptions([...SAFE_INPUT_OPTIONS])
 					.noVideo()
 					.outputOptions(['-map', '0:a:0', '-map_metadata', '0']);
 				const rate = target.sampleRate ? ['-ar', String(target.sampleRate)] : [];
@@ -186,6 +188,7 @@ export class AudioTranscodeService {
 			() =>
 				new Promise<void>((resolve, reject) => {
 					const stream = ffmpeg(srcPath)
+						.inputOptions([...SAFE_INPUT_OPTIONS])
 						.noVideo()
 						.audioChannels(1)
 						.audioFrequency(SAMPLE_RATE)

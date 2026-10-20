@@ -1,6 +1,7 @@
 import { basename } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import ffmpeg from 'fluent-ffmpeg';
+import { SAFE_INPUT_OPTIONS } from '../common/ffmpeg-input.js';
 
 /**
  * Structured codec info derived from FFprobe output. Mirrors the columns
@@ -75,7 +76,7 @@ export class FileProbeService {
 
 	probe(filePath: string): Promise<FileProbeResult | null> {
 		return new Promise((resolve) => {
-			ffmpeg.ffprobe(filePath, (err, metadata) => {
+			ffmpeg.ffprobe(filePath, [...SAFE_INPUT_OPTIONS], (err, metadata) => {
 				if (err) {
 					this.logger.warn(`FFprobe failed for ${basename(filePath)}: ${err.message}`);
 					resolve(null);

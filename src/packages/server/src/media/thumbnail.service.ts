@@ -4,6 +4,7 @@ import { nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
+import { SAFE_INPUT_OPTIONS } from '../common/ffmpeg-input.js';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -213,7 +214,7 @@ export class ThumbnailService {
 	 */
 	probeVideo(filePath: string): Promise<ProbeInfo> {
 		return new Promise((resolve, reject) => {
-			ffmpeg.ffprobe(filePath, (err, metadata) => {
+			ffmpeg.ffprobe(filePath, [...SAFE_INPUT_OPTIONS], (err, metadata) => {
 				if (err) return reject(err);
 
 				const videoStream = metadata.streams?.find((s) => s.codec_type === 'video');
@@ -247,7 +248,7 @@ export class ThumbnailService {
 		seekSeconds: number,
 	): Promise<void> {
 		return new Promise((resolve, reject) => {
-			const command = ffmpeg(inputPath);
+			const command = ffmpeg(inputPath).inputOptions([...SAFE_INPUT_OPTIONS]);
 			if (process.platform === 'win32') {
 				command.inputOptions(['-hwaccel', 'none']);
 			}

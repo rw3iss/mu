@@ -4,6 +4,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
+import { SAFE_INPUT_OPTIONS } from '../common/ffmpeg-input.js';
 import { normalizeCast } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
@@ -1114,7 +1115,7 @@ export class MetadataService {
 
 			try {
 				await new Promise<void>((resolve, reject) => {
-					ffmpeg.ffprobe(file.filePath, (err, metadata) => {
+					ffmpeg.ffprobe(file.filePath, [...SAFE_INPUT_OPTIONS], (err, metadata) => {
 						if (err) {
 							reject(err);
 							return;

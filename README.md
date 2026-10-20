@@ -117,6 +117,12 @@ Off by default. Turn it on during install, on the Setup page, or in **Settings �
 - **Public sharing** -- *Share link…* on any track or album menu, *Share* on music playlists (yours or public) and on the player's Up Next list (snapshots the current queue). Anyone with the `/listen/<token>` link can play it in the Mu player with no account; album/playlist links stay live, queue links are a snapshot. Links follow the movie share expiry (`share.tokenExpiryDays`, default 30) and can be revoked from the share dialog. A link only ever reaches the tracks, files, waveforms and covers it shares.
 - **API** -- everything is under `/api/v1/music/*` and returns 404 while Music is off. See `docs/music-support-plan.md` for the design.
 
+### Security
+- **Only media is picked up.** Scans and the folder watcher only read allowlisted video/audio extensions; uploads reject everything else (zips are filtered entry by entry and guarded against path traversal). No file is ever executed — media is only read by ffmpeg/ffprobe and the tag parser.
+- **ffmpeg can't be turned against the server.** Every ffmpeg/ffprobe input runs with `-protocol_whitelist file,pipe`, so a crafted file (e.g. an HLS/concat playlist disguised as a video) can't make ffmpeg fetch URLs or read other files. Paths are always passed as arguments, never through a shell.
+- **Sandboxed service.** `pnpm service install` (or `pnpm service harden`) adds a systemd drop-in: no privilege gain (NoNewPrivileges, no setuid), private `/tmp`, read-only kernel tunables/cgroups, native syscalls only. Devices are left alone so NVENC keeps working.
+- **Keep ffmpeg updated** (Fedora: RPM Fusion via `dnf upgrade`) — decoder bugs are the realistic risk with untrusted media. A virus scanner adds little for media files; consider ClamAV only for uploads from people you don't trust.
+
 ### Administration
 - **Admin dashboard** -- server stats, user management, media sources, log viewer, cache management
 - **Bulk movie operations** -- multi-select cards (Edit toggle in Library and Search), bulk re-scan, refresh metadata, clear metadata, hide/unhide, mark watched/unwatched, remove from library, delete from disk; per-movie failures are isolated so one bad row doesn't kill the batch
@@ -548,6 +554,7 @@ pnpm setup                    # prereqs -> install -> build -> migrate -> (offer
 
 # Service management (Linux / systemd user service) — see "Running Mu as a service" below
 pnpm service install          # install + enable + start (boot-start via linger); no sudo
+pnpm service harden           # (re)write the sandbox drop-in + restart (existing installs)
 pnpm service status           # service state + port + health
 pnpm service start            # (also: stop | restart)
 pnpm service enable           # (also: disable) — start-on-boot on/off

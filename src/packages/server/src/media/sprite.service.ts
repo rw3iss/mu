@@ -23,6 +23,7 @@ const FRAMES_PER_SHEET = COLUMNS * ROWS;
 const QUALITY = 5; // FFmpeg JPEG quality (2=best, 31=worst)
 
 import { parseThumbnailSize, THUMBNAIL_SIZE_ORDER, type ThumbnailSize } from '@mu/shared';
+import { SAFE_INPUT_OPTIONS } from '../common/ffmpeg-input.js';
 
 // Re-export the canonical type + parser so existing server-side
 // imports from this module (e.g. ThumbnailController,
@@ -283,6 +284,7 @@ export class SpriteService {
 				const timestamp = i * interval;
 				const framePath = join(framesDir, `${String(i).padStart(5, '0')}.jpg`);
 				await this.runFfmpeg(ffmpegPath, [
+					...SAFE_INPUT_OPTIONS,
 					'-ss',
 					String(timestamp),
 					'-i',
@@ -330,6 +332,7 @@ export class SpriteService {
 				// Use concat demuxer + tile to stitch into a grid
 				const rows = Math.ceil(chunkFrames.length / COLUMNS);
 				await this.runFfmpeg(ffmpegPath, [
+					...SAFE_INPUT_OPTIONS,
 					'-f',
 					'concat',
 					'-safe',
@@ -365,6 +368,7 @@ export class SpriteService {
 			const probe = execFileSync(
 				ffmpegPath.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1'),
 				[
+					...SAFE_INPUT_OPTIONS,
 					'-v',
 					'error',
 					'-select_streams',

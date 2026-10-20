@@ -4,6 +4,7 @@ import { nowISO, SUPPORTED_VIDEO_EXTENSIONS, WsEvent } from '@mu/shared';
 import { forwardRef, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { and, eq, isNull, like, or, sql } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
+import { SAFE_INPUT_OPTIONS } from '../../common/ffmpeg-input.js';
 import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import { normalizeTitle } from '../../common/text-normalize.js';
 import { DatabaseService } from '../../database/database.service.js';
@@ -504,7 +505,7 @@ export class VideoImporter implements MediaImporter, OnModuleInit {
 	 */
 	async probeFile(filePath: string): Promise<ProbeResult> {
 		return new Promise((resolve) => {
-			ffmpeg.ffprobe(filePath, (err, metadata) => {
+			ffmpeg.ffprobe(filePath, [...SAFE_INPUT_OPTIONS], (err, metadata) => {
 				if (err) {
 					this.logger.warn(`FFprobe failed for ${basename(filePath)}: ${err.message}`);
 					resolve({});

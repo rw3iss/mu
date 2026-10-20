@@ -8,6 +8,7 @@ import { WsEvent } from '@mu/shared';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
+import { SAFE_INPUT_OPTIONS } from '../../common/ffmpeg-input.js';
 import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import { ConfigService } from '../../config/config.service.js';
 import { DatabaseService } from '../../database/database.service.js';
@@ -549,7 +550,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		try {
 			const sizeBytes = statSync(filePath).size;
 			const data = await new Promise<any>((resolve, reject) => {
-				ffmpeg.ffprobe(filePath, (err, d) => (err ? reject(err) : resolve(d)));
+				ffmpeg.ffprobe(filePath, [...SAFE_INPUT_OPTIONS], (err, d) =>
+					err ? reject(err) : resolve(d),
+				);
 			});
 			const streams: any[] = data?.streams ?? [];
 			const v = streams.find((s) => s.codec_type === 'video');
@@ -1537,6 +1540,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			// execFileSync (no shell): the path is an argument, never shell text.
 			const { execFileSync } = await import('node:child_process');
 			const probeArgs = (entries: string, stream: string, of: string) => [
+				...SAFE_INPUT_OPTIONS,
 				'-v',
 				'error',
 				'-select_streams',
@@ -1575,10 +1579,14 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			}
 
 			// Check video codec (take first line only — MPEG-TS can report multiple streams)
-			const videoCodec = execFileSync('ffprobe', probeArgs('stream=codec_name', 'v:0', 'csv=p=0'), {
-				encoding: 'utf-8',
-				timeout: 10000,
-			})
+			const videoCodec = execFileSync(
+				'ffprobe',
+				probeArgs('stream=codec_name', 'v:0', 'csv=p=0'),
+				{
+					encoding: 'utf-8',
+					timeout: 10000,
+				},
+			)
 				.trim()
 				.split('\n')[0]
 				?.trim();
@@ -2032,7 +2040,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	 * sessions.
 	 */
 	private createFfmpegCommand(filePath: string): ReturnType<typeof ffmpeg> {
-		const command = ffmpeg(`file:${filePath}`);
+		const command = ffmpeg(`file:${filePath}`).inputOptions([...SAFE_INPUT_OPTIONS]);
 		if (process.platform === 'win32') {
 			command.inputOptions(['-hwaccel', 'none']);
 		}

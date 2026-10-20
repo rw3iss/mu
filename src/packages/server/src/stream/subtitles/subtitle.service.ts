@@ -3,6 +3,7 @@ import { access, mkdir, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import ffmpeg from 'fluent-ffmpeg';
+import { SAFE_INPUT_OPTIONS } from '../../common/ffmpeg-input.js';
 import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import { ConfigService } from '../../config/config.service.js';
 
@@ -398,7 +399,7 @@ export class SubtitleService {
 
 		// Fallback to ffmpeg for other formats (ASS, SSA, SUB, etc.)
 		return new Promise((resolve, reject) => {
-			const command = ffmpeg(inputPath);
+			const command = ffmpeg(inputPath).inputOptions([...SAFE_INPUT_OPTIONS]);
 			if (process.platform === 'win32') {
 				command.inputOptions(['-hwaccel', 'none']);
 			}
@@ -436,7 +437,7 @@ export class SubtitleService {
 	 */
 	private probe(filePath: string): Promise<any> {
 		return new Promise((resolve, reject) => {
-			ffmpeg.ffprobe(filePath, (err: Error | null, data: any) => {
+			ffmpeg.ffprobe(filePath, [...SAFE_INPUT_OPTIONS], (err: Error | null, data: any) => {
 				if (err) return reject(err);
 				resolve(data);
 			});
@@ -452,7 +453,7 @@ export class SubtitleService {
 		outputPath: string,
 	): Promise<void> {
 		return new Promise((resolve, reject) => {
-			const command = ffmpeg(inputPath);
+			const command = ffmpeg(inputPath).inputOptions([...SAFE_INPUT_OPTIONS]);
 			if (process.platform === 'win32') {
 				command.inputOptions(['-hwaccel', 'none']);
 			}

@@ -6,6 +6,7 @@ import { nowISO } from '@mu/shared';
 import { Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import ffmpeg from 'fluent-ffmpeg';
+import { SAFE_INPUT_OPTIONS } from '../../common/ffmpeg-input.js';
 import { ConfigService } from '../../config/config.service.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { artwork } from '../../database/schema/index.js';
@@ -119,6 +120,7 @@ export class ArtworkService {
 			await mkdir(dirname(out), { recursive: true });
 			await new Promise<void>((resolve, reject) => {
 				ffmpeg(row.originalPath)
+					.inputOptions([...SAFE_INPUT_OPTIONS])
 					.outputOptions([
 						'-vf',
 						`scale='min(${size},iw)':-2`,

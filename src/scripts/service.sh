@@ -5,6 +5,7 @@ set -euo pipefail
 # Mu — Service Manager (Linux / systemd, user service)
 #
 #   service.sh install     Install + enable + start the mu-server user service
+#   service.sh harden      (Re)write the sandbox drop-in and restart
 #   service.sh uninstall   Stop + disable + remove the unit  (KEEPS app & data)
 #   service.sh status      Show service + port + health
 #   service.sh start        | stop | restart
@@ -77,6 +78,31 @@ remove_stale_system_unit() {
 }
 
 # ── install ───────────────────────────────────────────────────────────────────
+# Sandboxing for the service (separate drop-in so the unit stays readable).
+# Only options that work in an unprivileged *user* unit and don't touch
+# devices: ProtectClock / PrivateDevices / DeviceAllow would set a closed
+# device policy and cut ffmpeg off from the GPU (NVENC). ProtectSystem is left
+# off because media folders (any path an admin adds) must stay writable for
+# uploads and in-place MP4 conversion.
+write_hardening_dropin() {
+    local dir="${UNIT_PATH}.d"
+    mkdir -p "$dir"
+    cat > "$dir/20-hardening.conf" <<'HARDEN'
+[Service]
+# No privilege gain via setuid/setgid binaries or file capabilities.
+NoNewPrivileges=yes
+RestrictSUIDSGID=yes
+# Private /tmp: temp files (zip uploads, probes) aren't visible to other users.
+PrivateTmp=yes
+LockPersonality=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+HARDEN
+    log "Wrote sandbox drop-in: $dir/20-hardening.conf"
+}
+
 cmd_install() {
     require_systemd; ensure_xdg
     step "Installing user service: ${SERVICE_NAME}"
@@ -130,6 +156,8 @@ SyslogIdentifier=$SERVICE_NAME
 [Install]
 WantedBy=default.target
 UNIT
+
+    write_hardening_dropin
 
     uctl daemon-reload
     uctl enable --now "$SERVICE_NAME"
@@ -195,10 +223,11 @@ cmd_logs() {
     journalctl --user -u "$SERVICE_NAME" -n "${2:-80}" -f
 }
 
-usage() { sed -n '4,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '4,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 case "${1:-}" in
     install)   cmd_install ;;
+    harden)    require_systemd; ensure_xdg; write_hardening_dropin; uctl daemon-reload; uctl restart "$SERVICE_NAME"; log "Restarted with the sandbox drop-in." ;;
     uninstall) cmd_uninstall ;;
     status)    cmd_status ;;
     start)     cmd_start ;;
