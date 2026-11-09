@@ -296,6 +296,7 @@ export function Settings(props: SettingsProps) {
 	const [convertOriginalFile, setConvertOriginalFile] = useState(true);
 	const [conversionGrowthThreshold, setConversionGrowthThreshold] = useState('1.5');
 	const [convertHevcToAv1, setConvertHevcToAv1] = useState(false);
+	const [av1TenBit, setAv1TenBit] = useState(false);
 	const [av1Cq, setAv1Cq] = useState('32');
 	// Shrink oversized H.264 files: re-encode any whose bitrate exceeds this many
 	// Mbps. 0 = off.
@@ -461,6 +462,7 @@ export function Settings(props: SettingsProps) {
 						setConversionGrowthThreshold(String(encoding.conversionGrowthThreshold));
 					if (typeof encoding.convertHevcToAv1 === 'boolean')
 						setConvertHevcToAv1(encoding.convertHevcToAv1);
+					if (typeof encoding.av1TenBit === 'boolean') setAv1TenBit(encoding.av1TenBit);
 					if (encoding.av1Cq != null) setAv1Cq(String(encoding.av1Cq));
 					if (encoding.reencodeAboveMbps != null)
 						setReencodeAboveMbps(String(encoding.reencodeAboveMbps));
@@ -609,6 +611,7 @@ export function Settings(props: SettingsProps) {
 					convertOriginalFile,
 					conversionGrowthThreshold: parseFloat(conversionGrowthThreshold) || 1.5,
 					convertHevcToAv1,
+					av1TenBit,
 					av1Cq: parseInt(av1Cq, 10) || 32,
 					reencodeAboveMbps: parseFloat(reencodeAboveMbps) || 0,
 					shrinkWorthRatio: parseFloat(shrinkWorthRatio) || 0.8,
@@ -645,6 +648,7 @@ export function Settings(props: SettingsProps) {
 		convertOriginalFile,
 		conversionGrowthThreshold,
 		convertHevcToAv1,
+		av1TenBit,
 		av1Cq,
 		reencodeAboveMbps,
 		shrinkWorthRatio,
@@ -2673,6 +2677,31 @@ export function Settings(props: SettingsProps) {
 											setConvertHevcToAv1(
 												(e.target as HTMLInputElement).checked,
 											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
+							</div>
+
+							{/* AV1 10-bit */}
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>Keep 10-bit in AV1</span>
+									<span class={styles.settingDescription}>
+										Off (default): AV1 conversions write 8-bit video, and HDR
+										sources are tone-mapped to normal (SDR) colors, so they play
+										in every browser. Files that are already 10-bit AV1 keep
+										their file and get an 8-bit copy in the cache. On: keep
+										10-bit / HDR (less banding), but some browsers and GPUs show
+										a black picture for it.
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={av1TenBit}
+										onChange={(e) =>
+											setAv1TenBit((e.target as HTMLInputElement).checked)
 										}
 									/>
 									<span class={styles.toggleTrack} />

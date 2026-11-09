@@ -338,9 +338,8 @@ export class StreamController {
 
 		const file = fileRows[0]!;
 		// Serving precedence:
-		//   1. NVMe hot-cache copy (staged source on the fast drive) — best for
-		//      concurrency, keeps reads off the media HDD.
-		//   2. Cache-mode converted MP4 (convertOriginalFile OFF).
+		//   1. Cached direct copy (cache-mode conversion / 8-bit compat copy).
+		//   2. NVMe hot-cache copy (staged source on the fast drive).
 		//   3. The original file. In-place conversions update file.filePath
 		//      directly, so this only matters for cache-mode.
 		// An alternate-audio request serves its single-track variant (see
@@ -354,8 +353,12 @@ export class StreamController {
 			this.memoryCache.touch(variant);
 			return this.directPlayService.serveFile(variant, request, reply);
 		}
-		const hot = this.mediaCache.getHotPath(file.id);
-		const cached = hot ?? this.transcoderService.getCachedDirectMp4(file.id);
+		// A cached direct copy wins over a hot copy of the source: it exists
+		// because the source itself doesn't play (e.g. the 8-bit copy of a
+		// 10-bit AV1 file), so serving the staged source would undo it.
+		const cached =
+			this.transcoderService.getCachedDirectMp4(file.id) ??
+			this.mediaCache.getHotPath(file.id);
 		const servePath = cached ?? file.filePath;
 		// Keep the file being played resident in RAM (no-op unless the admin set
 		// a memory-cache budget). Warms whichever copy we actually serve.

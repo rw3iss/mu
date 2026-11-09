@@ -17,7 +17,7 @@ import { EventsService } from '../../events/events.service.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import { TranscodeDebuggerService } from './transcode-debugger.service.js';
 import { TRANSCODING_PROFILES } from './transcoder.profiles.js';
-import { buildVideoFilter, isHdrSource } from './video-filter.js';
+import { buildVideoFilter, isHdrSource, SDR_COLOR_OPTS } from './video-filter.js';
 
 interface TranscodeOptions {
 	quality?: string;
@@ -696,15 +696,20 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						String(cq),
 						'-b:v',
 						'0',
-						// AV1 Main profile carries 10-bit and browsers decode it, so a
-						// 10-bit source keeps its depth (no banding). 8-bit stays 8-bit.
+						// `tenBit` keeps a 10-bit source at 10 bits (opt-in: some
+						// browsers/GPUs draw 10-bit AV1 black). Otherwise 8-bit, with
+						// HDR tone-mapped to SDR so the colors stay right.
 						'-pix_fmt',
 						opts.tenBit ? 'p010le' : 'yuv420p',
 					]);
-				if (!opts.preserveResolution) {
-					const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
-					command = command.outputOptions(['-vf', scaleFilter]);
-				}
+				const sdr = !opts.tenBit && isHdrSource(filePath);
+				const vf = opts.preserveResolution
+					? buildVideoFilter(null, sdr)
+					: opts.tenBit
+						? `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`
+						: buildVideoFilter(profile, sdr);
+				if (vf) command = command.outputOptions(['-vf', vf]);
+				if (sdr) command = command.outputOptions([...SDR_COLOR_OPTS]);
 			} else if (opts.videoCopy) {
 				// Video is already browser-compatible (H.264) — copy it losslessly
 				// and only bring the audio to AAC. Fast, no video quality loss.
@@ -733,10 +738,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					.audioCodec('aac')
 					.outputOptions(['-ac', '2', '-b:a', profile.audioBitrate, ...videoRateOpts]);
 
-				if (!opts.preserveResolution) {
-					const scaleFilter = buildVideoFilter(profile, isHdrSource(filePath));
-					command = command.outputOptions(['-vf', scaleFilter]);
-				}
+				const hdrIn = isHdrSource(filePath);
+				const vf = buildVideoFilter(opts.preserveResolution ? null : profile, hdrIn);
+				if (vf) command = command.outputOptions(['-vf', vf]);
+				if (hdrIn) command = command.outputOptions([...SDR_COLOR_OPTS]);
 
 				command = command.outputOptions([
 					'-preset',

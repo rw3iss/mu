@@ -25,6 +25,8 @@ export interface ConversionPlan {
 	reason: string;
 	/** Estimated output size for `reencode` (used for the would-grow guard). */
 	predictedBytes?: number;
+	/** Never replace the original: write the result as the cached direct copy. */
+	cacheOnly?: boolean;
 }
 
 export interface ConversionResult {
@@ -159,6 +161,9 @@ export class ConversionService {
 			// Convert HEVC → AV1 MP4 (GPU). AV1 is browser-universal AND efficient
 			// (no doubling), but requires a working NVENC AV1 encoder. Default off.
 			convertHevcToAv1: enc?.convertHevcToAv1 === true,
+			// Keep 10-bit sources at 10 bits in AV1. Default off: some browsers /
+			// GPUs draw 10-bit AV1 black, so AV1 output is 8-bit (HDR tone-mapped).
+			av1TenBit: enc?.av1TenBit === true,
 			// Re-encode (shrink) any file whose overall bitrate exceeds this many
 			// Mbps. Targets bloated H.264 BluRay rips. 0 = off. AV1 (GPU) when
 			// available, else H.264 CRF.
@@ -302,6 +307,16 @@ export class ConversionService {
 		// pointless AV1→H.264 re-encode that both bloats the file and loses
 		// quality. Make it an explicit skip so it can't depend on that.
 		if (av1 && browserContainer && browserAudio) {
+			// A 10-bit AV1 file (made while "Keep 10-bit" was on) keeps its file;
+			// an 8-bit copy goes in the cache and is what gets served.
+			if (
+				!this.getConfig().av1TenBit &&
+				isTenBitSource(file) &&
+				this.nvencActive() &&
+				!this.transcoder.getCachedDirectMp4(file.id)
+			) {
+				return { action: 'reencode-av1', reason: 'av1-10bit-compat-copy', cacheOnly: true };
+			}
 			return { action: 'skip', reason: 'already-direct-play' };
 		}
 
@@ -476,13 +491,16 @@ export class ConversionService {
 		opts: { inPlace?: boolean; forceCpu?: boolean } = {},
 		onProgress?: (pct: number) => void,
 	): Promise<ConversionResult> {
-		const inPlace = opts.inPlace ?? this.getConfig().convertOriginalFile;
+		const plan = this.planConversion(file);
+		const inPlace = plan.cacheOnly
+			? false
+			: (opts.inPlace ?? this.getConfig().convertOriginalFile);
 		// CPU+GPU parallel mode: this job encodes on the CPU — AV1 (NVENC-only)
 		// plans fall back to H.264 CRF on the CPU.
 		const cpu = !!opts.forceCpu;
-		const plan = this.planConversion(file);
-		// AV1 keeps a 10-bit source at 10 bits (H.264 must stay 8-bit for browsers).
-		const tenBit = isTenBitSource(file);
+		// AV1 keeps a 10-bit source at 10 bits only when the setting is on
+		// (H.264 is always 8-bit). Otherwise 8-bit, HDR tone-mapped to SDR.
+		const tenBit = this.getConfig().av1TenBit && isTenBitSource(file);
 		const base: ConversionResult = {
 			status: 'skipped',
 			action: plan.action,

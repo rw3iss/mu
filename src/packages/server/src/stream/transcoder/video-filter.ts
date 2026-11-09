@@ -9,8 +9,25 @@ const TONEMAP =
 	'zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,' +
 	'tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p';
 
-/** `-vf` chain for an H.264 transcode: fit + (tone map) + letterbox pad. */
-export function buildVideoFilter(profile: { width: number; height: number }, hdr: boolean): string {
+/** BT.709 tags for a tone-mapped (SDR) output. */
+export const SDR_COLOR_OPTS = [
+	'-color_primaries',
+	'bt709',
+	'-color_trc',
+	'bt709',
+	'-colorspace',
+	'bt709',
+];
+
+/**
+ * `-vf` chain for an 8-bit SDR output: fit + (tone map) + letterbox pad.
+ * `profile` null = keep the source size (only the tone map, or '' for SDR).
+ */
+export function buildVideoFilter(
+	profile: { width: number; height: number } | null,
+	hdr: boolean,
+): string {
+	if (!profile) return hdr ? TONEMAP : '';
 	const { width: w, height: h } = profile;
 	const fit = `scale=${w}:${h}:force_original_aspect_ratio=decrease:force_divisible_by=2`;
 	const pad = `pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2`;
