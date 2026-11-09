@@ -7,6 +7,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import { SAFE_INPUT_OPTIONS } from '../../common/ffmpeg-input.js';
 import { GuidResolverService } from '../../common/guid-resolver.service.js';
 import { normalizeTitle } from '../../common/text-normalize.js';
+import { resolutionLabel, videoBitDepth } from '../../common/video-probe.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, movies } from '../../database/schema/index.js';
 import { EventsService } from '../../events/events.service.js';
@@ -517,14 +518,7 @@ export class VideoImporter implements MediaImporter, OnModuleInit {
 
 				const width = videoStream?.width;
 				const height = videoStream?.height;
-				let resolution: string | undefined;
-				if (height) {
-					if (height >= 2160) resolution = '2160p';
-					else if (height >= 1080) resolution = '1080p';
-					else if (height >= 720) resolution = '720p';
-					else if (height >= 480) resolution = '480p';
-					else resolution = `${height}p`;
-				}
+				const resolution = resolutionLabel(width, height);
 
 				// HDR detection from color transfer/space
 				const colorTransfer = (videoStream as any)?.color_transfer ?? '';
@@ -577,9 +571,7 @@ export class VideoImporter implements MediaImporter, OnModuleInit {
 						: undefined,
 					videoWidth: width,
 					videoHeight: height,
-					videoBitDepth: (videoStream as any)?.bits_per_raw_sample
-						? parseInt((videoStream as any).bits_per_raw_sample, 10)
-						: undefined,
+					videoBitDepth: videoBitDepth(videoStream),
 					videoFrameRate: this.parseFrameRate((videoStream as any)?.r_frame_rate),
 					videoProfile:
 						videoStream?.profile != null ? String(videoStream.profile) : undefined,

@@ -6,6 +6,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import { CacheService } from '../cache/cache.service.js';
 import { SAFE_INPUT_OPTIONS } from '../common/ffmpeg-input.js';
 import { normalizeCast } from '../common/json-fields.js';
+import { resolutionLabel } from '../common/video-probe.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -1125,14 +1126,7 @@ export class MetadataService {
 						const audioStream = metadata.streams?.find((s) => s.codec_type === 'audio');
 						const width = videoStream?.width;
 						const height = videoStream?.height;
-						let resolution: string | undefined;
-						if (height) {
-							if (height >= 2160) resolution = '2160p';
-							else if (height >= 1080) resolution = '1080p';
-							else if (height >= 720) resolution = '720p';
-							else if (height >= 480) resolution = '480p';
-							else resolution = `${height}p`;
-						}
+						const resolution = resolutionLabel(width, height);
 						const audioStreams = (metadata.streams ?? []).filter(
 							(s) => s.codec_type === 'audio',
 						);

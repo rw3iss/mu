@@ -2,6 +2,7 @@ import { basename } from 'node:path';
 import { Injectable, Logger } from '@nestjs/common';
 import ffmpeg from 'fluent-ffmpeg';
 import { SAFE_INPUT_OPTIONS } from '../common/ffmpeg-input.js';
+import { resolutionLabel, videoBitDepth } from '../common/video-probe.js';
 
 /**
  * Structured codec info derived from FFprobe output. Mirrors the columns
@@ -88,14 +89,7 @@ export class FileProbeService {
 
 				const width = videoStream?.width;
 				const height = videoStream?.height;
-				let resolution: string | undefined;
-				if (height) {
-					if (height >= 2160) resolution = '2160p';
-					else if (height >= 1080) resolution = '1080p';
-					else if (height >= 720) resolution = '720p';
-					else if (height >= 480) resolution = '480p';
-					else resolution = `${height}p`;
-				}
+				const resolution = resolutionLabel(width, height);
 
 				const colorTransfer = (videoStream as any)?.color_transfer ?? '';
 				const colorSpace = (videoStream as any)?.color_space ?? '';
@@ -156,9 +150,7 @@ export class FileProbeService {
 						: undefined,
 					videoWidth: width,
 					videoHeight: height,
-					videoBitDepth: (videoStream as any)?.bits_per_raw_sample
-						? parseInt((videoStream as any).bits_per_raw_sample, 10)
-						: undefined,
+					videoBitDepth: videoBitDepth(videoStream),
 					videoFrameRate,
 					videoProfile:
 						videoStream?.profile != null ? String(videoStream.profile) : undefined,

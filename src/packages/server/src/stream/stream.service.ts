@@ -14,6 +14,7 @@ import { and, eq, lt, sql } from 'drizzle-orm';
 import { GuidResolverService } from '../common/guid-resolver.service.js';
 import { parseJsonArray } from '../common/json-fields.js';
 import { SessionRegistryService } from '../common/session-registry.service.js';
+import { effectiveHeight } from '../common/video-probe.js';
 import { ConfigService } from '../config/config.service.js';
 import { DatabaseService } from '../database/database.service.js';
 import {
@@ -236,7 +237,10 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 		const file = this.selectBestFile(fileList);
 		const mode = this.determineStreamMode(file);
-		const quality = this.resolveDefaultQuality(file.id, file.videoHeight);
+		const quality = this.resolveDefaultQuality(
+			file.id,
+			effectiveHeight(file.videoWidth, file.videoHeight),
+		);
 
 		const lib = this.settings.get<Record<string, unknown>>('library', {});
 		const persistEnabled = (lib as any)?.persistTranscodes !== false;
@@ -431,7 +435,9 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 
 		const sessionId = crypto.randomUUID();
 		this.guidResolver.warmup(sessionId, movieTitle);
-		const quality = options.quality || this.resolveDefaultQuality(file.id, file.videoHeight);
+		const quality =
+			options.quality ||
+			this.resolveDefaultQuality(file.id, effectiveHeight(file.videoWidth, file.videoHeight));
 
 		// Skip session tracking for shared/anonymous streams (sentinel users have no DB record)
 		if (userId !== '__shared__' && userId !== '__share__') {
@@ -723,7 +729,9 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		const audioTracks = this.parseAudioTracks(file);
 
 		// Build available quality options (capped at source resolution)
-		const qualities = this.getAvailableQualities(file.videoHeight);
+		const qualities = this.getAvailableQualities(
+			effectiveHeight(file.videoWidth, file.videoHeight),
+		);
 
 		return {
 			sessionId,
@@ -1323,8 +1331,8 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// Determine source-native quality
 		let sourceQuality = defaultQuality;
 		if (sourceHeight && sourceHeight > 0) {
-			if (sourceHeight >= 2160) sourceQuality = '4k';
-			else if (sourceHeight >= 1080) sourceQuality = '1080p';
+			if (sourceHeight >= 2160 * 0.97) sourceQuality = '4k';
+			else if (sourceHeight >= 1080 * 0.97) sourceQuality = '1080p';
 			else if (sourceHeight >= 720) sourceQuality = '720p';
 			else sourceQuality = '480p';
 		}
@@ -1519,6 +1527,6 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		if (!sourceHeight || sourceHeight <= 0) return allQualities;
 
 		// Only include qualities at or below source resolution
-		return allQualities.filter((q) => q.height <= sourceHeight);
+		return allQualities.filter((q) => q.height * 0.97 <= sourceHeight);
 	}
 }
