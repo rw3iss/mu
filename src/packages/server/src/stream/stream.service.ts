@@ -326,8 +326,8 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			);
 		}
 
-		// Pick the best available file (prefer highest resolution)
-		const file = this.selectBestFile(movieFileList);
+		// Pick the cheapest-to-deliver file (direct play first), then highest resolution
+		const file = this.selectBestFile(movieFileList, { clientHevc: options.clientHevc });
 
 		// Keep the source resident in RAM for the duration / re-watches (no-op
 		// unless a memory-cache budget is configured). ffmpeg then reads the
@@ -1244,15 +1244,22 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	 * Select the best file from a list of available movie files.
 	 * Prefers the highest resolution file available.
 	 */
-	private selectBestFile(files: any[]) {
+	/**
+	 * Pick which of a movie's files to play. Cheapest delivery wins first —
+	 * direct play, then direct stream (remux), then transcode — and resolution
+	 * only breaks ties. Preferring resolution alone picked a 4K HEVC/DTS file
+	 * over a 1080p MP4 of the same movie, forcing a live 4K transcode (slow
+	 * start, slow seeks, GPU/CPU load) when a direct-play copy was right there.
+	 */
+	private selectBestFile(files: any[], opts: { clientHevc?: boolean } = {}) {
 		if (files.length === 1) return files[0];
-
-		// Sort by resolution height descending, pick the first
-		return files.sort((a, b) => {
-			const aHeight = a.videoHeight ?? 0;
-			const bHeight = b.videoHeight ?? 0;
-			return bHeight - aHeight;
-		})[0];
+		const cost = (f: any) => {
+			const mode = this.determineStreamMode(f, opts);
+			return mode === StreamMode.DIRECT_PLAY ? 0 : mode === StreamMode.DIRECT_STREAM ? 1 : 2;
+		};
+		return [...files].sort(
+			(a, b) => cost(a) - cost(b) || (b.videoHeight ?? 0) - (a.videoHeight ?? 0),
+		)[0];
 	}
 
 	/**
