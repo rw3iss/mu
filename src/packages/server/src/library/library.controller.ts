@@ -96,14 +96,17 @@ export class LibraryController {
 	 * Convert all eligible movies to native direct-play MP4 and clear their
 	 * stale HLS/transcode caches. Each file becomes its own background
 	 * `convert-mp4` job (remux when lossless, re-encode otherwise, would-grow
-	 * cases skipped). `inPlace` defaults to the encoding setting
+	 * cases skipped). Optional `movieFileId` queues just that file. `inPlace` defaults to the encoding setting
 	 * (`convertOriginalFile`, ON by default) — when on, originals are replaced.
 	 */
 	@Post('convert-and-clear-cache')
 	@Roles('admin')
 	@RequireAction('edit:app-settings')
-	convertAndClearCache(@Body() body?: { inPlace?: boolean }) {
-		const queued = this.libraryJobs.enqueueConvertJobs({ inPlace: body?.inPlace });
+	convertAndClearCache(@Body() body?: { inPlace?: boolean; movieFileId?: string }) {
+		const queued = this.libraryJobs.enqueueConvertJobs({
+			inPlace: body?.inPlace,
+			movieFileId: typeof body?.movieFileId === 'string' ? body.movieFileId : undefined,
+		});
 		return {
 			message:
 				queued > 0

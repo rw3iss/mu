@@ -622,9 +622,10 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 	/**
 	 * Enqueue convert-to-MP4 jobs for every file with actionable conversion
 	 * work (see ConversionService.eligibleFiles). Skips files that already have
-	 * a pending/running convert job. Returns the number queued.
+	 * a pending/running convert job. `movieFileId` limits it to one file.
+	 * Returns the number queued.
 	 */
-	enqueueConvertJobs(opts: { inPlace?: boolean } = {}): number {
+	enqueueConvertJobs(opts: { inPlace?: boolean; movieFileId?: string } = {}): number {
 		const inPlace = opts.inPlace ?? this.conversionService.getConfig().convertOriginalFile;
 
 		const pendingFileIds = new Set<string>();
@@ -634,7 +635,9 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			}
 		}
 
-		const files = this.conversionService.eligibleFiles();
+		const files = this.conversionService
+			.eligibleFiles()
+			.filter((f) => !opts.movieFileId || f.id === opts.movieFileId);
 		let queued = 0;
 		for (const file of files) {
 			if (pendingFileIds.has(file.id)) continue;

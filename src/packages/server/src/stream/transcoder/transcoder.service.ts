@@ -635,6 +635,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			targetCodec?: 'h264' | 'av1';
 			/** AV1 NVENC constant-quality value; overrides the encoding setting. */
 			av1Cq?: number;
+			/** AV1 only: encode 10-bit (`p010le`) to keep a 10-bit source's depth. */
+			tenBit?: boolean;
 			/** Encode on the CPU (libx264) even when a GPU is configured. */
 			forceCpu?: boolean;
 		} = {},
@@ -693,8 +695,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						String(cq),
 						'-b:v',
 						'0',
+						// AV1 Main profile carries 10-bit and browsers decode it, so a
+						// 10-bit source keeps its depth (no banding). 8-bit stays 8-bit.
 						'-pix_fmt',
-						'yuv420p',
+						opts.tenBit ? 'p010le' : 'yuv420p',
 					]);
 				if (!opts.preserveResolution) {
 					const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;

@@ -481,6 +481,8 @@ export class ConversionService {
 		// plans fall back to H.264 CRF on the CPU.
 		const cpu = !!opts.forceCpu;
 		const plan = this.planConversion(file);
+		// AV1 keeps a 10-bit source at 10 bits (H.264 must stay 8-bit for browsers).
+		const tenBit = isTenBitSource(file);
 		const base: ConversionResult = {
 			status: 'skipped',
 			action: plan.action,
@@ -548,7 +550,7 @@ export class ConversionService {
 					tempPath,
 					cpu
 						? { preserveResolution: true, targetCodec: 'h264', forceCpu: true }
-						: { preserveResolution: true, targetCodec: 'av1' },
+						: { preserveResolution: true, targetCodec: 'av1', tenBit },
 					onProgress,
 				);
 			} else if (plan.action === 'shrink') {
@@ -560,7 +562,7 @@ export class ConversionService {
 					srcPath,
 					tempPath,
 					this.nvencActive() && !cpu
-						? { preserveResolution: true, targetCodec: 'av1' }
+						? { preserveResolution: true, targetCodec: 'av1', tenBit }
 						: { preserveResolution: true, targetCodec: 'h264', forceCpu: cpu },
 					onProgress,
 				);
@@ -660,4 +662,13 @@ export class ConversionService {
 		const gb = n / 1024 ** 3;
 		return gb >= 1 ? `${gb.toFixed(2)}GB` : `${(n / 1024 ** 2).toFixed(0)}MB`;
 	}
+}
+
+/** 10-bit (or deeper) video source, from the scanned bit depth or the codec profile ("Main 10"). */
+export function isTenBitSource(file: {
+	videoBitDepth?: number | null;
+	videoProfile?: string | null;
+}): boolean {
+	if ((file?.videoBitDepth ?? 0) > 8) return true;
+	return /\b(10|12)\b/.test(String(file?.videoProfile ?? ''));
 }
