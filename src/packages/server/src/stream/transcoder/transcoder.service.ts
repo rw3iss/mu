@@ -1059,12 +1059,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			const _proc = command.run();
 
 			// fluent-ffmpeg stores the process on the command object
-			const ffmpegProcess = (command as any).ffmpegProc;
-			if (ffmpegProcess) {
-				this.activeProcesses.set(sessionId, ffmpegProcess);
+			this.trackProcess(sessionId, command, (proc) => {
 				this.boostProcessPriority(sessionId);
-				this.transcodeDebugger.attachStderr(sessionId, ffmpegProcess);
-			}
+				this.transcodeDebugger.attachStderr(sessionId, proc);
+			});
 		});
 	}
 
@@ -1158,11 +1156,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 
 			command.run();
 
-			const ffmpegProcess = (command as any).ffmpegProc;
-			if (ffmpegProcess) {
-				this.activeProcesses.set(sessionId, ffmpegProcess);
-				this.transcodeDebugger.attachStderr(sessionId, ffmpegProcess);
-			}
+			this.trackProcess(sessionId, command, (proc) => {
+				this.transcodeDebugger.attachStderr(sessionId, proc);
+			});
 		});
 	}
 
@@ -1375,12 +1371,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 
 			command.run();
 
-			const ffmpegProcess = (command as any).ffmpegProc;
-			if (ffmpegProcess) {
-				this.activeProcesses.set(processKey, ffmpegProcess);
-				this.lowerProcessPriority(ffmpegProcess, processKey);
-				this.transcodeDebugger.attachStderr(processKey, ffmpegProcess);
-			}
+			this.trackProcess(processKey, command, (proc) => {
+				this.lowerProcessPriority(proc, processKey);
+				this.transcodeDebugger.attachStderr(processKey, proc);
+			});
 		});
 	}
 
@@ -1608,6 +1602,53 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		}
 	}
 
+	/** Bumped by stopTranscode; a process that starts under an old value is stale. */
+	private readonly processGen = new Map<string, number>();
+
+	/**
+	 * Record the ffmpeg child process for `key` once it has actually spawned.
+	 *
+	 * fluent-ffmpeg's `run()` spawns asynchronously (it resolves capabilities and
+	 * paths first), so `command.ffmpegProc` is usually still undefined right after
+	 * `run()`. Reading it synchronously meant the process was never tracked and
+	 * `stopTranscode` couldn't kill it — every seek-restart leaked a full 4K
+	 * transcode. Here we register on 'start', kill a superseded process for the
+	 * same key, and kill the new one at once if a stop arrived before it spawned.
+	 */
+	private trackProcess(
+		key: string,
+		command: ReturnType<typeof ffmpeg>,
+		onProc?: (proc: ChildProcess) => void,
+	): void {
+		const gen = this.processGen.get(key) ?? 0;
+		const register = () => {
+			const proc = (command as any).ffmpegProc as ChildProcess | undefined;
+			if (!proc) return;
+			if ((this.processGen.get(key) ?? 0) !== gen) {
+				// Stopped (or superseded) while it was starting up.
+				this.intentionallyStopped.add(key);
+				try {
+					proc.kill('SIGKILL');
+				} catch {
+					/* already gone */
+				}
+				return;
+			}
+			const prev = this.activeProcesses.get(key);
+			if (prev && prev !== proc && prev.exitCode === null) {
+				try {
+					prev.kill('SIGKILL');
+				} catch {
+					/* already gone */
+				}
+			}
+			this.activeProcesses.set(key, proc);
+			onProc?.(proc);
+		};
+		if ((command as any).ffmpegProc) register();
+		else command.once('start', register);
+	}
+
 	/**
 	 * Check whether a partially transcoded cache has enough segments to begin playback.
 	 */
@@ -1639,6 +1680,9 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	stopTranscode(sessionId: string): void {
+		// Invalidate any process for this key that is still starting up: fluent-ffmpeg
+		// spawns asynchronously, so it may not be in activeProcesses yet.
+		this.processGen.set(sessionId, (this.processGen.get(sessionId) ?? 0) + 1);
 		const proc = this.activeProcesses.get(sessionId);
 		if (proc) {
 			// Mark as a deliberate kill so the 'error' handler doesn't mistake the
@@ -1841,10 +1885,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				});
 
 			command.run();
-			const ffmpegProcess = (command as any).ffmpegProc;
-			if (ffmpegProcess) {
-				this.activeProcesses.set(sessionId, ffmpegProcess);
-			}
+			this.trackProcess(sessionId, command);
 		});
 	}
 
@@ -1963,10 +2004,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				});
 
 			command.run();
-			const ffmpegProcess = (command as any).ffmpegProc;
-			if (ffmpegProcess) {
-				this.activeProcesses.set(processKey, ffmpegProcess);
-			}
+			this.trackProcess(processKey, command);
 		});
 	}
 
@@ -2659,12 +2697,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				});
 
 			command.run();
-			const ffmpegProcess = (command as any).ffmpegProc;
-			if (ffmpegProcess) {
-				this.activeProcesses.set(processKey, ffmpegProcess);
-				this.lowerProcessPriority(ffmpegProcess, processKey);
-				this.transcodeDebugger.attachStderr(processKey, ffmpegProcess);
-			}
+			this.trackProcess(processKey, command, (proc) => {
+				this.lowerProcessPriority(proc, processKey);
+				this.transcodeDebugger.attachStderr(processKey, proc);
+			});
 		});
 	}
 

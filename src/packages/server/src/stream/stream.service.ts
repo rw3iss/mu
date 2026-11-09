@@ -826,6 +826,9 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		);
 	}
 
+	/** Per-session counter: the latest seek-restart wins. */
+	private readonly seekSeq = new Map<string, number>();
+
 	/** Stop the current transcode and restart it from `positionSeconds`. Invoked
 	 *  (debounced) by seekStream once the user settles on a seek position. */
 	private async performSeekRestart(
@@ -837,6 +840,10 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	): Promise<void> {
 		// Bail if the session was torn down while the debounce timer was pending.
 		if (!this.sessionDirs.has(sessionId)) return;
+		// Overlapping restarts (a new seek landing while the previous one awaits
+		// cleanup) must not both spawn ffmpeg: only the newest may start one.
+		const seq = (this.seekSeq.get(sessionId) ?? 0) + 1;
+		this.seekSeq.set(sessionId, seq);
 
 		// Stop current transcode
 		this.transcoderService.stopTranscode(sessionId);
@@ -849,6 +856,8 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		if (currentDir !== persistDir) {
 			await this.transcoderService.cleanup(sessionId);
 		}
+
+		if (this.seekSeq.get(sessionId) !== seq || !this.sessionDirs.has(sessionId)) return;
 
 		// Create new ephemeral dir for this seek
 		const newDir = this.transcoderService.getSessionDir(sessionId);
@@ -1056,6 +1065,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			clearTimeout(pendingSeek);
 			this.seekDebounce.delete(sessionId);
 		}
+		this.seekSeq.delete(sessionId);
 
 		// Stop any active transcode
 		if (session.transcoding) {
