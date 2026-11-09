@@ -45,6 +45,19 @@ interface StartStreamOptions {
 	/** The requesting browser reports it can decode HEVC natively (from the
 	 * `?hevc=1` query). Lets HEVC-in-MP4 files direct-play instead of transcode. */
 	clientHevc?: boolean;
+	/** Highest AV1 bit depth the browser decodes (`?av1=`): 0 = none, 8, 10.
+	 * Undefined (background callers, old clients) = assume AV1 plays. */
+	clientAv1?: number;
+	/** `?direct=0`: the browser failed to show this file directly (no video
+	 * frames), so never direct-play — serve a transcode instead. */
+	noDirect?: boolean;
+}
+
+/** Client capabilities that steer the direct-play decision. */
+export interface ClientCaps {
+	clientHevc?: boolean;
+	clientAv1?: number;
+	noDirect?: boolean;
 }
 
 /**
@@ -331,7 +344,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		}
 
 		// Pick the cheapest-to-deliver file (direct play first), then highest resolution
-		const file = this.selectBestFile(movieFileList, { clientHevc: options.clientHevc });
+		const file = this.selectBestFile(movieFileList, this.capsOf(options));
 
 		// Keep the source resident in RAM for the duration / re-watches (no-op
 		// unless a memory-cache budget is configured). ffmpeg then reads the
@@ -370,7 +383,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// Determine stream mode based on container, video codec, and audio codec.
 		// Pass the client's HEVC capability so HEVC-in-MP4 can direct-play for
 		// browsers that can decode it (others still transcode).
-		let mode = this.determineStreamMode(file, { clientHevc: options.clientHevc });
+		let mode = this.determineStreamMode(file, this.capsOf(options));
 
 		// Resolve preferred audio track: explicit option > preferred language > default (0)
 		if (options.audioTrack == null) {
@@ -1259,7 +1272,11 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	 * over a 1080p MP4 of the same movie, forcing a live 4K transcode (slow
 	 * start, slow seeks, GPU/CPU load) when a direct-play copy was right there.
 	 */
-	private selectBestFile(files: any[], opts: { clientHevc?: boolean } = {}) {
+	private capsOf(o: ClientCaps): ClientCaps {
+		return { clientHevc: o.clientHevc, clientAv1: o.clientAv1, noDirect: o.noDirect };
+	}
+
+	private selectBestFile(files: any[], opts: ClientCaps = {}) {
 		if (files.length === 1) return files[0];
 		const cost = (f: any) => {
 			const mode = this.determineStreamMode(f, opts);
@@ -1363,7 +1380,13 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	 *
 	 * Decision hierarchy: DIRECT_PLAY → DIRECT_STREAM → TRANSCODE
 	 */
-	determineStreamMode(file: any, opts: { clientHevc?: boolean } = {}): string {
+	determineStreamMode(file: any, opts: ClientCaps = {}): string {
+		const mode = this.baseStreamMode(file, opts);
+		// The browser already failed to show this file directly → transcode.
+		return opts.noDirect && mode === StreamMode.DIRECT_PLAY ? StreamMode.TRANSCODE : mode;
+	}
+
+	private baseStreamMode(file: any, opts: ClientCaps): string {
 		// Cache-mode direct play: a converted MP4 in the persistent cache
 		// supersedes the source codecs. The direct route serves that file.
 		if (file?.id && this.transcoderService.getCachedDirectMp4(file.id)) {
@@ -1411,7 +1434,12 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 			if (isH264 && isBrowserContainer && isBrowserAudio && !needsAudioTranscode) {
 				return StreamMode.DIRECT_PLAY;
 			}
-			if (isAv1 && isBrowserContainer && isBrowserAudio && !needsAudioTranscode) {
+			// A client that reports its AV1 support must cover this file's bit
+			// depth (Safari/iOS without AV1 hardware play the audio over black).
+			const av1Ok =
+				opts.clientAv1 === undefined ||
+				(opts.clientAv1 > 0 && ((file.videoBitDepth ?? 8) <= 8 || opts.clientAv1 >= 10));
+			if (isAv1 && av1Ok && isBrowserContainer && isBrowserAudio && !needsAudioTranscode) {
 				return StreamMode.DIRECT_PLAY;
 			}
 			if (isH264 && isMkv && isBrowserAudio && !needsAudioTranscode) {

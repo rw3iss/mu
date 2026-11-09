@@ -94,6 +94,60 @@ const SUPPORTS_HEVC: boolean = (() => {
 	}
 })();
 
+/**
+ * Highest AV1 bit depth this browser decodes: 0 (none), 8 or 10. Sent as
+ * `?av1=` so the server transcodes AV1 it can't show — Safari / iOS without
+ * AV1 hardware otherwise play the audio over a black picture. `canPlayType`
+ * gives a first answer; MediaCapabilities refines it once it resolves.
+ */
+let av1Support: number = (() => {
+	try {
+		const v = document.createElement('video');
+		if (v.canPlayType('video/mp4; codecs="av01.0.08M.08"') === '') return 0;
+		return v.canPlayType('video/mp4; codecs="av01.0.12M.10"') === '' ? 8 : 10;
+	} catch {
+		return 0;
+	}
+})();
+(async () => {
+	const mc = typeof navigator !== 'undefined' ? navigator.mediaCapabilities : undefined;
+	if (!mc?.decodingInfo || av1Support === 0) return;
+	const probe = (codec: string, w: number, h: number) =>
+		mc
+			.decodingInfo({
+				type: 'file',
+				video: {
+					contentType: `video/mp4; codecs="${codec}"`,
+					width: w,
+					height: h,
+					bitrate: 8_000_000,
+					framerate: 24,
+				},
+			})
+			.then((r) => r.supported)
+			.catch(() => false);
+	try {
+		if (await probe('av01.0.12M.10', 3840, 2160)) av1Support = 10;
+		else if (await probe('av01.0.08M.08', 1920, 1080)) av1Support = 8;
+		else av1Support = 0;
+	} catch {
+		// keep the canPlayType answer
+	}
+})();
+
+/**
+ * Movies whose direct file showed no video in this browser (the player's
+ * no-frames watchdog). Their next session asks for a transcode (`?direct=0`).
+ */
+const directPlayFailed = new Set<string>();
+
+/** Returns false when the movie was already marked (stops a reload loop). */
+export function markDirectPlayFailed(movieId: string): boolean {
+	if (directPlayFailed.has(movieId)) return false;
+	directPlayFailed.add(movieId);
+	return true;
+}
+
 export const streamService = {
 	/**
 	 * Get stream mode info for a movie (needs transcode, has cache, etc.)
@@ -130,6 +184,8 @@ export const streamService = {
 		const params = new URLSearchParams();
 		if (options?.audioTrack != null) params.set('audioTrack', String(options.audioTrack));
 		if (SUPPORTS_HEVC) params.set('hevc', '1');
+		params.set('av1', String(av1Support));
+		if (directPlayFailed.has(movieId)) params.set('direct', '0');
 		const qs = params.toString();
 		return api.get<StreamSession>(`/stream/${movieId}/start${qs ? `?${qs}` : ''}`);
 	},

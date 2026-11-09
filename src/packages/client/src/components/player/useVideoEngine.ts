@@ -2,7 +2,7 @@ import Hls from 'hls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { audioEngine } from '@/audio/audio-engine';
 import { getUiSetting } from '@/hooks/useUiSetting';
-import { streamService } from '@/services/stream.service';
+import { markDirectPlayFailed, streamService } from '@/services/stream.service';
 import { wsService } from '@/services/websocket.service';
 import {
 	bassEnhanceEnabled,
@@ -184,6 +184,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const intendedPlayingRef = useRef(false);
 	/** For direct play with deferred loading: stores the URL until user plays */
 	const deferredSrcRef = useRef<{ url: string; position: number } | null>(null);
+	/** Stops the direct-play no-video watchdog of the current source. */
+	const noVideoWatchRef = useRef<(() => void) | null>(null);
 	/** Tracks pending HLS recovery timeout so it can be cleared on destroy */
 	const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	/** Pre-roll poll: when Web Audio is engaged, playback waits for a buffered
@@ -494,6 +496,9 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			// reset intendedPlayingRef after we set it for the new stream.
 			suppressPauseRef.current = true;
 
+			noVideoWatchRef.current?.();
+			noVideoWatchRef.current = null;
+
 			// Clean up previous HLS instance
 			if (hlsRef.current) {
 				hlsRef.current.destroy();
@@ -557,6 +562,36 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 				} else {
 					directUrl = streamUrl;
 				}
+
+				// No-video watchdog: a browser that can't decode the video codec
+				// (e.g. AV1 on Safari without AV1 hardware) plays the audio over a
+				// black picture with no error. After ~3s of real playback with zero
+				// decoded frames, ask the effect below to switch to a transcode.
+				let played = 0;
+				let last = -1;
+				const onTime = () => {
+					const t = video.currentTime;
+					const d = t - last;
+					last = t;
+					if (video.paused || d <= 0 || d > 1.5) return;
+					played += d;
+					if (played < 3) return;
+					stopWatch();
+					const q = video.getVideoPlaybackQuality?.();
+					if (video.videoWidth === 0 || (q != null && q.totalVideoFrames === 0)) {
+						window.dispatchEvent(
+							new CustomEvent('mu:stream-no-video', {
+								detail: { movieId: globalMovieId.value },
+							}),
+						);
+					}
+				};
+				const stopWatch = () => {
+					video.removeEventListener('timeupdate', onTime);
+					if (noVideoWatchRef.current === stopWatch) noVideoWatchRef.current = null;
+				};
+				video.addEventListener('timeupdate', onTime);
+				noVideoWatchRef.current = stopWatch;
 
 				if (autoplay) {
 					// Load and play immediately
@@ -1100,7 +1135,7 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 		 * Always sends the saved per-movie audio choice — without it a reload
 		 * would fall back to the file's first track and undo the user's pick.
 		 */
-		const reload = (movieId: string, reason: 'superseded' | 'audio') => {
+		const reload = (movieId: string, reason: 'superseded' | 'audio' | 'no-video') => {
 			const video = sharedVideoElement;
 			const pos = video && Number.isFinite(video.currentTime) ? video.currentTime : 0;
 			const wasPlaying = intendedPlayingRef.current;
@@ -1139,6 +1174,11 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 							lang ? `Audio switched to ${lang}.` : 'Audio track switched.',
 							4000,
 						);
+					} else if (reason === 'no-video') {
+						notifyInfo(
+							"This browser can't show this video directly — switched to a transcoded stream.",
+							6000,
+						);
 					} else {
 						notifyInfo(
 							session.directPlay
@@ -1163,12 +1203,21 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 			if (!movieId || movieId !== globalMovieId.value) return;
 			reload(movieId, 'audio');
 		};
+		const onNoVideo = (e: Event) => {
+			const movieId = (e as CustomEvent<{ movieId?: string | null }>).detail?.movieId;
+			if (!movieId || movieId !== globalMovieId.value) return;
+			if (!markDirectPlayFailed(movieId)) return;
+			console.warn('[player] direct play decoded no video frames — using a transcode');
+			reload(movieId, 'no-video');
+		};
 		wsService.subscribe('stream');
 		wsService.on('stream:superseded', onSuperseded);
 		window.addEventListener('mu:stream-reload', onLocalReload);
+		window.addEventListener('mu:stream-no-video', onNoVideo);
 		return () => {
 			wsService.off('stream:superseded', onSuperseded);
 			window.removeEventListener('mu:stream-reload', onLocalReload);
+			window.removeEventListener('mu:stream-no-video', onNoVideo);
 		};
 	}, [initPlayback]);
 

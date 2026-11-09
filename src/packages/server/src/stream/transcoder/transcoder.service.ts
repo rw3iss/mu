@@ -17,6 +17,7 @@ import { EventsService } from '../../events/events.service.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import { TranscodeDebuggerService } from './transcode-debugger.service.js';
 import { TRANSCODING_PROFILES } from './transcoder.profiles.js';
+import { buildVideoFilter, isHdrSource } from './video-filter.js';
 
 interface TranscodeOptions {
 	quality?: string;
@@ -733,7 +734,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					.outputOptions(['-ac', '2', '-b:a', profile.audioBitrate, ...videoRateOpts]);
 
 				if (!opts.preserveResolution) {
-					const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+					const scaleFilter = buildVideoFilter(profile, isHdrSource(filePath));
 					command = command.outputOptions(['-vf', scaleFilter]);
 				}
 
@@ -874,7 +875,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
 
 			// Use scale filter instead of .size() to preserve aspect ratio
-			const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+			const scaleFilter = buildVideoFilter(profile, isHdrSource(filePath));
 
 			let command = this.createFfmpegCommand(filePath);
 
@@ -1251,7 +1252,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				] ?? TRANSCODING_PROFILES['1080p'])!;
 				const videoCodec = this.getVideoCodec(hwAccel);
 				const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
-				const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+				const scaleFilter = buildVideoFilter(profile, isHdrSource(filePath));
 				const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
 				command = command
@@ -1801,7 +1802,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			profile.videoBitrate,
 		);
 		const swPreset = enc.hwAccel === 'nvenc' ? 'veryfast' : enc.preset;
-		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+		const scaleFilter = buildVideoFilter(profile, isHdrSource(filePath));
 		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
 		return new Promise<void>((resolve, reject) => {
@@ -1925,7 +1926,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		);
 		// Map NVENC presets back to libx264 presets
 		const swPreset = enc.hwAccel === 'nvenc' ? 'veryfast' : enc.preset;
-		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+		const scaleFilter = buildVideoFilter(profile, isHdrSource(filePath));
 		const gopSize = String(Math.round((enc.segmentDuration * 24) / 2) * 2);
 
 		const outputPath = path.join(persistDir, 'stream.m3u8');
@@ -2591,7 +2592,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		const hwAccel = forceSoftware ? 'none' : enc.hwAccel;
 		const videoCodec = forceSoftware ? 'libx264' : this.getVideoCodec(hwAccel);
 		const videoRateOpts = this.getRateControlOpts(enc, profile.videoBitrate);
-		const scaleFilter = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2`;
+		const scaleFilter = buildVideoFilter(profile, isHdrSource(filePath));
 		const gopSize = String(Math.round((chunkDuration * 24) / 2) * 2);
 		const processKey = `chunk-${path.basename(outputPath, '.ts')}`;
 
