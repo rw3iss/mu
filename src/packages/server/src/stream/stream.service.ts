@@ -429,20 +429,37 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				const copyAudio = ['aac', 'mp3', 'opus', 'flac', 'mp4a'].some((c) =>
 					codec.includes(c),
 				);
-				void this.transcoderService
-					.buildAudioVariant(file.id, file.filePath, requested, copyAudio)
-					.then(() => {
-						this.events.emit(WsEvent.STREAM_SUPERSEDED, {
-							movieId,
-							fileId: file.id,
-							audioTrack: requested,
+				// Build from the copy that is actually served (the cached direct
+				// copy, e.g. the 8-bit copy of a 10-bit AV1 file), not the source.
+				const variantSrc =
+					this.transcoderService.getCachedDirectMp4(file.id) ?? file.filePath;
+				// One "ready" event per build — every start call during the build
+				// used to add its own, so the player reloaded once per request.
+				const alreadyBuilding = this.transcoderService.isAudioVariantBuilding(
+					file.id,
+					requested,
+				);
+				const build = this.transcoderService.buildAudioVariant(
+					file.id,
+					variantSrc,
+					requested,
+					copyAudio,
+				);
+				if (alreadyBuilding) build.catch(() => {});
+				else
+					void build
+						.then(() => {
+							this.events.emit(WsEvent.STREAM_SUPERSEDED, {
+								movieId,
+								fileId: file.id,
+								audioTrack: requested,
+							});
+						})
+						.catch((err) => {
+							this.logger.warn(
+								`Audio track ${requested} variant failed for ${file.id}: ${err?.message ?? err}`,
+							);
 						});
-					})
-					.catch((err) => {
-						this.logger.warn(
-							`Audio track ${requested} variant failed for ${file.id}: ${err?.message ?? err}`,
-						);
-					});
 			}
 		}
 

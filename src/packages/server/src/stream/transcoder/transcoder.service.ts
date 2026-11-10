@@ -344,6 +344,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	/** In-flight variant builds, so concurrent requests share one ffmpeg run. */
 	private audioVariantBuilds = new Map<string, Promise<string>>();
 
+	isAudioVariantBuilding(movieFileId: string, audioIndex: number): boolean {
+		return this.audioVariantBuilds.has(`${movieFileId}:${audioIndex}`);
+	}
+
 	/**
 	 * Build the single-audio-track MP4 described above. Video is always copied;
 	 * the audio is copied when the browser can play it and re-encoded to stereo
