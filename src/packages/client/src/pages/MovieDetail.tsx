@@ -1468,6 +1468,12 @@ export function MovieDetail({ id }: MovieDetailProps) {
 															.then(setMovie)
 															.catch(() => {});
 													}}
+													onDefaultsChanged={() => {
+														moviesService
+															.get(id!)
+															.then(setMovie)
+															.catch(() => {});
+													}}
 												/>
 
 												{/* Subtitles */}

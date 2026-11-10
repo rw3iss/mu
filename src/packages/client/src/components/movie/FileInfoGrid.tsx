@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'preact/hooks';
 import { CopyButton } from '@/components/common/CopyButton';
 import { streamService } from '@/services/stream.service';
-import { currentUser } from '@/state/auth.state';
+import { can, currentUser } from '@/state/auth.state';
 import type { Movie } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { formatBytes } from '@/utils/format-bytes';
@@ -12,16 +12,40 @@ interface FileInfoGridProps {
 	movie: Movie;
 	/** Called after a cached version is deleted so parent can refresh */
 	onCacheDeleted?: () => void;
+	/** Called after a default video version / audio track changes (refetch). */
+	onDefaultsChanged?: () => void;
 	/** Use dark-on-dark palette for player flyout panels */
 	dark?: boolean;
 	/** Force a single group column (narrow page columns). */
 	singleColumn?: boolean;
 }
 
-export function FileInfoGrid({ movie, onCacheDeleted, dark, singleColumn }: FileInfoGridProps) {
+export function FileInfoGrid({
+	movie,
+	onCacheDeleted,
+	onDefaultsChanged,
+	dark,
+	singleColumn,
+}: FileInfoGridProps) {
 	const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState(false);
 	const isAdmin = currentUser.value?.role === 'admin';
+	// Only editors can change defaults; the player flyout (no callback) is read-only.
+	const canSetDefaults = can('edit:movie') && !!onDefaultsChanged;
+	const [savingDefault, setSavingDefault] = useState<string | null>(null);
+
+	const setDefault = async (key: string, run: () => Promise<unknown>, done: string) => {
+		setSavingDefault(key);
+		try {
+			await run();
+			notifySuccess(done);
+			onDefaultsChanged?.();
+		} catch {
+			notifyError('Failed to set the default');
+		} finally {
+			setSavingDefault(null);
+		}
+	};
 
 	const handleDeleteCache = async (quality: string) => {
 		setDeleting(true);
@@ -194,6 +218,55 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark, singleColumn }: File
 								<span class={styles.value}>{fi.videoColorSpace}</span>
 							</>
 						)}
+						{fi.versions && fi.versions.length > 0 && (
+							<>
+								<span class={styles.label}>Versions ({fi.versions.length})</span>
+								<span class={styles.value}>
+									<div class={styles.trackList}>
+										{fi.versions.map((v) => (
+											<div key={v.id} class={styles.trackItem}>
+												<span class={styles.trackCodec}>
+													{(v.codec ?? '?').toUpperCase()}
+												</span>
+												<span class={styles.trackMeta}>
+													{v.width && v.height
+														? `${v.width}x${v.height}`
+														: ''}
+													{v.bitDepth ? ` · ${v.bitDepth}-bit` : ''}
+													{v.hdr ? ' · HDR' : ''}
+													{v.sizeBytes
+														? ` · ${formatBytes(v.sizeBytes, 1)}`
+														: ''}
+												</span>
+												<span class={styles.trackExtra} title={v.fileName}>
+													{VERSION_LABEL[v.kind]}
+												</span>
+												<DefaultControl
+													isDefault={v.isDefault}
+													auto={v.isDefault && !v.explicit}
+													canSet={
+														canSetDefaults &&
+														(fi.versions?.length ?? 0) > 1
+													}
+													busy={savingDefault === `v:${v.id}`}
+													onSet={() =>
+														setDefault(
+															`v:${v.id}`,
+															() =>
+																streamService.setDefaultVideo(
+																	movie.id,
+																	v.id,
+																),
+															'Default video version set',
+														)
+													}
+												/>
+											</div>
+										))}
+									</div>
+								</span>
+							</>
+						)}
 					</div>
 				</div>
 
@@ -228,6 +301,32 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark, singleColumn }: File
 														? t.language?.toUpperCase()
 														: ''}
 												</span>
+												<DefaultControl
+													isDefault={
+														t.default === true ||
+														(!fi.audioTracks.some((x) => x.default) &&
+															t.index === fi.audioTracks[0]?.index)
+													}
+													auto={!fi.audioTracks.some((x) => x.default)}
+													canSet={
+														canSetDefaults &&
+														!!fi.id &&
+														fi.audioTracks.length > 1
+													}
+													busy={savingDefault === `a:${t.index}`}
+													onSet={() =>
+														setDefault(
+															`a:${t.index}`,
+															() =>
+																streamService.setDefaultAudio(
+																	movie.id,
+																	fi.id!,
+																	t.index,
+																),
+															'Default audio track set',
+														)
+													}
+												/>
 											</div>
 										))}
 									</div>
@@ -296,5 +395,46 @@ export function FileInfoGrid({ movie, onCacheDeleted, dark, singleColumn }: File
 				)}
 			</div>
 		</div>
+	);
+}
+
+const VERSION_LABEL: Record<'file' | 'copy' | 'original', string> = {
+	file: 'File',
+	copy: 'Playback copy (cache)',
+	original: 'Original file',
+};
+
+/**
+ * "Default" badge for the entry that plays by default, or a small "Set default"
+ * button for the others (editors only). `auto` = no explicit choice yet.
+ */
+function DefaultControl({
+	isDefault,
+	auto,
+	canSet,
+	busy,
+	onSet,
+}: {
+	isDefault: boolean;
+	auto: boolean;
+	canSet: boolean;
+	busy: boolean;
+	onSet: () => void;
+}) {
+	if (isDefault) {
+		return (
+			<span
+				class={`${styles.statusBadge} ${styles.statusDefault}`}
+				title={auto ? 'Chosen automatically — no default set yet' : 'Set as default'}
+			>
+				{auto ? 'Default (auto)' : 'Default'}
+			</span>
+		);
+	}
+	if (!canSet) return null;
+	return (
+		<button type="button" class={styles.defaultBtn} disabled={busy} onClick={onSet}>
+			{busy ? '…' : 'Set default'}
+		</button>
 	);
 }

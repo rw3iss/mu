@@ -28,6 +28,7 @@ import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
 import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
+import { PlayDefaultsService } from './play-defaults/play-defaults.service.js';
 
 @Controller('stream')
 export class StreamController {
@@ -44,6 +45,7 @@ export class StreamController {
 		private readonly guidResolver: GuidResolverService,
 		private readonly mediaCache: MediaCacheService,
 		private readonly memoryCache: MemoryCacheService,
+		private readonly playDefaults: PlayDefaultsService,
 	) {}
 
 	/** Admin: in-RAM file cache status + system memory (for Settings → Encoding). */
@@ -357,7 +359,7 @@ export class StreamController {
 		// because the source itself doesn't play (e.g. the 8-bit copy of a
 		// 10-bit AV1 file), so serving the staged source would undo it.
 		const cached =
-			this.transcoderService.getCachedDirectMp4(file.id) ??
+			this.playDefaults.servedCopy(file) ??
 			this.mediaCache.getHotPath(file.id);
 		const servePath = cached ?? file.filePath;
 		// Keep the file being played resident in RAM (no-op unless the admin set

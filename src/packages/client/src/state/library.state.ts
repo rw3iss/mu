@@ -1,4 +1,4 @@
-import type { LibraryContentType } from '@mu/shared';
+import type { LibraryContentType, VideoVersion } from '@mu/shared';
 import { computed, signal } from '@preact/signals';
 import { route } from 'preact-router';
 import { getUiSetting, setUiSetting } from '@/hooks/useUiSetting';
@@ -70,6 +70,8 @@ export interface Movie {
 		videoProfileId?: string | null;
 	} | null;
 	fileInfo?: {
+		id?: string;
+		versions?: VideoVersion[];
 		containerFormat?: string;
 		codecVideo?: string;
 		codecAudio?: string;
@@ -94,6 +96,7 @@ export interface Movie {
 			channelLayout?: string;
 			sampleRate?: number;
 			bitDepth?: number;
+			default?: boolean;
 		}[];
 		subtitleTracks: {
 			index: number;

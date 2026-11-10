@@ -23,6 +23,8 @@ export const movies = sqliteTable(
 		contentRating: text('content_rating'),
 		hidden: integer('hidden', { mode: 'boolean' }).default(false),
 		playSettings: text('play_settings'),
+		/** Admin-chosen default video version: `<fileId>`, `<fileId>:copy` or `<fileId>:original`; null = auto. */
+		defaultVideo: text('default_video'),
 		/**
 		 * Subgroup FK (nullable). When set, the movie is a member of the
 		 * referenced subgroup; the parent group is reached via

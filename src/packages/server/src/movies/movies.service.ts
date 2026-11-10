@@ -44,6 +44,8 @@ import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
 import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { matchesSearchQuery, titleSearchCondition } from './title-search.js';
+import { PlayDefaultsService } from '../stream/play-defaults/play-defaults.service.js';
+import { StreamService } from '../stream/stream.service.js';
 
 /**
  * Ceiling for the inline enrichment on a not-in-library movie page. Long
@@ -68,6 +70,8 @@ export class MoviesService implements OnModuleInit {
 		private readonly metadataService: MetadataService,
 		private readonly events: EventsService,
 		private readonly entityLifecycle: EntityLifecycleService,
+		private readonly streamService: StreamService,
+		private readonly playDefaults: PlayDefaultsService,
 	) {}
 
 	onModuleInit(): void {
@@ -1054,14 +1058,19 @@ export class MoviesService implements OnModuleInit {
 			}
 		}
 
-		// Get duration and file info from movie file
-		const firstFile = files[0];
+		// File info describes the file that plays (admin default, else the
+		// stream's own pick among available files).
+		const available = files.filter((f) => f.available !== false);
+		const firstFile =
+			available.length > 1 ? this.streamService.pickFile(available) : (available[0] ?? files[0]);
 		if (firstFile) {
 			durationSeconds = firstFile.durationSeconds ?? 0;
 		}
 
 		const fileInfo = firstFile
 			? {
+					id: firstFile.id,
+					versions: this.playDefaults.versions(id, available, firstFile.id),
 					containerFormat: firstFile.containerFormat,
 					codecVideo: firstFile.codecVideo,
 					codecAudio: firstFile.codecAudio,

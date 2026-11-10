@@ -33,6 +33,7 @@ import { SubtitleService } from './subtitles/subtitle.service.js';
 import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
+import { PlayDefaultsService } from './play-defaults/play-defaults.service.js';
 
 interface StartStreamOptions {
 	quality?: string;
@@ -170,6 +171,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		private readonly sessionRegistry: SessionRegistryService,
 		private readonly mediaCache: MediaCacheService,
 		private readonly memoryCache: MemoryCacheService,
+		private readonly playDefaults: PlayDefaultsService,
 	) {}
 
 	onModuleInit(): void {
@@ -385,7 +387,12 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		// browsers that can decode it (others still transcode).
 		let mode = this.determineStreamMode(file, this.capsOf(options));
 
-		// Resolve preferred audio track: explicit option > preferred language > default (0)
+		// Resolve the audio track: explicit option > the movie's default track >
+		// preferred language > first track.
+		if (options.audioTrack == null) {
+			const def = this.parseAudioTracks(file).find((t: any) => t.default === true);
+			if (def) options.audioTrack = def.index;
+		}
 		if (options.audioTrack == null) {
 			const playback = this.settings.get<Record<string, unknown>>('playback', {}) as any;
 			const preferredLang = playback?.preferredAudioLanguage || 'eng';
@@ -432,7 +439,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				// Build from the copy that is actually served (the cached direct
 				// copy, e.g. the 8-bit copy of a 10-bit AV1 file), not the source.
 				const variantSrc =
-					this.transcoderService.getCachedDirectMp4(file.id) ?? file.filePath;
+					this.playDefaults.servedCopy(file) ?? file.filePath;
 				// One "ready" event per build — every start call during the build
 				// used to add its own, so the player reloaded once per request.
 				const alreadyBuilding = this.transcoderService.isAudioVariantBuilding(
@@ -1293,7 +1300,16 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		return { clientHevc: o.clientHevc, clientAv1: o.clientAv1, noDirect: o.noDirect };
 	}
 
+	/** The file a stream would play (admin default first, else cheapest delivery). */
+	pickFile(files: any[]): any {
+		return this.selectBestFile(files);
+	}
+
 	private selectBestFile(files: any[], opts: ClientCaps = {}) {
+		// An admin-chosen default version wins when its file is available.
+		const pinned = this.playDefaults.preferredFileId(files[0]?.movieId);
+		const pinnedFile = pinned ? files.find((f) => f.id === pinned) : undefined;
+		if (pinnedFile) return pinnedFile;
 		if (files.length === 1) return files[0];
 		const cost = (f: any) => {
 			const mode = this.determineStreamMode(f, opts);
@@ -1406,7 +1422,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 	private baseStreamMode(file: any, opts: ClientCaps): string {
 		// Cache-mode direct play: a converted MP4 in the persistent cache
 		// supersedes the source codecs. The direct route serves that file.
-		if (file?.id && this.transcoderService.getCachedDirectMp4(file.id)) {
+		if (file?.id && this.playDefaults.servedCopy(file)) {
 			return StreamMode.DIRECT_PLAY;
 		}
 

@@ -559,6 +559,7 @@ const alters = [
 	"ALTER TABLE movies ADD COLUMN source TEXT NOT NULL DEFAULT 'library'",
 	'CREATE INDEX IF NOT EXISTS movies_source_idx ON movies(source)',
 	'ALTER TABLE job_history ADD COLUMN details TEXT',
+	'ALTER TABLE movies ADD COLUMN default_video TEXT',
 ];
 
 for (const sql of alters) {

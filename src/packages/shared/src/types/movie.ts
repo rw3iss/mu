@@ -86,7 +86,29 @@ export interface MovieFile {
 	fileModifiedAt?: string;
 }
 
+/** A playable video version of a movie (File Info → Video → Versions). */
+export interface VideoVersion {
+	/** `<fileId>`, `<fileId>:copy` (cached direct copy) or `<fileId>:original`. */
+	id: string;
+	fileId: string;
+	kind: 'file' | 'copy' | 'original';
+	fileName: string;
+	codec: string | null;
+	width: number | null;
+	height: number | null;
+	bitDepth: number | null;
+	hdr: boolean;
+	sizeBytes: number | null;
+	/** Plays now (admin default, else the automatic pick). */
+	isDefault: boolean;
+	/** An admin chose it. */
+	explicit: boolean;
+}
+
 export interface FileInfo {
+	/** movie_files id of the file described. */
+	id?: string;
+	versions?: VideoVersion[];
 	containerFormat?: string;
 	codecVideo?: string;
 	codecAudio?: string;
@@ -124,6 +146,8 @@ export interface AudioTrack {
 	channelLayout?: string;
 	sampleRate?: number;
 	bitDepth?: number;
+	/** The movie's default audio track (set on the movie page). */
+	default?: boolean;
 }
 
 export interface MediaSource {

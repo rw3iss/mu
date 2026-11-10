@@ -163,6 +163,16 @@ export const streamService = {
 		return api.post(`/stream/${sessionId}/heartbeat`);
 	},
 
+	/** Movie page: set the default video version (null = automatic pick). */
+	setDefaultVideo(movieId: string, version: string | null): Promise<{ success: boolean }> {
+		return api.put(`/stream/defaults/${movieId}/video`, { version });
+	},
+
+	/** Movie page: set the default audio track (0-based audio index) of a file. */
+	setDefaultAudio(movieId: string, fileId: string, index: number): Promise<{ success: boolean }> {
+		return api.put(`/stream/defaults/${movieId}/audio`, { fileId, index });
+	},
+
 	/**
 	 * Delete a cached transcode for a movie at a specific quality.
 	 */

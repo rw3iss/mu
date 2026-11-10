@@ -18,6 +18,8 @@ import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
 import { TranscodeDebugController } from './transcoder/transcode-debug.controller.js';
 import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
+import { PlayDefaultsController } from './play-defaults/play-defaults.controller.js';
+import { PlayDefaultsService } from './play-defaults/play-defaults.service.js';
 
 @Module({
 	imports: [RemoteModule],
@@ -26,9 +28,11 @@ import { TranscoderService } from './transcoder/transcoder.service.js';
 		SubtitleController,
 		SubtitleManageController,
 		TranscodeDebugController,
+		PlayDefaultsController,
 	],
 	providers: [
 		StreamService,
+		PlayDefaultsService,
 		TranscoderService,
 		ConversionService,
 		HlsGeneratorService,
@@ -45,6 +49,7 @@ import { TranscoderService } from './transcoder/transcoder.service.js';
 	],
 	exports: [
 		StreamService,
+		PlayDefaultsService,
 		TranscoderService,
 		ConversionService,
 		DirectPlayService,

@@ -341,6 +341,17 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		return existsSync(p) ? p : null;
 	}
 
+	/** Delete a file's single-audio-track copies (their video may be stale). */
+	async clearAudioVariants(movieFileId: string): Promise<void> {
+		const root = this.getFilePersistentRoot(movieFileId);
+		const entries = await readdir(root).catch(() => [] as string[]);
+		for (const e of entries) {
+			if (e.startsWith('audio-')) {
+				await rm(path.join(root, e), { recursive: true, force: true }).catch(() => {});
+			}
+		}
+	}
+
 	/** In-flight variant builds, so concurrent requests share one ffmpeg run. */
 	private audioVariantBuilds = new Map<string, Promise<string>>();
 
