@@ -36,6 +36,7 @@ import { INTERRUPT_ACTION_KEY, type InterruptAction } from '@/state/globalPlayer
 import { totalMovies } from '@/state/library.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import { fetchPlaybackSettings } from '@/state/playbackSettings.state';
+import { SNIPPET_BURN_SUBS_KEY } from '@/state/snippet-recorder.state';
 import type { Theme } from '@/state/theme.state';
 import { setTheme, theme } from '@/state/theme.state';
 import {
@@ -231,6 +232,7 @@ export function Settings(props: SettingsProps) {
 
 	// Appearance settings
 	const [showRecentlyPlayed, setShowRecentlyPlayed] = useUiSetting('show_recently_played', true);
+	const [snippetBurnSubs, setSnippetBurnSubs] = useUiSetting(SNIPPET_BURN_SUBS_KEY, false);
 	// Seek-preview thumbnail size. Drives which sprite-sheet variant
 	// is requested from the server. Default 'large' so new users get
 	// the sharpest experience; the server resolver downgrades
@@ -2082,6 +2084,33 @@ export function Settings(props: SettingsProps) {
 										seconds
 									</span>
 								</div>
+							</div>
+
+							<h3 class={styles.sectionTitle}>Developer</h3>
+
+							<div class={styles.settingRow}>
+								<div class={styles.settingInfo}>
+									<span class={styles.settingLabel}>
+										Burn Subtitles into Snippets
+									</span>
+									<span class={styles.settingDescription}>
+										When you record a snippet while subtitles are on, draw them
+										into the recorded video with your subtitle appearance
+										settings. No effect when subtitles are off.
+									</span>
+								</div>
+								<label class={styles.toggle}>
+									<input
+										type="checkbox"
+										checked={snippetBurnSubs}
+										onChange={(e) =>
+											setSnippetBurnSubs(
+												(e.target as HTMLInputElement).checked,
+											)
+										}
+									/>
+									<span class={styles.toggleTrack} />
+								</label>
 							</div>
 
 							<MusicPlaybackPrefs />

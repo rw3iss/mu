@@ -1,6 +1,11 @@
 import { signal } from '@preact/signals';
 import { audioEngine } from '@/audio/audio-engine';
+import {
+	DEFAULT_SUBTITLE_SETTINGS,
+	type SubtitleSettings,
+} from '@/components/movie/SubtitleAppearance';
 import { getActiveVideoElement } from '@/components/player/useVideoEngine';
+import { getUiSetting } from '@/hooks/useUiSetting';
 import { notifyError, notifyInfo } from './notifications.state';
 
 export interface RecordedSnippet {
@@ -111,19 +116,102 @@ function captureVideoStream(video: HTMLVideoElement): MediaStream | null {
 	return null;
 }
 
+/** UI setting (Settings → Playback → Developer): burn shown subtitles into snippets. */
+export const SNIPPET_BURN_SUBS_KEY = 'dev_snippet_burn_subtitles';
+
+/** The subtitle track the player is showing now, if any. */
+function showingTextTrack(video: HTMLVideoElement): TextTrack | null {
+	for (let i = 0; i < video.textTracks.length; i++) {
+		const t = video.textTracks[i]!;
+		if (t.mode === 'showing') return t;
+	}
+	return null;
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+	const r = parseInt(hex.slice(1, 3), 16) || 0;
+	const g = parseInt(hex.slice(3, 5), 16) || 0;
+	const b = parseInt(hex.slice(5, 7), 16) || 0;
+	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 /**
- * Capture a downscaled video track by drawing the player frames into a smaller
- * canvas and capturing THAT. Returns null when no downscale is needed/possible
- * (caller falls back to capturing the element directly). GPU-accelerated
- * drawImage is cheap; the win is the much lighter encode of the smaller frame.
+ * Draw the active cues at the bottom of the frame, styled from the user's
+ * subtitle appearance settings (same values the `video::cue` CSS uses). The
+ * browser sizes cue text at 5% of the video height × the `em` factor.
  */
-function makeDownscaledTrack(
+function drawCues(
+	ctx: CanvasRenderingContext2D,
 	video: HTMLVideoElement,
+	cw: number,
+	ch: number,
+	s: SubtitleSettings,
+): void {
+	const track = showingTextTrack(video);
+	const cues = track?.activeCues;
+	if (!cues || cues.length === 0) return;
+	const lines: string[] = [];
+	for (let i = 0; i < cues.length; i++) {
+		const text = (cues[i] as VTTCue).text ?? '';
+		for (const l of text.replace(/<[^>]*>/g, '').split('\n')) {
+			const t = l.trim();
+			if (t) lines.push(t);
+		}
+	}
+	if (lines.length === 0) return;
+
+	const fontPx = Math.max(10, Math.round(ch * 0.05 * (s.fontSize / 100) * 1.3));
+	const lineH = Math.round(fontPx * Math.max(1, s.lineSpacing ?? 1) * 1.15);
+	const padX = Math.round(fontPx * 0.3);
+	// verticalOffset is in on-screen px; scale it to the canvas.
+	const screenH = video.clientHeight || ch;
+	const offset = (s.verticalOffset || 0) * (ch / screenH);
+	const bottom = ch - Math.round(ch * 0.05) + offset;
+
+	ctx.save();
+	ctx.font = `${fontPx}px sans-serif`;
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+	const bg = hexToRgba(s.backgroundColor, s.backgroundOpacity);
+	const fg = hexToRgba(s.fontColor, s.textOpacity);
+	lines.forEach((line, i) => {
+		const y = bottom - (lines.length - i - 0.5) * lineH;
+		const w = ctx.measureText(line).width;
+		if (s.backgroundOpacity > 0) {
+			ctx.shadowColor = 'transparent';
+			ctx.fillStyle = bg;
+			ctx.fillRect(cw / 2 - w / 2 - padX, y - lineH / 2, w + padX * 2, lineH);
+		}
+		ctx.shadowColor = s.shadowColor;
+		ctx.shadowBlur = Math.max(2, fontPx * 0.08);
+		ctx.shadowOffsetX = 1;
+		ctx.shadowOffsetY = 1;
+		ctx.fillStyle = fg;
+		ctx.fillText(line, cw / 2, y);
+	});
+	ctx.restore();
+}
+
+/**
+ * Capture the video through a canvas: downscale large sources (much lighter
+ * encode) and/or burn the shown subtitles in. Returns null when neither is
+ * needed/possible (caller captures the element directly). GPU-accelerated
+ * drawImage is cheap; the cue text is a line or two per frame.
+ */
+function makeCanvasTrack(
+	video: HTMLVideoElement,
+	burnSubs: boolean,
 ): { track: MediaStreamTrack; stop: () => void } | null {
 	const vw = video.videoWidth;
 	const vh = video.videoHeight;
-	if (!vw || !vh || vw <= MAX_CAPTURE_WIDTH) return null;
-	const scale = MAX_CAPTURE_WIDTH / vw;
+	if (!vw || !vh || (vw <= MAX_CAPTURE_WIDTH && !burnSubs)) return null;
+	const scale = Math.min(1, MAX_CAPTURE_WIDTH / vw);
+	const subStyle = burnSubs
+		? {
+				...DEFAULT_SUBTITLE_SETTINGS,
+				...getUiSetting('subtitle_appearance', DEFAULT_SUBTITLE_SETTINGS),
+			}
+		: null;
 	const cw = Math.max(2, Math.round((vw * scale) / 2) * 2);
 	const ch = Math.max(2, Math.round((vh * scale) / 2) * 2);
 	const canvas = document.createElement('canvas');
@@ -142,6 +230,7 @@ function makeDownscaledTrack(
 		if (stopped) return;
 		try {
 			cctx.drawImage(video, 0, 0, cw, ch);
+			if (subStyle) drawCues(cctx, video, cw, ch, subStyle);
 		} catch {
 			/* ignore a transient draw error */
 		}
@@ -172,9 +261,11 @@ export function startSnippet(movieTitle?: string): void {
 
 	const elementStream = captureVideoStream(video);
 
-	// Video: downscale large sources through a canvas so the live encode is
-	// light enough to not stutter playback; otherwise capture the element track.
-	const downscaled = makeDownscaledTrack(video);
+	// Video: go through a canvas to downscale large sources (so the live encode
+	// doesn't stutter playback) and/or to burn in the subtitles shown now
+	// (developer option); otherwise capture the element track.
+	const burnSubs = getUiSetting(SNIPPET_BURN_SUBS_KEY, false) && showingTextTrack(video) !== null;
+	const downscaled = makeCanvasTrack(video, burnSubs);
 	canvasDrawStop = downscaled?.stop ?? null;
 	const videoTrack = downscaled?.track ?? elementStream?.getVideoTracks()[0];
 	if (!videoTrack) {
