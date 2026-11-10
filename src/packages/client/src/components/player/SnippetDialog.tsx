@@ -3,9 +3,11 @@ import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { notifyError } from '@/state/notifications.state';
 import {
+	convertSnippetToMp4,
 	discardSnippet,
 	downloadBlobAs,
 	downloadSnippet,
+	needsMp4Conversion,
 	type RecordedSnippet,
 	recordedSnippet,
 	snippetExt,
@@ -56,6 +58,8 @@ function SnippetEditor({ snippet }: { snippet: RecordedSnippet }) {
 	const [current, setCurrent] = useState(0);
 	const [processing, setProcessing] = useState(false);
 	const [progress, setProgress] = useState(0);
+	const [converting, setConverting] = useState(false);
+	const busy = processing || converting;
 	const endRef = useRef(end);
 	endRef.current = end;
 
@@ -107,6 +111,26 @@ function SnippetEditor({ snippet }: { snippet: RecordedSnippet }) {
 	}, [start]);
 
 	const handleDownload = useCallback(async () => {
+		if (needsMp4Conversion(snippet.mimeType)) {
+			videoRef.current?.pause();
+			setConverting(true);
+			try {
+				const out = await convertSnippetToMp4(
+					snippet.blob,
+					isTrimmed ? { start, end } : undefined,
+				);
+				downloadBlobAs(
+					out,
+					`${snippetFilenameBase(snippet.movieTitle)}${isTrimmed ? '-trimmed' : ''}`,
+					'video/mp4',
+				);
+				return;
+			} catch {
+				notifyError('Could not convert to MP4 — downloading the WebM version instead.');
+			} finally {
+				setConverting(false);
+			}
+		}
 		if (!isTrimmed) {
 			downloadSnippet();
 			return;
@@ -146,7 +170,7 @@ function SnippetEditor({ snippet }: { snippet: RecordedSnippet }) {
 					start={start}
 					end={end}
 					current={current}
-					disabled={processing}
+					disabled={busy}
 					onChange={(s, e) => {
 						setStart(s);
 						setEnd(e);
@@ -158,7 +182,7 @@ function SnippetEditor({ snippet }: { snippet: RecordedSnippet }) {
 						{fmt(start)} – {fmt(end)} · <strong>{fmt(trimmedLen)}</strong>
 						{isTrimmed ? ' trimmed' : ''}
 					</span>
-					<Button variant="ghost" size="sm" onClick={playTrim} disabled={processing}>
+					<Button variant="ghost" size="sm" onClick={playTrim} disabled={busy}>
 						▶ Play selection
 					</Button>
 				</div>
@@ -166,7 +190,14 @@ function SnippetEditor({ snippet }: { snippet: RecordedSnippet }) {
 				<div class={styles.meta}>
 					{(snippet.blob.size / (1024 * 1024)).toFixed(1)} MB ·{' '}
 					{snippetExt(snippet.mimeType).toUpperCase()}
+					{needsMp4Conversion(snippet.mimeType) ? ' · downloads as MP4' : ''}
 				</div>
+
+				{converting && (
+					<div class={styles.progress}>
+						<span>Converting to MP4… this takes a few seconds.</span>
+					</div>
+				)}
 
 				{processing && (
 					<div class={styles.progress}>
@@ -181,11 +212,17 @@ function SnippetEditor({ snippet }: { snippet: RecordedSnippet }) {
 				)}
 
 				<div class={styles.actions}>
-					<Button variant="ghost" onClick={discardSnippet} disabled={processing}>
+					<Button variant="ghost" onClick={discardSnippet} disabled={busy}>
 						Discard
 					</Button>
-					<Button variant="primary" onClick={handleDownload} disabled={processing}>
-						{processing ? 'Trimming…' : isTrimmed ? 'Download trimmed' : 'Download'}
+					<Button variant="primary" onClick={handleDownload} disabled={busy}>
+						{converting
+							? 'Converting…'
+							: processing
+								? 'Trimming…'
+								: isTrimmed
+									? 'Download trimmed'
+									: 'Download'}
 					</Button>
 				</div>
 			</div>

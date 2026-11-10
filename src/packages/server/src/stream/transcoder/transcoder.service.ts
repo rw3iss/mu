@@ -100,6 +100,11 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 	/** Resolved FFmpeg binary path used for direct spawns (probes, etc.) */
 	private ffmpegPath = 'ffmpeg';
 
+	/** Resolved FFmpeg binary for one-off spawns (e.g. snippet conversion). */
+	get ffmpegBinary(): string {
+		return this.ffmpegPath;
+	}
+
 	constructor(
 		private readonly config: ConfigService,
 		private readonly settings: SettingsService,

@@ -586,3 +586,31 @@ export async function trimVideoBlob(
 		URL.revokeObjectURL(url);
 	}
 }
+
+/** True when the clip needs the server conversion to download as MP4. */
+export function needsMp4Conversion(mimeType: string): boolean {
+	return !mimeType.includes('mp4');
+}
+
+/**
+ * Convert (and optionally trim, same pass) a WebM clip to H.264/AAC MP4 on the
+ * server — `POST /stream/snippet/mp4`. Browsers that can't record MP4 (Linux
+ * Chromium, Firefox) still download an MP4.
+ */
+export async function convertSnippetToMp4(
+	blob: Blob,
+	range?: { start: number; end: number },
+): Promise<Blob> {
+	const form = new FormData();
+	form.append('clip', blob, 'clip.webm');
+	const qs = range ? `?start=${range.start.toFixed(3)}&end=${range.end.toFixed(3)}` : '';
+	const token = localStorage.getItem('mu_token');
+	const res = await fetch(`/api/v1/stream/snippet/mp4${qs}`, {
+		method: 'POST',
+		headers: token ? { Authorization: `Bearer ${token}` } : {},
+		credentials: 'include',
+		body: form,
+	});
+	if (!res.ok) throw new Error(`Conversion failed (${res.status})`);
+	return res.blob();
+}

@@ -3,6 +3,9 @@ import { RemoteModule } from '../remote/remote.module.js';
 import { ConversionService } from './conversion/conversion.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { MediaCacheService } from './media-cache/media-cache.service.js';
+import { PlayDefaultsController } from './play-defaults/play-defaults.controller.js';
+import { PlayDefaultsService } from './play-defaults/play-defaults.service.js';
+import { SnippetController } from './snippet/snippet.controller.js';
 import { StreamController } from './stream.controller.js';
 import { StreamService } from './stream.service.js';
 import { SubtitleController } from './subtitles/subtitle.controller.js';
@@ -18,9 +21,6 @@ import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
 import { TranscodeDebugController } from './transcoder/transcode-debug.controller.js';
 import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
-import { PlayDefaultsController } from './play-defaults/play-defaults.controller.js';
-import { PlayDefaultsService } from './play-defaults/play-defaults.service.js';
-
 @Module({
 	imports: [RemoteModule],
 	controllers: [
@@ -29,6 +29,7 @@ import { PlayDefaultsService } from './play-defaults/play-defaults.service.js';
 		SubtitleManageController,
 		TranscodeDebugController,
 		PlayDefaultsController,
+		SnippetController,
 	],
 	providers: [
 		StreamService,
