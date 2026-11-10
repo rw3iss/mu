@@ -224,43 +224,50 @@ export function FileInfoGrid({
 								<span class={styles.value}>
 									<div class={styles.trackList}>
 										{fi.versions.map((v) => (
-											<div key={v.id} class={styles.trackItem}>
-												<span class={styles.trackCodec}>
-													{(v.codec ?? '?').toUpperCase()}
-												</span>
-												<span class={styles.trackMeta}>
-													{v.width && v.height
-														? `${v.width}x${v.height}`
-														: ''}
-													{v.bitDepth ? ` · ${v.bitDepth}-bit` : ''}
-													{v.hdr ? ' · HDR' : ''}
-													{v.sizeBytes
-														? ` · ${formatBytes(v.sizeBytes, 1)}`
-														: ''}
-												</span>
-												<span class={styles.trackExtra} title={v.fileName}>
-													{VERSION_LABEL[v.kind]}
-												</span>
-												<DefaultControl
-													isDefault={v.isDefault}
-													auto={v.isDefault && !v.explicit}
-													canSet={
-														canSetDefaults &&
-														(fi.versions?.length ?? 0) > 1
-													}
-													busy={savingDefault === `v:${v.id}`}
-													onSet={() =>
-														setDefault(
-															`v:${v.id}`,
-															() =>
-																streamService.setDefaultVideo(
-																	movie.id,
-																	v.id,
-																),
-															'Default video version set',
-														)
-													}
-												/>
+											<div key={v.id} class={styles.versionItem}>
+												<div class={styles.trackItem}>
+													<span class={styles.trackCodec}>
+														{(v.codec ?? '?').toUpperCase()}
+													</span>
+													<span class={styles.trackMeta}>
+														{v.width && v.height
+															? `${v.width}x${v.height}`
+															: ''}
+														{v.bitDepth ? ` · ${v.bitDepth}-bit` : ''}
+														{v.hdr ? ' · HDR' : ''}
+														{v.sizeBytes
+															? ` · ${formatBytes(v.sizeBytes, 1)}`
+															: ''}
+													</span>
+												</div>
+												<div class={styles.versionSub}>
+													<span
+														class={styles.versionLabel}
+														title={v.fileName}
+													>
+														{VERSION_LABEL[v.kind]}
+													</span>
+													<DefaultControl
+														isDefault={v.isDefault}
+														auto={v.isDefault && !v.explicit}
+														canSet={
+															canSetDefaults &&
+															(fi.versions?.length ?? 0) > 1
+														}
+														busy={savingDefault === `v:${v.id}`}
+														onSet={() =>
+															setDefault(
+																`v:${v.id}`,
+																() =>
+																	streamService.setDefaultVideo(
+																		movie.id,
+																		v.id,
+																	),
+																'Default video version set',
+															)
+														}
+													/>
+												</div>
 											</div>
 										))}
 									</div>
