@@ -664,6 +664,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			tenBit?: boolean;
 			/** Encode on the CPU (libx264) even when a GPU is configured. */
 			forceCpu?: boolean;
+			/** AV1 only: bitrate ceiling (kbps) so the output can't outgrow the source. */
+			maxBitrateKbps?: number;
 		} = {},
 		onProgress?: (pct: number) => void,
 	): Promise<void> {
@@ -726,6 +728,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 						'-pix_fmt',
 						opts.tenBit ? 'p010le' : 'yuv420p',
 					]);
+				if (opts.maxBitrateKbps && opts.maxBitrateKbps > 0) {
+					const k = Math.round(opts.maxBitrateKbps);
+					command = command.outputOptions(['-maxrate', `${k}k`, '-bufsize', `${k * 2}k`]);
+				}
 				const sdr = !opts.tenBit && isHdrSource(filePath);
 				const vf = opts.preserveResolution
 					? buildVideoFilter(null, sdr)

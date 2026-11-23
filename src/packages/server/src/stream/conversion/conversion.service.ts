@@ -528,7 +528,8 @@ export class ConversionService {
 			: (opts.inPlace ?? this.getConfig().convertOriginalFile);
 		// CPU+GPU parallel mode: this job encodes on the CPU — AV1 (NVENC-only)
 		// plans fall back to H.264 CRF on the CPU.
-		const cpu = !!opts.forceCpu;
+		// HEVC → AV1 never takes the CPU lane: H.264 would roughly double the file.
+		const cpu = !!opts.forceCpu && plan.action !== 'reencode-av1';
 		// AV1 keeps a 10-bit source at 10 bits only when the setting is on
 		// (H.264 is always 8-bit). Otherwise 8-bit, HDR tone-mapped to SDR.
 		const tenBit = this.getConfig().av1TenBit && isTenBitSource(file);
@@ -599,7 +600,14 @@ export class ConversionService {
 					tempPath,
 					cpu
 						? { preserveResolution: true, targetCodec: 'h264', forceCpu: true }
-						: { preserveResolution: true, targetCodec: 'av1', tenBit },
+						: {
+								preserveResolution: true,
+								targetCodec: 'av1',
+								tenBit,
+								// AV1 at the configured CQ can exceed a low-bitrate HEVC
+								// source (720p web rips doubled) — cap at the source rate.
+								maxBitrateKbps: this.bitrateMbps(file) * 1000 || undefined,
+							},
 					onProgress,
 				);
 			} else if (plan.action === 'shrink') {
