@@ -349,6 +349,11 @@ export class ConversionService {
 			}
 		}
 
+		// 10-bit H.264 (High 10) — browsers can't decode it (black picture,
+		// audio plays). Re-encode to 8-bit H.264; never guarded by size.
+		if (h264 && isTenBitSource(file)) {
+			return { action: 'reencode', reason: 'h264-10bit' };
+		}
 		if (h264 && isMp4 && browserAudio) {
 			return { action: 'skip', reason: 'already-direct-play' };
 		}
@@ -670,6 +675,8 @@ export class ConversionService {
 					containerFormat: 'mp4',
 					videoWidth: probe.videoWidth ?? file.videoWidth ?? null,
 					videoHeight: probe.videoHeight ?? file.videoHeight ?? null,
+					videoBitDepth: probe.videoBitDepth ?? null,
+					videoProfile: probe.videoProfile ?? null,
 					fileModifiedAt: new Date().toISOString(),
 					available: true,
 				})

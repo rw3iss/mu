@@ -552,6 +552,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 		codecAudio: string | null;
 		videoWidth: number | null;
 		videoHeight: number | null;
+		videoBitDepth: number | null;
+		videoProfile: string | null;
 		/**
 		 * Every audio stream, in the same shape the scanner writes to
 		 * `movie_files.audio_tracks`. Conversion needs this to refresh the
@@ -586,6 +588,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				codecAudio: a?.codec_name ?? null,
 				videoWidth: v?.width ?? null,
 				videoHeight: v?.height ?? null,
+				videoBitDepth: pixFmtBitDepth(v?.pix_fmt, v?.bits_per_raw_sample),
+				videoProfile: v?.profile ?? null,
 				audioTracks: streams
 					.filter((st) => st.codec_type === 'audio')
 					.map((st, i) => ({
@@ -1861,7 +1865,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					profile.audioBitrate,
 					...swRateOpts,
 				])
-				.outputOptions(['-preset', swPreset])
+				.outputOptions(['-preset', swPreset, '-pix_fmt', 'yuv420p'])
 				.outputOptions(['-map', '0:v:0']);
 
 			if (options.audioTrack !== undefined) {
@@ -1989,7 +1993,7 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 					profile.audioBitrate,
 					...swRateOpts,
 				])
-				.outputOptions(['-preset', swPreset])
+				.outputOptions(['-preset', swPreset, '-pix_fmt', 'yuv420p'])
 				.outputOptions(['-map', '0:v:0', '-map', '0:a:0?'])
 				.output(outputPath)
 				.on('start', (commandLine: string) => {
@@ -2587,8 +2591,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			// AV1 NVENC constant-quality (0–63; ~32 is a good 1080p balance).
 			av1Cq: Number.isFinite(av1Cq) && av1Cq > 0 ? av1Cq : 32,
 			segmentDuration: enc?.segmentDuration ?? 4,
-			// Force 8-bit output for hardware encoders (NVENC doesn't support 10-bit H.264)
-			pixFmt: hwAccel !== 'none' ? 'yuv420p' : undefined,
+			// Always 8-bit 4:2:0. NVENC has no 10-bit H.264, and libx264 keeps a
+			// 10-bit source at 10 bits (High 10) — browsers can't decode that
+			// and play the audio over a black picture.
+			pixFmt: 'yuv420p' as string | undefined,
 		};
 	}
 
@@ -2778,4 +2784,16 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				return 'libx264';
 		}
 	}
+}
+
+/** Bit depth from ffprobe's pix_fmt (`yuv420p10le` → 10), else bits_per_raw_sample. */
+export function pixFmtBitDepth(
+	pixFmt?: string | null,
+	rawBits?: string | number | null,
+): number | null {
+	const m = /p(\d{2})(le|be)?$/.exec(String(pixFmt ?? ''));
+	if (m) return Number(m[1]);
+	if (pixFmt) return 8;
+	const n = Number(rawBits);
+	return Number.isFinite(n) && n > 0 ? n : null;
 }

@@ -23,12 +23,12 @@ import { movieFiles } from '../database/schema/index.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { MediaCacheService } from './media-cache/media-cache.service.js';
 import { MemoryCacheService } from './memory-cache/memory-cache.service.js';
+import { PlayDefaultsService } from './play-defaults/play-defaults.service.js';
 import { StreamService } from './stream.service.js';
 import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { HlsGeneratorService } from './transcoder/hls-generator.service.js';
 import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
-import { PlayDefaultsService } from './play-defaults/play-defaults.service.js';
 
 @Controller('stream')
 export class StreamController {
@@ -358,9 +358,7 @@ export class StreamController {
 		// A cached direct copy wins over a hot copy of the source: it exists
 		// because the source itself doesn't play (e.g. the 8-bit copy of a
 		// 10-bit AV1 file), so serving the staged source would undo it.
-		const cached =
-			this.playDefaults.servedCopy(file) ??
-			this.mediaCache.getHotPath(file.id);
+		const cached = this.playDefaults.servedCopy(file) ?? this.mediaCache.getHotPath(file.id);
 		const servePath = cached ?? file.filePath;
 		// Keep the file being played resident in RAM (no-op unless the admin set
 		// a memory-cache budget). Warms whichever copy we actually serve.

@@ -26,14 +26,15 @@ import {
 } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { isTenBitSource } from './conversion/conversion.service.js';
 import { DirectPlayService } from './direct-play/direct-play.service.js';
 import { MediaCacheService } from './media-cache/media-cache.service.js';
 import { MemoryCacheService } from './memory-cache/memory-cache.service.js';
+import { PlayDefaultsService } from './play-defaults/play-defaults.service.js';
 import { SubtitleService } from './subtitles/subtitle.service.js';
 import { ChunkManagerService } from './transcoder/chunk-manager.service.js';
 import { TranscodeDebuggerService } from './transcoder/transcode-debugger.service.js';
 import { TranscoderService } from './transcoder/transcoder.service.js';
-import { PlayDefaultsService } from './play-defaults/play-defaults.service.js';
 
 interface StartStreamOptions {
 	quality?: string;
@@ -438,8 +439,7 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 				);
 				// Build from the copy that is actually served (the cached direct
 				// copy, e.g. the 8-bit copy of a 10-bit AV1 file), not the source.
-				const variantSrc =
-					this.playDefaults.servedCopy(file) ?? file.filePath;
+				const variantSrc = this.playDefaults.servedCopy(file) ?? file.filePath;
 				// One "ready" event per build — every start call during the build
 				// used to add its own, so the player reloaded once per request.
 				const alreadyBuilding = this.transcoderService.isAudioVariantBuilding(
@@ -1436,7 +1436,11 @@ export class StreamService implements OnModuleInit, OnModuleDestroy {
 		}
 		const ext = filePath.slice(filePath.lastIndexOf('.'));
 
-		const isH264 = videoCodec === 'h264' || videoCodec === 'avc' || videoCodec === 'h.264';
+		// 10-bit H.264 (High 10) is not browser-decodable — treat it as foreign
+		// so it transcodes (8-bit) instead of direct-playing a black picture.
+		const isH264 =
+			(videoCodec === 'h264' || videoCodec === 'avc' || videoCodec === 'h.264') &&
+			!isTenBitSource(file);
 		const isMp4 = ext === '.mp4' || ext === '.m4v';
 		const isMkv = ext === '.mkv';
 		const isWebm = ext === '.webm';

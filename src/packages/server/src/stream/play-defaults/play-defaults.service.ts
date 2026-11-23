@@ -118,13 +118,19 @@ export class PlayDefaultsService {
 				isDefault: false,
 				explicit: false,
 			});
-			out.push({ ...base, id: `${f.id}:original`, kind: 'original', isDefault: false, explicit: false });
+			out.push({
+				...base,
+				id: `${f.id}:original`,
+				kind: 'original',
+				isDefault: false,
+				explicit: false,
+			});
 		}
-		const explicit = stored ? out.find((v) => v.id === stored || v.id === `${stored}:copy`) : undefined;
+		const explicit = stored
+			? out.find((v) => v.id === stored || v.id === `${stored}:copy`)
+			: undefined;
 		const chosen =
-			explicit ??
-			out.find((v) => v.fileId === autoFileId && v.kind !== 'original') ??
-			out[0];
+			explicit ?? out.find((v) => v.fileId === autoFileId && v.kind !== 'original') ?? out[0];
 		if (chosen) {
 			chosen.isDefault = true;
 			chosen.explicit = !!explicit;
@@ -135,7 +141,11 @@ export class PlayDefaultsService {
 	setDefaultVideo(movieId: string, version: string | null): void {
 		if (version != null) {
 			const [fileId, kind] = version.split(':');
-			const file = this.db.select().from(movieFiles).where(eq(movieFiles.id, fileId ?? '')).get();
+			const file = this.db
+				.select()
+				.from(movieFiles)
+				.where(eq(movieFiles.id, fileId ?? ''))
+				.get();
 			if (!file || file.movieId !== movieId) throw new NotFoundException('Version not found');
 			if (kind && kind !== 'copy' && kind !== 'original') {
 				throw new BadRequestException('Invalid version');
