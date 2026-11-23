@@ -607,6 +607,7 @@ export class ConversionService {
 								// AV1 at the configured CQ can exceed a low-bitrate HEVC
 								// source (720p web rips doubled) — cap at the source rate.
 								maxBitrateKbps: this.bitrateMbps(file) * 1000 || undefined,
+								audioCopy: allAudioAac(file),
 							},
 					onProgress,
 				);
@@ -730,4 +731,19 @@ export function isTenBitSource(file: {
 }): boolean {
 	if ((file?.videoBitDepth ?? 0) > 8) return true;
 	return /\b(10|12)\b/.test(String(file?.videoProfile ?? ''));
+}
+
+/** True when every audio stream is AAC, so a conversion can copy the audio as-is. */
+export function allAudioAac(file: { codecAudio?: string | null; audioTracks?: unknown }): boolean {
+	let tracks: Array<{ codec?: string }> = [];
+	try {
+		const raw = file?.audioTracks;
+		tracks = Array.isArray(raw) ? raw : JSON.parse(String(raw ?? '[]'));
+	} catch {
+		tracks = [];
+	}
+	const codecs = tracks.length
+		? tracks.map((t) => String(t?.codec ?? ''))
+		: [String(file?.codecAudio ?? '')];
+	return codecs.length > 0 && codecs.every((c) => c.toLowerCase() === 'aac');
 }

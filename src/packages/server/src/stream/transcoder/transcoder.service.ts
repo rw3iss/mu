@@ -666,6 +666,8 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 			forceCpu?: boolean;
 			/** AV1 only: bitrate ceiling (kbps) so the output can't outgrow the source. */
 			maxBitrateKbps?: number;
+			/** AV1 only: copy the audio streams (source audio is already AAC). */
+			audioCopy?: boolean;
 		} = {},
 		onProgress?: (pct: number) => void,
 	): Promise<void> {
@@ -708,12 +710,10 @@ export class TranscoderService implements OnModuleInit, OnModuleDestroy {
 				const av1Preset = /^p[1-7]$/.test(enc.preset) ? enc.preset : 'p5';
 				command = command
 					.videoCodec('av1_nvenc')
-					.audioCodec('aac')
+					.audioCodec(opts.audioCopy ? 'copy' : 'aac')
 					.outputOptions([
-						'-ac',
-						'2',
-						'-b:a',
-						profile.audioBitrate,
+						// Copied AAC keeps its size and channels (5.1 stays 5.1).
+						...(opts.audioCopy ? [] : ['-ac', '2', '-b:a', profile.audioBitrate]),
 						'-preset',
 						av1Preset,
 						'-rc',
