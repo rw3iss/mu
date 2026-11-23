@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { DEFAULT_THRESHOLDS, titleSimilarity } from '../confidence.js';
-import { GENERIC_FOLDER_NAMES, sanitiseRawTitle } from '../title-sanitiser.js';
+import { displayTitle, GENERIC_FOLDER_NAMES, sanitiseRawTitle } from '../title-sanitiser.js';
 import { DetectionInput, DetectionResult, Detector } from './types.js';
 
 /**
@@ -55,7 +55,7 @@ export class MultiFileDetector implements Detector {
 		// be a real title (e.g. a single letter or digit folder).
 		if (normalised.length < 3) return null;
 
-		const folderName = titleCase(normalised);
+		const folderName = displayTitle(folder) || titleCase(normalised);
 
 		// Fuzzy match against existing parents.
 		let parentGroupId: string | undefined;

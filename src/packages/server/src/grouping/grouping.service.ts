@@ -2,7 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { WsEvent } from '@mu/shared';
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import {
+	forwardRef,
+	Inject,
+	Injectable,
+	Logger,
+	NotFoundException,
+	OnModuleInit,
+} from '@nestjs/common';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import { type Movie, movieFiles, movies } from '../database/schema/index.js';
@@ -15,6 +22,7 @@ import {
 	type ResolvedGroupMetadata,
 } from '../metadata/group-metadata.service.js';
 import { MatchCandidatesRepository } from '../metadata/match-candidates.repository.js';
+import { MoviesService } from '../movies/movies.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { DEFAULT_THRESHOLDS, type GroupingThresholds, statusForConfidence } from './confidence.js';
 import { FolderTreeDetector } from './detectors/folder-tree-detector.js';
@@ -23,6 +31,7 @@ import { MultiFileDetector } from './detectors/multi-file-detector.js';
 import { SxxExxDetector } from './detectors/sxxexx-detector.js';
 import type { DetectionInput, DetectionResult, Detector } from './detectors/types.js';
 import { GroupsRepository } from './groups.repository.js';
+import { parseSeasonEpisode, sanitiseRawTitle } from './title-sanitiser.js';
 
 const SETTING_KEYS = {
 	enabled: 'grouping.enabled',
@@ -70,6 +79,8 @@ export class GroupingService implements OnModuleInit {
 		private readonly jobs: JobManagerService,
 		private readonly groupMetadata: GroupMetadataService,
 		private readonly matchCandidates: MatchCandidatesRepository,
+		@Inject(forwardRef(() => MoviesService))
+		private readonly moviesService: MoviesService,
 		sxxexx: SxxExxDetector,
 		folderTree: FolderTreeDetector,
 		multiFile: MultiFileDetector,
@@ -99,6 +110,9 @@ export class GroupingService implements OnModuleInit {
 		// channel (JOB_STARTED / JOB_PROGRESS / JOB_COMPLETED).
 		this.jobs.registerHandler('grouping-rebuild', async (_job, helpers) =>
 			this.rebuildAllWithProgress(helpers),
+		);
+		this.jobs.registerHandler('grouping-repair-series', async (_job, helpers) =>
+			this.repairSeries(helpers),
 		);
 
 		// Auto-trigger enrichment for newly-created parent groups. The
@@ -148,6 +162,10 @@ export class GroupingService implements OnModuleInit {
 	}
 
 	private applyMetadataPatch(groupId: string, patch: ResolvedGroupMetadata): void {
+		// Adopt the provider's canonical name ("The Last of Us") so a parent
+		// first named from a mangled filename gets its real title, and its
+		// season subgroups follow.
+		if (patch.name?.trim()) this.renameParent(groupId, patch.name.trim());
 		this.repo.update(groupId, {
 			tmdbTvId: patch.tmdbTvId ?? null,
 			imdbId: patch.imdbId ?? null,
@@ -164,6 +182,177 @@ export class GroupingService implements OnModuleInit {
 		if (patch.tmdbTvId) {
 			this.dedupeByTmdbTvId(groupId, patch.tmdbTvId);
 		}
+	}
+
+	/** Rename a parent and its "<Show> - Season N" subgroups. */
+	private renameParent(parentId: string, name: string): void {
+		const parent = this.repo.get(parentId);
+		if (!parent || parent.type !== 'parent') return;
+		if (parent.name !== name) this.repo.update(parentId, { name });
+		for (const sg of this.repo.listChildren(parentId)) {
+			if (sg.ordinal == null || sg.name === 'Specials') continue;
+			if (!/ - Season \d+$/.test(sg.name)) continue;
+			const want = `${name} - Season ${sg.ordinal}`;
+			if (sg.name !== want) this.repo.update(sg.id, { name: want });
+		}
+	}
+
+	/**
+	 * Enqueue the series repair pass (see {@link repairSeries}). Returns the
+	 * job id; progress streams over the job WS channel.
+	 */
+	enqueueRepairSeries(): { jobId: string } {
+		const jobId = this.jobs.enqueue({
+			type: 'grouping-repair-series',
+			label: 'Repair TV series groups',
+			payload: {},
+			priority: 30,
+		});
+		return { jobId };
+	}
+
+	/**
+	 * Heal series groups built from mangled names or duplicate downloads:
+	 *  1. resolve TMDB metadata for every parent (adopts the canonical name,
+	 *     merges parents that share a TMDB id);
+	 *  2. merge parents whose normalised names match ("Last Of Us" / "The Last of Us");
+	 *  3. rewrite episode titles whose show part is wrong ("South - S28E01" →
+	 *     "South Park - S28E01") for movies with no TMDB match;
+	 *  4. fold duplicate episodes (same show + SxxEyy, e.g. two releases) into
+	 *     one entry with several files (versions).
+	 */
+	async repairSeries(helpers: JobHelpers | null = null): Promise<{
+		metadataResolved: number;
+		parentsMerged: number;
+		titlesFixed: number;
+		episodesMerged: number;
+	}> {
+		const out = { metadataResolved: 0, parentsMerged: 0, titlesFixed: 0, episodesMerged: 0 };
+
+		// 1. TMDB pass.
+		const parents = this.repo.listParents();
+		for (let i = 0; i < parents.length; i++) {
+			const p = this.repo.get(parents[i]!.id);
+			if (!p) continue; // merged away by an earlier dedupe
+			try {
+				if (await this.refreshGroupMetadata(p.id)) out.metadataResolved++;
+			} catch (err: any) {
+				this.logger.warn(`repair: metadata for "${p.name}" failed: ${err?.message}`);
+			}
+			helpers?.reportProgress(((i + 1) / Math.max(1, parents.length)) * 60);
+		}
+
+		// 2. Merge parents with the same normalised name.
+		const byName = new Map<string, string>();
+		for (const p of this.repo.listParents()) {
+			const key = sanitiseRawTitle(p.name);
+			if (!key) continue;
+			const keep = byName.get(key);
+			if (!keep) {
+				byName.set(key, p.id);
+				continue;
+			}
+			const keeper = this.repo.get(keep)!;
+			// Keep the one TMDB identified.
+			const [target, source] = keeper.tmdbTvId || !p.tmdbTvId ? [keeper, p] : [p, keeper];
+			this.repo.mergeParent(source.id, target.id);
+			byName.set(key, target.id);
+			out.parentsMerged++;
+		}
+		helpers?.reportProgress(70);
+
+		// 3 + 4. Per season subgroup: titles, then duplicate episodes.
+		for (const parent of this.repo.listParents()) {
+			const showKey = sanitiseRawTitle(parent.name);
+			for (const sg of this.repo.listChildren(parent.id)) {
+				const members = this.repo.listMoviesInSubgroup(sg.id);
+				for (const m of members) {
+					if (m.tmdbId) continue;
+					const se = parseSeasonEpisode(m.title);
+					if (!se) continue;
+					const titleShow = sanitiseRawTitle(se.prefix);
+					if (titleShow === showKey) continue;
+					// Only fix a title whose show part is a truncation / variant of
+					// the parent's ("south" ⊂ "south park"), never a different show.
+					if (
+						titleShow &&
+						!showKey.startsWith(titleShow) &&
+						!titleShow.startsWith(showKey)
+					) {
+						continue;
+					}
+					const rest = m.title.slice(se.startIndex + se.matchText.length + 1);
+					const tag = `S${pad2(se.season)}E${pad2(se.episode)}`;
+					const title = `${parent.name} - ${tag}${rest.trim() ? ` ${rest.trim()}` : ''}`;
+					this.database.db
+						.update(movies)
+						.set({ title, updatedAt: new Date().toISOString() })
+						.where(eq(movies.id, m.id))
+						.run();
+					out.titlesFixed++;
+				}
+				out.episodesMerged += await this.mergeDuplicateEpisodes(sg.id);
+			}
+		}
+		helpers?.reportProgress(100);
+		if (out.titlesFixed || out.episodesMerged) {
+			this.events.emit('library:movie-updated', {});
+		}
+		this.logger.log(`Series repair: ${JSON.stringify(out)}`);
+		helpers?.log(`Series repair: ${JSON.stringify(out)}`);
+		return out;
+	}
+
+	/**
+	 * Within one season subgroup, fold movies that are the same episode into
+	 * one: the keeper gets every file (shown as versions), the duplicate's
+	 * watch progress moves over when the keeper has none, then it's purged.
+	 */
+	private async mergeDuplicateEpisodes(subgroupId: string): Promise<number> {
+		const members = this.repo.listMoviesInSubgroup(subgroupId);
+		const byEpisode = new Map<string, typeof members>();
+		for (const m of members) {
+			const files = this.database.db
+				.select({ fileName: movieFiles.fileName })
+				.from(movieFiles)
+				.where(eq(movieFiles.movieId, m.id))
+				.all();
+			const se =
+				parseSeasonEpisode(m.title) ??
+				files.map((f) => parseSeasonEpisode(f.fileName ?? '')).find(Boolean) ??
+				null;
+			if (!se) continue;
+			const key = `${se.season}:${se.episode}`;
+			byEpisode.set(key, [...(byEpisode.get(key) ?? []), m]);
+		}
+		let merged = 0;
+		for (const group of byEpisode.values()) {
+			if (group.length < 2) continue;
+			// Keeper: TMDB-matched first, then the oldest entry.
+			const sorted = [...group].sort(
+				(a, b) =>
+					Number(!!b.tmdbId) - Number(!!a.tmdbId) ||
+					String(a.addedAt).localeCompare(String(b.addedAt)),
+			);
+			const keeper = sorted[0]!;
+			for (const dup of sorted.slice(1)) {
+				this.database.db
+					.update(movieFiles)
+					.set({ movieId: keeper.id })
+					.where(eq(movieFiles.movieId, dup.id))
+					.run();
+				this.database.db.run(sql`
+					UPDATE play_history SET entity_id = ${keeper.id}
+					WHERE entity_type = 'movie' AND entity_id = ${dup.id}
+					  AND user_id NOT IN (
+						SELECT user_id FROM play_history
+						WHERE entity_type = 'movie' AND entity_id = ${keeper.id})`);
+				await this.moviesService.purgeMovie(dup.id);
+				this.logger.log(`Merged duplicate episode "${dup.title}" into "${keeper.title}"`);
+				merged++;
+			}
+		}
+		return merged;
 	}
 
 	private dedupeByTmdbTvId(canonicalParentId: string, tmdbTvId: number): void {
@@ -630,14 +819,21 @@ export class GroupingService implements OnModuleInit {
 			}
 		}
 
-		// 2. Find or create subgroup under that parent.
+		// 2. Find or create subgroup under that parent. Season subgroups are
+		// named after the parent (which may carry the TMDB name), not the
+		// filename-derived show name.
 		let subgroup = this.repo.findSubgroup(parentId, result.ordinal);
 		if (!subgroup) {
+			const parentRow = this.repo.get(parentId);
+			const subgroupName =
+				parentRow && result.ordinal != null && / - Season \d+$/.test(result.subgroupName)
+					? `${parentRow.name} - Season ${result.ordinal}`
+					: result.subgroupName;
 			subgroup = this.repo.insert({
 				id: randomUUID(),
 				type: 'subgroup',
 				groupType: result.groupTypeHint ?? 'series',
-				name: result.subgroupName,
+				name: subgroupName,
 				parentGroupId: parentId,
 				ordinal: result.ordinal,
 				status: persistStatus,
@@ -687,4 +883,8 @@ function commonParentFolder(paths: string[]): string | null {
 		if (common.length === 0) break;
 	}
 	return common.length ? common.join('/') : null;
+}
+
+function pad2(n: number): string {
+	return n.toString().padStart(2, '0');
 }

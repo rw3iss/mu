@@ -256,6 +256,15 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 		}
 	}, []);
 
+	const handleRepairSeries = useCallback(async () => {
+		try {
+			const { jobId } = await groupsService.repairSeries();
+			notifyInfo('Series repair started.', 6000, [jobAction(jobId)]);
+		} catch {
+			notifyError('Could not start the series repair.');
+		}
+	}, []);
+
 	const handleGroupSimilarItems = useCallback(async () => {
 		setGroupingItems(true);
 		let progressToastId: string | null = null;
@@ -744,6 +753,18 @@ export function AdminDashboard(_props: AdminDashboardProps) {
 							run: handleGroupSimilarItems,
 						})}
 						loading={groupingItems}
+					/>
+					<ActionRow
+						label="Repair TV Series"
+						description="Merge shows split under two names, fold duplicate episodes (two downloads of the same SxxEyy) into one entry with several versions, and fix shortened show names from TMDB."
+						onClick={confirmThen({
+							title: 'Repair TV Series',
+							message:
+								'Looks up every series on TMDB, merges duplicate shows and duplicate episodes, and fixes episode titles. Files on disk are not changed.',
+							confirmLabel: 'Repair',
+							started: 'Series repair started.',
+							run: handleRepairSeries,
+						})}
 					/>
 					<ActionRow
 						label="Sanitize Title Names"

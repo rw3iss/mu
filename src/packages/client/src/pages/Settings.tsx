@@ -3092,7 +3092,9 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.settingLabel}>Minimum File Size</span>
 									<span class={styles.settingDescription}>
 										Skip files smaller than this during scanning (filters out
-										junk/promo files). Set to 0 to disable.
+										junk/promo files). TV episodes (SxxEyy in the name) use 20
+										MB instead, and Extras / Featurettes / Sample / Trailer
+										files are always skipped. Set to 0 to disable.
 									</span>
 								</div>
 								<div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

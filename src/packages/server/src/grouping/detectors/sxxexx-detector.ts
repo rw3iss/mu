@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DEFAULT_THRESHOLDS, titleSimilarity } from '../confidence.js';
 import { normaliseTitle } from '../title-normaliser.js';
+import { displayTitle, stripMediaExtension } from '../title-sanitiser.js';
 import { DetectionInput, DetectionResult, Detector } from './types.js';
 
 /**
@@ -64,7 +65,7 @@ export class SxxExxDetector implements Detector {
 			return this.makeResult('Unknown Show', season, episode, 0.55, input, normalised);
 		}
 
-		const showName = titleCase(normalised);
+		const showName = displayTitle(rawShowName) || titleCase(normalised);
 		const confidence = this.computeConfidence(rawShowName, normalised);
 		return this.makeResult(showName, season, episode, confidence, input, normalised);
 	}
@@ -126,7 +127,7 @@ export class SxxExxDetector implements Detector {
 }
 
 function stripExtension(fname: string): string {
-	return fname.replace(/\.[a-z0-9]{1,4}$/i, '');
+	return stripMediaExtension(fname);
 }
 
 /** Quick title-case for display. Caller already normalised, so words are lowercase. */

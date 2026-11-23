@@ -219,6 +219,15 @@ export class GroupingController {
 		};
 	}
 
+	/** Merge split / duplicate series parents + duplicate episodes, fix show names (background job). */
+	@Post('admin/repair-series')
+	@Roles('admin')
+	@RequireAction('edit:app-settings')
+	repairSeries() {
+		const { jobId } = this.groupingService.enqueueRepairSeries();
+		return { ok: true, jobId };
+	}
+
 	@Post('admin/detect/:movieId')
 	@Roles('admin')
 	@RequireAction('edit:movie')

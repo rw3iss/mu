@@ -28,6 +28,8 @@ interface GroupCandidate extends MatchCandidate {
  * never writes to that table directly.
  */
 export interface ResolvedGroupMetadata {
+	/** Canonical show / collection name from the provider ("The Last of Us"). */
+	name?: string | null;
 	tmdbTvId?: number | null;
 	imdbId?: string | null;
 	posterUrl?: string | null;
@@ -202,6 +204,7 @@ export class GroupMetadataService {
 		const details = await this.tmdb.getTvDetails(tmdbTvId);
 		if (!details) return null;
 		return {
+			name: details.name || null,
 			tmdbTvId: details.id,
 			imdbId: details.external_ids?.imdb_id ?? null,
 			posterUrl: this.tmdb.getImageUrl(details.poster_path),
@@ -216,6 +219,7 @@ export class GroupMetadataService {
 		const details = await this.tmdb.getCollectionDetails(collectionId);
 		if (!details) return null;
 		return {
+			name: details.name || null,
 			// Collections have no IMDB id; tmdbTvId stays null on the group row.
 			posterUrl: this.tmdb.getImageUrl(details.poster_path),
 			backdropUrl: this.tmdb.getImageUrl(details.backdrop_path, 'w1280'),

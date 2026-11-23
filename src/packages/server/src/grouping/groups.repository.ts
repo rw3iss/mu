@@ -7,6 +7,7 @@ import {
 	movies,
 	type NewMovieGroup,
 } from '../database/schema/index.js';
+import { sanitiseRawTitle } from './title-sanitiser.js';
 
 export interface AltParent {
 	parentGroupId: string;
@@ -129,7 +130,16 @@ export class GroupsRepository {
 			const byImdb = this.findParentByImdbId(opts.imdbId);
 			if (byImdb) return byImdb;
 		}
-		if (opts.name) return this.getByNameAndType(opts.name, 'parent');
+		if (opts.name) {
+			const exact = this.getByNameAndType(opts.name, 'parent');
+			if (exact) return exact;
+			// Same show under different casing / article / punctuation
+			// ("The Last of Us" vs "Last Of Us") — compare normalised names.
+			const want = sanitiseRawTitle(opts.name);
+			if (want) {
+				return this.listParents().find((p) => sanitiseRawTitle(p.name) === want) ?? null;
+			}
+		}
 		return null;
 	}
 

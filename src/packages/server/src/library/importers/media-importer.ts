@@ -7,6 +7,8 @@ import type { MediaKind } from '@mu/shared';
 export type ImportFileResult =
 	| { status: 'skipped-size' }
 	| { status: 'skipped-duration' }
+	/** Bonus material (Extras/, Featurettes/, Sample/, *trailer*) — never imported. */
+	| { status: 'skipped-extra' }
 	| { status: 'updated' }
 	/** `entityId` = the movie (video) / track (audio) id. `movieId` kept for video callers. */
 	| { status: 'added'; entityId: string; title: string; movieId?: string }

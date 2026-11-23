@@ -192,6 +192,8 @@ const SE_PATTERNS: { regex: RegExp; season: number; episode: number }[] = [
 const SEASON_ONLY = /(?:^|[\s._-])(?:season|series|s)[\s._-]?(\d{1,3})(?=[\s._-]|$|\.)/i;
 
 const LEADING_THE = /^the[\s._-]+/i;
+const SITE_PREFIX =
+	/^\s*(?:www\.[^\s]+?\.[a-z]{2,4}|[a-z0-9-]+\.(?:com|org|net|re|to|tv|me|io|cc|ws|info|xyz))\s+-\s+/i;
 const COLLAPSE_WS = /\s+/g;
 const TRAILING_PUNCT = /[\s._-]+$/;
 const LEADING_PUNCT = /^[\s._-]+/;
@@ -281,12 +283,16 @@ export function parseSeasonOnly(input: string): number | null {
  *
  * Idempotent: passing the output back in returns the same string.
  */
-export function sanitiseRawTitle(input: string): string {
+export function sanitiseRawTitle(input: string, opts: { keepArticle?: boolean } = {}): string {
 	if (!input) return '';
 	let s = String(input);
 
-	// Strip extension if it accidentally got in here.
+	// Strip a real media extension if one got in here. Only known extensions:
+	// a generic "1–4 chars after the last dot" rule ate the last word of
+	// dotted names ("South.Park" → "South", "The.Last.of.Us" → "The Last of").
 	s = stripExtension(s);
+	// Leading release-site tags: "www.UIndex.org  -  ", "Crazy4TV.com - ".
+	s = s.replace(SITE_PREFIX, '');
 
 	// First pass — bracketed sections + year.
 	s = s.replace(BRACKET_CONTENT, ' ');
@@ -312,7 +318,7 @@ export function sanitiseRawTitle(input: string): string {
 
 	// Lowercase + drop "the" prefix.
 	s = s.toLowerCase();
-	s = s.replace(LEADING_THE, '');
+	if (!opts.keepArticle) s = s.replace(LEADING_THE, '');
 
 	// Collapse dashes that became sandwiched between spaces.
 	s = s.replace(/\s+-\s+/g, ' ');
@@ -348,7 +354,7 @@ export function buildPrettyTitle(rawInput: string): string {
 	const boundary = findTitleBoundary(stripped);
 	const titleSource = boundary > 0 ? stripped.slice(0, boundary) : stripped;
 
-	const clean = sanitiseRawTitle(titleSource);
+	const clean = sanitiseRawTitle(titleSource, { keepArticle: true });
 	if (!clean) return rawInput;
 	const pretty = titleCase(clean);
 	if (se) return `${pretty} - S${pad2(se.season)}E${pad2(se.episode)}`;
@@ -397,9 +403,63 @@ export function isDirtyTitle(input: string): boolean {
 	return false;
 }
 
-function stripExtension(input: string): string {
-	return input.replace(/\.[a-z0-9]{1,4}$/i, '');
+/** Known media/sidecar extensions — the only suffixes treated as an extension. */
+const MEDIA_EXTENSION =
+	/\.(?:mkv|mp4|m4v|avi|mov|wmv|flv|webm|ts|m2ts|mts|mpe?g|vob|divx|ogv|3gp|iso|srt|vtt|ass|ssa|sub|idx|nfo|part)$/i;
+
+/** Strip a known media extension (never an arbitrary "last dotted word"). */
+export function stripMediaExtension(input: string): string {
+	return input.replace(MEDIA_EXTENSION, '');
 }
+
+function stripExtension(input: string): string {
+	return stripMediaExtension(input);
+}
+
+/**
+ * Human display title for a show/collection name: sanitised, leading article
+ * kept, title-cased ("The.Last.of.Us" → "The Last of Us").
+ */
+export function displayTitle(raw: string): string {
+	return titleCase(sanitiseRawTitle(raw, { keepArticle: true }));
+}
+
+export interface EpisodeKey {
+	/** Normalised show name (lowercase, no leading article) — compare these. */
+	show: string;
+	season: number;
+	episode: number;
+}
+
+/**
+ * Show + season + episode identity of an episode filename or title, or null
+ * when there's no SxxEyy marker or no usable show name. Two files with equal
+ * keys are the same episode (e.g. two releases of it).
+ */
+export function parseEpisodeKey(input: string): EpisodeKey | null {
+	const se = parseSeasonEpisode(input);
+	if (!se) return null;
+	const show = sanitiseRawTitle(se.prefix);
+	if (!show || GENERIC_FOLDER_NAMES.has(show)) return null;
+	return { show, season: se.season, episode: se.episode };
+}
+
+/** Words kept lowercase inside a title ("The Last of Us", "Halt and Catch Fire"). */
+const SMALL_WORDS = new Set([
+	'a',
+	'an',
+	'and',
+	'as',
+	'at',
+	'by',
+	'for',
+	'in',
+	'of',
+	'on',
+	'or',
+	'to',
+	'vs',
+]);
 
 function pad2(n: number): string {
 	return n.toString().padStart(2, '0');
@@ -407,5 +467,37 @@ function pad2(n: number): string {
 
 function titleCase(input: string): string {
 	if (!input) return '';
-	return input.replace(/\b([a-z])/g, (m) => m.toUpperCase());
+	return input
+		.split(' ')
+		.map((w, i) =>
+			i > 0 && SMALL_WORDS.has(w) ? w : w.replace(/^([a-z])/, (m) => m.toUpperCase()),
+		)
+		.join(' ');
+}
+
+/**
+ * Bonus-material folders and files that must never be imported as movies or
+ * episodes: `Extras/`, `Featurettes/`, `Sample/`, `Trailers/`, `1c. Extras/`,
+ * `Sample,Screens/`, and files named `*sample*` / `*trailer*`. A folder that
+ * also carries a year or SxxEyy ("Extras (2005) Season 1") is a real title
+ * and is kept.
+ */
+const EXTRAS_FOLDER =
+	/^(?:\d+[a-z]?\.\s*)?(?:extras?|featurettes?|samples?|trailers?|teasers?|behind[ ._-]the[ ._-]scenes|deleted[ ._-]scenes|interviews?|shorts|bonus(?:[ ._-]features)?|special[ ._-]features|screens(?:hots)?|screenshots)\b/i;
+const EXTRAS_FILE = /(?:^|[\s._\-[(])(?:sample|trailer|teaser)(?:$|[\s._\-\])])/i;
+
+export function isExtrasPath(filePath: string, sourceRoot?: string): boolean {
+	const norm = filePath.replace(/\\/g, '/');
+	const rel =
+		sourceRoot && norm.startsWith(`${sourceRoot.replace(/\\/g, '/').replace(/\/$/, '')}/`)
+			? norm.slice(sourceRoot.replace(/\/$/, '').length + 1)
+			: norm;
+	const parts = rel.split('/');
+	const file = stripMediaExtension(parts.pop() ?? '');
+	for (const dir of parts) {
+		if (!EXTRAS_FOLDER.test(dir)) continue;
+		if (/\b(?:19|20)\d{2}\b/.test(dir) || parseSeasonEpisode(dir)) continue;
+		return true;
+	}
+	return EXTRAS_FILE.test(file);
 }

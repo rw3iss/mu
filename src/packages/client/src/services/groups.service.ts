@@ -109,6 +109,11 @@ export const groupsService = {
 		return api.post('/groups/admin/rebuild', {});
 	},
 
+	/** Background job: merge split / duplicate series + duplicate episodes, fix show names. */
+	repairSeries(): Promise<{ ok: boolean; jobId: string }> {
+		return api.post('/groups/admin/repair-series', {});
+	},
+
 	listMatchCandidates(groupId: string): Promise<{ candidates: MatchCandidate[] }> {
 		return api.get(`/groups/${groupId}/match-candidates`);
 	},

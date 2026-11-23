@@ -11,6 +11,7 @@ import { resolutionLabel, videoBitDepth } from '../../common/video-probe.js';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, movies } from '../../database/schema/index.js';
 import { EventsService } from '../../events/events.service.js';
+import { isExtrasPath, parseEpisodeKey } from '../../grouping/title-sanitiser.js';
 import { MoviesService } from '../../movies/movies.service.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import { SubtitleService } from '../../stream/subtitles/subtitle.service.js';
@@ -21,6 +22,11 @@ import {
 	type MediaImporter,
 	normalizeExtensions,
 } from './media-importer.js';
+
+/** Size floor for files named like TV episodes (SxxEyy); see importFile. */
+const EPISODE_MIN_FILE_SIZE_MB = 20;
+/** Runtime floor for TV episodes (the movie floor is 5 min). */
+const EPISODE_MIN_DURATION_SECONDS = 120;
 
 interface ParsedFilename {
 	title: string;
@@ -114,9 +120,20 @@ export class VideoImporter implements MediaImporter, OnModuleInit {
 		const fileModifiedAt = fileStat.mtime.toISOString();
 		const fileSize = fileStat.size;
 
-		// 1. Skip junk/promo files under the configured minimum size.
+		// 1. Skip bonus material by folder / name (Extras/, Featurettes/,
+		// Sample/, "*.sample.mkv", "*trailer*") — size and runtime can't tell
+		// a 10-minute featurette from a short episode.
+		if (isExtrasPath(filePath)) return { status: 'skipped-extra' };
+
+		// 1b. Skip junk/promo files under the configured minimum size. TV
+		// episodes (SxxEyy in the name) use a lower floor: a 22-minute 720p
+		// x265 episode is ~90 MB, under any floor that keeps movies clean.
 		const lib = this.settings.get<Record<string, unknown>>('library', {}) as any;
-		const minSizeMB = lib?.minFileSizeMB ?? 50;
+		const episode = parseEpisodeKey(fileName);
+		const minSizeMB = Math.min(
+			lib?.minFileSizeMB ?? 50,
+			episode ? (lib?.minEpisodeFileSizeMB ?? EPISODE_MIN_FILE_SIZE_MB) : Infinity,
+		);
 		if (minSizeMB > 0 && fileSize < minSizeMB * 1024 * 1024) {
 			return { status: 'skipped-size' };
 		}
@@ -185,7 +202,11 @@ export class VideoImporter implements MediaImporter, OnModuleInit {
 		// clear the 50MB floor comfortably — so trailers, samples, music videos
 		// and disc extras were being indexed as movies. Runtime is the honest
 		// signal. 0 disables the check.
-		const minDurationSeconds = (lib?.minDurationSeconds as number | undefined) ?? 300;
+		const minDurationSeconds = Math.min(
+			(lib?.minDurationSeconds as number | undefined) ?? 300,
+			// Short-form episodes (11-minute cartoons, webisodes) are real content.
+			episode ? EPISODE_MIN_DURATION_SECONDS : Infinity,
+		);
 		if (
 			minDurationSeconds > 0 &&
 			probeInfo.durationSeconds != null &&
@@ -203,11 +224,16 @@ export class VideoImporter implements MediaImporter, OnModuleInit {
 		// but ingestion always minted a fresh movies row per file path, so a
 		// season copied to a second drive produced a duplicate entry for every
 		// episode. Attach to the existing movie instead of duplicating it.
-		const existingMovie = this.findMovieByTitleYear(
-			parsed.title,
-			parsed.year ?? null,
-			probeInfo.durationSeconds ?? null,
-		);
+		// Episodes match on show + SxxEyy instead: a second release of an
+		// episode ("The.Hawk.S01E08…mkv" next to an already converted
+		// "The Hawk - S01E08.mp4") must become another version, not a twin.
+		const existingMovie =
+			(episode ? this.findEpisodeTwin(episode, probeInfo.durationSeconds ?? null) : null) ??
+			this.findMovieByTitleYear(
+				parsed.title,
+				parsed.year ?? null,
+				probeInfo.durationSeconds ?? null,
+			);
 		if (existingMovie) {
 			try {
 				this.database.db
@@ -635,6 +661,54 @@ export class VideoImporter implements MediaImporter, OnModuleInit {
 			if (known.every((d) => Math.abs(d - durationSeconds) <= tolerance)) {
 				return { id: c.id };
 			}
+		}
+		return null;
+	}
+
+	/**
+	 * An existing library movie that is the same episode (same normalised show
+	 * name + season + episode, from its title or any of its file names) and,
+	 * when both durations are known, runs within 10% / 2 min of this one.
+	 */
+	private findEpisodeTwin(
+		key: { show: string; season: number; episode: number },
+		durationSeconds: number | null,
+	): { id: string } | null {
+		const tag = `s${String(key.season).padStart(2, '0')}e${String(key.episode).padStart(2, '0')}`;
+		const rows = this.database.db
+			.select({
+				id: movies.id,
+				title: movies.title,
+				fileName: movieFiles.fileName,
+				durationSeconds: movieFiles.durationSeconds,
+			})
+			.from(movies)
+			.innerJoin(movieFiles, eq(movieFiles.movieId, movies.id))
+			.where(
+				and(
+					or(isNull(movies.source), eq(movies.source, 'library')),
+					or(
+						sql`lower(${movies.title}) like ${`%${tag}%`}`,
+						sql`lower(${movieFiles.fileName}) like ${`%${tag}%`}`,
+					),
+				),
+			)
+			.all();
+		for (const r of rows) {
+			const keys = [parseEpisodeKey(r.title), parseEpisodeKey(r.fileName ?? '')];
+			const same = keys.some(
+				(k) =>
+					k &&
+					k.show === key.show &&
+					k.season === key.season &&
+					k.episode === key.episode,
+			);
+			if (!same) continue;
+			if (durationSeconds && r.durationSeconds) {
+				const tolerance = Math.max(120, durationSeconds * 0.1);
+				if (Math.abs(r.durationSeconds - durationSeconds) > tolerance) continue;
+			}
+			return { id: r.id };
 		}
 		return null;
 	}

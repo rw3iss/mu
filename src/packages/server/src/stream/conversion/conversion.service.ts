@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, movies } from '../../database/schema/index.js';
 import { EventsService } from '../../events/events.service.js';
+import { buildPrettyTitle, parseEpisodeKey } from '../../grouping/title-sanitiser.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import { MemoryCacheService } from '../memory-cache/memory-cache.service.js';
 import { TranscoderService } from '../transcoder/transcoder.service.js';
@@ -446,6 +447,31 @@ export class ConversionService {
 		return rows.filter((f) => this.planConversion(f).action !== 'skip');
 	}
 
+	/**
+	 * File name (no extension) for an in-place conversion: the movie title
+	 * (+ year). An episode keeps its show + SxxEyy — when the stored title
+	 * has lost the show name, the name is rebuilt from the source file name
+	 * instead ("South.Park.S28E03…" never becomes "South - S28E03").
+	 */
+	private inPlaceBaseName(srcPath: string, title: string, year?: number | null): string {
+		const srcName = path.basename(srcPath);
+		const srcEp = parseEpisodeKey(srcName);
+		if (srcEp) {
+			const titleEp = parseEpisodeKey(title);
+			const ok =
+				titleEp &&
+				titleEp.season === srcEp.season &&
+				titleEp.episode === srcEp.episode &&
+				(titleEp.show === srcEp.show ||
+					titleEp.show.startsWith(srcEp.show) ||
+					srcEp.show.startsWith(titleEp.show)) &&
+				titleEp.show.length >= srcEp.show.length;
+			// Episode titles carry no year — "(2025)" would only clutter.
+			return this.sanitizeName(ok ? title : buildPrettyTitle(srcName));
+		}
+		return this.sanitizeName(title, year);
+	}
+
 	private sanitizeName(title: string, year?: number | null): string {
 		const base = `${title}${year ? ` (${year})` : ''}`;
 		// Strip characters illegal on Windows/most filesystems; collapse spaces.
@@ -532,7 +558,7 @@ export class ConversionService {
 		const dir = inPlace
 			? path.dirname(srcPath)
 			: this.transcoder.getPersistentDir(file.id, 'direct');
-		const baseName = inPlace ? this.sanitizeName(title, year) : 'direct';
+		const baseName = inPlace ? this.inPlaceBaseName(srcPath, title, year) : 'direct';
 		const finalPath = path.join(dir, `${baseName}.mp4`);
 		// The canonical target already exists and isn't our source — a prior
 		// conversion (or a duplicate file row) already produced it. Writing a

@@ -316,6 +316,9 @@ export class WatcherService implements OnModuleInit, OnModuleDestroy {
 			case 'skipped-duration':
 				this.logger.log(`Skipped (under min duration): ${fileName}`);
 				break;
+			case 'skipped-extra':
+				this.logger.log(`Skipped (extras / sample / trailer): ${fileName}`);
+				break;
 			case 'updated':
 				// Existing row touched — nothing else to do.
 				break;
