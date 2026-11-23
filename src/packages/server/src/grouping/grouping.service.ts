@@ -24,14 +24,19 @@ import {
 import { MatchCandidatesRepository } from '../metadata/match-candidates.repository.js';
 import { MoviesService } from '../movies/movies.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { DEFAULT_THRESHOLDS, type GroupingThresholds, statusForConfidence } from './confidence.js';
+import {
+	DEFAULT_THRESHOLDS,
+	type GroupingThresholds,
+	statusForConfidence,
+	titleSimilarity,
+} from './confidence.js';
 import { FolderTreeDetector } from './detectors/folder-tree-detector.js';
 import { FuzzyTitleDetector } from './detectors/fuzzy-title-detector.js';
 import { MultiFileDetector } from './detectors/multi-file-detector.js';
 import { SxxExxDetector } from './detectors/sxxexx-detector.js';
 import type { DetectionInput, DetectionResult, Detector } from './detectors/types.js';
 import { GroupsRepository } from './groups.repository.js';
-import { parseSeasonEpisode, sanitiseRawTitle } from './title-sanitiser.js';
+import { displayTitle, parseSeasonEpisode, sanitiseRawTitle } from './title-sanitiser.js';
 
 const SETTING_KEYS = {
 	enabled: 'grouping.enabled',
@@ -165,7 +170,9 @@ export class GroupingService implements OnModuleInit {
 		// Adopt the provider's canonical name ("The Last of Us") so a parent
 		// first named from a mangled filename gets its real title, and its
 		// season subgroups follow.
-		if (patch.name?.trim()) this.renameParent(groupId, patch.name.trim());
+		if (patch.name?.trim() && this.shouldAdoptName(groupId, patch.name.trim())) {
+			this.renameParent(groupId, patch.name.trim());
+		}
 		this.repo.update(groupId, {
 			tmdbTvId: patch.tmdbTvId ?? null,
 			imdbId: patch.imdbId ?? null,
@@ -182,6 +189,25 @@ export class GroupingService implements OnModuleInit {
 		if (patch.tmdbTvId) {
 			this.dedupeByTmdbTvId(groupId, patch.tmdbTvId);
 		}
+	}
+
+	/**
+	 * Take the provider's name only when it's the same title (casing,
+	 * article, punctuation) or the current name is a truncation of it
+	 * ("Last Of" → "The Last of Us"). A shorter or unrelated provider name
+	 * means a weak match ("South Park" matched to a show called "South") —
+	 * keep ours.
+	 */
+	private shouldAdoptName(groupId: string, providerName: string): boolean {
+		const cur = this.repo.get(groupId);
+		if (!cur) return false;
+		const a = sanitiseRawTitle(cur.name);
+		const b = sanitiseRawTitle(providerName);
+		if (!a || a === 'unknown show') return true;
+		if (!b) return false;
+		if (a === b) return true;
+		if (b.startsWith(a)) return b.length > a.length;
+		return titleSimilarity(a, b) >= 0.85;
 	}
 
 	/** Rename a parent and its "<Show> - Season N" subgroups. */
@@ -227,7 +253,61 @@ export class GroupingService implements OnModuleInit {
 		titlesFixed: number;
 		episodesMerged: number;
 	}> {
-		const out = { metadataResolved: 0, parentsMerged: 0, titlesFixed: 0, episodesMerged: 0 };
+		const out = {
+			redetected: 0,
+			renamed: 0,
+			metadataResolved: 0,
+			parentsMerged: 0,
+			titlesFixed: 0,
+			episodesMerged: 0,
+		};
+
+		// 0a. Re-detect episodes parked under "Unknown Show" and ungrouped
+		// library movies that are clearly episodes (SxxEyy in title or file).
+		const redetect = new Set<string>();
+		for (const p of this.repo.listParents()) {
+			if (sanitiseRawTitle(p.name) !== 'unknown show') continue;
+			for (const sg of this.repo.listChildren(p.id)) {
+				for (const m of this.repo.listMoviesInSubgroup(sg.id)) redetect.add(m.id);
+			}
+		}
+		const ungrouped = this.database.db
+			.select({ id: movies.id, title: movies.title, fileName: movieFiles.fileName })
+			.from(movies)
+			.innerJoin(movieFiles, eq(movieFiles.movieId, movies.id))
+			.where(
+				sql`${movies.groupId} IS NULL AND (${movies.source} IS NULL OR ${movies.source} = 'library')`,
+			)
+			.all();
+		for (const r of ungrouped) {
+			if (parseSeasonEpisode(r.title) || parseSeasonEpisode(r.fileName ?? '')) {
+				redetect.add(r.id);
+			}
+		}
+		for (const id of redetect) {
+			this.repo.detachMovie(id);
+			if (await this.detectAndAttach(id).catch(() => null)) out.redetected++;
+		}
+		for (const p of this.repo.listParents()) {
+			for (const sg of this.repo.listChildren(p.id)) {
+				if (this.repo.movieCountInSubgroup(sg.id) === 0) this.repo.delete(sg.id);
+			}
+			this.repo.deleteIfEmpty(p.id);
+		}
+
+		// 0b. Parents with no TMDB id whose name was cut short by the old
+		// extension bug ("Marvel S Iron") — rebuild it from member file names.
+		for (const p of this.repo.listParents()) {
+			if (p.tmdbTvId || p.status === 'confirmed') continue;
+			const better = this.nameFromMemberFiles(p.id);
+			if (!better) continue;
+			const a = sanitiseRawTitle(p.name);
+			const b = sanitiseRawTitle(better);
+			if (b && b !== a && b.length > a.length && (b.startsWith(a) || a.length <= 3)) {
+				this.renameParent(p.id, better);
+				out.renamed++;
+			}
+		}
 
 		// 1. TMDB pass.
 		const parents = this.repo.listParents();
@@ -271,13 +351,14 @@ export class GroupingService implements OnModuleInit {
 					const se = parseSeasonEpisode(m.title);
 					if (!se) continue;
 					const titleShow = sanitiseRawTitle(se.prefix);
-					if (titleShow === showKey) continue;
-					// Only fix a title whose show part is a truncation / variant of
-					// the parent's ("south" ⊂ "south park"), never a different show.
+					if (!showKey || showKey === 'unknown show' || titleShow === showKey) continue;
+					// Only fix a title whose show part is missing, "Unknown Show",
+					// or a truncation of the parent's ("south" ⊂ "south park") —
+					// never a different show.
 					if (
 						titleShow &&
-						!showKey.startsWith(titleShow) &&
-						!titleShow.startsWith(showKey)
+						titleShow !== 'unknown show' &&
+						!showKey.startsWith(titleShow)
 					) {
 						continue;
 					}
@@ -301,6 +382,32 @@ export class GroupingService implements OnModuleInit {
 		this.logger.log(`Series repair: ${JSON.stringify(out)}`);
 		helpers?.log(`Series repair: ${JSON.stringify(out)}`);
 		return out;
+	}
+
+	/** Most common display show name across a parent's member file names. */
+	private nameFromMemberFiles(parentId: string): string | null {
+		const counts = new Map<string, number>();
+		for (const sg of this.repo.listChildren(parentId)) {
+			for (const m of this.repo.listMoviesInSubgroup(sg.id)) {
+				const f = this.database.db
+					.select({ fileName: movieFiles.fileName })
+					.from(movieFiles)
+					.where(eq(movieFiles.movieId, m.id))
+					.get();
+				const se = parseSeasonEpisode(f?.fileName ?? '');
+				const name = se ? displayTitle(se.prefix) : '';
+				if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+			}
+		}
+		let best: string | null = null;
+		let n = 0;
+		for (const [k, v] of counts) {
+			if (v > n) {
+				best = k;
+				n = v;
+			}
+		}
+		return best;
 	}
 
 	/**

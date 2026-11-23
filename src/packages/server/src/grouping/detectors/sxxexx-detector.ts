@@ -1,7 +1,13 @@
+import path from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { DEFAULT_THRESHOLDS, titleSimilarity } from '../confidence.js';
 import { normaliseTitle } from '../title-normaliser.js';
-import { displayTitle, stripMediaExtension } from '../title-sanitiser.js';
+import {
+	displayTitle,
+	GENERIC_FOLDER_NAMES,
+	parseSeasonEpisode,
+	stripMediaExtension,
+} from '../title-sanitiser.js';
 import { DetectionInput, DetectionResult, Detector } from './types.js';
 
 /**
@@ -57,9 +63,18 @@ export class SxxExxDetector implements Detector {
 		}
 		if (m === null || season === null || episode === null) return null;
 
-		// Text before the match is the show-name candidate.
-		const rawShowName = fname.slice(0, cutAt);
-		const normalised = normaliseTitle(rawShowName);
+		// Text before the match is the show-name candidate. When the file name
+		// has none ("The - S01E08.mp4", left by an old rename), fall back to
+		// the stored title, then the folder ("The.Hawk.S01.1080p…").
+		let rawShowName = fname.slice(0, cutAt);
+		let normalised = normaliseTitle(rawShowName);
+		if (this.BLOCKLIST.has(normalised)) {
+			const alt = this.fallbackShowName(input);
+			if (alt) {
+				rawShowName = alt;
+				normalised = normaliseTitle(alt);
+			}
+		}
 		if (this.BLOCKLIST.has(normalised)) {
 			// Detector still fires but at low confidence — let fuzzy step decide.
 			return this.makeResult('Unknown Show', season, episode, 0.55, input, normalised);
@@ -68,6 +83,28 @@ export class SxxExxDetector implements Detector {
 		const showName = displayTitle(rawShowName) || titleCase(normalised);
 		const confidence = this.computeConfidence(rawShowName, normalised);
 		return this.makeResult(showName, season, episode, confidence, input, normalised);
+	}
+
+	private fallbackShowName(input: DetectionInput): string | null {
+		const usable = (raw: string | undefined | null) => {
+			if (!raw) return false;
+			const n = normaliseTitle(raw);
+			return (
+				!!n &&
+				!this.BLOCKLIST.has(n) &&
+				n !== 'unknown show' &&
+				!GENERIC_FOLDER_NAMES.has(n)
+			);
+		};
+		const fromTitle = parseSeasonEpisode(input.movieTitle ?? '')?.prefix;
+		if (usable(fromTitle)) return fromTitle!;
+		const folder = path.basename(path.dirname(input.filePath));
+		const cut = /(?:^|[\s._-])(?:s\d{1,2}(?:e\d+)?|season[\s._-]?\d+)(?:[\s._-]|$)/i.exec(
+			folder,
+		);
+		const fromFolder = cut ? folder.slice(0, cut.index) : null;
+		if (usable(fromFolder)) return fromFolder!;
+		return null;
 	}
 
 	private computeConfidence(_raw: string, normalised: string): number {
