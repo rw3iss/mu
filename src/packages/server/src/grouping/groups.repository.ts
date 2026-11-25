@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DatabaseService } from '../database/database.service.js';
 import {
 	type MovieGroup,
+	movieFiles,
 	movieGroups,
 	movies,
 	type NewMovieGroup,
@@ -344,6 +345,32 @@ export class GroupsRepository {
 
 	listMoviesInSubgroup(subgroupId: string): (typeof movies.$inferSelect)[] {
 		return this.database.db.select().from(movies).where(eq(movies.groupId, subgroupId)).all();
+	}
+
+	/**
+	 * Subgroup members for the group page: the movie rows plus `runtime`
+	 * (minutes — metadata runtime, else the longest file's length) and
+	 * `durationSeconds`, which the list rows show next to the year.
+	 */
+	listMoviesForDisplay(subgroupId: string) {
+		const rows = this.listMoviesInSubgroup(subgroupId);
+		if (rows.length === 0) return [];
+		const durations = new Map<string, number>();
+		for (const f of this.database.db
+			.select({ movieId: movieFiles.movieId, d: movieFiles.durationSeconds })
+			.from(movieFiles)
+			.where(inArray(movieFiles.movieId, rows.map((r) => r.id)))
+			.all()) {
+			if (f.d && f.d > (durations.get(f.movieId) ?? 0)) durations.set(f.movieId, f.d);
+		}
+		return rows.map((r) => {
+			const secs = durations.get(r.id) ?? null;
+			return {
+				...r,
+				runtime: r.runtimeMinutes ?? (secs ? Math.round(secs / 60) : null),
+				durationSeconds: secs ?? undefined,
+			};
+		});
 	}
 
 	movieCountInSubgroup(subgroupId: string): number {

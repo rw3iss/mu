@@ -87,7 +87,7 @@ export class GroupingController {
 		const group = this.repo.get(id);
 		if (!group) throw new NotFoundException(`Group ${id} not found`);
 		const children = group.type === 'parent' ? this.repo.listChildren(id) : [];
-		const movies = group.type === 'subgroup' ? this.repo.listMoviesInSubgroup(id) : [];
+		const movies = group.type === 'subgroup' ? this.repo.listMoviesForDisplay(id) : [];
 		return {
 			group,
 			children,
@@ -102,15 +102,13 @@ export class GroupingController {
 		const group = this.repo.get(id);
 		if (!group) throw new NotFoundException(`Group ${id} not found`);
 		if (group.type === 'subgroup') {
-			return { movies: this.repo.listMoviesInSubgroup(id) };
+			return { movies: this.repo.listMoviesForDisplay(id) };
 		}
 		// Parent: aggregate movies across all child subgroups.
 		const children = this.repo.listChildren(id);
-		const out: typeof this.repo.listMoviesInSubgroup extends (...a: any) => infer R
-			? R
-			: never = [] as any;
+		const out: ReturnType<GroupsRepository['listMoviesForDisplay']> = [];
 		for (const child of children) {
-			out.push(...this.repo.listMoviesInSubgroup(child.id));
+			out.push(...this.repo.listMoviesForDisplay(child.id));
 		}
 		return { movies: out };
 	}

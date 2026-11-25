@@ -39,9 +39,14 @@ export function MovieListItem({
 			})
 		: null;
 
-	const runtimeStr = movie.runtime
-		? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m`
+	const runtimeMin =
+		movie.runtime || (movie.durationSeconds ? Math.round(movie.durationSeconds / 60) : 0);
+	const runtimeStr = runtimeMin
+		? runtimeMin >= 60
+			? `${Math.floor(runtimeMin / 60)}h ${runtimeMin % 60}m`
+			: `${runtimeMin}m`
 		: null;
+	const yearLine = [movie.year, runtimeStr].filter(Boolean).join(' · ');
 
 	return (
 		<div
@@ -78,7 +83,7 @@ export function MovieListItem({
 							{movie.title}
 							{movie.hidden && <span class={styles.hiddenTag}>Hidden</span>}
 						</span>
-						{movie.year && <span class={styles.year}>{movie.year}</span>}
+						{yearLine && <span class={styles.year}>{yearLine}</span>}
 					</div>
 					{!selectionMode && !movie.remoteOrigin && (
 						<MovieOptionsMenu
@@ -101,7 +106,6 @@ export function MovieListItem({
 						<div class={styles.metaLine}>
 							<RatingBadge value={rating} class={styles.ratingChip} />
 							<MovieScoreChips movie={movie} />
-							{runtimeStr && <span>{runtimeStr}</span>}
 						</div>
 					</div>
 					<div class={styles.actions}>
