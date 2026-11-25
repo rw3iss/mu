@@ -359,7 +359,12 @@ export class GroupsRepository {
 		for (const f of this.database.db
 			.select({ movieId: movieFiles.movieId, d: movieFiles.durationSeconds })
 			.from(movieFiles)
-			.where(inArray(movieFiles.movieId, rows.map((r) => r.id)))
+			.where(
+				inArray(
+					movieFiles.movieId,
+					rows.map((r) => r.id),
+				),
+			)
 			.all()) {
 			if (f.d && f.d > (durations.get(f.movieId) ?? 0)) durations.set(f.movieId, f.d);
 		}

@@ -75,7 +75,10 @@ export class MultiFileDetector implements Detector {
 		}
 
 		// Episode = position in the alphabetised sibling list, 1-indexed.
-		const sortedSiblings = [...videoSiblings].sort();
+		// Natural order: "Part 2" before "Part 10" (plain sort put 10 after 1).
+		const sortedSiblings = [...videoSiblings].sort((a, b) =>
+			a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
+		);
 		const episode = sortedSiblings.indexOf(input.filePath) + 1;
 
 		return {

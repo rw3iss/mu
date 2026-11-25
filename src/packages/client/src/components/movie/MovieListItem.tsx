@@ -46,7 +46,7 @@ export function MovieListItem({
 			? `${Math.floor(runtimeMin / 60)}h ${runtimeMin % 60}m`
 			: `${runtimeMin}m`
 		: null;
-	const yearLine = [movie.year, runtimeStr].filter(Boolean).join(' · ');
+	const yearParts = [movie.year, runtimeStr].filter(Boolean);
 
 	return (
 		<div
@@ -83,7 +83,16 @@ export function MovieListItem({
 							{movie.title}
 							{movie.hidden && <span class={styles.hiddenTag}>Hidden</span>}
 						</span>
-						{yearLine && <span class={styles.year}>{yearLine}</span>}
+						{yearParts.length > 0 && (
+							<span class={styles.year}>
+								{yearParts.map((part, i) => (
+									<>
+										{i > 0 && <span class={styles.dot}>·</span>}
+										{part}
+									</>
+								))}
+							</span>
+						)}
 					</div>
 					{!selectionMode && !movie.remoteOrigin && (
 						<MovieOptionsMenu

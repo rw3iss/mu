@@ -264,6 +264,7 @@ export class GroupingService implements OnModuleInit {
 		const out = {
 			redetected: 0,
 			retyped: 0,
+			ordinalsFixed: 0,
 			renamed: 0,
 			metadataResolved: 0,
 			parentsMerged: 0,
@@ -403,6 +404,7 @@ export class GroupingService implements OnModuleInit {
 					out.titlesFixed++;
 				}
 				out.episodesMerged += await this.mergeDuplicateEpisodes(sg.id);
+				out.ordinalsFixed += this.fixEpisodeOrdinals(sg.id);
 			}
 		}
 		helpers?.reportProgress(100);
@@ -895,6 +897,30 @@ export class GroupingService implements OnModuleInit {
 		} catch {
 			return [];
 		}
+	}
+
+	/**
+	 * Episode order = the SxxEyy episode number. Rows grouped by the
+	 * multi-file detector got their position in a plain-sorted file list
+	 * ("Part 10" right after "Part 1"); an SxxEyy title always wins. Members
+	 * with no marker (a documentary, an extra) go after the episodes.
+	 */
+	private fixEpisodeOrdinals(subgroupId: string): number {
+		const members = this.repo.listMoviesInSubgroup(subgroupId);
+		const maxEp = Math.max(0, ...members.map((m) => parseSeasonEpisode(m.title)?.episode ?? 0));
+		if (maxEp === 0) return 0; // not a season (e.g. a movie collection) — keep its order
+		let fixed = 0;
+		let extra = maxEp;
+		for (const m of [...members].sort((a, b) =>
+			(a.title ?? '').localeCompare(b.title ?? '', undefined, { numeric: true }),
+		)) {
+			const ep = parseSeasonEpisode(m.title)?.episode ?? null;
+			const want = ep ?? ++extra;
+			if (m.groupEpisodeOrdinal === want) continue;
+			this.repo.attachMovie(m.id, subgroupId, want);
+			fixed++;
+		}
+		return fixed;
 	}
 
 	/** Set a parent and its season subgroups to group type "series". */

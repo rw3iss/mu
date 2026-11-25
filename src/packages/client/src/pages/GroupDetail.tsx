@@ -20,6 +20,26 @@ import { invalidateGroups } from '@/state/groups.state';
 import { notifyError, notifySuccess } from '@/state/notifications.state';
 import styles from './GroupDetail.module.scss';
 
+type GroupMovie = GroupDetailResponse['movies'][number];
+
+/** Episode number from an "SxxEyy" title, else null. */
+function episodeOf(m: GroupMovie): number | null {
+	const hit = /\bS\d{1,2}\s?E(\d{1,3})\b/i.exec(m.title ?? '');
+	return hit ? Number(hit[1]) : null;
+}
+
+/**
+ * Season order: SxxEyy episode number first (so E10 never sits after E01),
+ * then the stored episode ordinal; non-episodes (extras) after episodes.
+ */
+function byEpisode(a: GroupMovie, b: GroupMovie): number {
+	const ea = episodeOf(a);
+	const eb = episodeOf(b);
+	if (ea != null && eb != null && ea !== eb) return ea - eb;
+	if ((ea == null) !== (eb == null)) return ea == null ? 1 : -1;
+	return (a.groupEpisodeOrdinal ?? 0) - (b.groupEpisodeOrdinal ?? 0);
+}
+
 interface GroupDetailProps {
 	path?: string;
 	id?: string;
@@ -397,11 +417,7 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 											) : (
 												(childMovies[child.id] ?? [])
 													.slice()
-													.sort(
-														(a, b) =>
-															(a.groupEpisodeOrdinal ?? 0) -
-															(b.groupEpisodeOrdinal ?? 0),
-													)
+													.sort((a, b) => byEpisode(a, b))
 													.map((m) => (
 														<MovieListItem key={m.id} movie={m} />
 													))
@@ -436,7 +452,7 @@ export function GroupDetail({ id, matches }: GroupDetailProps) {
 				<div class={styles.episodesFlat}>
 					{data.movies
 						.slice()
-						.sort((a, b) => (a.groupEpisodeOrdinal ?? 0) - (b.groupEpisodeOrdinal ?? 0))
+						.sort((a, b) => byEpisode(a, b))
 						.map((m) => (
 							<MovieListItem key={m.id} movie={m} />
 						))}
