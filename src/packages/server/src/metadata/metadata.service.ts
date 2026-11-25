@@ -8,7 +8,7 @@ import { SAFE_INPUT_OPTIONS } from '../common/ffmpeg-input.js';
 import { normalizeCast } from '../common/json-fields.js';
 import { resolutionLabel } from '../common/video-probe.js';
 import { DatabaseService } from '../database/database.service.js';
-import { movieFiles, movieMetadata, movies } from '../database/schema/index.js';
+import { movieFiles, movieGroups, movieMetadata, movies } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
 import { LocalImdbSearchService } from '../imdb-datasets/local-imdb-search.service.js';
 import { MovieIdentityService } from '../providers/identity/movie-identity.service.js';
@@ -90,6 +90,7 @@ export class MetadataService {
 			filePath: file?.filePath ?? null,
 			fileName: file?.fileName ?? null,
 			durationSeconds: file?.durationSeconds ?? null,
+			showHint: this.seriesNameOf(movie.groupId),
 		});
 		const resolvedYear = query.year;
 		const fileDurationMinutes = query.kind === 'movie' ? query.durationMinutes : null;
@@ -449,6 +450,7 @@ export class MetadataService {
 				filePath: file?.filePath ?? null,
 				fileName: file?.fileName ?? null,
 				durationSeconds: file?.durationSeconds ?? null,
+				showHint: this.seriesNameOf(movie.groupId),
 			});
 			if (query.kind !== 'tv-episode') {
 				throw new NotFoundException(
@@ -1178,6 +1180,24 @@ export class MetadataService {
 
 		this.events.emit(WsEvent.LIBRARY_MOVIE_UPDATED, { movieId, source: 'rescan' });
 		return { updated, missing, errors };
+	}
+
+	/** Name of the series a grouped movie belongs to (subgroup → parent), or null. */
+	private seriesNameOf(groupId: string | null | undefined): string | null {
+		if (!groupId) return null;
+		const g = this.database.db
+			.select({ name: movieGroups.name, parentGroupId: movieGroups.parentGroupId })
+			.from(movieGroups)
+			.where(eq(movieGroups.id, groupId))
+			.get();
+		if (!g) return null;
+		if (!g.parentGroupId) return g.name;
+		const p = this.database.db
+			.select({ name: movieGroups.name })
+			.from(movieGroups)
+			.where(eq(movieGroups.id, g.parentGroupId))
+			.get();
+		return p?.name ?? g.name;
 	}
 }
 

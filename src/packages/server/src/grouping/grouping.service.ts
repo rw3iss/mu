@@ -36,7 +36,15 @@ import { MultiFileDetector } from './detectors/multi-file-detector.js';
 import { SxxExxDetector } from './detectors/sxxexx-detector.js';
 import type { DetectionInput, DetectionResult, Detector } from './detectors/types.js';
 import { GroupsRepository } from './groups.repository.js';
-import { displayTitle, parseSeasonEpisode, sanitiseRawTitle } from './title-sanitiser.js';
+import {
+	buildPrettyTitle,
+	displayTitle,
+	parseSeasonEpisode,
+	sanitiseRawTitle,
+} from './title-sanitiser.js';
+
+/** Group types the TMDB TV lookup runs for (see group-metadata.service). */
+const SERIES_GROUP_TYPES = new Set(['series', 'show', 'tv', 'season']);
 
 const SETTING_KEYS = {
 	enabled: 'grouping.enabled',
@@ -255,6 +263,7 @@ export class GroupingService implements OnModuleInit {
 	}> {
 		const out = {
 			redetected: 0,
+			retyped: 0,
 			renamed: 0,
 			metadataResolved: 0,
 			parentsMerged: 0,
@@ -293,6 +302,25 @@ export class GroupingService implements OnModuleInit {
 				if (this.repo.movieCountInSubgroup(sg.id) === 0) this.repo.delete(sg.id);
 			}
 			this.repo.deleteIfEmpty(p.id);
+		}
+
+		// 0c. A parent made by the multi-file / fuzzy detector ("collection")
+		// whose members are mostly SxxEyy episodes is a series: TMDB TV search
+		// only runs for series-type groups.
+		for (const p of this.repo.listParents()) {
+			if (SERIES_GROUP_TYPES.has((p.groupType ?? '').toLowerCase())) continue;
+			let total = 0;
+			let eps = 0;
+			for (const sg of this.repo.listChildren(p.id)) {
+				for (const m of this.repo.listMoviesInSubgroup(sg.id)) {
+					total++;
+					if (parseSeasonEpisode(m.title)) eps++;
+				}
+			}
+			if (eps >= 2 && eps * 2 >= total) {
+				this.markSeries(p.id);
+				out.retyped++;
+			}
 		}
 
 		// 0b. Parents with no TMDB id whose name was cut short by the old
@@ -351,7 +379,7 @@ export class GroupingService implements OnModuleInit {
 					const se = parseSeasonEpisode(m.title);
 					if (!se) continue;
 					const titleShow = sanitiseRawTitle(se.prefix);
-					if (!showKey || showKey === 'unknown show' || titleShow === showKey) continue;
+					if (!showKey || showKey === 'unknown show') continue;
 					// Only fix a title whose show part is missing, "Unknown Show",
 					// or a truncation of the parent's ("south" ⊂ "south park") —
 					// never a different show.
@@ -362,9 +390,11 @@ export class GroupingService implements OnModuleInit {
 					) {
 						continue;
 					}
-					const rest = m.title.slice(se.startIndex + se.matchText.length + 1);
-					const tag = `S${pad2(se.season)}E${pad2(se.episode)}`;
-					const title = `${parent.name} - ${tag}${rest.trim() ? ` ${rest.trim()}` : ''}`;
+					// One pattern for every episode: "<Show> - SxxEyy - <Episode>".
+					const title = buildPrettyTitle(m.title.slice(se.startIndex), {
+						showHint: parent.name,
+					});
+					if (!title || title === m.title) continue;
 					this.database.db
 						.update(movies)
 						.set({ title, updatedAt: new Date().toISOString() })
@@ -867,6 +897,14 @@ export class GroupingService implements OnModuleInit {
 		}
 	}
 
+	/** Set a parent and its season subgroups to group type "series". */
+	private markSeries(parentId: string): void {
+		this.repo.update(parentId, { groupType: 'series' });
+		for (const sg of this.repo.listChildren(parentId)) {
+			this.repo.update(sg.id, { groupType: 'series' });
+		}
+	}
+
 	private persistDetection(
 		movie: Movie,
 		result: DetectionResult,
@@ -891,6 +929,16 @@ export class GroupingService implements OnModuleInit {
 			});
 			if (existing) {
 				parentId = existing.id;
+				// An episode joining a "collection" parent (made earlier by the
+				// multi-file detector from "Show Part 1…" files) makes it a series,
+				// so the TMDB TV lookup can run.
+				if (
+					result.source === 'sxxexx-filename' &&
+					!SERIES_GROUP_TYPES.has((existing.groupType ?? '').toLowerCase())
+				) {
+					this.markSeries(existing.id);
+					if (!existing.tmdbTvId) createdParent = true; // enqueue enrichment below
+				}
 			} else {
 				const newParent = this.repo.insert({
 					id: randomUUID(),

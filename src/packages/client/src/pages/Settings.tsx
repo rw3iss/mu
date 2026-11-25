@@ -2996,7 +2996,9 @@ export function Settings(props: SettingsProps) {
 									<span class={styles.settingDescription}>
 										Run the "Sanitize Title" routine on newly scanned movies —
 										clean the title from the filename (strip quality tags,
-										release groups, junk) before metadata is fetched.
+										release groups, junk) before metadata is fetched. TV
+										episodes are written as "Show - S01E02 - Episode Title"; a
+										missing show name is taken from the folder.
 									</span>
 								</div>
 								<label class={styles.toggle}>

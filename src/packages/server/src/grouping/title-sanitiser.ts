@@ -27,6 +27,8 @@
  *   - TV w/o SE:    "Some Show"
  */
 
+import path from 'node:path';
+
 const QUALITY_TOKENS = [
 	'2160p',
 	'1080p',
@@ -347,18 +349,108 @@ export function titleTokens(input: string): Set<string> {
  *
  * Used by the Admin sanitize-titles action.
  */
-export function buildPrettyTitle(rawInput: string): string {
+export function buildPrettyTitle(
+	rawInput: string,
+	opts: { showHint?: string | null } = {},
+): string {
 	if (!rawInput) return rawInput;
 	const stripped = stripExtension(rawInput);
 	const se = parseSeasonEpisode(stripped);
+	if (se) return buildEpisodeTitle(stripped, se, opts.showHint ?? null) || rawInput;
 	const boundary = findTitleBoundary(stripped);
 	const titleSource = boundary > 0 ? stripped.slice(0, boundary) : stripped;
 
 	const clean = sanitiseRawTitle(titleSource, { keepArticle: true });
 	if (!clean) return rawInput;
-	const pretty = titleCase(clean);
-	if (se) return `${pretty} - S${pad2(se.season)}E${pad2(se.episode)}`;
-	return pretty;
+	return titleCase(clean);
+}
+
+/** Any SxxEyy / NxNN token (with its leading separator). */
+const SE_TOKEN_ANY =
+	/(?:^|[\s._-])(?:s\d{1,2}[\s._-]?e\d{1,3}(?:e\d{1,3})?|\d{1,2}x\d{1,3})(?=[\s._-]|$)/gi;
+
+/**
+ * Episode title in one fixed pattern: `Show - SxxEyy - Episode Title`.
+ * The show comes from the text before the marker, else `showHint` (the
+ * folder or series name); the episode title is the text after the marker up
+ * to the first year / quality token, with repeated SxxEyy tokens removed.
+ * Idempotent: "Band of Brothers - S01E02 - Day of Days" maps to itself, and
+ * "S01e02 Day of Days - S01E02" (no show) becomes
+ * "Band of Brothers - S01E02 - Day of Days" with the hint.
+ */
+function buildEpisodeTitle(
+	stripped: string,
+	se: SeasonEpisodeMatch,
+	showHint: string | null,
+): string {
+	const tag = `S${pad2(se.season)}E${pad2(se.episode)}`;
+
+	const prefix = se.prefix.replace(SITE_PREFIX, '');
+	const prefixCut = findMetadataIndex(prefix);
+	const showNorm = sanitiseRawTitle(prefixCut >= 0 ? prefix.slice(0, prefixCut) : prefix, {
+		keepArticle: true,
+	});
+	let show = showNorm && !GENERIC_FOLDER_NAMES.has(showNorm) ? titleCase(showNorm) : '';
+	if (!show && showHint?.trim()) show = showHint.trim();
+
+	const markerEnd = stripped.indexOf(se.matchText, se.startIndex) + se.matchText.length;
+	let rest = stripped.slice(markerEnd).replace(SE_TOKEN_ANY, ' ');
+	const dotted = !/\s/.test(rest.trim()) && /[._]/.test(rest);
+	if (dotted) rest = rest.replace(/[._]+/g, ' ');
+	const restCut = findMetadataIndex(rest);
+	if (restCut >= 0) rest = rest.slice(0, restCut);
+	rest = rest
+		.replace(BRACKET_CONTENT, ' ')
+		.replace(/[[\](){}]/g, ' ')
+		.replace(KNOWN_GROUP_REGEX, ' ')
+		.replace(COLLAPSE_WS, ' ')
+		.replace(/^[\s._\-–—:]+|[\s._\-–—:]+$/g, '')
+		.trim();
+	// Release names are all one case — title-case them; keep a hand-typed
+	// mixed-case title ("Hooli-Con", "FBI") as it is.
+	const episodeTitle =
+		rest && (dotted || rest === rest.toLowerCase() || rest === rest.toUpperCase())
+			? titleCase(rest.toLowerCase())
+			: rest;
+
+	return [show, tag, episodeTitle].filter(Boolean).join(' - ');
+}
+
+/** Index of the first year or quality token (0 allowed), or -1. */
+function findMetadataIndex(input: string): number {
+	let earliest = -1;
+	const take = (i: number) => {
+		if (i >= 0 && (earliest < 0 || i < earliest)) earliest = i;
+	};
+	take(/(?:^|[\s._([-])(?:19\d{2}|20\d{2})(?=$|[\s._)\]-])/.exec(input)?.index ?? -1);
+	take(new RegExp(QUALITY_REGEX.source, 'i').exec(input)?.index ?? -1);
+	return earliest;
+}
+
+/** Folder name segment that marks a season folder ("S01", "Season 2"). */
+const FOLDER_SEASON_CUT = /(?:^|[\s._-])(?:s\d{1,2}(?:e\d+)?|season[\s._-]?\d+)(?:[\s._-]|$)/i;
+
+/**
+ * Show name from an episode's folders: "Band.Of.Brothers.S01.YG/…" →
+ * "Band of Brothers"; "Show/Season 1/…" → "Show". Null for a generic or
+ * missing folder (an episode loose in the library root).
+ */
+export function showNameFromPath(filePath: string | null | undefined): string | null {
+	if (!filePath) return null;
+	let dir = path.dirname(filePath);
+	for (let i = 0; i < 2; i++) {
+		const folder = path.basename(dir);
+		if (!folder || folder === dir) return null;
+		const cut = FOLDER_SEASON_CUT.exec(folder);
+		const raw = cut ? folder.slice(0, cut.index) : folder;
+		const norm = sanitiseRawTitle(raw);
+		if (norm && !GENERIC_FOLDER_NAMES.has(norm) && !/^\d+$/.test(norm)) {
+			return displayTitle(raw);
+		}
+		if (!cut) return null;
+		dir = path.dirname(dir);
+	}
+	return null;
 }
 
 /**

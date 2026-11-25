@@ -7,7 +7,11 @@ import { eq } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import { movieFiles, movies } from '../../database/schema/index.js';
 import { EventsService } from '../../events/events.service.js';
-import { buildPrettyTitle, parseEpisodeKey } from '../../grouping/title-sanitiser.js';
+import {
+	buildPrettyTitle,
+	parseEpisodeKey,
+	showNameFromPath,
+} from '../../grouping/title-sanitiser.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import { MemoryCacheService } from '../memory-cache/memory-cache.service.js';
 import { TranscoderService } from '../transcoder/transcoder.service.js';
@@ -472,7 +476,9 @@ export class ConversionService {
 					srcEp.show.startsWith(titleEp.show)) &&
 				titleEp.show.length >= srcEp.show.length;
 			// Episode titles carry no year — "(2025)" would only clutter.
-			return this.sanitizeName(ok ? title : buildPrettyTitle(srcName));
+			return this.sanitizeName(
+				ok ? title : buildPrettyTitle(srcName, { showHint: showNameFromPath(srcPath) }),
+			);
 		}
 		return this.sanitizeName(title, year);
 	}

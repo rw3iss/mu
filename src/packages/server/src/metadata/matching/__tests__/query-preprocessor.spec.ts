@@ -59,3 +59,30 @@ describe('buildTitleQuery', () => {
 		expect(q.kind).toBe('movie');
 	});
 });
+
+describe('buildTitleQuery — episode without a show in the name', () => {
+	const base = {
+		storedTitle: 'S01e02 Day of Days - S01E02',
+		storedYear: null,
+		fileName: 'S01e02 Day of Days - S01E02.mp4',
+		durationSeconds: 3600,
+	};
+	it('uses the series hint, then the folder', () => {
+		const q1 = buildTitleQuery({
+			...base,
+			filePath: '/m/Movies/x.mp4',
+			showHint: 'Band of Brothers',
+		});
+		expect(q1).toMatchObject({
+			kind: 'tv-episode',
+			showTitle: 'band of brothers',
+			season: 1,
+			episode: 2,
+		});
+		const q2 = buildTitleQuery({
+			...base,
+			filePath: '/m/Movies/Band.Of.Brothers.S01.YG/S01e02 Day of Days - S01E02.mp4',
+		});
+		expect(q2).toMatchObject({ kind: 'tv-episode', showTitle: 'band of brothers' });
+	});
+});

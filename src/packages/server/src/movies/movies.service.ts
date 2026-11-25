@@ -33,7 +33,7 @@ import {
 } from '../database/schema/index.js';
 import { EntityLifecycleService } from '../entities/entity-lifecycle.service.js';
 import { EventsService } from '../events/events.service.js';
-import { buildPrettyTitle, isDirtyTitle } from '../grouping/title-sanitiser.js';
+import { buildPrettyTitle, isDirtyTitle, showNameFromPath } from '../grouping/title-sanitiser.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { LibraryService } from '../library/library.service.js';
 import { ThumbnailService } from '../media/thumbnail.service.js';
@@ -41,11 +41,11 @@ import { tmdbToContribution } from '../metadata/adapters/tmdb.adapter.js';
 import { ImageService } from '../metadata/image.service.js';
 import { MetadataService } from '../metadata/metadata.service.js';
 import { TmdbProvider } from '../metadata/providers/tmdb.provider.js';
+import { PlayDefaultsService } from '../stream/play-defaults/play-defaults.service.js';
+import { StreamService } from '../stream/stream.service.js';
 import { SubtitleService } from '../stream/subtitles/subtitle.service.js';
 import { TranscoderService } from '../stream/transcoder/transcoder.service.js';
 import { matchesSearchQuery, titleSearchCondition } from './title-search.js';
-import { PlayDefaultsService } from '../stream/play-defaults/play-defaults.service.js';
-import { StreamService } from '../stream/stream.service.js';
 
 /**
  * Ceiling for the inline enrichment on a not-in-library movie page. Long
@@ -1062,7 +1062,9 @@ export class MoviesService implements OnModuleInit {
 		// stream's own pick among available files).
 		const available = files.filter((f) => f.available !== false);
 		const firstFile =
-			available.length > 1 ? this.streamService.pickFile(available) : (available[0] ?? files[0]);
+			available.length > 1
+				? this.streamService.pickFile(available)
+				: (available[0] ?? files[0]);
 		if (firstFile) {
 			durationSeconds = firstFile.durationSeconds ?? 0;
 		}
@@ -1813,7 +1815,7 @@ export class MoviesService implements OnModuleInit {
 		// available, so the user can rescue movies whose dirty filename
 		// was already crammed into a partly-clean title field.
 		const source = (dbIsDirty || force) && fileBase ? fileBase : raw;
-		const cleaned = buildPrettyTitle(source);
+		const cleaned = buildPrettyTitle(source, { showHint: showNameFromPath(filePath) });
 		if (!cleaned || cleaned.length < 2 || cleaned === raw) return null;
 
 		if (!force) {

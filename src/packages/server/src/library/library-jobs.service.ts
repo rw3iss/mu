@@ -16,7 +16,7 @@ import { parseJsonArray } from '../common/json-fields.js';
 import { DatabaseService } from '../database/database.service.js';
 import { movieFiles, movies, playHistory, transcodeCache } from '../database/schema/index.js';
 import { EventsService } from '../events/events.service.js';
-import { buildPrettyTitle } from '../grouping/title-sanitiser.js';
+import { buildPrettyTitle, showNameFromPath } from '../grouping/title-sanitiser.js';
 import type { JobHelpers, JobRecord } from '../jobs/job.interface.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
 import { jobTypeRegistry } from '../jobs/job-type-registry.js';
@@ -1430,7 +1430,9 @@ export class LibraryJobsService implements OnModuleInit, OnApplicationBootstrap 
 			const fileBase = row.filePath
 				? path.basename(row.filePath, path.extname(row.filePath))
 				: null;
-			const cleaned = buildPrettyTitle(fileBase || row.title);
+			const cleaned = buildPrettyTitle(fileBase || row.title, {
+				showHint: showNameFromPath(row.filePath),
+			});
 			if (!cleaned || cleaned.length < 2 || cleaned === row.title) return null;
 			this.database.db
 				.update(movies)

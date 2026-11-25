@@ -1,5 +1,10 @@
 import path from 'node:path';
-import { parseSeasonEpisode, sanitiseRawTitle } from '../../grouping/title-sanitiser.js';
+import {
+	GENERIC_FOLDER_NAMES,
+	parseSeasonEpisode,
+	sanitiseRawTitle,
+	showNameFromPath,
+} from '../../grouping/title-sanitiser.js';
 import { extractYear } from './year-extractor.js';
 
 /**
@@ -34,6 +39,8 @@ export interface BuildTitleQueryInput {
 	filePath: string | null;
 	fileName: string | null;
 	durationSeconds: number | null;
+	/** Show name when neither the file name nor the title has one (series group name). */
+	showHint?: string | null;
 }
 
 /**
@@ -61,15 +68,35 @@ export function buildTitleQuery(input: BuildTitleQueryInput): TitleQuery {
 		}) ?? null;
 
 	// SE detection — try the filename first (canonical), then the title.
-	const se =
-		(fileName && parseSeasonEpisode(fileName)) || parseSeasonEpisode(storedTitle) || null;
+	const fileSe = fileName ? parseSeasonEpisode(fileName) : null;
+	const titleSe = parseSeasonEpisode(storedTitle);
+	const se = fileSe || titleSe || null;
 
-	if (se && se.prefix.trim().length > 0) {
-		// Show-name candidate: whatever sat before the SE marker.
-		// Run it through the same sanitiser the grouping pipeline uses
-		// so "Goliath.SEASON.01.S01.COMPLETE.1080p" → "goliath".
-		const showRaw = se.prefix.replace(/[.\-_]+$/, '').trim();
-		const showTitle = sanitiseRawTitle(showRaw) || showRaw;
+	if (se) {
+		// Show-name candidate: whatever sat before the SE marker (file name,
+		// then title). Run it through the same sanitiser the grouping pipeline
+		// uses so "Goliath.SEASON.01.S01.COMPLETE.1080p" → "goliath". A file
+		// named only "S01E02 Day of Days.mkv" has no show — then the series
+		// group name, then the folder ("Band.Of.Brothers.S01.YG").
+		const showOf = (m: typeof se | null) => {
+			const raw = m?.prefix.replace(/[.\-_\s]+$/, '').trim() ?? '';
+			const n = sanitiseRawTitle(raw);
+			return n && !GENERIC_FOLDER_NAMES.has(n) ? n : '';
+		};
+		const showTitle =
+			showOf(fileSe) ||
+			showOf(titleSe) ||
+			sanitiseRawTitle(input.showHint ?? '') ||
+			sanitiseRawTitle(showNameFromPath(filePath) ?? '');
+		if (!showTitle) {
+			return {
+				kind: 'movie',
+				title: storedTitle,
+				sanitisedTitle: sanitiseRawTitle(storedTitle) || storedTitle,
+				year,
+				durationMinutes,
+			};
+		}
 		return {
 			kind: 'tv-episode',
 			showTitle,
