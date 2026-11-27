@@ -5,6 +5,7 @@ import { Controller, Delete, Get, Logger, Param, Post, Query } from '@nestjs/com
 import { desc, eq, sql } from 'drizzle-orm';
 import { RequireAction } from '../common/decorators/require-action.decorator.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
+import { RESTART_EXIT_CODE, setShutdownExitCode } from '../common/shutdown-exit.js';
 import { DatabaseService } from '../database/database.service.js';
 import { jobHistory } from '../database/schema/index.js';
 import { JobManagerService } from '../jobs/job-manager.service.js';
@@ -57,6 +58,17 @@ export class ServerController {
 		// nohup'd one then run side-by-side, both watching the media
 		// source, racing each other on inserts. nssm restart cleanly
 		// kills the tracked PID and starts a fresh one.
+		// Under systemd (user service): exit non-zero so `Restart=on-failure`
+		// starts a new instance. A spawned restart.sh lives in the unit's cgroup
+		// and is killed with it, and a clean exit 0 leaves the unit stopped.
+		if (process.env.INVOCATION_ID) {
+			setTimeout(() => {
+				setShutdownExitCode(RESTART_EXIT_CODE);
+				process.kill(process.pid, 'SIGTERM');
+			}, 1000);
+			return { message: 'Server restarting...', restartedAt: nowISO() };
+		}
+
 		const scriptDir = path.resolve(import.meta.dirname, '..', '..', '..', '..');
 		const restartScript = path.join(scriptDir, 'restart.sh');
 		const isWindows = process.platform === 'win32';

@@ -1,4 +1,5 @@
 import { APP_VERSION } from '@mu/shared';
+import { shutdownExitCode } from './common/shutdown-exit.js';
 import 'reflect-metadata';
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -391,18 +392,18 @@ async function bootstrap() {
 		logger.log(`${signal} received — shutting down (force-exit in ${SHUTDOWN_GRACE_MS}ms)`);
 		const forceExit = setTimeout(() => {
 			logger.warn('Graceful shutdown exceeded grace window — forcing exit.');
-			process.exit(0);
+			process.exit(shutdownExitCode());
 		}, SHUTDOWN_GRACE_MS);
 		forceExit.unref();
 		app.close()
 			.then(() => {
 				clearTimeout(forceExit);
-				process.exit(0);
+				process.exit(shutdownExitCode());
 			})
 			.catch((err) => {
 				logger.error(`Error during shutdown: ${err?.message ?? err}`);
 				clearTimeout(forceExit);
-				process.exit(0);
+				process.exit(shutdownExitCode());
 			});
 	};
 	process.once('SIGTERM', () => shutdown('SIGTERM'));
