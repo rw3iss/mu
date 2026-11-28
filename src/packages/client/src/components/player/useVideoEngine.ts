@@ -12,9 +12,9 @@ import {
 	initAudioEffects,
 	stereoWidthEnabled,
 } from '@/state/audio-effects.state';
-import { audioResetTrigger, clearAudioSuspect } from '@/state/audio-reset.state';
+import { audioResetTrigger, clearAudioSuspect, requestAudioReset } from '@/state/audio-reset.state';
 import { globalMovieId } from '@/state/globalPlayer.state';
-import { notifyInfo } from '@/state/notifications.state';
+import { notifyInfo, notifyWarning } from '@/state/notifications.state';
 import { getAdapter } from '@/state/player/registry';
 import {
 	clampVolume,
@@ -31,6 +31,7 @@ import {
 import { shareToken } from '@/state/share.state';
 import { clearWatchPosition, setLocalPosition } from '@/state/watchPositions.state';
 import { clearVideoSubtitles } from '@/utils/subtitle-dom';
+import { watchPlaybackStall } from './playback-stall-watchdog';
 
 const BUFFER_CONFIGS: Record<
 	string,
@@ -186,6 +187,8 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 	const deferredSrcRef = useRef<{ url: string; position: number } | null>(null);
 	/** Stops the direct-play no-video watchdog of the current source. */
 	const noVideoWatchRef = useRef<(() => void) | null>(null);
+	/** Stops the frozen-clock (dead audio output) watchdog of the current source. */
+	const stallWatchRef = useRef<(() => void) | null>(null);
 	/** Tracks pending HLS recovery timeout so it can be cleared on destroy */
 	const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	/** Pre-roll poll: when Web Audio is engaged, playback waits for a buffered
@@ -498,6 +501,25 @@ export function useVideoEngine(enabled: boolean = true): VideoEngine {
 
 			noVideoWatchRef.current?.();
 			noVideoWatchRef.current = null;
+			stallWatchRef.current?.();
+			// Frozen clock with data buffered = the audio output is not
+			// pulling samples (dead DAC / device). Mute so the video plays;
+			// an element bound to Web Audio can't escape that way, so block
+			// Web Audio and swap to a fresh element (audio-reset path).
+			stallWatchRef.current = watchPlaybackStall(video, () => {
+				console.warn('[player] playback clock frozen with data buffered — muting');
+				isMuted.value = true;
+				if (audioEngine.isAttached()) {
+					audioEngine.blockWebAudio('audio output not responding');
+					requestAudioReset();
+				} else {
+					video.muted = true;
+				}
+				notifyWarning(
+					'Your audio output is not responding, so the video plays muted. Check the output device, then reload the page to get sound back.',
+					12000,
+				);
+			});
 
 			// Clean up previous HLS instance
 			if (hlsRef.current) {

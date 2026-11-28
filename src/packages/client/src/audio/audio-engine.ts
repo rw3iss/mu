@@ -187,6 +187,8 @@ export class AudioEngine {
 	private inputGainDb = 0;
 	private currentBands: EqBand[] = [...DEFAULT_EQ_BANDS];
 	private currentCompressor: CompressorSettings = { ...DEFAULT_COMPRESSOR };
+	/** Set by blockWebAudio; non-null = never attach again. */
+	private blockedReason: string | null = null;
 	private attached = false;
 	/** Pending post-effect silence probe (see scheduleSilenceProbe). */
 	private silenceProbeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -362,6 +364,13 @@ export class AudioEngine {
 	 */
 	attachSource(element: HTMLMediaElement): boolean {
 		if (this.attached && this.sources.has(element)) return true;
+
+		// Web Audio was turned off for this page after the output stopped
+		// responding (see blockWebAudio). Audio stays on the native path.
+		if (this.blockedReason) {
+			dwarn(`[audioEngine] attach() refused — Web Audio blocked: ${this.blockedReason}`);
+			return false;
+		}
 
 		// HARD GUARD: refuse to attach when the element is fed by an HLS
 		// MediaSource (blob: URL). `createMediaElementSource` on such an
@@ -806,6 +815,15 @@ export class AudioEngine {
 
 	isAttached(): boolean {
 		return this.attached;
+	}
+
+	/**
+	 * Refuse every later attach for the rest of this page's life. Used when
+	 * the audio output stops pulling samples: an element bound to Web Audio
+	 * then freezes, and only a fresh, unbound element can play (muted).
+	 */
+	blockWebAudio(reason: string): void {
+		this.blockedReason = reason;
 	}
 
 	/**

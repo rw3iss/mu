@@ -58,14 +58,27 @@ export class ServerController {
 		// nohup'd one then run side-by-side, both watching the media
 		// source, racing each other on inserts. nssm restart cleanly
 		// kills the tracked PID and starts a fresh one.
-		// Under systemd (user service): exit non-zero so `Restart=on-failure`
-		// starts a new instance. A spawned restart.sh lives in the unit's cgroup
-		// and is killed with it, and a clean exit 0 leaves the unit stopped.
+		// Under systemd (user service): ask systemd to restart the unit.
+		// `--no-block` queues the job and returns at once, so it survives
+		// systemd stopping this process (and the systemctl child with it).
+		// A script spawned here would die with the unit's cgroup. Fallback
+		// when systemctl fails: exit 75, which `Restart=on-failure` restarts.
 		if (process.env.INVOCATION_ID) {
+			const unit = process.env.MU_SYSTEMD_UNIT || 'mu-server';
 			setTimeout(() => {
-				setShutdownExitCode(RESTART_EXIT_CODE);
-				process.kill(process.pid, 'SIGTERM');
-			}, 1000);
+				const child = spawn('systemctl', ['--user', 'restart', '--no-block', unit], {
+					stdio: 'ignore',
+				});
+				const fallback = (why: string) => {
+					this.logger.error(`systemctl restart failed (${why}) — exiting with code 75`);
+					setShutdownExitCode(RESTART_EXIT_CODE);
+					process.kill(process.pid, 'SIGTERM');
+				};
+				child.on('error', (err) => fallback(err.message));
+				child.on('exit', (code) => {
+					if (code !== 0 && code !== null) fallback(`exit ${code}`);
+				});
+			}, 500);
 			return { message: 'Server restarting...', restartedAt: nowISO() };
 		}
 
